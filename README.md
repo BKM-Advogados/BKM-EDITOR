@@ -14,8 +14,11 @@ node node_modules/electron/install.js   # o npm 11 bloqueia o script que baixa o
 npm run dev
 ```
 
-Na primeira vez, clique em **Abrir o exemplo (Cliente · C2)**: ele copia `exemplos/exemplo` para `Documentos\Estudio\exemplo`.
-Para abrir uma pasta direto: `ESTUDIO_PROJETO=<pasta> npm run dev`.
+Na primeira vez, clique em **Abrir o exemplo (Cliente · C2)**: ele copia `exemplos/exemplo` para `%USERPROFILE%\Estudio\exemplo`
+(fora de Documentos, que o OneDrive pode mover). Para abrir uma pasta direto: `ESTUDIO_PROJETO=<pasta> npm run dev`.
+
+**Executável:** `npm run package` gera `out\Estudio-win32-x64\Estudio.exe` (a pasta inteira, ~450 MB, é o app; ainda sem
+instalador, o `forge.config.ts` não tem makers).
 
 Na aba **Claude** do terminal, rode `/login` uma vez (o Claude Code CLI desta máquina tem login próprio, separado do
 app desktop) e confie na pasta. Depois é só pedir: "resolva o comentário cmt_0001", "deixe o título da capa maior",
@@ -74,10 +77,12 @@ npm run e2e         # com o app aberto via ESTUDIO_DEPURAR_PORTA=9471: seleção
 
 ## Pendências conhecidas
 
-- **Memória:** o modo de desenvolvimento mediu 580–950 MB (todos os processos do app, sem o `claude`). O orçamento do
-  `desempenho.md` é 300 MB parado e 500–650 MB editando. Medir no app empacotado e atacar a partir daí.
-- **Empacotar** (`npm run package`) ainda não foi testado; o forge.config já leva o compositor do Remotion, o node-pty
-  e o exemplo.
+- **Memória (app empacotado, 05/11/2026, memória privada de todos os processos, sem o `claude`):** 307 MB parado no
+  vídeo; 547 MB depois de passar pelas quatro áreas com o 3D aberto. Orçamento do `desempenho.md`: 300 MB parado e
+  500–650 MB editando. O maior é o processo da GPU (117 → 286 MB com o 3D): soltar o contexto WebGL ao sair do 3D é o
+  próximo corte. Cada aba viva do Claude soma ~240 MB (é o próprio Claude Code).
+- **Instalador:** `npm run package` funciona e passa no e2e; falta configurar um maker (`npm run make`) para gerar
+  instalador.
 - **Áudio:** a prévia toca a narração sem a normalização a −16 LUFS e sem o `mix.py`; a mixagem por medida em TS e a
   transcrição (Whisper) ficam para depois.
 - **Fontes** do tema vêm do Google Fonts na primeira vez (precisa de internet).

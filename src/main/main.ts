@@ -70,6 +70,16 @@ const criarJanela = () => {
     if (url.startsWith('https://')) void shell.openExternal(url);
     return {action: 'deny'};
   });
+  // recarregar a página (Ctrl+R) ou perder o renderer faz a interface esquecer as abas: fecha os terminais para não
+  // sobrar claude órfão gastando memória por trás
+  const largarTerminais = () => {
+    terminais.fecharTodos();
+    mcpHttp?.esquecerTudo();
+  };
+  janela.webContents.on('did-start-navigation', (d) => {
+    if (d.isMainFrame && !d.isSameDocument) largarTerminais();
+  });
+  janela.webContents.on('render-process-gone', largarTerminais);
   janela.once('ready-to-show', () => janela?.show());
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) void janela.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   else void janela.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
@@ -86,7 +96,9 @@ lidar(CANAL.abrirPasta, async () => {
   return r.canceled || !r.filePaths[0] ? null : abrirProjeto(r.filePaths[0]);
 });
 lidar(CANAL.abrirExemplo, async () => {
-  const destino = path.join(app.getPath('documents'), 'Estudio', 'exemplo');
+  // na pasta da pessoa e não em Documentos: com o OneDrive movendo Documentos, a sincronização trava a gravação
+  // atômica dos JSON e sobe o .git do projeto
+  const destino = path.join(app.getPath('home'), 'Estudio', 'exemplo');
   if (!existsSync(path.join(destino, 'estudio.json'))) cpSync(recursos(path.join('exemplos', 'exemplo')), destino, {recursive: true});
   return abrirProjeto(destino);
 });

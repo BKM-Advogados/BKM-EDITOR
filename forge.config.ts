@@ -63,6 +63,12 @@ function resolveInstalledCompositorPackageDirectory({
   allowMissing: boolean;
   compositorPackage: string;
 }): string | null {
+  // o @lydell/node-pty fecha o package.json no "exports"; a pasta em node_modules resolve sem passar por ele
+  const direto = path.join(process.cwd(), "node_modules", compositorPackage);
+  if (existsSync(path.join(direto, "package.json"))) {
+    return direto;
+  }
+
   try {
     const compositorPackageJson = require.resolve(`${compositorPackage}/package.json`, {
       paths: [process.cwd()],
