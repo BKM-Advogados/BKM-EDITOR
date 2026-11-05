@@ -1,0 +1,88 @@
+// O servidor MCP de verdade (o mesmo arquivo que o Claude chama), sobre uma cópia do projeto de exemplo.
+import {execSync} from 'node:child_process';
+import {cpSync, mkdtempSync, rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+import {afterAll, beforeAll, describe, expect, it} from 'vitest';
+import {Client} from '@modelcontextprotocol/sdk/client/index.js';
+import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
+import {Projeto} from '../src/nucleo/projeto';
+
+const RAIZ = path.join(__dirname, '..');
+let pasta = '';
+let cliente: Client;
+
+const chamar = async (name: string, args: Record<string, unknown> = {}) => {
+  const r = (await cliente.callTool({name, arguments: args})) as {isError?: boolean; content: {text: string}[]};
+  const t = r.content[0].text;
+  let dado: unknown = t;
+  try {
+    dado = JSON.parse(t);
+  } catch {
+    /* texto simples */
+  }
+  return {erro: Boolean(r.isError), dado: dado as any};
+};
+
+beforeAll(async () => {
+  execSync('npm run mcp:build', {cwd: RAIZ, stdio: 'ignore'});
+  pasta = mkdtempSync(path.join(tmpdir(), 'estudio-mcp-'));
+  cpSync(path.join(RAIZ, 'exemplos', 'exemplo'), pasta, {recursive: true, filter: (f) => !f.endsWith('.mp4')});
+  cliente = new Client({name: 'teste', version: '0'});
+  await cliente.connect(new StdioClientTransport({command: process.execPath, args: [path.join(RAIZ, 'dist-mcp', 'nucleo.cjs'), '--projeto', pasta]}));
+}, 60_000);
+
+afterAll(async () => {
+  await cliente?.close();
+  rmSync(pasta, {recursive: true, force: true});
+});
+
+describe('MCP estudio', () => {
+  it('lista as ferramentas', async () => {
+    const {tools} = await cliente.listTools();
+    expect(tools.map((t) => t.name).sort()).toEqual([
+      'aplicar_patch', 'estado_do_editor', 'ler_comentario', 'ler_documento', 'listar_comentarios', 'listar_mudancas',
+      'projeto_info', 'resolver_comentario', 'responder_comentario',
+    ]);
+  });
+
+  it('resolve um comentário da pessoa com patch, e a mudança vai para o diário', async () => {
+    const p = new Projeto(pasta);
+    const c = p.novoComentario({documento: 'carrossel', autor: 'pessoa', texto: 'o 25% entra cedo demais', alvo: {objeto: '/cenas/2/blocos/1', tempo_ms: 47000}});
+
+    const lido = await chamar('ler_comentario', {id: c.id});
+    expect(lido.dado.objeto_atual.tipo).toBe('numero');
+
+    const doc = await chamar('ler_documento', {documento: 'carrossel', caminho: '/cenas/2/blocos/1/em'});
+    expect(doc.dado.conteudo).toBe('adicional@43800');
+
+    const ok = await chamar('aplicar_patch', {
+      documento: 'carrossel', versao_base: doc.dado.versao, rotulo: 'número entra no fim da palavra',
+      patch: [{op: 'test', path: '/cenas/2/blocos/1/em', value: 'adicional@43800'}, {op: 'replace', path: '/cenas/2/blocos/1/em', value: 'adicional$@43800'}],
+    });
+    expect(ok.erro).toBe(false);
+
+    // versão velha: recusado, nada gravado
+    const velho = await chamar('aplicar_patch', {documento: 'carrossel', versao_base: doc.dado.versao, patch: [{op: 'replace', path: '/cenas/2/blocos/1/y', value: 1}]});
+    expect(velho.erro).toBe(true);
+    expect(String(velho.dado)).toContain('conflito');
+
+    await chamar('responder_comentario', {id: c.id, texto: 'agora entra no fim de "adicional"'});
+    await chamar('resolver_comentario', {id: c.id, nota: 'em → adicional$@43800'});
+    expect(p.comentarios()[0].estado).toBe('resolvido');
+
+    const mud = await chamar('listar_mudancas');
+    expect(mud.dado).toHaveLength(1);
+    expect(mud.dado[0]).toMatchObject({autor: 'agente', origem: 'mcp', rotulo: 'número entra no fim da palavra'});
+    expect(p.diario()[0].inverso).toEqual([{op: 'replace', path: '/cenas/2/blocos/1/em', value: 'adicional@43800'}]);
+  });
+
+  it('recusa patch cujo test falha, sem gravar', async () => {
+    const doc = await chamar('ler_documento', {documento: 'capa'});
+    const r = await chamar('aplicar_patch', {documento: 'capa', versao_base: doc.dado.versao,
+      patch: [{op: 'test', path: '/camadas/2/texto', value: 'outro'}, {op: 'replace', path: '/camadas/2/tamanho', value: 10}]});
+    expect(r.erro).toBe(true);
+    const depois = await chamar('ler_documento', {documento: 'capa'});
+    expect(depois.dado.versao).toBe(doc.dado.versao);
+  });
+});

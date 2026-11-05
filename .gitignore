@@ -1,0 +1,9 @@
+node_modules/
+.vite/
+out/
+dist-mcp/
+remotion-bundle/
+remotion-browser/
+testes/saida/
+*.log
+referencia/

@@ -1,0 +1,21 @@
+// Servidor MCP "estudio" por stdio, para usar o projeto fora do app (outro editor, CI). Dentro do app, as abas do
+// Claude falam com o mesmo conjunto de ferramentas por HTTP local (src/main/mcp-http.ts), sem um processo por aba.
+// Uso: node dist-mcp/nucleo.cjs --projeto <pasta> [--autor agente]
+import path from 'node:path';
+import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
+import {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
+import {Projeto} from '../src/nucleo/projeto';
+import {registrarFerramentas} from '../src/nucleo/ferramentas-mcp';
+
+const arg = (nome: string) => {
+  const i = process.argv.indexOf(nome);
+  return i >= 0 ? process.argv[i + 1] : undefined;
+};
+
+const servidor = new McpServer({name: 'estudio', version: '0.1.0'});
+registrarFerramentas(servidor, new Projeto(path.resolve(arg('--projeto') ?? process.cwd())), arg('--autor') ?? 'agente', 'mcp');
+
+servidor.connect(new StdioServerTransport()).catch((e: unknown) => {
+  process.stderr.write(`estudio MCP: ${String(e)}\n`);
+  process.exit(1);
+});

@@ -1,0 +1,174 @@
+/* Tokens do Estúdio. Tema escuro neutro de app criativo (cinza sem matiz para não enviesar a cor da peça), um acento
+   para seleção e cores fixas para quem fez a mudança (pessoa, agente). Densidade pensada para 1366×768. */
+:root {
+  --fundo-0: #121315;      /* atrás de tudo, divisórias */
+  --fundo-1: #18191c;      /* painéis */
+  --fundo-2: #1f2124;      /* cabeçalhos, barras */
+  --fundo-3: #272a2e;      /* campos, itens com hover */
+  --fundo-4: #31353a;      /* item ativo */
+  --borda: #2c2f34;
+  --borda-forte: #3a3e44;
+  --texto: #e3e5e8;
+  --texto-2: #a8adb4;
+  --texto-3: #757b84;
+  --acento: #4f8cff;       /* seleção, foco */
+  --acento-fraco: rgba(79, 140, 255, 0.18);
+  --marca: #c88155;        /* cobre da Cliente: botões principais */
+  --comentario: #ffca16;   /* âmbar: comentário */
+  --pessoa: #a8adb4;       /* só o agente tem cor (docs/tela.md) */
+  --agente: #baa7ff;       /* violeta: agente */
+  --cabeca: #ff4d4d;       /* cabeça de reprodução */
+  --erro: #ff6b6b;
+  --ok: #5fc39b;
+  --raio: 4px;
+  --raio-2: 6px;
+  --esp-1: 4px;
+  --esp-2: 8px;
+  --esp-3: 12px;
+  --esp-4: 16px;
+  --fonte: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --fonte-mono: "Cascadia Mono", "Cascadia Code", Consolas, "SF Mono", monospace;
+  --tam-1: 11px;
+  --tam-2: 12px;
+  --tam-3: 13px;
+  --tam-4: 15px;
+  --icone: 16px;
+  --barra: 36px;
+  --rodape: 24px;
+}
+
+* { box-sizing: border-box; }
+html, body, #raiz { margin: 0; height: 100%; overflow: hidden; background: var(--fundo-0); color: var(--texto);
+  font: var(--tam-2)/1.4 var(--fonte); -webkit-font-smoothing: antialiased; }
+button, input, select, textarea { font: inherit; color: inherit; }
+::selection { background: var(--acento-fraco); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--fundo-4); border-radius: 10px; border: 2px solid var(--fundo-1); }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ---------- casca ---------- */
+.casca { display: grid; grid-template-rows: var(--barra) 1fr var(--rodape); height: 100%; }
+.barra { display: flex; align-items: center; gap: var(--esp-3); padding: 0 var(--esp-2) 0 var(--esp-3); background: var(--fundo-2);
+  border-bottom: 1px solid var(--borda); -webkit-app-region: drag; user-select: none; }
+.barra > * { -webkit-app-region: no-drag; }
+.barra .marca { font-weight: 700; letter-spacing: 0.04em; color: var(--marca); }
+.barra .projeto { color: var(--texto-2); max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.areas { display: flex; gap: 2px; margin: 0 auto; background: var(--fundo-0); padding: 3px; border-radius: var(--raio-2); }
+.areas button { display: flex; align-items: center; gap: 6px; border: 0; background: transparent; color: var(--texto-2); padding: 4px 12px;
+  border-radius: var(--raio); cursor: pointer; }
+.areas button:hover { color: var(--texto); background: var(--fundo-3); }
+.areas button.ativa { color: var(--texto); background: var(--fundo-4); }
+.areas kbd { font: var(--tam-1) var(--fonte-mono); color: var(--texto-3); }
+.acoes { display: flex; gap: var(--esp-1); }
+.rodape { display: flex; align-items: center; gap: var(--esp-4); padding: 0 var(--esp-3); background: var(--fundo-2); border-top: 1px solid var(--borda);
+  color: var(--texto-3); font-size: var(--tam-1); white-space: nowrap; overflow: hidden; }
+.rodape .aviso { color: var(--texto-2); overflow: hidden; text-overflow: ellipsis; }
+.rodape .dir { margin-left: auto; display: flex; gap: var(--esp-4); }
+.doca { min-height: 0; }
+
+/* ---------- controles ---------- */
+.bt { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border: 1px solid var(--borda-forte); border-radius: var(--raio);
+  background: var(--fundo-3); color: var(--texto); cursor: pointer; white-space: nowrap; }
+.bt:hover { background: var(--fundo-4); }
+.bt:disabled { opacity: 0.5; cursor: default; }
+.bt.principal { background: var(--acento); border-color: var(--acento); color: #fff; font-weight: 600; }
+.bt.principal:hover { filter: brightness(1.08); }
+.bt.fantasma { background: transparent; border-color: transparent; color: var(--texto-2); }
+.bt.fantasma:hover { background: var(--fundo-3); color: var(--texto); }
+.bt.ligado { background: var(--acento-fraco); border-color: var(--acento); color: var(--texto); }
+.bt.mini { height: 22px; padding: 0 6px; font-size: var(--tam-2); }
+.campo { width: 100%; height: 26px; padding: 0 8px; border: 1px solid var(--borda); border-radius: var(--raio); background: var(--fundo-0); color: var(--texto); }
+textarea.campo { height: auto; min-height: 56px; padding: 6px 8px; resize: vertical; line-height: 1.35; }
+.campo:focus { outline: none; border-color: var(--acento); }
+.rotulo { font-size: var(--tam-1); color: var(--texto-3); }
+.linha-campo { display: grid; grid-template-columns: 92px 1fr; align-items: center; gap: var(--esp-2); margin-bottom: 6px; }
+.linha-campo > span { color: var(--texto-2); font-size: var(--tam-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+input[type="range"] { accent-color: var(--acento); width: 100%; }
+input[type="color"] { width: 100%; height: 26px; border: 1px solid var(--borda); border-radius: var(--raio); background: var(--fundo-0); padding: 2px; }
+
+/* ---------- painéis ---------- */
+.painel { height: 100%; display: flex; flex-direction: column; background: var(--fundo-1); min-height: 0; }
+.painel-topo { display: flex; align-items: center; gap: var(--esp-2); padding: 6px var(--esp-2); border-bottom: 1px solid var(--borda); background: var(--fundo-1); }
+.painel-topo .titulo { font-weight: 600; font-size: var(--tam-2); color: var(--texto-2); white-space: nowrap; }
+.painel-topo .rotulo { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.painel-topo .esp { flex: 1; }
+.painel-corpo { flex: 1; overflow: auto; padding: var(--esp-2); min-height: 0; }
+.vazio { color: var(--texto-3); padding: var(--esp-4); text-align: center; font-size: var(--tam-2); }
+.lista { list-style: none; margin: 0; padding: 0; }
+.lista li { display: flex; align-items: center; gap: var(--esp-2); padding: 4px 6px; border-radius: var(--raio); cursor: pointer; color: var(--texto-2); }
+.lista li:hover { background: var(--fundo-3); color: var(--texto); }
+.lista li.sel { background: var(--acento-fraco); color: var(--texto); box-shadow: inset 2px 0 0 var(--acento); }
+.lista .sub { padding-left: 22px; }
+.etiqueta { font: 600 var(--tam-1) var(--fonte-mono); padding: 1px 5px; border-radius: 3px; background: var(--fundo-4); color: var(--texto-2); }
+.etiqueta.pessoa { background: var(--fundo-4); color: var(--pessoa); }
+.etiqueta.agente { background: rgba(186, 167, 255, 0.16); color: var(--agente); }
+.etiqueta.sistema { color: var(--texto-3); }
+
+/* ---------- monitor ---------- */
+.monitor { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; background: #0c0d0e; overflow: hidden; min-height: 0; }
+.monitor .palco { position: relative; box-shadow: 0 0 0 1px var(--borda-forte); }
+.sobreposicao { position: absolute; inset: 0; pointer-events: none; }
+.sobreposicao .caixa-sel { position: absolute; border: 1.5px solid var(--acento); box-shadow: 0 0 0 1px rgba(0,0,0,0.6); pointer-events: auto; cursor: move; }
+.sobreposicao .caixa-hover { position: absolute; border: 1px dashed rgba(79,140,255,0.7); }
+.sobreposicao .alca { position: absolute; width: 9px; height: 9px; background: var(--acento); border: 1px solid #000; right: -5px; bottom: -5px; cursor: nwse-resize; pointer-events: auto; }
+.pino { position: absolute; width: 22px; height: 22px; margin: -22px 0 0 -2px; border-radius: 11px 11px 11px 0; background: var(--comentario); color: #1b1b1b;
+  font: 700 10px/22px var(--fonte); text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,0.5); pointer-events: auto; cursor: pointer; }
+.pino.resolvido { opacity: 0.45; }
+.balao { position: absolute; width: 260px; background: var(--fundo-2); border: 1px solid var(--borda-forte); border-radius: var(--raio-2); padding: var(--esp-2);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5); pointer-events: auto; z-index: 5; }
+.controles { display: flex; align-items: center; gap: var(--esp-2); padding: 6px var(--esp-2); border-top: 1px solid var(--borda); background: var(--fundo-2);
+  container-type: inline-size; white-space: nowrap; overflow: hidden; }
+.controles .tempo { font: var(--tam-2) var(--fonte-mono); color: var(--texto-2); }
+/* monitor estreito (coluna do vídeo vertical no notebook): some o que é secundário */
+@container (max-width: 470px) { .controles .largo { display: none; } }
+.ferramentas { display: flex; gap: 2px; }
+
+/* ---------- linha do tempo ---------- */
+.lt { position: relative; height: 100%; overflow-x: auto; overflow-y: hidden; background: var(--fundo-1); user-select: none; }
+.lt .regua { position: sticky; top: 0; height: 20px; background: var(--fundo-2); border-bottom: 1px solid var(--borda); z-index: 2; }
+.lt .marca-t { position: absolute; top: 0; height: 20px; border-left: 1px solid var(--borda-forte); font: 10px/20px var(--fonte-mono); color: var(--texto-3); padding-left: 3px; }
+.lt .trilha { position: relative; height: 26px; border-bottom: 1px solid var(--borda); }
+.lt .trilha-nome { position: sticky; left: 0; z-index: 1; display: inline-block; width: 0; }
+.lt .seg { position: absolute; top: 3px; height: 20px; border-radius: 3px; padding: 0 6px; font-size: var(--tam-1); line-height: 20px; overflow: hidden; white-space: nowrap;
+  text-overflow: ellipsis; color: #101112; cursor: pointer; }
+.lt .seg.cena { background: #5c6773; color: var(--texto); }
+.lt .seg.cena.parte { background: #6b5747; }
+.lt .seg.bloco { background: #8fb3e8; cursor: grab; }
+.lt .seg.bloco.sel { outline: 2px solid var(--acento); outline-offset: 1px; }
+.lt .seg.fala { background: transparent; color: var(--texto-3); padding: 0 2px; top: 5px; cursor: default; }
+.lt .cabeca { position: absolute; top: 0; bottom: 0; width: 1px; background: #ff4d4d; z-index: 3; pointer-events: none; }
+.lt .cabeca::before { content: ""; position: absolute; top: 0; left: -5px; border: 5px solid transparent; border-top: 7px solid #ff4d4d; }
+.lt .pino-t { position: absolute; top: 2px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: var(--comentario); z-index: 2; }
+
+/* ---------- terminal ---------- */
+.terminal-abas { display: flex; align-items: center; gap: 2px; padding: 3px 6px; background: var(--fundo-2); border-bottom: 1px solid var(--borda); }
+.terminal-abas .aba { display: flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: var(--raio); color: var(--texto-2); cursor: pointer; }
+.terminal-abas .aba.ativa { background: var(--fundo-4); color: var(--texto); }
+.terminal-abas .aba .x { opacity: 0.5; }
+.terminal-abas .aba .x:hover { opacity: 1; }
+.terminal-corpo { flex: 1; position: relative; min-height: 0; background: #101113; }
+.terminal-corpo .xterm-host { position: absolute; inset: 4px 0 0 8px; }
+
+/* ---------- dockview no tema da casa ---------- */
+.dockview-theme-estudio {
+  --dv-background-color: var(--fundo-0);
+  --dv-paneview-header-border-color: var(--borda);
+  --dv-tabs-and-actions-container-background-color: var(--fundo-2);
+  --dv-activegroup-visiblepanel-tab-background-color: var(--fundo-1);
+  --dv-activegroup-hiddenpanel-tab-background-color: var(--fundo-2);
+  --dv-inactivegroup-visiblepanel-tab-background-color: var(--fundo-1);
+  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--fundo-2);
+  --dv-activegroup-visiblepanel-tab-color: var(--texto);
+  --dv-activegroup-hiddenpanel-tab-color: var(--texto-3);
+  --dv-inactivegroup-visiblepanel-tab-color: var(--texto-2);
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--texto-3);
+  --dv-tab-divider-color: var(--borda);
+  --dv-separator-border: var(--fundo-0);
+  --dv-group-view-background-color: var(--fundo-1);
+  --dv-tabs-and-actions-container-height: 28px;
+  --dv-tabs-and-actions-container-font-size: 12px;
+  --dv-sash-color: transparent;
+  --dv-active-sash-color: var(--acento);
+  --dv-drag-over-background-color: var(--acento-fraco);
+  --dv-drag-over-border-color: var(--acento);
+}

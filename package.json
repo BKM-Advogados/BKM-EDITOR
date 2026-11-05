@@ -1,0 +1,66 @@
+{
+  "name": "estudio",
+  "productName": "Estudio",
+  "version": "0.1.0",
+  "description": "Estúdio criativo desktop: vídeo, imagem, 3D e efeitos, editáveis à mão ou pelo terminal com o Claude",
+  "private": true,
+  "main": ".vite/build/main.js",
+  "engines": {
+    "node": "^20.19.0 || ^22.13.0 || >=24"
+  },
+  "scripts": {
+    "dev": "npm run mcp:build && electron-forge start",
+    "package": "npm run mcp:build && electron-forge package",
+    "make": "npm run mcp:build && electron-forge make",
+    "mcp:build": "esbuild mcp/nucleo.ts --bundle --platform=node --format=cjs --target=node20 --outfile=dist-mcp/nucleo.cjs --log-level=warning",
+    "studio": "remotion studio src/composicoes/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "e2e": "tsx scripts/e2e.mjs"
+  },
+  "dependencies": {
+    "@lydell/node-pty": "1.2.0-beta.18",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@remotion/bundler": "4.0.540",
+    "@remotion/google-fonts": "4.0.540",
+    "@remotion/player": "4.0.540",
+    "@remotion/renderer": "4.0.540",
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/addon-webgl": "0.19.0",
+    "@xterm/xterm": "6.0.0",
+    "chokidar": "4.0.3",
+    "dockview-react": "8.8.3",
+    "fast-json-patch": "3.1.1",
+    "lucide-react": "1.68.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "remotion": "4.0.540",
+    "scheduler": "0.27.0",
+    "three": "0.187.0",
+    "ws": "8.21.0",
+    "zod": "^3.25.0"
+  },
+  "optionalDependencies": {
+    "@remotion/compositor-darwin-arm64": "4.0.540",
+    "@remotion/compositor-darwin-x64": "4.0.540",
+    "@remotion/compositor-linux-x64-gnu": "4.0.540",
+    "@remotion/compositor-win32-x64-msvc": "4.0.540"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "7.11.1",
+    "@electron-forge/plugin-vite": "7.11.1",
+    "@remotion/cli": "4.0.540",
+    "@types/node": "^22.15.0",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@types/three": "0.187.0",
+    "@vitejs/plugin-react": "4.3.4",
+    "electron": "42.11.16",
+    "esbuild": "^0.25.0",
+    "playwright": "1.64.1",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vite": "6.4.5",
+    "vitest": "3.2.7"
+  }
+}

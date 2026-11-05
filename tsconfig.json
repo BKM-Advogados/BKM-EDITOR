@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "Preserve",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "moduleResolution": "Bundler",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+    "noUnusedLocals": true,
+    "types": ["node"]
+  },
+  "include": ["src", "mcp", "testes", "scripts", "forge.env.d.ts", "forge.config.ts", "vite.*.ts", "vitest.config.ts"],
+  "exclude": ["remotion.config.ts", "out", ".vite", "referencia", "node_modules"]
+}
