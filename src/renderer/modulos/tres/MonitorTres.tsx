@@ -1,20 +1,27 @@
-// Monitor 3D: a cena do documento ativo pelo motor (Three.js puro). Clique seleciona; o gizmo move, gira e escala (W, E, R)
-// e grava um patch só ao soltar. Com a ferramenta de comentário (M), clicar abre um balão ancorado no objeto e no ponto.
+// Monitor 3D: a cena do documento ativo pelo motor (Three.js puro). Trilho flutuante com Q seleção, W mover, E girar,
+// R escala e M comentário (as teclas valem neste monitor). Clique seleciona; o gizmo grava um patch só ao soltar e,
+// durante o arrasto, mostra o valor junto ao cursor; Ctrl encaixa. No alto, o rótulo da vista ("Câmera da cena" ou
+// "Perspectiva · vista livre") e, quando a vista sai da câmera, "Usar a vista atual" e "Voltar à câmera". Delete exclui
+// o objeto selecionado (Ctrl+Z desfaz). Com a ferramenta de comentário, clicar abre um balão ancorado no objeto e no ponto.
 import React, {useEffect, useRef, useState} from 'react';
-import {Camera, MessageSquarePlus, Move3d, Pause, Play, Rotate3d, Scale3d} from 'lucide-react';
+import {Camera, MessageSquarePlus, MousePointer2, Move3d, Pause, Play, Rotate3d, Scale3d, Undo2} from 'lucide-react';
 import type {TransformControlsMode} from 'three/examples/jsm/controls/TransformControls.js';
 import type {DocCena3D, OperacaoPatch, Vetor3} from '../../../nucleo/documentos';
 import {aplicar, comentar, loja, patchTrocar, selecionar, useLoja} from '../../estado/loja';
 import {arredV, iguaisV, indiceEm, objetosDe, type Transformacao} from './comum';
 import {Motor} from './motor';
+import {Trilho, teclaLivre} from '../../componentes/Trilho';
+import {excluirObjeto} from './acoes';
 import {registrarVista, usarVistaComoCamera} from './vista';
 
-const MODOS: {modo: TransformControlsMode; nome: string; tecla: string; icone: React.ReactNode}[] = [
-  {modo: 'translate', nome: 'Mover', tecla: 'W', icone: <Move3d size={13} />},
-  {modo: 'rotate', nome: 'Girar', tecla: 'E', icone: <Rotate3d size={13} />},
-  {modo: 'scale', nome: 'Escala', tecla: 'R', icone: <Scale3d size={13} />},
+type Modo = TransformControlsMode | 'selecao';
+const MODOS: {modo: Modo; nome: string; tecla: string; icone: React.ReactNode}[] = [
+  {modo: 'selecao', nome: 'Seleção (sem gizmo)', tecla: 'Q', icone: <MousePointer2 />},
+  {modo: 'translate', nome: 'Mover', tecla: 'W', icone: <Move3d />},
+  {modo: 'rotate', nome: 'Girar', tecla: 'E', icone: <Rotate3d />},
+  {modo: 'scale', nome: 'Escala', tecla: 'R', icone: <Scale3d />},
 ];
-const POR_TECLA: Record<string, TransformControlsMode> = {w: 'translate', e: 'rotate', r: 'scale'};
+const POR_TECLA: Record<string, Modo> = {q: 'selecao', w: 'translate', e: 'rotate', r: 'scale'};
 const VERBO = {posicao: 'mover', rotacao: 'girar', escala: 'escalar'} as const;
 
 // teto do perfil (o processo principal mede a RAM com os.totalmem); sem perfil, 1,5
@@ -46,7 +53,9 @@ const Palco: React.FC<{documento: string}> = ({documento}) => {
   const motor = useRef<Motor | null>(null);
   const pinos = useRef(new Map<string, {el: HTMLDivElement; mundo: Vetor3}>());
   const [erro, setErro] = useState<string | null>(null);
-  const [modo, setModo] = useState<TransformControlsMode>('translate');
+  const [modo, setModo] = useState<Modo>('translate');
+  const [naCamera, setNaCamera] = useState(true);
+  const leitura = useRef<HTMLDivElement>(null);
   const [animando, setAnimando] = useState(false);
   const [balao, setBalao] = useState<Balao | null>(null);
   const [textoBalao, setTextoBalao] = useState('');
@@ -106,12 +115,35 @@ const Palco: React.FC<{documento: string}> = ({documento}) => {
         el.style.top = `${p.y * 100}%`;
       }
     };
+    m.aoMudarVista = () => setNaCamera(m.naCamera());
+    // leitura do gizmo junto ao cursor, pelo DOM (o arrasto não re-renderiza o React)
+    const cursor = {x: 0, y: 0};
+    const seguir = (e: PointerEvent) => {
+      const r = host.getBoundingClientRect();
+      cursor.x = e.clientX - r.left;
+      cursor.y = e.clientY - r.top;
+      if (leitura.current && leitura.current.style.display === 'block') {
+        leitura.current.style.left = `${cursor.x + 16}px`;
+        leitura.current.style.top = `${cursor.y + 16}px`;
+      }
+    };
+    host.addEventListener('pointermove', seguir);
+    m.aoLer = (texto) => {
+      const el = leitura.current;
+      if (!el) return;
+      el.style.display = texto ? 'block' : 'none';
+      if (!texto) return;
+      el.textContent = texto;
+      el.style.left = `${cursor.x + 16}px`;
+      el.style.top = `${cursor.y + 16}px`;
+    };
     const sair = registrarVista(m.lerVista, (id, a) => {
       m.cena.ajustar(id, a);
       m.pedir();
     });
     return () => {
       sair();
+      host.removeEventListener('pointermove', seguir);
       m.descartar();
       motor.current = null;
       pinos.current.clear();
@@ -123,23 +155,47 @@ const Palco: React.FC<{documento: string}> = ({documento}) => {
     if (!m || !doc) return;
     m.sincronizar(doc);
     m.aplicarCamera(doc.camera);
+    setNaCamera(m.naCamera());
   }, [doc]);
 
   const idSelecionado = selecao?.documento === documento ? (objetosDe(doc)[indiceEm(selecao.caminho, 'objetos')]?.id ?? null) : null;
-  useEffect(() => motor.current?.selecionar(idSelecionado, modoComentario), [idSelecionado, modoComentario, doc]);
-  useEffect(() => motor.current?.modo(modo), [modo]);
+  useEffect(() => motor.current?.selecionar(idSelecionado, modoComentario || modo === 'selecao'), [idSelecionado, modoComentario, modo, doc]);
+  useEffect(() => {
+    if (modo !== 'selecao') motor.current?.modo(modo);
+  }, [modo]);
   useEffect(() => motor.current?.animar(animando), [animando]);
 
+  // teclas deste monitor: Q/W/E/R trocam a ferramenta, Delete exclui o objeto selecionado, Ctrl segurado encaixa
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => {
-      const alvo = e.target as HTMLElement;
-      if (e.ctrlKey || e.altKey || e.metaKey || /INPUT|TEXTAREA|SELECT/.test(alvo.tagName) || alvo.isContentEditable || alvo.closest?.('.xterm')) return;
+      if (e.key === 'Control') motor.current?.encaixe(true);
+      if (!teclaLivre(e)) return;
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const sel = loja.get().selecao;
+        const i = sel?.documento === documento ? indiceEm(sel.caminho, 'objetos') : -1;
+        if (i >= 0) {
+          e.preventDefault();
+          void excluirObjeto(documento, i);
+        }
+        return;
+      }
       const m = POR_TECLA[e.key.toLowerCase()];
-      if (m) setModo(m);
+      if (m && !e.shiftKey) {
+        setModo(m);
+        loja.definir({modoComentario: false});
+      }
     };
+    const solta = (e: KeyboardEvent) => e.key === 'Control' && motor.current?.encaixe(false);
+    const perdeu = () => motor.current?.encaixe(false);
     window.addEventListener('keydown', tecla);
-    return () => window.removeEventListener('keydown', tecla);
-  }, []);
+    window.addEventListener('keyup', solta);
+    window.addEventListener('blur', perdeu);
+    return () => {
+      window.removeEventListener('keydown', tecla);
+      window.removeEventListener('keyup', solta);
+      window.removeEventListener('blur', perdeu);
+    };
+  }, [documento]);
 
   const salvarComentario = async () => {
     const b = balao;
@@ -165,7 +221,28 @@ const Palco: React.FC<{documento: string}> = ({documento}) => {
     <div className="painel">
       <div className="monitor">
         <div ref={area} style={{position: 'absolute', inset: 0, cursor: modoComentario ? 'crosshair' : 'default'}} />
-        {erro && <div className="vazio" style={{color: 'var(--erro)', position: 'absolute'}}>{erro}</div>}
+        <Trilho flutuante grupos={[
+          MODOS.map((m) => ({id: m.modo, nome: m.nome, tecla: m.tecla, icone: m.icone, ativa: !modoComentario && modo === m.modo, aoClicar: () => {
+            setModo(m.modo);
+            loja.definir({modoComentario: false});
+          }})),
+          [{id: 'm', nome: 'Comentário', tecla: 'M', icone: <MessageSquarePlus />, ativa: modoComentario, aoClicar: () => loja.definir({modoComentario: true})}],
+        ]} />
+        <div className="vista-3d">
+          <span className="nome-vista">{naCamera ? 'Câmera da cena' : 'Perspectiva · vista livre'}</span>
+          <span className="esp" />
+          {!naCamera && (
+            <>
+              <button className="bt mini" onClick={() => motor.current?.voltarCamera()} title="Volta a vista para a câmera do documento"><Undo2 />Voltar à câmera</button>
+              <button className="bt mini" onClick={() => void usarVistaComoCamera(documento)} title="Grava a vista atual em /camera"><Camera />Usar a vista atual</button>
+            </>
+          )}
+          <button className={`bt mini${animando ? ' ligado' : ''}`} onClick={() => setAnimando((a) => !a)} title="Prévia animada: gira os objetos pelo campo gira (graus por segundo)">
+            {animando ? <Pause /> : <Play />}Animar
+          </button>
+        </div>
+        <div className="leitura-3d" ref={leitura} />
+        {erro && <div className="erro-monitor">{erro}</div>}
         <div className="sobreposicao">
           {meus.map((c) => {
             const mundo = pontoNoMundo(c.alvo.contexto);
@@ -188,7 +265,7 @@ const Palco: React.FC<{documento: string}> = ({documento}) => {
           })}
           {balao && (
             <div className="balao" style={{left: Math.max(4, Math.min(balao.x, balao.w - 270)), top: Math.max(4, Math.min(balao.y + 8, balao.h - 150))}}>
-              <div className="rotulo" style={{marginBottom: 6}}>comentário{balao.nome ? ` em ${balao.nome}` : ' na cena'}</div>
+              <div className="rotulo" style={{marginBottom: 6}}>Comentário{balao.nome ? ` em ${balao.nome}` : ' na cena'}</div>
               <textarea className="campo" autoFocus value={textoBalao} onChange={(e) => setTextoBalao(e.target.value)} placeholder="O que mudar aqui?"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) void salvarComentario();
@@ -196,30 +273,11 @@ const Palco: React.FC<{documento: string}> = ({documento}) => {
                 }} />
               <div style={{display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 6}}>
                 <button className="bt fantasma mini" onClick={() => setBalao(null)}>Cancelar</button>
-                <button className="bt principal mini" onClick={() => void salvarComentario()}>Comentar (Ctrl+Enter)</button>
+                <button className="bt principal mini" onClick={() => void salvarComentario()}>Comentar · Ctrl+Enter</button>
               </div>
             </div>
           )}
         </div>
-      </div>
-      <div className="controles">
-        <div className="ferramentas">
-          {MODOS.map((m) => (
-            <button key={m.modo} className={`bt mini${!modoComentario && modo === m.modo ? ' ligado' : ''}`} title={`${m.nome} (${m.tecla})`}
-              onClick={() => {
-                setModo(m.modo);
-                loja.definir({modoComentario: false});
-              }}>
-              {m.icone}
-            </button>
-          ))}
-          <button className={`bt mini${modoComentario ? ' ligado' : ''}`} onClick={() => loja.definir({modoComentario: true})} title="Comentar (M)"><MessageSquarePlus size={13} /></button>
-        </div>
-        <button className={`bt mini${animando ? ' ligado' : ''}`} onClick={() => setAnimando((a) => !a)} title="Prévia animada: gira os objetos pelo campo gira (graus por segundo)">
-          {animando ? <Pause size={13} /> : <Play size={13} />}Animar
-        </button>
-        <span style={{flex: 1}} />
-        <button className="bt mini" onClick={() => void usarVistaComoCamera(documento)} title="Grava a vista atual em /camera"><Camera size={13} />Salvar câmera</button>
       </div>
     </div>
   );

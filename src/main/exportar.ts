@@ -7,6 +7,7 @@ import {existsSync} from 'node:fs';
 import {rm} from 'node:fs/promises';
 import type {Progresso} from '../compartilhado/api';
 import {getCompositorPackage} from './compositor-package';
+import {getPackagedBrowserPaths} from './packaged-browser';
 
 export const PASTA_PACOTE = 'remotion-bundle';
 let pacoteDev: Promise<string> | null = null;
@@ -40,13 +41,16 @@ export const exportarVideo = async (o: {
 }) => {
   const {ensureBrowser, renderMedia, selectComposition} = await import('@remotion/renderer');
   o.aviso({tipo: 'status', mensagem: 'Preparando o navegador de render…'});
-  await ensureBrowser({onBrowserDownload: () => ({version: null, onProgress: ({percent}) => o.aviso({tipo: 'progresso', etapa: 'baixando navegador', progresso: percent * 100})})});
+  // no app instalado o navegador vem empacotado (forge.config); sem ele, baixa na primeira exportação
+  const empacotado = o.empacotado ? getPackagedBrowserPaths({arch: process.arch, platform: process.platform, projectRoot: o.raizApp})?.packagedBrowserExecutablePath : undefined;
+  const browserExecutable = empacotado && existsSync(empacotado) ? empacotado : null;
+  await ensureBrowser({browserExecutable, onBrowserDownload: () => ({version: null, onProgress: ({percent}) => o.aviso({tipo: 'progresso', etapa: 'baixando navegador', progresso: percent * 100})})});
   o.aviso({tipo: 'status', mensagem: 'Empacotando as composições…'});
   const serveUrl = await servirDe(o.raizApp, o.empacotado, o.aviso);
   const binariesDirectory = o.empacotado
     ? path.join(path.dirname(o.raizApp), 'app.asar.unpacked', 'node_modules', getCompositorPackage({arch: process.arch, platform: process.platform}))
     : null;
-  const composition = await selectComposition({serveUrl, id: 'CarrosselTema', inputProps: o.props, binariesDirectory});
+  const composition = await selectComposition({serveUrl, id: 'CarrosselTema', inputProps: o.props, binariesDirectory, browserExecutable});
   o.aviso({tipo: 'status', mensagem: `Renderizando ${composition.durationInFrames} quadros…`});
   await renderMedia({
     composition,
@@ -55,6 +59,7 @@ export const exportarVideo = async (o: {
     outputLocation: o.arquivo,
     inputProps: o.props,
     binariesDirectory,
+    browserExecutable,
     concurrency: Math.max(1, Math.floor(os.cpus().length / 2)),
     onProgress: ({progress}) => o.aviso({tipo: 'progresso', etapa: 'renderizando', progresso: progress * 100}),
   });

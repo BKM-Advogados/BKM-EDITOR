@@ -9,6 +9,8 @@ import type {Efeito} from '../../nucleo/efeitos';
 export type Area = 'video' | 'imagem' | '3d' | 'efeitos';
 export type Lido = {doc: any; versao: string};
 export type Selecao = {documento: string; caminho: string} | null;
+export type TipoAviso = 'ok' | 'erro' | 'info' | 'agente';
+export type Aviso = {texto: string; tipo: TipoAviso; em: number};
 
 export type Estado = {
   info: InfoProjeto | null;
@@ -23,12 +25,13 @@ export type Estado = {
   diario: EntradaDiario[];
   modoComentario: boolean;
   comentarioAberto?: string;
-  aviso?: {texto: string; tipo: 'ok' | 'erro' | 'info'; em: number};
+  aviso?: Aviso;
+  zoomLinha: number | null; // pixels por segundo da linha do tempo; null = ajustar à janela (vale no Vídeo e em Efeitos)
   ultimaMudancaAgente?: number; // seq da última mudança do agente vista
   previaEfeitos?: {documento: string; efeitos: Efeito[]}; // controle deslizante sendo arrastado, antes do patch
 };
 
-let estado: Estado = {info: null, area: 'video', ativo: {}, docs: {}, props: {}, selecao: null, tempo_ms: 0, comentarios: [], diario: [], modoComentario: false};
+let estado: Estado = {info: null, area: 'video', ativo: {}, docs: {}, props: {}, selecao: null, tempo_ms: 0, comentarios: [], diario: [], modoComentario: false, zoomLinha: null};
 const ouvintes = new Set<() => void>();
 
 export const loja = {
@@ -67,7 +70,15 @@ export const useLoja = <T,>(sel: (e: Estado) => T): T => {
   return useSyncExternalStore(loja.assinar, ler);
 };
 
-export const avisar = (texto: string, tipo: 'ok' | 'erro' | 'info' = 'info') => loja.definir({aviso: {texto, tipo, em: Date.now()}});
+// o aviso fica 4 s no rodapé (no lugar das dicas de tecla) e some; o seguinte reinicia a contagem
+export const VALIDADE_AVISO_MS = 4000;
+let validadeAviso: ReturnType<typeof setTimeout> | undefined;
+export const avisar = (texto: string, tipo: TipoAviso = 'info') => {
+  const aviso = {texto, tipo, em: Date.now()};
+  loja.definir({aviso});
+  clearTimeout(validadeAviso);
+  validadeAviso = setTimeout(() => loja.get().aviso === aviso && loja.definir({aviso: undefined}), VALIDADE_AVISO_MS);
+};
 
 const entradaDe = (id: string) => estado.info?.manifesto.documentos.find((d) => d.id === id);
 export const documentosDe = (m: Modulo) => estado.info?.manifesto.documentos.filter((d) => d.modulo === m) ?? [];
@@ -88,7 +99,7 @@ export const carregarDiario = async () => {
   const ultimaAgente = [...diario].reverse().find((d) => d.autor === 'agente');
   const anterior = estado.ultimaMudancaAgente;
   loja.definir({diario, ultimaMudancaAgente: ultimaAgente?.seq});
-  if (ultimaAgente && anterior !== undefined && ultimaAgente.seq !== anterior) avisar(`Agente: ${ultimaAgente.rotulo}`, 'info');
+  if (ultimaAgente && anterior !== undefined && ultimaAgente.seq !== anterior) avisar(`Claude: ${ultimaAgente.rotulo}`, 'agente');
 };
 
 export const abrirProjeto = async (info: InfoProjeto) => {
@@ -154,6 +165,6 @@ export const selecionar = (s: Selecao) => loja.definir({selecao: s});
 export const comentar = async (documento: string, texto: string, alvo: Comentario['alvo']) => {
   const c = await window.estudio.novoComentario({documento, texto, alvo});
   await carregarComentarios();
-  avisar(`Comentário ${c.id} criado. O agente vê com listar_comentarios.`, 'ok');
+  avisar('Comentário criado. O Claude já vê.', 'ok');
   return c;
 };

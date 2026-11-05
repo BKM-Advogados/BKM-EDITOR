@@ -82,7 +82,7 @@ export const BitmapTrabalho: React.FC<{src: string; largura: number; altura: num
 
   if (erro) {
     return (
-      <div style={{position: 'absolute', inset: 0, border: '3px dashed rgba(255,107,107,0.85)', color: '#ff6b6b', font: '600 24px system-ui, sans-serif',
+      <div style={{position: 'absolute', inset: 0, border: '3px dashed var(--erro)', color: 'var(--erro)', font: '600 24px system-ui, sans-serif',
         display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 12, overflow: 'hidden'}}>
         imagem não encontrada<br />{src}
       </div>

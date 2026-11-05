@@ -1,76 +1,51 @@
-// Campos que o inspector 3D precisa além dos comuns: vetor x/y/z lado a lado, escolha numa lista e cor que mostra ao
-// vivo e grava só ao fechar o seletor (um patch por gesto, não por movimento).
-import React, {useEffect, useRef, useState} from 'react';
+// Campos que o inspector 3D precisa além dos comuns: vetor x/y/z lado a lado (filete na cor do eixo, pelos tokens),
+// escolha numa lista e cor com prévia ao vivo que grava só ao fechar o seletor (um patch por gesto, não por movimento).
+import React, {useEffect, useState} from 'react';
 import type {Vetor3} from '../../../nucleo/documentos';
+import {CampoCor, CampoSelecao, LinhaCampo, numeroBr} from '../../componentes/Campos';
 
 const EIXOS = [
-  {nome: 'x', cor: '#e5534b'},
-  {nome: 'y', cor: '#6bc46d'},
-  {nome: 'z', cor: '#4f8cff'},
+  {nome: 'X', cor: 'var(--eixo-x)'},
+  {nome: 'Y', cor: 'var(--eixo-y)'},
+  {nome: 'Z', cor: 'var(--eixo-z)'},
 ];
 
-const Eixo: React.FC<{valor: number | undefined; nome: string; cor: string; passo: number; aoMudar: (n: number) => void}> = ({valor, nome, cor, passo, aoMudar}) => {
-  const [v, setV] = useState(valor === undefined ? '' : String(valor));
-  useEffect(() => setV(valor === undefined ? '' : String(valor)), [valor]);
+const Eixo: React.FC<{valor: number | undefined; nome: string; cor: string; unidade?: string; aoMudar: (n: number) => void}> = ({valor, nome, cor, unidade, aoMudar}) => {
+  const texto = valor === undefined ? '' : numeroBr(valor);
+  const [v, setV] = useState(texto);
+  useEffect(() => setV(texto), [texto]);
   const gravar = () => {
-    const n = Number(v.replace(',', '.'));
+    const n = Number(v.trim().replace(',', '.'));
     if (v.trim() !== '' && Number.isFinite(n) && n !== valor) aoMudar(n);
+    else if (!Number.isFinite(n)) setV(texto);
   };
   return (
-    <input className="campo" type="number" step={passo} value={v} title={nome} aria-label={nome}
-      style={{padding: '0 4px', minWidth: 0, boxShadow: `inset 2px 0 0 ${cor}`}}
-      onChange={(e) => setV(e.target.value)} onBlur={gravar} onKeyDown={(e) => e.key === 'Enter' && gravar()} />
+    <div className="campo num" style={{padding: '0 6px', boxShadow: `inset 2px 0 0 ${cor}`}} title={nome}>
+      <input type="text" inputMode="decimal" value={v} aria-label={nome} onChange={(e) => setV(e.target.value)} onBlur={gravar} onKeyDown={(e) => e.key === 'Enter' && gravar()} />
+      {unidade && <span className="u">{unidade}</span>}
+    </div>
   );
 };
 
-/** Três números lado a lado; cada eixo grava sozinho ao sair do campo ou com Enter. */
-export const CampoVetor: React.FC<{rotulo: string; valor: Vetor3 | undefined; aoMudar: (v: Vetor3) => void; passo?: number; padrao?: Vetor3}> = ({rotulo, valor, aoMudar, passo = 0.1, padrao = [0, 0, 0]}) => (
-  <div className="linha-campo">
-    <span>{rotulo}</span>
-    <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 4}}>
-      {EIXOS.map((e, i) => (
-        <Eixo key={e.nome} nome={e.nome} cor={e.cor} passo={passo} valor={valor?.[i]}
-          aoMudar={(n) => aoMudar((valor ?? padrao).map((x, j) => (j === i ? n : x)) as Vetor3)} />
-      ))}
-    </div>
-  </div>
-);
+/** Três números lado a lado; cada eixo grava sozinho ao sair do campo ou com Enter. O ponto à esquerda aparece quando
+ *  o vetor difere do padrão, e clicar nele redefine. */
+export const CampoVetor: React.FC<{rotulo: string; valor: Vetor3 | undefined; aoMudar: (v: Vetor3) => void; passo?: number; padrao?: Vetor3; unidade?: string; aoRedefinir?: () => void}> = ({rotulo, valor, aoMudar, padrao = [0, 0, 0], unidade, aoRedefinir}) => {
+  const difere = !!valor && valor.some((x, i) => x !== padrao[i]);
+  return (
+    <LinhaCampo rotulo={rotulo} como="div" difere={difere} padrao={padrao.map((x) => numeroBr(x)).join('; ')} aoRedefinir={aoRedefinir ?? (() => aoMudar(padrao))}>
+      <div className="lado l3">
+        {EIXOS.map((e, i) => (
+          <Eixo key={e.nome} nome={`${rotulo} ${e.nome}`} cor={e.cor} unidade={unidade} valor={valor?.[i]}
+            aoMudar={(n) => aoMudar((valor ?? padrao).map((x, j) => (j === i ? n : x)) as Vetor3)} />
+        ))}
+      </div>
+    </LinhaCampo>
+  );
+};
 
 export const CampoEscolha = <T extends string>({rotulo, valor, opcoes, aoMudar}: {rotulo: string; valor: T; opcoes: {valor: T; nome: string}[]; aoMudar: (v: T) => void}) => (
-  <label className="linha-campo">
-    <span>{rotulo}</span>
-    <select className="campo" value={valor} onChange={(e) => e.target.value !== valor && aoMudar(e.target.value as T)}>
-      {opcoes.map((o) => <option key={o.valor} value={o.valor}>{o.nome}</option>)}
-    </select>
-  </label>
+  <CampoSelecao<T> rotulo={rotulo} valor={valor} opcoes={opcoes.map((o) => [o.valor, o.nome] as [T, string])} aoMudar={aoMudar} />
 );
 
-const hex = (c: string) => (/^#[0-9a-f]{6}$/i.test(c) ? c.toLowerCase() : '#000000');
-
 /** Cor com prévia ao vivo (aoVer) e gravação só no 'change' nativo, que o seletor dispara ao fechar. */
-export const CampoCorAoSoltar: React.FC<{rotulo: string; valor: string; aoMudar: (v: string) => void; aoVer?: (v: string) => void}> = ({rotulo, valor, aoMudar, aoVer}) => {
-  const ref = useRef<HTMLInputElement>(null);
-  const [v, setV] = useState(hex(valor));
-  useEffect(() => setV(hex(valor)), [valor]);
-  const gravar = useRef(aoMudar);
-  gravar.current = aoMudar;
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const fechou = () => {
-      if (el.value.toLowerCase() !== hex(valor)) gravar.current(el.value.toUpperCase());
-    };
-    el.addEventListener('change', fechou);
-    return () => el.removeEventListener('change', fechou);
-  }, [valor]);
-  return (
-    <label className="linha-campo">
-      <span>{rotulo}</span>
-      <input ref={ref} type="color" value={v}
-        onChange={(e) => {
-          setV(e.target.value);
-          aoVer?.(e.target.value);
-        }} />
-    </label>
-  );
-};
+export const CampoCorAoSoltar: React.FC<{rotulo: string; valor: string; aoMudar: (v: string) => void; aoVer?: (v: string) => void}> = (p) => <CampoCor {...p} />;

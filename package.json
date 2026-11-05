@@ -3,8 +3,9 @@
   "productName": "Estudio",
   "version": "0.1.0",
   "description": "Estúdio criativo desktop: vídeo, imagem, 3D e efeitos, editáveis à mão ou pelo terminal com o Claude",
+  "author": "BKM Advogados",
   "private": true,
-  "main": ".vite/build/main.js",
+  "main": ".vite/app/main.js",
   "engines": {
     "node": "^20.19.0 || ^22.13.0 || >=24"
   },
@@ -12,6 +13,7 @@
     "dev": "npm run mcp:build && electron-forge start",
     "package": "npm run mcp:build && electron-forge package",
     "make": "npm run mcp:build && electron-forge make",
+    "instalador": "npm run package && electron-builder --prepackaged out/Estudio-win32-x64 --win nsis --x64 --publish never",
     "mcp:build": "esbuild mcp/nucleo.ts --bundle --platform=node --format=cjs --target=node20 --outfile=dist-mcp/nucleo.cjs --log-level=warning",
     "studio": "remotion studio src/composicoes/index.ts",
     "typecheck": "tsc --noEmit",
@@ -19,6 +21,8 @@
     "e2e": "tsx scripts/e2e.mjs"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "5.3.0",
+    "@fontsource/jetbrains-mono": "5.3.0",
     "@lydell/node-pty": "1.2.0-beta.18",
     "@modelcontextprotocol/sdk": "1.32.2",
     "@remotion/bundler": "4.0.540",
@@ -48,6 +52,7 @@
   },
   "devDependencies": {
     "@electron-forge/cli": "7.11.1",
+    "@electron-forge/maker-zip": "7.11.1",
     "@electron-forge/plugin-vite": "7.11.1",
     "@remotion/cli": "4.0.540",
     "@types/node": "^22.15.0",
@@ -56,6 +61,7 @@
     "@types/three": "0.187.0",
     "@vitejs/plugin-react": "4.3.4",
     "electron": "42.11.16",
+    "electron-builder": "26.17.0",
     "esbuild": "^0.25.0",
     "playwright": "1.64.1",
     "tsx": "4.23.15",

@@ -25,6 +25,14 @@ export const CANAL = {
   terminalFechar: 'estudio:terminal-fechar',
   terminalDados: 'estudio:terminal-dados',
   terminalSaiu: 'estudio:terminal-saiu',
+  conversaConta: 'estudio:conversa-conta',
+  conversaAbrir: 'estudio:conversa-abrir',
+  conversaEnviar: 'estudio:conversa-enviar',
+  conversaPermitir: 'estudio:conversa-permitir',
+  conversaParar: 'estudio:conversa-parar',
+  conversaHibernar: 'estudio:conversa-hibernar',
+  conversaFechar: 'estudio:conversa-fechar',
+  conversaEvento: 'estudio:conversa-evento',
   exportar: 'estudio:exportar',
   exportarImagem: 'estudio:exportar-imagem',
   progresso: 'estudio:progresso',
@@ -45,6 +53,24 @@ export type Mudanca = {arquivo: string; autor?: string};
 export type Metricas = {memoria_mb: number; processos: {tipo: string; memoria_mb: number; cpu: number}[]};
 
 export type Progresso = {tipo: 'status' | 'progresso'; mensagem?: string; etapa?: string; progresso?: number};
+
+/** Login do Claude Code da pessoa, lido de `claude auth status`. chave_api: há ANTHROPIC_API_KEY, que no modo -p tem prioridade. */
+export type ContaClaude = {instalado: boolean; logado: boolean; metodo: string; email?: string; plano?: string; chave_api: boolean};
+
+/** O que a conversa com o Claude (claude -p, stream-json) manda para a interface desenhar. */
+export type EventoConversa =
+  | {tipo: 'pronto'; sessao: string; modelo?: string}
+  | {tipo: 'estado'; estado: string}
+  | {tipo: 'texto'; delta: string}
+  | {tipo: 'mensagem'; texto: string}
+  | {tipo: 'ferramenta'; uso: string; nome: string; entrada: Record<string, unknown>}
+  | {tipo: 'resultado'; uso: string; ok: boolean; texto: string}
+  | {tipo: 'permissao'; pedido: string; ferramenta: string; entrada: Record<string, unknown>; titulo?: string; motivo?: string; pode_sempre: boolean}
+  | {tipo: 'permissao-cancelada'; pedido: string}
+  | {tipo: 'fim'; erro: boolean; texto?: string; custo_usd?: number; duracao_ms?: number}
+  | {tipo: 'hibernou'}
+  | {tipo: 'saiu'; codigo: number | null; detalhe?: string}
+  | {tipo: 'erro'; mensagem: string};
 
 export type ApiEstudio = {
   abrirPasta: () => Promise<InfoProjeto | null>;
@@ -71,6 +97,17 @@ export type ApiEstudio = {
     fechar: (id: number) => void;
     aoReceber: (cb: (id: number, dados: string) => void) => () => void;
     aoSair: (cb: (id: number, codigo: number) => void) => () => void;
+  };
+  // o Claude como conversa: o mesmo claude da pessoa no modo sem tela; `sessao` retoma uma conversa existente
+  conversa: {
+    conta: () => Promise<ContaClaude>;
+    abrir: (o?: {sessao?: string}) => Promise<{id: number; sessao: string}>;
+    enviar: (id: number, texto: string) => Promise<void>;
+    permitir: (id: number, pedido: string, decisao: 'permitir' | 'negar', sempre?: boolean) => void;
+    parar: (id: number) => void;
+    hibernar: (id: number) => Promise<string | null>;
+    fechar: (id: number) => void;
+    aoEvento: (cb: (id: number, e: EventoConversa) => void) => () => void;
   };
   exportarVideo: (documento: string) => Promise<{ok: boolean; arquivo?: string; mensagem?: string}>;
   exportarImagem: (documento: string, pngBase64: string) => Promise<{ok: boolean; arquivo?: string}>;

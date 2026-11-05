@@ -1,0 +1,100 @@
+/* Casca (barra de título própria, tema dos painéis, abas) e o painel do Claude. Carregado depois de estilo.css e
+   usa os tokens dele: fundo-0 vão, fundo-1 barras, fundo-2 corpo, fundo-3 campo/hover, fundo-4 ativo. */
+
+/* ── barra de título própria: a janela não tem moldura do Windows; os botões dela ficam por cima (titleBarOverlay) ── */
+.casca { grid-template-rows: 36px 1fr var(--rodape, 22px); }
+.barra { position: relative; height: 36px; display: flex; align-items: center; gap: 10px; padding: 0 0 0 10px; background: var(--fundo-0);
+  border-bottom: 0; -webkit-app-region: drag; user-select: none;
+  padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 8px); }
+.barra > * { -webkit-app-region: no-drag; }
+.barra .marca { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 8px; border: 0; border-radius: 4px; background: none;
+  color: var(--texto); font: 600 13px var(--fonte); letter-spacing: 0; cursor: default; }
+.barra .marca:hover { background: var(--fundo-3); }
+.barra .projeto { display: flex; align-items: center; gap: 6px; max-width: 34vw; overflow: hidden; white-space: nowrap; font-size: 12px; font-weight: 600;
+  color: var(--texto); -webkit-app-region: drag; }
+.barra .projeto .sep { color: var(--texto-3); font-weight: 400; }
+.barra .projeto .doc { color: var(--texto-2); font-weight: 400; overflow: hidden; text-overflow: ellipsis; }
+.barra .areas { position: absolute; left: 50%; transform: translateX(-50%); margin: 0; padding: 0; gap: 2px; background: none; border-radius: 0; }
+.barra .areas button { height: 28px; padding: 0 12px; gap: 7px; border-radius: 4px; color: var(--texto-2); font: 600 12px var(--fonte); }
+.barra .areas button svg { color: var(--icone-inativo, var(--texto-3)); }
+.barra .areas button:hover { background: var(--fundo-3); color: var(--texto); }
+.barra .areas button.ativa { background: var(--fundo-2); color: var(--texto); }
+.barra .areas button.ativa svg { color: var(--texto); }
+.barra .areas kbd { display: none; }
+.barra .acoes { margin-left: auto; display: flex; align-items: center; gap: 2px; }
+.barra .acoes .bt { height: 26px; }
+.barra .acoes kbd { font: 600 10px var(--fonte-mono); color: var(--texto-2); background: var(--fundo-3); border-radius: 3px; padding: 0 4px; margin-left: 2px; }
+.menu-app { position: absolute; top: 34px; left: 8px; z-index: 50; min-width: 250px; padding: 4px; background: var(--fundo-2); border: 1px solid var(--borda-forte);
+  border-radius: 8px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55); -webkit-app-region: no-drag; }
+.menu-app button { width: 100%; display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px; border: 0; border-radius: 4px; background: none;
+  color: var(--texto); font: 12px var(--fonte); text-align: left; cursor: default; }
+.menu-app button:hover { background: var(--fundo-3); }
+.menu-app button svg { color: var(--texto-2); }
+.menu-app kbd { margin-left: auto; font: 10px var(--fonte-mono); color: var(--texto-3); }
+.menu-app hr { border: 0; border-top: 1px solid var(--borda); margin: 4px 2px; }
+
+/* ── tema próprio do dockview: grupos com cantos de 4 px sobre o vão, abas na cor das barras ── */
+.dockview-theme-estudio {
+  --dv-background-color: var(--fundo-0);
+  --dv-group-view-background-color: var(--fundo-2);
+  --dv-tabs-and-actions-container-background-color: var(--fundo-1);
+  --dv-tabs-and-actions-container-height: 28px;
+  --dv-tabs-and-actions-container-font-size: 12px;
+  --dv-activegroup-visiblepanel-tab-background-color: var(--fundo-2);
+  --dv-activegroup-hiddenpanel-tab-background-color: var(--fundo-1);
+  --dv-inactivegroup-visiblepanel-tab-background-color: var(--fundo-2);
+  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--fundo-1);
+  --dv-activegroup-visiblepanel-tab-color: var(--texto);
+  --dv-activegroup-hiddenpanel-tab-color: var(--texto-3);
+  --dv-inactivegroup-visiblepanel-tab-color: var(--texto-2);
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--texto-3);
+  --dv-tab-divider-color: transparent;
+  --dv-separator-border: transparent;
+  --dv-paneview-header-border-color: var(--borda);
+  --dv-sash-color: transparent;
+  --dv-active-sash-color: var(--acento);
+  --dv-drag-over-background-color: rgba(112, 184, 255, 0.12);
+  --dv-drag-over-border-color: var(--acento);
+  --dv-icon-hover-background-color: var(--fundo-3);
+  --dv-scrollbar-background-color: var(--fundo-4);
+}
+[data-faixa='P'] .dockview-theme-estudio { --dv-tabs-and-actions-container-height: 30px; }
+.dockview-theme-estudio .dv-groupview { border-radius: 4px; overflow: hidden; container-type: inline-size; }
+.dockview-theme-estudio .dv-tab { padding: 0 10px; }
+.dockview-theme-estudio .dv-groupview.dv-active-group .dv-tab.dv-active-tab { box-shadow: inset 0 1px 0 var(--acento); }
+.aba-doca { display: flex; align-items: center; gap: 6px; height: 100%; font: 12px var(--fonte); white-space: nowrap; }
+.aba-doca .aba-icone { display: inline-grid; place-items: center; color: var(--icone-inativo, var(--texto-3)); }
+.dv-active-tab .aba-doca .aba-icone { color: var(--texto-2); }
+.aba-terminal .aba-icone { color: var(--agente) !important; }
+.aba-doca .aba-contador { font: 600 10px/14px var(--fonte); color: var(--sobre-acento, #111); background: var(--comentario); border-radius: 7px; padding: 0 4px; }
+.aba-doca .aba-x { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 3px; color: var(--texto-3); visibility: hidden; }
+.dv-tab:hover .aba-doca .aba-x { visibility: visible; }
+.aba-doca .aba-x:hover { background: var(--fundo-3); color: var(--texto); }
+/* grupo estreito: as abas de trás ficam só com o ícone (o nome continua na dica) */
+@container (max-width: 360px) {
+  .dv-tab:not(.dv-active-tab) .aba-doca .aba-titulo { display: none; }
+  .dv-tab:not(.dv-active-tab) { padding: 0 8px; }
+}
+
+/* ── painel do Claude: abas de conversa e de terminal ── */
+.claude-painel { background: var(--fundo-2); }
+.claude-abas { height: 30px; flex: none; display: flex; align-items: stretch; gap: 0; padding: 0 4px 0 2px; background: var(--fundo-1); border-bottom: 1px solid var(--borda); overflow: hidden; }
+.claude-abas .aba { display: flex; align-items: center; gap: 6px; padding: 0 10px; min-width: 0; flex-shrink: 1; color: var(--texto-3); font: 12px var(--fonte); cursor: default; white-space: nowrap; }
+.claude-abas .aba .nome { overflow: hidden; text-overflow: ellipsis; }
+.claude-abas .aba:hover { color: var(--texto-2); }
+.claude-abas .aba.ativa { color: var(--texto); box-shadow: inset 0 -2px 0 var(--agente); }
+.claude-abas .aba.terminal-ativa { box-shadow: inset 0 -2px 0 var(--borda-forte); }
+.claude-abas .aba .icone-agente { color: var(--agente); flex: none; }
+.claude-abas .aba .x { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 3px; color: var(--texto-3); visibility: hidden; flex: none; }
+.claude-abas .aba:hover .x, .claude-abas .aba.ativa .x { visibility: visible; }
+.claude-abas .aba .x:hover { background: var(--fundo-3); color: var(--texto); }
+.claude-abas .espaco { flex: 1; min-width: 8px; }
+.claude-abas > .bt { align-self: center; flex: none; }
+@container (max-width: 520px) { .claude-abas > .bt .rot { display: none; } }
+.estado-ponto { width: 6px; height: 6px; border-radius: 50%; flex: none; display: none; }
+.estado-ponto.trabalhando { display: block; background: var(--agente); }
+.estado-ponto.precisa { display: block; background: var(--comentario); }
+.estado-ponto.hibernada { display: block; box-shadow: inset 0 0 0 1px var(--texto-3); }
+.claude-painel .terminal-corpo { flex: 1; position: relative; min-height: 0; background: var(--fundo-1); }
+.claude-painel .terminal-corpo .xterm-host { position: absolute; inset: 8px 6px 4px 12px; }
+.claude-painel .terminal-corpo .xterm-viewport { background: var(--fundo-1) !important; }

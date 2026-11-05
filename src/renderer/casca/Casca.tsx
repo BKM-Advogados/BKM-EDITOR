@@ -1,9 +1,10 @@
 // Casca do Estúdio: barra com as quatro áreas, painéis acopláveis (dockview) e rodapé de estado. Cada área guarda o
 // próprio arranjo de painéis (como as páginas do Resolve e os workspaces do Blender); o terminal é o mesmo em todas.
-import React, {Suspense, useCallback, useEffect, useRef} from 'react';
-import {DockviewReact, type DockviewApi, type DockviewReadyEvent, type IDockviewPanelProps} from 'dockview-react';
+import React, {Suspense, useCallback, useEffect, useRef, useState} from 'react';
+import {DockviewReact, type DockviewApi, type DockviewReadyEvent, type DockviewTheme, type IDockviewPanelHeaderProps, type IDockviewPanelProps} from 'dockview-react';
 import 'dockview-react/dist/styles/dockview.css';
-import {Box, Film, FolderOpen, Image as ImageIcon, LayoutPanelLeft, MessageSquarePlus, Sparkles, Undo2} from 'lucide-react';
+import {Blend, BookOpen, Box, Film, FolderOpen, History, Image as ImageIcon, LayoutPanelLeft, ListTree, MessageSquare, MessageSquarePlus, MonitorPlay, Rows3,
+  SlidersHorizontal, Sparkle, Undo2, X} from 'lucide-react';
 import {abrirProjeto, avisar, desfazer, loja, useLoja, type Area} from '../estado/loja';
 import type {PaineisDoModulo} from './contrato';
 import {PaineisVideo} from '../modulos/video/paineis';
@@ -12,6 +13,7 @@ import {PaineisEfeitos} from '../modulos/efeitos/paineis';
 import {Comentarios} from '../paineis/Comentarios';
 import {Historico} from '../paineis/Historico';
 import {Rodape} from './Rodape';
+import './casca.css';
 
 // o 3D (Three.js) e o terminal (xterm.js) só carregam quando alguém abre: a memória do app parado fica menor
 const Terminal = React.lazy(() => import('../paineis/Terminal').then((m) => ({default: m.Terminal})));
@@ -22,7 +24,7 @@ const AREAS: {id: Area; nome: string; icone: React.ReactNode; atalho: string}[] 
   {id: 'video', nome: 'Vídeo', icone: <Film size={15} />, atalho: '1'},
   {id: 'imagem', nome: 'Imagem', icone: <ImageIcon size={15} />, atalho: '2'},
   {id: '3d', nome: '3D', icone: <Box size={15} />, atalho: '3'},
-  {id: 'efeitos', nome: 'Efeitos', icone: <Sparkles size={15} />, atalho: '4'},
+  {id: 'efeitos', nome: 'Efeitos', icone: <Blend size={15} />, atalho: '4'},
 ];
 
 const Carregando: React.FC = () => <div className="vazio">carregando…</div>;
@@ -47,6 +49,33 @@ const PorArea: React.FC<{parte: 'Lista' | 'Monitor' | 'Inspector' | 'Linha'}> = 
   return C ? <C /> : <div className="vazio">sem linha do tempo neste módulo</div>;
 };
 
+// aba dos painéis: ícone + nome; em grupo estreito as abas de trás ficam só com o ícone (casca.css). Os painéis que
+// sustentam a área não têm ×; os outros mostram o × ao passar o mouse.
+const ICONES_ABA: Record<string, React.ReactNode> = {
+  monitor: <MonitorPlay size={14} />, linha: <Rows3 size={14} />, lista: <ListTree size={14} />, inspector: <SlidersHorizontal size={14} />,
+  comentarios: <MessageSquare size={14} />, historico: <History size={14} />, terminal: <Sparkle size={14} />,
+};
+const ESSENCIAIS = new Set(['monitor', 'linha', 'lista', 'inspector', 'terminal']);
+const AbaDoPainel: React.FC<IDockviewPanelHeaderProps> = ({api}) => {
+  const [titulo, setTitulo] = useState(api.title ?? '');
+  useEffect(() => {
+    const d = api.onDidTitleChange((e) => setTitulo(e.title));
+    return () => d.dispose();
+  }, [api]);
+  const abertos = useLoja((e) => (api.id === 'comentarios' ? e.comentarios.filter((c) => c.estado === 'aberto').length : 0));
+  return (
+    <div className={`aba-doca aba-${api.id}`} title={titulo}>
+      <span className="aba-icone">{ICONES_ABA[api.id]}</span>
+      <span className="aba-titulo">{titulo}</span>
+      {abertos > 0 && <span className="aba-contador">{abertos}</span>}
+      {!ESSENCIAIS.has(api.id) && (
+        <span className="aba-x" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => (e.stopPropagation(), api.close())} title="Fechar"><X size={12} /></span>
+      )}
+    </div>
+  );
+};
+const TEMA: DockviewTheme = {name: 'estudio', className: 'dockview-theme-estudio', colorScheme: 'dark', gap: 2};
+
 const componentes: Record<string, React.FC<IDockviewPanelProps>> = {
   lista: () => <PorArea parte="Lista" />,
   monitor: () => <PorArea parte="Monitor" />,
@@ -60,7 +89,7 @@ const componentes: Record<string, React.FC<IDockviewPanelProps>> = {
 // faixas de layout de docs/tela.md: C (compacta) abaixo de 1600x800, P (padrão) acima; cada área x faixa guarda o seu
 type Faixa = 'C' | 'P';
 const faixaAtual = (): Faixa => (window.innerWidth < 1600 || window.innerHeight < 800 ? 'C' : 'P');
-const CHAVE = (area: Area, faixa: Faixa) => `estudio:layout:v3:${area}:${faixa}`;
+const CHAVE = (area: Area, faixa: Faixa) => `estudio:layout:v4:${area}:${faixa}`;
 const lerLayout = (area: Area, faixa: Faixa) => {
   try {
     const t = localStorage.getItem(CHAVE(area, faixa));
@@ -91,20 +120,20 @@ const layoutPadrao = (api: DockviewApi, area: Area, faixa: Faixa) => {
   api.addPanel({id: 'monitor', component: 'monitor', title: 'Monitor'});
   if (faixa === 'P') {
     if (temLinha) api.addPanel({id: 'linha', component: 'linha', title: 'Linha do tempo', position: {direction: 'below'}, initialHeight: 260});
-    api.addPanel({id: 'terminal', component: 'terminal', title: 'Terminal', position: {direction: 'right'}, initialWidth: 600});
+    api.addPanel({id: 'terminal', component: 'terminal', title: 'Claude', position: {direction: 'right'}, initialWidth: 600});
     api.addPanel({id: 'lista', component: 'lista', title: 'Lista', position: {referencePanel: 'monitor', direction: 'left'}, initialWidth: 260});
     api.addPanel({id: 'inspector', component: 'inspector', title: 'Propriedades', position: {referencePanel: 'monitor', direction: 'right'}, initialWidth: 310});
     abasDoInspector(false);
   } else if (area === 'video') {
     // vídeo vertical: o monitor numa coluna de altura total; à direita, propriedades e terminal em cima e a linha embaixo
-    api.addPanel({id: 'terminal', component: 'terminal', title: 'Terminal', position: {direction: 'right'}, initialWidth: Math.max(620, W - 380)});
+    api.addPanel({id: 'terminal', component: 'terminal', title: 'Claude', position: {direction: 'right'}, initialWidth: Math.max(620, W - 380)});
     api.addPanel({id: 'linha', component: 'linha', title: 'Linha do tempo', position: {referencePanel: 'terminal', direction: 'below'}, initialHeight: Math.max(200, Math.round(H * 0.34))});
     api.addPanel({id: 'inspector', component: 'inspector', title: 'Propriedades', position: {referencePanel: 'terminal', direction: 'left'}, initialWidth: 300});
     abasDoInspector(true);
   } else {
     // imagem, 3D e efeitos: monitor largo; à direita o terminal em cima e, embaixo dele, a lista e as propriedades
     if (temLinha) api.addPanel({id: 'linha', component: 'linha', title: 'Linha do tempo', position: {referencePanel: 'monitor', direction: 'below'}, initialHeight: 200});
-    api.addPanel({id: 'terminal', component: 'terminal', title: 'Terminal', position: {direction: 'right'}, initialWidth: Math.min(620, Math.round(W * 0.45))});
+    api.addPanel({id: 'terminal', component: 'terminal', title: 'Claude', position: {direction: 'right'}, initialWidth: Math.min(620, Math.round(W * 0.45))});
     api.addPanel({id: 'lista', component: 'lista', title: 'Lista', position: {referencePanel: 'terminal', direction: 'below'}, initialHeight: Math.round(H * 0.5)});
     api.addPanel({id: 'inspector', component: 'inspector', title: 'Propriedades', position: {referencePanel: 'lista', direction: 'right'}});
     abasDoInspector(false);
@@ -121,11 +150,13 @@ export const Casca: React.FC = () => {
   const areaMontada = useRef<Area>(area);
 
   const faixa = useRef<Faixa>(faixaAtual());
+  const abrirRef = useRef<() => Promise<void>>(async () => undefined);
 
   const montar = useCallback((a: Area, padrao = false) => {
     const d = api.current;
     if (!d) return;
     faixa.current = faixaAtual();
+    document.documentElement.dataset.faixa = faixa.current;
     d.clear();
     const salvo = padrao ? null : lerLayout(a, faixa.current);
     try {
@@ -171,7 +202,10 @@ export const Casca: React.FC = () => {
         ev.preventDefault();
         ev.stopPropagation();
         api.current?.getPanel('terminal')?.api.setActive();
-        (document.querySelector('.terminal-corpo textarea') as HTMLTextAreaElement | null)?.focus();
+        (document.querySelector('.conversa .caixa-pedido textarea, .terminal-corpo textarea') as HTMLTextAreaElement | null)?.focus();
+      } else if (ev.ctrlKey && !ev.altKey && !ev.shiftKey && ev.key.toLowerCase() === 'o') {
+        ev.preventDefault();
+        void abrirRef.current();
       } else if (ev.ctrlKey && ev.key.toLowerCase() === 'z' && !digitando) {
         ev.preventDefault();
         void desfazer();
@@ -193,32 +227,55 @@ export const Casca: React.FC = () => {
     const i = await window.estudio.abrirPasta().catch((e: Error) => (avisar(e.message, 'erro'), null));
     if (i) await abrirProjeto(i);
   };
+  abrirRef.current = abrir;
+
+  const [menu, setMenu] = useState(false);
+  useEffect(() => {
+    if (!menu) return;
+    const fechar = () => setMenu(false);
+    window.addEventListener('pointerdown', fechar);
+    return () => window.removeEventListener('pointerdown', fechar);
+  }, [menu]);
+  const ativo = useLoja((e) => e.ativo);
+  const alvoEfeitos = useLoja((e) => e.alvoEfeitos);
+  const idDoc = area === 'efeitos' ? alvoEfeitos : (ativo as Record<string, string | undefined>)[area];
+  const docAtivo = info?.manifesto.documentos.find((d) => d.id === idDoc)?.titulo;
 
   return (
     <div className="casca">
       <header className="barra">
-        <span className="marca">ESTÚDIO</span>
-        <span className="projeto" title={info?.raiz}>{info?.manifesto.nome ?? 'nenhum projeto'}</span>
+        <button className="marca" onPointerDown={(e) => e.stopPropagation()} onClick={() => setMenu((m) => !m)} title="Menu do Estúdio">
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="9" height="9" rx="2" fill="none" stroke="var(--acento)" strokeWidth="1.5" /><rect x="5.5" y="5.5" width="9" height="9" rx="2" fill="none" stroke="var(--agente)" strokeWidth="1.5" /></svg>
+          Estúdio
+        </button>
+        {menu && (
+          <div className="menu-app" onPointerDown={(e) => e.stopPropagation()}>
+            <button onClick={() => (setMenu(false), void abrir())}><FolderOpen size={14} />Abrir pasta…<kbd>Ctrl+O</kbd></button>
+            <button onClick={() => (setMenu(false), void window.estudio.abrirExemplo().then(abrirProjeto).catch((e: Error) => avisar(e.message, 'erro')))}><BookOpen size={14} />Abrir o exemplo</button>
+            <hr />
+            <button onClick={() => (setMenu(false), montar(area, true))}><LayoutPanelLeft size={14} />Redefinir os painéis desta área</button>
+          </div>
+        )}
+        <span className="projeto" title={info?.raiz}>
+          <span className="sep">/</span>{info?.manifesto.nome ?? 'nenhum projeto'}
+          {docAtivo && <><span className="sep">›</span><span className="doc">{docAtivo}</span></>}
+        </span>
         <nav className="areas">
           {AREAS.map((a) => (
-            <button key={a.id} className={a.id === area ? 'ativa' : ''} onClick={() => loja.definir({area: a.id})} title={`${a.nome} (Alt+${a.atalho})`}>
-              {a.icone}{a.nome}<kbd>{a.atalho}</kbd>
+            <button key={a.id} className={a.id === area ? 'ativa' : ''} onClick={() => loja.definir({area: a.id})} title={`${a.nome} · ${a.atalho} ou Alt+${a.atalho}`}>
+              {a.icone}{a.nome}
             </button>
           ))}
         </nav>
         <div className="acoes">
           <button className={`bt fantasma${modoComentario ? ' ligado' : ''}`} onClick={() => loja.definir((s) => ({modoComentario: !s.modoComentario}))} title="Comentar na tela (M)">
-            <MessageSquarePlus size={15} />Comentar
+            <MessageSquarePlus size={15} />Comentar<kbd>M</kbd>
           </button>
           <button className="bt fantasma" onClick={() => void desfazer()} title="Desfazer a sua última edição (Ctrl+Z)"><Undo2 size={15} /></button>
-          <button className="bt fantasma" onClick={() => {
-            montar(area, true);
-          }} title="Redefinir os painéis desta área"><LayoutPanelLeft size={15} /></button>
-          <button className="bt fantasma" onClick={() => void abrir()} title="Abrir projeto"><FolderOpen size={15} /></button>
         </div>
       </header>
       <div className="doca">
-        <DockviewReact className="dockview-theme-estudio" components={componentes} onReady={pronto} />
+        <DockviewReact theme={TEMA} components={componentes} defaultTabComponent={AbaDoPainel} onReady={pronto} />
       </div>
       <Rodape />
     </div>

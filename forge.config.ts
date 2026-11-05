@@ -2,6 +2,7 @@ import {existsSync} from "node:fs";
 import {cp, mkdir} from "node:fs/promises";
 import path from "node:path";
 import {ensureBrowser} from "@remotion/renderer";
+import {MakerZIP} from "@electron-forge/maker-zip";
 import {VitePlugin} from "@electron-forge/plugin-vite";
 import {getCompositorPackage} from "./src/main/compositor-package";
 import {getPackagedBrowserPaths} from "./src/main/packaged-browser";
@@ -12,7 +13,9 @@ const DARWIN_COMPOSITOR_PACKAGES = [
   "@remotion/compositor-darwin-arm64",
 ];
 const PACKAGE_BROWSER_ENV_VAR = "REMOTION_ELECTRON_PACKAGE_BROWSER";
-const shouldPackageBrowser = process.env[PACKAGE_BROWSER_ENV_VAR] === "true";
+// o navegador de render vai junto por padrão: a exportação de vídeo funciona em qualquer PC, sem internet nem download
+// no primeiro uso (REMOTION_ELECTRON_PACKAGE_BROWSER=false gera um pacote menor, que baixa na primeira exportação)
+const shouldPackageBrowser = process.env[PACKAGE_BROWSER_ENV_VAR] !== "false";
 
 const DARWIN_UNIVERSAL_ARCH_FILES =
   "Contents/Resources/app.asar.unpacked/node_modules/@remotion/compositor-darwin-*/**";
@@ -165,6 +168,10 @@ export async function stageBrowser({
 
 const config = {
   packagerConfig: {
+    name: "Estudio",
+    executableName: "Estudio",
+    icon: "build/icone",
+    win32metadata: {CompanyName: "BKM Advogados", FileDescription: "Estúdio", ProductName: "Estúdio"},
     asar: {
       unpackDir: shouldPackageBrowser
         ? "{node_modules/@remotion/compositor-*,node_modules/@lydell/**,remotion-browser}"
@@ -180,6 +187,8 @@ const config = {
   },
   // nada para recompilar: o node-pty vem pré-compilado (N-API) e o compositor do Remotion é binário pronto
   rebuildConfig: {onlyModules: []},
+  // o .zip é a versão portátil (descompactar e abrir o Estudio.exe); o instalador .exe é o NSIS do electron-builder.yml
+  makers: [new MakerZIP({}, ["win32"])],
   hooks: {
     packageAfterCopy: async (
       _forgeConfig: unknown,

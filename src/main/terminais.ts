@@ -10,7 +10,7 @@ import type {IPty} from '@lydell/node-pty';
 type Saida = {dados: (id: number, d: string) => void; saiu: (id: number, codigo: number) => void};
 type Aba = {pty: IPty; buffer: string; timer: NodeJS.Timeout | null; claude: boolean};
 
-const PATH_COM_LOCAL = () =>
+export const PATH_COM_LOCAL = () =>
   `${process.env.PATH ?? ''}${process.platform === 'win32' ? ';' : ':'}${os.homedir()}${process.platform === 'win32' ? '\\.local\\bin' : '/.local/bin'}`;
 
 // O app pode ter sido aberto de dentro de outra sessão do Claude Code (app desktop, terminal do VS Code). As marcas
@@ -48,7 +48,18 @@ export class Terminais {
     return this.claude !== null;
   }
 
-  async criar(o: {tipo: 'claude' | 'shell'; colunas: number; linhas: number; cwd: string; arquivoMcp?: string; sessao?: string; limiteClaude: number}) {
+  /** Executável do Claude Code achado em preparar(), ou null. */
+  get caminhoClaude() {
+    return this.claude;
+  }
+
+  /** Abas do Claude com processo vivo. */
+  vivas() {
+    return [...this.abas.values()].filter((a) => a.claude).length;
+  }
+
+  // outrasVivas: conversas do Claude abertas fora do terminal, que contam no mesmo limite do perfil de RAM
+  async criar(o: {tipo: 'claude' | 'shell'; colunas: number; linhas: number; cwd: string; arquivoMcp?: string; sessao?: string; limiteClaude: number; outrasVivas?: number}) {
     const pty = await import('@lydell/node-pty');
     const windows = process.platform === 'win32';
     let arquivo: string;
@@ -56,8 +67,7 @@ export class Terminais {
     let sessao: string | undefined;
     if (o.tipo === 'claude') {
       if (!this.claude) throw new Error('o Claude Code não está instalado nesta máquina (claude.ai/install)');
-      const vivas = [...this.abas.values()].filter((a) => a.claude).length;
-      if (vivas >= o.limiteClaude) throw new Error(`limite de ${o.limiteClaude} sessões do Claude abertas neste PC; hiberne uma aba para abrir outra`);
+      if (this.vivas() + (o.outrasVivas ?? 0) >= o.limiteClaude) throw new Error(`limite de ${o.limiteClaude} sessões do Claude abertas neste PC; hiberne uma aba para abrir outra`);
       sessao = o.sessao ?? randomUUID();
       arquivo = this.claude;
       // as ferramentas do projeto (MCP estudio) ficam liberadas: só mexem nos JSON do projeto, com diário e desfazer

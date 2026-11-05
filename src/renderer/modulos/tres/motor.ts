@@ -29,6 +29,10 @@ export class Motor {
   aoSoltar?: (id: string, antes: Transformacao, depois: Transformacao) => void;
   aoClicar?: (x: number, y: number) => void;
   aoRenderizar?: () => void;
+  /** Leitura do valor durante o arrasto do gizmo ("X +0,50 · Y 0,00 · Z 0,00"); null quando solta. */
+  aoLer?: (texto: string | null) => void;
+  /** A vista mudou (órbita): quem ouve confere se ainda é a câmera do documento. */
+  aoMudarVista?: () => void;
 
   constructor(private readonly hospedeiro: HTMLElement, pixelRatio: number) {
     this.renderer = new WebGLRenderer({antialias: true, powerPreference: 'low-power'});
@@ -43,7 +47,16 @@ export class Motor {
     this.gizmo = new TransformControls(this.camera, tela);
     this.gizmo.addEventListener('change', this.pedir);
     this.gizmo.addEventListener('dragging-changed', this.arrastando);
+    this.gizmo.addEventListener('objectChange', this.lerArrasto);
     this.cena.cena.add(this.gizmo.getHelper());
+    this.orbita.addEventListener('change', this.vistaMudou);
+
+    // cores dos eixos e do eixo ativo pelos tokens do CSS (uma cor, um sentido; sem o RGB puro do three)
+    const css = getComputedStyle(document.documentElement);
+    const token = (n: string, padrao: string) => css.getPropertyValue(n).trim() || padrao;
+    this.gizmo.setColors(token('--eixo-x', '#e5484d'), token('--eixo-y', '#46a758'), token('--eixo-z', '#3e63dd'), '#ffffff');
+    // faixa compacta (notebook): gizmo um pouco menor
+    if (window.innerWidth < 1600 || window.innerHeight < 800) this.gizmo.setSize(0.85);
 
     // depois dos controles, para ler o estado do gizmo já atualizado pelo pointerdown dele
     tela.addEventListener('pointerdown', this.apertou);
@@ -105,6 +118,53 @@ export class Motor {
     this.orbita.update();
     this.pedir();
   }
+
+  /** A vista atual é a câmera do documento (a última aplicada)? */
+  naCamera() {
+    if (!this.cameraAplicada) return true;
+    const c = JSON.parse(this.cameraAplicada) as CameraDoc;
+    const v = this.lerVista();
+    const perto = (a: readonly number[], b: readonly number[]) => a.every((x, i) => Math.abs(x - b[i]) < 0.005);
+    return perto(v.posicao, c.posicao) && perto(v.alvo, c.alvo) && Math.abs(v.fov - c.fov) < 0.01;
+  }
+
+  /** Volta a vista para a câmera do documento. */
+  voltarCamera() {
+    const c = this.cameraAplicada;
+    this.cameraAplicada = '';
+    if (c) this.aplicarCamera(JSON.parse(c) as CameraDoc);
+    this.aoMudarVista?.();
+  }
+
+  /** Ctrl encaixa: 0,1 ao mover, 15° ao girar, 0,1 na escala. */
+  encaixe(ligado: boolean) {
+    this.gizmo.setTranslationSnap(ligado ? 0.1 : null);
+    this.gizmo.setRotationSnap(ligado ? 15 * GRAU : null);
+    this.gizmo.setScaleSnap(ligado ? 0.1 : null);
+  }
+
+  private vistaMudou = () => this.aoMudarVista?.();
+
+  private lerArrasto = () => {
+    if (!this.gizmo.dragging || !this.antes) return;
+    const d = this.transformacao();
+    if (!d) return;
+    const a = this.antes;
+    const br = (n: number, casas = 2) => n.toFixed(casas).replace('.', ',').replace(/^-?0,00$/, '0,00');
+    const sinal = (n: number) => `${n > 0 ? '+' : ''}${br(n)}`;
+    const eixos = ['X', 'Y', 'Z'];
+    const eixo = this.gizmo.axis ?? '';
+    let texto: string;
+    if (this.gizmo.mode === 'rotate') {
+      const delta = d.rotacao.map((x, i) => x - a.rotacao[i]);
+      const um = eixos.indexOf(eixo);
+      texto = um >= 0 ? `Girar ${eixo} ${Math.round(delta[um])}°` : `Girar ${delta.map((x, i) => `${eixos[i]} ${Math.round(x)}°`).join(' · ')}`;
+    } else if (this.gizmo.mode === 'scale') {
+      const f = d.escala.map((x, i) => (a.escala[i] ? x / a.escala[i] : x));
+      texto = f.every((x) => Math.abs(x - f[0]) < 1e-3) ? `Escala ${br(f[0])}×` : `Escala ${f.map((x, i) => `${eixos[i]} ${br(x)}×`).join(' · ')}`;
+    } else texto = d.posicao.map((x, i) => `${eixos[i]} ${sinal(x - a.posicao[i])}`).join(' · ');
+    this.aoLer?.(texto);
+  };
 
   lerVista = (): CameraDoc => ({posicao: arredV(this.camera.position.toArray()), alvo: arredV(this.orbita.target.toArray()), fov: arred3(this.camera.fov)});
 
@@ -179,6 +239,7 @@ export class Motor {
     const antes = this.antes;
     const depois = this.transformacao();
     this.antes = null;
+    this.aoLer?.(null);
     if (antes && depois && this.selecionado) this.aoSoltar?.(this.selecionado, antes, depois);
   };
 
@@ -205,6 +266,8 @@ export class Motor {
     this.orbita.removeEventListener('change', this.pedir);
     this.gizmo.removeEventListener('change', this.pedir);
     this.gizmo.removeEventListener('dragging-changed', this.arrastando);
+    this.gizmo.removeEventListener('objectChange', this.lerArrasto);
+    this.orbita.removeEventListener('change', this.vistaMudou);
     this.gizmo.detach();
     this.cena.cena.remove(this.gizmo.getHelper());
     this.gizmo.dispose(); // desliga os eventos e descarta geometrias e materiais do gizmo
@@ -213,6 +276,6 @@ export class Motor {
     this.renderer.dispose();
     this.renderer.forceContextLoss();
     tela.remove();
-    this.aoSoltar = this.aoClicar = this.aoRenderizar = undefined;
+    this.aoSoltar = this.aoClicar = this.aoRenderizar = this.aoLer = this.aoMudarVista = undefined;
   }
 }

@@ -1,0 +1,94 @@
+/* Conversa com o Claude: escrita comum no tema escuro (Inter 13/1,55), ações como cartões, contexto como pílulas.
+   Usa os tokens do :root (estilo.css): fundo-1 barras, fundo-2 corpo, fundo-3 campo, --agente, --comentario. */
+.conversa { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--fundo-2); font-family: var(--fonte); }
+.mensagens { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px 8px; display: flex; flex-direction: column; gap: 16px;
+  font-size: 13px; line-height: 1.55; color: var(--texto); }
+.mensagens > * { flex: none; }
+
+.msg-pessoa { align-self: flex-end; max-width: 84%; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.msg-pessoa .bolha { background: var(--fundo-3); border-radius: 12px 12px 3px 12px; padding: 7px 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.conversa .anexos { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.conversa .anexo { height: 20px; display: inline-flex; align-items: center; gap: 4px; padding: 0 8px; border-radius: 10px; font: 11px var(--fonte);
+  color: var(--texto-2); background: var(--fundo-1); border: 1px solid var(--borda); white-space: nowrap; cursor: default; }
+.conversa .anexo.selecao { border-color: color-mix(in srgb, var(--acento) 55%, transparent); }
+.conversa .anexo.comentario { border-color: color-mix(in srgb, var(--comentario) 55%, transparent); }
+.conversa .anexo .mono { font-family: var(--fonte-mono); }
+.conversa .anexo .tirar { display: inline-grid; place-items: center; border: 0; background: none; color: var(--texto-3); padding: 0; margin-left: 1px; cursor: pointer; }
+.conversa .anexo .tirar:hover { color: var(--texto); }
+.conversa .ponto-c { width: 6px; height: 6px; border-radius: 50%; background: var(--comentario); flex: none; }
+
+.msg-claude { display: flex; flex-direction: column; gap: 8px; max-width: 68ch; }
+.msg-claude .quem { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--texto-2); }
+.msg-claude .quem svg { color: var(--agente); }
+.msg-claude .hora { font-weight: 400; color: var(--texto-3); font-size: 11px; }
+.prosa p { margin: 0 0 8px; }
+.prosa p:last-child { margin-bottom: 0; }
+.prosa ul, .prosa ol { margin: 0 0 8px; padding-left: 20px; }
+.prosa li { margin: 2px 0; }
+.prosa .titulo-md { font-weight: 600; }
+.prosa b { font-weight: 600; }
+.prosa code, .conversa code { font: 12px var(--fonte-mono); background: var(--fundo-3); padding: 1px 5px; border-radius: 4px; }
+.prosa pre { margin: 0 0 8px; padding: 8px 10px; background: var(--fundo-1); border: 1px solid var(--borda); border-radius: 6px; overflow-x: auto; }
+.prosa pre code { background: none; padding: 0; font-size: 12px; line-height: 1.45; }
+.prosa a { color: var(--acento); }
+.prosa.ao-vivo > :last-child::after { content: ''; display: inline-block; width: 7px; height: 13px; margin-left: 2px; vertical-align: -2px; background: var(--agente); opacity: .7; }
+
+.acoes-ag { display: flex; flex-direction: column; border: 1px solid var(--borda); border-radius: 8px; background: var(--fundo-1); overflow: hidden; }
+.acao { min-height: 30px; display: flex; align-items: center; gap: 8px; padding: 4px 10px; font-size: 12px; line-height: 1.4; }
+.acao + .acao { border-top: 1px solid var(--borda); }
+.acao .feito { color: var(--ok); flex: none; }
+.acao .falhou { color: var(--erro); flex: none; }
+.acao .girando { color: var(--agente); flex: none; animation: conversa-gira 1s linear infinite; }
+@keyframes conversa-gira { to { transform: rotate(360deg); } }
+.acao .desc { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acao .desc b { font-weight: 600; }
+.acao .desc em { color: var(--texto-3); font-style: normal; }
+.acao .cmd { margin-left: 6px; }
+.acao.com-erro .desc { color: var(--texto-2); }
+.acao .diff { font: 11px var(--fonte-mono); color: var(--texto-2); background: var(--fundo-3); border-radius: 4px; padding: 1px 6px; white-space: nowrap; flex: none; }
+.acao .diff s { color: var(--erro); }
+.acao .diff ins { color: var(--ok); text-decoration: none; }
+.conversa .link { border: 0; background: none; padding: 0; font: 11px var(--fonte); color: var(--acento); cursor: pointer; white-space: nowrap; flex: none; }
+.conversa .link.fraco { color: var(--texto-3); }
+.conversa .link:hover:not(:disabled) { text-decoration: underline; }
+.conversa .link:disabled { cursor: default; opacity: .7; }
+
+.permissao { border: 1px solid color-mix(in srgb, var(--comentario) 45%, var(--borda)); border-radius: 8px; background: var(--fundo-1); padding: 9px 11px; display: flex; flex-direction: column; gap: 7px; }
+.permissao.decidida { border-color: var(--borda); opacity: .8; }
+.perm-topo { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; }
+.perm-topo svg { color: var(--comentario); }
+.perm-cmd { margin: 0; padding: 6px 8px; background: var(--fundo-0); border-radius: 4px; font: 12px var(--fonte-mono); color: var(--texto); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 120px; overflow-y: auto; }
+.perm-botoes { display: flex; gap: 6px; }
+.perm-decisao { font-size: 11px; color: var(--texto-3); }
+
+.aviso-conversa { font-size: 12px; color: var(--texto-2); background: var(--fundo-1); border: 1px solid var(--borda); border-radius: 8px; padding: 8px 11px; }
+.aviso-conversa.erro { border-color: color-mix(in srgb, var(--erro) 45%, var(--borda)); }
+.faixa-conta { display: flex; gap: 9px; align-items: flex-start; font-size: 12px; color: var(--texto); background: var(--fundo-1);
+  border: 1px solid color-mix(in srgb, var(--comentario) 45%, var(--borda)); border-radius: 8px; padding: 9px 11px; }
+.faixa-conta > svg { color: var(--comentario); flex: none; margin-top: 2px; }
+.faixa-conta.aviso { border-color: var(--borda); color: var(--texto-2); }
+.faixa-botoes { display: flex; gap: 6px; margin-top: 8px; }
+
+.vazio-conversa { margin: auto 0; align-self: center; max-width: 46ch; text-align: center; color: var(--texto-2); display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.vazio-conversa > svg { color: var(--agente); }
+.vazio-conversa p { margin: 0; }
+.vazio-conversa .sugestoes { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.vazio-conversa .sugestoes .anexo { cursor: pointer; height: 24px; padding: 0 10px; font-size: 12px; }
+.vazio-conversa .sugestoes .anexo:hover { color: var(--texto); border-color: var(--borda-forte); }
+
+.trabalhando { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--texto-2); }
+.trabalhando .ponto { width: 6px; height: 6px; border-radius: 50%; background: var(--agente); }
+.trabalhando .parar { margin-left: auto; border: 0; background: none; font: 11px var(--fonte); color: var(--texto-3); cursor: pointer; }
+.trabalhando .parar:hover { color: var(--texto); }
+
+.compositor { flex: none; padding: 4px 12px 8px; }
+.caixa-pedido { background: var(--fundo-1); border: 1px solid var(--borda-forte); border-radius: 10px; padding: 7px 8px 6px 10px; display: flex; flex-direction: column; gap: 6px; }
+.caixa-pedido:focus-within { border-color: var(--acento); }
+.caixa-pedido .anexos { justify-content: flex-start; }
+.caixa-pedido textarea { resize: none; border: 0; outline: none; background: transparent; color: var(--texto); font: 13px/1.5 var(--fonte); padding: 0; min-height: 20px; max-height: 160px; }
+.caixa-pedido textarea::placeholder { color: var(--texto-3); }
+.caixa-pedido .baixo { display: flex; align-items: center; gap: 2px; }
+.caixa-pedido .modelo { font-size: 11px; color: var(--texto-3); margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.caixa-pedido .enviar { width: 26px; height: 26px; border-radius: 50%; border: 0; background: var(--acento); color: var(--sobre-acento, #111); display: grid; place-items: center; margin-left: 8px; cursor: pointer; flex: none; }
+.caixa-pedido .enviar:disabled { background: var(--fundo-4); color: var(--texto-3); cursor: default; }
+.rodape-pedido { font-size: 11px; color: var(--texto-3); padding: 4px 2px 0; display: flex; gap: 12px; white-space: nowrap; overflow: hidden; }

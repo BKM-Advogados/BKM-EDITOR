@@ -1,21 +1,29 @@
-// Monitor da imagem: prévia em DOM do documento (fundo, camadas e pilha de efeitos), numa escala que cabe no painel.
-// Clicar seleciona a camada de cima sob o cursor; a caixa de seleção arrasta (x, y) e a alça redimensiona (largura,
-// altura; Shift mantém a proporção), com um patch só ao soltar. Com a ferramenta de comentário (C), clicar abre um
-// balão ancorado na camada e no ponto da imagem; os pinos mostram os comentários do documento.
+// Monitor da imagem: prévia em DOM do documento (fundo, camadas e pilha de efeitos) sobre o entorno cinza, com xadrez
+// onde o fundo é transparente e o rótulo "Capa C2 · 1080 × 1350" acima da peça. À esquerda, o trilho: V mover, H mão,
+// Z zoom | T texto, U forma, inserir imagem | M comentário (as teclas valem neste monitor). Clicar seleciona a camada de
+// cima sob o cursor; a caixa de seleção arrasta (x, y) e a alça redimensiona (largura, altura; Shift mantém a
+// proporção), com um patch só ao soltar. Com a ferramenta de comentário (M), clicar abre um balão ancorado na camada e
+// no ponto da imagem; os pinos mostram os comentários do documento.
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
-import {Download, MessageSquarePlus, Minus, MousePointer2, Plus} from 'lucide-react';
+import {Check, ChevronDown, Download, Hand, ImagePlus, MessageSquarePlus, MousePointer2, Square, Type, X, ZoomIn} from 'lucide-react';
 import type {CamadaImagem, Comentario, DocImagem, OperacaoPatch} from '../../../nucleo/documentos';
 import {CamadaEfeitos} from '../../../composicoes/efeitos/CamadaEfeitos';
 import {aplicar, comentar, loja, patchTrocar, selecionar, useLoja} from '../../estado/loja';
+import {BotaoMenu, usarFora} from '../../componentes/Menu';
+import {Trilho, teclaLivre} from '../../componentes/Trilho';
 import {BitmapTrabalho} from './BitmapTrabalho';
 import {ENTRELINHA, PADRAO, alinhamentoCss, definirPrevia, docValido, familiaCss, indiceDe, rotuloCamada, usarDocumentoImagem, usarPrevia, visivel} from './comum';
+import {novaForma, novaImagem, novoTexto} from './acoes';
 import {exportarPng} from './exportarPng';
 
 type Geometria = {x: number; y: number; largura: number; altura: number};
 type Gesto = Geometria & {i: number; id: string};
 type Arrasto = {x0: number; y0: number; modo: 'mover' | 'redimensionar'; base: Gesto; rot: number; alvo: Gesto | null};
+type Ferramenta = 'mover' | 'mao' | 'zoom' | 'texto' | 'forma';
 
 const CAMPOS = ['x', 'y', 'largura', 'altura'] as const;
+const POR_TECLA: Record<string, Ferramenta> = {v: 'mover', h: 'mao', z: 'zoom', t: 'texto', u: 'forma'};
+const MARGEM = 32; // por lado; em cima sobra lugar para o rótulo da peça
 
 // ref por estado: o monitor só aparece depois que o documento carrega, e o observador tem de ligar nessa hora
 const usarTamanho = () => {
@@ -27,7 +35,7 @@ const usarTamanho = () => {
     ro.observe(el);
     return () => ro.disconnect();
   }, [el]);
-  return [setEl, t] as const;
+  return [setEl, t, el] as const;
 };
 
 const caixaCss = (c: CamadaImagem, escala: number): React.CSSProperties => ({
@@ -51,7 +59,7 @@ const Camada = React.memo(function Camada({c, caminho, escala}: {c: CamadaImagem
     return (
       <div data-caminho={caminho} style={{...base, fontFamily: familiaCss(c.fonte), fontSize: c.tamanho ?? PADRAO.tamanho, fontWeight: c.peso ?? PADRAO.peso,
         fontStyle: 'normal', letterSpacing: 'normal', color: c.cor ?? PADRAO.cor, textAlign: alinhamentoCss(c.alinhar), lineHeight: ENTRELINHA,
-        whiteSpace: 'pre-wrap', overflowWrap: 'break-word'}}>
+        whiteSpace: 'pre-wrap', overflowWrap: 'break-word', fontVariantNumeric: 'normal'}}>
         {c.texto ?? ''}
       </div>
     );
@@ -60,10 +68,28 @@ const Camada = React.memo(function Camada({c, caminho, escala}: {c: CamadaImagem
     borderRadius: c.forma === 'elipse' ? '50%' : Math.max(0, c.raio ?? PADRAO.raio)}} />;
 });
 
+/** Popover do "inserir imagem": o campo de caminho de sempre (até a Onda 3 trazer arrastar e colar). */
+const InserirImagem: React.FC<{documento: string; doc: DocImagem; fechar: () => void}> = ({documento, doc, fechar}) => {
+  const [caminho, setCaminho] = useState('');
+  const caixa = usarFora(true, fechar);
+  const confirmar = async () => {
+    if (await novaImagem(documento, doc, caminho)) fechar();
+  };
+  return (
+    <div ref={caixa} className="flutuante pop-trilho" style={{top: 160}}>
+      <input className="campo" autoFocus value={caminho} placeholder="midia/logo-exemplo.png" title="Caminho do arquivo dentro da pasta do projeto"
+        onChange={(e) => setCaminho(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void confirmar()} />
+      <button className="bti ligado" disabled={!caminho.trim()} onClick={() => void confirmar()} title="Inserir"><Check /></button>
+      <button className="bti" onClick={fechar} title="Cancelar"><X /></button>
+    </div>
+  );
+};
+
 export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcado}) => {
   const documentoPadrao = usarDocumentoImagem();
   const documento = forcado ?? documentoPadrao;
   const doc = useLoja((e) => (documento ? (e.docs[documento]?.doc as DocImagem | undefined) : undefined));
+  const titulo = useLoja((e) => e.info?.manifesto.documentos.find((d) => d.id === documento)?.titulo ?? documento);
   const editavel = useLoja((e) => e.area !== 'efeitos');
   const selecao = useLoja((e) => e.selecao);
   const modoComentario = useLoja((e) => e.modoComentario);
@@ -72,14 +98,21 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
   const previaEfeitos = useLoja((e) => (e.previaEfeitos && e.previaEfeitos.documento === documento ? e.previaEfeitos.efeitos : undefined));
   const previa = usarPrevia();
   const palco = useRef<HTMLDivElement>(null);
-  const [refMonitor, {w, h}] = usarTamanho();
+  const coords = useRef<HTMLSpanElement>(null);
+  const [refMonitor, {w, h}, monitorEl] = usarTamanho();
   const [zoom, setZoom] = useState<number | null>(null);
+  const [ferramenta, setFerramenta] = useState<Ferramenta>('mover');
+  const [inserindo, setInserindo] = useState(false);
   const [gesto, setGesto] = useState<Gesto | null>(null);
+  const [nova, setNova] = useState<Geometria | null>(null); // forma sendo desenhada
   const [hover, setHover] = useState<string | null>(null);
   const [balao, setBalao] = useState<{x: number; y: number; caminho?: string} | null>(null);
   const [textoBalao, setTextoBalao] = useState('');
   const [exportando, setExportando] = useState(false);
   const arrasto = useRef<Arrasto | null>(null);
+  const desenho = useRef<{x0: number; y0: number} | null>(null);
+  const panoramica = useRef<{x: number; y: number; sl: number; st: number} | null>(null);
+  const ancoraZoom = useRef<{px: number; py: number; cx: number; cy: number} | null>(null);
 
   // camadas como aparecem: o documento, mais o campo em prévia (inspector) e o arrasto em curso
   const camadas = useMemo(() => {
@@ -95,19 +128,75 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
   // a prévia vale até o documento mudar (o patch dela chegou, ou outra mão mexeu)
   useEffect(() => definirPrevia(null), [doc]);
 
+  const valido = docValido(doc);
+  const W = valido ? Math.max(1, doc.largura) : 1;
+  const H = valido ? Math.max(1, doc.altura) : 1;
+  const ajustada = Math.max(0.02, Math.min((w - MARGEM * 2) / W, (h - MARGEM * 2) / H));
+  const escala = zoom ?? ajustada;
+
+  // zoom no ponto: depois de mudar a escala, a rolagem devolve o mesmo ponto da peça para baixo do cursor
+  const aproximar = (fator: number | null, cx?: number, cy?: number) => {
+    const p = palco.current;
+    if (p && monitorEl && cx !== undefined && cy !== undefined) {
+      const r = p.getBoundingClientRect();
+      ancoraZoom.current = {px: (cx - r.left) / escala, py: (cy - r.top) / escala, cx, cy};
+    }
+    setZoom(fator === null ? null : Math.min(8, Math.max(0.02, +(escala * fator).toFixed(4))));
+  };
+  useLayoutEffect(() => {
+    const a = ancoraZoom.current;
+    ancoraZoom.current = null;
+    const p = palco.current;
+    if (!a || !p || !monitorEl) return;
+    const r = p.getBoundingClientRect();
+    monitorEl.scrollLeft += r.left + a.px * escala - a.cx;
+    monitorEl.scrollTop += r.top + a.py * escala - a.cy;
+  }, [escala]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Ctrl+roda aproxima no cursor
+  const aproximarRef = useRef(aproximar);
+  aproximarRef.current = aproximar;
+  useEffect(() => {
+    if (!monitorEl) return;
+    const roda = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      aproximarRef.current(Math.exp(-e.deltaY * 0.0025), e.clientX, e.clientY);
+    };
+    monitorEl.addEventListener('wheel', roda, {passive: false});
+    return () => monitorEl.removeEventListener('wheel', roda);
+  }, [monitorEl]);
+
+  // teclas das ferramentas deste monitor (V também sai do modo comentário, pela casca)
+  useEffect(() => {
+    const tecla = (e: KeyboardEvent) => {
+      if (e.ctrlKey && !e.altKey && (e.key === '0' || e.key === '1')) {
+        const alvo = e.target as HTMLElement;
+        if (/INPUT|TEXTAREA|SELECT/.test(alvo.tagName) || alvo.closest?.('.xterm')) return;
+        e.preventDefault();
+        setZoom(e.key === '0' ? null : 1);
+        return;
+      }
+      if (!teclaLivre(e) || e.shiftKey) return;
+      const f = POR_TECLA[e.key.toLowerCase()];
+      if (!f || (!editavel && (f === 'texto' || f === 'forma'))) return;
+      setFerramenta(f);
+      if (f !== 'mover') loja.definir({modoComentario: false});
+    };
+    window.addEventListener('keydown', tecla);
+    return () => window.removeEventListener('keydown', tecla);
+  }, [editavel]);
+
   if (!documento) return <div className="vazio">nenhuma imagem no projeto</div>;
   if (!doc) return <div className="vazio">carregando…</div>;
-  if (!docValido(doc)) return <div className="vazio" style={{color: 'var(--erro)'}}>o documento {documento} não tem a lista "camadas"</div>;
+  if (!valido) return <div className="vazio" style={{color: 'var(--erro)'}}>o documento {documento} não tem a lista "camadas"</div>;
 
-  const W = Math.max(1, doc.largura);
-  const H = Math.max(1, doc.altura);
-  const ajustada = Math.max(0.02, Math.min((w - 24) / W, (h - 24) / H));
-  const escala = zoom ?? ajustada;
   const fundo = previa && previa.documento === documento && previa.caminho === '/fundo' ? String(previa.valor) : doc.fundo;
   const iSel = editavel && selecao?.documento === documento ? indiceDe(selecao.caminho) : -1;
   const sel = iSel >= 0 ? camadas[iSel] : undefined;
   const iHover = hover && hover !== selecao?.caminho ? indiceDe(hover) : -1;
   const sobre = iHover >= 0 ? camadas[iHover] : undefined;
+  const ferr: Ferramenta = modoComentario ? 'mover' : ferramenta;
 
   const caminhoSob = (x: number, y: number) => {
     for (const el of document.elementsFromPoint(x, y)) {
@@ -116,26 +205,91 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
     }
     return null;
   };
+  const pontoDoc = (cx: number, cy: number) => {
+    const r = palco.current!.getBoundingClientRect();
+    return {x: (cx - r.left) / escala, y: (cy - r.top) / escala};
+  };
 
   const clicar = (ev: React.MouseEvent) => {
-    const caminho = caminhoSob(ev.clientX, ev.clientY);
+    if (panoramica.current || desenho.current) return;
     if (modoComentario) {
       const b = palco.current!.getBoundingClientRect();
       setTextoBalao('');
-      setBalao({x: ev.clientX - b.left, y: ev.clientY - b.top, caminho: caminho ?? undefined});
+      setBalao({x: ev.clientX - b.left, y: ev.clientY - b.top, caminho: caminhoSob(ev.clientX, ev.clientY) ?? undefined});
       return;
     }
+    if (ferr === 'zoom') return aproximar(ev.altKey ? 1 / 1.5 : 1.5, ev.clientX, ev.clientY);
+    if (ferr === 'texto' && editavel) {
+      void novoTexto(documento, doc, pontoDoc(ev.clientX, ev.clientY)).then((ok) => ok && setFerramenta('mover'));
+      return;
+    }
+    if (ferr !== 'mover') return;
+    const caminho = caminhoSob(ev.clientX, ev.clientY);
     if (editavel) selecionar(caminho ? {documento, caminho} : null);
   };
 
   const mover = (ev: React.MouseEvent) => {
-    if (arrasto.current || modoComentario || !editavel) return;
-    setHover(caminhoSob(ev.clientX, ev.clientY));
+    if (coords.current) {
+      const p = pontoDoc(ev.clientX, ev.clientY);
+      coords.current.textContent = `x ${Math.round(p.x)} · y ${Math.round(p.y)}`;
+    }
+    if (arrasto.current || modoComentario || !editavel || ferr !== 'mover') return;
+    const c = caminhoSob(ev.clientX, ev.clientY);
+    setHover((ant) => (ant === c ? ant : c));
+  };
+
+  // mão (H) ou botão do meio: arrasta a vista
+  const comecarPanoramica = (ev: React.PointerEvent) => {
+    if (!monitorEl || !(ev.button === 1 || (ev.button === 0 && ferr === 'mao' && !modoComentario))) return false;
+    ev.preventDefault();
+    ev.currentTarget.setPointerCapture(ev.pointerId);
+    panoramica.current = {x: ev.clientX, y: ev.clientY, sl: monitorEl.scrollLeft, st: monitorEl.scrollTop};
+    return true;
+  };
+  const durantePanoramica = (ev: React.PointerEvent) => {
+    const p = panoramica.current;
+    if (!p || !monitorEl) return false;
+    monitorEl.scrollLeft = p.sl - (ev.clientX - p.x);
+    monitorEl.scrollTop = p.st - (ev.clientY - p.y);
+    return true;
+  };
+
+  // forma (U): arrasta para desenhar; Shift faz quadrado; um clique cria o tamanho padrão no ponto
+  const comecarForma = (ev: React.PointerEvent) => {
+    if (ferr !== 'forma' || !editavel || ev.button !== 0 || modoComentario) return;
+    ev.stopPropagation();
+    ev.currentTarget.setPointerCapture(ev.pointerId);
+    const p = pontoDoc(ev.clientX, ev.clientY);
+    desenho.current = {x0: p.x, y0: p.y};
+    setNova({x: p.x, y: p.y, largura: 0, altura: 0});
+  };
+  const duranteForma = (ev: React.PointerEvent) => {
+    const d = desenho.current;
+    if (!d) return;
+    const p = pontoDoc(ev.clientX, ev.clientY);
+    let lw = p.x - d.x0;
+    let lh = p.y - d.y0;
+    if (ev.shiftKey) {
+      const m = Math.max(Math.abs(lw), Math.abs(lh));
+      lw = Math.sign(lw || 1) * m;
+      lh = Math.sign(lh || 1) * m;
+    }
+    setNova({x: Math.min(d.x0, d.x0 + lw), y: Math.min(d.y0, d.y0 + lh), largura: Math.abs(lw), altura: Math.abs(lh)});
+  };
+  const soltarForma = () => {
+    const d = desenho.current;
+    const n = nova;
+    desenho.current = null;
+    setNova(null);
+    if (!d || !n) return;
+    const lado = Math.max(8, Math.round(Math.min(W, H) * 0.3));
+    const caixa = n.largura * escala < 4 || n.altura * escala < 4 ? {x: d.x0 - lado / 2, y: d.y0 - lado / 2, largura: lado, altura: lado} : n;
+    void novaForma(documento, doc, caixa).then((ok) => ok && setFerramenta('mover'));
   };
 
   const iniciar = (ev: React.PointerEvent, modo: Arrasto['modo']) => {
     const c = doc.camadas[iSel];
-    if (!c || ev.button !== 0) return;
+    if (!c || ev.button !== 0 || ferr !== 'mover') return;
     ev.stopPropagation();
     ev.currentTarget.setPointerCapture(ev.pointerId);
     arrasto.current = {x0: ev.clientX, y0: ev.clientY, modo, rot: c.rotacao ?? 0, alvo: null,
@@ -208,77 +362,110 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
     if (caminho) selecionar({documento, caminho});
   };
 
-  const aproximar = (fator: number) => setZoom(Math.min(8, Math.max(0.02, +(escala * fator).toFixed(4))));
-
   const exportar = () => {
     setExportando(true);
     void exportarPng(documento).finally(() => setExportando(false));
   };
 
+  const usar = (f: Ferramenta) => () => {
+    setFerramenta(f);
+    loja.definir({modoComentario: false});
+  };
+  const grupos = [
+    [
+      {id: 'mover', nome: 'Mover', tecla: 'V', icone: <MousePointer2 />, ativa: !modoComentario && ferramenta === 'mover', aoClicar: usar('mover')},
+      {id: 'mao', nome: 'Mão', tecla: 'H', icone: <Hand />, ativa: !modoComentario && ferramenta === 'mao', aoClicar: usar('mao')},
+      {id: 'zoom', nome: 'Zoom (Alt afasta)', tecla: 'Z', icone: <ZoomIn />, ativa: !modoComentario && ferramenta === 'zoom', aoClicar: usar('zoom')},
+    ],
+    ...(editavel ? [[
+      {id: 'texto', nome: 'Texto', tecla: 'T', icone: <Type />, ativa: !modoComentario && ferramenta === 'texto', aoClicar: usar('texto')},
+      {id: 'forma', nome: 'Forma (Shift faz quadrado)', tecla: 'U', icone: <Square />, ativa: !modoComentario && ferramenta === 'forma', aoClicar: usar('forma')},
+      {id: 'imagem', nome: 'Inserir imagem do projeto', icone: <ImagePlus />, ativa: inserindo, aoClicar: () => setInserindo(true)},
+    ]] : []),
+    [{id: 'm', nome: 'Comentário', tecla: 'M', icone: <MessageSquarePlus />, ativa: modoComentario, aoClicar: () => loja.definir({modoComentario: true})}],
+  ];
+  const cursor = modoComentario ? 'crosshair' : ferr === 'mao' ? 'grab' : ferr === 'zoom' ? 'zoom-in' : ferr === 'texto' ? 'text' : ferr === 'forma' ? 'crosshair' : 'default';
+
   return (
     <div className="painel">
-      <div className="monitor" ref={refMonitor} style={{overflow: 'auto', justifyContent: 'flex-start', alignItems: 'flex-start'}}>
-        {w > 0 && h > 0 && <div className="palco" ref={palco} style={{width: W * escala, height: H * escala, margin: 'auto', flex: 'none', cursor: modoComentario ? 'crosshair' : 'default'}}
-          onClick={clicar} onMouseMove={mover} onMouseLeave={() => setHover(null)}>
-          <div style={{position: 'absolute', left: 0, top: 0, width: W, height: H, transform: `scale(${escala})`, transformOrigin: '0 0',
-            background: fundo, overflow: 'hidden', userSelect: 'none'}}>
-            <CamadaEfeitos efeitos={previaEfeitos ?? doc.efeitos} quadro={0}>
-              <div style={{position: 'absolute', inset: 0, background: fundo}} />
-              {camadas.map((c, i) => visivel(c) && <Camada key={c.id || i} c={c} caminho={`/camadas/${i}`} escala={escala} />)}
-            </CamadaEfeitos>
-          </div>
-          <div className="sobreposicao">
-            {sobre && <div className="caixa-hover" style={caixaCss(sobre, escala)} />}
-            {sel && (
-              <div className="caixa-sel" style={{...caixaCss(sel, escala), pointerEvents: modoComentario ? 'none' : undefined, borderStyle: visivel(sel) ? undefined : 'dashed'}}
-                onPointerDown={(e) => iniciar(e, 'mover')} onPointerMove={durante} onPointerUp={(e) => void soltar(e)} onPointerCancel={cancelar}
-                onClick={(e) => e.stopPropagation()}>
-                <div className="alca" onPointerDown={(e) => iniciar(e, 'redimensionar')} title="Redimensionar (Shift mantém a proporção)" />
-              </div>
-            )}
-            {pinos.map((c) => (
-              <div key={c.id} className={`pino${c.estado === 'resolvido' ? ' resolvido' : ''}`} title={c.texto}
-                style={{left: `${c.alvo.ponto!.x * 100}%`, top: `${c.alvo.ponto!.y * 100}%`, outline: c.id === comentarioAberto ? '2px solid var(--acento)' : undefined}}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  abrirPino(c);
-                }}>
-                {c.id.replace(/\D/g, '').replace(/^0+/, '')}
-              </div>
-            ))}
-            {balao && (
-              <div className="balao" style={{left: Math.max(0, Math.min(balao.x, W * escala - 270)), top: Math.max(0, Math.min(balao.y + 8, H * escala - 150))}}
-                onClick={(e) => e.stopPropagation()}>
-                <div className="rotulo" style={{marginBottom: 6}}>comentário{balao.caminho ? ` · ${balao.caminho}` : ''}</div>
-                <textarea className="campo" autoFocus value={textoBalao} onChange={(e) => setTextoBalao(e.target.value)} placeholder="O que mudar aqui?"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) void salvarComentario();
-                    if (e.key === 'Escape') setBalao(null);
-                  }} />
-                <div style={{display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 6}}>
-                  <button className="bt fantasma mini" onClick={() => setBalao(null)}>Cancelar</button>
-                  <button className="bt principal mini" onClick={() => void salvarComentario()}>Comentar (Ctrl+Enter)</button>
+      <div className="monitor-grade">
+        <Trilho grupos={grupos} />
+        <div className="monitor" ref={refMonitor} style={{overflow: 'auto', justifyContent: 'flex-start', alignItems: 'flex-start', padding: `${MARGEM + 8}px ${MARGEM}px ${MARGEM - 8}px`}}
+          onPointerDown={(e) => comecarPanoramica(e)} onPointerMove={(e) => durantePanoramica(e)}
+          onPointerUp={() => setTimeout(() => (panoramica.current = null), 0)}>
+          {w > 0 && h > 0 && <div className="palco xadrez" ref={palco} style={{width: W * escala, height: H * escala, margin: 'auto', cursor}}
+            onClick={clicar} onMouseMove={mover} onMouseLeave={() => {
+              setHover(null);
+              if (coords.current) coords.current.textContent = '';
+            }}
+            onPointerDown={comecarForma} onPointerMove={duranteForma} onPointerUp={() => desenho.current && setTimeout(soltarForma, 0)}>
+            <span className="rotulo-peca" title="Propriedades da imagem" onClick={(e) => {
+              e.stopPropagation();
+              if (editavel) selecionar(null);
+            }}><b>{titulo}</b> · {W} × {H}</span>
+            <div style={{position: 'absolute', left: 0, top: 0, width: W, height: H, transform: `scale(${escala})`, transformOrigin: '0 0',
+              background: fundo, overflow: 'hidden', userSelect: 'none'}}>
+              <CamadaEfeitos efeitos={previaEfeitos ?? doc.efeitos} quadro={0}>
+                <div style={{position: 'absolute', inset: 0, background: fundo}} />
+                {camadas.map((c, i) => visivel(c) && <Camada key={c.id || i} c={c} caminho={`/camadas/${i}`} escala={escala} />)}
+              </CamadaEfeitos>
+            </div>
+            <div className="sobreposicao">
+              {sobre && <div className="caixa-hover" style={caixaCss(sobre, escala)} />}
+              {nova && <div className="caixa-nova" style={{left: nova.x * escala, top: nova.y * escala, width: nova.largura * escala, height: nova.altura * escala}} />}
+              {sel && (
+                <div className="caixa-sel" style={{...caixaCss(sel, escala), pointerEvents: modoComentario || ferr !== 'mover' ? 'none' : undefined, borderStyle: visivel(sel) ? undefined : 'dashed'}}
+                  onPointerDown={(e) => iniciar(e, 'mover')} onPointerMove={durante} onPointerUp={(e) => void soltar(e)} onPointerCancel={cancelar}
+                  onClick={(e) => e.stopPropagation()}>
+                  {!sel.rotacao && sel.y * escala > 20 && <span className="etiqueta-sel">{rotuloCamada(sel)}</span>}
+                  <div className="alca" onPointerDown={(e) => iniciar(e, 'redimensionar')} title="Redimensionar (Shift mantém a proporção)" />
                 </div>
-              </div>
-            )}
-          </div>
-        </div>}
-      </div>
-      <div className="controles">
-        <div className="ferramentas">
-          <button className={`bt mini${!modoComentario ? ' ligado' : ''}`} onClick={() => loja.definir({modoComentario: false})} title="Selecionar"><MousePointer2 size={13} /></button>
-          <button className={`bt mini${modoComentario ? ' ligado' : ''}`} onClick={() => loja.definir({modoComentario: true})} title="Comentar (C)"><MessageSquarePlus size={13} /></button>
+              )}
+              {pinos.map((c) => (
+                <div key={c.id} className={`pino${c.estado === 'resolvido' ? ' resolvido' : ''}`} title={c.texto}
+                  style={{left: `${c.alvo.ponto!.x * 100}%`, top: `${c.alvo.ponto!.y * 100}%`, outline: c.id === comentarioAberto ? '2px solid var(--acento)' : undefined}}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    abrirPino(c);
+                  }}>
+                  {c.id.replace(/\D/g, '').replace(/^0+/, '')}
+                </div>
+              ))}
+              {balao && (
+                <div className="balao" style={{left: Math.max(0, Math.min(balao.x, W * escala - 270)), top: Math.max(0, Math.min(balao.y + 8, H * escala - 150))}}
+                  onClick={(e) => e.stopPropagation()}>
+                  <div className="rotulo" style={{marginBottom: 6}}>Comentário{balao.caminho && doc.camadas[indiceDe(balao.caminho)] ? ` em ${rotuloCamada(doc.camadas[indiceDe(balao.caminho)])}` : ''}</div>
+                  <textarea className="campo" autoFocus value={textoBalao} onChange={(e) => setTextoBalao(e.target.value)} placeholder="O que mudar aqui?"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) void salvarComentario();
+                      if (e.key === 'Escape') setBalao(null);
+                    }} />
+                  <div style={{display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 6}}>
+                    <button className="bt fantasma mini" onClick={() => setBalao(null)}>Cancelar</button>
+                    <button className="bt principal mini" onClick={() => void salvarComentario()}>Comentar · Ctrl+Enter</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>}
         </div>
-        <span className="rotulo" style={{textTransform: 'none'}}>{doc.largura}×{doc.altura}</span>
-        <span style={{flex: 1}} />
-        <button className="bt fantasma mini" onClick={() => aproximar(1 / 1.25)} title="Afastar"><Minus size={13} /></button>
-        <button className={`bt mini${zoom === null ? ' ligado' : ''}`} onClick={() => setZoom(null)} title={zoom === null ? 'Ajustado ao painel' : 'Ajustar ao painel'}
-          style={{minWidth: 52, justifyContent: 'center'}}>
-          {Math.round(escala * 100)}%
-        </button>
-        <button className="bt fantasma mini" onClick={() => aproximar(1.25)} title="Aproximar"><Plus size={13} /></button>
-        <button className="bt mini" disabled={exportando} onClick={exportar} title="Exportar PNG em resolução cheia, com os efeitos"><Download size={13} />Exportar PNG</button>
+        <div className="transporte">
+          <BotaoMenu className="bt mini zoom-bt" lado="esquerda" acima titulo={zoom === null ? 'Zoom: ajustado ao painel' : 'Zoom'} icone={null}
+            rotulo={<>{Math.round(escala * 100)}%<ChevronDown className="i12" /></>}
+            itens={[
+              {rotulo: 'Ajustar ao painel', tecla: 'Ctrl+0', acao: () => setZoom(null)},
+              'sep',
+              {rotulo: '50%', acao: () => setZoom(0.5)},
+              {rotulo: '100%', tecla: 'Ctrl+1', acao: () => setZoom(1)},
+              {rotulo: '200%', acao: () => setZoom(2)},
+            ]} />
+          <span className="coords largo" ref={coords} />
+          <button className="bt fantasma" style={{marginLeft: 'auto'}} disabled={exportando} onClick={exportar} title="Exportar PNG em resolução cheia, com os efeitos">
+            <Download /><span className="largo">Exportar PNG</span>
+          </button>
+        </div>
       </div>
+      {inserindo && editavel && <InserirImagem documento={documento} doc={doc} fechar={() => setInserindo(false)} />}
     </div>
   );
 };

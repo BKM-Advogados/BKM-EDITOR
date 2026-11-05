@@ -1,5 +1,5 @@
 import {contextBridge, ipcRenderer, type IpcRendererEvent} from 'electron';
-import {CANAL, type ApiEstudio, type Mudanca, type Progresso} from '../compartilhado/api';
+import {CANAL, type ApiEstudio, type EventoConversa, type Mudanca, type Progresso} from '../compartilhado/api';
 
 const ouvir = <A extends unknown[]>(canal: string, cb: (...a: A) => void) => {
   const h = (_e: IpcRendererEvent, ...a: A) => cb(...a);
@@ -33,6 +33,16 @@ const api: ApiEstudio = {
     fechar: (id) => ipcRenderer.send(CANAL.terminalFechar, id),
     aoReceber: (cb) => ouvir<[number, string]>(CANAL.terminalDados, cb),
     aoSair: (cb) => ouvir<[number, number]>(CANAL.terminalSaiu, cb),
+  },
+  conversa: {
+    conta: () => ipcRenderer.invoke(CANAL.conversaConta),
+    abrir: (o) => ipcRenderer.invoke(CANAL.conversaAbrir, o ?? {}),
+    enviar: (id, texto) => ipcRenderer.invoke(CANAL.conversaEnviar, id, texto),
+    permitir: (id, pedido, decisao, sempre) => ipcRenderer.send(CANAL.conversaPermitir, id, pedido, decisao, sempre),
+    parar: (id) => ipcRenderer.send(CANAL.conversaParar, id),
+    hibernar: (id) => ipcRenderer.invoke(CANAL.conversaHibernar, id),
+    fechar: (id) => ipcRenderer.send(CANAL.conversaFechar, id),
+    aoEvento: (cb) => ouvir<[number, EventoConversa]>(CANAL.conversaEvento, cb),
   },
   exportarVideo: (documento) => ipcRenderer.invoke(CANAL.exportar, documento),
   exportarImagem: (documento, png) => ipcRenderer.invoke(CANAL.exportarImagem, documento, png),

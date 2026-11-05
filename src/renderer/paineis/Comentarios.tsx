@@ -1,7 +1,8 @@
 // Comentários do projeto: os da pessoa e as respostas do agente. Clicar leva ao objeto e ao tempo; "Pedir ao Claude"
 // manda o pedido para a aba ativa do terminal.
 import React, {useEffect, useState} from 'react';
-import {Check, RotateCcw, Send, Sparkles} from 'lucide-react';
+import {Check, RotateCcw, Send} from 'lucide-react';
+import {IconeAgente} from '../componentes/Icones';
 import {avisar, carregarComentarios, loja, selecionar, useLoja} from '../estado/loja';
 import type {Comentario} from '../../nucleo/documentos';
 
@@ -60,7 +61,7 @@ const Cartao: React.FC<{c: Comentario; aberto: boolean}> = ({c, aberto}) => {
           <div style={{display: 'flex', gap: 6, marginTop: 6}}>
             {c.estado === 'aberto' ? (
               <>
-                <button className="bt mini" onClick={() => void pedirAoClaude(c)}><Sparkles size={13} color="var(--agente)" />Pedir ao Claude</button>
+                <button className="bt mini" onClick={() => void pedirAoClaude(c)}><IconeAgente />Pedir ao Claude</button>
                 <button className="bt fantasma mini" onClick={() => void window.estudio.resolverComentario(c.id).then(carregarComentarios)}><Check size={13} />Resolver</button>
               </>
             ) : (
@@ -84,13 +85,12 @@ export const Comentarios: React.FC = () => {
   return (
     <div className="painel">
       <div className="painel-topo">
-        <span className="titulo">Comentários</span>
         <span className="esp" />
         <button className={`bt mini${filtro === 'aberto' ? ' ligado' : ''}`} onClick={() => setFiltro('aberto')}>Abertos</button>
         <button className={`bt mini${filtro === 'todos' ? ' ligado' : ''}`} onClick={() => setFiltro('todos')}>Todos</button>
       </div>
       <div className="painel-corpo">
-        {lista.length === 0 && <div className="vazio">Nenhum comentário{filtro === 'aberto' ? ' aberto' : ''}. Use Comentar (C) e clique na tela.</div>}
+        {lista.length === 0 && <div className="vazio">Nenhum comentário{filtro === 'aberto' ? ' aberto' : ''}. Use Comentar (M) e clique na tela.</div>}
         {lista.map((c) => <div key={c.id} id={`cmt-${c.id}`}><Cartao c={c} aberto={c.id === aberto} /></div>)}
       </div>
     </div>

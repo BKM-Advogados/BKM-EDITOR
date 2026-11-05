@@ -7,3 +7,4 @@ remotion-browser/
 testes/saida/
 *.log
 referencia/
+.vite-bloqueada-bitdefender/

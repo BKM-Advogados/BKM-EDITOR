@@ -3,7 +3,7 @@
 import {chromium} from 'playwright';
 
 const navegador = await chromium.connectOverCDP(`http://127.0.0.1:${process.env.ESTUDIO_DEPURAR_PORTA ?? '9471'}`);
-const p = navegador.contexts().flatMap((c) => c.pages()).find((x) => /^(http:\/\/localhost:5173|file:)/.test(x.url()));
+const p = navegador.contexts().flatMap((c) => c.pages()).find((x) => /^(http:\/\/localhost:\d+|file:)/.test(x.url()));
 const erros = [];
 p.on('pageerror', (e) => erros.push(e.message));
 p.on('console', (m) => m.type() === 'error' && erros.push(m.text().slice(0, 200)));

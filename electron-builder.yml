@@ -1,0 +1,30 @@
+# Instalador do Windows (NSIS), montado sobre o app que o Electron Forge empacota em out/Estudio-win32-x64:
+#   npm run instalador   →   out/instalador/Estudio-Setup-<versão>.exe
+# Instala na pasta da pessoa (%LocalAppData%\Programs\Estudio), sem pedir administrador, e cria os atalhos na área de
+# trabalho e no menu Iniciar. Troca do Squirrel (5/11/2026): o antivírus da BKM derrubava o executável intermediário dele.
+appId: br.com.bkmadvogados.estudio
+productName: Estudio
+copyright: BKM Advogados
+directories:
+  output: out/instalador
+win:
+  icon: build/icone.ico
+  target:
+    - target: nsis
+      arch: [x64]
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: Estúdio
+  menuCategory: false
+  runAfterFinish: true
+  deleteAppDataOnUninstall: false
+  installerIcon: build/icone.ico
+  uninstallerIcon: build/icone.ico
+  uninstallDisplayName: Estúdio
+  artifactName: Estudio-Setup-${version}.${ext}
+  language: '1046'

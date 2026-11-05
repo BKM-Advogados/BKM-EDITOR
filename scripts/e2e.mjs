@@ -9,7 +9,7 @@ const porta = process.env.ESTUDIO_DEPURAR_PORTA ?? '9471';
 const projeto = process.env.ESTUDIO_PROJETO ?? path.resolve('testes/saida/exemplo');
 const ler = (rel) => JSON.parse(readFileSync(path.join(projeto, rel), 'utf-8'));
 const navegador = await chromium.connectOverCDP(`http://127.0.0.1:${porta}`);
-const p = navegador.contexts().flatMap((c) => c.pages()).find((x) => /^(http:\/\/localhost:5173|file:)/.test(x.url()));
+const p = navegador.contexts().flatMap((c) => c.pages()).find((x) => /^(http:\/\/localhost:\d+|file:)/.test(x.url()));
 if (!p) throw new Error('janela do Estúdio não achada');
 const erros = [];
 p.on('pageerror', (e) => erros.push(e.message));

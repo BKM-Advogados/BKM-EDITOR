@@ -6,7 +6,7 @@ const [nome = 'tela', espera = '1500', js] = process.argv.slice(2);
 const porta = process.env.ESTUDIO_DEPURAR_PORTA ?? '9471';
 const navegador = await chromium.connectOverCDP(`http://127.0.0.1:${porta}`);
 // só a janela do Estúdio (dev server do Vite ou arquivo empacotado), nunca outro navegador que use a mesma porta
-const pagina = navegador.contexts().flatMap((c) => c.pages()).find((p) => /^(http:\/\/localhost:5173|file:)/.test(p.url()));
+const pagina = navegador.contexts().flatMap((c) => c.pages()).find((p) => /^(http:\/\/localhost:\d+|file:)/.test(p.url()));
 if (!pagina) throw new Error('janela do Estúdio não achada');
 const erros = [];
 pagina.on('console', (m) => (m.type() === 'error' || m.type() === 'warning') && erros.push(`${m.type()}: ${m.text()}`));

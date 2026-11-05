@@ -10,7 +10,6 @@ export const Historico: React.FC = () => {
   return (
     <div className="painel">
       <div className="painel-topo">
-        <span className="titulo">Histórico</span>
         <span className="esp" />
         <button className="bt mini" onClick={() => void desfazer()} title="Desfaz a sua última edição (Ctrl+Z)"><Undo2 size={13} />Desfazer</button>
       </div>

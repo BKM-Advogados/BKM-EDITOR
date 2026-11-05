@@ -4,7 +4,7 @@ import {chromium} from 'playwright';
 
 const [texto = 'numero', espera = '3000', nome = 'acao'] = process.argv.slice(2);
 const navegador = await chromium.connectOverCDP(`http://127.0.0.1:${process.env.ESTUDIO_DEPURAR_PORTA ?? '9471'}`);
-const p = navegador.contexts().flatMap((c) => c.pages()).find((x) => /^(http:\/\/localhost:5173|file:)/.test(x.url()));
+const p = navegador.contexts().flatMap((c) => c.pages()).find((x) => /^(http:\/\/localhost:\d+|file:)/.test(x.url()));
 const msgs = [];
 p.on('console', (m) => msgs.push(`${m.type()}: ${m.text().slice(0, 300)}`));
 p.on('pageerror', (e) => msgs.push(`pageerror: ${e.message}`));

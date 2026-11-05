@@ -4,6 +4,7 @@ import {cpSync, existsSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {CANAL, type InfoProjeto, type Metricas, type Perfil, type Progresso} from '../compartilhado/api';
+import {Conversas, contaClaude} from './conversa';
 import type {Comentario, EstadoEditor, OperacaoPatch} from '../nucleo/documentos';
 import {ErroProjeto} from '../nucleo/projeto';
 import {exportarVideo} from './exportar';
@@ -11,6 +12,9 @@ import {McpHttp} from './mcp-http';
 import {ServidorMidia} from './servidor-midia';
 import {SessaoProjeto} from './sessao-projeto';
 import {Terminais} from './terminais';
+
+// o mesmo id do instalador (electron-builder.yml): a barra de tarefas agrupa a janela com o atalho
+app.setAppUserModelId('br.com.bkmadvogados.estudio');
 
 // teste de ponta a ponta: o script de e2e se conecta à janela pelo protocolo de depuração do Chromium
 if (process.env.ESTUDIO_DEPURAR_PORTA) app.commandLine.appendSwitch('remote-debugging-port', process.env.ESTUDIO_DEPURAR_PORTA);
@@ -29,6 +33,12 @@ let mcpHttp: McpHttp | null = null;
 let abasClaude = 0;
 const enviar = (canal: string, ...a: unknown[]) => janela?.webContents.send(canal, ...a);
 const terminais = new Terminais({dados: (id, d) => enviar(CANAL.terminalDados, id, d), saiu: (id, c) => enviar(CANAL.terminalSaiu, id, c)});
+// teste da conversa sem login: ESTUDIO_CLAUDE_FALSO aponta para um claude falso (testes/fixtures/claude-falso.mjs),
+// rodado pelo próprio Electron em modo Node
+const claudeFalso = process.env.ESTUDIO_CLAUDE_FALSO;
+const conversas = new Conversas({evento: (id, e) => enviar(CANAL.conversaEvento, id, e), vivas: () => terminais.vivas(),
+  claude: () => (claudeFalso ? process.execPath : terminais.caminhoClaude),
+  ...(claudeFalso ? {prefixo: [claudeFalso], ambienteExtra: {ELECTRON_RUN_AS_NODE: '1'}} : {})});
 
 const recursos = (rel: string) => (app.isPackaged ? path.join(process.resourcesPath, rel) : path.join(app.getAppPath(), rel));
 
@@ -46,6 +56,7 @@ const info = (): InfoProjeto | null =>
 const abrirProjeto = async (raiz: string) => {
   if (!existsSync(path.join(raiz, 'estudio.json'))) throw new Error(`não é um projeto do Estúdio (falta estudio.json): ${raiz}`);
   terminais.fecharTodos();
+  conversas.fecharTodas();
   await sessao?.fechar();
   desfeitos.clear();
   sessao = new SessaoProjeto(raiz, (arquivo) => enviar(CANAL.mudou, {arquivo}));
@@ -61,7 +72,10 @@ const criarJanela = () => {
     minWidth: 1100,
     minHeight: 640,
     show: false,
-    backgroundColor: '#17191b',
+    // barra de título própria (a casca desenha nome, áreas e ações); os botões da janela continuam os do Windows
+    titleBarStyle: 'hidden',
+    titleBarOverlay: {color: '#0f0f0f', symbolColor: '#b4b4b4', height: 36},
+    backgroundColor: '#0f0f0f',
     title: 'Estúdio',
     autoHideMenuBar: true,
     webPreferences: {contextIsolation: true, nodeIntegration: false, sandbox: true, preload: path.join(__dirname, 'preload.js')},
@@ -74,6 +88,7 @@ const criarJanela = () => {
   // sobrar claude órfão gastando memória por trás
   const largarTerminais = () => {
     terminais.fecharTodos();
+    conversas.fecharTodas();
     mcpHttp?.esquecerTudo();
   };
   janela.webContents.on('did-start-navigation', (d) => {
@@ -136,8 +151,13 @@ lidar(CANAL.resolverComentario, (id: string) => exigirProjeto().resolver(id, 'pe
 lidar(CANAL.reabrir, (id: string) => exigirProjeto().reabrir(id));
 lidar(CANAL.diario, (desde?: number) => exigirProjeto().diario(desde ?? 0).slice(-200));
 lidar(CANAL.terminalCriar, (o: {tipo: 'claude' | 'shell'; colunas: number; linhas: number; sessao?: string}) =>
-  terminais.criar({...o, cwd: exigirProjeto().raiz, limiteClaude: PERFIL.sessoes_claude,
+  terminais.criar({...o, cwd: exigirProjeto().raiz, limiteClaude: PERFIL.sessoes_claude, outrasVivas: conversas.vivas(),
     arquivoMcp: o.tipo === 'claude' ? mcpHttp!.novaAba(midia.origem, `Claude ${++abasClaude}`) : undefined}));
+lidar(CANAL.conversaConta, () => contaClaude(terminais.caminhoClaude));
+lidar(CANAL.conversaAbrir, (o: {sessao?: string}) =>
+  conversas.abrir({cwd: exigirProjeto().raiz, sessao: o.sessao, arquivoMcp: mcpHttp!.novaAba(midia.origem, `Claude ${++abasClaude}`)}));
+lidar(CANAL.conversaEnviar, (id: number, texto: string) => conversas.enviar(id, texto, PERFIL.sessoes_claude));
+lidar(CANAL.conversaHibernar, (id: number) => conversas.hibernar(id));
 lidar(CANAL.exportar, async (documento: string) => {
   const p = exigirProjeto();
   const montado = sessao!.propsVideo(documento, midia.base);
@@ -184,6 +204,9 @@ ipcMain.on(CANAL.gravarEstado, (e, estado: Omit<EstadoEditor, 'atualizado_em'>) 
 ipcMain.on(CANAL.terminalEscrever, (e, id: number, d: string) => (confiavel(e), terminais.escrever(id, d)));
 ipcMain.on(CANAL.terminalTamanho, (e, id: number, c: number, l: number) => (confiavel(e), terminais.tamanho(id, c, l)));
 ipcMain.on(CANAL.terminalFechar, (e, id: number) => (confiavel(e), terminais.fechar(id)));
+ipcMain.on(CANAL.conversaPermitir, (e, id: number, pedido: string, decisao: 'permitir' | 'negar', sempre?: boolean) => (confiavel(e), conversas.permitir(id, pedido, decisao, sempre)));
+ipcMain.on(CANAL.conversaParar, (e, id: number) => (confiavel(e), conversas.parar(id)));
+ipcMain.on(CANAL.conversaFechar, (e, id: number) => (confiavel(e), conversas.fechar(id)));
 
 app.on('ready', async () => {
   await midia.iniciar();
@@ -197,6 +220,7 @@ app.on('ready', async () => {
 
 app.on('window-all-closed', () => {
   terminais.fecharTodos();
+  conversas.fecharTodas();
   mcpHttp?.esquecerTudo();
   void sessao?.fechar();
   midia.parar();
