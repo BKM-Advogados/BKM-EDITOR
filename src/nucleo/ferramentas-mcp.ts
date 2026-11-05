@@ -3,7 +3,9 @@
 import type {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {z} from 'zod';
 import {ErroProjeto, valorEm, type Projeto} from './projeto';
-import type {OperacaoPatch} from './documentos';
+import type {Modulo, OperacaoPatch} from './documentos';
+import {documentoNovo} from './criar-projeto';
+import {FORMATOS_IMAGEM, FORMATOS_VIDEO} from './formatos';
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x, null, 2)}]});
 const erro = (e: unknown) => ({
@@ -60,6 +62,30 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
     const r = projeto.aplicarPatch({documento, versao_base, patch, autor: autor, origem, rotulo});
     return {ok: true, versao: r.versao, seq: r.entrada.seq};
   }));
+
+  servidor.registerTool('criar_documento', {
+    description: `Cria um documento novo no projeto (vídeo de cenas, imagem ou cena 3D) e o põe no manifesto; a tela abre sozinha. Formatos de vídeo: ${FORMATOS_VIDEO.map((f) => `${f.id} (${f.proporcao}, ${f.largura}x${f.altura})`).join(', ')}. De imagem: ${FORMATOS_IMAGEM.map((f) => `${f.id} (${f.largura}x${f.altura})`).join(', ')}. Ou largura e altura livres.`,
+    inputSchema: {
+      modulo: z.enum(['video', 'imagem', '3d']),
+      titulo: z.string().optional(),
+      formato: z.string().optional().describe('id do formato da lista'),
+      largura: z.number().int().min(16).max(7680).optional(),
+      altura: z.number().int().min(16).max(7680).optional(),
+      fps: z.number().min(1).max(120).optional(),
+    },
+  }, seguro(({modulo, titulo, formato, largura, altura, fps}: {modulo: Modulo; titulo?: string; formato?: string; largura?: number; altura?: number; fps?: number}) => {
+    const preset = (modulo === 'imagem' ? FORMATOS_IMAGEM : FORMATOS_VIDEO).find((f) => f.id === formato);
+    if (formato && !preset) throw new ErroProjeto(`formato desconhecido: ${formato}`, 'nao_achado');
+    const tam = largura && altura ? {largura, altura} : preset ? {largura: preset.largura, altura: preset.altura} : undefined;
+    const {entrada, conteudo} = documentoNovo(projeto.manifesto(), modulo, {titulo, formato: tam ? {...tam, fps: fps ?? 30} : undefined});
+    projeto.adicionarDocumento(entrada, conteudo);
+    return {ok: true, ...entrada};
+  }));
+
+  servidor.registerTool('renomear_projeto', {
+    description: 'Muda o nome do projeto (aparece na barra do app e na lista de recentes). A pasta não muda.',
+    inputSchema: {nome: z.string().min(1).max(120)},
+  }, seguro(({nome}: {nome: string}) => ({ok: true, nome: projeto.renomear(nome).nome})));
 
   servidor.registerTool('listar_comentarios', {
     description: 'Comentários da pessoa. Por padrão só os abertos.',

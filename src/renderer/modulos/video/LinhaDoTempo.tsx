@@ -2,19 +2,22 @@
 // e os comentários. Clicar ou arrastar na régua busca o tempo; arrastar um bloco muda a palavra em que ele entra; as
 // alças do bloco selecionado mudam onde ele entra e onde sai (as âncoras viram "palavra@ms" da palavra mais perto).
 // O zoom fica na loja (vale também em Efeitos) e começa em "ajustar à janela". A cabeça anda pelo DOM, sem re-render.
+// No vídeo de cenas não há narração: arrastar grava ms contados do começo da cena, e a alça da cena selecionada muda a
+// duração dela.
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore} from 'react';
 import {Maximize2, ZoomIn, ZoomOut} from 'lucide-react';
 import type {Palavra, TrechoNarracao} from '../../../nucleo/roteiro/resolver';
-import {loja, selecionar, trocar, useLoja} from '../../estado/loja';
+import {aplicar, loja, patchTrocar, selecionar, trocar, useLoja, valorEm} from '../../estado/loja';
 import {teclaLivre} from '../../componentes/Trilho';
 import {ancoraPerto} from './ancoras';
 import {aoQuadro, irPara, msAtual, tocando} from './tocador';
 import {tipoDe} from './tipos';
 
 type BlocoP = {tipo: string; em: number; sai?: number; origem?: string; texto?: string; id?: string};
-type CenaP = {tipo: string; t_in: number; t_out: number; n?: number; titulo?: string; tag?: string; origem?: string; blocos?: BlocoP[]};
+type CenaP = {tipo: string; t_in: number; t_out: number; n?: number; titulo?: string; nome?: string; tag?: string; origem?: string; blocos?: BlocoP[]};
 type Legenda = {s: number; e: number; palavras: {w: string; s?: number; e?: number}[]};
-type PropsLt = {duracao_ms: number; cenas: CenaP[]; legendas: Legenda[]; narracao?: {trechos: TrechoNarracao[]}};
+type PropsLt = {duracao_ms: number; cenas: CenaP[]; legendas?: Legenda[]; narracao?: {trechos: TrechoNarracao[]}; composicao?: string};
+type ArrastoCena = {origem: string; x0: number; dms: number; dur: number};
 type Arrasto = {origem: string; modo: 'mover' | 'ini' | 'fim'; x0: number; dms: number; em: number; fim: number};
 
 const ESQ = 12; // respiro antes do zero
@@ -98,6 +101,7 @@ export const LinhaDoTempo: React.FC = () => {
   const barraNoCabecalho = useSyncExternalStore(assinarCabecalho, () => noCabecalho > 0);
   const [palavras, setPalavras] = useState<Palavra[]>([]);
   const [arrasto, setArrasto] = useState<Arrasto | null>(null);
+  const [arrastoCena, setArrastoCena] = useState<ArrastoCena | null>(null);
   const [largura, setLargura] = useState(0);
   const caixa = useRef<HTMLDivElement>(null);
   const cabeca = useRef<HTMLDivElement>(null);
@@ -143,7 +147,7 @@ export const LinhaDoTempo: React.FC = () => {
   // palavras da fala no tempo de saída; as que não cabem sem encostar na anterior ficam de fora
   const falas = useMemo(() => {
     if (!props) return [] as {w: string; s: number; l: number}[];
-    const lista = props.legendas.flatMap((l) => l.palavras.map((p, i) => ({w: p.w, s: p.s ?? (i === 0 ? l.s : NaN)}))).filter((p) => Number.isFinite(p.s));
+    const lista = (props.legendas ?? []).flatMap((l) => l.palavras.map((p, i) => ({w: p.w, s: p.s ?? (i === 0 ? l.s : NaN)}))).filter((p) => Number.isFinite(p.s));
     const out: {w: string; s: number; l: number}[] = [];
     let fim = -Infinity;
     for (const p of lista) {
@@ -281,9 +285,43 @@ export const LinhaDoTempo: React.FC = () => {
     quadroBusca = requestAnimationFrame(() => irPara(tempoDoPonto(cx)));
   };
 
+  const deCenas = props.composicao === 'VideoCenas';
+  // vídeo de cenas: tempos em ms desde o começo da cena, em passos de 50 ms, sem sair dela
+  const soltarBlocoCenas = async (a: Arrasto) => {
+    const cena = props.cenas.find((c) => a.origem.startsWith(`${c.origem}/`));
+    if (!cena) return;
+    const doc = loja.get().docs[documento]?.doc;
+    const b = valorEm(doc, a.origem) as {em?: number; sai?: number} | undefined;
+    if (!b) return;
+    const dur = cena.t_out - cena.t_in;
+    const r50 = (v: number) => Math.round(v / 50) * 50;
+    const emRel = a.em - cena.t_in;
+    const fimRel = a.fim - cena.t_in;
+    let patch;
+    if (a.modo === 'mover') {
+      const novo = Math.max(0, Math.min(dur - 100, r50(emRel + a.dms)));
+      const delta = novo - emRel;
+      patch = [...patchTrocar(doc, `${a.origem}/em`, novo), ...(b.sai !== undefined ? patchTrocar(doc, `${a.origem}/sai`, Math.max(novo + 100, Math.min(dur, b.sai + delta))) : [])];
+    } else if (a.modo === 'ini') patch = patchTrocar(doc, `${a.origem}/em`, Math.max(0, Math.min(fimRel - 100, r50(emRel + a.dms))));
+    else {
+      const sai = Math.max(emRel + 100, Math.min(dur, r50(fimRel + a.dms)));
+      patch = patchTrocar(doc, `${a.origem}/sai`, sai >= dur ? undefined : sai);
+    }
+    await aplicar(documento, patch, a.modo === 'mover' ? 'mover bloco no tempo' : a.modo === 'ini' ? 'onde o bloco entra' : 'onde o bloco sai');
+  };
+  const soltarCena = async () => {
+    const a = arrastoCena;
+    setArrastoCena(null);
+    if (!a || Math.abs(a.dms) < 50) return;
+    const dur = Math.max(300, Math.round((a.dur + a.dms) / 100) * 100);
+    await trocar(documento, `${a.origem}/duracao_ms`, dur, `duração da cena: ${(dur / 1000).toLocaleString('pt-BR')} s`);
+  };
+
   const soltarBloco = async () => {
     const a = arrasto;
     setArrasto(null);
+    if (arrastoCena) return void soltarCena();
+    if (a && Math.abs(a.dms) >= 50 && deCenas) return void soltarBlocoCenas(a);
     if (!a || Math.abs(a.dms) < 60 || !props.narracao) return;
     const alvo = ancoraPerto((a.modo === 'fim' ? a.fim : a.em) + a.dms, palavras, props.narracao.trechos);
     if (!alvo) return;
@@ -308,8 +346,10 @@ export const LinhaDoTempo: React.FC = () => {
         onPointerMove={(e) => {
           const a = arrasto;
           if (a) setArrasto({...a, dms: ((e.clientX - a.x0) / pxs) * 1000});
+          const ac = arrastoCena;
+          if (ac) setArrastoCena({...ac, dms: ((e.clientX - ac.x0) / pxs) * 1000});
         }}
-        onPointerUp={() => void soltarBloco()} onPointerCancel={() => setArrasto(null)}>
+        onPointerUp={() => void soltarBloco()} onPointerCancel={() => (setArrasto(null), setArrastoCena(null))}>
         <div className="conteudo" style={{width: larguraConteudo}}>
           <div className="regua" style={quadros} onPointerDown={(e) => {
             if (e.button !== 0) return;
@@ -329,17 +369,31 @@ export const LinhaDoTempo: React.FC = () => {
             <div className="alca-cabeca" ref={alcaCabeca} />
           </div>
           <div className="trilha cenas" onClick={buscar}>
-            {props.cenas.map((c, i) => (
-              <div key={i} className="cena" style={{left: x(c.t_in), width: Math.max(2, x(c.t_out) - x(c.t_in)), background: i % 2 ? 'var(--trilha-cena-b)' : 'var(--trilha-cena-a)'}}
-                title={c.titulo ?? c.tag ?? c.tipo}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  irPara(c.t_in);
-                  if (c.origem) selecionar({documento, caminho: c.origem});
-                }}>
-                {c.tipo === 'parte' ? <><b>{c.n}</b>{c.titulo ?? ''}</> : c.tipo}
-              </div>
-            ))}
+            {props.cenas.map((c, i) => {
+              const ac = arrastoCena && arrastoCena.origem === c.origem ? arrastoCena : null;
+              const largura = Math.max(2, x(c.t_out) - x(c.t_in) + (ac ? (ac.dms / 1000) * pxs : 0));
+              const sel = deCenas && c.origem && selecao?.caminho === c.origem;
+              return (
+                <div key={i} className={`cena${sel ? ' sel' : ''}`} style={{left: x(c.t_in), width: largura, background: i % 2 ? 'var(--trilha-cena-b)' : 'var(--trilha-cena-a)'}}
+                  title={deCenas ? `Cena ${c.n}${c.nome ? ` · ${c.nome}` : ''} · ${((c.t_out - c.t_in) / 1000).toLocaleString('pt-BR')} s` : c.titulo ?? c.tag ?? c.tipo}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    irPara(c.t_in);
+                    if (c.origem) selecionar({documento, caminho: c.origem});
+                  }}>
+                  {c.tipo === 'parte' || c.tipo === 'cena' ? <><b>{c.n}</b>{c.titulo ?? c.nome ?? ''}</> : c.tipo}
+                  {sel && (
+                    <span className="alc fim" title="Arraste para mudar a duração da cena" onClick={(e) => e.stopPropagation()}
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        if (e.button !== 0) return;
+                        (e.currentTarget.closest('.lt') as HTMLElement | null)?.setPointerCapture(e.pointerId);
+                        setArrastoCena({origem: c.origem!, x0: e.clientX, dms: 0, dur: c.t_out - c.t_in});
+                      }} />
+                  )}
+                </div>
+              );
+            })}
           </div>
           {(faixas.length ? faixas : [[]]).map((faixa, fi) => (
             <div key={fi} className="trilha" onClick={buscar}>
@@ -371,9 +425,11 @@ export const LinhaDoTempo: React.FC = () => {
               })}
             </div>
           ))}
-          <div className="trilha palavras" onClick={buscar}>
-            {falas.map((p, i) => <div key={i} className="palavra" style={{left: p.l}}>{p.w}</div>)}
-          </div>
+          {!deCenas && (
+            <div className="trilha palavras" onClick={buscar}>
+              {falas.map((p, i) => <div key={i} className="palavra" style={{left: p.l}}>{p.w}</div>)}
+            </div>
+          )}
           <div className="cabeca" ref={cabeca} />
         </div>
       </div>

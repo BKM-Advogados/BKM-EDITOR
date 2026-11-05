@@ -29,9 +29,12 @@ export type Estado = {
   zoomLinha: number | null; // pixels por segundo da linha do tempo; null = ajustar à janela (vale no Vídeo e em Efeitos)
   ultimaMudancaAgente?: number; // seq da última mudança do agente vista
   previaEfeitos?: {documento: string; efeitos: Efeito[]}; // controle deslizante sendo arrastado, antes do patch
+  // "Descreva o vídeo para o Claude" da tela inicial: vai para uma conversa nova quando a casca abrir
+  pedidoClaude?: {texto: string; rotulo: string; contexto: string};
 };
 
-let estado: Estado = {info: null, area: 'video', ativo: {}, docs: {}, props: {}, selecao: null, tempo_ms: 0, comentarios: [], diario: [], modoComentario: false, zoomLinha: null};
+const INICIAL: Estado = {info: null, area: 'video', ativo: {}, docs: {}, props: {}, selecao: null, tempo_ms: 0, comentarios: [], diario: [], modoComentario: false, zoomLinha: null};
+let estado: Estado = INICIAL;
 const ouvintes = new Set<() => void>();
 
 export const loja = {
@@ -70,14 +73,14 @@ export const useLoja = <T,>(sel: (e: Estado) => T): T => {
   return useSyncExternalStore(loja.assinar, ler);
 };
 
-// o aviso fica 4 s no rodapé (no lugar das dicas de tecla) e some; o seguinte reinicia a contagem
+// o aviso fica 4 s no rodapé (no lugar das dicas de tecla) e some; erro fica 9 s; o seguinte reinicia a contagem
 export const VALIDADE_AVISO_MS = 4000;
 let validadeAviso: ReturnType<typeof setTimeout> | undefined;
 export const avisar = (texto: string, tipo: TipoAviso = 'info') => {
   const aviso = {texto, tipo, em: Date.now()};
   loja.definir({aviso});
   clearTimeout(validadeAviso);
-  validadeAviso = setTimeout(() => loja.get().aviso === aviso && loja.definir({aviso: undefined}), VALIDADE_AVISO_MS);
+  validadeAviso = setTimeout(() => loja.get().aviso === aviso && loja.definir({aviso: undefined}), tipo === 'erro' ? 9000 : VALIDADE_AVISO_MS);
 };
 
 const entradaDe = (id: string) => estado.info?.manifesto.documentos.find((d) => d.id === id);
@@ -102,11 +105,67 @@ export const carregarDiario = async () => {
   if (ultimaAgente && anterior !== undefined && ultimaAgente.seq !== anterior) avisar(`Claude: ${ultimaAgente.rotulo}`, 'agente');
 };
 
+// Conversas e terminais vivem fora do React (paineis/conversas.ts, paineis/terminais.ts) e carregam só quando alguém
+// abre o painel do Claude; ao trocar ou fechar o projeto, quem estiver carregado se limpa por aqui.
+const aoTrocarProjeto = new Set<() => void>();
+export const quandoTrocarProjeto = (f: () => void) => {
+  aoTrocarProjeto.add(f);
+  return () => {
+    aoTrocarProjeto.delete(f);
+  };
+};
+
+const AREAS_VALIDAS = new Set<Area>(['video', 'imagem', '3d', 'efeitos']);
+
 export const abrirProjeto = async (info: InfoProjeto) => {
+  const mesmo = estado.info?.raiz === info.raiz;
+  const existe = (id?: string) => Boolean(id && info.manifesto.documentos.some((d) => d.id === id));
   const ativo: Estado['ativo'] = {};
+  if (mesmo) for (const [m, id] of Object.entries(estado.ativo)) if (existe(id)) ativo[m as Modulo] = id;
   for (const d of info.manifesto.documentos) ativo[d.modulo] ??= d.id;
-  loja.definir({info, ativo, alvoEfeitos: ativo.video, docs: {}, props: {}, selecao: null, tempo_ms: 0, ultimaMudancaAgente: undefined});
+  if (mesmo) {
+    // o estudio.json mudou (documento novo, nome): a tela fica onde está
+    const docs = Object.fromEntries(Object.entries(estado.docs).filter(([id]) => existe(id)));
+    loja.definir((e) => ({info, ativo, alvoEfeitos: existe(e.alvoEfeitos) ? e.alvoEfeitos : ativo.video ?? ativo.imagem, docs,
+      selecao: e.selecao && existe(e.selecao.documento) ? e.selecao : null}));
+  } else {
+    aoTrocarProjeto.forEach((f) => f());
+    // reabre onde a pessoa parou (área, documento, seleção e tempo); sem isso, na área do primeiro documento
+    const ult = info.estado;
+    const docUlt = ult?.documento ? info.manifesto.documentos.find((d) => d.id === ult.documento) : undefined;
+    if (docUlt) ativo[docUlt.modulo] = docUlt.id;
+    const area: Area = ult?.area && AREAS_VALIDAS.has(ult.area) ? ult.area : info.manifesto.documentos[0]?.modulo ?? 'video';
+    loja.definir({...INICIAL, info, area, ativo, alvoEfeitos: area === 'efeitos' && docUlt ? docUlt.id : ativo.video ?? ativo.imagem,
+      selecao: docUlt && ult?.selecao ? {documento: docUlt.id, caminho: ult.selecao} : null, tempo_ms: ult?.tempo_ms ?? 0,
+      zoomLinha: estado.zoomLinha, pedidoClaude: estado.pedidoClaude});
+    if (info.aviso) avisar(info.aviso, 'info');
+  }
   await Promise.all([...info.manifesto.documentos.map((d) => carregarDoc(d.id)), carregarComentarios(), carregarDiario()]);
+};
+
+/** Fecha o projeto e volta à tela inicial. */
+export const fecharProjeto = async () => {
+  await window.estudio.fecharProjeto();
+  aoTrocarProjeto.forEach((f) => f());
+  loja.definir({...INICIAL, zoomLinha: estado.zoomLinha});
+};
+
+/** Tira o prefixo que o Electron põe nas mensagens de erro do processo principal. */
+export const mensagemDe = (e: unknown) => String((e as Error)?.message ?? e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+
+/** Documento novo no projeto aberto, já ativo na área dele. */
+export const criarDocumento = async (modulo: Modulo, formato?: {largura: number; altura: number; fps?: number}, titulo?: string) => {
+  try {
+    const entrada = await window.estudio.criarDocumento({modulo, formato: formato as never, titulo});
+    const info = await window.estudio.projetoAtual();
+    if (info) await abrirProjeto(info);
+    loja.definir((e) => ({area: modulo, ativo: {...e.ativo, [modulo]: entrada.id}, selecao: null, tempo_ms: 0, ...(modulo === 'video' ? {alvoEfeitos: entrada.id} : {})}));
+    avisar(`${entrada.titulo} criado`, 'ok');
+    return entrada;
+  } catch (e) {
+    avisar(mensagemDe(e), 'erro');
+    return null;
+  }
 };
 
 /** Liga a tela ao disco: o arquivo que mudou é relido. */
@@ -145,7 +204,7 @@ export const aplicar = async (documento: string, patch: OperacaoPatch[], rotulo?
     void carregarDiario();
     return Boolean(r);
   } catch (e) {
-    const msg = String((e as Error).message ?? e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+    const msg = mensagemDe(e);
     avisar(msg.includes('mudou') ? 'O documento mudou por outra mão (agente?). Recarreguei; refaça a edição.' : msg, 'erro');
     await carregarDoc(documento);
     return false;

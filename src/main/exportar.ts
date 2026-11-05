@@ -50,7 +50,8 @@ export const exportarVideo = async (o: {
   const binariesDirectory = o.empacotado
     ? path.join(path.dirname(o.raizApp), 'app.asar.unpacked', 'node_modules', getCompositorPackage({arch: process.arch, platform: process.platform}))
     : null;
-  const composition = await selectComposition({serveUrl, id: 'CarrosselTema', inputProps: o.props, binariesDirectory, browserExecutable});
+  const id = o.props.composicao === 'VideoCenas' ? 'VideoCenas' : 'CarrosselTema';
+  const composition = await selectComposition({serveUrl, id, inputProps: o.props, binariesDirectory, browserExecutable});
   o.aviso({tipo: 'status', mensagem: `Renderizando ${composition.durationInFrames} quadros…`});
   await renderMedia({
     composition,

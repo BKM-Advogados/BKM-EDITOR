@@ -4,7 +4,11 @@
 import type {PlayerRef} from '@remotion/player';
 import {avisar, loja} from '../../estado/loja';
 
-export const FPS = 30;
+// quadros por segundo do vídeo aberto (o monitor troca ao abrir um vídeo de outro formato); o carrossel é 30
+export let FPS = 30;
+export const definirFps = (fps: number) => {
+  if (Number.isFinite(fps) && fps > 0) FPS = fps;
+};
 let player: PlayerRef | null = null;
 const ouvintes = new Set<(ms: number) => void>();
 
@@ -95,7 +99,7 @@ export const parar = () => {
 };
 export const alternarRepetir = () => mudarControle({repetir: !repetirAtual});
 
-/** HH:MM:SS:QQ (quadro a 30 fps), como no Premiere e no Resolve. */
+/** HH:MM:SS:QQ (quadro no fps do vídeo), como no Premiere e no Resolve. */
 export const formatarTempo = (ms: number) => {
   const q = Math.round((Math.max(0, ms) / 1000) * FPS);
   const s = Math.floor(q / FPS);

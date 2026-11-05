@@ -1,22 +1,18 @@
-// Abre o projeto (o da linha de comando, o último aberto ou o exemplo) e liga a tela ao disco.
-import React, {useEffect, useRef} from 'react';
-import {BookOpen, FolderOpen} from 'lucide-react';
-import {IconeEstudio} from './componentes/Icones';
-import {abrirProjeto, avisar, loja, observarProjeto, useLoja} from './estado/loja';
-import {Casca} from './casca/Casca';
+// Tela inicial ou editor. A casca (dockview, Remotion, Player) só carrega quando um projeto abre: a tela inicial parada
+// fica leve. O processo principal abre sozinho o projeto da linha de comando ou, se a pessoa preferir, o último.
+import React, {Suspense, useEffect, useRef} from 'react';
+import {abrirProjeto, loja, observarProjeto, useLoja} from './estado/loja';
+import {Inicio} from './inicio/Inicio';
+import {RaizDialogo} from './componentes/Dialogo';
 
-const BoasVindas: React.FC = () => (
-  <div style={{height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16}}>
-    <div style={{display: 'flex', alignItems: 'center', gap: 12, fontSize: 26, fontWeight: 600, color: 'var(--texto)'}}><IconeEstudio tamanho={30} />Estúdio</div>
-    <div style={{color: 'var(--texto-2)'}}>Vídeo, imagem, 3D e efeitos, editáveis à mão ou conversando com o Claude.</div>
-    <div style={{display: 'flex', gap: 8}}>
-      <button className="bt principal" onClick={() => void window.estudio.abrirExemplo().then(abrirProjeto)}><BookOpen size={15} />Abrir o exemplo (Cliente · C2)</button>
-      <button className="bt" onClick={() => void window.estudio.abrirPasta().then((i) => i && abrirProjeto(i)).catch((e: Error) => avisar(e.message, 'erro'))}>
-        <FolderOpen size={15} />Abrir pasta…
-      </button>
-    </div>
-  </div>
-);
+const Casca = React.lazy(() => import('./casca/Casca').then((m) => ({default: m.Casca})));
+
+// a miniatura do projeto na tela inicial é o que está no monitor (a peça, sem a moldura cinza em volta)
+const retanguloDaMiniatura = () => {
+  const el = document.querySelector<HTMLElement>('.monitor .palco, .monitor canvas, .monitor');
+  const r = el?.getBoundingClientRect();
+  return r && r.width > 16 && r.height > 16 ? {x: r.left, y: r.top, width: r.width, height: r.height} : null;
+};
 
 export const App: React.FC = () => {
   const info = useLoja((e) => e.info);
@@ -24,10 +20,15 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     void window.estudio.projetoAtual().then((i) => i && abrirProjeto(i));
-    return observarProjeto();
+    const largar = window.estudio.aoPedirMiniatura(retanguloDaMiniatura);
+    const parar = observarProjeto();
+    return () => {
+      largar();
+      parar();
+    };
   }, []);
 
-  // o que a pessoa está vendo vai para .estudio/estado.json, que o agente lê com estado_do_editor
+  // o que a pessoa está vendo vai para .estudio/estado.json: o agente lê com estado_do_editor e o projeto reabre ali
   useEffect(() => loja.assinar(() => {
     const e = loja.get();
     if (!e.info) return;
@@ -40,5 +41,10 @@ export const App: React.FC = () => {
     }
   }), []);
 
-  return info ? <Casca /> : <BoasVindas />;
+  return (
+    <>
+      {info ? <Suspense fallback={<div className="vazio" style={{paddingTop: 80}}>abrindo o projeto…</div>}><Casca /></Suspense> : <Inicio />}
+      <RaizDialogo />
+    </>
+  );
 };

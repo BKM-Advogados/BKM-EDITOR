@@ -4,12 +4,14 @@
 // palavra e o código de tempo, e são conferidas contra a narração antes de gravar. Sem seleção, o resumo do vídeo.
 import React, {useEffect, useState} from 'react';
 import {Clapperboard, Copy, Film, FileJson, Link} from 'lucide-react';
+import {ehDocCenas} from '../../../nucleo/cenas';
 import {lerAncora, norm, type Palavra} from '../../../nucleo/roteiro/resolver';
 import {aplicar, trocar, useLoja, valorEm} from '../../estado/loja';
 import {CabecalhoInspector, CampoLeitura, CampoNumero, CampoTexto, LinhaCampo, Secao, copiar, numeroBr} from '../../componentes/Campos';
 import type {ItemMenu} from '../../componentes/Menu';
 import {FPS, formatarTempo, irPara} from './tocador';
 import {resumoBloco, tipoDe} from './tipos';
+import {InspectorCenas} from './InspectorCenas';
 
 type NomeSecao = 'Tempo' | 'Conteúdo' | 'Posição e tamanho' | 'Outros';
 const SECOES: NomeSecao[] = ['Tempo', 'Conteúdo', 'Posição e tamanho', 'Outros'];
@@ -146,7 +148,8 @@ export const InspectorVideo: React.FC = () => {
   const titulo = useLoja((e) => e.info?.manifesto.documentos.find((d) => d.id === documento)?.titulo ?? documento);
   const selecao = useLoja((e) => e.selecao);
   const palavras = usarPalavras((lido?.doc as {palavras?: string} | undefined)?.palavras);
-  if (!documento || !lido) return <div className="vazio">nenhum vídeo</div>;
+  if (!documento || !lido) return <div className="vazio">Sem vídeo ainda: crie no monitor.</div>;
+  if (ehDocCenas(lido.doc)) return <InspectorCenas documento={documento} />;
   const caminho = selecao?.documento === documento ? selecao.caminho : null;
   const obj = caminho ? (valorEm(lido.doc, caminho) as Record<string, unknown> | undefined) : undefined;
   const props = montado && 'props' in montado ? montado.props : null;
@@ -157,18 +160,17 @@ export const InspectorVideo: React.FC = () => {
     const nBlocos = cenasP.reduce((n, c) => n + (c.blocos?.length ?? 0), 0);
     return (
       <div className="painel">
-        <CabecalhoInspector icone={<Film />} nome={titulo ?? "Vídeo"} sub="Vídeo" dica={`versão ${lido.versao}`}
-          menu={[{rotulo: 'Copiar versão', icone: <Copy className="i14" />, acao: () => copiar(lido.versao, 'Versão copiada')}]} />
+        <CabecalhoInspector icone={<Film />} nome={titulo ?? 'Vídeo'} sub="Carrossel narrado" dica={`9:16 · 1080×1920 · ${FPS} qps`} />
         <div className="insp-corpo">
           <div className="resumo">
-            1080 × 1920 · {FPS} fps · {formatarTempo(props?.duracao_ms ?? 0)}<br />
+            9:16 · 1080×1920 · {FPS} qps · {formatarTempo(props?.duracao_ms ?? 0)}<br />
             <b>{lido.doc.cenas?.length ?? 0}</b> cenas · <b>{nBlocos}</b> blocos
           </div>
           <Secao titulo="Vídeo" chave="video:doc">
-            <CampoTexto rotulo="Rótulo das partes" valor={String(lido.doc.rotulo_partes ?? '')} aoMudar={(t) => void trocar(documento, '/rotulo_partes', t, 'rótulo das partes')} />
+            <CampoTexto rotulo="Contagem das partes" dica="texto antes do número da parte (ex.: PARTE)" valor={String(lido.doc.rotulo_partes ?? '')} aoMudar={(t) => void trocar(documento, '/rotulo_partes', t, 'rótulo das partes')} />
           </Secao>
-          {montado && 'erro' in montado && <Secao titulo="Erro no roteiro"><div className="texto-livre" style={{color: 'var(--erro)'}}>{montado.erro}</div></Secao>}
-          {avisos.length > 0 && <Secao titulo={`Avisos do roteiro (${avisos.length})`}><div className="avisos-roteiro">{avisos.map((a, i) => <div key={i}>{a}</div>)}</div></Secao>}
+          {montado && 'erro' in montado && <Secao titulo="Não deu para montar o vídeo"><div className="texto-livre" style={{color: 'var(--erro)'}}>{montado.erro}</div></Secao>}
+          {avisos.length > 0 && <Secao titulo={`Avisos (${avisos.length})`}><div className="avisos-roteiro">{avisos.map((a, i) => <div key={i}>{a}</div>)}</div></Secao>}
           <div className="vazio">Clique num bloco no monitor ou na linha do tempo para editar.</div>
         </div>
       </div>

@@ -29,7 +29,7 @@ export const ListaTres: React.FC = () => {
   }, [menu]);
 
   const docs = documentosDe('3d');
-  if (!documento || !doc) return <div className="vazio">nenhuma cena 3D</div>;
+  if (!documento || !doc) return <div className="vazio">Sem cena 3D ainda: crie no monitor.</div>;
   const objetos = objetosDe(doc);
   const luzes = luzesDe(doc);
   const caminhoSel = selecao?.documento === documento ? selecao.caminho : undefined;
@@ -86,7 +86,7 @@ export const ListaTres: React.FC = () => {
         </div>
       </div>
       <div className="painel-corpo">
-        {objetos.length === 0 && <div className="vazio">Cena vazia. Use Adicionar ou peça ao agente.</div>}
+        {objetos.length === 0 && <div className="vazio">Cena vazia. Use Adicionar ou peça ao Claude.</div>}
         <ul className="lista">
           {objetos.map((o, i) => {
             const caminho = `/objetos/${i}`;

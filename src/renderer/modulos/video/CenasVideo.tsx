@@ -1,15 +1,19 @@
 // Lista do vídeo: cenas e blocos do roteiro, na ordem, como o índice do Final Cut ou do Resolve. Cada cena mostra o
 // número da parte, o título, o início e a duração, e pode recolher; cada bloco tem o filete da família e o ícone do
 // tipo. A cena em que a cabeça está ganha uma marca vermelha (lê o tempo parado da loja, não o de cada quadro).
-// Clicar seleciona e leva a prévia ao tempo do objeto.
+// Clicar seleciona e leva a prévia ao tempo do objeto. No topo, criar cena e bloco, duplicar e excluir (Ctrl+D e
+// Delete fazem o mesmo).
 import React, {useState} from 'react';
-import {ChevronDown, ChevronRight} from 'lucide-react';
+import {ChevronDown, ChevronRight, CopyPlus, Plus, Trash2} from 'lucide-react';
+import {ehDocCenas, TIPOS_BLOCO_CENAS, type TipoBlocoCenas} from '../../../nucleo/cenas';
 import {documentosDe, loja, selecionar, useLoja} from '../../estado/loja';
 import {numeroBr} from '../../componentes/Campos';
+import {BotaoMenu} from '../../componentes/Menu';
 import {formatarCurto, irPara} from './tocador';
 import {resumoBloco, tipoDe} from './tipos';
+import {adicionarBloco, adicionarCena, duplicarSelecao, excluirSelecao, TIPOS_CLIENTE} from './acoes';
 
-type Cena = {tipo: string; tag?: string; titulo?: string; linhas?: {t: string}[]; blocos?: {tipo: string; texto?: string; id?: string}[]};
+type Cena = {tipo?: string; nome?: string; tag?: string; titulo?: string; linhas?: {t: string}[]; blocos?: {tipo: string; texto?: string; id?: string}[]};
 type CenaP = {origem?: string; tipo: string; n?: number; t_in: number; t_out: number; blocos?: {origem?: string; em: number}[]};
 
 const recolhidas = new Set<string>(); // vale enquanto o app está aberto
@@ -23,7 +27,12 @@ export const CenasVideo: React.FC = () => {
   const abertos = useLoja((e) => e.comentarios.filter((c) => c.estado === 'aberto' && c.documento === documento));
   const [, forcar] = useState(0);
   const docs = documentosDe('video');
-  if (!documento || !doc) return <div className="vazio">nenhum vídeo</div>;
+  if (!documento || !doc) return <div className="vazio">Sem vídeo ainda: crie no monitor.</div>;
+  const deCenas = ehDocCenas(doc);
+  const tiposBloco = deCenas
+    ? (Object.keys(TIPOS_BLOCO_CENAS) as TipoBlocoCenas[]).map((t) => ({tipo: t, nome: TIPOS_BLOCO_CENAS[t].nome}))
+    : TIPOS_CLIENTE.map(({tipo, nome}) => ({tipo, nome}));
+  const temSelecao = selecao?.documento === documento && /^\/cenas\/\d+/.test(selecao.caminho);
 
   const cenasP = ((montado && 'props' in montado ? montado.props.cenas : undefined) ?? []) as CenaP[];
   const daCena = (i: number) => cenasP.find((c) => c.origem === `/cenas/${i}`);
@@ -52,11 +61,23 @@ export const CenasVideo: React.FC = () => {
     <div className="painel">
       {docs.length > 1 && (
         <div className="painel-topo">
-          <select className="campo" value={documento} onChange={(e) => loja.definir((s) => ({ativo: {...s.ativo, video: e.target.value}, selecao: null}))}>
+          <select className="campo" value={documento} onChange={(e) => loja.definir((s) => ({ativo: {...s.ativo, video: e.target.value}, selecao: null, tempo_ms: 0}))}>
             {docs.map((d) => <option key={d.id} value={d.id}>{d.titulo}</option>)}
           </select>
         </div>
       )}
+      <div className="barra-lista">
+        <button className="bt fantasma mini" onClick={() => void adicionarCena(documento)} disabled={!deCenas}
+          title={deCenas ? 'Nova cena depois da selecionada' : 'No carrossel narrado, cena nova precisa de uma palavra da narração: peça ao Claude'}><Plus size={13} />Cena</button>
+        <BotaoMenu titulo="Novo bloco na cena selecionada (ou na do tempo atual)" icone={<Plus size={13} />} rotulo="Bloco" className="bt fantasma mini" lado="esquerda"
+          itens={tiposBloco.map((t) => {
+            const Icone = tipoDe(t.tipo).icone;
+            return {rotulo: t.nome, icone: <Icone className="i14" />, acao: () => void adicionarBloco(documento, t.tipo)};
+          })} />
+        <span className="espaco" />
+        <button className="bti" disabled={!temSelecao} onClick={() => void duplicarSelecao(documento)} title="Duplicar  Ctrl+D"><CopyPlus size={14} /></button>
+        <button className="bti" disabled={!temSelecao} onClick={() => void excluirSelecao(documento)} title="Excluir  Delete"><Trash2 size={14} /></button>
+      </div>
       <div className="painel-corpo sem-margem">
         <ul className="lista">
           {doc.cenas?.map((c, i) => {
@@ -75,8 +96,9 @@ export const CenasVideo: React.FC = () => {
                       {fechada ? <ChevronRight className="i12" /> : <ChevronDown className="i12" />}
                     </button>
                   ) : <span style={{width: 18, flex: 'none'}} />}
-                  {c.tipo === 'parte' && p?.n !== undefined ? <b style={{flex: 'none'}}>{p.n}</b> : <span className="meta" style={{flex: 'none'}}>{c.tipo}</span>}
-                  <span className="nome">{c.titulo ?? c.tag ?? c.linhas?.map((l) => l.t).join(' ') ?? ''}</span>
+                  {deCenas ? <b style={{flex: 'none'}}>{i + 1}</b>
+                    : c.tipo === 'parte' && p?.n !== undefined ? <b style={{flex: 'none'}}>{p.n}</b> : <span className="meta" style={{flex: 'none'}}>{c.tipo}</span>}
+                  <span className="nome">{deCenas ? c.nome || (c.blocos?.[0] ? resumoBloco(c.blocos[0]) : 'cena vazia') || `Cena ${i + 1}` : c.titulo ?? c.tag ?? c.linhas?.map((l) => l.t).join(' ') ?? ''}</span>
                   {p && <span className="meta" title="início · duração">{formatarCurto(p.t_in)} · {numeroBr(Math.round((p.t_out - p.t_in) / 100) / 10, 1)} s</span>}
                 </li>
                 {!fechada && c.blocos?.map((b, j) => {
@@ -89,7 +111,7 @@ export const CenasVideo: React.FC = () => {
                       <span className="tipo" style={{color: `var(--trilha-${t.familia})`}}><Icone /></span>
                       <span className="nome">{resumoBloco(b) || t.nome}</span>
                       {temComentario(cb) && <span className="ponto-c" title="comentário aberto" />}
-                      <span className="meta">{b.tipo}</span>
+                      <span className="meta">{t.nome}</span>
                     </li>
                   );
                 })}
@@ -97,6 +119,7 @@ export const CenasVideo: React.FC = () => {
             );
           })}
         </ul>
+        {!doc.cenas?.length && <div className="vazio">Nenhuma cena. Use "+ Cena" acima.</div>}
       </div>
     </div>
   );

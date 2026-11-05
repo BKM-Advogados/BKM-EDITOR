@@ -6,7 +6,9 @@ import path from 'node:path';
 import {promisify} from 'node:util';
 import chokidar, {type FSWatcher} from 'chokidar';
 import {PASTA_INTERNA, Projeto} from '../nucleo/projeto';
-import {ErroRoteiro, resolverRoteiro, type Palavra} from '../nucleo/roteiro/resolver';
+import {ErroRoteiro, resolverRoteiro, type Palavra, type Roteiro} from '../nucleo/roteiro/resolver';
+import {ehDocCenas, resolverCenas} from '../nucleo/cenas';
+import {FORMATO_PADRAO} from '../nucleo/formatos';
 import type {DocVideo} from '../nucleo/documentos';
 import type {PropsVideo} from '../compartilhado/api';
 
@@ -18,14 +20,14 @@ export class SessaoProjeto {
   private observador: FSWatcher | null = null;
   private pendentes = new Map<string, NodeJS.Timeout>();
   private relogioGit: NodeJS.Timeout | null = null;
-  private temGit = false;
+  private _temGit = false;
 
   constructor(raiz: string, private readonly aoMudar: (arquivo: string) => void) {
     this.projeto = new Projeto(raiz);
   }
 
   async abrir() {
-    this.temGit = await this.prepararGit();
+    this._temGit = await this.prepararGit();
     this.observador = chokidar.watch(this.projeto.raiz, {
       ignored: (p) => IGNORAR.test(p),
       ignoreInitial: true,
@@ -51,10 +53,22 @@ export class SessaoProjeto {
       this.pendentes.delete(rel);
       this.aoMudar(rel);
     }, 60));
-    if (this.temGit && !rel.startsWith(PASTA_INTERNA)) {
+    if (this._temGit && !rel.startsWith(PASTA_INTERNA)) {
       if (this.relogioGit) clearTimeout(this.relogioGit);
       this.relogioGit = setTimeout(() => void this.salvarVersao(), 8000);
     }
+  }
+
+  get temGit() {
+    return this._temGit;
+  }
+
+  /** Ctrl+S: ponto de restauração agora, sem esperar a calma de 8 s. */
+  async marcarVersao(mensagem = 'estúdio: ponto de restauração') {
+    if (!this._temGit) return false;
+    if (this.relogioGit) clearTimeout(this.relogioGit);
+    await this.salvarVersao(mensagem);
+    return true;
   }
 
   private async git(...args: string[]) {
@@ -88,15 +102,23 @@ export class SessaoProjeto {
     }
   }
 
-  /** Props do CarrosselTema para a prévia e a exportação, com a mídia servida em `base`. */
+  /** Props da composição do vídeo (VideoCenas ou CarrosselTema) para a prévia e a exportação, com a mídia em `base`. */
   propsVideo(documento: string, base: string): PropsVideo {
     try {
       const rel = this.projeto.arquivoDoDocumento(documento);
       const {doc} = this.projeto.lerJson<DocVideo>(rel);
-      const palavras = this.projeto.lerJson<Palavra[]>(doc.palavras).doc;
-      const {props, trechos, avisos} = resolverRoteiro(doc, palavras);
+      if (ehDocCenas(doc)) {
+        const {props, avisos} = resolverCenas(doc);
+        return {props: {...props, base_midia: base}, avisos};
+      }
+      // o carrossel da Cliente: 1080×1920 a 30 qps até a animação dele aceitar outro formato
+      const r = doc as Roteiro & DocVideo;
+      if (typeof r.palavras !== 'string') return {erro: 'este vídeo não tem "tipo" nem narração (palavras); não sei montá-lo'};
+      const palavras = this.projeto.lerJson<Palavra[]>(r.palavras).doc;
+      if (!Array.isArray(palavras) || !palavras.length) return {erro: `a transcrição da narração (${r.palavras}) está vazia`};
+      const {props, trechos, avisos} = resolverRoteiro(r, palavras);
       return {
-        props: {...props, base_midia: `${base}/midia`, narracao: {src: `${base}/${doc.fonte}`, trechos}, efeitos: doc.efeitos ?? []},
+        props: {...props, ...FORMATO_PADRAO, base_midia: `${base}/midia`, narracao: {src: `${base}/${r.fonte}`, trechos}, efeitos: r.efeitos ?? []},
         avisos,
       };
     } catch (e) {

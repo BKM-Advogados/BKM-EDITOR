@@ -101,8 +101,7 @@ const InspectorDocumento: React.FC<{documento: string; doc: DocImagem; versao: s
   };
   return (
     <div className="painel">
-      <CabecalhoInspector icone={<IconeImagem />} nome={titulo} sub={`Imagem · ${doc.largura} × ${doc.altura}`} dica={`versão ${versao} · ${doc.camadas.length} camadas`}
-        menu={[{rotulo: 'Copiar versão', icone: <Copy className="i14" />, acao: () => copiar(versao, 'Versão copiada')}]} />
+      <CabecalhoInspector icone={<IconeImagem />} nome={titulo} sub={`Imagem · ${doc.largura} × ${doc.altura}`} dica={`${doc.camadas.length} ${doc.camadas.length === 1 ? 'camada' : 'camadas'}`} />
       <div className="insp-corpo">
         <Secao titulo="Prancheta" chave="imagem:prancheta">
           <CampoSelecao rotulo="Tamanho" valor={pronto ? `${pronto.l}x${pronto.a}` : 'outro'}
@@ -134,7 +133,7 @@ export const InspectorImagem: React.FC = () => {
   const documento = usarDocumentoImagem();
   const lido = useLoja((e) => (documento ? e.docs[documento] : undefined));
   const selecao = useLoja((e) => e.selecao);
-  if (!documento || !lido) return <div className="vazio">nenhuma imagem</div>;
+  if (!documento || !lido) return <div className="vazio">Sem imagem ainda: crie no monitor.</div>;
   const doc = lido.doc as DocImagem;
   if (!docValido(doc)) return <div className="vazio" style={{color: 'var(--erro)'}}>o documento {documento} não tem a lista "camadas"</div>;
   const caminho = selecao?.documento === documento && indiceDe(selecao.caminho) >= 0 ? selecao.caminho : null;

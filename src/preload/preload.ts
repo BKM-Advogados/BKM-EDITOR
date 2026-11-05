@@ -1,5 +1,5 @@
 import {contextBridge, ipcRenderer, type IpcRendererEvent} from 'electron';
-import {CANAL, type ApiEstudio, type EventoConversa, type Mudanca, type Progresso} from '../compartilhado/api';
+import {CANAL, type ApiEstudio, type EventoConversa, type Mudanca, type Progresso, type Retangulo} from '../compartilhado/api';
 
 const ouvir = <A extends unknown[]>(canal: string, cb: (...a: A) => void) => {
   const h = (_e: IpcRendererEvent, ...a: A) => cb(...a);
@@ -12,7 +12,33 @@ const ouvir = <A extends unknown[]>(canal: string, cb: (...a: A) => void) => {
 const api: ApiEstudio = {
   abrirPasta: () => ipcRenderer.invoke(CANAL.abrirPasta),
   abrirExemplo: () => ipcRenderer.invoke(CANAL.abrirExemplo),
+  abrirProjeto: (raiz) => ipcRenderer.invoke(CANAL.abrirProjeto, raiz),
   projetoAtual: () => ipcRenderer.invoke(CANAL.projetoAtual),
+  criarProjeto: (o) => ipcRenderer.invoke(CANAL.criarProjeto, o),
+  fecharProjeto: () => ipcRenderer.invoke(CANAL.fecharProjeto),
+  duplicarProjeto: (o) => ipcRenderer.invoke(CANAL.duplicarProjeto, o),
+  renomearProjeto: (nome) => ipcRenderer.invoke(CANAL.renomearProjeto, nome),
+  criarDocumento: (o) => ipcRenderer.invoke(CANAL.criarDocumento, o),
+  renomearDocumento: (id, titulo) => ipcRenderer.invoke(CANAL.renomearDocumento, id, titulo),
+  ambiente: () => ipcRenderer.invoke(CANAL.ambiente),
+  recentes: () => ipcRenderer.invoke(CANAL.recentes),
+  esquecerRecente: (raiz) => ipcRenderer.invoke(CANAL.esquecerRecente, raiz),
+  preferencias: () => ipcRenderer.invoke(CANAL.preferencias),
+  gravarPreferencias: (p) => ipcRenderer.invoke(CANAL.gravarPreferencias, p),
+  escolherPasta: (titulo) => ipcRenderer.invoke(CANAL.escolherPasta, titulo),
+  mostrarNaPasta: (caminho) => ipcRenderer.send(CANAL.mostrarNaPasta, caminho),
+  marcarVersao: () => ipcRenderer.invoke(CANAL.marcarVersao),
+  escolherMidia: (tipo) => ipcRenderer.invoke(CANAL.escolherMidia, tipo),
+  // pedido e resposta: o processo principal manda um número e espera o retângulo de volta com o mesmo número
+  aoPedirMiniatura: (cb) => ouvir<[number]>(CANAL.pedirMiniatura, (n) => {
+    let r: Retangulo | null = null;
+    try {
+      r = cb();
+    } catch {
+      r = null;
+    }
+    ipcRenderer.send(CANAL.miniatura, n, r);
+  }),
   lerDocumento: (documento) => ipcRenderer.invoke(CANAL.lerDocumento, documento),
   lerJson: (caminho) => ipcRenderer.invoke(CANAL.lerJson, caminho),
   aplicarPatch: (p) => ipcRenderer.invoke(CANAL.aplicarPatch, p),

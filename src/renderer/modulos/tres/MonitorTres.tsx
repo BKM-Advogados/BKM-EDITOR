@@ -8,6 +8,7 @@ import {Camera, MessageSquarePlus, MousePointer2, Move3d, Pause, Play, Rotate3d,
 import type {TransformControlsMode} from 'three/examples/jsm/controls/TransformControls.js';
 import type {DocCena3D, OperacaoPatch, Vetor3} from '../../../nucleo/documentos';
 import {aplicar, comentar, loja, patchTrocar, selecionar, useLoja} from '../../estado/loja';
+import {SemDocumento} from '../../componentes/SemDocumento';
 import {arredV, iguaisV, indiceEm, objetosDe, type Transformacao} from './comum';
 import {Motor} from './motor';
 import {Trilho, teclaLivre} from '../../componentes/Trilho';
@@ -39,7 +40,7 @@ type Balao = {x: number; y: number; w: number; h: number; objeto?: string; objet
 export const MonitorTres: React.FC = () => {
   const documento = useLoja((e) => e.ativo['3d']);
   const carregado = useLoja((e) => Boolean(documento && e.docs[documento]));
-  if (!documento) return <div className="vazio">nenhuma cena 3D no projeto</div>;
+  if (!documento) return <SemDocumento modulo="3d" />;
   if (!carregado) return <div className="vazio">carregando a cena…</div>;
   return <Palco documento={documento} />;
 };

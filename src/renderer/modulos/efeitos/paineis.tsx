@@ -5,6 +5,7 @@ import React from 'react';
 import {ArrowDown, ArrowUp, Blend, Copy, GripVertical, Plus, Trash2} from 'lucide-react';
 import type {PaineisDoModulo} from '../../casca/contrato';
 import {aplicar, documentosDe, loja, selecionar, trocar, useLoja} from '../../estado/loja';
+import {SemDocumento} from '../../componentes/SemDocumento';
 import {definicao, EFEITOS, novoEfeito, type Efeito} from '../../../nucleo/efeitos';
 import {CabecalhoInspector, CampoCor, CampoDeslizante, CampoLeitura, Secao} from '../../componentes/Campos';
 import {MonitorVideo} from '../video/MonitorVideo';
@@ -62,7 +63,7 @@ const Pilha: React.FC = () => {
         </select>
       </div>
       <div className="painel-corpo">
-        {!alvo ? <div className="vazio">sem vídeo ou imagem no projeto</div> : (
+        {!alvo ? <SemDocumento modulo="video" compacto /> : (
           <>
             <div className="pre-ajustes">
               {PRESETS.map((p) => (

@@ -5,7 +5,7 @@ import {createHash} from 'node:crypto';
 import {existsSync, mkdirSync, readFileSync, renameSync, writeFileSync, appendFileSync} from 'node:fs';
 import path from 'node:path';
 import jsonpatch, {type Operation} from 'fast-json-patch';
-import type {ArquivoComentarios, Comentario, EntradaDiario, EstadoEditor, Manifesto, OperacaoPatch} from './documentos';
+import type {ArquivoComentarios, Comentario, EntradaDiario, EntradaDocumento, EstadoEditor, Manifesto, OperacaoPatch} from './documentos';
 
 export const PASTA_INTERNA = '.estudio';
 
@@ -42,7 +42,11 @@ export class Projeto {
 
   lerJson<T>(rel: string): {doc: T; versao: string} {
     const texto = this.lerTexto(rel);
-    return {doc: JSON.parse(texto) as T, versao: versaoDe(texto)};
+    try {
+      return {doc: JSON.parse(texto) as T, versao: versaoDe(texto)};
+    } catch (e) {
+      throw new ErroProjeto(`${rel} não é um JSON válido (${(e as Error).message}); desfaça a última mudança no arquivo`, 'patch');
+    }
   }
 
   /** Grava de forma atômica (arquivo temporário + rename), para o observador nunca ler meio arquivo. */
@@ -55,7 +59,41 @@ export class Projeto {
   }
 
   manifesto(): Manifesto {
-    return this.lerJson<Manifesto>('estudio.json').doc;
+    const m = this.lerJson<Manifesto>('estudio.json').doc;
+    if (!m || typeof m !== 'object' || !Array.isArray(m.documentos)) throw new ErroProjeto('o estudio.json não tem a lista "documentos"', 'patch');
+    return m;
+  }
+
+  private gravarManifesto(m: Manifesto) {
+    this.gravarTexto('estudio.json', serializar(m));
+  }
+
+  renomear(nome: string): Manifesto {
+    const limpo = nome.trim().slice(0, 120);
+    if (!limpo) throw new ErroProjeto('o nome do projeto não pode ficar vazio');
+    const m = {...this.manifesto(), nome: limpo};
+    this.gravarManifesto(m);
+    return m;
+  }
+
+  /** Grava o arquivo de um documento novo e o põe no manifesto (o conteúdo vem de criar-projeto.ts). */
+  adicionarDocumento(entrada: EntradaDocumento, conteudo: unknown): EntradaDocumento {
+    const m = this.manifesto();
+    if (m.documentos.some((d) => d.id === entrada.id || d.caminho === entrada.caminho)) throw new ErroProjeto(`já existe o documento ${entrada.id}`, 'conflito');
+    if (this.existe(entrada.caminho)) throw new ErroProjeto(`o arquivo ${entrada.caminho} já existe`, 'conflito');
+    this.gravarTexto(entrada.caminho, serializar(conteudo));
+    this.gravarManifesto({...m, documentos: [...m.documentos, entrada]});
+    return entrada;
+  }
+
+  renomearDocumento(id: string, titulo: string): EntradaDocumento {
+    const m = this.manifesto();
+    const i = m.documentos.findIndex((d) => d.id === id);
+    if (i < 0) throw new ErroProjeto(`documento não achado: ${id}`, 'nao_achado');
+    const documentos = [...m.documentos];
+    documentos[i] = {...documentos[i], titulo: titulo.trim() || documentos[i].titulo};
+    this.gravarManifesto({...m, documentos});
+    return documentos[i];
   }
 
   /** Caminho do arquivo de um documento, pelo id do manifesto ou pelo próprio caminho. */

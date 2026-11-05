@@ -167,6 +167,9 @@ export async function stageBrowser({
 }
 
 const config = {
+  // out/pacote e não out/: o antivírus deste PC (GravityZone) travou o out/Estudio-win32-x64/Estudio.exe antigo, e o
+  // Forge não consegue apagá-lo para empacotar de novo
+  outDir: "out/pacote",
   packagerConfig: {
     name: "Estudio",
     executableName: "Estudio",

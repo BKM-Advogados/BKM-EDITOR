@@ -19,7 +19,7 @@ export const CamadasImagem: React.FC = () => {
   const selecao = useLoja((e) => e.selecao);
   const comentarios = useLoja((e) => e.comentarios);
   const docs = documentosDe('imagem');
-  if (!documento || !doc) return <div className="vazio">nenhuma imagem no projeto</div>;
+  if (!documento || !doc) return <div className="vazio">Sem imagem ainda: crie no monitor.</div>;
   if (!docValido(doc)) return <div className="vazio" style={{color: 'var(--erro)'}}>o documento {documento} não tem a lista "camadas"</div>;
 
   const iSel = selecao?.documento === documento ? indiceDe(selecao.caminho) : -1;

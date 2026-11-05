@@ -91,7 +91,7 @@ export const InspectorTres: React.FC = () => {
   const documento = useLoja((e) => e.ativo['3d']);
   const doc = useLoja((e) => (documento ? e.docs[documento]?.doc : undefined)) as DocCena3D | undefined;
   const selecao = useLoja((e) => e.selecao);
-  if (!documento || !doc) return <div className="vazio">nenhuma cena 3D</div>;
+  if (!documento || !doc) return <div className="vazio">Sem cena 3D ainda: crie no monitor.</div>;
   const caminho = selecao?.documento === documento ? selecao.caminho : undefined;
   const iObj = indiceEm(caminho, 'objetos');
   const iLuz = indiceEm(caminho, 'luzes');

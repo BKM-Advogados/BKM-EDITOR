@@ -6,18 +6,21 @@
 // seleção só muda de estado quando o bloco se mexe e os pinos olham uma janela de meio segundo.
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore} from 'react';
 import {Player, type PlayerRef} from '@remotion/player';
-import {Download, MessageSquarePlus, MousePointer2, Pause, Play, Repeat2, SkipBack, SkipForward, StepBack, StepForward} from 'lucide-react';
-import {CarrosselTema} from '../../../composicoes/cliente/CarrosselTema';
-import {aplicar, avisar, comentar, loja, patchTrocar, selecionar, useLoja, valorEm} from '../../estado/loja';
+import {MessageSquarePlus, MousePointer2, Pause, Play, Plus, Repeat2, SkipBack, SkipForward, StepBack, StepForward} from 'lucide-react';
+import {COMPOSICOES, composicaoDe} from '../../../composicoes/registro';
+import {FORMATO_PADRAO} from '../../../nucleo/formatos';
+import {aplicar, comentar, loja, patchTrocar, selecionar, useLoja, valorEm} from '../../estado/loja';
 import {Trilho, teclaLivre} from '../../componentes/Trilho';
+import {SemDocumento} from '../../componentes/SemDocumento';
 import {Tempo} from './Tempo';
 import {
-  alternar, alternarRepetir, andar, aoQuadro, assinarControle, FPS, formatarCurto, formatarTempo, irPara, lerControle, msAtual, parar, registrarPlayer, shuttle,
+  alternar, alternarRepetir, andar, aoQuadro, assinarControle, definirFps, FPS, formatarCurto, formatarTempo, irPara, lerControle, msAtual, parar, registrarPlayer,
+  shuttle,
 } from './tocador';
 import {resumoBloco, tipoDe} from './tipos';
+import {adicionarCena, duplicarSelecao, excluirSelecao} from './acoes';
 
-const W = 1080;
-const H = 1920;
+const arred = (n: number) => Math.round(n * 10000) / 10000;
 
 type Caixa = {x: number; y: number; w: number; h: number};
 type CenaP = {tipo: string; t_in: number; blocos?: {em: number}[]};
@@ -27,15 +30,19 @@ const iguais = (a: Caixa | null, b: Caixa | null) =>
 const usarTamanho = (ref: React.RefObject<HTMLElement | null>) => {
   const [t, setT] = useState({w: 0, h: 0});
   useLayoutEffect(() => {
-    if (!ref.current) return;
+    const el = ref.current;
+    if (!el) return;
+    // mede já na montagem: o ResizeObserver só avisa no próximo quadro desenhado (e nada, com a janela minimizada)
+    setT({w: el.clientWidth, h: el.clientHeight});
     const ro = new ResizeObserver(([e]) => setT({w: e.contentRect.width, h: e.contentRect.height}));
-    ro.observe(ref.current);
+    ro.observe(el);
     return () => ro.disconnect();
   }, [ref]);
   return t;
 };
 
-// o vídeo reabre no último tempo parado; na primeira vez, no começo da 1ª parte (acaba a "prévia preta" do gancho)
+// o vídeo reabre no último tempo parado; na primeira vez, no começo da 1ª parte (acaba a "prévia preta" do gancho) ou,
+// no vídeo de cenas, logo depois da entrada do primeiro bloco
 const chaveTempo = (documento: string) => `estudio:tempo:${loja.get().info?.raiz ?? ''}:${documento}`;
 const lerTempo = (documento: string) => {
   try {
@@ -63,7 +70,6 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
   const palco = useRef<HTMLDivElement>(null);
   const {w, h} = usarTamanho(area);
   const margem = w < 480 ? 10 : 16;
-  const escala = Math.max(0.05, Math.min((w - margem * 2) / W, (h - margem * 2) / H));
   const [janela, setJanela] = useState(() => Math.round(loja.get().tempo_ms / 500)); // tempo em meios segundos, para os pinos
   const [tocandoAgora, setTocando] = useState(false);
   const [caixaSel, setCaixaSel] = useState<Caixa | null>(null);
@@ -74,6 +80,14 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
   const [desloc, setDesloc] = useState({dx: 0, dy: 0, dw: 0});
 
   const props = montado && 'props' in montado ? montado.props : null;
+  // formato do vídeo: o vídeo de cenas traz largura, altura e fps nas props; o carrossel é 1080×1920 a 30
+  const medidas = props as {largura?: number; altura?: number; fps?: number} | null;
+  const W = medidas?.largura ?? FORMATO_PADRAO.largura;
+  const H = medidas?.altura ?? FORMATO_PADRAO.altura;
+  definirFps(medidas?.fps ?? FORMATO_PADRAO.fps);
+  const escala = Math.max(0.05, Math.min((w - margem * 2) / W, (h - margem * 2) / H));
+  const cenasRel = props?.composicao === 'VideoCenas'; // posição em frações do quadro (e não em px do 1080×1920)
+  const Componente = COMPOSICOES[composicaoDe(props)];
   const duracaoMs = props?.duracao_ms ?? 0;
   const duracao = props ? Math.max(1, Math.ceil((props.duracao_ms / 1000) * FPS)) : 1;
   const previa = useLoja((e) => (e.previaEfeitos && e.previaEfeitos.documento === documento ? e.previaEfeitos.efeitos : undefined));
@@ -92,7 +106,7 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
       p.removeEventListener('play', on);
       p.removeEventListener('pause', off);
     };
-  }, [props !== null]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [props !== null, Componente, W, H, medidas?.fps]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // primeira abertura deste vídeo na sessão: último tempo guardado ou começo da 1ª parte
   useEffect(() => {
@@ -102,7 +116,8 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
     jaAbertos.add(chave);
     if (loja.get().tempo_ms > 0) return;
     const parte = (props.cenas as CenaP[] | undefined)?.find((c) => c.tipo === 'parte');
-    const t = lerTempo(documento) ?? (parte ? parte.t_in + 300 : 0);
+    // vídeo de cenas: 0,8 s, com o primeiro bloco já entrado (no quadro 0 ele ainda está transparente)
+    const t = lerTempo(documento) ?? (parte ? parte.t_in + 300 : props.composicao === 'VideoCenas' ? 800 : 0);
     if (t > 0) irPara(Math.min(t, props.duracao_ms));
   }, [props, documento]);
   useEffect(() => {
@@ -149,8 +164,16 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
   const kSegurado = useRef(false);
   const atalhos = useRef<(e: KeyboardEvent) => void>(() => undefined);
   atalhos.current = (e: KeyboardEvent) => {
-    if (!teclaLivre(e) || !palco.current) return;
+    if (!palco.current) return;
     const k = e.key.toLowerCase();
+    // Delete e Ctrl+D só na área Vídeo (em Efeitos as mesmas teclas são da pilha de efeitos)
+    const comCtrlD = e.ctrlKey && !e.altKey && !e.shiftKey && k === 'd';
+    if (loja.get().area === 'video' && documento && (e.key === 'Delete' || comCtrlD) && teclaLivre(new KeyboardEvent('keydown', {key: e.key}), e.target)) {
+      e.preventDefault();
+      void (e.key === 'Delete' ? excluirSelecao(documento) : duplicarSelecao(documento));
+      return;
+    }
+    if (!teclaLivre(e)) return;
     if (e.key === ' ') {
       e.preventDefault();
       alternar();
@@ -213,7 +236,9 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
     ev.stopPropagation();
     (ev.target as HTMLElement).setPointerCapture(ev.pointerId);
     const bloco = valorEm(loja.get().docs[documento]?.doc, selecao.caminho) as {y?: number; x?: number; largura?: number} | undefined;
-    arrasto.current = {x0: ev.clientX, y0: ev.clientY, caminho: selecao.caminho, y: bloco?.y ?? 600, x: bloco?.x ?? 70, largura: bloco?.largura, modo};
+    arrasto.current = cenasRel
+      ? {x0: ev.clientX, y0: ev.clientY, caminho: selecao.caminho, y: bloco?.y ?? 0.4, x: bloco?.x ?? 0.1, largura: bloco?.largura ?? 0.8, modo}
+      : {x0: ev.clientX, y0: ev.clientY, caminho: selecao.caminho, y: bloco?.y ?? 600, x: bloco?.x ?? 70, largura: bloco?.largura, modo};
   };
   const durante = (ev: React.PointerEvent) => {
     const a = arrasto.current;
@@ -229,7 +254,11 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
     setDesloc({dx: 0, dy: 0, dw: 0});
     if (!a || !documento || (Math.abs(d.dx) < 2 && Math.abs(d.dy) < 2 && Math.abs(d.dw) < 2)) return;
     const doc = loja.get().docs[documento]?.doc;
-    const patch = a.modo === 'mover'
+    const patch = cenasRel
+      ? a.modo === 'mover'
+        ? [...patchTrocar(doc, `${a.caminho}/y`, arred(a.y + d.dy / H)), ...(Math.abs(d.dx) >= 2 ? patchTrocar(doc, `${a.caminho}/x`, arred(a.x + d.dx / W)) : [])]
+        : patchTrocar(doc, `${a.caminho}/largura`, Math.max(0.05, arred((a.largura ?? 0.8) + d.dw / W)))
+      : a.modo === 'mover'
       ? [...patchTrocar(doc, `${a.caminho}/y`, Math.round(a.y + d.dy)), ...(Math.abs(d.dx) >= 2 ? patchTrocar(doc, `${a.caminho}/x`, Math.round(a.x + d.dx)) : [])]
       : patchTrocar(doc, `${a.caminho}/largura`, Math.max(80, Math.round((a.largura ?? 940) + d.dw)));
     await aplicar(documento, patch, a.modo === 'mover' ? `mover bloco ${a.caminho}` : `largura do bloco ${a.caminho}`);
@@ -251,7 +280,7 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
   const pinos = comentarios.filter((c) => c.documento === documento && c.alvo.ponto && c.alvo.tempo_ms !== undefined && Math.abs(c.alvo.tempo_ms - agora) < 1500);
   const nomeSel = blocoSel?.tipo ? [tipoDe(blocoSel.tipo).nome, resumoBloco(blocoSel as Parameters<typeof resumoBloco>[0], 24)].filter(Boolean).join(' · ') : null;
 
-  if (!documento) return <div className="vazio">nenhum vídeo no projeto</div>;
+  if (!documento) return <SemDocumento modulo="video" />;
   return (
     <div className="painel">
       <div className="monitor-grade">
@@ -260,18 +289,23 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
             {id: 'v', nome: 'Seleção', tecla: 'V', icone: <MousePointer2 />, ativa: !modoComentario, aoClicar: () => loja.definir({modoComentario: false})},
             {id: 'm', nome: 'Comentário', tecla: 'M', icone: <MessageSquarePlus />, ativa: modoComentario, aoClicar: () => loja.definir({modoComentario: true})},
           ],
-          [{id: 'exportar', nome: 'Exportar MP4 (renderiza com o Remotion)', icone: <Download />, fim: true, aoClicar: () => void exportar(documento)}],
         ]} />
         <div className="monitor" ref={area}>
           {montado && 'erro' in montado && <div className="erro-monitor">{montado.erro}</div>}
           {props && (
             <div className="palco" ref={palco} style={{width: W * escala, height: H * escala, cursor: modoComentario ? 'crosshair' : 'default'}}
               onClick={clicar} onMouseMove={mover} onMouseLeave={() => setHover(null)}>
-              <Player ref={playerRef} component={CarrosselTema as unknown as React.FC<Record<string, unknown>>} inputProps={inputProps}
+              <Player key={`${composicaoDe(props)}:${W}x${H}@${FPS}`} ref={playerRef} component={Componente} inputProps={inputProps}
                 durationInFrames={duracao} fps={FPS} compositionWidth={W} compositionHeight={H} playbackRate={controle.taxa} loop={controle.repetir}
                 style={{width: W * escala, height: H * escala}} clickToPlay={false} spaceKeyToPlayOrPause={false}
                 doubleClickToFullscreen={false} numberOfSharedAudioTags={12} />
               <div className="sobreposicao">
+                {cenasRel && !(props.cenas as unknown[]).length && (
+                  <div className="sem-cenas" onClick={(e) => e.stopPropagation()}>
+                    <span>Este vídeo ainda não tem cenas</span>
+                    <button className="bt principal" onClick={() => void adicionarCena(documento)}><Plus size={14} />Adicionar a primeira cena</button>
+                  </div>
+                )}
                 {hover && !tocandoAgora && <div className="caixa-hover" style={{left: hover.x, top: hover.y, width: hover.w, height: hover.h}} />}
                 {caixaSel && (
                   <div className="caixa-sel" onPointerDown={(e) => iniciarArrasto(e, 'mover')} onPointerMove={durante} onPointerUp={() => void soltar()}
@@ -327,10 +361,4 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
       </div>
     </div>
   );
-};
-
-const exportar = async (documento: string) => {
-  avisar('Exportando… (a primeira vez empacota as composições e pode levar um minuto)');
-  const r = await window.estudio.exportarVideo(documento);
-  avisar(r.ok ? `Exportado: ${r.arquivo}` : `Exportação: ${r.mensagem}`, r.ok ? 'ok' : 'erro');
 };

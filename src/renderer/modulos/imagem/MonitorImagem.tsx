@@ -9,6 +9,7 @@ import {Check, ChevronDown, Download, Hand, ImagePlus, MessageSquarePlus, MouseP
 import type {CamadaImagem, Comentario, DocImagem, OperacaoPatch} from '../../../nucleo/documentos';
 import {CamadaEfeitos} from '../../../composicoes/efeitos/CamadaEfeitos';
 import {aplicar, comentar, loja, patchTrocar, selecionar, useLoja} from '../../estado/loja';
+import {SemDocumento} from '../../componentes/SemDocumento';
 import {BotaoMenu, usarFora} from '../../componentes/Menu';
 import {Trilho, teclaLivre} from '../../componentes/Trilho';
 import {BitmapTrabalho} from './BitmapTrabalho';
@@ -187,7 +188,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
     return () => window.removeEventListener('keydown', tecla);
   }, [editavel]);
 
-  if (!documento) return <div className="vazio">nenhuma imagem no projeto</div>;
+  if (!documento) return <SemDocumento modulo="imagem" />;
   if (!doc) return <div className="vazio">carregando…</div>;
   if (!valido) return <div className="vazio" style={{color: 'var(--erro)'}}>o documento {documento} não tem a lista "camadas"</div>;
 

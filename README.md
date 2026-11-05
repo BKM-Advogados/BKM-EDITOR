@@ -1,12 +1,18 @@
-# Estúdio (MVP)
+# Estúdio (V2)
 
 App desktop que une edição de **vídeo**, **imagem**, **3D** e **efeitos** num lugar só. Tudo é JSON na pasta do
-projeto: a pessoa edita na tela, o Claude edita pelo terminal embutido (com a conta da própria pessoa), e as duas mãos
-passam pelo mesmo JSON Patch com versão, diário e desfazer. A tela acompanha o arquivo; o agente vê o que a pessoa mudou.
+projeto: a pessoa edita na tela, o Claude edita conversando (com a conta da própria pessoa), e as duas mãos passam pelo
+mesmo JSON Patch com versão, diário e desfazer. A tela acompanha o arquivo; o agente vê o que a pessoa mudou.
 
 Nome provisório. Pasta: `C:\Users\usuario\projetos\estudio` (fora do OneDrive, por causa do `node_modules`).
+Repositório: `BKM-Advogados/BKM-EDITOR` (privado). V1 = tag `v1.0.0`.
 
-## Rodar
+## Instalar e rodar
+
+**Instalador:** `npm run instalador` gera `Estudio-Setup-<versão>.exe` na raiz do projeto (NSIS, por usuário, com
+atalho na área de trabalho e no Iniciar). O guia para outro PC está em `INSTALAR.md`.
+
+Desenvolvimento:
 
 ```bash
 npm install
@@ -14,95 +20,115 @@ node node_modules/electron/install.js   # o npm 11 bloqueia o script que baixa o
 npm run dev
 ```
 
-Na primeira vez, clique em **Abrir o exemplo (Cliente · C2)**: ele copia `exemplos/exemplo` para `%USERPROFILE%\Estudio\exemplo`
-(fora de Documentos, que o OneDrive pode mover). Para abrir uma pasta direto: `ESTUDIO_PROJETO=<pasta> npm run dev`.
+Para abrir uma pasta direto: `ESTUDIO_PROJETO=<pasta> npm run dev`.
 
-**Executável:** `npm run package` gera `out\Estudio-win32-x64\Estudio.exe` (a pasta inteira, ~450 MB, é o app; ainda sem
-instalador, o `forge.config.ts` não tem makers).
+**Prévia web (sem Electron):** quando o Electron não pode rodar (o antivírus deste PC bloqueia o de desenvolvimento),
+`npx vite --config vite.renderer.config.ts --port 5199` e abra `http://localhost:5199/scripts/previa-web/index.html`.
+A ponte `window.estudio` é simulada em memória (`scripts/previa-web/ponte.ts`): dá para ver a tela inicial, criar um
+vídeo de cenas e editar, sem disco, sem exportar e sem o Claude de verdade.
 
-Na aba **Claude** do terminal, rode `/login` uma vez (o Claude Code CLI desta máquina tem login próprio, separado do
-app desktop) e confie na pasta. Depois é só pedir: "resolva o comentário cmt_0001", "deixe o título da capa maior",
-"gire o anel 3D mais devagar".
+## Começar
+
+O app abre na **tela inicial**:
+
+- **Novo:** escolha Vídeo, Imagem ou 3D, o formato pelo destino (Reels e Shorts 9:16, Feed 4:5, Quadrado 1:1, YouTube
+  16:9 ou Personalizado) e o modelo. Clicar no formato marca; clicar no modelo cria; **Enter** cria em branco. Nome,
+  pasta e quadros por segundo têm padrão e ficam em "Mais opções". Os projetos vão para `%USERPROFILE%\Estudio`
+  (troca em Preferências; o app avisa quando a pasta é do OneDrive).
+- **Começar conversando:** descreva o vídeo; Enter cria o projeto em branco e abre a conversa com o Claude já com o
+  pedido. Sem o Claude Code instalado, o campo fica desligado e o resto funciona.
+- **Continuar e Recentes:** o último projeto com miniatura (a foto do monitor ao fechar) e a grade dos outros, com
+  Duplicar, Mostrar na pasta e Remover da lista (nunca apaga a pasta).
+- **Ver um pronto:** cópia nova do carrossel C2 da Cliente a cada clique (o exemplo nunca é editado no lugar).
+- Na primeira vez, a faixa "Antes de começar" mostra o estado do Claude, a pasta dos projetos, o perfil da máquina e
+  avisa se falta o Git.
+
+No editor, o menu do ícone tem Novo projeto (Ctrl+N), Novo neste projeto (vídeo, imagem, 3D), Abrir (Ctrl+O), Abrir
+recente, Duplicar projeto, Mostrar na pasta, Marcar ponto de restauração (Ctrl+S), Preferências e Fechar projeto
+(Ctrl+W, volta à tela inicial). O nome do projeto na barra renomeia com um clique; "Salvo" lembra que tudo grava na
+hora. **Exportar** (Ctrl+Shift+E) salva o MP4 ou o PNG em `saidas/` e mostra o arquivo. O projeto reabre na área, no
+documento, na seleção e no tempo em que a pessoa parou.
+
+Para o Claude: na aba **Claude**, a conversa usa o `claude` da própria pessoa (`/login` uma vez pelo terminal, que é
+o login próprio do Claude Code). Depois é só pedir: "crie 5 cenas sobre férias proporcionais", "deixe o título maior".
 
 ## O que tem
 
-| Área | Na tela | Pelo terminal (MCP `estudio`) |
+| Área | Na tela | Pelo Claude (MCP `estudio`) |
 |---|---|---|
-| **Vídeo** | o carrossel C2 real (composição da Cliente no Remotion Player), seleção de bloco no quadro, arrastar e redimensionar, propriedades com conferência das âncoras `palavra@ms`, linha do tempo com cenas, blocos e fala, arrastar bloco = entrar em outra palavra | `ler_documento`, `aplicar_patch` no `video/roteiro.json` |
-| **Imagem** | capa em camadas (imagem, texto, forma), mover, redimensionar, ordem, visível, exportar PNG | o mesmo, no `imagem/capa.json` |
-| **3D** | cena Three.js sob demanda, gizmo mover/girar/escala (W/E/R), luzes, câmera, animar | o mesmo, no `3d/cena.json` |
-| **Efeitos** | pilha de efeitos (desfoque, brilho, contraste, saturação, matiz, sépia, vinheta, granulado, tom) no vídeo ou na imagem, com prévia ao vivo e pré-ajustes | o campo `efeitos` de cada documento |
+| **Vídeo de cenas** (o que se começa do zero) | qualquer formato; cenas com duração própria e blocos de título, texto, lista, número e imagem; posição em % do quadro (trocar 9:16 por 16:9 não desmonta nada); criar, duplicar (Ctrl+D) e excluir (Delete) cena e bloco; arrastar bloco no quadro e na linha do tempo; alça da cena muda a duração; propriedades com formato, cores, tempo em segundos e letra em px | `ler_documento`, `aplicar_patch`, `criar_documento` |
+| **Carrossel narrado da Cliente** | o C2 real, com blocos presos às palavras da narração (`palavra@ms`), linha do tempo com a fala, arrastar bloco = entrar em outra palavra; criar bloco, duplicar e excluir partes | o mesmo, no `video/roteiro.json` |
+| **Imagem** | camadas (imagem, texto, forma), mover, redimensionar, ordem, visível, exportar PNG | o mesmo |
+| **3D** | cena Three.js sob demanda, gizmo mover/girar/escala (W/E/R), luzes, câmera, animar | o mesmo |
+| **Efeitos** | pilha de efeitos no vídeo ou na imagem, com prévia ao vivo e pré-ajustes | o campo `efeitos` |
+
+Área sem documento mostra o que falta e cria com um clique no formato do destino.
 
 Em todas as áreas:
 
 - **Comentar (M):** clique no quadro. O comentário fica ancorado no objeto (caminho JSON e id), no tempo e no ponto.
-  O agente lê com `listar_comentarios` / `ler_comentario`, responde e resolve. "Pedir ao Claude" manda o pedido para a aba.
-- **Histórico:** o diário de mudanças (`.estudio/diario.jsonl`) com quem mudou (pessoa ou agente, e de qual aba).
-- **Ctrl+Z** desfaz só as edições da pessoa; o que o agente fez não é desfeito por engano.
-- **Terminal:** várias abas do Claude e de shell em paralelo. A aba pode **hibernar** (libera a memória) e **retomar**
-  a mesma conversa (`--resume`). O limite de sessões vivas vem da RAM da máquina (2 com 8 GB, 4 com 16 GB, 8 acima).
-- **Atalhos:** Alt+1…4 troca de área (vale com o terminal em foco), Ctrl+' vai ao terminal, Espaço/J/K/L e ←/→ no
-  vídeo, M comenta, V seleciona, Esc cancela.
+- **Histórico:** o diário de mudanças (`.estudio/diario.jsonl`) com quem mudou (pessoa ou agente).
+- **Ctrl+Z** desfaz só as edições da pessoa; **Ctrl+S** marca um ponto de restauração no git do projeto.
+- **Claude:** conversas e terminais em abas; a conversa pode hibernar e retomar (`--resume`). O limite de sessões
+  vivas vem da RAM (2 com 8 GB, 4 com 16 GB, 8 acima).
+- **Atalhos:** Alt+1…4 troca de área, Ctrl+' vai à conversa, Espaço/J/K/L e ←/→ no vídeo, M comenta, V seleciona.
 
-O agente recebe as ferramentas: `projeto_info`, `estado_do_editor` (o que a pessoa está vendo e selecionou),
-`ler_documento`, `aplicar_patch` (com `versao_base` e `test`; recusa se o documento mudou por baixo),
-`listar_comentarios`, `ler_comentario`, `responder_comentario`, `resolver_comentario`, `listar_mudancas`.
-Cada projeto leva um `CLAUDE.md` explicando os arquivos e o jeito de trabalhar.
+O agente recebe: `projeto_info`, `estado_do_editor`, `ler_documento`, `aplicar_patch` (com `versao_base` e `test`),
+`criar_documento`, `renomear_projeto`, `listar_comentarios`, `ler_comentario`, `responder_comentario`,
+`resolver_comentario` e `listar_mudancas`. Cada projeto novo leva um `CLAUDE.md` com o formato dos documentos dele.
 
 ## Como é feito
 
 - **Electron 42 + React 19 + TypeScript**, a partir do template oficial de Electron da Remotion (Forge + Vite).
-- **Processo principal** (`src/main`): projeto aberto, observador da pasta, git com calma, servidor local em
-  127.0.0.1 (mídia com Range para a prévia e o render, e o **MCP por HTTP**, um token por aba), terminais com
-  `@lydell/node-pty` rodando o `claude` direto (sem shell no meio), exportação MP4 com `renderMedia`.
-- **Núcleo** (`src/nucleo`): documentos, JSON Patch com lock otimista e patch inverso, comentários, diário, o
-  resolvedor do roteiro **portado do Python para TypeScript** (bate com o `preparar_carrossel.py` no C2) e as ferramentas MCP.
-- **Composições** (`src/composicoes`): o CarrosselTema do motor do Mac, com a narração tocada em trechos do vídeo-fonte
-  (mudar pausa não exige regravar áudio), mídia pelo servidor local e a camada de efeitos.
-- **Interface** (`src/renderer`): casca com dockview (arranjo por área e por faixa de tela), módulos de vídeo, imagem,
-  3D (carregado só quando abre) e efeitos, terminais fora do React (sobrevivem à troca de área).
+- **Processo principal** (`src/main`): projeto aberto, criar/fechar/duplicar/renomear, recentes e preferências
+  (`memoria.ts`, na pasta de dados do app), observador da pasta, git com calma, servidor local em 127.0.0.1 (mídia com
+  Range e o **MCP por HTTP**, um token por aba), conversa com o `claude -p` em stream-json, terminais com
+  `@lydell/node-pty`, exportação MP4 com `renderMedia`.
+- **Núcleo** (`src/nucleo`): documentos, JSON Patch com lock otimista e patch inverso, comentários, diário, formatos
+  (`formatos.ts`), o vídeo de cenas (`cenas.ts`), criar projeto (`criar-projeto.ts`, com `modelos.ts` só de dados), o
+  resolvedor do roteiro da Cliente (portado do Python, bate com o `preparar_carrossel.py` no C2) e as ferramentas MCP.
+- **Composições** (`src/composicoes`): `VideoCenas` (tema neutro, formato pelas props) e o `CarrosselTema` da Cliente,
+  escolhidos pelo registro (`registro.ts`) na prévia e na exportação.
+- **Interface** (`src/renderer`): tela inicial (`inicio/`, sem carregar o editor), casca com dockview (arranjo por
+  área, faixa de tela e orientação do vídeo), módulos de vídeo, imagem, 3D (sob demanda) e efeitos.
 
-Os documentos de desenho estão em `docs/`: `arquitetura.md`, `tela.md` e `desempenho.md` (pesquisa em grafo de
-agentes, 04/11/2026). O MVP adota deles: terminal na coluna da direita, faixas C/P, atalhos, cores, MCP por HTTP,
-`claude` direto no PTY, hibernação e perfis por RAM. O que ficou para os próximos passos está abaixo.
+Os documentos de desenho estão em `docs/`. A pesquisa de uso que deu origem à V2 está em
+`tasks/estudio-ux-inicio-2026-11-05/briefing.md` (Onda A).
 
 ## Testes
 
 ```bash
-npm test            # resolvedor × Python, MCP por stdio e por HTTP (10 testes)
-npm run e2e         # com o app aberto via ESTUDIO_DEPURAR_PORTA=9471: seleção, edição, comentário, mudança de fora, áreas
+npm test            # 28 testes: resolvedor × Python, MCP por stdio e HTTP, conversa (claude falso), criar projeto, vídeo de cenas, formatos
+npm run typecheck
+npm run e2e         # com o app aberto via ESTUDIO_DEPURAR_PORTA=9471
 ```
 
-`scripts/e2e-claude.mjs` faz o ciclo completo com o Claude de verdade (precisa do `/login` na aba).
+`scripts/e2e-claude.mjs` faz o ciclo completo com o Claude de verdade (precisa do `/login`).
 
 ## Pendências conhecidas
 
-- **Memória (app empacotado, 05/11/2026, memória privada de todos os processos, sem o `claude`):** 307 MB parado no
-  vídeo; 547 MB depois de passar pelas quatro áreas com o 3D aberto. Orçamento do `desempenho.md`: 300 MB parado e
-  500–650 MB editando. O maior é o processo da GPU (117 → 286 MB com o 3D): soltar o contexto WebGL ao sair do 3D é o
-  próximo corte. Cada aba viva do Claude soma ~240 MB (é o próprio Claude Code).
-- **Instalador:** `npm run package` funciona e passa no e2e; falta configurar um maker (`npm run make`) para gerar
-  instalador.
-- **Áudio:** a prévia toca a narração sem a normalização a −16 LUFS e sem o `mix.py`; a mixagem por medida em TS e a
-  transcrição (Whisper) ficam para depois.
-- **Fontes** do tema vêm do Google Fonts na primeira vez (precisa de internet).
+- **Neste PC o Electron de desenvolvimento está bloqueado pelo Bitdefender** (GravityZone): o app instalado roda, mas
+  `npm run dev` e o e2e precisam de exceção para a pasta do projeto. A prévia web cobre a interface.
+- **Onda B** (briefing): transcrição local da narração (whisper.cpp), importar mídia e painel Mídia, a Cliente fora do código
+  (Carrossel Cliente como modelo do tipo cenas), o Claude que planeja (perguntas e Plano do vídeo antes de montar), exportar
+  por destino, chip de formato no monitor, primeiros passos e "Salvar como modelo".
+- **Memória (app empacotado, 05/11/2026):** 307 MB parado no vídeo; 547 MB com as quatro áreas e o 3D. A tela inicial
+  agora abre sem o editor (falta medir a linha "Início parado").
+- **Fontes** dos temas vêm do Google Fonts na primeira vez (precisa de internet).
 - **Licença do Remotion:** a BKM e a Cliente passam de 3 pessoas; uso fora da avaliação pede a Company License.
-- Do `arquitetura.md`, ficam para depois: endereçamento por `@id`, schemas Zod com propriedades geradas, utility
-  processes para PTY e render, hooks do Claude com o chip de contexto, git com um autor por commit, cena 3D e imagem
-  como blocos dentro do vídeo, cortar/aparar na linha do tempo.
-- Os hooks globais do Claude da pessoa também rodam nas abas (aparecem como "hook error" se dependerem de outro shell).
 
 ## Pastas
 
 ```
-src/main          processo principal (projeto, servidor local, MCP HTTP, terminais, exportação)
+src/main          processo principal (projeto, recentes, servidor local, MCP HTTP, conversa, terminais, exportação)
 src/preload       ponte mínima e tipada (window.estudio)
 src/compartilhado contrato de IPC
-src/nucleo        documentos, patch, diário, comentários, resolvedor do roteiro, ferramentas MCP, efeitos
-src/composicoes   composições Remotion (prévia e exportação)
-src/renderer      interface: casca, estado, módulos (video, imagem, tres, efeitos), painéis
+src/nucleo        documentos, patch, diário, comentários, formatos, vídeo de cenas, criar projeto, roteiro da Cliente, MCP
+src/composicoes   composições Remotion (VideoCenas, CarrosselTema) e o registro
+src/renderer      interface: tela inicial, casca, estado, módulos (video, imagem, tres, efeitos), painéis
 mcp/nucleo.ts     o mesmo MCP por stdio, para usar o projeto fora do app
-exemplos/exemplo    projeto de exemplo (vídeo, capa, cena 3D, mídia)
+exemplos/exemplo    projeto de exemplo (vídeo, capa, cena 3D, mídia), base dos modelos da Cliente
+scripts/previa-web a interface no navegador com a ponte simulada
 docs/             arquitetura, tela e desempenho
 testes/           vitest e fixtures; testes/saida guarda fotos e projetos de teste (ignorado no git)
 ```

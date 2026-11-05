@@ -16,23 +16,23 @@
 
 ## Instalar
 
-1. Rode o **`Estudio-Setup.exe`**.
+1. Rode o **`Estudio-Setup-0.2.0.exe`**.
 2. Na primeira vez, o Windows pode mostrar "O Windows protegeu o computador", porque o app ainda não tem assinatura
    digital. Clique em **Mais informações** e depois em **Executar assim mesmo**.
-3. O instalador não pede administrador. Ele instala na sua pasta de usuário (`%LocalAppData%\Estudio`), cria os atalhos
-   na **área de trabalho** e no **menu Iniciar** e abre o app.
-
-**Versão portátil, sem instalar:** descompacte o `Estudio-win32-x64-*.zip` numa pasta e abra o `Estudio.exe`.
+3. O instalador não pede administrador. Ele instala na sua pasta de usuário (`%LocalAppData%\Programs\Estudio`), cria
+   os atalhos na **área de trabalho** e no **menu Iniciar** e abre o app.
 
 ## Primeiro uso
 
-1. Clique em **Abrir o exemplo (Cliente · C2)**. O app copia um projeto de exemplo para `%USERPROFILE%\Estudio\exemplo`.
+1. O app abre na **tela inicial**. Para começar do zero: em **Novo**, escolha o formato pelo destino (Reels 9:16,
+   YouTube 16:9…) e clique em **Em branco**. Os projetos ficam em `%USERPROFILE%\Estudio` (dá para trocar em
+   Preferências). Para ver um vídeo pronto, clique em **Ver um pronto**: o app copia o carrossel C2 da Cliente.
 2. **Login do Claude, uma vez só:**
    - no painel **Claude**, à direita, clique em **Abrir terminal**;
    - digite `/login` e entre com a sua conta;
    - o login é feito pela Anthropic, no navegador; o Estúdio não vê nem guarda a sua senha;
    - volte à aba da conversa e clique em **Já entrei**.
-3. Peça o que quiser na caixa de pedido. O Claude vê o que você selecionou e o comentário aberto, e cada mudança dele
+3. Peça o que quiser na caixa de pedido, ou já na tela inicial, em **Começar conversando**. O Claude vê o que você selecionou e o comentário aberto, e cada mudança dele
    aparece num cartão com **Ver** e **Reverter**.
 
 ## Bom saber

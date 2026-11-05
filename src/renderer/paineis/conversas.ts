@@ -3,9 +3,9 @@
 // chegam viram itens para desenhar: a fala da pessoa, o texto do Claude, as ações como cartões e os pedidos de
 // permissão.
 import type {ContaClaude, EventoConversa} from '../../compartilhado/api';
-import {avisar} from '../estado/loja';
+import {avisar, quandoTrocarProjeto} from '../estado/loja';
 
-export type Anexo = {chave: string; tipo: 'selecao' | 'comentario' | 'tempo'; rotulo: string; contexto: string};
+export type Anexo = {chave: string; tipo: 'selecao' | 'comentario' | 'tempo' | 'projeto'; rotulo: string; contexto: string};
 export type Bloco =
   | {tipo: 'texto'; texto: string; aoVivo?: boolean}
   | {tipo: 'acao'; uso: string; nome: string; entrada: Record<string, unknown>; ok?: boolean; resultado?: string}
@@ -257,6 +257,24 @@ export const avisarNaConversa = (id: number, texto: string) => {
   c.itens.push({tipo: 'aviso', texto});
   mudou();
 };
+
+/** Conversa nova que já começa com um pedido (o campo "Descreva o vídeo para o Claude" da tela inicial): a fala mostra
+ *  o pedido da pessoa; o que o Claude precisa saber do projeto novo vai como anexo. */
+export const conversarCom = async (texto: string, anexos: Anexo[] = []) => {
+  await lerConta().catch(() => null);
+  const c = await novaConversa();
+  if (c) await enviar(c.id, texto, anexos);
+  return c;
+};
+
+// as conversas são da pasta do projeto: ao trocar ou fechar, o processo principal encerra os claude e a tela esquece
+quandoTrocarProjeto(() => {
+  conversas = [];
+  ativa = null;
+  foco = 'conversa';
+  contagem = 0;
+  mudou();
+});
 
 /** "Pedir ao Claude" de outros painéis: põe o pedido na caixa da conversa ativa (a pessoa confere e manda). */
 export const preencher = (texto: string) => {

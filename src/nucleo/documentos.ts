@@ -1,5 +1,6 @@
 // Modelo de documentos do projeto. Tudo é JSON legível na pasta do projeto: a pessoa edita pela interface, o agente
 // edita pelo terminal (MCP "estudio" ou o próprio arquivo), e as duas mãos passam pelo mesmo JSON Patch com versão.
+import type {DocCenas} from './cenas';
 import type {Efeito} from './efeitos';
 import type {Roteiro} from './roteiro/resolver';
 
@@ -15,7 +16,8 @@ export type Manifesto = {
 };
 
 // ---------- vídeo ----------
-export type DocVideo = Roteiro & {efeitos?: Efeito[]};
+// dois tipos: o vídeo de cenas ("tipo": "cenas", o que se começa do zero) e o carrossel narrado da Cliente (sem "tipo")
+export type DocVideo = (Roteiro | DocCenas) & {efeitos?: Efeito[]};
 
 // ---------- imagem ----------
 export type CamadaImagem = {

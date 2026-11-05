@@ -1,7 +1,7 @@
 {
   "name": "estudio",
   "productName": "Estudio",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Estúdio criativo desktop: vídeo, imagem, 3D e efeitos, editáveis à mão ou pelo terminal com o Claude",
   "author": "BKM Advogados",
   "private": true,
@@ -13,7 +13,7 @@
     "dev": "npm run mcp:build && electron-forge start",
     "package": "npm run mcp:build && electron-forge package",
     "make": "npm run mcp:build && electron-forge make",
-    "instalador": "npm run package && electron-builder --prepackaged out/Estudio-win32-x64 --win nsis --x64 --publish never && node scripts/copiar-instalador.mjs",
+    "instalador": "npm run package && electron-builder --prepackaged out/pacote/Estudio-win32-x64 --win nsis --x64 --publish never && node scripts/copiar-instalador.mjs",
     "mcp:build": "esbuild mcp/nucleo.ts --bundle --platform=node --format=cjs --target=node20 --outfile=dist-mcp/nucleo.cjs --log-level=warning",
     "studio": "remotion studio src/composicoes/index.ts",
     "typecheck": "tsc --noEmit",

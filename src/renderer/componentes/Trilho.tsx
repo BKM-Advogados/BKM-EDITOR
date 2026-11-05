@@ -22,7 +22,7 @@ export const Trilho: React.FC<{grupos: Ferramenta[][]; flutuante?: boolean; chil
 );
 
 /** Tecla de ferramenta: ignora campos de texto, o terminal e combinações com Ctrl/Alt. */
-export const teclaLivre = (e: KeyboardEvent) => {
-  const alvo = e.target as HTMLElement;
+export const teclaLivre = (e: KeyboardEvent, alvoDe?: EventTarget | null) => {
+  const alvo = (alvoDe ?? e.target) as HTMLElement;
   return !(e.ctrlKey || e.altKey || e.metaKey || /INPUT|TEXTAREA|SELECT/.test(alvo.tagName) || alvo.isContentEditable || alvo.closest?.('.xterm'));
 };

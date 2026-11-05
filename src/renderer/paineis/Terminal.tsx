@@ -4,12 +4,14 @@
 // escreverem juntas no mesmo histórico. Carregado sob demanda.
 import React, {useEffect, useLayoutEffect, useRef, useSyncExternalStore} from 'react';
 import {Moon, Play, Plus, Sparkle, SquareTerminal, Terminal as IconeTerminal, X} from 'lucide-react';
-import {useLoja} from '../estado/loja';
+import {loja, quandoTrocarProjeto, useLoja} from '../estado/loja';
 import {abrirAba, abrirClaudeNaSessao, ajustar, ativar, fecharAba, fecharClaudeDaSessao, hibernar, retomar, terminais} from './terminais';
-import {ativarConversa, avisarNaConversa, estadoConversas, fecharConversa, focarTerminal, hibernarConversa, novaConversa} from './conversas';
+import {ativarConversa, avisarNaConversa, conversarCom, estadoConversas, fecharConversa, focarTerminal, hibernarConversa, novaConversa} from './conversas';
 import {Conversa} from './Conversa';
 
 let primeiraVez = true;
+// projeto novo, painel novo: a primeira montagem volta a abrir uma conversa (ou um terminal, sem o Claude)
+quandoTrocarProjeto(() => (primeiraVez = true));
 
 const ESTADO: Record<string, string> = {nova: '', pronta: '', trabalhando: 'trabalhando', precisa: 'precisa de você', hibernada: 'hibernada'};
 
@@ -28,7 +30,12 @@ export const Terminal: React.FC = () => {
   useEffect(() => {
     if (primeiraVez && abas.length === 0 && conversas.length === 0) {
       primeiraVez = false;
-      if (temClaude) void novaConversa();
+      // projeto criado pelo campo "Descreva para o Claude" da tela inicial: a primeira conversa já leva o pedido
+      const pedido = loja.get().pedidoClaude;
+      if (pedido && temClaude) {
+        loja.definir({pedidoClaude: undefined});
+        void conversarCom(pedido.texto, [{chave: 'projeto-novo', tipo: 'projeto', rotulo: pedido.rotulo, contexto: pedido.contexto}]);
+      } else if (temClaude) void novaConversa();
       else void abrirAba('shell');
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

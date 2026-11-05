@@ -4,7 +4,7 @@
 import {FitAddon} from '@xterm/addon-fit';
 import {Terminal} from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
-import {avisar} from '../estado/loja';
+import {avisar, quandoTrocarProjeto} from '../estado/loja';
 import {preencher} from './conversas';
 
 export type Aba = {id: number; tipo: 'claude' | 'shell'; titulo: string; estado: 'viva' | 'hibernada' | 'saiu'; sessao?: string; el: HTMLDivElement; term: Terminal; fit: FitAddon};
@@ -139,6 +139,15 @@ export const ativar = (id: number) => {
   ativa = id;
   avisarMudanca();
 };
+
+// o processo principal já encerrou os PTYs do projeto que saiu; aqui some o que a tela guardava deles
+quandoTrocarProjeto(() => {
+  for (const a of abas) a.term.dispose();
+  abas = [];
+  ativa = null;
+  contagem = {claude: 0, shell: 0};
+  avisarMudanca();
+});
 
 /** Ajusta o xterm ativo ao tamanho do painel (e a fonte à faixa de tela) e avisa o PTY. */
 export const ajustar = () => {
