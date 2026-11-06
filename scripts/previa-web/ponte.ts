@@ -2,17 +2,49 @@
 // olhar e fotografar a tela inicial e o editor quando o Electron não pode rodar (o antivírus bloqueia o de
 // desenvolvimento neste PC). Não grava nada em disco. Uso: npx vite --config vite.renderer.config.ts --port 5199 e abrir
 // http://localhost:5199/scripts/previa-web/index.html
+// Som: "escolher arquivo de áudio" devolve um WAV sintético (uma narração, depois uma música, alternando), como URL de
+// blob que o <audio> e o Web Audio tocam de verdade; o envelope medido fica em memória e entra nas props como no app.
 import jsonpatch, {type Operation} from 'fast-json-patch';
-import type {ApiEstudio, InfoProjeto, Mudanca, NovoProjeto, Preferencias, Recente} from '../../src/compartilhado/api';
+import type {ApiEstudio, InfoProjeto, Mudanca, NovoProjeto, Preferencias, Recente, Trilha} from '../../src/compartilhado/api';
 import type {EntradaDocumento, Manifesto, Modulo} from '../../src/nucleo/documentos';
+import type {Envelope} from '../../src/nucleo/audio';
 import {novoDocCenas, resolverCenas, type DocCenas} from '../../src/nucleo/cenas';
 import {MODELOS} from '../../src/nucleo/modelos';
+import {codificarWav, musicaSintetica, narracaoSintetica, TAXA} from '../audio-sintetico';
 
 type Proj = {raiz: string; manifesto: Manifesto; docs: Record<string, unknown>; versao: number};
 const projetos = new Map<string, Proj>();
 let aberto: Proj | null = null;
 let prefs: Preferencias = {pasta_projetos: 'C:\\Users\\pessoa\\Estudio', ao_iniciar: 'inicio', formato_video: 'reels', formato_imagem: 'feed',
-  boas_vindas_vista: new URLSearchParams(location.search).has('vista')};
+  boas_vindas_vista: new URLSearchParams(location.search).has('vista'), pasta_trilhas: 'C:\\Users\\pessoa\\Estudio\\trilhas'};
+
+// ---------- som sintético ----------
+const audios = new Map<string, {url: string; nome: string}>(); // url do blob → nome que o clipe mostra
+const envelopes: Record<string, Envelope | undefined> = {};
+const wavSintetico = (tipo: 'narracao' | 'musica', nome: string) => {
+  const amostras = tipo === 'narracao' ? narracaoSintetica(12) : musicaSintetica(14);
+  const url = URL.createObjectURL(new Blob([codificarWav([amostras], TAXA)], {type: 'audio/wav'}));
+  audios.set(url, {url, nome});
+  return url;
+};
+let vez = 0;
+const proximoAudio = () => (vez++ % 2 === 0 ? wavSintetico('narracao', 'narração sintética.wav') : wavSintetico('musica', 'música sintética.wav'));
+const TRILHAS: Trilha[] = [
+  {nome: 'Cama suave', caminho: 'C:\\Users\\pessoa\\Estudio\\trilhas\\calmas\\cama-suave.mp3', pasta: 'calmas', tamanho_kb: 3812},
+  {nome: 'Pulso leve', caminho: 'C:\\Users\\pessoa\\Estudio\\trilhas\\pulso-leve.wav', pasta: '', tamanho_kb: 12040},
+];
+// o clipe que entra com um blob ganha o nome do áudio sintético (no app, o nome vem do arquivo em midia/)
+const nomearClipes = (doc: unknown) => {
+  const andar = (x: unknown) => {
+    if (Array.isArray(x)) x.forEach(andar);
+    else if (x && typeof x === 'object') {
+      const o = x as Record<string, unknown>;
+      if (typeof o.arquivo === 'string' && audios.has(o.arquivo) && !o.nome) o.nome = audios.get(o.arquivo)!.nome;
+      Object.values(o).forEach(andar);
+    }
+  };
+  andar(doc);
+};
 const recentes: Recente[] = new URLSearchParams(location.search).has('vazio') ? [] : [
   {raiz: 'C:\\Users\\pessoa\\Estudio\\Cliente C2', nome: 'Cliente · C2 · Transferência de cidade', aberto_em: new Date(Date.now() - 3 * 3600e3).toISOString(), existe: true, modulos: ['video', 'imagem', '3d']},
   {raiz: 'C:\\Users\\pessoa\\Estudio\\Ferias', nome: 'Férias proporcionais', aberto_em: new Date(Date.now() - 26 * 3600e3).toISOString(), existe: true, modulos: ['video']},
@@ -101,12 +133,13 @@ const api: ApiEstudio = {
   escolherPasta: async () => null,
   mostrarNaPasta: nada,
   marcarVersao: async () => ({ok: true, mensagem: 'Ponto de restauração criado'}),
-  escolherMidia: async () => null,
+  escolherMidia: async (tipo) => (tipo === 'audio' ? proximoAudio() : null),
   aoPedirMiniatura: () => nada,
   lerDocumento: async <T,>(id: string) => ({doc: structuredClone(aberto!.docs[id]) as T, versao: String(aberto!.versao)}),
   lerJson: async <T,>() => [] as T,
   aplicarPatch: async ({documento, patch}) => {
     const r = jsonpatch.applyPatch(structuredClone(aberto!.docs[documento]), patch as Operation[], true, false);
+    nomearClipes(r.newDocument);
     aberto!.docs[documento] = r.newDocument;
     aberto!.versao++;
     return {versao: String(aberto!.versao), seq: aberto!.versao};
@@ -114,7 +147,7 @@ const api: ApiEstudio = {
   desfazer: async () => ({ok: false, mensagem: 'desfazer não funciona na prévia web'}),
   propsVideo: async (id) => {
     const d = aberto!.docs[id] as DocCenas;
-    const {props, avisos} = resolverCenas(d);
+    const {props, avisos} = resolverCenas(d, {envelopes});
     return {props: props as never, avisos};
   },
   comentarios: async () => [],
@@ -151,6 +184,15 @@ const api: ApiEstudio = {
   exportarImagem: async () => ({ok: false}),
   aoProgresso: () => nada,
   metricas: async () => ({memoria_mb: 312, processos: []}),
+  audio: {
+    gravarEnvelope: async (arquivo, envelope) => {
+      envelopes[arquivo] = envelope;
+      mudou(`${arquivo}.envelope.json`);
+      return `${arquivo}.envelope.json`;
+    },
+    listarTrilhas: async () => ({pasta: prefs.pasta_trilhas, trilhas: TRILHAS}),
+    importarTrilha: async (caminho) => wavSintetico('musica', `${TRILHAS.find((t) => t.caminho === caminho)?.nome ?? 'trilha'}.wav`),
+  },
 };
 
 (window as unknown as {estudio: ApiEstudio}).estudio = api;

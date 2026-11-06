@@ -281,7 +281,9 @@ export const LinhaDoTempo: React.FC = () => {
   }, []);
 
   if (!documento || !props) return <div className="vazio">{montado && 'erro' in montado ? montado.erro : 'sem vídeo'}</div>;
-  const larguraConteudo = Math.max(largura, x(props.duracao_ms) + ESQ);
+  // clipe de áudio que passa do fim do vídeo continua alcançável (para aparar ou arrastar de volta)
+  const fimAudio = props.audio?.faixas.reduce((m, f) => f.clipes.reduce((n, c) => Math.max(n, c.em + c.duracao_ms), m), 0) ?? 0;
+  const larguraConteudo = Math.max(largura, x(Math.max(props.duracao_ms, fimAudio)) + ESQ);
 
   // régua hierárquica: rótulos a cada passo; marcas menores quando cabem; traço de quadro a partir de 240 px/s
   const passo = passoRegua(pxs);
