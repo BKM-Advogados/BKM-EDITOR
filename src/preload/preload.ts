@@ -70,8 +70,8 @@ const api: ApiEstudio = {
     fechar: (id) => ipcRenderer.send(CANAL.conversaFechar, id),
     aoEvento: (cb) => ouvir<[number, EventoConversa]>(CANAL.conversaEvento, cb),
   },
-  exportarVideo: (documento) => ipcRenderer.invoke(CANAL.exportar, documento),
-  exportarImagem: (documento, png) => ipcRenderer.invoke(CANAL.exportarImagem, documento, png),
+  exportarVideo: (documento, opcoes) => ipcRenderer.invoke(CANAL.exportar, documento, opcoes),
+  exportarImagem: (documento, dados, opcoes) => ipcRenderer.invoke(CANAL.exportarImagem, documento, dados, opcoes),
   aoProgresso: (cb) => ouvir<[Progresso]>(CANAL.progresso, cb),
   metricas: () => ipcRenderer.invoke(CANAL.metricas),
   audio: {
@@ -90,6 +90,8 @@ const api: ApiEstudio = {
     fontesDoProjeto: () => ipcRenderer.invoke(CANAL.fontesDoProjeto),
   },
   exportarPaginas: (o) => ipcRenderer.invoke(CANAL.exportarPaginas, o),
+  cancelarExportacao: () => ipcRenderer.send(CANAL.exportarCancelar),
+  mostrarArquivo: (caminho) => ipcRenderer.send(CANAL.mostrarArquivo, caminho),
 };
 
 contextBridge.exposeInMainWorld('estudio', api);

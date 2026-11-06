@@ -78,7 +78,7 @@ função recebe conta desde o começo do clipe, mesmo com corte (conferido no c�
 usa o mesmo `renderMedia` de sempre, que mixa os `<Html5Audio>` no MP4. Na prévia um arquivo que não carrega vira aviso
 no console; no render o Remotion para e avisa, melhor do que sair mudo.
 
-`scripts/exportar-teste.mjs` (`npx tsx scripts/exportar-teste.mjs`) monta um projeto com narração e música sintéticas,
+`scripts/exportar-teste-som.mjs` (`npx tsx scripts/exportar-teste-som.mjs`) monta um projeto com narração e música sintéticas,
 mede os envelopes, renderiza e confere com `getVideoMetadata` que o MP4 tem faixa de áudio. Saída em
 `testes/saida/exportar-teste/`.
 

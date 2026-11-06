@@ -1,17 +1,18 @@
 // Processo principal do Estúdio: uma janela, o projeto aberto, os terminais, o servidor de mídia e a exportação.
 import {app, BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent} from 'electron';
 import {execFile} from 'node:child_process';
-import {copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
+import {copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import {CANAL, type InfoProjeto, type Metricas, type NovoProjeto, type Perfil, type Preferencias, type Progresso, type Retangulo} from '../compartilhado/api';
+import {CANAL, type InfoProjeto, type Metricas, type NovoProjeto, type Perfil, type Preferencias, type Progresso, type ResultadoExportacao, type Retangulo} from '../compartilhado/api';
 import {Conversas, contaClaude} from './conversa';
 import type {Comentario, EstadoEditor, Manifesto, Modulo, OperacaoPatch} from '../nucleo/documentos';
 import {aplicarMarcaAoPlano, dentroDoOneDrive, documentoNovo, gravarPlano, nomeDePasta, nomePadrao, pastaLivre, planoDoProjeto} from '../nucleo/criar-projeto';
 import {MODELOS} from '../nucleo/modelos';
-import type {Formato} from '../nucleo/formatos';
+import {FORMATO_PADRAO, type Formato} from '../nucleo/formatos';
+import {argumentosDoRender, destinoDoFormato, FORMATOS_IMAGEM_SAIDA, nomesDosArquivos, type OpcoesExportarImagem, type OpcoesExportarVideo} from '../nucleo/exportacao';
 import {ErroProjeto, Projeto, serializar} from '../nucleo/projeto';
-import {exportarVideo} from './exportar';
+import {prepararRender, renderizarVideo} from './exportar';
 import {registrarIpcMarcas} from './ipc-marcas';
 import {registrarExportarPaginas} from './exportar-paginas';
 import {McpHttp} from './mcp-http';
@@ -323,36 +324,68 @@ lidar(CANAL.conversaAbrir, (o: {sessao?: string}) =>
   conversas.abrir({cwd: exigirProjeto().raiz, sessao: o.sessao, arquivoMcp: mcpHttp!.novaAba(midia.origem, `Claude ${++abasClaude}`)}));
 lidar(CANAL.conversaEnviar, (id: number, texto: string) => conversas.enviar(id, texto, PERFIL.sessoes_claude));
 lidar(CANAL.conversaHibernar, (id: number) => conversas.hibernar(id));
-// exporta direto em saidas/ (sem diálogo) e mostra o arquivo na pasta
-lidar(CANAL.exportar, async (documento: string) => {
+// ---------- exportação: um ou mais arquivos em saidas/, com andamento na interface e na barra de tarefas, e Cancelar ----------
+// Sem opções (chamada antiga), sai o MP4 H.264 no formato do documento. Com elas, um arquivo por destino: o vídeo de cenas
+// é relativo ao quadro, então basta trocar largura e altura nas props; o carrossel da Cliente é fixo em 1080×1920 e só
+// aceita escala. O diálogo mostra os arquivos e "Mostrar na pasta" ao fim, então a pasta não abre sozinha.
+let cancelarExportacao: (() => void) | null = null;
+lidar(CANAL.exportar, async (documento: string, opcoes?: OpcoesExportarVideo): Promise<ResultadoExportacao> => {
   const p = exigirProjeto();
+  if (cancelarExportacao) return {ok: false, mensagem: 'já há uma exportação em andamento'};
   const montado = sessao!.propsVideo(documento, midia.base);
   if ('erro' in montado) return {ok: false, mensagem: montado.erro};
-  mkdirSync(p.caminho('saidas'), {recursive: true});
-  const destino = arquivoLivre(p.caminho('saidas'), tituloDoDocumento(p, documento), 'mp4');
-  const aviso = (x: Progresso) => {
-    enviar(CANAL.progresso, x);
-    if (x.tipo === 'progresso' && x.progresso !== undefined) janela?.setProgressBar(x.progresso / 100);
+  const props = montado.props;
+  const formato: Formato = {largura: Number(props.largura) || FORMATO_PADRAO.largura, altura: Number(props.altura) || FORMATO_PADRAO.altura, fps: Number(props.fps) || FORMATO_PADRAO.fps};
+  const fixo = props.composicao !== 'VideoCenas';
+  const o: OpcoesExportarVideo = {codec: 'h264', qualidade: 'alta', escala: 1, ...opcoes, destinos: fixo || !opcoes?.destinos?.length ? [destinoDoFormato(formato)] : opcoes.destinos};
+  const pasta = p.caminho('saidas');
+  mkdirSync(pasta, {recursive: true});
+  const planos = nomesDosArquivos(o.nome?.trim() || tituloDoDocumento(p, documento), o.destinos, formato);
+  const {makeCancelSignal} = await import('@remotion/renderer');
+  const {cancelSignal, cancel} = makeCancelSignal();
+  cancelarExportacao = cancel;
+  const arquivos: string[] = [];
+  let parcial: string | undefined;
+  // o andamento de cada arquivo vai à interface com o nome dele; a barra de tarefas mostra o andamento geral
+  const avisoDe = (indice: number, arquivo: string) => (x: Progresso) => {
+    enviar(CANAL.progresso, {...x, arquivo, indice: indice + 1, total: planos.length});
+    if (x.tipo === 'progresso' && x.progresso !== undefined) janela?.setProgressBar((indice + x.progresso / 100) / planos.length);
   };
   try {
-    const arquivo = await exportarVideo({raizApp: app.getAppPath(), empacotado: app.isPackaged, props: montado.props, arquivo: destino, aviso});
-    shell.showItemInFolder(arquivo);
-    aviso({tipo: 'status', mensagem: `Exportado: ${path.relative(p.raiz, arquivo)}`});
-    return {ok: true, arquivo};
+    const preparado = await prepararRender({raizApp: app.getAppPath(), empacotado: app.isPackaged, aviso: avisoDe(0, '')});
+    for (const [i, plano] of planos.entries()) {
+      const args = argumentosDoRender(o, plano.destino, formato, Number(props.duracao_ms) || 0);
+      const destino = arquivoLivre(pasta, plano.nome, args.ext);
+      parcial = destino;
+      await renderizarVideo(preparado, {
+        props: fixo ? props : {...props, largura: args.largura, altura: args.altura},
+        arquivo: destino, codec: args.codec, videoBitrate: args.videoBitrate, escala: fixo ? args.escala : 1, quadros: args.frameRange, cancelSignal,
+      }, avisoDe(i, path.basename(destino)));
+      arquivos.push(destino);
+      parcial = undefined;
+    }
+    enviar(CANAL.progresso, {tipo: 'status', mensagem: `Exportado: ${arquivos.map((a) => path.relative(p.raiz, a)).join(', ')}`});
+    return {ok: true, arquivo: arquivos[0], arquivos, pasta};
   } catch (e) {
-    aviso({tipo: 'status', mensagem: `Falhou: ${(e as Error).message}`});
-    return {ok: false, mensagem: (e as Error).message};
+    const mensagem = (e as Error).message;
+    const cancelado = /cancel/i.test(mensagem);
+    if (parcial) rmSync(parcial, {force: true}); // o arquivo pela metade não fica em saidas/
+    enviar(CANAL.progresso, {tipo: 'status', mensagem: cancelado ? 'Exportação cancelada' : `Falhou: ${mensagem}`});
+    return {ok: false, cancelado, mensagem: cancelado ? 'Exportação cancelada' : mensagem, arquivos, pasta};
   } finally {
+    cancelarExportacao = null;
     janela?.setProgressBar(-1);
   }
 });
-lidar(CANAL.exportarImagem, (documento: string, png: string) => {
+// a interface manda a imagem já desenhada (PNG, JPG ou WebP em data URL); aqui só grava com o nome livre em saidas/
+lidar(CANAL.exportarImagem, (documento: string, dados: string, opcoes?: OpcoesExportarImagem) => {
   const p = exigirProjeto();
-  mkdirSync(p.caminho('saidas'), {recursive: true});
-  const destino = arquivoLivre(p.caminho('saidas'), tituloDoDocumento(p, documento), 'png');
-  writeFileSync(destino, Buffer.from(png.replace(/^data:image\/png;base64,/, ''), 'base64'));
-  shell.showItemInFolder(destino);
-  return {ok: true, arquivo: destino};
+  const pasta = p.caminho('saidas');
+  mkdirSync(pasta, {recursive: true});
+  const ext = FORMATOS_IMAGEM_SAIDA.find((f) => f.id === opcoes?.formato)?.ext ?? 'png';
+  const destino = arquivoLivre(pasta, `${opcoes?.nome?.trim() || tituloDoDocumento(p, documento)}${opcoes?.sufixo ?? ''}`, ext);
+  writeFileSync(destino, Buffer.from(dados.replace(/^data:image\/[\w.+-]+;base64,/, ''), 'base64'));
+  return {ok: true, arquivo: destino, pasta};
 });
 lidar(CANAL.metricas, (): Metricas => {
   const processos = app.getAppMetrics().map((m) => ({tipo: m.type, memoria_mb: Math.round(m.memory.workingSetSize / 1024), cpu: Math.round(m.cpu.percentCPUUsage)}));
@@ -381,6 +414,11 @@ ipcMain.on(CANAL.terminalFechar, (e, id: number) => (confiavel(e), terminais.fec
 ipcMain.on(CANAL.conversaPermitir, (e, id: number, pedido: string, decisao: 'permitir' | 'negar', sempre?: boolean) => (confiavel(e), conversas.permitir(id, pedido, decisao, sempre)));
 ipcMain.on(CANAL.conversaParar, (e, id: number) => (confiavel(e), conversas.parar(id)));
 ipcMain.on(CANAL.conversaFechar, (e, id: number) => (confiavel(e), conversas.fechar(id)));
+ipcMain.on(CANAL.exportarCancelar, (e) => (confiavel(e), cancelarExportacao?.()));
+ipcMain.on(CANAL.mostrarArquivo, (e, caminho: string) => {
+  confiavel(e);
+  if (typeof caminho === 'string' && existsSync(caminho)) shell.showItemInFolder(caminho);
+});
 
 // kits de marca e fontes próprias (ipc-marcas.ts): a pasta das preferências, servida também pelo servidor de mídia
 const marcas = registrarIpcMarcas({lidar, janela: () => janela, memoria, midia, exigirProjeto, exemplo: pastaDoExemplo()});

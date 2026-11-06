@@ -1,4 +1,4 @@
-// Áudio sintético para a prévia web (ponte simulada) e para o teste de exportação (exportar-teste.mjs): uma "narração"
+// Áudio sintético para a prévia web (ponte simulada) e para o teste de exportação com som (exportar-teste-som.mjs): uma "narração"
 // (sílabas de tom com harmônicos e um pouco de ruído, em frases separadas por pausas) e uma "música" (acorde sustentado
 // com tremolo), codificadas em WAV de 16 bits. Determinístico: o ruído sai de um gerador com semente fixa.
 export const TAXA = 22050;

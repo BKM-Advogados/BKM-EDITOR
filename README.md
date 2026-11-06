@@ -25,7 +25,8 @@ Para abrir uma pasta direto: `ESTUDIO_PROJETO=<pasta> npm run dev`.
 **Prévia web (sem Electron):** quando o Electron não pode rodar (o antivírus deste PC bloqueia o de desenvolvimento),
 `npx vite --config vite.renderer.config.ts --port 5199` e abra `http://localhost:5199/scripts/previa-web/index.html`.
 A ponte `window.estudio` é simulada em memória (`scripts/previa-web/ponte.ts`): dá para ver a tela inicial, criar um
-vídeo de cenas e editar, sem disco, sem exportar e sem o Claude de verdade.
+vídeo de cenas e editar, sem disco e sem o Claude de verdade; a exportação é simulada (o diálogo mostra um andamento de
+mentira e nada é gravado).
 
 ## Começar
 
@@ -46,7 +47,7 @@ O app abre na **tela inicial**:
 No editor, o menu do ícone tem Novo projeto (Ctrl+N), Novo neste projeto (vídeo, imagem, 3D), Abrir (Ctrl+O), Abrir
 recente, Duplicar projeto, Mostrar na pasta, Marcar ponto de restauração (Ctrl+S), Marca, Preferências e Fechar projeto
 (Ctrl+W, volta à tela inicial). O nome do projeto na barra renomeia com um clique; "Salvo" lembra que tudo grava na
-hora. **Exportar** (Ctrl+Shift+E) salva o MP4 ou o PNG em `saidas/` e mostra o arquivo. O projeto reabre na área, no
+hora. **Exportar** (Ctrl+Shift+E) abre o diálogo de exportação do documento da área (abaixo). O projeto reabre na área, no
 documento, na seleção e no tempo em que a pessoa parou.
 
 **Kit de marca:** cores, fontes, logo e assinatura de cada escritório ficam em `%USERPROFILE%\Estudio\marcas\<id>\`
@@ -66,11 +67,33 @@ o login próprio do Claude Code). Depois é só pedir: "crie 5 cenas sobre féri
 |---|---|---|
 | **Vídeo de cenas** (o que se começa do zero) | qualquer formato; cenas com duração própria e blocos de título, texto, lista, número e imagem; posição em % do quadro (trocar 9:16 por 16:9 não desmonta nada); criar, duplicar (Ctrl+D) e excluir (Delete) cena e bloco; arrastar bloco no quadro e na linha do tempo; alça da cena muda a duração; propriedades com formato, cores, tempo em segundos e letra em px | `ler_documento`, `aplicar_patch`, `criar_documento` |
 | **Carrossel narrado da Cliente** | o C2 real, com blocos presos às palavras da narração (`palavra@ms`), linha do tempo com a fala, arrastar bloco = entrar em outra palavra; criar bloco, duplicar e excluir partes | o mesmo, no `video/roteiro.json` |
-| **Imagem** | camadas (imagem, texto, forma), mover, redimensionar, ordem, visível, exportar PNG; **carrossel** de várias páginas (barra de páginas, PageUp/PageDown, "Novo carrossel" com campos por página) e exportar PNG por página + PDF para o LinkedIn (`docs/carrossel.md`) | o mesmo (`paginas[]`, `estado_do_editor` diz a página) |
+| **Imagem** | camadas (imagem, texto, forma), mover, redimensionar, ordem, visível, exportar PNG, JPG ou WebP com qualidade e escala; **carrossel** de várias páginas (barra de páginas, PageUp/PageDown, "Novo carrossel" com campos por página) e exportar PNG por página + PDF para o LinkedIn (`docs/carrossel.md`) | o mesmo (`paginas[]`, `estado_do_editor` diz a página) |
 | **3D** | cena Three.js sob demanda, gizmo mover/girar/escala (W/E/R), luzes, câmera, animar | o mesmo |
 | **Efeitos** | pilha de efeitos no vídeo ou na imagem, com prévia ao vivo e pré-ajustes | o campo `efeitos` |
 
 Área sem documento mostra o que falta e cria com um clique no formato do destino.
+
+**Exportar** (botão da barra ou Ctrl+Shift+E) abre o diálogo do documento da área, o único lugar por onde algo sai do
+projeto:
+
+- **Vídeo:** destinos (Reels e Shorts 9:16, Feed 4:5, Quadrado 1:1, YouTube 16:9 ou personalizado; o padrão é o formato
+  do documento, e marcar vários gera um arquivo por proporção, `Nome-9x16.mp4`, `Nome-4x5.mp4`…; o vídeo de cenas é em
+  frações do quadro, então o mesmo documento serve a todas), formato (MP4 H.264, MP4 H.265 ou WebM VP9), qualidade (alta,
+  média, leve, como bitrate pelo tamanho e pelos quadros por segundo), escala (1×, 0,75×, 0,5×), trecho em segundos, nome
+  e a **estimativa de tamanho** (bitrate × duração). Durante, o andamento de verdade (`onProgress` do `renderMedia`) e
+  **Cancelar** (`makeCancelSignal`); no fim, os arquivos em `saidas/` com "Mostrar na pasta". O carrossel narrado da Cliente é
+  fixo em 1080×1920 e só sai em 9:16.
+- **Imagem:** PNG, JPG ou WebP, qualidade (JPG e WebP), escala (0,5×, 1×, 2×) e nome, desenhada em resolução cheia com a
+  pilha de efeitos. O botão "Exportar PNG" do monitor da imagem continua exportando direto, sem diálogo.
+
+No monitor do vídeo, o botão de **zona segura** (ícone de moldura no transporte) sobrepõe o que a interface de cada rede
+cobre: Reels, TikTok e Shorts (faixas de cima e de baixo, coluna de ícones à direita e o corte 3:4 da grade), Feed 4:5
+(miolos 1:1 e 3:4 da grade) e YouTube 16:9 (controles, legendas e a área segura de título). Os valores, com a fonte de
+cada um, estão em `src/nucleo/zonas-seguras.ts`; a escolha é da interface, não do documento, e não sai na exportação.
+
+**Lâmina** (Ctrl+K ou o botão de tesoura na lista de cenas): divide a cena do vídeo de cenas no tempo da cabeça. Os
+blocos ficam na metade em que começam e os que atravessam o corte vão para as duas, aparados; a segunda cena nasce com
+ids novos. Ctrl+Z desfaz.
 
 Em todas as áreas:
 
@@ -109,12 +132,13 @@ Os documentos de desenho estão em `docs/`. A pesquisa de uso que deu origem à 
 ## Testes
 
 ```bash
-npm test            # 41 testes: resolvedor × Python, MCP por stdio e HTTP, conversa (claude falso), criar projeto, vídeo de cenas, formatos, kit de marca e fontes
+npm test            # TESTES_TOTAL testes: resolvedor × Python, MCP por stdio e HTTP, conversa (claude falso), criar projeto, vídeo de cenas, formatos, som e ducking, kit de marca e fontes, carrossel e PDF, lâmina, exportação, zonas seguras
 npm run typecheck
 npm run e2e         # com o app aberto via ESTUDIO_DEPURAR_PORTA=9471
 ```
 
-`scripts/e2e-claude.mjs` faz o ciclo completo com o Claude de verdade (precisa do `/login`).
+`scripts/e2e-claude.mjs` faz o ciclo completo com o Claude de verdade (precisa do `/login`). `npx tsx scripts/exportar-teste.mjs`
+renderiza um vídeo de cenas de teste em 9:16, 4:5 e 16:9 fora do Electron, em `testes/saida/exportar/`.
 
 ## Pendências conhecidas
 
@@ -122,7 +146,7 @@ npm run e2e         # com o app aberto via ESTUDIO_DEPURAR_PORTA=9471
   `npm run dev` e o e2e precisam de exceção para a pasta do projeto. A prévia web cobre a interface.
 - **Onda B** (briefing): transcrição local da narração (whisper.cpp), importar mídia e painel Mídia, o Carrossel Cliente como
   modelo do tipo cenas (a paleta e as fontes dele já vêm do kit `cliente`), o Claude que planeja (perguntas e Plano do vídeo
-  antes de montar), exportar por destino, chip de formato no monitor, primeiros passos e "Salvar como modelo".
+  antes de montar), chip de formato no monitor, primeiros passos e "Salvar como modelo".
 - **Memória (app empacotado, 05/11/2026):** 307 MB parado no vídeo; 547 MB com as quatro áreas e o 3D. A tela inicial
   agora abre sem o editor (falta medir a linha "Início parado").
 - **Fontes** do Google (Inter, Archivo, IBM Plex) baixam na primeira vez (precisa de internet); as de arquivo do kit não.

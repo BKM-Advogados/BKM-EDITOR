@@ -1,8 +1,10 @@
 // Criar, duplicar e excluir cena e bloco do vídeo pela interface, como JSON Patch (o mesmo caminho das outras edições:
 // diário, desfazer, o Claude vê). Cada patch confere o id do que vai mexer, para não pisar no que o agente mudou por
 // baixo. No vídeo de cenas vale tudo; no carrossel narrado da Cliente, cena nova precisa de uma palavra da narração, então só
-// partes podem sair e blocos podem entrar (o resolvedor põe o bloco 300 ms depois do começo da cena).
+// partes podem sair e blocos podem entrar (o resolvedor põe o bloco 300 ms depois do começo da cena). A lâmina (Ctrl+K)
+// divide a cena na cabeça pelo núcleo (cenas-dividir.ts).
 import {comIdsNovos, ehDocCenas, idLivre, novaCenaCenas, novoBlocoCenas, TIPOS_BLOCO_CENAS, type TipoBlocoCenas} from '../../../nucleo/cenas';
+import {dividirCena, PEDACO_MIN_MS} from '../../../nucleo/cenas-dividir';
 import type {OperacaoPatch} from '../../../nucleo/documentos';
 import {aplicar, avisar, loja, selecionar, valorEm} from '../../estado/loja';
 import {irPara, msAtual} from './tocador';
@@ -125,5 +127,24 @@ export const excluirSelecao = async (documento: string) => {
   if (await aplicar(documento, [...testeId(sel!.caminho, alvo.id), {op: 'remove', path: sel!.caminho}], rotulo)) {
     selecionar(p.bloco === null ? null : {documento, caminho: `/cenas/${p.cena}`});
     avisar(`${p.bloco === null ? 'Cena excluída' : 'Bloco excluído'}. Ctrl+Z desfaz.`, 'ok');
+  }
+};
+
+/** Lâmina (Ctrl+K): divide a cena em que a cabeça está, no tempo dela. A segunda metade fica selecionada e a cabeça não
+ *  sai do lugar (agora é o começo dela). */
+export const dividirNaCabeca = async (documento: string) => {
+  const d = doc(documento);
+  if (!ehDocCenas(d)) return avisar('No carrossel narrado as cenas seguem a narração: não dá para dividir no cursor.', 'info');
+  const t = msAtual();
+  const c = cenasP(documento).find((x) => x.origem && t >= x.t_in && t < x.t_out);
+  const i = c?.origem ? Number(c.origem.split('/')[2]) : NaN;
+  const cena = Number.isFinite(i) ? d.cenas[i] : undefined;
+  if (!c || !cena) return avisar('Leve a cabeça para dentro de uma cena para dividir.', 'info');
+  const divisao = dividirCena(d, cena.id, t - c.t_in);
+  if (!divisao) return avisar(`O corte precisa ficar a pelo menos ${PEDACO_MIN_MS} ms das pontas da cena.`, 'info');
+  const seg = (Math.round(t / 100) / 10).toFixed(1).replace('.', ',');
+  if (await aplicar(documento, divisao.patch, `dividir cena ${i + 1} em ${seg} s`)) {
+    selecionar({documento, caminho: `/cenas/${i + 1}`});
+    avisar('Cena dividida. Ctrl+Z desfaz.', 'ok');
   }
 };

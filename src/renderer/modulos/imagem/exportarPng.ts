@@ -1,9 +1,11 @@
-// Exportação da imagem em resolução cheia: fundo e camadas visíveis num canvas do tamanho do documento, depois a pilha
-// de efeitos (filtro CSS no ctx.filter ao copiar para um segundo canvas; vinheta, granulado e tom por cima) e o PNG vai
-// ao processo principal, que pergunta onde salvar. Uma camada por vez: cada imagem é carregada, desenhada e solta antes
-// da próxima. As regras de texto e encaixe são as mesmas da prévia (comum.ts).
+// Exportação da imagem em resolução cheia (ou na escala pedida): fundo e camadas visíveis num canvas do tamanho do
+// documento, depois a pilha de efeitos (filtro CSS no ctx.filter ao copiar para um segundo canvas; vinheta, granulado e
+// tom por cima) e a imagem vai ao processo principal, que grava em saidas/. Uma camada por vez: cada imagem é carregada,
+// desenhada e solta antes da próxima. As regras de texto e encaixe são as mesmas da prévia (comum.ts). Sem opções sai o
+// PNG de sempre; o diálogo de exportar passa formato (PNG, JPG, WebP), qualidade, escala e nome.
 import type {CamadaImagem, DocImagem} from '../../../nucleo/documentos';
 import {camadas as camadasDeEfeito, filtroCss, type Efeito} from '../../../nucleo/efeitos';
+import {FORMATOS_IMAGEM_SAIDA, type FormatoImagem} from '../../../nucleo/exportacao';
 import {avisar, loja} from '../../estado/loja';
 import {ENTRELINHA, PADRAO, encaixe, esperarFontes, familiaCss, rotuloCamada, urlMidia, visivel} from './comum';
 
@@ -158,10 +160,11 @@ const desenharTom = (ctx: CanvasRenderingContext2D, e: Efeito, W: number, H: num
   ctx.restore();
 };
 
-/** Documento inteiro em resolução cheia; devolve o canvas e as camadas cuja imagem não carregou. */
-export const desenharDocumento = async (doc: DocImagem) => {
-  const W = Math.round(doc.largura);
-  const H = Math.round(doc.altura);
+/** Documento inteiro em resolução cheia vezes `escala` (as camadas desenham em px do documento, o canvas é escalado);
+ *  devolve o canvas e as camadas cuja imagem não carregou. */
+export const desenharDocumento = async (doc: DocImagem, escala = 1) => {
+  const W = Math.round(doc.largura * escala);
+  const H = Math.round(doc.altura * escala);
   if (!(W > 0 && H > 0) || W > LADO_MAX || H > LADO_MAX || W * H > AREA_MAX) throw new Error(`tamanho ${W}×${H} fora do que o canvas aceita`);
   const textos = doc.camadas.filter((c) => visivel(c) && c.tipo === 'texto');
   await esperarFontes(textos.map((c) => c.fonte || PADRAO.fonte));
@@ -169,13 +172,15 @@ export const desenharDocumento = async (doc: DocImagem) => {
 
   const composicao = novoCanvas(W, H);
   const ctx = contexto(composicao);
+  ctx.scale(escala, escala);
   ctx.fillStyle = doc.fundo;
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillRect(0, 0, doc.largura, doc.altura);
   const faltaram: string[] = [];
   for (const c of doc.camadas) if (visivel(c) && !(await desenharCamada(ctx, c))) faltaram.push(rotuloCamada(c));
 
   const efeitos = doc.efeitos ?? [];
-  const filtro = filtroCss(efeitos);
+  // o desfoque é em px do documento: acompanha a escala
+  const filtro = filtroCss(efeitos).replace(/blur\((\d*\.?\d+)px\)/g, (_, n: string) => `blur(${Number(n) * escala}px)`);
   const extras = camadasDeEfeito(efeitos);
   if (!filtro && !extras.length) return {canvas: composicao, faltaram};
 
@@ -195,19 +200,34 @@ export const desenharDocumento = async (doc: DocImagem) => {
   return {canvas: final, faltaram};
 };
 
-export const exportarPng = async (documento: string) => {
+export type OpcoesPng = {formato?: FormatoImagem; qualidade?: number; escala?: number; nome?: string; sufixo?: string; revelar?: boolean};
+export type SaidaPng = {ok: boolean; arquivo?: string; pasta?: string; faltaram: string[]; mensagem?: string};
+
+/** Exporta a imagem para saidas/. Sem opções, o PNG em resolução cheia de sempre, mostrado na pasta ao fim (quem chama
+ *  em série, como o carrossel de páginas, passa `revelar: false`); o diálogo de exportar passa formato, qualidade (0 a
+ *  1, só JPG e WebP), escala e nome, e mostra o arquivo por conta própria. */
+export const exportarPng = async (documento: string, opcoes: OpcoesPng = {}): Promise<SaidaPng> => {
   const doc = loja.get().docs[documento]?.doc as DocImagem | undefined;
-  if (!doc) return avisar('A imagem ainda não carregou.', 'erro');
-  avisar(`Exportando ${documento}.png em ${doc.largura}×${doc.altura}…`);
+  if (!doc) {
+    avisar('A imagem ainda não carregou.', 'erro');
+    return {ok: false, faltaram: [], mensagem: 'a imagem ainda não carregou'};
+  }
+  const formato = FORMATOS_IMAGEM_SAIDA.find((f) => f.id === opcoes.formato) ?? FORMATOS_IMAGEM_SAIDA[0];
+  const escala = opcoes.escala && opcoes.escala > 0 ? opcoes.escala : 1;
+  avisar(`Exportando ${formato.nome} em ${Math.round(doc.largura * escala)}×${Math.round(doc.altura * escala)}…`);
   try {
-    const {canvas, faltaram} = await desenharDocumento(doc);
-    const png = canvas.toDataURL('image/png');
+    const {canvas, faltaram} = await desenharDocumento(doc, escala);
+    const dados = canvas.toDataURL(formato.mime, formato.comQualidade ? Math.min(1, Math.max(0.05, opcoes.qualidade ?? 0.9)) : undefined);
     soltar(canvas);
-    const r = await window.estudio.exportarImagem(documento, png);
+    const r = await window.estudio.exportarImagem(documento, dados, {formato: formato.id, nome: opcoes.nome, sufixo: opcoes.sufixo});
     const falta = faltaram.length ? ` (sem imagem: ${faltaram.join(', ')})` : '';
-    if (r.ok) avisar(`PNG exportado: ${r.arquivo}${falta}`, faltaram.length ? 'erro' : 'ok');
-    else avisar('Exportação cancelada.', 'info');
+    if (r.ok) {
+      avisar(`${formato.nome} exportado: ${r.arquivo}${falta}`, faltaram.length ? 'erro' : 'ok');
+      if (opcoes.revelar !== false && r.arquivo) window.estudio.mostrarArquivo(r.arquivo);
+    } else avisar('Exportação cancelada.', 'info');
+    return {...r, faltaram};
   } catch (e) {
-    avisar(`Exportação do PNG falhou: ${(e as Error).message}`, 'erro');
+    avisar(`Exportação da imagem falhou: ${(e as Error).message}`, 'erro');
+    return {ok: false, faltaram: [], mensagem: (e as Error).message};
   }
 };

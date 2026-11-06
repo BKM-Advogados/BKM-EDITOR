@@ -3,14 +3,18 @@
 // comentário); embaixo, o transporte com o código de tempo e J/K/L como shuttle. Clicar num bloco seleciona; com a
 // ferramenta de comentário (M), clicar abre um balão ancorado no bloco, no tempo e no ponto do quadro.
 // O tempo que muda a cada quadro não re-renderiza o monitor: o código de tempo é um <Tempo/> com ref, a caixa de
-// seleção só muda de estado quando o bloco se mexe e os pinos olham uma janela de meio segundo.
+// seleção só muda de estado quando o bloco se mexe e os pinos olham uma janela de meio segundo. No transporte, a zona
+// segura das redes (nucleo/zonas-seguras.ts) liga uma sobreposição por cima do quadro: escolha da interface, fora da
+// exportação.
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore} from 'react';
 import {Player, type PlayerRef} from '@remotion/player';
-import {MessageSquarePlus, MousePointer2, Pause, Play, Plus, Repeat2, SkipBack, SkipForward, StepBack, StepForward} from 'lucide-react';
+import {ChevronDown, Frame, MessageSquarePlus, MousePointer2, Pause, Play, Plus, Repeat2, SkipBack, SkipForward, StepBack, StepForward} from 'lucide-react';
 import {COMPOSICOES, composicaoDe} from '../../../composicoes/registro';
 import {FORMATO_PADRAO} from '../../../nucleo/formatos';
+import {conjuntoDe, ZONAS_SEGURAS, zonaSugerida, type IdZonaSegura} from '../../../nucleo/zonas-seguras';
 import {aplicar, comentar, loja, patchTrocar, selecionar, useLoja, valorEm} from '../../estado/loja';
 import {Trilho, teclaLivre} from '../../componentes/Trilho';
+import {BotaoMenu} from '../../componentes/Menu';
 import {SemDocumento} from '../../componentes/SemDocumento';
 import {Tempo} from './Tempo';
 import {
@@ -18,7 +22,8 @@ import {
   shuttle,
 } from './tocador';
 import {resumoBloco, tipoDe} from './tipos';
-import {adicionarCena, duplicarSelecao, excluirSelecao} from './acoes';
+import {adicionarCena, dividirNaCabeca, duplicarSelecao, excluirSelecao} from './acoes';
+import './zonas-seguras.css';
 
 const arred = (n: number) => Math.round(n * 10000) / 10000;
 
@@ -54,6 +59,27 @@ const lerTempo = (documento: string) => {
 };
 const jaAbertos = new Set<string>();
 
+// zona segura ligada no monitor: escolha da interface (não do documento), lembrada entre sessões; `ultimaZona` é a que
+// o botão religa
+const CHAVE_ZONA = 'estudio:zona-segura';
+const lerZona = (): IdZonaSegura | null => {
+  try {
+    const v = localStorage.getItem(CHAVE_ZONA);
+    return v && conjuntoDe(v as IdZonaSegura) ? (v as IdZonaSegura) : null;
+  } catch {
+    return null;
+  }
+};
+const gravarZona = (z: IdZonaSegura | null) => {
+  try {
+    if (z) localStorage.setItem(CHAVE_ZONA, z);
+    else localStorage.removeItem(CHAVE_ZONA);
+  } catch {
+    /* sem armazenamento: vale só enquanto o app está aberto */
+  }
+};
+let ultimaZona: IdZonaSegura | null = lerZona();
+
 export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForcado}) => {
   const docAtivo = useLoja((e) => e.ativo.video);
   const documento = docForcado ?? docAtivo;
@@ -78,6 +104,12 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
   const [textoBalao, setTextoBalao] = useState('');
   const arrasto = useRef<{x0: number; y0: number; caminho: string; y: number; x: number; largura?: number; modo: 'mover' | 'largura'} | null>(null);
   const [desloc, setDesloc] = useState({dx: 0, dy: 0, dw: 0});
+  const [zona, setZona] = useState<IdZonaSegura | null>(lerZona);
+  const escolherZona = (z: IdZonaSegura | null) => {
+    setZona(z);
+    gravarZona(z);
+    if (z) ultimaZona = z;
+  };
 
   const props = montado && 'props' in montado ? montado.props : null;
   // formato do vídeo: o vídeo de cenas traz largura, altura e fps nas props; o carrossel é 1080×1920 a 30
@@ -87,6 +119,8 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
   definirFps(medidas?.fps ?? FORMATO_PADRAO.fps);
   const escala = Math.max(0.05, Math.min((w - margem * 2) / W, (h - margem * 2) / H));
   const cenasRel = props?.composicao === 'VideoCenas'; // posição em frações do quadro (e não em px do 1080×1920)
+  const conjunto = conjuntoDe(zona);
+  const sugerida = zonaSugerida(W, H);
   const Componente = COMPOSICOES[composicaoDe(props)];
   const duracaoMs = props?.duracao_ms ?? 0;
   const duracao = props ? Math.max(1, Math.ceil((props.duracao_ms / 1000) * FPS)) : 1;
@@ -166,11 +200,12 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
   atalhos.current = (e: KeyboardEvent) => {
     if (!palco.current) return;
     const k = e.key.toLowerCase();
-    // Delete e Ctrl+D só na área Vídeo (em Efeitos as mesmas teclas são da pilha de efeitos)
+    // Delete, Ctrl+D e Ctrl+K (lâmina) só na área Vídeo (em Efeitos as mesmas teclas são da pilha de efeitos)
     const comCtrlD = e.ctrlKey && !e.altKey && !e.shiftKey && k === 'd';
-    if (loja.get().area === 'video' && documento && (e.key === 'Delete' || comCtrlD) && teclaLivre(new KeyboardEvent('keydown', {key: e.key}), e.target)) {
+    const comCtrlK = e.ctrlKey && !e.altKey && !e.shiftKey && k === 'k';
+    if (loja.get().area === 'video' && documento && (e.key === 'Delete' || comCtrlD || comCtrlK) && teclaLivre(new KeyboardEvent('keydown', {key: e.key}), e.target)) {
       e.preventDefault();
-      void (e.key === 'Delete' ? excluirSelecao(documento) : duplicarSelecao(documento));
+      void (e.key === 'Delete' ? excluirSelecao(documento) : comCtrlK ? dividirNaCabeca(documento) : duplicarSelecao(documento));
       return;
     }
     if (!teclaLivre(e)) return;
@@ -306,6 +341,15 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
                     <button className="bt principal" onClick={() => void adicionarCena(documento)}><Plus size={14} />Adicionar a primeira cena</button>
                   </div>
                 )}
+                {conjunto && (
+                  <div className="zonas-seguras" aria-hidden="true">
+                    {conjunto.zonas.map((z, i) => (
+                      <div key={i} className={`zona ${z.tipo}`} style={{left: `${z.x * 100}%`, top: `${z.y * 100}%`, width: `${z.largura * 100}%`, height: `${z.altura * 100}%`}}>
+                        <span>{z.rotulo}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {hover && !tocandoAgora && <div className="caixa-hover" style={{left: hover.x, top: hover.y, width: hover.w, height: hover.h}} />}
                 {caixaSel && (
                   <div className="caixa-sel" onPointerDown={(e) => iniciarArrasto(e, 'mover')} onPointerMove={durante} onPointerUp={() => void soltar()}
@@ -356,6 +400,14 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
             <button className="bti largo" onClick={() => irPara(duracaoMs)} title="Fim  End"><SkipForward /></button>
             <button className={`bti largo${controle.repetir ? ' ligado' : ''}`} onClick={alternarRepetir} title="Repetir"><Repeat2 /></button>
           </div>
+          <span className="zona-botoes">
+            <button className={`bti${conjunto ? ' ligado' : ''}`} onClick={() => escolherZona(conjunto ? null : ultimaZona ?? sugerida)}
+              title={conjunto ? `Zona segura: ${conjunto.nome}. Clique para desligar` : 'Zona segura das redes: o que a interface do Reels, do TikTok e do YouTube cobre (só na tela, não sai na exportação)'}>
+              <Frame />
+            </button>
+            <BotaoMenu titulo="Escolher a rede da zona segura" icone={<ChevronDown className="i12" />} className="bti estreito" acima lado="direita"
+              itens={ZONAS_SEGURAS.map((z) => ({rotulo: `${z.nome} · ${z.proporcao}${z.id === sugerida ? ' · este quadro' : ''}`, acao: () => escolherZona(z.id)}))} />
+          </span>
           <span className="dur" title="Duração"><span className="longa">{formatarTempo(duracaoMs)}</span><span className="curta">/{formatarCurto(duracaoMs)}</span></span>
         </div>
       </div>
