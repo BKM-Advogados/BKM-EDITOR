@@ -3,20 +3,27 @@
 // alças do bloco selecionado mudam onde ele entra e onde sai (as âncoras viram "palavra@ms" da palavra mais perto).
 // O zoom fica na loja (vale também em Efeitos) e começa em "ajustar à janela". A cabeça anda pelo DOM, sem re-render.
 // No vídeo de cenas não há narração: arrastar grava ms contados do começo da cena, e a alça da cena selecionada muda a
-// duração dela.
+// duração dela. Abaixo dos blocos, o vídeo de cenas tem as faixas de áudio (FaixasAudio.tsx), e a barra ganha o
+// "+ Áudio" (narração, música, efeito ou música da biblioteca).
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore} from 'react';
-import {Maximize2, ZoomIn, ZoomOut} from 'lucide-react';
+import {Maximize2, Mic, Music, Plus, Volume2, ZoomIn, ZoomOut} from 'lucide-react';
+import type {AudioP} from '../../../nucleo/audio';
 import type {Palavra, TrechoNarracao} from '../../../nucleo/roteiro/resolver';
 import {aplicar, loja, patchTrocar, selecionar, trocar, useLoja, valorEm} from '../../estado/loja';
+import {BotaoMenu} from '../../componentes/Menu';
 import {teclaLivre} from '../../componentes/Trilho';
 import {ancoraPerto} from './ancoras';
+import {adicionarClipeAudio} from './acoes-audio';
+import {BibliotecaTrilhas} from './BibliotecaTrilhas';
+import {medirPendentes} from './envelope';
+import {FaixasAudio} from './FaixasAudio';
 import {aoQuadro, irPara, msAtual, tocando} from './tocador';
 import {tipoDe} from './tipos';
 
 type BlocoP = {tipo: string; em: number; sai?: number; origem?: string; texto?: string; id?: string};
 type CenaP = {tipo: string; t_in: number; t_out: number; n?: number; titulo?: string; nome?: string; tag?: string; origem?: string; blocos?: BlocoP[]};
 type Legenda = {s: number; e: number; palavras: {w: string; s?: number; e?: number}[]};
-type PropsLt = {duracao_ms: number; cenas: CenaP[]; legendas?: Legenda[]; narracao?: {trechos: TrechoNarracao[]}; composicao?: string};
+type PropsLt = {duracao_ms: number; cenas: CenaP[]; legendas?: Legenda[]; narracao?: {trechos: TrechoNarracao[]}; composicao?: string; audio?: AudioP};
 type ArrastoCena = {origem: string; x0: number; dms: number; dur: number};
 type Arrasto = {origem: string; modo: 'mover' | 'ini' | 'fim'; x0: number; dms: number; em: number; fim: number};
 
@@ -25,7 +32,7 @@ const ZOOM_MAX = 400; // px por segundo
 const PASSOS = [1, 2, 5, 10, 15, 30, 60, 120, 300]; // segundos entre rótulos da régua
 
 // ---------- o que a barra de ações precisa saber (a barra pode morar no cabeçalho do grupo, fora deste painel) ----------
-type Medidas = {ajuste: number; blocos: number; zoom: (pxs: number | null, clientX?: number) => void} | null;
+type Medidas = {ajuste: number; blocos: number; clipes: number; zoom: (pxs: number | null, clientX?: number) => void; audio?: string} | null; // audio: o documento de cenas que aceita "+ Áudio"
 let medidas: Medidas = null;
 const ouvintesMedidas = new Set<() => void>();
 const publicar = (m: Medidas) => {
@@ -61,18 +68,33 @@ export const AcoesLinhaDoTempo: React.FC<{noCabecalho?: boolean}> = ({noCabecalh
       ouvintesCabecalho.forEach((f) => f());
     };
   }, [cab]);
+  const [biblioteca, setBiblioteca] = useState(false);
   if (!m) return null;
   const minimo = Math.min(m.ajuste, 2);
   const pxs = zoom ?? m.ajuste;
   const passo = (f: number) => m.zoom(Math.max(minimo, Math.min(ZOOM_MAX, pxs * f)));
+  const documento = m.audio;
   return (
     <div className="acoes-lt">
+      {documento && (
+        <span style={{position: 'relative', display: 'inline-flex', marginRight: 6}}>
+          <BotaoMenu titulo="Adicionar áudio: narração, música ou efeito (copia o arquivo para midia/)" icone={<Plus size={13} />} rotulo="Áudio" className="bt fantasma mini" lado="esquerda"
+            itens={[
+              {rotulo: 'Narração…', icone: <Mic className="i14" />, acao: () => void adicionarClipeAudio(documento, 'voz')},
+              {rotulo: 'Música…', icone: <Music className="i14" />, acao: () => void adicionarClipeAudio(documento, 'musica')},
+              {rotulo: 'Efeito sonoro…', icone: <Volume2 className="i14" />, acao: () => void adicionarClipeAudio(documento, 'efeitos')},
+              'sep',
+              {rotulo: 'Música da biblioteca…', icone: <Music className="i14" />, acao: () => setBiblioteca(true)},
+            ]} />
+          {biblioteca && <BibliotecaTrilhas documento={documento} aoFechar={() => setBiblioteca(false)} />}
+        </span>
+      )}
       <button className={`bti${zoom === null ? ' ligado' : ''}`} onClick={() => m.zoom(null)} title="Ajustar à janela  Shift+Z"><Maximize2 /></button>
       <button className="bti" onClick={() => passo(1 / 1.5)} title="Afastar  −"><ZoomOut /></button>
       <input type="range" aria-label="Zoom da linha do tempo" min={Math.log(minimo)} max={Math.log(ZOOM_MAX)} step={0.01} value={Math.log(pxs)}
         onChange={(e) => m.zoom(Math.exp(Number(e.target.value)))} />
       <button className="bti" onClick={() => passo(1.5)} title="Aproximar  ="><ZoomIn /></button>
-      <span className="conta">{m.blocos} {m.blocos === 1 ? 'bloco' : 'blocos'}</span>
+      <span className="conta">{m.blocos} {m.blocos === 1 ? 'bloco' : 'blocos'}{m.clipes > 0 && ` · ${m.clipes} ${m.clipes === 1 ? 'clipe' : 'clipes'}`}</span>
     </div>
   );
 };
@@ -143,6 +165,9 @@ export const LinhaDoTempo: React.FC = () => {
     return out;
   }, [props]);
   const nBlocos = faixas.reduce((n, f) => n + f.length, 0);
+  const nClipes = props?.audio?.faixas.reduce((n, f) => n + f.clipes.length, 0) ?? 0;
+  // clipe sem envelope (arquivo trocado à mão, projeto de outro PC): mede em segundo plano e as props voltam com a onda
+  useEffect(() => medirPendentes(props), [props]);
 
   // palavras da fala no tempo de saída; as que não cabem sem encostar na anterior ficam de fora
   const falas = useMemo(() => {
@@ -174,8 +199,8 @@ export const LinhaDoTempo: React.FC = () => {
 
   useEffect(() => {
     if (!props) return;
-    publicar({ajuste, blocos: nBlocos, zoom: (p, cx) => zoomRef.current(p, cx)});
-  }, [ajuste, nBlocos, props !== null]); // eslint-disable-line react-hooks/exhaustive-deps
+    publicar({ajuste, blocos: nBlocos, clipes: nClipes, zoom: (p, cx) => zoomRef.current(p, cx), audio: props.composicao === 'VideoCenas' ? documento : undefined});
+  }, [ajuste, nBlocos, nClipes, props !== null, props?.composicao, documento]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => publicar(null), []);
 
   // depois do zoom, devolve a rolagem para o mesmo tempo sob o cursor; e repinta a cabeça na escala nova
@@ -430,6 +455,7 @@ export const LinhaDoTempo: React.FC = () => {
               {falas.map((p, i) => <div key={i} className="palavra" style={{left: p.l}}>{p.w}</div>)}
             </div>
           )}
+          {deCenas && props.audio && <FaixasAudio documento={documento} audio={props.audio} x={x} pxs={pxs} duracaoVideo={props.duracao_ms} aoBuscar={buscar} />}
           <div className="cabeca" ref={cabeca} />
         </div>
       </div>

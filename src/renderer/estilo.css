@@ -499,3 +499,51 @@ input[type="range"]:focus-visible { outline: none; }
 .barra-lista .bti { width: 24px; height: 24px; }
 .lt .cena.sel { color: var(--texto); box-shadow: inset 0 0 0 1px var(--acento); }
 .lt .cena .alc.fim { position: absolute; top: 0; bottom: 0; right: 0; width: 6px; background: var(--acento); cursor: ew-resize; border-radius: 0 var(--raio-1) var(--raio-1) 0; }
+
+/* ---------- faixas de áudio do vídeo de cenas (FaixasAudio.tsx, BibliotecaTrilhas.tsx) ---------- */
+.lt .trilha.audio { height: 36px; border-top: 1px solid var(--borda); }
+.lt .trilha.audio.sel { background: var(--acento-fraco); }
+.lt .trilha.audio.muda .clipe { opacity: 0.45; }
+.lt .rotulo-faixa { position: sticky; left: 0; z-index: 3; display: inline-flex; align-items: center; gap: 5px; height: 100%; padding: 0 4px 0 8px; font-size: var(--tam-1);
+  color: var(--texto-2); background: linear-gradient(90deg, var(--fundo-2) 85%, transparent); cursor: pointer; white-space: nowrap; }
+.lt .rotulo-faixa > svg.lucide { color: var(--trilha-audio); flex: none; }
+.lt .rotulo-faixa .nome { max-width: 90px; overflow: hidden; text-overflow: ellipsis; }
+.lt .rotulo-faixa .bti { width: 18px; height: 18px; color: var(--texto-3); }
+.lt .trilha.audio.muda .rotulo-faixa .bti { color: var(--aviso); }
+.lt .trilha.audio.sel .rotulo-faixa { color: var(--texto); }
+.lt .clipe { position: absolute; top: 2px; bottom: 2px; border-radius: var(--raio-1); background: #10322a; box-shadow: inset 0 2px 0 var(--trilha-audio); overflow: hidden; cursor: grab; }
+.lt .clipe.musica { background: #122a33; box-shadow: inset 0 2px 0 #4ccce6; }
+.lt .clipe.efeitos { background: #2a2e14; box-shadow: inset 0 2px 0 #c9d64c; }
+.lt .clipe:hover { filter: brightness(1.1); }
+.lt .clipe.fora, .lt .clipe.mudo { opacity: 0.4; }
+.lt .clipe svg.onda { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+.lt .clipe .onda .crua { fill: none; stroke: var(--trilha-audio); stroke-opacity: 0.45; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.lt .clipe .onda .cheia { fill: var(--trilha-audio); fill-opacity: 0.6; }
+.lt .clipe.musica .onda .crua { stroke: #4ccce6; }
+.lt .clipe.musica .onda .cheia { fill: #4ccce6; }
+.lt .clipe.efeitos .onda .crua { stroke: #c9d64c; }
+.lt .clipe.efeitos .onda .cheia { fill: #c9d64c; }
+.lt .clipe .onda .vol { fill: none; stroke: var(--texto); stroke-opacity: 0.85; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.lt .clipe .onda .medindo { fill: var(--texto-3); opacity: 0.5; }
+.lt .clipe .txt { position: absolute; left: 6px; top: 1px; font-size: var(--tam-1); color: var(--texto); text-shadow: 0 0 3px #000, 0 0 3px #000; white-space: nowrap; pointer-events: none; }
+.lt .clipe.sel { outline: 2px solid var(--texto); outline-offset: -1px; z-index: 2; overflow: visible; }
+.lt .clipe .alc { position: absolute; top: 0; bottom: 0; width: 6px; background: var(--texto); cursor: ew-resize; z-index: 1; }
+.lt .clipe .alc.ini { left: 0; border-radius: var(--raio-1) 0 0 var(--raio-1); }
+.lt .clipe .alc.fim { right: 0; border-radius: 0 var(--raio-1) var(--raio-1) 0; }
+.cab-insp .ico-fam.audio { background: #10322a; color: var(--trilha-audio); }
+.interruptor { display: inline-flex; align-items: center; gap: 8px; height: var(--controle); }
+.interruptor input[type="checkbox"] { width: 14px; height: 14px; margin: 0; accent-color: var(--acento); cursor: pointer; }
+.biblioteca { left: 0; top: calc(100% + 4px); width: 340px; max-height: 380px; display: flex; flex-direction: column; padding: 6px; gap: 6px; }
+.biblioteca .topo { display: flex; align-items: center; gap: 6px; }
+.biblioteca .topo > svg.lucide { color: var(--trilha-audio); flex: none; }
+.biblioteca .topo .campo { flex: 1; }
+.biblioteca .corpo { flex: 1; min-height: 60px; overflow: auto; display: flex; flex-direction: column; gap: 1px; }
+.biblioteca .corpo code { font: var(--tam-1) var(--fonte-mono); color: var(--texto-2); }
+.biblioteca .trilha-item { display: flex; align-items: baseline; gap: 8px; padding: 4px 8px; border: 0; border-radius: var(--raio); background: transparent; color: var(--texto);
+  text-align: left; cursor: pointer; font-size: var(--tam-2); }
+.biblioteca .trilha-item:hover, .biblioteca .trilha-item:focus-visible { background: var(--acento-fundo); outline: none; }
+.biblioteca .trilha-item:disabled { cursor: default; opacity: 0.6; }
+.biblioteca .trilha-item .nome { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.biblioteca .meta { color: var(--texto-3); font-size: var(--tam-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.biblioteca .rodape { display: flex; align-items: center; gap: 4px; border-top: 1px solid var(--borda); padding-top: 6px; }
+.biblioteca .rodape .espaco { flex: 1; }

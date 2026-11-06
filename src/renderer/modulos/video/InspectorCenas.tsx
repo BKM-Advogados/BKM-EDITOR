@@ -1,16 +1,19 @@
 // Propriedades do vídeo de cenas, com nomes de quem edita. Sem seleção: o formato (trocar 9:16 por 16:9 não desmonta
 // nada, porque a posição é relativa ao quadro) e as cores do tema. Cena: nome, duração e fundo. Bloco: conteúdo,
-// tempo (segundos na cena), posição e tamanho em % do quadro e a letra em px do formato atual.
+// tempo (segundos na cena), posição e tamanho em % do quadro e a letra em px do formato atual. Faixa de áudio: nome,
+// papel, volume, mudo e o ducking (música); clipe: arquivo, tempo, corte, volume, fades e mudo, com o que foi medido.
 import React from 'react';
-import {Clapperboard, CopyPlus, Film, FileJson, ImagePlus, Link, Trash2} from 'lucide-react';
-import {TIPOS_BLOCO_CENAS, type BlocoCenas, type CenaCenas, type DocCenas} from '../../../nucleo/cenas';
+import {Clapperboard, CopyPlus, Film, FileAudio, FileJson, ImagePlus, Link, Trash2} from 'lucide-react';
+import {ALVO_LU_MAX, ALVO_LU_MIN, DUCKING_PADRAO, PAPEIS, type ClipeAudio, type ClipeAudioP, type FaixaAudio, type FaixaAudioP, type PapelFaixa} from '../../../nucleo/audio';
+import {TIPOS_BLOCO_CENAS, type BlocoCenas, type CenaCenas, type DocCenas, type PropsCenas} from '../../../nucleo/cenas';
 import {FORMATOS_VIDEO, formatoDoVideo, rotuloFormato} from '../../../nucleo/formatos';
 import {avisar, mensagemDe, trocar, useLoja, valorEm} from '../../estado/loja';
-import {CabecalhoInspector, CampoCor, CampoLeitura, CampoNumero, CampoSelecao, CampoTexto, Secao, copiar, numeroBr} from '../../componentes/Campos';
+import {CabecalhoInspector, CampoCor, CampoDeslizante, CampoInterruptor, CampoLeitura, CampoNumero, CampoSelecao, CampoTexto, Secao, copiar, numeroBr} from '../../componentes/Campos';
 import type {ItemMenu} from '../../componentes/Menu';
 import {formatarTempo} from './tocador';
 import {resumoBloco, tipoDe} from './tipos';
 import {duplicarSelecao, excluirSelecao} from './acoes';
+import {duplicarSelecaoAudio, excluirSelecaoAudio, ICONES_PAPEL, partesAudio, trocarArquivoDoClipe} from './acoes-audio';
 
 const pct = (v: number | undefined, padrao: number) => Math.round((v ?? padrao) * 1000) / 10;
 const ALINHAR: [NonNullable<BlocoCenas['alinhar']>, string][] = [['esquerda', 'Esquerda'], ['centro', 'Centro'], ['direita', 'Direita']];
@@ -21,6 +24,7 @@ const ResumoVideo: React.FC<{documento: string; doc: DocCenas; titulo: string; d
   const preset = FORMATOS_VIDEO.find((p) => p.largura === f.largura && p.altura === f.altura);
   const tema = doc.tema ?? {};
   const nBlocos = doc.cenas.reduce((n, c) => n + (c.blocos?.length ?? 0), 0);
+  const nClipes = (doc.audio?.faixas ?? []).reduce((n, f) => n + (f.clipes?.length ?? 0), 0);
   return (
     <div className="painel">
       <CabecalhoInspector icone={<Film />} nome={titulo} sub="Vídeo de cenas" dica={rotuloFormato(f)} />
@@ -28,6 +32,7 @@ const ResumoVideo: React.FC<{documento: string; doc: DocCenas; titulo: string; d
         <div className="resumo">
           {rotuloFormato(f)} · {formatarTempo(duracao)}<br />
           <b>{doc.cenas.length}</b> {doc.cenas.length === 1 ? 'cena' : 'cenas'} · <b>{nBlocos}</b> {nBlocos === 1 ? 'bloco' : 'blocos'}
+          {nClipes > 0 ? <> · <b>{nClipes}</b> {nClipes === 1 ? 'clipe de áudio' : 'clipes de áudio'}</> : <> · sem som (use "+ Áudio" na linha do tempo)</>}
         </div>
         <Secao titulo="Formato" chave="cenas:formato">
           <CampoSelecao rotulo="Destino" valor={preset?.id ?? 'livre'}
@@ -141,6 +146,103 @@ const PropsBloco: React.FC<{documento: string; caminho: string; b: BlocoCenas; f
     );
   };
 
+const PAPEL_OPCOES = (Object.keys(PAPEIS) as PapelFaixa[]).map((p): [PapelFaixa, string] => [p, PAPEIS[p].nome_faixa]);
+const pctDe = (v: number | undefined) => Math.round((v ?? 1) * 100);
+const dbTexto = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `${v.toFixed(1).replace('.', ',')} dB`);
+
+const PropsFaixa: React.FC<{documento: string; caminho: string; f: FaixaAudio; fp?: FaixaAudioP; menu: ItemMenu[]}> = ({documento, caminho, f, fp, menu}) => {
+  const papel = fp?.papel ?? 'efeitos';
+  const Icone = ICONES_PAPEL[papel];
+  const campo = (k: keyof FaixaAudio, rotulo: string) => (v: unknown) => void trocar(documento, `${caminho}/${k}`, v, `${rotulo} da faixa ${f.nome}`);
+  const d = f.ducking ?? {};
+  // o ducking é um objeto só: grava inteiro, sem a chave que voltou ao padrão
+  const duck = (k: 'ativo' | 'alvo_lu' | 'ataque_ms' | 'soltura_ms', rotulo: string) => (v: unknown) => {
+    const novo: Record<string, unknown> = {...d};
+    if (v === undefined) delete novo[k];
+    else novo[k] = v;
+    void trocar(documento, `${caminho}/ducking`, Object.keys(novo).length ? novo : undefined, `${rotulo} do ducking`);
+  };
+  const medidos = (fp?.clipes ?? []).map((c) => c.ducking).filter((x): x is NonNullable<ClipeAudioP['ducking']> => Boolean(x));
+  const m = medidos[0];
+  const n = f.clipes?.length ?? 0;
+  return (
+    <div className="painel">
+      <CabecalhoInspector icone={<Icone />} familia={'audio' as never} nome={f.nome} sub={`Faixa de ${PAPEIS[papel].nome_faixa.toLowerCase()} · ${n} ${n === 1 ? 'clipe' : 'clipes'}`} dica={caminho} menu={menu} />
+      <div className="insp-corpo">
+        <Secao titulo="Faixa" chave="audio:faixa">
+          <CampoTexto rotulo="Nome" valor={f.nome ?? ''} aoMudar={(v) => campo('nome', 'nome')(v || PAPEIS[papel].nome_faixa)} />
+          <CampoSelecao rotulo="Papel" valor={papel} opcoes={PAPEL_OPCOES} aoMudar={campo('papel', 'papel')} />
+          <CampoDeslizante rotulo="Volume" min={0} max={100} passo={1} valor={pctDe(f.volume)} padrao={100} formatar={(v) => `${v} %`}
+            aoMudar={(v) => campo('volume', 'volume')(v === 100 ? undefined : Math.round(v) / 100)} />
+          <CampoInterruptor rotulo="Mudo" valor={Boolean(f.mudo)} aoMudar={(v) => campo('mudo', 'mudo')(v || undefined)} texto={f.mudo ? 'a faixa não toca' : 'toca'} />
+        </Secao>
+        {papel === 'musica' && (
+          <Secao titulo="Ducking (cai sob a voz)" chave="audio:ducking">
+            <CampoInterruptor rotulo="Ligado" valor={d.ativo !== false} aoMudar={(v) => duck('ativo', 'ligar')(v ? undefined : false)}
+              dica="A música baixa enquanto a narração fala e volta nas pausas" />
+            <CampoDeslizante rotulo="Abaixo da voz" min={ALVO_LU_MIN} max={ALVO_LU_MAX} passo={1} valor={d.alvo_lu ?? DUCKING_PADRAO.alvo_lu} padrao={DUCKING_PADRAO.alvo_lu}
+              formatar={(v) => `${v} LU`} aoMudar={(v) => duck('alvo_lu', 'alvo')(v === DUCKING_PADRAO.alvo_lu ? undefined : v)} />
+            <CampoNumero rotulo="Ataque" unidade="ms" valor={d.ataque_ms ?? DUCKING_PADRAO.ataque_ms} padrao={DUCKING_PADRAO.ataque_ms}
+              aoMudar={(v) => duck('ataque_ms', 'ataque')(Math.max(1, Math.round(v)))} aoRedefinir={() => duck('ataque_ms', 'ataque')(undefined)} />
+            <CampoNumero rotulo="Soltura" unidade="ms" valor={d.soltura_ms ?? DUCKING_PADRAO.soltura_ms} padrao={DUCKING_PADRAO.soltura_ms}
+              aoMudar={(v) => duck('soltura_ms', 'soltura')(Math.max(1, Math.round(v)))} aoRedefinir={() => duck('soltura_ms', 'soltura')(undefined)} />
+            <CampoLeitura rotulo="Medido" dica="Mediana da voz e da música com os volumes de faixa e clipe; a redução é o que falta para a música ficar o alvo abaixo da voz">
+              {m ? (m.medido ? <>voz {dbTexto(m.voz_db)} · música {dbTexto(m.musica_db)} · cai <b>{dbTexto(m.reducao_db)}</b></> : <>medindo… (por ora cai {dbTexto(m.reducao_db)})</>)
+                : n ? 'sem narração para seguir' : 'sem clipes'}
+            </CampoLeitura>
+            <div className="vazio">A casa mixa música e efeitos bem baixos: de 18 a 23 LU abaixo da voz.</div>
+          </Secao>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const PropsClipe: React.FC<{documento: string; caminho: string; c: ClipeAudio; cp?: ClipeAudioP; faixa: FaixaAudio; papel: PapelFaixa; menu: ItemMenu[]; sub: string}> =
+  ({documento, caminho, c, cp, faixa, papel, menu, sub}) => {
+    const Icone = ICONES_PAPEL[papel];
+    const nome = c.nome || c.arquivo.split('/').pop() || c.arquivo;
+    const campo = (k: keyof ClipeAudio, rotulo: string) => (v: unknown) => void trocar(documento, `${caminho}/${k}`, v, `${rotulo} do clipe ${nome}`);
+    const env = cp?.envelope;
+    const maxDur = env ? Math.max(0.1, (env.duracao_ms - (c.corte_ms ?? 0)) / 1000) : undefined;
+    return (
+      <div className="painel">
+        <CabecalhoInspector icone={<Icone />} familia={'audio' as never} nome={nome} sub={sub} dica={c.id} menu={menu} />
+        <div className="insp-corpo">
+          <Secao titulo="Arquivo" chave="audio:arquivo">
+            <CampoLeitura rotulo="Arquivo" dica={c.arquivo}>{c.arquivo.split('/').pop()}</CampoLeitura>
+            <CampoLeitura rotulo="Medido">{env ? <>{numeroBr(env.duracao_ms / 1000, 1)} s · {dbTexto(cp?.nivel_db)} (mediana)</> : 'medindo…'}</CampoLeitura>
+            <div style={{padding: '2px 8px 6px'}}><button className="bt" onClick={() => void trocarArquivoDoClipe(documento, caminho)}><FileAudio size={14} />Trocar arquivo…</button></div>
+            <CampoTexto rotulo="Nome" valor={c.nome ?? ''} aoMudar={(v) => campo('nome', 'nome')(v || undefined)} dica="Como aparece na linha do tempo (vazio = nome do arquivo)" />
+          </Secao>
+          <Secao titulo="Tempo" chave="audio:tempo">
+            <CampoNumero rotulo="Começa em" unidade="s" passo={0.1} valor={(c.em ?? 0) / 1000} aoMudar={(v) => campo('em', 'começo')(Math.max(0, Math.round(v * 1000)))} />
+            <CampoNumero rotulo="Duração" unidade="s" passo={0.1} valor={(c.duracao_ms ?? 0) / 1000} padrao={maxDur} aoRedefinir={maxDur !== undefined ? () => campo('duracao_ms', 'duração')(Math.round(maxDur * 1000)) : undefined}
+              aoMudar={(v) => (v >= 0.1 ? campo('duracao_ms', 'duração')(Math.round(Math.min(maxDur ?? Infinity, v) * 1000)) : avisar('O clipe precisa de pelo menos 0,1 s', 'erro'))} />
+            <CampoNumero rotulo="Corte no arquivo" unidade="s" passo={0.1} valor={(c.corte_ms ?? 0) / 1000} padrao={0} dica="Quanto do começo do arquivo fica de fora"
+              aoRedefinir={c.corte_ms ? () => campo('corte_ms', 'corte')(undefined) : undefined}
+              aoMudar={(v) => campo('corte_ms', 'corte')(v > 0 ? Math.round(v * 1000) : undefined)} />
+          </Secao>
+          <Secao titulo="Volume" chave="audio:volume">
+            <CampoDeslizante rotulo="Volume" min={0} max={100} passo={1} valor={pctDe(c.volume)} padrao={100} formatar={(v) => `${v} %`}
+              aoMudar={(v) => campo('volume', 'volume')(v === 100 ? undefined : Math.round(v) / 100)} />
+            <CampoNumero rotulo="Fade de entrada" unidade="s" passo={0.1} valor={(c.fade_in_ms ?? 0) / 1000} padrao={0}
+              aoMudar={(v) => campo('fade_in_ms', 'fade de entrada')(v > 0 ? Math.round(v * 1000) : undefined)} />
+            <CampoNumero rotulo="Fade de saída" unidade="s" passo={0.1} valor={(c.fade_out_ms ?? 0) / 1000} padrao={0}
+              aoMudar={(v) => campo('fade_out_ms', 'fade de saída')(v > 0 ? Math.round(v * 1000) : undefined)} />
+            <CampoInterruptor rotulo="Mudo" valor={Boolean(c.mudo)} aoMudar={(v) => campo('mudo', 'mudo')(v || undefined)} texto={c.mudo ? 'não toca' : 'toca'} />
+            {cp?.ducking && (
+              <CampoLeitura rotulo="Ducking" dica="Vem da faixa de música: a redução sob a voz, medida">
+                {cp.ducking.reducao_db > 0 ? <>cai <b>{dbTexto(cp.ducking.reducao_db)}</b> sob a voz{cp.ducking.medido ? '' : ' (estimado até medir)'}</> : 'nada a baixar: a música já está abaixo do alvo'}
+              </CampoLeitura>
+            )}
+          </Secao>
+          <div className="vazio">Arraste o clipe na linha do tempo para mudar onde começa; as alças aparam o começo e o fim. Faixa: {faixa.nome}.</div>
+        </div>
+      </div>
+    );
+  };
+
 export const InspectorCenas: React.FC<{documento: string}> = ({documento}) => {
   const lido = useLoja((e) => e.docs[documento]);
   const montado = useLoja((e) => e.props[documento]);
@@ -149,6 +251,24 @@ export const InspectorCenas: React.FC<{documento: string}> = ({documento}) => {
   const doc = lido?.doc as DocCenas;
   const props = montado && 'props' in montado ? montado.props : null;
   const caminho = selecao?.documento === documento ? selecao.caminho : null;
+  const pa = caminho ? partesAudio(caminho) : null;
+  const faixaDoc = pa ? doc.audio?.faixas?.[pa.faixa] : undefined;
+  if (caminho && pa && faixaDoc) {
+    const fp = (props as PropsCenas | null)?.audio?.faixas.find((f) => f.origem === `/audio/faixas/${pa.faixa}`);
+    const menuAudio: ItemMenu[] = [
+      {rotulo: 'Duplicar', icone: <CopyPlus className="i14" />, tecla: 'Ctrl+D', acao: () => void duplicarSelecaoAudio(documento)},
+      {rotulo: 'Excluir', icone: <Trash2 className="i14" />, tecla: 'Delete', acao: () => void excluirSelecaoAudio(documento)},
+      'sep',
+      {rotulo: 'Copiar caminho', icone: <Link className="i14" />, acao: () => copiar(caminho, `Caminho ${caminho} copiado`)},
+      {rotulo: 'Copiar JSON', icone: <FileJson className="i14" />, acao: () => copiar(JSON.stringify(valorEm(doc, caminho), null, 2), 'JSON copiado')},
+    ];
+    if (pa.clipe === null) return <PropsFaixa documento={documento} caminho={caminho} f={faixaDoc} fp={fp} menu={menuAudio} />;
+    const clipe = faixaDoc.clipes?.[pa.clipe];
+    if (clipe) {
+      return <PropsClipe documento={documento} caminho={caminho} c={clipe} cp={fp?.clipes.find((c) => c.origem === caminho)} faixa={faixaDoc} papel={fp?.papel ?? 'efeitos'} menu={menuAudio}
+        sub={`${faixaDoc.nome} · clipe ${pa.clipe + 1} · ${numeroBr((clipe.duracao_ms ?? 0) / 1000, 1)} s`} />;
+    }
+  }
   const m = caminho ? /^\/cenas\/(\d+)(?:\/blocos\/(\d+))?$/.exec(caminho) : null;
   const obj = caminho && m ? valorEm(doc, caminho) : undefined;
   if (!caminho || !m || !obj || typeof obj !== 'object') {

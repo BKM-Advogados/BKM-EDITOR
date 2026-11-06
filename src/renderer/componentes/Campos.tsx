@@ -208,3 +208,13 @@ export const CabecalhoInspector: React.FC<{icone: React.ReactNode; familia?: 'te
     {menu && menu.length > 0 && <BotaoMenu titulo="Mais ações" icone={<Ellipsis />} itens={menu} />}
   </div>
 );
+
+/** Liga/desliga (mudo, ducking): caixa de marcar na cor do acento, com o rótulo à esquerda como os outros campos. */
+export const CampoInterruptor: React.FC<{rotulo: string; valor: boolean; aoMudar: (v: boolean) => void; dica?: string; texto?: string}> = ({rotulo, valor, aoMudar, dica, texto}) => (
+  <LinhaCampo rotulo={rotulo} dica={dica}>
+    <span className="valor interruptor">
+      <input type="checkbox" checked={valor} onChange={(e) => aoMudar(e.target.checked)} aria-label={rotulo} />
+      {texto && <span className="ler">{texto}</span>}
+    </span>
+  </LinhaCampo>
+);
