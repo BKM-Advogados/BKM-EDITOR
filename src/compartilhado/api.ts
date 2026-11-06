@@ -57,6 +57,7 @@ export const CANAL = {
   exportarImagem: 'estudio:exportar-imagem',
   progresso: 'estudio:progresso',
   metricas: 'estudio:metricas',
+  exportarPaginas: 'estudio:exportar-paginas',
 } as const;
 
 /** O projeto aberto. `estado` é o último que a pessoa viu (área, documento, seleção), para reabrir onde parou; `git`
@@ -167,7 +168,13 @@ export type ApiEstudio = {
   exportarImagem: (documento: string, pngBase64: string) => Promise<{ok: boolean; arquivo?: string}>;
   aoProgresso: (cb: (p: Progresso) => void) => () => void;
   metricas: () => Promise<Metricas>;
+  /** Carrossel: PNG por página em saidas/<nome>/01.png… e, com `pdf`, saidas/<nome>.pdf (uma página por imagem, sem margem). */
+  exportarPaginas: (o: PedidoExportarPaginas) => Promise<ResultadoExportarPaginas>;
 };
+
+/** Páginas já desenhadas pela interface (PNG em data URL) com o número que aparece no nome do arquivo (1 = 01.png). */
+export type PedidoExportarPaginas = {documento: string; paginas: {png: string; numero: number}[]; pdf: boolean};
+export type ResultadoExportarPaginas = {ok: boolean; pasta?: string; pdf?: string; arquivos?: string[]; mostrar?: string; mensagem?: string};
 
 declare global {
   interface Window {

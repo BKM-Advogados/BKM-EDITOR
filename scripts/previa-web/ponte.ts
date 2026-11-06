@@ -151,6 +151,7 @@ const api: ApiEstudio = {
   exportarImagem: async () => ({ok: false}),
   aoProgresso: () => nada,
   metricas: async () => ({memoria_mb: 312, processos: []}),
+  exportarPaginas: async (o) => ({ok: false, mensagem: `exportar não funciona na prévia web (${o.paginas.length} página(s) desenhada(s)${o.pdf ? ' e o PDF' : ''})`}),
 };
 
 (window as unknown as {estudio: ApiEstudio}).estudio = api;

@@ -44,12 +44,23 @@ export type CamadaImagem = {
   raio?: number;
 };
 
+/** Uma página (prancheta) do carrossel: as camadas dela, no tamanho comum do documento. */
+export type PaginaImagem = {
+  id: string;
+  nome: string;
+  camadas: CamadaImagem[]; // de baixo para cima
+};
+
+// Uma prancheta só tem `camadas` na raiz (a capa da Cliente, os projetos de antes). O carrossel tem `paginas`, cada uma
+// com as suas camadas, e a lista `camadas` da raiz fica vazia. Documento sem `paginas` vale como uma página só, em
+// memória, sem reescrever o arquivo (src/nucleo/carrossel.ts, docs/carrossel.md).
 export type DocImagem = {
   formato: 1;
   largura: number;
   altura: number;
   fundo: string;
-  camadas: CamadaImagem[]; // de baixo para cima
+  camadas: CamadaImagem[]; // de baixo para cima; num carrossel fica vazia e cada página tem as suas
+  paginas?: PaginaImagem[];
   efeitos?: Efeito[];
 };
 
@@ -127,5 +138,6 @@ export type EstadoEditor = {
   documento?: string;
   selecao?: string; // caminho do objeto selecionado
   tempo_ms?: number;
+  pagina?: string; // imagem com várias páginas: caminho da página ativa, ex.: /paginas/2
   atualizado_em: string;
 };

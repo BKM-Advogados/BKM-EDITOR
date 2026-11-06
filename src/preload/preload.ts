@@ -74,6 +74,7 @@ const api: ApiEstudio = {
   exportarImagem: (documento, png) => ipcRenderer.invoke(CANAL.exportarImagem, documento, png),
   aoProgresso: (cb) => ouvir<[Progresso]>(CANAL.progresso, cb),
   metricas: () => ipcRenderer.invoke(CANAL.metricas),
+  exportarPaginas: (o) => ipcRenderer.invoke(CANAL.exportarPaginas, o),
 };
 
 contextBridge.exposeInMainWorld('estudio', api);
