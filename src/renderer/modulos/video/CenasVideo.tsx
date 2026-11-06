@@ -1,17 +1,17 @@
 // Lista do vídeo: cenas e blocos do roteiro, na ordem, como o índice do Final Cut ou do Resolve. Cada cena mostra o
 // número da parte, o título, o início e a duração, e pode recolher; cada bloco tem o filete da família e o ícone do
 // tipo. A cena em que a cabeça está ganha uma marca vermelha (lê o tempo parado da loja, não o de cada quadro).
-// Clicar seleciona e leva a prévia ao tempo do objeto. No topo, criar cena e bloco, duplicar e excluir (Ctrl+D e
-// Delete fazem o mesmo).
+// Clicar seleciona e leva a prévia ao tempo do objeto. No topo, criar cena e bloco, a lâmina (divide a cena na cabeça,
+// Ctrl+K), duplicar e excluir (Ctrl+D e Delete fazem o mesmo).
 import React, {useState} from 'react';
-import {ChevronDown, ChevronRight, CopyPlus, Plus, Trash2} from 'lucide-react';
+import {ChevronDown, ChevronRight, CopyPlus, Plus, Scissors, Trash2} from 'lucide-react';
 import {ehDocCenas, TIPOS_BLOCO_CENAS, type TipoBlocoCenas} from '../../../nucleo/cenas';
 import {documentosDe, loja, selecionar, useLoja} from '../../estado/loja';
 import {numeroBr} from '../../componentes/Campos';
 import {BotaoMenu} from '../../componentes/Menu';
 import {formatarCurto, irPara} from './tocador';
 import {resumoBloco, tipoDe} from './tipos';
-import {adicionarBloco, adicionarCena, duplicarSelecao, excluirSelecao, TIPOS_CLIENTE} from './acoes';
+import {adicionarBloco, adicionarCena, dividirNaCabeca, duplicarSelecao, excluirSelecao, TIPOS_CLIENTE} from './acoes';
 
 type Cena = {tipo?: string; nome?: string; tag?: string; titulo?: string; linhas?: {t: string}[]; blocos?: {tipo: string; texto?: string; id?: string}[]};
 type CenaP = {origem?: string; tipo: string; n?: number; t_in: number; t_out: number; blocos?: {origem?: string; em: number}[]};
@@ -75,6 +75,8 @@ export const CenasVideo: React.FC = () => {
             return {rotulo: t.nome, icone: <Icone className="i14" />, acao: () => void adicionarBloco(documento, t.tipo)};
           })} />
         <span className="espaco" />
+        <button className="bti" disabled={!deCenas} onClick={() => void dividirNaCabeca(documento)}
+          title={deCenas ? 'Dividir a cena na cabeça (lâmina)  Ctrl+K' : 'No carrossel narrado as cenas seguem a narração'}><Scissors size={14} /></button>
         <button className="bti" disabled={!temSelecao} onClick={() => void duplicarSelecao(documento)} title="Duplicar  Ctrl+D"><CopyPlus size={14} /></button>
         <button className="bti" disabled={!temSelecao} onClick={() => void excluirSelecao(documento)} title="Excluir  Delete"><Trash2 size={14} /></button>
       </div>
