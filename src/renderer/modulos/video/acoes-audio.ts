@@ -20,6 +20,7 @@ const duracaoDoVideo = (documento: string) => {
 };
 const testeId = (caminho: string, id: unknown): OperacaoPatch[] => (typeof id === 'string' ? [{op: 'test', path: `${caminho}/id`, value: id}] : []);
 const r50 = (v: number) => Math.round(v / 50) * 50;
+const numero = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 
 export const partesAudio = (caminho: string) => {
   const m = /^\/audio\/faixas\/(\d+)(?:\/clipes\/(\d+))?$/.exec(caminho);
@@ -62,12 +63,13 @@ const faixaPara = (d: DocCenas, documento: string, papel: PapelFaixa): {indice: 
   return {indice: faixas.length, faixa: novaFaixaAudio(papel, idNovo(d, PAPEIS[papel].id)), criar: 'faixa'};
 };
 
-/** Clipe novo: narração e efeito entram no tempo atual com o arquivo inteiro; a música entra no zero, até o fim do
- *  vídeo, saindo em fade. */
-const clipeNovo = (d: DocCenas, papel: PapelFaixa, arquivo: string, env: Envelope, duracaoVideo: number): ClipeAudio => {
-  const em = papel === 'musica' ? 0 : Math.max(0, Math.min(Math.max(0, duracaoVideo - DURACAO_CLIPE_MIN), r50(msAtual())));
+/** Clipe novo: narração e efeito entram no tempo atual com o arquivo inteiro; a música entra onde a faixa acaba (no
+ *  zero, se vazia) e vai até o fim do vídeo, saindo em fade. */
+const clipeNovo = (d: DocCenas, faixa: FaixaAudio, papel: PapelFaixa, arquivo: string, env: Envelope, duracaoVideo: number): ClipeAudio => {
+  const fimDaFaixa = (faixa.clipes ?? []).reduce((m, c) => Math.max(m, numero(c.em) + numero(c.duracao_ms)), 0);
+  const em = papel === 'musica' ? (fimDaFaixa < duracaoVideo - DURACAO_CLIPE_MIN ? fimDaFaixa : 0) : Math.max(0, Math.min(Math.max(0, duracaoVideo - DURACAO_CLIPE_MIN), r50(msAtual())));
   const inteira = Math.max(DURACAO_CLIPE_MIN, env.duracao_ms);
-  const duracao_ms = papel === 'musica' && duracaoVideo > 0 ? Math.max(DURACAO_CLIPE_MIN, Math.min(inteira, duracaoVideo)) : inteira;
+  const duracao_ms = papel === 'musica' && duracaoVideo > 0 ? Math.max(DURACAO_CLIPE_MIN, Math.min(inteira, duracaoVideo - em)) : inteira;
   const c: ClipeAudio = {id: idNovo(d, 'clipe'), arquivo, em, duracao_ms};
   if (papel === 'musica' && duracao_ms > FADE_MUSICA_MS * 2) c.fade_out_ms = FADE_MUSICA_MS;
   return c;
@@ -84,7 +86,7 @@ export const adicionarClipeAudio = async (documento: string, papel: PapelFaixa, 
     const d = docDe(documento); // o documento pode ter mudado enquanto media
     if (!ehDocCenas(d)) return;
     const {indice, faixa, criar} = faixaPara(d, documento, papel);
-    const clipe = clipeNovo(d, papel, arq, env, duracaoDoVideo(documento));
+    const clipe = clipeNovo(d, faixa, papel, arq, env, duracaoDoVideo(documento));
     let ops: OperacaoPatch[];
     let j = 0;
     if (criar === 'audio') {

@@ -49,7 +49,7 @@ writeFileSync(path.join(saida, 'video.json'), JSON.stringify(doc, null, 2));
 const {props, avisos} = resolverCenas(doc, {envelopes});
 const duck = props.audio.faixas[1].clipes[0].ducking;
 log(`props: ${props.duracao_ms} ms, ${props.largura}×${props.altura} a ${props.fps} qps; avisos: ${avisos.length ? avisos.join(' | ') : 'nenhum'}`);
-log(`ducking medido: voz ${duck.voz_db} dB, música ${duck.musica_db} dB, redução ${duck.reducao_db} dB (alvo 20 LU); ganho mínimo ${Math.min(...duck.ganho)}`);
+log(`ducking medido: voz ${duck.voz_db.toFixed(1)} dB, música ${duck.musica_db.toFixed(1)} dB, redução ${duck.reducao_db} dB (alvo 20 LU); ganho mínimo ${Math.min(...duck.ganho)}`);
 writeFileSync(path.join(saida, 'props.json'), JSON.stringify(props));
 
 // 3. pacote, composição e render
