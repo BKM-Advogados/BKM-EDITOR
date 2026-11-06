@@ -5,9 +5,10 @@ import {useSyncExternalStore} from 'react';
 import {loadFont as Archivo} from '@remotion/google-fonts/Archivo';
 import {loadFont as IBMPlexMono} from '@remotion/google-fonts/IBMPlexMono';
 import {loadFont as IBMPlexSans} from '@remotion/google-fonts/IBMPlexSans';
-import type {CamadaImagem, DocImagem} from '../../../nucleo/documentos';
+import type {CamadaImagem, DocImagem, PaginaImagem} from '../../../nucleo/documentos';
+import {baseCamadas, idLivre, indiceNaBase, paginaDoCaminho, paginasDe, slug} from '../../../nucleo/carrossel';
 import {fonte} from '../../../composicoes/fontes';
-import {loja, useLoja} from '../../estado/loja';
+import {loja, useLoja, type Estado} from '../../estado/loja';
 
 export const ENTRELINHA = 1.15;
 export const FONTES = ['Archivo', 'IBM Plex Sans', 'IBM Plex Mono', 'system-ui'];
@@ -23,14 +24,41 @@ export const usarDocumentoImagem = () =>
     return e.ativo.imagem;
   });
 
-/** O agente pode gravar um JSON quebrado à mão: sem lista de camadas, os painéis avisam em vez de cair. */
-export const docValido = (doc: unknown): doc is DocImagem => Array.isArray((doc as DocImagem | undefined)?.camadas);
+/** O agente pode gravar um JSON quebrado à mão: sem lista de camadas nem de páginas, os painéis avisam em vez de cair. */
+export const docValido = (doc: unknown): doc is DocImagem => {
+  const d = doc as DocImagem | undefined;
+  return Array.isArray(d?.camadas) || Array.isArray(d?.paginas);
+};
 
 export const visivel = (c: CamadaImagem) => c.visivel !== false;
 
-export const indiceDe = (caminho?: string | null) => {
-  const m = /^\/camadas\/(\d+)$/.exec(caminho ?? '');
-  return m ? Number(m[1]) : -1;
+/** Índice da camada num caminho "<base>/N" ("/camadas/3" ou "/paginas/1/camadas/3"); -1 se não for camada dessa lista. */
+export const indiceDe = (caminho: string | null | undefined, base: string) => indiceNaBase(caminho, base);
+
+// ---------- páginas (carrossel) ----------
+// A página ativa fica na loja pelo id (sobrevive a reordenar); aqui vira índice, lista de camadas e base dos caminhos.
+export type PaginaAtiva = {p: number; pagina: PaginaImagem; paginas: PaginaImagem[]; base: string; camadas: CamadaImagem[]};
+
+export const paginaAtivaDe = (e: Estado, documento: string, doc: DocImagem): PaginaAtiva => {
+  const paginas = paginasDe(doc);
+  const id = e.paginaAtiva[documento];
+  const p = Math.max(0, id ? paginas.findIndex((x) => x.id === id) : 0);
+  const pagina = paginas[p] ?? paginas[0];
+  return {p, pagina, paginas, base: baseCamadas(doc, p), camadas: Array.isArray(pagina?.camadas) ? pagina.camadas : []};
+};
+
+export const usarPaginaAtiva = (documento: string | undefined, doc: DocImagem | undefined) =>
+  useLoja((e) => (documento && docValido(doc) ? paginaAtivaDe(e, documento, doc) : null));
+
+/** Vai para a página `p`; a seleção de outra página é solta. */
+export const irParaPagina = (documento: string, doc: DocImagem, p: number) => {
+  const paginas = paginasDe(doc);
+  const pagina = paginas[Math.max(0, Math.min(p, paginas.length - 1))];
+  if (!pagina) return;
+  loja.definir((e) => ({
+    paginaAtiva: {...e.paginaAtiva, [documento]: pagina.id},
+    selecao: e.selecao?.documento === documento && paginaDoCaminho(doc, e.selecao.caminho) !== paginas.indexOf(pagina) ? null : e.selecao,
+  }));
 };
 
 export const rotuloCamada = (c: CamadaImagem) => c.nome || c.texto?.split('\n')[0] || c.id;
@@ -73,12 +101,8 @@ export const medirImagem = async (caminho: string) => {
   return {iw: img.naturalWidth || 1, ih: img.naturalHeight || 1};
 };
 
-export const idNovo = (base: string, camadas: CamadaImagem[]) => {
-  const limpo = base.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'camada';
-  let n = 1;
-  while (camadas.some((c) => c.id === `${limpo}-${n}`)) n++;
-  return `${limpo}-${n}`;
-};
+/** Id de camada livre na lista (da página): "texto-1", "texto-2"… */
+export const idNovo = (base: string, camadas: CamadaImagem[]) => idLivre(camadas, slug(base, 'camada'));
 
 // ---------- fontes ----------
 // O font-family vem do carregador das composições (fonte()), que funciona fora do Remotion: o delayRender só conta

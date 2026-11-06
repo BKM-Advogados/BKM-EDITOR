@@ -3,19 +3,23 @@
 // Z zoom | T texto, U forma, inserir imagem | M comentário (as teclas valem neste monitor). Clicar seleciona a camada de
 // cima sob o cursor; a caixa de seleção arrasta (x, y) e a alça redimensiona (largura, altura; Shift mantém a
 // proporção), com um patch só ao soltar. Com a ferramenta de comentário (M), clicar abre um balão ancorado na camada e
-// no ponto da imagem; os pinos mostram os comentários do documento.
+// no ponto da imagem; os pinos mostram os comentários do documento. Num carrossel, o monitor mostra a página ativa (a
+// barra de páginas fica entre a peça e o transporte, PaginasImagem.tsx) e os caminhos das camadas levam a página.
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import {Check, ChevronDown, Download, Hand, ImagePlus, MessageSquarePlus, MousePointer2, Square, Type, X, ZoomIn} from 'lucide-react';
 import type {CamadaImagem, Comentario, DocImagem, OperacaoPatch} from '../../../nucleo/documentos';
+import {paginaDoCaminho, temPaginas} from '../../../nucleo/carrossel';
 import {CamadaEfeitos} from '../../../composicoes/efeitos/CamadaEfeitos';
 import {aplicar, comentar, loja, patchTrocar, selecionar, useLoja} from '../../estado/loja';
 import {SemDocumento} from '../../componentes/SemDocumento';
 import {BotaoMenu, usarFora} from '../../componentes/Menu';
 import {Trilho, teclaLivre} from '../../componentes/Trilho';
-import {BitmapTrabalho} from './BitmapTrabalho';
-import {ENTRELINHA, PADRAO, alinhamentoCss, definirPrevia, docValido, familiaCss, indiceDe, rotuloCamada, usarDocumentoImagem, usarPrevia, visivel} from './comum';
+import {definirPrevia, docValido, indiceDe, irParaPagina, rotuloCamada, usarDocumentoImagem, usarPaginaAtiva, usarPrevia, visivel} from './comum';
 import {novaForma, novaImagem, novoTexto} from './acoes';
 import {exportarPng} from './exportarPng';
+import {exportarPagina} from './exportarPaginas';
+import {PaginasImagem} from './PaginasImagem';
+import {Camada} from './Prancheta';
 
 type Geometria = {x: number; y: number; largura: number; altura: number};
 type Gesto = Geometria & {i: number; id: string};
@@ -46,29 +50,6 @@ const caixaCss = (c: CamadaImagem, escala: number): React.CSSProperties => ({
 
 const contextoDe = (c: CamadaImagem) => (c.tipo === 'texto' && c.texto ? `${c.nome ?? c.id}: ${c.texto}` : rotuloCamada(c)).slice(0, 160);
 
-const Camada = React.memo(function Camada({c, caminho, escala}: {c: CamadaImagem; caminho: string; escala: number}) {
-  const base: React.CSSProperties = {position: 'absolute', left: c.x, top: c.y, width: c.largura, height: c.altura,
-    opacity: c.opacidade ?? 1, transform: c.rotacao ? `rotate(${c.rotacao}deg)` : undefined};
-  if (c.tipo === 'imagem') {
-    return (
-      <div data-caminho={caminho} style={{...base, overflow: 'hidden'}}>
-        {c.src && <BitmapTrabalho src={c.src} largura={c.largura} altura={c.altura} ajuste={c.ajuste} escala={escala} />}
-      </div>
-    );
-  }
-  if (c.tipo === 'texto') {
-    return (
-      <div data-caminho={caminho} style={{...base, fontFamily: familiaCss(c.fonte), fontSize: c.tamanho ?? PADRAO.tamanho, fontWeight: c.peso ?? PADRAO.peso,
-        fontStyle: 'normal', letterSpacing: 'normal', color: c.cor ?? PADRAO.cor, textAlign: alinhamentoCss(c.alinhar), lineHeight: ENTRELINHA,
-        whiteSpace: 'pre-wrap', overflowWrap: 'break-word', fontVariantNumeric: 'normal'}}>
-        {c.texto ?? ''}
-      </div>
-    );
-  }
-  return <div data-caminho={caminho} style={{...base, background: c.preenchimento ?? PADRAO.preenchimento,
-    borderRadius: c.forma === 'elipse' ? '50%' : Math.max(0, c.raio ?? PADRAO.raio)}} />;
-});
-
 /** Popover do "inserir imagem": o campo de caminho de sempre (até a Onda 3 trazer arrastar e colar). */
 const InserirImagem: React.FC<{documento: string; doc: DocImagem; fechar: () => void}> = ({documento, doc, fechar}) => {
   const [caminho, setCaminho] = useState('');
@@ -90,6 +71,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
   const documentoPadrao = usarDocumentoImagem();
   const documento = forcado ?? documentoPadrao;
   const doc = useLoja((e) => (documento ? (e.docs[documento]?.doc as DocImagem | undefined) : undefined));
+  const ativa = usarPaginaAtiva(documento, doc);
   const titulo = useLoja((e) => e.info?.manifesto.documentos.find((d) => d.id === documento)?.titulo ?? documento);
   const editavel = useLoja((e) => e.area !== 'efeitos');
   const selecao = useLoja((e) => e.selecao);
@@ -115,19 +97,30 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
   const panoramica = useRef<{x: number; y: number; sl: number; st: number} | null>(null);
   const ancoraZoom = useRef<{px: number; py: number; cx: number; cy: number} | null>(null);
 
-  // camadas como aparecem: o documento, mais o campo em prévia (inspector) e o arrasto em curso
+  // a página ativa: as camadas dela e a base dos caminhos ("/camadas" ou "/paginas/2/camadas")
+  const base = ativa?.base ?? '/camadas';
+  const camadasPag = ativa?.camadas ?? [];
+  // camadas como aparecem: a página, mais o campo em prévia (inspector) e o arrasto em curso
   const camadas = useMemo(() => {
-    const p = previa && previa.documento === documento ? /^\/camadas\/(\d+)\/(\w+)$/.exec(previa.caminho) : null;
-    return (docValido(doc) ? doc.camadas : []).map((c, i) => {
+    const p = previa && previa.documento === documento && previa.caminho.startsWith(`${base}/`) ? /^(\d+)\/(\w+)$/.exec(previa.caminho.slice(base.length + 1)) : null;
+    return camadasPag.map((c, i) => {
       let r = c;
       if (p && Number(p[1]) === i) r = {...r, [p[2]]: previa!.valor};
       if (gesto && gesto.i === i && gesto.id === c.id) r = {...r, x: gesto.x, y: gesto.y, largura: gesto.largura, altura: gesto.altura};
       return r;
     });
-  }, [doc, previa, gesto, documento]);
-  const pinos = useMemo(() => comentarios.filter((c) => c.documento === documento && c.alvo.ponto), [comentarios, documento]);
+  }, [camadasPag, base, previa, gesto, documento]);
+  // pinos da página ativa (e os sem camada, que são do documento)
+  const pinos = useMemo(() => comentarios.filter((c) => c.documento === documento && c.alvo.ponto && (!c.alvo.objeto || !docValido(doc) || !temPaginas(doc) || paginaDoCaminho(doc, c.alvo.objeto) === (ativa?.p ?? 0))),
+    [comentarios, documento, doc, ativa?.p]);
   // a prévia vale até o documento mudar (o patch dela chegou, ou outra mão mexeu)
   useEffect(() => definirPrevia(null), [doc]);
+  // seleção numa camada de outra página (pelo painel de comentários, pelo pino): a página dela vem para a frente
+  useEffect(() => {
+    if (!documento || !docValido(doc) || !ativa || selecao?.documento !== documento) return;
+    const p = paginaDoCaminho(doc, selecao.caminho);
+    if (p >= 0 && p !== ativa.p) irParaPagina(documento, doc, p);
+  }, [selecao, documento, doc, ativa]);
 
   const valido = docValido(doc);
   const W = valido ? Math.max(1, doc.largura) : 1;
@@ -190,14 +183,15 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
 
   if (!documento) return <SemDocumento modulo="imagem" />;
   if (!doc) return <div className="vazio">carregando…</div>;
-  if (!valido) return <div className="vazio" style={{color: 'var(--erro)'}}>o documento {documento} não tem a lista "camadas"</div>;
+  if (!valido || !ativa) return <div className="vazio" style={{color: 'var(--erro)'}}>o documento {documento} não tem a lista "camadas" nem "paginas"</div>;
 
   const fundo = previa && previa.documento === documento && previa.caminho === '/fundo' ? String(previa.valor) : doc.fundo;
-  const iSel = editavel && selecao?.documento === documento ? indiceDe(selecao.caminho) : -1;
+  const iSel = editavel && selecao?.documento === documento ? indiceDe(selecao.caminho, base) : -1;
   const sel = iSel >= 0 ? camadas[iSel] : undefined;
-  const iHover = hover && hover !== selecao?.caminho ? indiceDe(hover) : -1;
+  const iHover = hover && hover !== selecao?.caminho ? indiceDe(hover, base) : -1;
   const sobre = iHover >= 0 ? camadas[iHover] : undefined;
   const ferr: Ferramenta = modoComentario ? 'mover' : ferramenta;
+  const variasPaginas = ativa.paginas.length > 1;
 
   const caminhoSob = (x: number, y: number) => {
     for (const el of document.elementsFromPoint(x, y)) {
@@ -289,7 +283,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
   };
 
   const iniciar = (ev: React.PointerEvent, modo: Arrasto['modo']) => {
-    const c = doc.camadas[iSel];
+    const c = camadasPag[iSel];
     if (!c || ev.button !== 0 || ferr !== 'mover') return;
     ev.stopPropagation();
     ev.currentTarget.setPointerCapture(ev.pointerId);
@@ -329,7 +323,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
     }
     const g = a.alvo;
     const atual = loja.get().docs[documento]?.doc;
-    const caminho = `/camadas/${g.i}`;
+    const caminho = `${base}/${g.i}`;
     const mudancas = CAMPOS.flatMap((k) => (g[k] !== a.base[k] ? patchTrocar(atual, `${caminho}/${k}`, g[k]) : []));
     if (mudancas.length) {
       const patch: OperacaoPatch[] = [{op: 'test', path: `${caminho}/id`, value: g.id}, ...mudancas];
@@ -346,7 +340,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
   const salvarComentario = async () => {
     if (!balao || !textoBalao.trim()) return setBalao(null);
     const b = palco.current!.getBoundingClientRect();
-    const c = balao.caminho ? doc.camadas[indiceDe(balao.caminho)] : undefined;
+    const c = balao.caminho ? camadasPag[indiceDe(balao.caminho, base)] : undefined;
     await comentar(documento, textoBalao.trim(), {
       objeto: c ? balao.caminho : undefined, objeto_id: c?.id, contexto: c ? contextoDe(c) : undefined,
       ponto: {x: +(balao.x / b.width).toFixed(4), y: +(balao.y / b.height).toFixed(4)},
@@ -358,14 +352,15 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
   const abrirPino = (c: Comentario) => {
     loja.definir({comentarioAberto: c.id});
     if (!editavel) return;
-    const porId = c.alvo.objeto_id ? doc.camadas.findIndex((x) => x.id === c.alvo.objeto_id) : -1;
-    const caminho = porId >= 0 ? `/camadas/${porId}` : c.alvo.objeto;
+    const porId = c.alvo.objeto_id ? camadasPag.findIndex((x) => x.id === c.alvo.objeto_id) : -1;
+    const caminho = porId >= 0 ? `${base}/${porId}` : c.alvo.objeto;
     if (caminho) selecionar({documento, caminho});
   };
 
+  // uma prancheta só: o PNG de sempre; carrossel: só a página ativa ("<nome> - 02.png")
   const exportar = () => {
     setExportando(true);
-    void exportarPng(documento).finally(() => setExportando(false));
+    void (temPaginas(doc) ? exportarPagina(documento, ativa.p) : exportarPng(documento)).finally(() => setExportando(false));
   };
 
   const usar = (f: Ferramenta) => () => {
@@ -389,7 +384,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
 
   return (
     <div className="painel">
-      <div className="monitor-grade">
+      <div className={`monitor-grade${editavel ? ' com-paginas' : ''}`}>
         <Trilho grupos={grupos} />
         <div className="monitor" ref={refMonitor} style={{overflow: 'auto', justifyContent: 'flex-start', alignItems: 'flex-start', padding: `${MARGEM + 8}px ${MARGEM}px ${MARGEM - 8}px`}}
           onPointerDown={(e) => comecarPanoramica(e)} onPointerMove={(e) => durantePanoramica(e)}
@@ -403,12 +398,12 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
             <span className="rotulo-peca" title="Propriedades da imagem" onClick={(e) => {
               e.stopPropagation();
               if (editavel) selecionar(null);
-            }}><b>{titulo}</b> · {W} × {H}</span>
+            }}><b>{titulo}</b> · {W} × {H}{variasPaginas && <> · {ativa.p + 1}/{ativa.paginas.length} {ativa.pagina.nome}</>}</span>
             <div style={{position: 'absolute', left: 0, top: 0, width: W, height: H, transform: `scale(${escala})`, transformOrigin: '0 0',
               background: fundo, overflow: 'hidden', userSelect: 'none'}}>
               <CamadaEfeitos efeitos={previaEfeitos ?? doc.efeitos} quadro={0}>
                 <div style={{position: 'absolute', inset: 0, background: fundo}} />
-                {camadas.map((c, i) => visivel(c) && <Camada key={c.id || i} c={c} caminho={`/camadas/${i}`} escala={escala} />)}
+                {camadas.map((c, i) => visivel(c) && <Camada key={c.id || i} c={c} caminho={`${base}/${i}`} escala={escala} />)}
               </CamadaEfeitos>
             </div>
             <div className="sobreposicao">
@@ -435,7 +430,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
               {balao && (
                 <div className="balao" style={{left: Math.max(0, Math.min(balao.x, W * escala - 270)), top: Math.max(0, Math.min(balao.y + 8, H * escala - 150))}}
                   onClick={(e) => e.stopPropagation()}>
-                  <div className="rotulo" style={{marginBottom: 6}}>Comentário{balao.caminho && doc.camadas[indiceDe(balao.caminho)] ? ` em ${rotuloCamada(doc.camadas[indiceDe(balao.caminho)])}` : ''}</div>
+                  <div className="rotulo" style={{marginBottom: 6}}>Comentário{balao.caminho && camadasPag[indiceDe(balao.caminho, base)] ? ` em ${rotuloCamada(camadasPag[indiceDe(balao.caminho, base)])}` : ''}</div>
                   <textarea className="campo" autoFocus value={textoBalao} onChange={(e) => setTextoBalao(e.target.value)} placeholder="O que mudar aqui?"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) void salvarComentario();
@@ -450,6 +445,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
             </div>
           </div>}
         </div>
+        {editavel && <PaginasImagem documento={documento} doc={doc} />}
         <div className="transporte">
           <BotaoMenu className="bt mini zoom-bt" lado="esquerda" acima titulo={zoom === null ? 'Zoom: ajustado ao painel' : 'Zoom'} icone={null}
             rotulo={<>{Math.round(escala * 100)}%<ChevronDown className="i12" /></>}
@@ -461,8 +457,9 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
               {rotulo: '200%', acao: () => setZoom(2)},
             ]} />
           <span className="coords largo" ref={coords} />
-          <button className="bt fantasma" style={{marginLeft: 'auto'}} disabled={exportando} onClick={exportar} title="Exportar PNG em resolução cheia, com os efeitos">
-            <Download /><span className="largo">Exportar PNG</span>
+          <button className="bt fantasma" style={{marginLeft: 'auto'}} disabled={exportando} onClick={exportar}
+            title={variasPaginas ? 'Exportar só esta página em PNG, com os efeitos (o carrossel inteiro sai pela barra de páginas)' : 'Exportar PNG em resolução cheia, com os efeitos'}>
+            <Download /><span className="largo">{variasPaginas ? 'Exportar página' : 'Exportar PNG'}</span>
           </button>
         </div>
       </div>

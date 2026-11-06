@@ -1,0 +1,34 @@
+/* Barra de páginas do carrossel (modulos/imagem/PaginasImagem.tsx): faixa entre o monitor e o transporte, com as
+   miniaturas das páginas na ordem, a ativa com a borda do acento, e as ações à direita. Arrastar uma miniatura sobre
+   outra reordena; o alvo mostra um filete do acento no lado em que a página vai cair. */
+.monitor-grade.com-paginas { grid-template-rows: minmax(0, 1fr) auto var(--transporte); }
+.paginas { grid-column: 1 / -1; display: flex; align-items: stretch; gap: 6px; height: 92px; padding: 6px 8px 4px; background: var(--fundo-1);
+  border-top: 1px solid var(--borda); min-width: 0; container-type: inline-size; }
+.paginas .rolagem { flex: 1; min-width: 0; display: flex; gap: 6px; overflow-x: auto; overflow-y: hidden; padding: 2px 2px 0; scrollbar-width: thin; }
+.paginas .rolagem::-webkit-scrollbar { height: 6px; }
+.paginas .pagina { flex: none; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 3px 4px 2px; border-radius: var(--raio-2);
+  border: 1px solid transparent; background: transparent; color: var(--texto-2); cursor: pointer; position: relative; outline: none; user-select: none; }
+.paginas .pagina:hover { background: var(--fundo-3); color: var(--texto); }
+.paginas .pagina.ativa { border-color: var(--acento); background: var(--acento-fraco); color: var(--texto); }
+.paginas .pagina:focus-visible { outline: 1px solid var(--acento); outline-offset: 1px; }
+.paginas .pagina.arrastando { opacity: 0.4; }
+.paginas .pagina.solta-antes::before, .paginas .pagina.solta-depois::after { content: ""; position: absolute; top: 4px; bottom: 4px; width: 3px; border-radius: 2px;
+  background: var(--acento); }
+.paginas .pagina.solta-antes::before { left: -5px; }
+.paginas .pagina.solta-depois::after { right: -5px; }
+.paginas .mini-pagina { position: relative; overflow: hidden; border-radius: var(--raio-1); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08); pointer-events: none; }
+.paginas .legenda { display: flex; align-items: center; gap: 4px; max-width: 112px; font-size: var(--tam-1); line-height: 14px; white-space: nowrap; }
+.paginas .legenda b { color: var(--texto-3); font-weight: var(--peso-forte); font-variant-numeric: tabular-nums; }
+.paginas .pagina.ativa .legenda b { color: var(--acento); }
+.paginas .legenda .nome-pg { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.paginas .legenda input { width: 96px; height: 18px; padding: 0 4px; font-size: var(--tam-1); border: 1px solid var(--acento); border-radius: var(--raio-1);
+  background: var(--fundo-0); color: var(--texto); outline: none; }
+.paginas .ponto-c { width: 6px; height: 6px; border-radius: 3px; background: var(--comentario); flex: none; }
+.paginas .acoes-pg { flex: none; display: flex; flex-direction: column; justify-content: center; gap: 4px; padding-left: 6px; border-left: 1px solid var(--borda); }
+.paginas .acoes-pg .linha { display: flex; align-items: center; gap: 2px; }
+.paginas .acoes-pg .bt.mini { height: 24px; padding: 0 8px; font-size: var(--tam-2); }
+.paginas .acoes-pg .bti { width: 24px; height: 24px; }
+.paginas .vazia { align-self: center; color: var(--texto-3); font-size: var(--tam-2); padding: 0 8px; white-space: nowrap; }
+@container (max-width: 560px) {
+  .paginas .acoes-pg .largo { display: none; }
+}
