@@ -44,10 +44,18 @@ O app abre na **tela inicial**:
   avisa se falta o Git.
 
 No editor, o menu do ícone tem Novo projeto (Ctrl+N), Novo neste projeto (vídeo, imagem, 3D), Abrir (Ctrl+O), Abrir
-recente, Duplicar projeto, Mostrar na pasta, Marcar ponto de restauração (Ctrl+S), Preferências e Fechar projeto
+recente, Duplicar projeto, Mostrar na pasta, Marcar ponto de restauração (Ctrl+S), Marca, Preferências e Fechar projeto
 (Ctrl+W, volta à tela inicial). O nome do projeto na barra renomeia com um clique; "Salvo" lembra que tudo grava na
 hora. **Exportar** (Ctrl+Shift+E) salva o MP4 ou o PNG em `saidas/` e mostra o arquivo. O projeto reabre na área, no
 documento, na seleção e no tempo em que a pessoa parou.
+
+**Kit de marca:** cores, fontes, logo e assinatura de cada escritório ficam em `%USERPROFILE%\Estudio\marcas\<id>\`
+(`marca.json`, `logo.*`, `fontes/*.ttf|otf|woff|woff2`; a pasta troca no painel). Na primeira abertura nascem `cliente` (a
+paleta do manual, a mesma do carrossel), `bkm` (provisório, para trocar) e `neutro`. O kit entra em "Mais opções →
+Marca" ao criar o projeto e em menu → **Marca…** no editor: aplicar ao documento ativo (o `tema` do vídeo; fundo, fonte
+e cor dos textos na imagem), criar, duplicar, editar, importar logo e **fontes próprias** (arquivo), e escolher a fonte
+do vídeo. O logo vai para `midia/` e as fontes para `fontes/` do projeto; a prévia e a exportação carregam as fontes
+pelo servidor local antes de desenhar.
 
 Para o Claude: na aba **Claude**, a conversa usa o `claude` da própria pessoa (`/login` uma vez pelo terminal, que é
 o login próprio do Claude Code). Depois é só pedir: "crie 5 cenas sobre férias proporcionais", "deixe o título maior".
@@ -75,7 +83,8 @@ Em todas as áreas:
 
 O agente recebe: `projeto_info`, `estado_do_editor`, `ler_documento`, `aplicar_patch` (com `versao_base` e `test`),
 `criar_documento`, `renomear_projeto`, `listar_comentarios`, `ler_comentario`, `responder_comentario`,
-`resolver_comentario` e `listar_mudancas`. Cada projeto novo leva um `CLAUDE.md` com o formato dos documentos dele.
+`resolver_comentario`, `listar_mudancas` e `aplicar_marca`. Cada projeto novo leva um `CLAUDE.md` com o formato dos
+documentos dele e o que o kit de marca põe no `tema`.
 
 ## Como é feito
 
@@ -86,9 +95,11 @@ O agente recebe: `projeto_info`, `estado_do_editor`, `ler_documento`, `aplicar_p
   `@lydell/node-pty`, exportação MP4 com `renderMedia`.
 - **Núcleo** (`src/nucleo`): documentos, JSON Patch com lock otimista e patch inverso, comentários, diário, formatos
   (`formatos.ts`), o vídeo de cenas (`cenas.ts`), criar projeto (`criar-projeto.ts`, com `modelos.ts` só de dados), o
-  resolvedor do roteiro da Cliente (portado do Python, bate com o `preparar_carrossel.py` no C2) e as ferramentas MCP.
+  kit de marca (`marca.ts` só de dados e regras; `pasta-marcas.ts` lê e grava a pasta), o resolvedor do roteiro da Cliente
+  (portado do Python, bate com o `preparar_carrossel.py` no C2) e as ferramentas MCP.
 - **Composições** (`src/composicoes`): `VideoCenas` (tema neutro, formato pelas props) e o `CarrosselTema` da Cliente,
-  escolhidos pelo registro (`registro.ts`) na prévia e na exportação.
+  escolhidos pelo registro (`registro.ts`) na prévia e na exportação; o registro embrulha cada um para carregar as
+  fontes de arquivo que o tema cita antes de desenhar (`fontes.ts`: Google Fonts e `@remotion/fonts`).
 - **Interface** (`src/renderer`): tela inicial (`inicio/`, sem carregar o editor), casca com dockview (arranjo por
   área, faixa de tela e orientação do vídeo), módulos de vídeo, imagem, 3D (sob demanda) e efeitos.
 
@@ -98,7 +109,7 @@ Os documentos de desenho estão em `docs/`. A pesquisa de uso que deu origem à 
 ## Testes
 
 ```bash
-npm test            # 28 testes: resolvedor × Python, MCP por stdio e HTTP, conversa (claude falso), criar projeto, vídeo de cenas, formatos
+npm test            # 41 testes: resolvedor × Python, MCP por stdio e HTTP, conversa (claude falso), criar projeto, vídeo de cenas, formatos, kit de marca e fontes
 npm run typecheck
 npm run e2e         # com o app aberto via ESTUDIO_DEPURAR_PORTA=9471
 ```
@@ -109,12 +120,13 @@ npm run e2e         # com o app aberto via ESTUDIO_DEPURAR_PORTA=9471
 
 - **Neste PC o Electron de desenvolvimento está bloqueado pelo Bitdefender** (GravityZone): o app instalado roda, mas
   `npm run dev` e o e2e precisam de exceção para a pasta do projeto. A prévia web cobre a interface.
-- **Onda B** (briefing): transcrição local da narração (whisper.cpp), importar mídia e painel Mídia, a Cliente fora do código
-  (Carrossel Cliente como modelo do tipo cenas), o Claude que planeja (perguntas e Plano do vídeo antes de montar), exportar
-  por destino, chip de formato no monitor, primeiros passos e "Salvar como modelo".
+- **Onda B** (briefing): transcrição local da narração (whisper.cpp), importar mídia e painel Mídia, o Carrossel Cliente como
+  modelo do tipo cenas (a paleta e as fontes dele já vêm do kit `cliente`), o Claude que planeja (perguntas e Plano do vídeo
+  antes de montar), exportar por destino, chip de formato no monitor, primeiros passos e "Salvar como modelo".
 - **Memória (app empacotado, 05/11/2026):** 307 MB parado no vídeo; 547 MB com as quatro áreas e o 3D. A tela inicial
   agora abre sem o editor (falta medir a linha "Início parado").
-- **Fontes** dos temas vêm do Google Fonts na primeira vez (precisa de internet).
+- **Fontes** do Google (Inter, Archivo, IBM Plex) baixam na primeira vez (precisa de internet); as de arquivo do kit não.
+  O seletor de fonte da camada de texto da imagem ainda lista só as quatro fixas.
 - **Licença do Remotion:** a BKM e a Cliente passam de 3 pessoas; uso fora da avaliação pede a Company License.
 
 ## Pastas
