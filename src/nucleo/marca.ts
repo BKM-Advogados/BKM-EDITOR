@@ -173,19 +173,23 @@ const ehDocImagem = (doc: unknown): doc is DocImagem => {
 };
 const por = (atual: unknown, path: string, value: unknown): OperacaoPatch => ({op: atual === undefined ? 'add' : 'replace', path, value});
 
-/** Patch que aplica o kit a um documento: o vídeo de cenas troca o `tema` inteiro; a imagem troca o fundo e, nos textos,
- *  a fonte (negrito leva a de título) e a cor. Outro tipo de documento: lista vazia (não recebe kit). */
+/** Patch que aplica o kit a um documento: o vídeo de cenas troca o `tema` inteiro; a imagem troca o fundo e, nos textos
+ *  (da raiz e de cada página do carrossel), a fonte (negrito leva a de título) e a cor. Outro tipo de documento: lista
+ *  vazia (não recebe kit). */
 export const patchDaMarca = (doc: unknown, m: Marca, tema: TemaDeMarca = temaDaMarca(m)): OperacaoPatch[] => {
   if (ehDocCenas(doc)) {
     return doc.tema === undefined ? [{op: 'add', path: '/tema', value: tema}] : [{op: 'test', path: '/tema', value: doc.tema}, {op: 'replace', path: '/tema', value: tema}];
   }
   if (ehDocImagem(doc)) {
     const ops = [por(doc.fundo, '/fundo', m.cores.fundo)];
-    doc.camadas.forEach((c, i) => {
-      if (!c || c.tipo !== 'texto') return;
-      ops.push(por(c.fonte, `/camadas/${i}/fonte`, (c.peso ?? 400) >= 600 ? m.fontes.titulo : m.fontes.texto));
-      ops.push(por(c.cor, `/camadas/${i}/cor`, m.cores.texto));
-    });
+    const textos = (camadas: DocImagem['camadas'], base: string) =>
+      camadas.forEach((c, i) => {
+        if (!c || c.tipo !== 'texto') return;
+        ops.push(por(c.fonte, `${base}/${i}/fonte`, (c.peso ?? 400) >= 600 ? m.fontes.titulo : m.fontes.texto));
+        ops.push(por(c.cor, `${base}/${i}/cor`, m.cores.texto));
+      });
+    textos(doc.camadas, '/camadas');
+    doc.paginas?.forEach((p, i) => textos(p.camadas, `/paginas/${i}/camadas`));
     return ops;
   }
   return [];

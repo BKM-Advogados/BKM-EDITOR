@@ -132,7 +132,7 @@ Os documentos de desenho estão em `docs/`. A pesquisa de uso que deu origem à 
 ## Testes
 
 ```bash
-npm test            # TESTES_TOTAL testes: resolvedor × Python, MCP por stdio e HTTP, conversa (claude falso), criar projeto, vídeo de cenas, formatos, som e ducking, kit de marca e fontes, carrossel e PDF, lâmina, exportação, zonas seguras
+npm test            # 86 testes: resolvedor × Python, MCP por stdio e HTTP, conversa (claude falso), criar projeto, vídeo de cenas, formatos, som e ducking, kit de marca e fontes, carrossel e PDF, lâmina, exportação, zonas seguras
 npm run typecheck
 npm run e2e         # com o app aberto via ESTUDIO_DEPURAR_PORTA=9471
 ```

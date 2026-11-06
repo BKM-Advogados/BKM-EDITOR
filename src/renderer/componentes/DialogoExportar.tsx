@@ -7,6 +7,7 @@ import React, {useEffect, useState, useSyncExternalStore} from 'react';
 import {CircleCheck, FolderOpen, X} from 'lucide-react';
 import type {Progresso, ResultadoExportacao} from '../../compartilhado/api';
 import type {DocImagem} from '../../nucleo/documentos';
+import {paginasDe, temPaginas} from '../../nucleo/carrossel';
 import {
   CODECS, destinoDoFormato, ESCALAS_IMAGEM, ESCALAS_VIDEO, estimarExportacao, formatarBytes, FORMATOS_IMAGEM_SAIDA, nomesDosArquivos, QUALIDADES, trechoValido,
   type CodecVideo, type Destino, type FormatoImagem, type OpcoesExportarVideo, type QualidadeVideo,
@@ -14,6 +15,7 @@ import {
 import {FORMATO_PADRAO, FORMATOS_VIDEO, type Formato} from '../../nucleo/formatos';
 import {avisar, useLoja} from '../estado/loja';
 import {exportarPng, type SaidaPng} from '../modulos/imagem/exportarPng';
+import {exportarCarrossel} from '../modulos/imagem/exportarPaginas';
 import {numeroBr} from './Campos';
 import './dialogo-exportar.css';
 
@@ -263,9 +265,18 @@ const ExportarImagem: React.FC<{documento: string; fechar: () => void}> = ({docu
   const f = FORMATOS_IMAGEM_SAIDA.find((x) => x.id === formato)!;
   const W = Math.round((doc?.largura ?? 0) * escala);
   const H = Math.round((doc?.altura ?? 0) * escala);
+  // carrossel: sai PNG por página e PDF pelo exportarPaginas.ts (os avisos vêm da loja); formato, qualidade e escala são
+  // da imagem de uma página só
+  const carrossel = temPaginas(doc);
+  const nPaginas = doc && carrossel ? paginasDe(doc).length : 0;
 
   const exportar = async () => {
     if (!doc) return;
+    if (carrossel) {
+      fechar();
+      await exportarCarrossel(documento);
+      return;
+    }
     setFase({tipo: 'exportando'});
     const r = await exportarPng(documento, {formato, qualidade: qualidade / 100, escala, nome: nome.trim() || undefined, revelar: false});
     setFase({tipo: 'pronto', r});
@@ -279,6 +290,17 @@ const ExportarImagem: React.FC<{documento: string; fechar: () => void}> = ({docu
       <Moldura titulo={r.ok ? 'Imagem exportada' : 'A exportação falhou'} sub={sub} fechar={fechar}>
         {r.ok && r.faltaram.length > 0 && <div className="erro-exp">Saiu sem estas imagens (não carregaram): {r.faltaram.join(', ')}</div>}
         <Pronto arquivos={r.arquivo ? [r.arquivo] : []} pasta={r.pasta} erro={r.ok ? undefined : r.mensagem ?? 'sem detalhes'} voltar={() => setFase({tipo: 'opcoes'})} fechar={fechar} />
+      </Moldura>
+    );
+  }
+  if (carrossel) {
+    return (
+      <Moldura titulo="Exportar carrossel" sub={sub} fechar={fechar} aoEnter={() => void exportar()}>
+        <div className="estimativa-exp"><span>Carrossel de <b>{nPaginas}</b> {nPaginas === 1 ? 'página' : 'páginas'}: sai um PNG por página em saidas/{titulo}/ e o PDF <b>{titulo}.pdf</b>, sem margem, para o LinkedIn</span></div>
+        <div className="dialogo-botoes">
+          <button className="bt fantasma" onClick={fechar}>Cancelar</button>
+          <button className="bt principal" disabled={!doc} onClick={() => void exportar()} autoFocus>Exportar</button>
+        </div>
       </Moldura>
     );
   }

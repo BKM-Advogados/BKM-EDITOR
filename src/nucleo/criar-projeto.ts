@@ -131,9 +131,19 @@ export const claudeMd = (modulos: Modulo[]) => {
       '  `lista` usa `itens` (lista de textos, entram um a um); `numero` conta de `de` até `ate`, com `prefixo`, `sufixo` e',
       '  `rotulo`; `imagem` usa `src` (caminho em `midia/`) e `ajuste` (`cobrir` ou `conter`). `alinhar`: esquerda, centro',
       '  ou direita. Ids novos não podem repetir os que já existem.',
+      '  Som (opcional): `audio.faixas[]`, cada faixa com `id`, `nome`, `papel` (`voz`, `musica` ou `efeitos`), `volume` (0 a 1),',
+      '  `mudo` e, na música, `ducking` {ativo, alvo_lu (quanto fica abaixo da voz; padrão 20), ataque_ms, soltura_ms}; cada',
+      '  `clipes[]` com `id`, `arquivo` (em `midia/`), `em` (ms na linha do tempo), `duracao_ms`, `corte_ms`, `volume`,',
+      '  `fade_in_ms`, `fade_out_ms` e `mudo`. O que ficar fora do vídeo vira aviso, não erro (detalhe em docs/audio.md do app).',
     );
   }
-  if (tem('imagem')) linhas.push('- Imagem: `largura`, `altura`, `fundo` e `camadas` (`imagem`, `texto`, `forma`) de baixo para cima, com `efeitos`.');
+  if (tem('imagem')) {
+    linhas.push(
+      '- Imagem: `largura`, `altura`, `fundo` e `camadas` (`imagem`, `texto`, `forma`) de baixo para cima, com `efeitos`. Um',
+      '  carrossel tem `paginas[]` (cada uma com `id`, `nome` e as suas `camadas`; a raiz fica com `camadas: []`) e as camadas',
+      '  se endereçam por `/paginas/P/camadas/N`; `estado_do_editor` diz a página ativa. Exporta PNG por página e PDF.',
+    );
+  }
   if (tem('3d')) linhas.push('- Cena 3D: objetos com `posicao`, `rotacao` em graus, `escala` e `cor`; luzes; câmera.');
   if (tem('video') || tem('imagem')) {
     linhas.push(
