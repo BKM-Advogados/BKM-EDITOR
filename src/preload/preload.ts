@@ -74,6 +74,11 @@ const api: ApiEstudio = {
   exportarImagem: (documento, png) => ipcRenderer.invoke(CANAL.exportarImagem, documento, png),
   aoProgresso: (cb) => ouvir<[Progresso]>(CANAL.progresso, cb),
   metricas: () => ipcRenderer.invoke(CANAL.metricas),
+  audio: {
+    gravarEnvelope: (arquivo, envelope) => ipcRenderer.invoke(CANAL.audioGravarEnvelope, arquivo, envelope),
+    listarTrilhas: () => ipcRenderer.invoke(CANAL.audioListarTrilhas),
+    importarTrilha: (caminho) => ipcRenderer.invoke(CANAL.audioImportarTrilha, caminho),
+  },
 };
 
 contextBridge.exposeInMainWorld('estudio', api);

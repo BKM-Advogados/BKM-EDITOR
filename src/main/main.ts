@@ -17,6 +17,7 @@ import {Memoria} from './memoria';
 import {ServidorMidia} from './servidor-midia';
 import {SessaoProjeto} from './sessao-projeto';
 import {Terminais} from './terminais';
+import {registrarIpcAudio} from './ipc-audio';
 
 // o mesmo id do instalador (electron-builder.yml): a barra de tarefas agrupa a janela com o atalho
 app.setAppUserModelId('br.com.bkmadvogados.estudio');
@@ -354,6 +355,8 @@ lidar(CANAL.metricas, (): Metricas => {
   const processos = app.getAppMetrics().map((m) => ({tipo: m.type, memoria_mb: Math.round(m.memory.workingSetSize / 1024), cpu: Math.round(m.cpu.percentCPUUsage)}));
   return {memoria_mb: processos.reduce((s, x) => s + x.memoria_mb, 0), processos};
 });
+
+registrarIpcAudio(lidar, exigirProjeto, () => memoria.prefs()); // som do vídeo de cenas
 
 ipcMain.on(CANAL.gravarEstado, (e, estado: Omit<EstadoEditor, 'atualizado_em'>) => {
   confiavel(e);

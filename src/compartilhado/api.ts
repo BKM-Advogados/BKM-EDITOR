@@ -3,6 +3,7 @@
 import type {Comentario, EntradaDiario, EntradaDocumento, EstadoEditor, Manifesto, Modulo, OperacaoPatch} from '../nucleo/documentos';
 import type {IdModelo} from '../nucleo/modelos';
 import type {Formato} from '../nucleo/formatos';
+import type {Envelope} from '../nucleo/audio';
 
 export const CANAL = {
   abrirPasta: 'estudio:abrir-pasta',
@@ -57,6 +58,10 @@ export const CANAL = {
   exportarImagem: 'estudio:exportar-imagem',
   progresso: 'estudio:progresso',
   metricas: 'estudio:metricas',
+  // som do vídeo de cenas (src/main/ipc-audio.ts)
+  audioGravarEnvelope: 'estudio:audio-gravar-envelope',
+  audioListarTrilhas: 'estudio:audio-listar-trilhas',
+  audioImportarTrilha: 'estudio:audio-importar-trilha',
 } as const;
 
 /** O projeto aberto. `estado` é o último que a pessoa viu (área, documento, seleção), para reabrir onde parou; `git`
@@ -69,7 +74,8 @@ export type Ambiente = {perfil: Perfil; git: boolean; claude: boolean; versao: s
 
 export type Recente = {raiz: string; nome: string; aberto_em: string; existe: boolean; modulos: Modulo[]; miniatura?: string};
 
-export type Preferencias = {pasta_projetos: string; ao_iniciar: 'inicio' | 'ultimo'; formato_video: string; formato_imagem: string; boas_vindas_vista: boolean};
+export type Preferencias = {pasta_projetos: string; ao_iniciar: 'inicio' | 'ultimo'; formato_video: string; formato_imagem: string; boas_vindas_vista: boolean;
+  pasta_trilhas: string}; // biblioteca de músicas e efeitos da pessoa (padrão: Estudio	rilhas)
 
 export type NovoProjeto = {nome?: string; modelo: IdModelo; formato?: Formato | {largura: number; altura: number}; pasta?: string; formato_id?: string};
 
@@ -167,7 +173,18 @@ export type ApiEstudio = {
   exportarImagem: (documento: string, pngBase64: string) => Promise<{ok: boolean; arquivo?: string}>;
   aoProgresso: (cb: (p: Progresso) => void) => () => void;
   metricas: () => Promise<Metricas>;
+  // som do vídeo de cenas: envelope medido pela interface, biblioteca de trilhas
+  audio: {
+    /** Grava midia/<arquivo>.envelope.json; devolve o caminho gravado. */
+    gravarEnvelope: (arquivo: string, envelope: Envelope) => Promise<string>;
+    listarTrilhas: () => Promise<{pasta: string; trilhas: Trilha[]}>;
+    /** Copia uma trilha da biblioteca para midia/; devolve o caminho no projeto. */
+    importarTrilha: (caminho: string) => Promise<string>;
+  };
 };
+
+/** Um arquivo da pasta de trilhas: nome sem extensão, caminho absoluto, subpasta e tamanho. */
+export type Trilha = {nome: string; caminho: string; pasta: string; tamanho_kb: number};
 
 declare global {
   interface Window {

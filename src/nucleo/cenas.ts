@@ -1,7 +1,9 @@
 // "Vídeo de cenas": o tipo de vídeo que se começa do zero. Cada cena tem duração própria em ms e blocos (título, texto,
 // lista, número, imagem) que entram e saem em ms contados do começo da cena. Posição e tamanho são frações do quadro
-// (0 a 1), e a letra é uma fração do lado menor: trocar 9:16 por 16:9 não desmonta o layout. Narração é opcional e
-// fica para a transcrição local (Onda B). O carrossel narrado da Cliente continua no resolvedor de roteiro.
+// (0 a 1), e a letra é uma fração do lado menor: trocar 9:16 por 16:9 não desmonta o layout. O som é opcional: `audio`
+// traz faixas (narração, música, efeitos) com clipes em ms da linha do tempo (audio.ts); a transcrição da narração fica
+// para a Onda B. O carrossel narrado da Cliente continua no resolvedor de roteiro.
+import {resolverAudio, type AudioCenas, type AudioP, type Envelope} from './audio';
 import type {Efeito} from './efeitos';
 import {formatoDoVideo, type Formato} from './formatos';
 
@@ -35,7 +37,7 @@ export type CenaCenas = {id: string; nome?: string; duracao_ms: number; fundo?: 
 
 export type TemaCenas = {fundo: string; texto: string; destaque: string; suave: string; fonte: string};
 
-export type DocCenas = {tipo: 'cenas'; formato: Formato; tema: TemaCenas; cenas: CenaCenas[]; efeitos?: Efeito[]};
+export type DocCenas = {tipo: 'cenas'; formato: Formato; tema: TemaCenas; cenas: CenaCenas[]; efeitos?: Efeito[]; audio?: AudioCenas};
 
 export const TEMA_NEUTRO: TemaCenas = {fundo: '#111418', texto: '#F2F2F2', destaque: '#70B8FF', suave: '#A3ABB5', fonte: 'Inter'};
 
@@ -121,13 +123,17 @@ export type PropsCenas = {
   tema: TemaCenas;
   cenas: CenaCenasP[];
   efeitos: Efeito[];
+  audio?: AudioP;
   base_midia?: string;
 };
+
+/** O que o resolvedor recebe de fora do documento: os envelopes já medidos, por arquivo (midia/x.wav). */
+export type OpcoesResolver = {envelopes?: Record<string, Envelope | undefined>};
 
 const numero = (v: unknown, padrao: number) => (typeof v === 'number' && Number.isFinite(v) ? v : padrao);
 
 /** Props da composição VideoCenas, em ms de saída. Valores fora do lugar viram aviso, não erro: o vídeo sempre toca. */
-export const resolverCenas = (doc: DocCenas): {props: PropsCenas; avisos: string[]} => {
+export const resolverCenas = (doc: DocCenas, opcoes: OpcoesResolver = {}): {props: PropsCenas; avisos: string[]} => {
   const avisos: string[] = [];
   const formato = formatoDoVideo(doc);
   const tema = {...TEMA_NEUTRO, ...(doc.tema ?? {})};
@@ -149,9 +155,12 @@ export const resolverCenas = (doc: DocCenas): {props: PropsCenas; avisos: string
     });
     return {origem: `/cenas/${i}`, id: c.id, nome: c.nome, tipo: 'cena', n: i + 1, t_in, t_out, fundo: c.fundo ?? tema.fundo, blocos};
   });
+  const duracao_ms = Math.max(1000, t);
+  const som = resolverAudio(doc.audio, duracao_ms, opcoes.envelopes);
+  avisos.push(...som.avisos);
   return {
-    props: {composicao: 'VideoCenas', duracao_ms: Math.max(1000, t), largura: formato.largura, altura: formato.altura, fps: formato.fps, tema, cenas,
-      efeitos: doc.efeitos ?? []},
+    props: {composicao: 'VideoCenas', duracao_ms, largura: formato.largura, altura: formato.altura, fps: formato.fps, tema, cenas,
+      efeitos: doc.efeitos ?? [], ...(som.audio ? {audio: som.audio} : {})},
     avisos,
   };
 };

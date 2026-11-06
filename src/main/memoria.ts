@@ -1,5 +1,5 @@
 // O que o app lembra fora dos projetos, na pasta de dados do usuário: preferências (pasta padrão dos projetos, o que
-// abrir ao iniciar, últimos formatos) e a lista de recentes. Nada aqui é essencial: arquivo ausente ou quebrado volta
+// abrir ao iniciar, últimos formatos, pasta de trilhas) e a lista de recentes. Nada aqui é essencial: arquivo ausente ou quebrado volta
 // ao padrão.
 import {existsSync, mkdirSync, readFileSync, renameSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
@@ -42,6 +42,7 @@ export class Memoria {
       formato_video: p.formato_video ?? 'reels',
       formato_imagem: p.formato_imagem ?? 'feed',
       boas_vindas_vista: Boolean(p.boas_vindas_vista),
+      pasta_trilhas: typeof p.pasta_trilhas === 'string' && p.pasta_trilhas ? p.pasta_trilhas : path.join(this.pastaPadrao, 'trilhas'),
     };
   }
 

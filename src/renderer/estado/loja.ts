@@ -176,6 +176,8 @@ export const observarProjeto = () =>
     if (arquivo === 'comentarios.json') return void carregarComentarios();
     if (arquivo.startsWith('.estudio/diario')) return void carregarDiario();
     if (arquivo === 'estudio.json') return void window.estudio.projetoAtual().then((i) => i && abrirProjeto(i));
+    // envelope de áudio medido (midia/x.wav.envelope.json): as props dos vídeos ganham a forma de onda e o ducking
+    if (arquivo.endsWith('.envelope.json')) return void info.manifesto.documentos.filter((d) => d.modulo === 'video').forEach((d) => void carregarDoc(d.id));
     for (const d of info.manifesto.documentos) {
       const doc = estado.docs[d.id]?.doc as {palavras?: string} | undefined;
       if (d.caminho === arquivo || doc?.palavras === arquivo) void carregarDoc(d.id);

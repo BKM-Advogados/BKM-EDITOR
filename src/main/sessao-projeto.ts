@@ -11,6 +11,7 @@ import {ehDocCenas, resolverCenas} from '../nucleo/cenas';
 import {FORMATO_PADRAO} from '../nucleo/formatos';
 import type {DocVideo} from '../nucleo/documentos';
 import type {PropsVideo} from '../compartilhado/api';
+import {lerEnvelopes} from './ipc-audio';
 
 const exec = promisify(execFile);
 const IGNORAR = /(^|[\\/])(\.git|node_modules)([\\/]|$)|\.tmp$|estado\.json$|mcp\.json$/;
@@ -108,7 +109,8 @@ export class SessaoProjeto {
       const rel = this.projeto.arquivoDoDocumento(documento);
       const {doc} = this.projeto.lerJson<DocVideo>(rel);
       if (ehDocCenas(doc)) {
-        const {props, avisos} = resolverCenas(doc);
+        // os envelopes medidos (midia/*.envelope.json) entram nas props: prévia e exportação veem o mesmo ducking
+        const {props, avisos} = resolverCenas(doc, {envelopes: lerEnvelopes(this.projeto, doc)});
         return {props: {...props, base_midia: base}, avisos};
       }
       // o carrossel da Cliente: 1080×1920 a 30 qps até a animação dele aceitar outro formato

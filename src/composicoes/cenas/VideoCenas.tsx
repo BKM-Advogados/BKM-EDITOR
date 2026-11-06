@@ -1,12 +1,15 @@
 // Vídeo de cenas com o tema neutro: título, texto, lista, número e imagem, em qualquer formato. Largura, altura e fps
 // vêm do Remotion (calculateMetadata no Root, compositionWidth no Player); posição e letra são frações do quadro, então
 // o mesmo documento serve a 9:16 e a 16:9. Cada bloco leva `data-origem` (o caminho dele no documento) para a prévia
-// achar o que foi clicado; o atributo não muda nenhum pixel. Tempos em ms de saída (src/nucleo/cenas.ts).
+// achar o que foi clicado; o atributo não muda nenhum pixel. Tempos em ms de saída (src/nucleo/cenas.ts). O som são
+// os clipes das faixas (src/nucleo/audio.ts), cada um num Html5Audio dentro de uma Sequence, com o volume por quadro
+// (faixa × clipe × fades × ducking); o renderMedia da exportação mixa tudo no MP4.
 import React from 'react';
-import {AbsoluteFill, Easing, Img, interpolate, Sequence, spring, useCurrentFrame, useVideoConfig} from 'remotion';
+import {AbsoluteFill, Easing, getRemotionEnvironment, Html5Audio, Img, interpolate, Sequence, spring, useCurrentFrame, useVideoConfig} from 'remotion';
 import {CamadaEfeitos} from '../efeitos/CamadaEfeitos';
 import {fonte} from '../fontes';
 import {definirBaseMidia, midia} from '../midia';
+import {volumeDoClipe, type AudioP, type ClipeAudioP, type FaixaAudioP} from '../../nucleo/audio';
 import {TIPOS_BLOCO_CENAS, type BlocoCenasP, type CenaCenasP, type PropsCenas, type TemaCenas} from '../../nucleo/cenas';
 
 const clamp = {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'} as const;
@@ -100,6 +103,30 @@ const Cena: React.FC<{c: CenaCenasP; tema: TemaCenas; familia: string; dur: numb
   );
 };
 
+/** Um clipe de áudio: a Sequence põe o clipe no tempo do vídeo, trimBefore pula o corte dentro do arquivo e o volume é
+ *  calculado por quadro desde o começo do clipe. Na prévia, arquivo que não carrega vira aviso no console; no render o
+ *  Remotion para e avisa (melhor que exportar mudo sem ninguém saber). */
+const Clipe: React.FC<{c: ClipeAudioP; f: FaixaAudioP}> = ({c, f}) => {
+  const {fps} = useVideoConfig();
+  const q = (ms: number) => Math.round((ms / 1000) * fps);
+  const de = q(c.em);
+  const dur = Math.max(1, q(c.em + c.duracao_ms) - de);
+  const {isRendering} = getRemotionEnvironment();
+  return (
+    <Sequence from={de} durationInFrames={dur} layout="none" name={`${f.nome} · ${c.nome}`}>
+      <Html5Audio src={midia(c.arquivo)} trimBefore={q(c.corte_ms)} volume={(quadro) => volumeDoClipe(f, c, (quadro / fps) * 1000)}
+        onError={isRendering ? undefined : (e) => console.warn(`[estúdio] não deu para tocar ${c.arquivo}:`, e)} />
+    </Sequence>
+  );
+};
+
+const Som: React.FC<{audio?: AudioP; duracao_ms: number}> = ({audio, duracao_ms}) => (
+  <>
+    {(audio?.faixas ?? []).filter((f) => !f.mudo).flatMap((f) =>
+      f.clipes.filter((c) => !c.mudo && !c.fora && c.em < duracao_ms).map((c) => <Clipe key={c.origem} c={c} f={f} />))}
+  </>
+);
+
 export const VideoCenas: React.FC<PropsCenas> = (p) => {
   definirBaseMidia(p.base_midia);
   const frame = useCurrentFrame();
@@ -119,6 +146,7 @@ export const VideoCenas: React.FC<PropsCenas> = (p) => {
           );
         })}
       </CamadaEfeitos>
+      <Som audio={p.audio} duracao_ms={p.duracao_ms} />
     </AbsoluteFill>
   );
 };
