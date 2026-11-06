@@ -3,6 +3,7 @@
 import type {Comentario, EntradaDiario, EntradaDocumento, EstadoEditor, Manifesto, Modulo, OperacaoPatch} from '../nucleo/documentos';
 import type {IdModelo} from '../nucleo/modelos';
 import type {Formato} from '../nucleo/formatos';
+import type {OpcoesExportarImagem, OpcoesExportarVideo} from '../nucleo/exportacao';
 
 export const CANAL = {
   abrirPasta: 'estudio:abrir-pasta',
@@ -57,6 +58,8 @@ export const CANAL = {
   exportarImagem: 'estudio:exportar-imagem',
   progresso: 'estudio:progresso',
   metricas: 'estudio:metricas',
+  exportarCancelar: 'estudio:exportar-cancelar',
+  mostrarArquivo: 'estudio:mostrar-arquivo',
 } as const;
 
 /** O projeto aberto. `estado` é o último que a pessoa viu (área, documento, seleção), para reabrir onde parou; `git`
@@ -87,7 +90,11 @@ export type Mudanca = {arquivo: string; autor?: string};
 
 export type Metricas = {memoria_mb: number; processos: {tipo: string; memoria_mb: number; cpu: number}[]};
 
-export type Progresso = {tipo: 'status' | 'progresso'; mensagem?: string; etapa?: string; progresso?: number};
+/** Andamento da exportação; `arquivo`, `indice` e `total` dizem qual dos arquivos está saindo quando são vários. */
+export type Progresso = {tipo: 'status' | 'progresso'; mensagem?: string; etapa?: string; progresso?: number; arquivo?: string; indice?: number; total?: number};
+
+/** Saída da exportação: os arquivos gravados em saidas/ (o primeiro repetido em `arquivo`), a pasta e, se parou antes, por quê. */
+export type ResultadoExportacao = {ok: boolean; arquivo?: string; arquivos?: string[]; pasta?: string; mensagem?: string; cancelado?: boolean};
 
 /** Login do Claude Code da pessoa, lido de `claude auth status`. chave_api: há ANTHROPIC_API_KEY, que no modo -p tem prioridade. */
 export type ContaClaude = {instalado: boolean; logado: boolean; metodo: string; email?: string; plano?: string; chave_api: boolean};
@@ -163,10 +170,14 @@ export type ApiEstudio = {
     fechar: (id: number) => void;
     aoEvento: (cb: (id: number, e: EventoConversa) => void) => () => void;
   };
-  exportarVideo: (documento: string) => Promise<{ok: boolean; arquivo?: string; mensagem?: string}>;
-  exportarImagem: (documento: string, pngBase64: string) => Promise<{ok: boolean; arquivo?: string}>;
+  /** Vídeo em saidas/: sem opções, MP4 H.264 no formato do documento; com elas, um arquivo por destino. O andamento sai em aoProgresso. */
+  exportarVideo: (documento: string, opcoes?: OpcoesExportarVideo) => Promise<ResultadoExportacao>;
+  /** Imagem já desenhada pela interface (data URL); o formato dá a extensão do arquivo. */
+  exportarImagem: (documento: string, dados: string, opcoes?: OpcoesExportarImagem) => Promise<{ok: boolean; arquivo?: string; pasta?: string}>;
   aoProgresso: (cb: (p: Progresso) => void) => () => void;
   metricas: () => Promise<Metricas>;
+  cancelarExportacao: () => void; // para a exportação em andamento; o exportarVideo resolve com cancelado: true
+  mostrarArquivo: (caminho: string) => void; // abre a pasta com o arquivo marcado
 };
 
 declare global {

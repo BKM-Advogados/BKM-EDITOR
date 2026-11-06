@@ -1,12 +1,14 @@
 // Prévia da interface no navegador, sem Electron: uma ponte `window.estudio` em memória, com projetos de mentira, para
 // olhar e fotografar a tela inicial e o editor quando o Electron não pode rodar (o antivírus bloqueia o de
-// desenvolvimento neste PC). Não grava nada em disco. Uso: npx vite --config vite.renderer.config.ts --port 5199 e abrir
+// desenvolvimento neste PC). Não grava nada em disco; a exportação é de mentira (andamento simulado), só para o diálogo.
+// Uso: npx vite --config vite.renderer.config.ts --port 5199 e abrir
 // http://localhost:5199/scripts/previa-web/index.html
 import jsonpatch, {type Operation} from 'fast-json-patch';
-import type {ApiEstudio, InfoProjeto, Mudanca, NovoProjeto, Preferencias, Recente} from '../../src/compartilhado/api';
+import type {ApiEstudio, InfoProjeto, Mudanca, NovoProjeto, Preferencias, Progresso, Recente} from '../../src/compartilhado/api';
 import type {EntradaDocumento, Manifesto, Modulo} from '../../src/nucleo/documentos';
 import {novoDocCenas, resolverCenas, type DocCenas} from '../../src/nucleo/cenas';
 import {MODELOS} from '../../src/nucleo/modelos';
+import {argumentosDoRender, destinoDoFormato, nomesDosArquivos, type OpcoesExportarVideo} from '../../src/nucleo/exportacao';
 
 type Proj = {raiz: string; manifesto: Manifesto; docs: Record<string, unknown>; versao: number};
 const projetos = new Map<string, Proj>();
@@ -20,6 +22,13 @@ const recentes: Recente[] = new URLSearchParams(location.search).has('vazio') ? 
 ];
 const ouvintesMudou = new Set<(m: Mudanca) => void>();
 const mudou = (arquivo: string) => setTimeout(() => ouvintesMudou.forEach((f) => f({arquivo})), 30);
+
+// exportação de mentira: andamento em pouco mais de 1 s por destino, cancelável, nada gravado
+const ouvintesProgresso = new Set<(p: Progresso) => void>();
+let exportacaoCancelada = false;
+const progresso = (p: Progresso) => ouvintesProgresso.forEach((f) => f(p));
+const esperar = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
+const pastaSaidas = () => `${aberto!.raiz}\\saidas`;
 
 const info = (): InfoProjeto | null => aberto && {raiz: aberto.raiz, manifesto: structuredClone(aberto.manifesto), base_midia: '', claude: true, git: true,
   perfil: {nome: 'padrao', sessoes_claude: 4, escala_previa: 0.75, pixel_ratio: 1.5}, estado: null};
@@ -147,10 +156,41 @@ const api: ApiEstudio = {
     fechar: nada,
     aoEvento: () => nada,
   },
-  exportarVideo: async () => ({ok: false, mensagem: 'exportar não funciona na prévia web'}),
-  exportarImagem: async () => ({ok: false}),
-  aoProgresso: () => nada,
+  exportarVideo: async (documento, opcoes) => {
+    exportacaoCancelada = false;
+    const {props} = resolverCenas(aberto!.docs[documento] as DocCenas);
+    const formato = {largura: props.largura, altura: props.altura, fps: props.fps};
+    const o: OpcoesExportarVideo = {codec: 'h264', qualidade: 'alta', escala: 1, ...opcoes, destinos: opcoes?.destinos?.length ? opcoes.destinos : [destinoDoFormato(formato)]};
+    const base = o.nome?.trim() || aberto!.manifesto.documentos.find((d) => d.id === documento)?.titulo || documento;
+    const planos = nomesDosArquivos(base, o.destinos, formato);
+    const arquivos: string[] = [];
+    progresso({tipo: 'status', mensagem: 'Preparando o navegador de render… (prévia web: nada é gravado)'});
+    await esperar(500);
+    for (const [i, plano] of planos.entries()) {
+      const a = argumentosDoRender(o, plano.destino, formato, props.duracao_ms);
+      const nome = `${plano.nome}.${a.ext}`;
+      progresso({tipo: 'status', mensagem: `Renderizando ${a.quadros} quadros…`, arquivo: nome, indice: i + 1, total: planos.length});
+      for (let p = 0; p <= 100; p += 4) {
+        if (exportacaoCancelada) return {ok: false, cancelado: true, mensagem: 'Exportação cancelada', arquivos, pasta: pastaSaidas()};
+        progresso({tipo: 'progresso', etapa: 'renderizando', progresso: p, arquivo: nome, indice: i + 1, total: planos.length});
+        await esperar(50);
+      }
+      arquivos.push(`${pastaSaidas()}\\${nome}`);
+    }
+    return {ok: true, arquivo: arquivos[0], arquivos, pasta: pastaSaidas()};
+  },
+  exportarImagem: async (documento, _dados, opcoes) => ({ok: true, arquivo: `${pastaSaidas()}\\${opcoes?.nome || documento}${opcoes?.sufixo ?? ''}.${opcoes?.formato ?? 'png'}`, pasta: pastaSaidas()}),
+  aoProgresso: (cb) => {
+    ouvintesProgresso.add(cb);
+    return () => {
+      ouvintesProgresso.delete(cb);
+    };
+  },
   metricas: async () => ({memoria_mb: 312, processos: []}),
+  cancelarExportacao: () => {
+    exportacaoCancelada = true;
+  },
+  mostrarArquivo: nada,
 };
 
 (window as unknown as {estudio: ApiEstudio}).estudio = api;

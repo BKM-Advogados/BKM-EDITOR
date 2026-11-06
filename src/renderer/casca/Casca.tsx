@@ -1,7 +1,8 @@
 // Casca do Estúdio: barra com as quatro áreas, painéis acopláveis (dockview) e rodapé de estado. Cada área guarda o
 // próprio arranjo de painéis (como as páginas do Resolve e os workspaces do Blender); o terminal é o mesmo em todas.
 // A barra tem o menu de costume dos editores (Novo, Abrir, Abrir recente, Duplicar, Fechar, Preferências), o nome do
-// projeto renomeável com um clique, o "Salvo" (tudo grava na hora; Ctrl+S marca um ponto de restauração) e o Exportar.
+// projeto renomeável com um clique, o "Salvo" (tudo grava na hora; Ctrl+S marca um ponto de restauração) e o Exportar,
+// que abre o diálogo de exportação do documento da área (componentes/DialogoExportar.tsx).
 import React, {Suspense, useCallback, useEffect, useRef, useState} from 'react';
 import {DockviewReact, type DockviewApi, type DockviewReadyEvent, type DockviewTheme, type IDockviewPanelHeaderProps, type IDockviewPanelProps} from 'dockview-react';
 import 'dockview-react/dist/styles/dockview.css';
@@ -16,7 +17,7 @@ import type {PaineisDoModulo} from './contrato';
 import {PaineisVideo} from '../modulos/video/paineis';
 import {PaineisImagem} from '../modulos/imagem/paineis';
 import {PaineisEfeitos} from '../modulos/efeitos/paineis';
-import {exportarPng} from '../modulos/imagem/exportarPng';
+import {abrirDialogoExportar, RaizDialogoExportar} from '../componentes/DialogoExportar';
 import {Comentarios} from '../paineis/Comentarios';
 import {Historico} from '../paineis/Historico';
 import {Rodape} from './Rodape';
@@ -160,19 +161,13 @@ const orientacaoDe = (e: ReturnType<typeof loja.get>): Orientacao => {
   return largura && altura && largura > altura ? 'H' : 'V';
 };
 
-// ---------- exportar a área atual ----------
-const exportarVideo = async (documento: string) => {
-  avisar('Exportando o vídeo para a pasta saidas… (a primeira vez prepara o render e pode levar um minuto)');
-  const r = await window.estudio.exportarVideo(documento);
-  avisar(r.ok ? `Exportado: ${r.arquivo}` : `Exportação: ${r.mensagem}`, r.ok ? 'ok' : 'erro');
-};
+// ---------- exportar a área atual: abre o diálogo com o documento da área ----------
 const exportarArea = () => {
   const e = loja.get();
   const id = e.area === 'efeitos' ? e.alvoEfeitos : e.area === '3d' ? undefined : e.ativo[e.area];
   const modulo = e.info?.manifesto.documentos.find((d) => d.id === id)?.modulo;
-  if (!id || !modulo) return avisar(e.area === '3d' ? 'A cena 3D ainda não exporta.' : 'Nada para exportar nesta área.', 'info');
-  if (modulo === 'video') return void exportarVideo(id);
-  if (modulo === 'imagem') return void exportarPng(id);
+  if (!id || !modulo || modulo === '3d') return avisar(e.area === '3d' ? 'A cena 3D ainda não exporta.' : 'Nada para exportar nesta área.', 'info');
+  abrirDialogoExportar(id);
 };
 
 // ---------- preferências ----------
@@ -461,7 +456,7 @@ export const Casca: React.FC = () => {
           </button>
           <button className="bt fantasma" onClick={() => void desfazer()} title="Desfazer a sua última edição (Ctrl+Z)"><Undo2 size={15} /></button>
           <button className="bt exportar" disabled={!podeExportar} onClick={exportarArea}
-            title={podeExportar ? `Exportar ${docAtivo!.modulo === 'video' ? 'MP4' : 'PNG'} para a pasta saidas (Ctrl+Shift+E)` : 'A cena 3D ainda não exporta'}>
+            title={podeExportar ? `Exportar ${docAtivo!.modulo === 'video' ? 'o vídeo' : 'a imagem'} para a pasta saidas… (Ctrl+Shift+E)` : 'A cena 3D ainda não exporta'}>
             <Download size={15} />Exportar
           </button>
         </div>
@@ -471,6 +466,7 @@ export const Casca: React.FC = () => {
       </div>
       <Rodape />
       {preferencias && <PainelPreferencias aoFechar={() => setPreferencias(false)} />}
+      <RaizDialogoExportar />
     </div>
   );
 };
