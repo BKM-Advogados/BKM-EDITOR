@@ -1,14 +1,16 @@
 // Inspector da imagem: propriedades da camada selecionada (posição e tamanho, e as do tipo) ou, sem seleção, a
-// prancheta (tamanho, fundo) e a pilha de efeitos numa linha. Cada campo grava um patch ao sair dele, ao soltar o
-// controle ou ao fechar o seletor de cor; enquanto o controle mexe, o monitor mostra o valor pela prévia ao vivo.
-// O "visível" não aparece aqui: é o olho da lista de camadas.
+// prancheta (tamanho, fundo, comum a todas as páginas), a página ativa (nome) quando há várias e a pilha de efeitos
+// numa linha. Cada campo grava um patch ao sair dele, ao soltar o controle ou ao fechar o seletor de cor; enquanto o
+// controle mexe, o monitor mostra o valor pela prévia ao vivo. O "visível" não aparece aqui: é o olho da lista.
 import React from 'react';
 import {ChevronRight, Copy, FileJson, Image as IconeImagem, Link} from 'lucide-react';
 import type {CamadaImagem, DocImagem, OperacaoPatch} from '../../../nucleo/documentos';
+import {baseCamadas, paginaDoCaminho} from '../../../nucleo/carrossel';
 import {aplicar, avisar, loja, patchTrocar, trocar, useLoja} from '../../estado/loja';
-import {CabecalhoInspector, CampoCor, CampoDeslizante, CampoNumero, CampoSelecao, CampoTexto, Secao, copiar} from '../../componentes/Campos';
+import {CabecalhoInspector, CampoCor, CampoDeslizante, CampoLeitura, CampoNumero, CampoSelecao, CampoTexto, Secao, copiar} from '../../componentes/Campos';
 import {IconeEfeitos} from '../../componentes/Icones';
-import {FONTES, PADRAO, caminhoNoProjeto, definirPrevia, docValido, indiceDe, rotuloCamada, usarDocumentoImagem} from './comum';
+import {FONTES, PADRAO, caminhoNoProjeto, definirPrevia, docValido, indiceDe, rotuloCamada, usarDocumentoImagem, usarPaginaAtiva, type PaginaAtiva} from './comum';
+import {renomearPagina} from './acoes';
 import {iconeCamada} from './CamadasImagem';
 
 const PESOS: [string, string][] = ['100', '200', '300', '400', '500', '600', '700', '800', '900'].map((p) => [p, p]);
@@ -87,9 +89,12 @@ const InspectorCamada: React.FC<{documento: string; caminho: string; c: CamadaIm
   );
 };
 
-const InspectorDocumento: React.FC<{documento: string; doc: DocImagem; versao: string}> = ({documento, doc, versao}) => {
+const InspectorDocumento: React.FC<{documento: string; doc: DocImagem; ativa: PaginaAtiva}> = ({documento, doc, ativa}) => {
   const titulo = useLoja((e) => e.info?.manifesto.documentos.find((d) => d.id === documento)?.titulo ?? documento);
   const efeitos = doc.efeitos ?? [];
+  const varias = ativa.paginas.length > 1;
+  const camadas = varias ? `${ativa.paginas.length} páginas · ${ativa.camadas.length} ${ativa.camadas.length === 1 ? 'camada' : 'camadas'} nesta página`
+    : `${ativa.camadas.length} ${ativa.camadas.length === 1 ? 'camada' : 'camadas'}`;
   const ligados = efeitos.filter((e) => e.ativo !== false).length;
   const positivo = (campo: 'largura' | 'altura') => (v: number) =>
     v > 0 ? void trocar(documento, `/${campo}`, Math.round(v), `${campo} da imagem`) : avisar(`${campo} precisa ser maior que zero`, 'erro');
@@ -101,9 +106,16 @@ const InspectorDocumento: React.FC<{documento: string; doc: DocImagem; versao: s
   };
   return (
     <div className="painel">
-      <CabecalhoInspector icone={<IconeImagem />} nome={titulo} sub={`Imagem · ${doc.largura} × ${doc.altura}`} dica={`${doc.camadas.length} ${doc.camadas.length === 1 ? 'camada' : 'camadas'}`} />
+      <CabecalhoInspector icone={<IconeImagem />} nome={titulo} sub={`${varias ? 'Carrossel' : 'Imagem'} · ${doc.largura} × ${doc.altura}`} dica={camadas} />
       <div className="insp-corpo">
-        <Secao titulo="Prancheta" chave="imagem:prancheta">
+        {varias && (
+          <Secao titulo={`Página ${ativa.p + 1} de ${ativa.paginas.length}`} chave="imagem:pagina">
+            <CampoTexto rotulo="Nome" valor={ativa.pagina.nome} aoMudar={(v) => void renomearPagina(documento, ativa.p, v)} />
+            <CampoLeitura rotulo="Id" dica="O id da página fica igual quando ela muda de lugar">{ativa.pagina.id}</CampoLeitura>
+            <CampoLeitura rotulo="Caminho" dica="Para o Claude: ler_documento com este caminho traz só esta página">{`/paginas/${ativa.p}`}</CampoLeitura>
+          </Secao>
+        )}
+        <Secao titulo={varias ? 'Prancheta (todas as páginas)' : 'Prancheta'} chave="imagem:prancheta">
           <CampoSelecao rotulo="Tamanho" valor={pronto ? `${pronto.l}x${pronto.a}` : 'outro'}
             opcoes={[...TAMANHOS.map((t) => [`${t.l}x${t.a}`, `${t.nome} · ${t.l} × ${t.a}`] as [string, string]), ['outro', 'Personalizado']]}
             aoMudar={(v) => {
@@ -132,14 +144,18 @@ const InspectorDocumento: React.FC<{documento: string; doc: DocImagem; versao: s
 export const InspectorImagem: React.FC = () => {
   const documento = usarDocumentoImagem();
   const lido = useLoja((e) => (documento ? e.docs[documento] : undefined));
+  const doc = lido?.doc as DocImagem | undefined;
+  const ativa = usarPaginaAtiva(documento, doc);
   const selecao = useLoja((e) => e.selecao);
-  if (!documento || !lido) return <div className="vazio">Sem imagem ainda: crie no monitor.</div>;
-  const doc = lido.doc as DocImagem;
-  if (!docValido(doc)) return <div className="vazio" style={{color: 'var(--erro)'}}>o documento {documento} não tem a lista "camadas"</div>;
-  const caminho = selecao?.documento === documento && indiceDe(selecao.caminho) >= 0 ? selecao.caminho : null;
-  const c = caminho ? doc.camadas[indiceDe(caminho)] : undefined;
+  if (!documento || !lido || !doc) return <div className="vazio">Sem imagem ainda: crie no monitor.</div>;
+  if (!docValido(doc) || !ativa) return <div className="vazio" style={{color: 'var(--erro)'}}>o documento {documento} não tem a lista "camadas" nem "paginas"</div>;
+  // a camada selecionada pode estar em qualquer página (o monitor traz a página dela para a frente)
+  const p = selecao?.documento === documento ? paginaDoCaminho(doc, selecao.caminho) : -1;
+  const base = p >= 0 ? baseCamadas(doc, p) : null;
+  const caminho = base && selecao && indiceDe(selecao.caminho, base) >= 0 ? selecao.caminho : null;
+  const c = caminho && base ? ativa.paginas[p]?.camadas[indiceDe(caminho, base)] : undefined;
   if (caminho && c) return <InspectorCamada key={caminho} documento={documento} caminho={caminho} c={c} />;
-  return <InspectorDocumento documento={documento} doc={doc} versao={lido.versao} />;
+  return <InspectorDocumento documento={documento} doc={doc} ativa={ativa} />;
 };
 
 export {TIPOS as TIPOS_CAMADA};

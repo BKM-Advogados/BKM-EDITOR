@@ -13,6 +13,7 @@ import type {Formato} from '../nucleo/formatos';
 import {ErroProjeto, Projeto, serializar} from '../nucleo/projeto';
 import {exportarVideo} from './exportar';
 import {registrarIpcMarcas} from './ipc-marcas';
+import {registrarExportarPaginas} from './exportar-paginas';
 import {McpHttp} from './mcp-http';
 import {Memoria} from './memoria';
 import {ServidorMidia} from './servidor-midia';
@@ -357,6 +358,7 @@ lidar(CANAL.metricas, (): Metricas => {
   const processos = app.getAppMetrics().map((m) => ({tipo: m.type, memoria_mb: Math.round(m.memory.workingSetSize / 1024), cpu: Math.round(m.cpu.percentCPUUsage)}));
   return {memoria_mb: processos.reduce((s, x) => s + x.memoria_mb, 0), processos};
 });
+registrarExportarPaginas(lidar, CANAL.exportarPaginas, {projeto: exigirProjeto, mostrar: (arquivo) => shell.showItemInFolder(arquivo)});
 
 registrarIpcAudio(lidar, exigirProjeto, () => memoria.prefs()); // som do vídeo de cenas
 

@@ -71,6 +71,7 @@ export const CANAL = {
   marcasImportarFonte: 'estudio:marcas-importar-fonte',
   marcasAplicar: 'estudio:marcas-aplicar',
   fontesDoProjeto: 'estudio:fontes-do-projeto',
+  exportarPaginas: 'estudio:exportar-paginas',
 } as const;
 
 /** O projeto aberto. `estado` é o último que a pessoa viu (área, documento, seleção), para reabrir onde parou; `git`
@@ -208,10 +209,16 @@ export type ApiEstudio = {
     aplicar: (id: string, documento: string) => Promise<{versao: string; marca: string; nome: string; copiados: string[]}>;
     fontesDoProjeto: () => Promise<FonteArquivo[]>;
   };
+  /** Carrossel: PNG por página em saidas/<nome>/01.png… e, com `pdf`, saidas/<nome>.pdf (uma página por imagem, sem margem). */
+  exportarPaginas: (o: PedidoExportarPaginas) => Promise<ResultadoExportarPaginas>;
 };
 
 /** Um arquivo da pasta de trilhas: nome sem extensão, caminho absoluto, subpasta e tamanho. */
 export type Trilha = {nome: string; caminho: string; pasta: string; tamanho_kb: number};
+
+/** Páginas já desenhadas pela interface (PNG em data URL) com o número que aparece no nome do arquivo (1 = 01.png). */
+export type PedidoExportarPaginas = {documento: string; paginas: {png: string; numero: number}[]; pdf: boolean};
+export type ResultadoExportarPaginas = {ok: boolean; pasta?: string; pdf?: string; arquivos?: string[]; mostrar?: string; mensagem?: string};
 
 declare global {
   interface Window {

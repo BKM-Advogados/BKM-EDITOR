@@ -66,7 +66,7 @@ o login próprio do Claude Code). Depois é só pedir: "crie 5 cenas sobre féri
 |---|---|---|
 | **Vídeo de cenas** (o que se começa do zero) | qualquer formato; cenas com duração própria e blocos de título, texto, lista, número e imagem; posição em % do quadro (trocar 9:16 por 16:9 não desmonta nada); criar, duplicar (Ctrl+D) e excluir (Delete) cena e bloco; arrastar bloco no quadro e na linha do tempo; alça da cena muda a duração; propriedades com formato, cores, tempo em segundos e letra em px | `ler_documento`, `aplicar_patch`, `criar_documento` |
 | **Carrossel narrado da Cliente** | o C2 real, com blocos presos às palavras da narração (`palavra@ms`), linha do tempo com a fala, arrastar bloco = entrar em outra palavra; criar bloco, duplicar e excluir partes | o mesmo, no `video/roteiro.json` |
-| **Imagem** | camadas (imagem, texto, forma), mover, redimensionar, ordem, visível, exportar PNG | o mesmo |
+| **Imagem** | camadas (imagem, texto, forma), mover, redimensionar, ordem, visível, exportar PNG; **carrossel** de várias páginas (barra de páginas, PageUp/PageDown, "Novo carrossel" com campos por página) e exportar PNG por página + PDF para o LinkedIn (`docs/carrossel.md`) | o mesmo (`paginas[]`, `estado_do_editor` diz a página) |
 | **3D** | cena Three.js sob demanda, gizmo mover/girar/escala (W/E/R), luzes, câmera, animar | o mesmo |
 | **Efeitos** | pilha de efeitos no vídeo ou na imagem, com prévia ao vivo e pré-ajustes | o campo `efeitos` |
 

@@ -3,8 +3,9 @@
 // muda no disco (pela interface ou pelo agente no terminal), o documento é relido e a tela acompanha.
 import {useRef, useSyncExternalStore} from 'react';
 import type {InfoProjeto, PropsVideo} from '../../compartilhado/api';
-import type {Comentario, EntradaDiario, Modulo, OperacaoPatch} from '../../nucleo/documentos';
+import type {Comentario, DocImagem, EntradaDiario, Modulo, OperacaoPatch} from '../../nucleo/documentos';
 import type {Efeito} from '../../nucleo/efeitos';
+import {indicePagina, paginasDe} from '../../nucleo/carrossel';
 
 export type Area = 'video' | 'imagem' | '3d' | 'efeitos';
 export type Lido = {doc: any; versao: string};
@@ -31,9 +32,11 @@ export type Estado = {
   previaEfeitos?: {documento: string; efeitos: Efeito[]}; // controle deslizante sendo arrastado, antes do patch
   // "Descreva o vídeo para o Claude" da tela inicial: vai para uma conversa nova quando a casca abrir
   pedidoClaude?: {texto: string; rotulo: string; contexto: string};
+  paginaAtiva: Partial<Record<string, string>>; // imagem com várias páginas: id da página ativa, por documento
 };
 
-const INICIAL: Estado = {info: null, area: 'video', ativo: {}, docs: {}, props: {}, selecao: null, tempo_ms: 0, comentarios: [], diario: [], modoComentario: false, zoomLinha: null};
+const INICIAL: Estado = {info: null, area: 'video', ativo: {}, docs: {}, props: {}, selecao: null, tempo_ms: 0, comentarios: [], diario: [], modoComentario: false, zoomLinha: null,
+  paginaAtiva: {}};
 let estado: Estado = INICIAL;
 const ouvintes = new Set<() => void>();
 
@@ -141,6 +144,13 @@ export const abrirProjeto = async (info: InfoProjeto) => {
     if (info.aviso) avisar(info.aviso, 'info');
   }
   await Promise.all([...info.manifesto.documentos.map((d) => carregarDoc(d.id)), carregarComentarios(), carregarDiario()]);
+  // a página do carrossel em que a pessoa parou só se resolve com o documento lido (o estado guarda o caminho, a loja o id)
+  const ult = info.estado;
+  if (!mesmo && ult?.documento && ult.pagina && estado.info?.raiz === info.raiz) {
+    const doc = estado.docs[ult.documento]?.doc as DocImagem | undefined;
+    const id = doc && Array.isArray(doc.paginas) ? paginasDe(doc)[indicePagina(ult.pagina)]?.id : undefined;
+    if (id) loja.definir((e) => ({paginaAtiva: {...e.paginaAtiva, [ult.documento!]: id}}));
+  }
 };
 
 /** Fecha o projeto e volta à tela inicial. */

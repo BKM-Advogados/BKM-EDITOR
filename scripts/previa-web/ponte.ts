@@ -250,6 +250,7 @@ const api: ApiEstudio = {
     },
     fontesDoProjeto: async () => [],
   },
+  exportarPaginas: async (o) => ({ok: false, mensagem: `exportar não funciona na prévia web (${o.paginas.length} página(s) desenhada(s)${o.pdf ? ' e o PDF' : ''})`}),
 };
 
 (window as unknown as {estudio: ApiEstudio}).estudio = api;

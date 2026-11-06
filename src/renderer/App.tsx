@@ -1,6 +1,8 @@
 // Tela inicial ou editor. A casca (dockview, Remotion, Player) só carrega quando um projeto abre: a tela inicial parada
 // fica leve. O processo principal abre sozinho o projeto da linha de comando ou, se a pessoa preferir, o último.
 import React, {Suspense, useEffect, useRef} from 'react';
+import type {DocImagem} from '../nucleo/documentos';
+import {caminhoPagina, paginasDe} from '../nucleo/carrossel';
 import {abrirProjeto, loja, observarProjeto, useLoja} from './estado/loja';
 import {Inicio} from './inicio/Inicio';
 import {RaizDialogo} from './componentes/Dialogo';
@@ -38,7 +40,10 @@ export const App: React.FC = () => {
     const e = loja.get();
     if (!e.info) return;
     const documento = e.area === 'efeitos' ? e.alvoEfeitos : e.area === '3d' ? e.ativo['3d'] : e.ativo[e.area];
-    const estado = {area: e.area, documento, selecao: e.selecao?.caminho, tempo_ms: e.area === 'video' || e.area === 'efeitos' ? e.tempo_ms : undefined};
+    // imagem com várias páginas: o caminho da página ativa ("/paginas/2"), para o agente saber onde a pessoa está
+    const doc = documento ? (e.docs[documento]?.doc as DocImagem | undefined) : undefined;
+    const pagina = doc && Array.isArray(doc.paginas) ? caminhoPagina(doc, Math.max(0, paginasDe(doc).findIndex((p) => p.id === e.paginaAtiva[documento!]))) : undefined;
+    const estado = {area: e.area, documento, selecao: e.selecao?.caminho, tempo_ms: e.area === 'video' || e.area === 'efeitos' ? e.tempo_ms : undefined, pagina};
     const chave = JSON.stringify(estado);
     if (chave !== ultimoEstado.current) {
       ultimoEstado.current = chave;

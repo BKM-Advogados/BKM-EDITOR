@@ -89,6 +89,7 @@ const api: ApiEstudio = {
     aplicar: (id, documento) => ipcRenderer.invoke(CANAL.marcasAplicar, id, documento),
     fontesDoProjeto: () => ipcRenderer.invoke(CANAL.fontesDoProjeto),
   },
+  exportarPaginas: (o) => ipcRenderer.invoke(CANAL.exportarPaginas, o),
 };
 
 contextBridge.exposeInMainWorld('estudio', api);
