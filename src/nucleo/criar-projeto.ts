@@ -2,13 +2,17 @@
 // testes; `gravarPlano` escreve. A estrutura é a do exemplo: estudio.json, video/, imagem/, 3d/, midia/, saidas/, um
 // .gitignore e um CLAUDE.md que ensina ao Claude o formato dos documentos daquele projeto. Os modelos da Cliente copiam do
 // exemplo empacotado (exemplos/exemplo), sempre em cópia nova. A lista de modelos fica em modelos.ts (sem disco), que a
-// tela inicial também importa.
-import {cpSync, existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
+// tela inicial também importa. Um kit de marca entra depois, por aplicarMarcaAoPlano: tema do documento, logo em
+// midia/ e fontes em fontes/.
+import {copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
+import jsonpatch, {type Operation} from 'fast-json-patch';
 import type {DocCena3D, DocImagem, EntradaDocumento, Manifesto, Modulo} from './documentos';
 import {novoDocCenas} from './cenas';
 import {MODELOS, type IdModelo} from './modelos';
 import {FORMATOS_IMAGEM, FORMATOS_VIDEO, type Formato} from './formatos';
+import {arquivosDaMarca, patchDaMarca, temaDaMarca} from './marca';
+import type {MarcaLida} from './pasta-marcas';
 import {serializar} from './projeto';
 
 export const GITIGNORE = 'saidas/\n.estudio/estado.json\n.estudio/miniatura.jpg\n.estudio/mcp*\n*.tmp\n';
@@ -131,6 +135,15 @@ export const claudeMd = (modulos: Modulo[]) => {
   }
   if (tem('imagem')) linhas.push('- Imagem: `largura`, `altura`, `fundo` e `camadas` (`imagem`, `texto`, `forma`) de baixo para cima, com `efeitos`.');
   if (tem('3d')) linhas.push('- Cena 3D: objetos com `posicao`, `rotacao` em graus, `escala` e `cor`; luzes; câmera.');
+  if (tem('video') || tem('imagem')) {
+    linhas.push(
+      '- Kit de marca: `aplicar_marca` põe num documento as cores, a fonte, o logo (`midia/logo-<id>.*`) e as fontes próprias',
+      '  (`fontes/`) de um kit (ks, bkm, neutro ou outro criado no app). No vídeo de cenas isso fica no `tema`: `marca` é o id do',
+      '  kit, e `logo`, `assinatura` e `fontes_arquivos` (cada uma com `familia`, `arquivo` e `peso`) acompanham as cores. Na',
+      '  imagem muda o fundo e a fonte e a cor dos textos. `fonte` aceita Inter, Archivo, IBM Plex Sans, IBM Plex Mono ou a',
+      '  `familia` de uma fonte própria. Fique nas cores do kit; para outra marca, troque o kit em vez de inventar cores.',
+    );
+  }
   linhas.push(
     '- `midia/`: arquivos usados pelos documentos. `saidas/`: o que o app exporta (fora do git).',
     '- `comentarios.json`: comentários da pessoa, ancorados num objeto (`alvo.objeto`, JSON Pointer), num tempo e num ponto.',
@@ -144,6 +157,9 @@ export const claudeMd = (modulos: Modulo[]) => {
     '3. `criar_documento` cria vídeo, imagem ou cena 3D no projeto; `renomear_projeto` muda o nome.',
     '4. `listar_comentarios`, `ler_comentario`, `responder_comentario` e `resolver_comentario` cuidam dos pedidos da pessoa.',
     '5. `listar_mudancas` mostra o que a pessoa mudou à mão desde a sua última olhada.',
+  );
+  if (tem('video') || tem('imagem')) linhas.push('6. `aplicar_marca` troca o kit de marca (cores, fonte, logo e fontes próprias) de um documento.');
+  linhas.push(
     '',
     'Tudo o que você faz cai nos documentos, e a pessoa edita depois. Não grave fora da pasta do projeto.',
     '',
@@ -153,7 +169,8 @@ export const claudeMd = (modulos: Modulo[]) => {
 
 // ---------- plano do projeto ----------
 export type OpcoesProjeto = {nome: string; modelo: IdModelo; formato?: Formato | {largura: number; altura: number}};
-export type Plano = {manifesto: Manifesto; arquivos: Record<string, string>; pastas: string[]; copiarDoExemplo?: string[]};
+/** `copiar` traz arquivos de fora do projeto (logo e fontes do kit de marca): `de` absoluto, `para` relativo ao projeto. */
+export type Plano = {manifesto: Manifesto; arquivos: Record<string, string>; pastas: string[]; copiarDoExemplo?: string[]; copiar?: {de: string; para: string}[]};
 
 /** Arquivos de um projeto novo (sem gravar nada). Modelos da Cliente listam o que copiar do exemplo em `copiarDoExemplo`. */
 export const planoDoProjeto = (o: OpcoesProjeto): Plano => {
@@ -184,6 +201,24 @@ export const planoDoProjeto = (o: OpcoesProjeto): Plano => {
   };
 };
 
+/** Põe o kit de marca no plano: o tema dos documentos novos (vídeo de cenas e imagem) e o logo e as fontes a copiar.
+ *  O que o kit cita mas não está na pasta dele (`existe`) fica de fora, para o tema não apontar para arquivo que não há. */
+export const aplicarMarcaAoPlano = (plano: Plano, marca: MarcaLida, existe: (p: string) => boolean = existsSync): Plano => {
+  const tudo = arquivosDaMarca(marca);
+  const copiar = tudo.copiar.filter((c) => existe(path.join(marca.pasta, c.de))).map((c) => ({de: path.join(marca.pasta, c.de), para: c.para}));
+  const presentes = new Set(copiar.map((c) => c.para));
+  const tema = temaDaMarca(marca, {logo: tudo.logo && presentes.has(tudo.logo) ? tudo.logo : undefined, fontes_arquivos: tudo.fontes_arquivos.filter((f) => presentes.has(f.arquivo))});
+  for (const e of plano.manifesto.documentos) {
+    const texto = plano.arquivos[e.caminho];
+    if (!texto) continue;
+    const doc = JSON.parse(texto) as unknown;
+    const patch = patchDaMarca(doc, marca, tema);
+    if (patch.length) plano.arquivos[e.caminho] = serializar(jsonpatch.applyPatch(doc, patch as Operation[], true, false).newDocument);
+  }
+  if (copiar.length) plano.copiar = [...(plano.copiar ?? []), ...copiar];
+  return plano;
+};
+
 /** Grava o plano numa pasta nova. `exemplo` é a pasta do exemplo empacotado (só para os modelos da Cliente). */
 export const gravarPlano = (destino: string, plano: Plano, exemplo?: string) => {
   if (existsSync(path.join(destino, 'estudio.json'))) throw new Error(`já existe um projeto em ${destino}`);
@@ -193,6 +228,10 @@ export const gravarPlano = (destino: string, plano: Plano, exemplo?: string) => 
     cpSync(path.join(exemplo, rel), path.join(destino, rel), {recursive: true});
   }
   for (const p of plano.pastas) mkdirSync(path.join(destino, p), {recursive: true});
+  for (const c of plano.copiar ?? []) {
+    mkdirSync(path.dirname(path.join(destino, c.para)), {recursive: true});
+    copyFileSync(c.de, path.join(destino, c.para));
+  }
   for (const [rel, texto] of Object.entries(plano.arquivos)) {
     mkdirSync(path.dirname(path.join(destino, rel)), {recursive: true});
     writeFileSync(path.join(destino, rel), texto, 'utf-8');

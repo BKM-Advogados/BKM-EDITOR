@@ -79,6 +79,16 @@ const api: ApiEstudio = {
     listarTrilhas: () => ipcRenderer.invoke(CANAL.audioListarTrilhas),
     importarTrilha: (caminho) => ipcRenderer.invoke(CANAL.audioImportarTrilha, caminho),
   },
+  marcas: {
+    listar: () => ipcRenderer.invoke(CANAL.marcasListar),
+    gravar: (m) => ipcRenderer.invoke(CANAL.marcasGravar, m),
+    criar: (nome) => ipcRenderer.invoke(CANAL.marcasCriar, nome),
+    duplicar: (id, nome) => ipcRenderer.invoke(CANAL.marcasDuplicar, id, nome),
+    importarLogo: (id) => ipcRenderer.invoke(CANAL.marcasImportarLogo, id),
+    importarFonte: (id) => ipcRenderer.invoke(CANAL.marcasImportarFonte, id),
+    aplicar: (id, documento) => ipcRenderer.invoke(CANAL.marcasAplicar, id, documento),
+    fontesDoProjeto: () => ipcRenderer.invoke(CANAL.fontesDoProjeto),
+  },
 };
 
 contextBridge.exposeInMainWorld('estudio', api);

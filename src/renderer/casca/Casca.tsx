@@ -6,7 +6,7 @@ import React, {Suspense, useCallback, useEffect, useRef, useState} from 'react';
 import {DockviewReact, type DockviewApi, type DockviewReadyEvent, type DockviewTheme, type IDockviewPanelHeaderProps, type IDockviewPanelProps} from 'dockview-react';
 import 'dockview-react/dist/styles/dockview.css';
 import {Blend, BookOpen, Box, Check, Copy, Download, Film, FilePlus2, FolderOpen, FolderSearch, History, Home, Image as ImageIcon, LayoutPanelLeft, ListTree,
-  MessageSquare, MessageSquarePlus, MonitorPlay, Plus, Rows3, Settings, SlidersHorizontal, Sparkle, Undo2, X} from 'lucide-react';
+  MessageSquare, MessageSquarePlus, MonitorPlay, Palette, Plus, Rows3, Settings, SlidersHorizontal, Sparkle, Undo2, X} from 'lucide-react';
 import type {Preferencias, Recente} from '../../compartilhado/api';
 import type {Modulo} from '../../nucleo/documentos';
 import {FORMATOS_IMAGEM, FORMATOS_VIDEO} from '../../nucleo/formatos';
@@ -20,6 +20,7 @@ import {exportarPng} from '../modulos/imagem/exportarPng';
 import {Comentarios} from '../paineis/Comentarios';
 import {Historico} from '../paineis/Historico';
 import {Rodape} from './Rodape';
+import {PainelMarca} from './PainelMarca';
 import './casca.css';
 
 // o 3D (Three.js) e o terminal (xterm.js) só carregam quando alguém abre: a memória do app parado fica menor
@@ -249,6 +250,7 @@ export const Casca: React.FC = () => {
   const faixa = useRef<Faixa>(faixaAtual());
   const abrirRef = useRef<() => Promise<void>>(async () => undefined);
   const [preferencias, setPreferencias] = useState(false);
+  const [marca, setMarca] = useState(false);
 
   const montar = useCallback((a: Area, padrao = false) => {
     const d = api.current;
@@ -434,6 +436,7 @@ export const Casca: React.FC = () => {
             <button onClick={item(() => void marcarVersao())}><Check size={14} />Marcar ponto de restauração<kbd>Ctrl+S</kbd></button>
             <button onClick={item(() => void window.estudio.abrirExemplo().then(abrirProjeto).catch((e: Error) => avisar(mensagemDe(e), 'erro')))}><BookOpen size={14} />Ver um pronto (exemplo Cliente)</button>
             <hr />
+            <button onClick={item(() => setMarca(true))}><Palette size={14} />Marca…</button>
             <button onClick={item(() => setPreferencias(true))}><Settings size={14} />Preferências…</button>
             <button onClick={item(() => montar(area, true))}><LayoutPanelLeft size={14} />Redefinir os painéis desta área</button>
             <hr />
@@ -471,6 +474,7 @@ export const Casca: React.FC = () => {
       </div>
       <Rodape />
       {preferencias && <PainelPreferencias aoFechar={() => setPreferencias(false)} />}
+      {marca && <PainelMarca aoFechar={() => setMarca(false)} />}
     </div>
   );
 };

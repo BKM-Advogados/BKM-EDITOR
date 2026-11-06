@@ -7,11 +7,12 @@ import os from 'node:os';
 import {CANAL, type InfoProjeto, type Metricas, type NovoProjeto, type Perfil, type Preferencias, type Progresso, type Retangulo} from '../compartilhado/api';
 import {Conversas, contaClaude} from './conversa';
 import type {Comentario, EstadoEditor, Manifesto, Modulo, OperacaoPatch} from '../nucleo/documentos';
-import {dentroDoOneDrive, documentoNovo, gravarPlano, nomeDePasta, nomePadrao, pastaLivre, planoDoProjeto} from '../nucleo/criar-projeto';
+import {aplicarMarcaAoPlano, dentroDoOneDrive, documentoNovo, gravarPlano, nomeDePasta, nomePadrao, pastaLivre, planoDoProjeto} from '../nucleo/criar-projeto';
 import {MODELOS} from '../nucleo/modelos';
 import type {Formato} from '../nucleo/formatos';
 import {ErroProjeto, Projeto, serializar} from '../nucleo/projeto';
 import {exportarVideo} from './exportar';
+import {registrarIpcMarcas} from './ipc-marcas';
 import {McpHttp} from './mcp-http';
 import {Memoria} from './memoria';
 import {ServidorMidia} from './servidor-midia';
@@ -148,6 +149,7 @@ const criarProjeto = async (o: NovoProjeto) => {
   const nome = o.nome?.trim() || nomePadrao(new Date());
   const destino = pastaLivre(o.pasta || prefs.pasta_projetos, nome);
   const plano = planoDoProjeto({nome, modelo: o.modelo, formato: o.formato});
+  if (o.marca) aplicarMarcaAoPlano(plano, marcas.ler(o.marca));
   gravarPlano(destino, plano, pastaDoExemplo());
   const modulo = MODELOS.find((m) => m.id === o.modelo)?.modulo;
   if (o.formato_id && modulo === 'video') memoria.gravarPrefs({formato_video: o.formato_id});
@@ -377,6 +379,9 @@ ipcMain.on(CANAL.terminalFechar, (e, id: number) => (confiavel(e), terminais.fec
 ipcMain.on(CANAL.conversaPermitir, (e, id: number, pedido: string, decisao: 'permitir' | 'negar', sempre?: boolean) => (confiavel(e), conversas.permitir(id, pedido, decisao, sempre)));
 ipcMain.on(CANAL.conversaParar, (e, id: number) => (confiavel(e), conversas.parar(id)));
 ipcMain.on(CANAL.conversaFechar, (e, id: number) => (confiavel(e), conversas.fechar(id)));
+
+// kits de marca e fontes próprias (ipc-marcas.ts): a pasta das preferências, servida também pelo servidor de mídia
+const marcas = registrarIpcMarcas({lidar, janela: () => janela, memoria, midia, exigirProjeto, exemplo: pastaDoExemplo()});
 
 app.on('ready', async () => {
   await midia.iniciar();

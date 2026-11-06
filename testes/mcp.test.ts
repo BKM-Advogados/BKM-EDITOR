@@ -29,7 +29,9 @@ beforeAll(async () => {
   pasta = mkdtempSync(path.join(tmpdir(), 'estudio-mcp-'));
   cpSync(path.join(RAIZ, 'exemplos', 'exemplo'), pasta, {recursive: true, filter: (f) => !f.endsWith('.mp4')});
   cliente = new Client({name: 'teste', version: '0'});
-  await cliente.connect(new StdioClientTransport({command: process.execPath, args: [path.join(RAIZ, 'dist-mcp', 'nucleo.cjs'), '--projeto', pasta]}));
+  // os kits de marca vão para uma pasta de teste, não para a da pessoa
+  const env = Object.fromEntries(Object.entries({...process.env, ESTUDIO_MARCAS: path.join(pasta, '.marcas-teste')}).filter(([, v]) => v !== undefined)) as Record<string, string>;
+  await cliente.connect(new StdioClientTransport({command: process.execPath, args: [path.join(RAIZ, 'dist-mcp', 'nucleo.cjs'), '--projeto', pasta], env}));
 }, 60_000);
 
 afterAll(async () => {
@@ -41,7 +43,7 @@ describe('MCP estudio', () => {
   it('lista as ferramentas', async () => {
     const {tools} = await cliente.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
-      'aplicar_patch', 'criar_documento', 'estado_do_editor', 'ler_comentario', 'ler_documento', 'listar_comentarios', 'listar_mudancas',
+      'aplicar_marca', 'aplicar_patch', 'criar_documento', 'estado_do_editor', 'ler_comentario', 'ler_documento', 'listar_comentarios', 'listar_mudancas',
       'projeto_info', 'renomear_projeto', 'resolver_comentario', 'responder_comentario',
     ]);
   });
@@ -84,5 +86,18 @@ describe('MCP estudio', () => {
     expect(r.erro).toBe(true);
     const depois = await chamar('ler_documento', {documento: 'capa'});
     expect(depois.dado.versao).toBe(doc.dado.versao);
+  });
+
+  it('aplica um kit de marca a um vídeo de cenas novo', async () => {
+    const criado = await chamar('criar_documento', {modulo: 'video', titulo: 'Com marca', formato: 'reels'});
+    expect(criado.erro).toBe(false);
+    const r = await chamar('aplicar_marca', {id: 'cliente', documento: criado.dado.id});
+    expect(r.erro).toBe(false);
+    expect(r.dado).toMatchObject({ok: true, documento: criado.dado.id, marca: 'cliente', nome: 'Cliente Advogados'});
+    const doc = await chamar('ler_documento', {documento: criado.dado.id, caminho: '/tema'});
+    expect(doc.dado.conteudo).toMatchObject({marca: 'cliente', fundo: '#171A19', destaque: '#C88155', fonte: 'Archivo'});
+    const naoHa = await chamar('aplicar_marca', {id: 'inexistente', documento: criado.dado.id});
+    expect(naoHa.erro).toBe(true);
+    expect(String(naoHa.dado)).toContain('não achado');
   });
 });
