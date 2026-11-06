@@ -3,16 +3,37 @@
 // desenvolvimento neste PC). Não grava nada em disco. Uso: npx vite --config vite.renderer.config.ts --port 5199 e abrir
 // http://localhost:5199/scripts/previa-web/index.html
 import jsonpatch, {type Operation} from 'fast-json-patch';
-import type {ApiEstudio, InfoProjeto, Mudanca, NovoProjeto, Preferencias, Recente} from '../../src/compartilhado/api';
+import type {ApiEstudio, InfoProjeto, MarcaInfo, Mudanca, NovoProjeto, Preferencias, Recente} from '../../src/compartilhado/api';
 import type {EntradaDocumento, Manifesto, Modulo} from '../../src/nucleo/documentos';
 import {novoDocCenas, resolverCenas, type DocCenas} from '../../src/nucleo/cenas';
+import {idDeMarca, MARCA_NEUTRO, MARCAS_INICIAIS, patchDaMarca, temaDaMarca, type Marca} from '../../src/nucleo/marca';
 import {MODELOS} from '../../src/nucleo/modelos';
 
 type Proj = {raiz: string; manifesto: Manifesto; docs: Record<string, unknown>; versao: number};
 const projetos = new Map<string, Proj>();
 let aberto: Proj | null = null;
+const PASTA_MARCAS = 'C:\\Users\\pessoa\\Estudio\\marcas';
 let prefs: Preferencias = {pasta_projetos: 'C:\\Users\\pessoa\\Estudio', ao_iniciar: 'inicio', formato_video: 'reels', formato_imagem: 'feed',
-  boas_vindas_vista: new URLSearchParams(location.search).has('vista')};
+  boas_vindas_vista: new URLSearchParams(location.search).has('vista'), pasta_marcas: PASTA_MARCAS};
+// kits de marca em memória: os três de fábrica, sem logo (não há servidor de mídia aqui), e um quarto com uma fonte de
+// arquivo de verdade: o woff2 do JetBrains Mono que o Vite já serve de node_modules, para ver a fonte própria chegar à
+// prévia pelo mesmo caminho do app (tema.fontes_arquivos → registro → @remotion/fonts). Vai como URL completa porque o
+// Vite não entende o "@" codificado que o midia() produziria no caminho.
+const comPasta = (m: Marca): MarcaInfo => ({...structuredClone(m), logo: undefined, pasta: `${PASTA_MARCAS}\\${m.id}`, url: location.origin});
+const FONTE_EXEMPLO = {familia: 'JetBrains Mono Arquivo', arquivo: `${location.origin}/node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-600-normal.woff2`, peso: 600};
+const marcas: MarcaInfo[] = [...MARCAS_INICIAIS.map(comPasta), comPasta({formato: 1, id: 'exemplo-fonte', nome: 'Exemplo · fonte própria',
+  cores: {fundo: '#1B1F2A', texto: '#F6F1E7', destaque: '#E0B35A', suave: '#A9B0BE'}, fontes: {titulo: FONTE_EXEMPLO.familia, texto: FONTE_EXEMPLO.familia, arquivos: [FONTE_EXEMPLO]},
+  notas: 'Só na prévia web: a fonte vem de node_modules pelo Vite.'})];
+const aplicarMarca = (p: Proj, idMarca: string, documento: string) => {
+  const m = marcas.find((k) => k.id === idMarca);
+  if (!m) throw new Error(`kit de marca não achado: ${idMarca}`);
+  // sem disco não há cópia para fontes/: o tema aponta para o arquivo onde ele está
+  const patch = patchDaMarca(p.docs[documento], m, temaDaMarca(m, {fontes_arquivos: m.fontes.arquivos}));
+  if (!patch.length) throw new Error(`o documento ${documento} não recebe kit de marca (só vídeo de cenas e imagem)`);
+  p.docs[documento] = jsonpatch.applyPatch(structuredClone(p.docs[documento]), patch as Operation[], true, false).newDocument;
+  p.versao++;
+  return {versao: String(p.versao), marca: m.id, nome: m.nome, copiados: []};
+};
 const recentes: Recente[] = new URLSearchParams(location.search).has('vazio') ? [] : [
   {raiz: 'C:\\Users\\pessoa\\Estudio\\Cliente C2', nome: 'Cliente · C2 · Transferência de cidade', aberto_em: new Date(Date.now() - 3 * 3600e3).toISOString(), existe: true, modulos: ['video', 'imagem', '3d']},
   {raiz: 'C:\\Users\\pessoa\\Estudio\\Ferias', nome: 'Férias proporcionais', aberto_em: new Date(Date.now() - 26 * 3600e3).toISOString(), existe: true, modulos: ['video']},
@@ -47,7 +68,8 @@ const criar = (o: NovoProjeto): InfoProjeto => {
   if (modelo.exemplo) throw new Error('Na prévia web os modelos da Cliente não abrem (precisam do exemplo empacotado).');
   const nome = o.nome || 'Sem título · 05/11 14:32';
   const p: Proj = {raiz: `${prefs.pasta_projetos}\\${nome}`, manifesto: {formato: 1, nome, documentos: []}, docs: {}, versao: 1};
-  novoDocumento(p, modelo.modulo, o.formato as never);
+  const doc = novoDocumento(p, modelo.modulo, o.formato as never);
+  if (o.marca) aplicarMarca(p, o.marca, doc.id);
   projetos.set(p.raiz, p);
   aberto = p;
   recentes.unshift({raiz: p.raiz, nome, aberto_em: new Date().toISOString(), existe: true, modulos: [modelo.modulo]});
@@ -151,6 +173,41 @@ const api: ApiEstudio = {
   exportarImagem: async () => ({ok: false}),
   aoProgresso: () => nada,
   metricas: async () => ({memoria_mb: 312, processos: []}),
+  marcas: {
+    listar: async () => structuredClone(marcas),
+    gravar: async (m) => {
+      const i = marcas.findIndex((k) => k.id === m.id);
+      const salvo = {...comPasta(m), logo: m.logo};
+      if (i >= 0) marcas[i] = salvo;
+      else marcas.push(salvo);
+      return structuredClone(salvo);
+    },
+    criar: async (nome) => {
+      const base = idDeMarca(nome);
+      let id = base;
+      for (let n = 2; marcas.some((k) => k.id === id); n++) id = `${base}-${n}`;
+      const novo = comPasta({...MARCA_NEUTRO, id, nome: nome.trim() || 'Nova marca', notas: undefined});
+      marcas.push(novo);
+      return structuredClone(novo);
+    },
+    duplicar: async (id, nome) => {
+      const origem = marcas.find((k) => k.id === id);
+      if (!origem) throw new Error(`kit não achado: ${id}`);
+      return api.marcas.gravar({...structuredClone(origem), id: idDeMarca(nome), nome});
+    },
+    importarLogo: async () => {
+      throw new Error('Na prévia web não há diálogo de arquivo.');
+    },
+    importarFonte: async () => {
+      throw new Error('Na prévia web não há diálogo de arquivo.');
+    },
+    aplicar: async (id, documento) => {
+      const r = aplicarMarca(aberto!, id, documento);
+      mudou(aberto!.manifesto.documentos.find((d) => d.id === documento)!.caminho);
+      return r;
+    },
+    fontesDoProjeto: async () => [],
+  },
 };
 
 (window as unknown as {estudio: ApiEstudio}).estudio = api;

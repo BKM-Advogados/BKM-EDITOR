@@ -4,6 +4,7 @@ import React, {Suspense, useEffect, useRef} from 'react';
 import {abrirProjeto, loja, observarProjeto, useLoja} from './estado/loja';
 import {Inicio} from './inicio/Inicio';
 import {RaizDialogo} from './componentes/Dialogo';
+import {registrarFontesDoProjeto} from './casca/fontes-do-projeto';
 
 const Casca = React.lazy(() => import('./casca/Casca').then((m) => ({default: m.Casca})));
 
@@ -17,6 +18,10 @@ const retanguloDaMiniatura = () => {
 export const App: React.FC = () => {
   const info = useLoja((e) => e.info);
   const ultimoEstado = useRef('');
+  // as fontes próprias do projeto (fontes/) ficam registradas antes de qualquer texto ser desenhado na imagem ou no PNG
+  useEffect(() => {
+    registrarFontesDoProjeto(info?.raiz, info?.base_midia);
+  }, [info?.raiz, info?.base_midia]);
 
   useEffect(() => {
     void window.estudio.projetoAtual().then((i) => i && abrirProjeto(i));

@@ -6,7 +6,7 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import {ArrowUp, BookOpen, Box, Check, ChevronDown, ChevronRight, Copy, Film, FolderOpen, FolderSearch, Image as ImageIcon, MoreHorizontal, Sparkle, Trash2,
   TriangleAlert, X} from 'lucide-react';
-import type {Ambiente, ContaClaude, NovoProjeto, Preferencias, Recente} from '../../compartilhado/api';
+import type {Ambiente, ContaClaude, MarcaInfo, NovoProjeto, Preferencias, Recente} from '../../compartilhado/api';
 import type {Modulo} from '../../nucleo/documentos';
 import {MODELOS, type IdModelo} from '../../nucleo/modelos';
 import {FORMATOS_IMAGEM, FORMATOS_VIDEO, type PresetFormato} from '../../nucleo/formatos';
@@ -99,6 +99,9 @@ export const Inicio: React.FC = () => {
   const [pasta, setPasta] = useState('');
   const [pedido, setPedido] = useState('');
   const [ocupado, setOcupado] = useState(false);
+  // kit de marca do projeto novo ('' = tema neutro, como sempre)
+  const [marcas, setMarcas] = useState<MarcaInfo[]>([]);
+  const [marca, setMarca] = useState('');
 
   const carregarRecentes = () => void window.estudio.recentes().then(setRecentes).catch(() => setRecentes([]));
   useEffect(() => {
@@ -108,6 +111,7 @@ export const Inicio: React.FC = () => {
     });
     void window.estudio.ambiente().then(setAmbiente);
     void lerConta().then(setConta).catch(() => setConta(null));
+    void window.estudio.marcas.listar().then(setMarcas).catch(() => setMarcas([]));
     carregarRecentes();
   }, []);
 
@@ -117,7 +121,8 @@ export const Inicio: React.FC = () => {
   const tamanho = idFormato === PERSONALIZADO ? livre : preset ? {largura: preset.largura, altura: preset.altura, fps: livre.fps} : undefined;
   const modelos = MODELOS.filter((m) => m.modulo === aba);
   const branco = modelos.find((m) => !m.exemplo)!.id;
-  const chip = aba === '3d' ? 'Cena 3D · Em branco' : `${idFormato === PERSONALIZADO ? `${livre.largura}×${livre.altura}` : preset?.proporcao} · Em branco`;
+  const kit = aba !== '3d' ? marcas.find((m) => m.id === marca) : undefined;
+  const chip = aba === '3d' ? 'Cena 3D · Em branco' : `${idFormato === PERSONALIZADO ? `${livre.largura}×${livre.altura}` : preset?.proporcao}${kit ? ` · ${kit.nome}` : ''} · Em branco`;
   const claudePronto = Boolean(ambiente?.claude && conta?.instalado);
 
   const criar = async (modelo: IdModelo, pedidoClaude?: {texto: string; rotulo: string; contexto: string}) => {
@@ -125,7 +130,7 @@ export const Inicio: React.FC = () => {
     setOcupado(true);
     try {
       const o: NovoProjeto = {modelo, nome: nome.trim() || undefined, pasta: pasta || undefined,
-        ...(aba !== '3d' && tamanho && !MODELOS.find((m) => m.id === modelo)?.exemplo ? {formato: tamanho, formato_id: idFormato} : {})};
+        ...(aba !== '3d' && tamanho && !MODELOS.find((m) => m.id === modelo)?.exemplo ? {formato: tamanho, formato_id: idFormato, marca: kit?.id} : {})};
       const info = await window.estudio.criarProjeto(o);
       if (pedidoClaude) loja.definir({pedidoClaude});
       await abrirProjeto(info);
@@ -288,6 +293,14 @@ export const Inicio: React.FC = () => {
                   </span>
                 </label>
                 {/onedrive/i.test(pasta || pastaPadrao) && <div className="alerta-opcoes"><TriangleAlert size={13} />Pasta dentro do OneDrive: a sincronização pode travar a gravação.</div>}
+                {aba !== '3d' && (
+                  <label><span>Marca</span>
+                    <select className="campo" value={marca} onChange={(e) => setMarca(e.target.value)} title="Cores, fonte e logo do kit entram no tema do documento novo">
+                      <option value="">Sem kit (tema neutro)</option>
+                      {marcas.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                    </select>
+                  </label>
+                )}
                 {aba !== '3d' && idFormato === PERSONALIZADO && (
                   <label><span>Tamanho</span>
                     <span className="linha-pasta">
