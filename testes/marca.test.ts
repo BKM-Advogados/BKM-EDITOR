@@ -79,6 +79,10 @@ describe('kit de marca', () => {
     expect(inferirFonte('C:\\fontes\\OpenSans-Regular.woff2')).toEqual({familia: 'Open Sans', peso: 400});
     expect(inferirFonte('Minha Fonte.otf')).toEqual({familia: 'Minha Fonte', peso: 400});
     expect(inferirFonte('Archivo_700.ttf')).toEqual({familia: 'Archivo', peso: 700});
+    // nome que não vale sem aspas num font-family perde o que sobra
+    expect(inferirFonte('Minha (fonte) #2.ttf').familia).toBe('Minha fonte 2');
+    expect(normalizarMarca({fontes: {titulo: 'Minha (fonte)', arquivos: [{familia: 'A "b"', arquivo: 'fontes/a.ttf'}]}}).fontes).toEqual({titulo: 'Minha fonte', texto: 'Minha fonte',
+      arquivos: [{familia: 'A b', arquivo: 'fontes/a.ttf'}]});
   });
 
   it('importa fonte e aplica ao vídeo de cenas: tema, logo em midia/ e fonte em fontes/; trocar o kit limpa o tema', () => {

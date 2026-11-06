@@ -81,9 +81,12 @@ const cor = (v: unknown, padrao: string) => {
   if (!t) return padrao;
   return /^#[0-9a-f]{6}$/i.test(t) ? t.toUpperCase() : t;
 };
+/** Nome de família que vale sem aspas num font-family (letras, números, espaço, hífen e sublinhado): as composições e o
+ *  FontFace usam o nome cru, e "Minha (fonte)" quebraria a declaração inteira. */
+export const nomeDeFamilia = (nome: string) => nome.replace(/[^\p{L}\p{N} _-]+/gu, ' ').replace(/\s+/g, ' ').trim();
 const fonteArquivo = (x: unknown): FonteArquivo | null => {
   const o = (x && typeof x === 'object' ? x : {}) as Record<string, unknown>;
-  const familia = texto(o.familia);
+  const familia = texto(o.familia) && nomeDeFamilia(texto(o.familia)!);
   const arquivo = texto(o.arquivo)?.replace(/\\/g, '/');
   if (!familia || !arquivo) return null;
   const peso = typeof o.peso === 'number' && o.peso >= 100 && o.peso <= 900 ? Math.round(o.peso) : undefined;
@@ -97,8 +100,9 @@ export const normalizarMarca = (x: unknown, idPadrao = 'marca'): Marca => {
   const fontes = (o.fontes && typeof o.fontes === 'object' ? o.fontes : {}) as Record<string, unknown>;
   const N = MARCA_NEUTRO.cores;
   const apoio = Object.fromEntries(Object.entries(cores).filter(([k, v]) => !(k in N) && texto(v)).map(([k, v]) => [k, cor(v, '')]));
-  const titulo = texto(fontes.titulo) ?? MARCA_NEUTRO.fontes.titulo;
-  const mono = texto(fontes.mono);
+  const titulo = (texto(fontes.titulo) && nomeDeFamilia(texto(fontes.titulo)!)) || MARCA_NEUTRO.fontes.titulo;
+  const textoFonte = texto(fontes.texto) && nomeDeFamilia(texto(fontes.texto)!);
+  const mono = texto(fontes.mono) && nomeDeFamilia(texto(fontes.mono)!);
   const logo = texto(o.logo);
   const assinatura = texto(o.assinatura);
   const notas = texto(o.notas);
@@ -107,7 +111,7 @@ export const normalizarMarca = (x: unknown, idPadrao = 'marca'): Marca => {
     id: idDeMarca(texto(o.id) ?? idPadrao),
     nome: texto(o.nome) ?? idPadrao,
     cores: {fundo: cor(cores.fundo, N.fundo), texto: cor(cores.texto, N.texto), destaque: cor(cores.destaque, N.destaque), suave: cor(cores.suave, N.suave), ...apoio},
-    fontes: {titulo, texto: texto(fontes.texto) ?? titulo, ...(mono ? {mono} : {}),
+    fontes: {titulo, texto: textoFonte || titulo, ...(mono ? {mono} : {}),
       arquivos: (Array.isArray(fontes.arquivos) ? fontes.arquivos : []).map(fonteArquivo).filter((f): f is FonteArquivo => f !== null)},
     ...(logo ? {logo} : {}),
     ...(assinatura ? {assinatura} : {}),
@@ -129,7 +133,7 @@ export const inferirFonte = (nomeArquivo: string): Omit<FonteArquivo, 'arquivo'>
   const peso = PESOS.find(([re]) => re.test(variante))?.[1] ?? (/^\d{3}$/.test(variante) ? Number(variante) : undefined);
   const italico = /italic|oblique/i.test(variante);
   const nome = corte > 0 && (peso !== undefined || italico) ? base.slice(0, corte) : base;
-  const familia = nome.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[-_]+/g, ' ').trim() || base;
+  const familia = nomeDeFamilia(nome.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[-_]+/g, ' ')) || nomeDeFamilia(base) || 'Fonte';
   return {familia, peso: peso ?? 400, ...(italico ? {estilo: 'italic' as const} : {})};
 };
 
