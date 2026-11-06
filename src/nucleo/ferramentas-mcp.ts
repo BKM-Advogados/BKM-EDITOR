@@ -6,6 +6,8 @@ import {ErroProjeto, valorEm, type Projeto} from './projeto';
 import type {Modulo, OperacaoPatch} from './documentos';
 import {documentoNovo} from './criar-projeto';
 import {FORMATOS_IMAGEM, FORMATOS_VIDEO} from './formatos';
+import {MARCAS_INICIAIS} from './marca';
+import {PastaMarcas} from './pasta-marcas';
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x, null, 2)}]});
 const erro = (e: unknown) => ({
@@ -123,4 +125,21 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
     inputSchema: {desde: z.number().optional(), autor: z.string().optional()},
   }, seguro(({desde = 0, autor}: {desde?: number; autor?: string}) =>
     projeto.diario(desde).filter((e) => !autor || e.autor === autor).map(({inverso: _i, ...e}) => e)));
+
+  // kits de marca (src/nucleo/marca.ts): a pasta vem das preferências do app ou de ESTUDIO_MARCAS
+  const marcas = new PastaMarcas();
+  let ids = MARCAS_INICIAIS.map((m) => m.id);
+  try {
+    ids = [...new Set([...ids, ...marcas.listar().map((m) => m.id)])];
+  } catch {
+    /* pasta ilegível agora: a lista de fábrica serve */
+  }
+  servidor.registerTool('aplicar_marca', {
+    description: `Aplica um kit de marca a um documento. No vídeo de cenas troca o "tema" inteiro (cores, fonte, logo copiado para midia/, assinatura e fontes próprias copiadas para fontes/); na imagem troca o fundo e a fonte e a cor dos textos. Kits: ${ids.join(', ')} (a pessoa cria outros no app, em menu → Marca…). Sem "documento", vai no que a pessoa está vendo.`,
+    inputSchema: {id: z.string().describe('id do kit, ex.: ks'), documento: z.string().optional().describe('id do documento no manifesto')},
+  }, seguro(({id, documento}: {id: string; documento?: string}) => {
+    const alvo = documento ?? projeto.estado()?.documento ?? projeto.manifesto().documentos[0]?.id;
+    if (!alvo) throw new ErroProjeto('o projeto não tem documento para receber o kit', 'nao_achado');
+    return {ok: true, documento: alvo, ...marcas.aplicar(projeto, id, alvo, {autor, origem})};
+  }));
 };

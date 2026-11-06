@@ -1,6 +1,7 @@
 // Servidor local da mídia do projeto, só em 127.0.0.1 e atrás de um token aleatório por sessão. A prévia (Player) e a
-// exportação (Chrome Headless do Remotion) leem a narração, as fotos e os efeitos sonoros por aqui. Responde a Range,
-// que o <audio>/<video> usa para buscar um trecho sem baixar o arquivo inteiro.
+// exportação (Chrome Headless do Remotion) leem a narração, as fotos, as fontes próprias (fontes/) e os efeitos sonoros
+// por aqui. Responde a Range, que o <audio>/<video> usa para buscar um trecho sem baixar o arquivo inteiro. Uma rota
+// própria (~marcas/<id>/…) serve o logo e as fontes dos kits de marca, com ou sem projeto aberto, para o painel Marca.
 import {randomBytes} from 'node:crypto';
 import {createReadStream, statSync} from 'node:fs';
 import http from 'node:http';
@@ -11,7 +12,13 @@ const TIPOS: Record<string, string> = {
   '.mp4': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime', '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.ogg': 'audio/ogg', '.aac': 'audio/aac',
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.gif': 'image/gif', '.avif': 'image/avif',
   '.json': 'application/json', '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json',
+  '.ttf': 'font/ttf', '.otf': 'font/otf', '.woff': 'font/woff', '.woff2': 'font/woff2',
 };
+
+/** Primeiro segmento depois do token que leva à pasta dos kits de marca, e não ao projeto. */
+export const ROTA_MARCAS = '~marcas';
+// da pasta dos kits só saem logo e fontes
+const TIPOS_DE_MARCA = new Set(['.ttf', '.otf', '.woff', '.woff2', '.png', '.svg', '.jpg', '.jpeg', '.webp']);
 
 type Rota = (req: http.IncomingMessage, res: http.ServerResponse) => Promise<boolean>;
 
@@ -19,6 +26,7 @@ export class ServidorMidia {
   private servidor: http.Server | null = null;
   private rotas: Rota[] = [];
   private raiz: string | null = null;
+  private marcas: (() => string) | null = null;
   private readonly token = randomBytes(16).toString('hex');
   private porta = 0;
 
@@ -50,8 +58,18 @@ export class ServidorMidia {
     this.raiz = raiz;
   }
 
+  /** A pasta dos kits de marca (lida na hora: a pessoa pode trocá-la nas preferências). */
+  servirMarcas(pasta: (() => string) | null) {
+    this.marcas = pasta;
+  }
+
   get base() {
     return `http://127.0.0.1:${this.porta}/${this.token}`;
+  }
+
+  /** Endereço da pasta de um kit: `${urlMarca(id)}/logo.png`, `${urlMarca(id)}/fontes/X.ttf`. */
+  urlMarca(id: string) {
+    return `${this.base}/${ROTA_MARCAS}/${encodeURIComponent(id)}`;
   }
 
   parar() {
@@ -63,10 +81,21 @@ export class ServidorMidia {
     const url = new URL(req.url ?? '/', 'http://x');
     const partes = url.pathname.split('/').filter(Boolean).map(decodeURIComponent);
     if (req.method !== 'GET' && req.method !== 'HEAD') return void res.writeHead(405).end();
-    if (!this.raiz || partes[0] !== this.token) return void res.writeHead(404).end();
-    const abs = path.resolve(this.raiz, ...partes.slice(1));
-    const rel = path.relative(this.raiz, abs);
-    if (rel.startsWith('..') || path.isAbsolute(rel) || rel.split(path.sep)[0] === '.git') return void res.writeHead(403).end();
+    if (partes[0] !== this.token) return void res.writeHead(404).end();
+    let raiz: string | null;
+    let rel: string[];
+    if (partes[1] === ROTA_MARCAS) {
+      raiz = this.marcas?.() ?? null;
+      rel = partes.slice(2);
+      if (rel.length < 2 || !TIPOS_DE_MARCA.has(path.extname(rel[rel.length - 1]).toLowerCase())) return void res.writeHead(404).end();
+    } else {
+      raiz = this.raiz;
+      rel = partes.slice(1);
+    }
+    if (!raiz) return void res.writeHead(404).end();
+    const abs = path.resolve(raiz, ...rel);
+    const dentro = path.relative(raiz, abs);
+    if (dentro.startsWith('..') || path.isAbsolute(dentro) || dentro.split(path.sep)[0] === '.git') return void res.writeHead(403).end();
     let tamanho: number;
     try {
       const st = statSync(abs);

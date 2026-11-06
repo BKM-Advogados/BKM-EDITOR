@@ -26,6 +26,7 @@
     "@lydell/node-pty": "1.2.0-beta.18",
     "@modelcontextprotocol/sdk": "1.32.2",
     "@remotion/bundler": "4.0.540",
+    "@remotion/fonts": "4.0.540",
     "@remotion/google-fonts": "4.0.540",
     "@remotion/player": "4.0.540",
     "@remotion/renderer": "4.0.540",

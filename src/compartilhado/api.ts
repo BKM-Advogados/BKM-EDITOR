@@ -3,6 +3,7 @@
 import type {Comentario, EntradaDiario, EntradaDocumento, EstadoEditor, Manifesto, Modulo, OperacaoPatch} from '../nucleo/documentos';
 import type {IdModelo} from '../nucleo/modelos';
 import type {Formato} from '../nucleo/formatos';
+import type {FonteArquivo, Marca} from '../nucleo/marca';
 
 export const CANAL = {
   abrirPasta: 'estudio:abrir-pasta',
@@ -57,6 +58,14 @@ export const CANAL = {
   exportarImagem: 'estudio:exportar-imagem',
   progresso: 'estudio:progresso',
   metricas: 'estudio:metricas',
+  marcasListar: 'estudio:marcas-listar',
+  marcasGravar: 'estudio:marcas-gravar',
+  marcasCriar: 'estudio:marcas-criar',
+  marcasDuplicar: 'estudio:marcas-duplicar',
+  marcasImportarLogo: 'estudio:marcas-importar-logo',
+  marcasImportarFonte: 'estudio:marcas-importar-fonte',
+  marcasAplicar: 'estudio:marcas-aplicar',
+  fontesDoProjeto: 'estudio:fontes-do-projeto',
 } as const;
 
 /** O projeto aberto. `estado` é o último que a pessoa viu (área, documento, seleção), para reabrir onde parou; `git`
@@ -69,9 +78,14 @@ export type Ambiente = {perfil: Perfil; git: boolean; claude: boolean; versao: s
 
 export type Recente = {raiz: string; nome: string; aberto_em: string; existe: boolean; modulos: Modulo[]; miniatura?: string};
 
-export type Preferencias = {pasta_projetos: string; ao_iniciar: 'inicio' | 'ultimo'; formato_video: string; formato_imagem: string; boas_vindas_vista: boolean};
+export type Preferencias = {pasta_projetos: string; ao_iniciar: 'inicio' | 'ultimo'; formato_video: string; formato_imagem: string; boas_vindas_vista: boolean;
+  pasta_marcas: string};
 
-export type NovoProjeto = {nome?: string; modelo: IdModelo; formato?: Formato | {largura: number; altura: number}; pasta?: string; formato_id?: string};
+/** `marca` é o id do kit de marca que entra no tema do documento novo (sem ele, o tema neutro). */
+export type NovoProjeto = {nome?: string; modelo: IdModelo; formato?: Formato | {largura: number; altura: number}; pasta?: string; formato_id?: string; marca?: string};
+
+/** Kit de marca como a interface o vê: o kit, a pasta dele e o endereço no servidor local (logo e fontes para a prévia). */
+export type MarcaInfo = Marca & {pasta: string; url: string};
 
 /** Retângulo da tela (px CSS da janela) que vira a miniatura do projeto na tela inicial. */
 export type Retangulo = {x: number; y: number; width: number; height: number};
@@ -167,6 +181,19 @@ export type ApiEstudio = {
   exportarImagem: (documento: string, pngBase64: string) => Promise<{ok: boolean; arquivo?: string}>;
   aoProgresso: (cb: (p: Progresso) => void) => () => void;
   metricas: () => Promise<Metricas>;
+  // kits de marca (pasta marcas/ das preferências) e as fontes próprias do projeto aberto (pasta fontes/)
+  marcas: {
+    listar: () => Promise<MarcaInfo[]>;
+    gravar: (m: Marca) => Promise<MarcaInfo>;
+    criar: (nome: string) => Promise<MarcaInfo>;
+    duplicar: (id: string, nome: string) => Promise<MarcaInfo>;
+    /** Diálogo de arquivo; null se a pessoa cancelou. */
+    importarLogo: (id: string) => Promise<MarcaInfo | null>;
+    importarFonte: (id: string) => Promise<MarcaInfo | null>;
+    /** Copia logo e fontes para o projeto e troca o tema do documento (vai para o diário). */
+    aplicar: (id: string, documento: string) => Promise<{versao: string; marca: string; nome: string; copiados: string[]}>;
+    fontesDoProjeto: () => Promise<FonteArquivo[]>;
+  };
 };
 
 declare global {

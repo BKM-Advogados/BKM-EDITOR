@@ -42,6 +42,7 @@ export class Memoria {
       formato_video: p.formato_video ?? 'reels',
       formato_imagem: p.formato_imagem ?? 'feed',
       boas_vindas_vista: Boolean(p.boas_vindas_vista),
+      pasta_marcas: typeof p.pasta_marcas === 'string' && p.pasta_marcas ? p.pasta_marcas : path.join(this.pastaPadrao, 'marcas'),
     };
   }
 
