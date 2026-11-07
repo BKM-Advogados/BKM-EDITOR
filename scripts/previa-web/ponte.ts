@@ -9,6 +9,7 @@ import jsonpatch, {type Operation} from 'fast-json-patch';
 import type {ApiEstudio, InfoProjeto, MarcaInfo, Mudanca, NovoProjeto, Preferencias, Progresso, Recente, Trilha} from '../../src/compartilhado/api';
 import type {EntradaDocumento, Manifesto, Modulo} from '../../src/nucleo/documentos';
 import type {Envelope} from '../../src/nucleo/audio';
+import type {Fato, Fonte, Pesquisa} from '../../src/nucleo/pesquisa';
 import {novoDocCenas, resolverCenas, type DocCenas} from '../../src/nucleo/cenas';
 import {idDeMarca, MARCA_NEUTRO, MARCAS_INICIAIS, patchDaMarca, temaDaMarca, type Marca} from '../../src/nucleo/marca';
 import {MODELOS} from '../../src/nucleo/modelos';
@@ -73,6 +74,52 @@ const recentes: Recente[] = new URLSearchParams(location.search).has('vazio') ? 
   {raiz: 'C:\\Users\\pessoa\\Estudio\\Ferias', nome: 'Férias proporcionais', aberto_em: new Date(Date.now() - 26 * 3600e3).toISOString(), existe: true, modulos: ['video']},
   {raiz: 'C:\\Users\\pessoa\\Estudio\\Capa', nome: 'Capa do C3', aberto_em: new Date(Date.now() - 5 * 86400e3).toISOString(), existe: false, modulos: ['imagem']},
 ];
+// ---------- pesquisa de exemplo ----------
+// Duas fontes e três fatos, à mão (pesquisa.ts usa node:crypto e não roda aqui): um fato que confere, um com número
+// que não está no trecho e um com o trecho só parecido. Os textos são recortes do art. 477 da CLT; inicio e fim saem
+// do próprio texto, como o registrar_fato faria. O sha256 é de mentira.
+const TEXTO_CLT = [
+  'Art. 477.  Na extinção do contrato de trabalho, o empregador deverá proceder à anotação na Carteira de Trabalho e Previdência Social, comunicar a dispensa aos órgãos competentes e realizar o pagamento das verbas rescisórias no prazo e na forma estabelecidos neste artigo.  (Redação dada pela Lei nº 13.467, de 2017)',
+  '§ 1o (Revogado).   (Redação dada pela Lei nº 13.467, de 2017)',
+  '§ 6o  A entrega ao empregado de documentos que comprovem a comunicação da extinção contratual aos órgãos competentes bem como o pagamento dos valores constantes do instrumento de rescisão ou recibo de quitação deverão ser efetuados até dez dias contados a partir do término do contrato.  (Redação dada pela Lei nº 13.467, de 2017)',
+  'a) (revogado);  (Redação dada pela Lei nº 13.467, de 2017)',
+  'b) (revogado).  (Redação dada pela Lei nº 13.467, de 2017)',
+  '§ 8º - A inobservância do disposto no § 6º deste artigo sujeitará o infrator à multa de 160 BTN, por trabalhador, bem assim ao pagamento da multa a favor do empregado, em valor equivalente ao seu salário, devidamente corrigido pelo índice de variação do BTN, salvo quando, comprovadamente, o trabalhador der causa à mora.  (Incluído pela Lei nº 7.855, de 24.10.1989)',
+].join('\n');
+const TEXTO_CAMARA = [
+  '§ 4º O pagamento a que fizer jus o empregado será efetuado: (Redação dada pela Lei nº 13.467, de 2017)',
+  'I - em dinheiro, depósito bancário ou cheque visado, conforme acordem as partes; ou (Incluído pela Lei nº 13.467, de 2017)',
+  'II - em dinheiro ou depósito bancário quando o empregado for analfabeto. (Incluído pela Lei nº 13.467, de 2017)',
+].join('\n');
+const textosFonte: Record<string, string> = {f1: TEXTO_CLT, f2: TEXTO_CAMARA};
+const TRECHO_PRAZO = 'deverão ser efetuados até dez dias contados a partir do término do contrato.';
+const TRECHO_ANALFABETO = 'II - em dinheiro ou depósito bancário quando o empregado for analfabeto.';
+const fatoDeExemplo = (f: Omit<Fato, 'inicio' | 'fim' | 'criado_em' | 'autor'>, texto: string, achado: string): Fato => ({
+  ...f, ...(texto.includes(achado) ? {inicio: texto.indexOf(achado), fim: texto.indexOf(achado) + achado.length} : {}), criado_em: new Date(Date.now() - 40 * 60e3).toISOString(), autor: 'Claude 1',
+});
+const fontesDeExemplo: Fonte[] = [
+  {id: 'f1', url: 'https://www.planalto.gov.br/ccivil_03/decreto-lei/del5452compilado.htm', titulo: 'Del5452compilado', orgao: 'Presidência da República — Casa Civil, Subchefia para Assuntos Jurídicos',
+    nivel: 1, catalogo: 'planalto', acessado_em: new Date(Date.now() - 50 * 60e3).toISOString(), http: 200, bytes: 1512334, sha256: '0'.repeat(64),
+    arquivo: 'pesquisa/fontes/f1.txt', sinais_vigencia: ['(Revogad', 'Redação dada pela', '(Incluído'],
+    observacao: '06/11/2026 10:12 · Claude 1: texto compilado da CLT, baixado pelo servidor do escritório (o Planalto recusa o IP do escritório).', autor: 'Claude 1'},
+  {id: 'f2', url: 'https://www2.camara.leg.br/legin/fed/declei/1940-1949/decreto-lei-5452-1-maio-1943-415500-publicacaooriginal-1-pe.html',
+    titulo: 'Decreto-Lei nº 5.452, de 1º de maio de 1943', orgao: 'Câmara dos Deputados', nivel: 1, catalogo: 'camara-legin',
+    acessado_em: new Date(Date.now() - 45 * 60e3).toISOString(), http: 200, bytes: 48211, sha256: '1'.repeat(64), arquivo: 'pesquisa/fontes/f2.txt',
+    sinais_vigencia: ['Redação dada pela', '(Incluído'], autor: 'Claude 1'},
+];
+const fatosDeExemplo: Fato[] = [
+  fatoDeExemplo({id: 'F1', afirmacao: 'A empresa tem até 10 dias, contados do fim do contrato, para pagar a rescisão.', fonte_id: 'f1',
+    localizador: 'CLT, art. 477, § 6º', trecho: TRECHO_PRAZO, achado: 'exato', digitos: {afirmacao: ['10'], faltando: []},
+    vigencia: ['(Revogad', 'Redação dada pela'], estado: 'trecho_confere'}, TEXTO_CLT, TRECHO_PRAZO),
+  fatoDeExemplo({id: 'F2', afirmacao: 'A empresa tem até 15 dias, contados do fim do contrato, para pagar a rescisão.', fonte_id: 'f1',
+    localizador: 'CLT, art. 477, § 6º', trecho: TRECHO_PRAZO, achado: 'exato', digitos: {afirmacao: ['15'], faltando: ['15']},
+    vigencia: ['(Revogad', 'Redação dada pela'], estado: 'a_revisar', nota: 'o trecho fala em dez dias'}, TEXTO_CLT, TRECHO_PRAZO),
+  fatoDeExemplo({id: 'F3', afirmacao: 'Trabalhador analfabeto recebe a rescisão em dinheiro ou depósito no banco.', fonte_id: 'f2',
+    localizador: 'CLT, art. 477, § 4º, II', trecho: 'II – em dinheiro ou deposito bancario quando o empregado for analfabeto', achado: 'parecido',
+    digitos: {afirmacao: [], faltando: []}, vigencia: ['(Incluído'], estado: 'a_revisar'}, TEXTO_CAMARA, TRECHO_ANALFABETO),
+];
+const pesquisaDeExemplo: Pesquisa = {formato: 1, fontes: fontesDeExemplo, fatos: fatosDeExemplo};
+
 const ouvintesMudou = new Set<(m: Mudanca) => void>();
 const mudou = (arquivo: string) => setTimeout(() => ouvintesMudou.forEach((f) => f({arquivo})), 30);
 
@@ -90,8 +137,15 @@ const docImagem = (l: number, a: number) => ({formato: 1, largura: l, altura: a,
   x: Math.round(l * 0.08), y: Math.round(a * 0.4), largura: Math.round(l * 0.84), altura: 200, texto: 'Seu título', fonte: 'Inter', tamanho: 90, peso: 700, cor: '#F2F2F2', alinhar: 'centro'}]});
 const doc3d = () => ({formato: 1, fundo: '#111418', camera: {posicao: [4, 3, 6], alvo: [0, 0.5, 0], fov: 40}, luzes: [{id: 'a', tipo: 'ambiente', cor: '#fff', intensidade: 0.6}],
   objetos: [{id: 'caixa', nome: 'Caixa', tipo: 'caixa', posicao: [0, 0.75, 0], rotacao: [0, 25, 0], escala: [1.5, 1.5, 1.5], cor: '#70B8FF'}]});
+const docVideo = (f?: {largura: number; altura: number; fps?: number}) => {
+  const d = novoDocCenas({largura: f?.largura ?? 1080, altura: f?.altura ?? 1920, fps: f?.fps ?? 30});
+  // o primeiro bloco já cita um fato da pesquisa de exemplo, para ver as etiquetas no inspetor
+  const bloco = d.cenas[0]?.blocos[0];
+  if (bloco) bloco.refs = ['F1'];
+  return d;
+};
 const conteudo = (m: Modulo, f?: {largura: number; altura: number; fps?: number}) =>
-  m === 'video' ? novoDocCenas({largura: f?.largura ?? 1080, altura: f?.altura ?? 1920, fps: f?.fps ?? 30}) : m === 'imagem' ? docImagem(f?.largura ?? 1080, f?.altura ?? 1350) : doc3d();
+  m === 'video' ? docVideo(f) : m === 'imagem' ? docImagem(f?.largura ?? 1080, f?.altura ?? 1350) : doc3d();
 
 const novoDocumento = (p: Proj, modulo: Modulo, f?: {largura: number; altura: number; fps?: number}, titulo?: string): EntradaDocumento => {
   const base = modulo === '3d' ? 'cena3d' : modulo;
@@ -291,6 +345,17 @@ const api: ApiEstudio = {
     exportacaoCancelada = true;
   },
   mostrarArquivo: nada,
+  pesquisa: async () => structuredClone(pesquisaDeExemplo),
+  textoFonte: async (fonteId, inicio, fim) => {
+    const texto = textosFonte[fonteId];
+    if (texto === undefined) throw new Error(`o texto da fonte ${fonteId} não está nesta pasta`);
+    return inicio === undefined && fim === undefined ? texto : texto.slice(inicio ?? 0, fim ?? texto.length);
+  },
+  abrirFonte: async (url) => {
+    if (!/^https?:\/\//i.test(url)) return false;
+    window.open(url, '_blank', 'noopener');
+    return true;
+  },
 };
 
 (window as unknown as {estudio: ApiEstudio}).estudio = api;

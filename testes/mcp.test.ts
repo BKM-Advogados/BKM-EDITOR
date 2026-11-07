@@ -1,6 +1,8 @@
 // O servidor MCP de verdade (o mesmo arquivo que o Claude chama), sobre uma cópia do projeto de exemplo.
 import {execSync} from 'node:child_process';
-import {cpSync, mkdtempSync, rmSync} from 'node:fs';
+import {cpSync, mkdtempSync, readFileSync, rmSync} from 'node:fs';
+import http from 'node:http';
+import type {AddressInfo} from 'node:net';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {afterAll, beforeAll, describe, expect, it} from 'vitest';
@@ -43,8 +45,9 @@ describe('MCP estudio', () => {
   it('lista as ferramentas', async () => {
     const {tools} = await cliente.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
-      'aplicar_marca', 'aplicar_patch', 'criar_documento', 'estado_do_editor', 'ler_comentario', 'ler_documento', 'listar_comentarios', 'listar_mudancas',
-      'projeto_info', 'renomear_projeto', 'resolver_comentario', 'responder_comentario',
+      'anotar_fonte', 'aplicar_marca', 'aplicar_patch', 'checar_texto', 'criar_documento', 'estado_do_editor', 'ler_comentario', 'ler_documento', 'ler_fonte',
+      'listar_comentarios', 'listar_mudancas', 'listar_pesquisa', 'projeto_info', 'registrar_fato', 'renomear_projeto', 'resolver_comentario',
+      'responder_comentario', 'texto_da_fonte',
     ]);
   });
 
@@ -99,5 +102,23 @@ describe('MCP estudio', () => {
     const naoHa = await chamar('aplicar_marca', {id: 'inexistente', documento: criado.dado.id});
     expect(naoHa.erro).toBe(true);
     expect(String(naoHa.dado)).toContain('não achado');
+  });
+
+  it('lê uma fonte pela rede do Node (o fetch do MCP por stdio) e registra um fato', async () => {
+    const html = readFileSync(path.join(__dirname, 'fixtures', 'pesquisa', 'planalto-art477.htm'));
+    const local = http.createServer((_req, res) => res.writeHead(200, {'Content-Type': 'text/html; charset=windows-1252'}).end(html));
+    await new Promise<void>((ok) => local.listen(0, '127.0.0.1', ok));
+    try {
+      const url = `http://127.0.0.1:${(local.address() as AddressInfo).port}/del5452compilado.htm`;
+      const lida = await chamar('ler_fonte', {url});
+      expect(lida.erro).toBe(false);
+      expect(lida.dado).toMatchObject({id: 'f1', http: 200, nivel: 0});
+      expect(lida.dado.texto).toContain('até dez dias contados a partir do término do contrato');
+      const fato = await chamar('registrar_fato', {afirmacao: 'A rescisão é paga em até 10 dias.', fonte_id: 'f1', trecho: 'até dez dias contados a partir do término do contrato'});
+      expect(fato.dado).toMatchObject({id: 'F1', achado: 'exato', estado: 'trecho_confere'});
+      expect((await chamar('projeto_info')).dado).toMatchObject({fontes: 1, fatos: 1});
+    } finally {
+      local.close();
+    }
   });
 });

@@ -92,6 +92,9 @@ const api: ApiEstudio = {
   exportarPaginas: (o) => ipcRenderer.invoke(CANAL.exportarPaginas, o),
   cancelarExportacao: () => ipcRenderer.send(CANAL.exportarCancelar),
   mostrarArquivo: (caminho) => ipcRenderer.send(CANAL.mostrarArquivo, caminho),
+  pesquisa: () => ipcRenderer.invoke(CANAL.pesquisa),
+  textoFonte: (fonteId, inicio, fim) => ipcRenderer.invoke(CANAL.textoFonte, fonteId, inicio, fim),
+  abrirFonte: (url) => ipcRenderer.invoke(CANAL.abrirFonte, url),
 };
 
 contextBridge.exposeInMainWorld('estudio', api);

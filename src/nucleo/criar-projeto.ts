@@ -3,7 +3,8 @@
 // .gitignore e um CLAUDE.md que ensina ao Claude o formato dos documentos daquele projeto. Os modelos da Cliente copiam do
 // exemplo empacotado (exemplos/exemplo), sempre em cópia nova. A lista de modelos fica em modelos.ts (sem disco), que a
 // tela inicial também importa. Um kit de marca entra depois, por aplicarMarcaAoPlano: tema do documento, logo em
-// midia/ e fontes em fontes/.
+// midia/ e fontes em fontes/. Projeto com vídeo ou imagem ganha no CLAUDE.md a seção "Pesquisa" (pesquisa/, docs/pesquisa.md);
+// no modelo modelo-carrossel, que copia o CLAUDE.md do exemplo, a seção já vem no exemplo (e é acrescentada se faltar).
 import {copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import jsonpatch, {type Operation} from 'fast-json-patch';
@@ -15,7 +16,8 @@ import {arquivosDaMarca, patchDaMarca, temaDaMarca} from './marca';
 import type {MarcaLida} from './pasta-marcas';
 import {serializar} from './projeto';
 
-export const GITIGNORE = 'saidas/\n.estudio/estado.json\n.estudio/miniatura.jpg\n.estudio/mcp*\n*.tmp\n';
+// o texto baixado de cada fonte (pesquisa/fontes/<id>.txt) fica fora do git: é grande e se baixa de novo pela url
+export const GITIGNORE = 'saidas/\n.estudio/estado.json\n.estudio/miniatura.jpg\n.estudio/mcp*\n*.tmp\npesquisa/fontes/\n';
 
 const DOIS = (n: number) => String(n).padStart(2, '0');
 
@@ -109,6 +111,49 @@ export const documentoNovo = (manifesto: Manifesto, modulo: Modulo, o: {formato?
 };
 
 // ---------- CLAUDE.md ----------
+/** Seção "Pesquisa": o Claude pesquisa, o código prova (trecho exato, dígitos, vigência) e a pessoa vê no painel. A
+ *  pesquisa é só um visualizador: fato é fato, nada se aprova nem se reprova, nada bloqueia, nada da fonte é apagado. */
+const secaoPesquisa = () => [
+  '',
+  '## Pesquisa',
+  '',
+  'Todo fato jurídico, número, prazo ou decisão que entrar numa cena precisa de fonte. A pesquisa fica em',
+  '`pesquisa/pesquisa.json` e aparece no painel Pesquisa do app; você a grava pelas ferramentas abaixo, nunca à mão.',
+  '',
+  '1. **Ler a fonte.** `ler_fonte` {url, observacao?, titulo?} baixa a página, guarda o texto limpo, o sha256, o nível pelo',
+  '   catálogo e as marcas de vigência, e devolve a fonte (`f1`, `f2`…) com o começo do texto. `texto_da_fonte` {fonte_id,',
+  '   pagina? ou inicio? e fim?} lê o resto, 6.000 caracteres por página. `anotar_fonte` {fonte_id, observacao} acrescenta',
+  '   à observação da fonte (a "observação de quem baixou": contexto, ressalva, de onde veio); nunca apaga o que havia.',
+  '2. **Fontes por nível.** Regra jurídica só com fonte de nível 1: Planalto (lei compilada), Câmara, Senado, LexML, Diário',
+  '   Oficial da União, TST, STF, STJ, TRT-3, CNJ/DJEN. Governo e agências (MTE, gov.br, Agência Brasil, Agência Senado e',
+  '   Câmara) são nível 2 e servem para notícia e contexto. Fora do catálogo vira nível 0. Fato de empresa ou de setor:',
+  '   fonte primária ou duas notícias independentes. Wikipedia, blogs, redes sociais, sites de outros escritórios e',
+  '   imprensa estrangeira ficam fora.',
+  '3. **Registrar o fato.** `registrar_fato` {afirmacao, fonte_id, trecho, localizador?, nota?} grava o fato (`F1`, `F2`…).',
+  '   O `trecho` é **literal**, copiado do texto da fonte, com todo número e prazo da afirmação dentro dele; o',
+  '   `localizador` é como "CLT, art. 477, § 6º", "Súmula 51 do TST", "Tema 152 do STF". O app procura o trecho no texto',
+  '   (exato, parecido ou não encontrado) e confere os dígitos e as marcas de vigência em volta. Fica `trecho_confere`',
+  '   quando o trecho é exato e nenhum número falta; senão `a_revisar`. `trecho_confere` prova que o trecho existe na',
+  '   fonte e que os números batem, não que ele sustenta a afirmação: isso você confere lendo. Não escreva trecho de',
+  '   memória: copie de `texto_da_fonte`.',
+  '4. **Vigência.** Antes de usar norma ou súmula, olhe as marcas que o app achou ("(Revogado", "Redação dada pela",',
+  '   "(Vide", "cancelada", "convertida"). Norma revogada ou superada não entra na narração como regra atual.',
+  '5. **Lacunas declaradas.** O que não achou em fonte de nível 1 não vira afirmação: diga "não encontrei fonte para X"',
+  '   na conversa e no dossiê (`pesquisa/dossie.md`, que continua valendo), e a cena diz "em geral" ou pula.',
+  '6. **Blocos citam fatos.** Todo bloco (ou cena) que afirma regra, número ou prazo leva `refs` com os ids dos fatos',
+  '   (`"refs": ["F3", "F7"]`). `listar_pesquisa` devolve fontes e fatos; `checar_texto` {documento? ou texto?} avisa nome',
+  '   de empresa ou pessoa, termo da OAB e bloco com número sem `refs`.',
+  '7. **Regras da Cliente** (são avisos; a pessoa decide): nunca o nome da empresa empregadora nem de trabalhador no texto do',
+  '   vídeo ("a usina localizada em Cidade Exemplo", "operador de alto-forno"); nada de honorários, grátis, resultado',
+  '   garantido, "entre na Justiça", "contrate"; nada de valor a receber ou chance de ganhar; decisão de 1º grau é',
+  '   "sujeita a recurso"; sem travessão; última frase fixa: "Ficou com alguma dúvida? Procure um advogado trabalhista."',
+  '8. **Fato é fato.** A pesquisa registra o que a fonte diz: ninguém aprova nem reprova, e nada bloqueia a exportação.',
+  '   Não censure, não apague nem anonimize nada da fonte (nomes, partes, OAB, CNPJ ficam como no original); o cuidado',
+  '   com nomes vale só para o texto do vídeo.',
+  '9. **Narração confere com os fatos.** Depois de escrever as cenas, releia cada fala contra a pesquisa: todo número e',
+  '   regra da fala tem de estar num fato. O que não estiver sai ou vira pergunta para a pessoa.',
+];
+
 export const claudeMd = (modulos: Modulo[]) => {
   const tem = (m: Modulo) => modulos.includes(m);
   const linhas = [
@@ -158,6 +203,14 @@ export const claudeMd = (modulos: Modulo[]) => {
     '- `midia/`: arquivos usados pelos documentos. `saidas/`: o que o app exporta (fora do git).',
     '- `comentarios.json`: comentários da pessoa, ancorados num objeto (`alvo.objeto`, JSON Pointer), num tempo e num ponto.',
     '- `.estudio/diario.jsonl`: diário de todas as mudanças (quem, quando, patch e patch inverso).',
+  );
+  if (tem('video') || tem('imagem')) {
+    linhas.push(
+      '- `pesquisa/pesquisa.json`: fontes e fatos da pesquisa (seção "Pesquisa" abaixo); o texto de cada fonte fica em',
+      '  `pesquisa/fontes/<id>.txt` (fora do git). `pesquisa/dossie.md` é o rascunho do skill `pesquisa-juridica`.',
+    );
+  }
+  linhas.push(
     '',
     '## Como trabalhar',
     '',
@@ -169,6 +222,7 @@ export const claudeMd = (modulos: Modulo[]) => {
     '5. `listar_mudancas` mostra o que a pessoa mudou à mão desde a sua última olhada.',
   );
   if (tem('video') || tem('imagem')) linhas.push('6. `aplicar_marca` troca o kit de marca (cores, fonte, logo e fontes próprias) de um documento.');
+  if (tem('video') || tem('imagem')) linhas.push(...secaoPesquisa());
   linhas.push(
     '',
     'Tudo o que você faz cai nos documentos, e a pessoa edita depois. Não grave fora da pasta do projeto.',
@@ -179,8 +233,10 @@ export const claudeMd = (modulos: Modulo[]) => {
 
 // ---------- plano do projeto ----------
 export type OpcoesProjeto = {nome: string; modelo: IdModelo; formato?: Formato | {largura: number; altura: number}};
-/** `copiar` traz arquivos de fora do projeto (logo e fontes do kit de marca): `de` absoluto, `para` relativo ao projeto. */
-export type Plano = {manifesto: Manifesto; arquivos: Record<string, string>; pastas: string[]; copiarDoExemplo?: string[]; copiar?: {de: string; para: string}[]};
+/** `copiar` traz arquivos de fora do projeto (logo e fontes do kit de marca): `de` absoluto, `para` relativo ao projeto.
+ *  `acrescentarAoClaudeMd` vai no fim do CLAUDE.md copiado do exemplo (a seção "Pesquisa"), se ele ainda não a tiver. */
+export type Plano = {manifesto: Manifesto; arquivos: Record<string, string>; pastas: string[]; copiarDoExemplo?: string[]; copiar?: {de: string; para: string}[];
+  acrescentarAoClaudeMd?: string};
 
 /** Arquivos de um projeto novo (sem gravar nada). Modelos da Cliente listam o que copiar do exemplo em `copiarDoExemplo`. */
 export const planoDoProjeto = (o: OpcoesProjeto): Plano => {
@@ -190,7 +246,8 @@ export const planoDoProjeto = (o: OpcoesProjeto): Plano => {
   const pastas = ['midia', 'saidas', '.estudio'];
   if (o.modelo === 'modelo-carrossel') {
     // o exemplo inteiro, com o nome novo
-    return {manifesto: {formato: 1, nome, documentos: []}, arquivos: {'.gitignore': GITIGNORE}, pastas, copiarDoExemplo: ['.']};
+    return {manifesto: {formato: 1, nome, documentos: []}, arquivos: {'.gitignore': GITIGNORE}, pastas, copiarDoExemplo: ['.'],
+      acrescentarAoClaudeMd: secaoPesquisa().join('\n')};
   }
   if (o.modelo === 'modelo-capa') {
     const manifesto: Manifesto = {formato: 1, nome, documentos: [{id: 'capa', modulo: 'imagem', caminho: 'imagem/capa.json', titulo: 'Capa'}]};
@@ -245,6 +302,12 @@ export const gravarPlano = (destino: string, plano: Plano, exemplo?: string) => 
   for (const [rel, texto] of Object.entries(plano.arquivos)) {
     mkdirSync(path.dirname(path.join(destino, rel)), {recursive: true});
     writeFileSync(path.join(destino, rel), texto, 'utf-8');
+  }
+  // o CLAUDE.md do exemplo já traz a seção "Pesquisa"; se uma cópia antiga do exemplo não trouxer, vai no fim, uma vez só
+  const claude = path.join(destino, 'CLAUDE.md');
+  if (plano.acrescentarAoClaudeMd && existsSync(claude)) {
+    const atual = readFileSync(claude, 'utf-8');
+    if (!atual.includes('## Pesquisa')) writeFileSync(claude, `${atual.replace(/\s*$/, '\n')}${plano.acrescentarAoClaudeMd}\n`, 'utf-8');
   }
   // o exemplo inteiro vem com o manifesto dele: só o nome muda
   if (plano.copiarDoExemplo?.includes('.')) {

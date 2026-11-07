@@ -1,13 +1,14 @@
 // MCP "estudio" por HTTP local, servido pelo processo principal (docs/arquitetura.md, por memória: por stdio cada aba do
 // Claude subiria um processo a mais). Sem estado entre pedidos: cada POST monta servidor e transporte, responde e fecha.
-// Cada aba tem um token próprio no cabeçalho, que diz ao diário de qual aba veio a mudança.
+// Cada aba tem um token próprio no cabeçalho, que diz ao diário de qual aba veio a mudança. A rede do ler_fonte (o
+// net.fetch do Electron, montado no processo principal) chega pelo construtor.
 import {randomBytes} from 'node:crypto';
 import {mkdirSync, rmSync, writeFileSync} from 'node:fs';
 import type http from 'node:http';
 import path from 'node:path';
 import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {StreamableHTTPServerTransport} from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import {registrarFerramentas} from '../nucleo/ferramentas-mcp';
+import {registrarFerramentas, type Rede} from '../nucleo/ferramentas-mcp';
 import type {Projeto} from '../nucleo/projeto';
 
 type Aba = {origem: string; arquivo: string};
@@ -15,7 +16,7 @@ type Aba = {origem: string; arquivo: string};
 export class McpHttp {
   private abas = new Map<string, Aba>();
 
-  constructor(private readonly pastaConfig: string, private readonly projeto: () => Projeto | null) {}
+  constructor(private readonly pastaConfig: string, private readonly projeto: () => Projeto | null, private readonly rede?: Rede) {}
 
   /** Token e arquivo de configuração (--mcp-config) para uma aba nova do Claude. */
   novaAba(base: string, origem: string): string {
@@ -50,7 +51,7 @@ export class McpHttp {
     let corpo = '';
     for await (const pedaco of req) corpo += pedaco;
     const servidor = new McpServer({name: 'estudio', version: '0.1.0'});
-    registrarFerramentas(servidor, projeto, 'agente', aba.origem);
+    registrarFerramentas(servidor, projeto, 'agente', aba.origem, this.rede);
     const transporte = new StreamableHTTPServerTransport({sessionIdGenerator: undefined, enableJsonResponse: true});
     res.on('close', () => {
       void transporte.close();

@@ -1,5 +1,5 @@
 // Processo principal do Estúdio: uma janela, o projeto aberto, os terminais, o servidor de mídia e a exportação.
-import {app, BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent} from 'electron';
+import {app, BrowserWindow, dialog, ipcMain, net, shell, type IpcMainInvokeEvent} from 'electron';
 import {execFile} from 'node:child_process';
 import {copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
@@ -12,6 +12,7 @@ import {MODELOS} from '../nucleo/modelos';
 import {FORMATO_PADRAO, type Formato} from '../nucleo/formatos';
 import {argumentosDoRender, destinoDoFormato, FORMATOS_IMAGEM_SAIDA, nomesDosArquivos, type OpcoesExportarImagem, type OpcoesExportarVideo} from '../nucleo/exportacao';
 import {ErroProjeto, Projeto, serializar} from '../nucleo/projeto';
+import {criarRede} from '../nucleo/ferramentas-mcp';
 import {prepararRender, renderizarVideo} from './exportar';
 import {registrarIpcMarcas} from './ipc-marcas';
 import {registrarExportarPaginas} from './exportar-paginas';
@@ -316,6 +317,24 @@ lidar(CANAL.responder, (id: string, texto: string) => exigirProjeto().responder(
 lidar(CANAL.resolverComentario, (id: string) => exigirProjeto().resolver(id, 'pessoa'));
 lidar(CANAL.reabrir, (id: string) => exigirProjeto().reabrir(id));
 lidar(CANAL.diario, (desde?: number) => exigirProjeto().diario(desde ?? 0).slice(-200));
+// pesquisa (docs/pesquisa.md): a interface só lê; o Claude grava pelo MCP e o observador da pasta avisa a tela
+lidar(CANAL.pesquisa, () => exigirProjeto().pesquisa());
+// o texto de uma fonte passa de 600 KB (a CLT inteira): lido sem travar o processo principal
+lidar(CANAL.textoFonte, async (fonteId: string, inicio?: number, fim?: number) => {
+  const texto = await exigirProjeto().lerTextoFonteSemTravar(fonteId);
+  return inicio === undefined && fim === undefined ? texto : texto.slice(inicio ?? 0, fim ?? texto.length);
+});
+lidar(CANAL.abrirFonte, async (url: string) => {
+  let endereco: URL;
+  try {
+    endereco = new URL(url);
+  } catch {
+    return false;
+  }
+  if (endereco.protocol !== 'http:' && endereco.protocol !== 'https:') return false;
+  await shell.openExternal(endereco.href);
+  return true;
+});
 lidar(CANAL.terminalCriar, (o: {tipo: 'claude' | 'shell'; colunas: number; linhas: number; sessao?: string}) =>
   terminais.criar({...o, cwd: exigirProjeto().raiz, limiteClaude: PERFIL.sessoes_claude, outrasVivas: conversas.vivas(),
     arquivoMcp: o.tipo === 'claude' ? mcpHttp!.novaAba(midia.origem, `Claude ${++abasClaude}`) : undefined}));
@@ -425,7 +444,8 @@ const marcas = registrarIpcMarcas({lidar, janela: () => janela, memoria, midia, 
 
 app.on('ready', async () => {
   await midia.iniciar();
-  mcpHttp = new McpHttp(path.join(app.getPath('userData'), 'mcp'), () => sessao?.projeto ?? null);
+  // a rede do ler_fonte no app: net.fetch do Electron (proxy e certificados do sistema), assíncrono, 40 s e 20 MB no máximo
+  mcpHttp = new McpHttp(path.join(app.getPath('userData'), 'mcp'), () => sessao?.projeto ?? null, criarRede((url, init) => net.fetch(url, init)));
   midia.rota((req, res) => mcpHttp!.atender(req, res));
   claude = await terminais.preparar();
   criarJanela();

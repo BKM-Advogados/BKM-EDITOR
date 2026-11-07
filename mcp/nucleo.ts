@@ -1,11 +1,12 @@
 // Servidor MCP "estudio" por stdio, para usar o projeto fora do app (outro editor, CI). Dentro do app, as abas do
 // Claude falam com o mesmo conjunto de ferramentas por HTTP local (src/main/mcp-http.ts), sem um processo por aba.
+// A rede do ler_fonte aqui é o fetch do Node (criarRede, em src/nucleo/ferramentas-mcp.ts).
 // Uso: node dist-mcp/nucleo.cjs --projeto <pasta> [--autor agente]
 import path from 'node:path';
 import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
 import {Projeto} from '../src/nucleo/projeto';
-import {registrarFerramentas} from '../src/nucleo/ferramentas-mcp';
+import {criarRede, registrarFerramentas} from '../src/nucleo/ferramentas-mcp';
 
 const arg = (nome: string) => {
   const i = process.argv.indexOf(nome);
@@ -13,7 +14,7 @@ const arg = (nome: string) => {
 };
 
 const servidor = new McpServer({name: 'estudio', version: '0.1.0'});
-registrarFerramentas(servidor, new Projeto(path.resolve(arg('--projeto') ?? process.cwd())), arg('--autor') ?? 'agente', 'mcp');
+registrarFerramentas(servidor, new Projeto(path.resolve(arg('--projeto') ?? process.cwd())), arg('--autor') ?? 'agente', 'mcp', criarRede());
 
 servidor.connect(new StdioServerTransport()).catch((e: unknown) => {
   process.stderr.write(`estudio MCP: ${String(e)}\n`);

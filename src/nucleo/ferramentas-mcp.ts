@@ -1,5 +1,8 @@
 // Ferramentas do MCP "estudio", as mesmas por stdio (mcp/nucleo.ts, fora do app) e por HTTP (o app, uma conexão
-// por aba do Claude). O autor e a origem vão para o diário, para a pessoa ver quem mudou o quê.
+// por aba do Claude). O autor e a origem vão para o diário, para a pessoa ver quem mudou o quê. As ferramentas da
+// pesquisa (ler_fonte e as seguintes, docs/pesquisa.md) só medem e informam: nada se aprova, nada se recusa, nada da
+// fonte é apagado. A rede do ler_fonte vem de quem registra: net.fetch do Electron no app (src/main/mcp-http.ts),
+// fetch do Node no MCP por stdio e nos testes, as duas montadas por criarRede.
 import type {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {z} from 'zod';
 import {ErroProjeto, valorEm, type Projeto} from './projeto';
@@ -8,6 +11,13 @@ import {documentoNovo} from './criar-projeto';
 import {FORMATOS_IMAGEM, FORMATOS_VIDEO} from './formatos';
 import {MARCAS_INICIAIS} from './marca';
 import {PastaMarcas} from './pasta-marcas';
+import {ehDocCenas, type DocCenas} from './cenas';
+import {CATALOGO_FONTES} from './catalogo-fontes';
+import {
+  acharTrecho, caminhoTextoFonte, conferirDigitos, decodificarComAviso, entorno, estadoDoFato, hashTexto, limparHtml, nivelDe, numerosDe, paginar, proximoId,
+  sinaisDeVigencia, tituloDoHtml, TAMANHO_PAGINA, type Fato, type Fonte,
+} from './pesquisa';
+import {checarTexto, REGRAS_CLIENTE, terminaComUltimaFrase, type Aviso} from './regras';
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x, null, 2)}]});
 const erro = (e: unknown) => ({
@@ -22,15 +32,98 @@ const seguro = <A,>(f: (a: A) => unknown) => async (a: A) => {
   }
 };
 
-export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, autor: string, origem: string) => {
+// ---------- rede do ler_fonte ----------
+// Segue redirecionamentos, desiste em 40 s, não passa de 20 MB e se apresenta com um User-Agent próprio, para o site
+// saber quem está lendo. Nada aqui é síncrono.
+
+/** O que o ler_fonte recebe: status, endereço depois dos redirecionamentos, Content-Type e os bytes crus. */
+export type Rede = (url: string) => Promise<{status: number; url_final: string; content_type?: string; bytes: Uint8Array}>;
+
+export const USER_AGENT = 'Mozilla/5.0 (compatible; Estudio-BKM/0.2; +ti@escritorioexemplo.com.br)';
+export const TEMPO_REDE_MS = 40_000;
+export const LIMITE_REDE_BYTES = 20 * 1024 * 1024;
+
+/** A busca de quem chama: fetch do Node ou net.fetch do Electron (mesma assinatura). */
+export type Buscar = (url: string, init: RequestInit) => Promise<Response>;
+
+const megas = (n: number) => `${Math.round(n / 1024 / 1024)} MB`;
+
+export const criarRede = (buscar: Buscar = (url, init) => fetch(url, init), opcoes: {tempo_ms?: number; limite_bytes?: number} = {}): Rede => {
+  const tempo = opcoes.tempo_ms ?? TEMPO_REDE_MS;
+  const limite = opcoes.limite_bytes ?? LIMITE_REDE_BYTES;
+  return async (url) => {
+    let endereco: URL;
+    try {
+      endereco = new URL(url);
+    } catch {
+      throw new Error(`endereço inválido: ${url}`);
+    }
+    if (endereco.protocol !== 'http:' && endereco.protocol !== 'https:') throw new Error(`só endereços http ou https: ${url}`);
+    const parar = new AbortController();
+    const relogio = setTimeout(() => parar.abort(), tempo);
+    try {
+      const r = await buscar(endereco.href, {
+        redirect: 'follow',
+        signal: parar.signal,
+        headers: {'User-Agent': USER_AGENT, Accept: 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5', 'Accept-Language': 'pt-BR,pt;q=0.9'},
+      });
+      const declarado = Number(r.headers.get('content-length'));
+      if (declarado > limite) throw new Error(`a página tem ${megas(declarado)}, acima do limite de ${megas(limite)}`);
+      // lido em pedaços: o limite vale também para quem não declara o tamanho
+      const partes: Uint8Array[] = [];
+      let total = 0;
+      if (r.body) {
+        const leitor = r.body.getReader();
+        for (;;) {
+          const {done, value} = await leitor.read();
+          if (done) break;
+          total += value.byteLength;
+          if (total > limite) {
+            await leitor.cancel();
+            throw new Error(`a página passa do limite de ${megas(limite)}`);
+          }
+          partes.push(value);
+        }
+      }
+      const bytes = new Uint8Array(total);
+      let pos = 0;
+      for (const p of partes) {
+        bytes.set(p, pos);
+        pos += p.byteLength;
+      }
+      return {status: r.status, url_final: r.url || endereco.href, content_type: r.headers.get('content-type') ?? undefined, bytes};
+    } catch (e) {
+      if (parar.signal.aborted) throw new Error(`a página não respondeu em ${Math.round(tempo / 1000)} s: ${url}`);
+      const causa = (e as {cause?: {message?: string}}).cause?.message;
+      throw new Error(`não deu para baixar ${url}: ${(e as Error).message}${causa ? ` (${causa})` : ''}`);
+    } finally {
+      clearTimeout(relogio);
+    }
+  };
+};
+
+// ---------- ferramentas ----------
+
+export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, autor: string, origem: string, rede?: Rede) => {
   servidor.registerTool('projeto_info', {
-    description: 'Nome do projeto, documentos (id, módulo, caminho) e quantos comentários estão abertos.',
+    description: 'Nome do projeto, documentos (id, módulo, caminho), quantos comentários estão abertos e quantas fontes e fatos a pesquisa tem.',
     inputSchema: {},
-  }, seguro(() => ({
-    pasta: projeto.raiz,
-    ...projeto.manifesto(),
-    comentarios_abertos: projeto.comentarios().filter((c) => c.estado === 'aberto').length,
-  })));
+  }, seguro(() => {
+    let pesquisa: {fontes: number | string; fatos: number | string};
+    try {
+      const p = projeto.pesquisa();
+      pesquisa = {fontes: p.fontes.length, fatos: p.fatos.length};
+    } catch (e) {
+      // pesquisa.json quebrado não esconde o resto do projeto
+      pesquisa = {fontes: `ilegível: ${(e as Error).message}`, fatos: 'ilegível'};
+    }
+    return {
+      pasta: projeto.raiz,
+      ...projeto.manifesto(),
+      comentarios_abertos: projeto.comentarios().filter((c) => c.estado === 'aberto').length,
+      ...pesquisa,
+    };
+  }));
 
   servidor.registerTool('estado_do_editor', {
     description: 'O que a pessoa está vendo agora no app: área (video, imagem, 3d, efeitos), documento, objeto selecionado (caminho JSON Pointer) e tempo do vídeo.',
@@ -126,6 +219,8 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   }, seguro(({desde = 0, autor}: {desde?: number; autor?: string}) =>
     projeto.diario(desde).filter((e) => !autor || e.autor === autor).map(({inverso: _i, ...e}) => e)));
 
+  registrarPesquisa(servidor, projeto, autor, origem, rede);
+
   // kits de marca (src/nucleo/marca.ts): a pasta vem das preferências do app ou de ESTUDIO_MARCAS
   const marcas = new PastaMarcas();
   let ids = MARCAS_INICIAIS.map((m) => m.id);
@@ -141,5 +236,276 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
     const alvo = documento ?? projeto.estado()?.documento ?? projeto.manifesto().documentos[0]?.id;
     if (!alvo) throw new ErroProjeto('o projeto não tem documento para receber o kit', 'nao_achado');
     return {ok: true, documento: alvo, ...marcas.aplicar(projeto, id, alvo, {autor, origem})};
+  }));
+};
+
+// ---------- pesquisa: fontes e fatos (src/nucleo/pesquisa.ts, docs/pesquisa.md) ----------
+
+const CARACTERES_NA_LEITURA = 3000; // o ler_fonte devolve o começo do texto; o resto vem por texto_da_fonte
+
+const doisDigitos = (n: number) => String(n).padStart(2, '0');
+/** "06/11/2026 14:32", na hora local: o carimbo de cada linha da observação. */
+const carimbo = (d = new Date()) => `${doisDigitos(d.getDate())}/${doisDigitos(d.getMonth() + 1)}/${d.getFullYear()} ${doisDigitos(d.getHours())}:${doisDigitos(d.getMinutes())}`;
+/** A observação só cresce: cada anotação é uma linha nova com data e autor. */
+const acrescentar = (atual: string | undefined, texto: string, autor: string) => {
+  const linha = `${carimbo()} · ${autor}: ${texto.trim()}`;
+  return atual ? `${atual}\n${linha}` : linha;
+};
+
+const fonteDe = (projeto: Projeto, id: string): Fonte => {
+  const f = projeto.pesquisa().fontes.find((x) => x.id === id);
+  if (!f) throw new ErroProjeto(`fonte não achada: ${id} (leia a url com ler_fonte primeiro)`, 'nao_achado');
+  return f;
+};
+
+const ehPdf = (bytes: Uint8Array, contentType: string | undefined) =>
+  (contentType ?? '').toLowerCase().includes('pdf') || (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46);
+
+/** HTML vira texto limpo; texto puro fica como veio. PDF ainda não se lê (quem chama confere antes, com ehPdf). */
+const textoDaResposta = (bytes: Uint8Array, contentType: string | undefined) => {
+  const tipo = (contentType ?? '').toLowerCase();
+  const {texto: bruto, aviso: avisoCharset} = decodificarComAviso(bytes, contentType);
+  const ehHtml = tipo.includes('html') || tipo.includes('xml') || (!tipo.startsWith('text/plain') && /^\s*</.test(bruto));
+  return {bruto, ehHtml, avisoCharset, texto: ehHtml ? limparHtml(bruto) : bruto.replace(/\r\n?/g, '\n')};
+};
+
+// Página de bloqueio que chega com HTTP 200 (o F5 do Planalto, o filtro de um tribunal): vira fonte normal, porque a
+// pesquisa só mostra, mas o retorno do ler_fonte avisa para o Claude conferir o texto antes de citar.
+const BLOQUEIO = /request rejected|requested url was rejected|acesso negado|access denied|captcha/i;
+const avisoDoTexto = (texto: string): string | undefined => {
+  const tamanho = texto.trim().length;
+  if (BLOQUEIO.test(texto.slice(0, 3000))) return 'o texto parece uma página de bloqueio do site ("Request Rejected", "Acesso Negado"): confira em texto_da_fonte antes de registrar fatos';
+  if (tamanho < 500) return `o texto tem só ${tamanho} caracteres: pode ser página de bloqueio ou montada por JavaScript; confira antes de registrar fatos`;
+  return undefined;
+};
+
+// Campos que aparecem na tela, em qualquer documento (roteiro do carrossel, imagem): o checar_texto olha só eles. No
+// roteiro da Cliente as linhas do gancho ficam em cenas[].linhas[].t e as etiquetas em cenas[].tag e rotulo_partes.
+const CAMPOS_DE_TEXTO = new Set(['texto', 'itens', 'rotulo', 'titulo', 'legenda', 'fala', 'falas', 'linhas', 'prefixo', 'sufixo', 't', 'tag', 'rotulo_partes']);
+const textosDoJson = (x: unknown, onde = '', campo = ''): {onde: string; texto: string}[] => {
+  if (typeof x === 'string') return CAMPOS_DE_TEXTO.has(campo) && x.trim() ? [{onde, texto: x}] : [];
+  if (Array.isArray(x)) return x.flatMap((v, i) => textosDoJson(v, `${onde}/${i}`, campo));
+  if (x && typeof x === 'object') return Object.entries(x).flatMap(([k, v]) => textosDoJson(v, `${onde}/${k.replace(/~/g, '~0').replace(/\//g, '~1')}`, k));
+  return [];
+};
+
+/** A narração do roteiro da Cliente: o documento aponta para a transcrição palavra por palavra ("palavras":
+ *  "video/palavras.json", com {w} por palavra). Sem o arquivo, não há narração para olhar. */
+const narracaoDe = (projeto: Projeto, doc: unknown): string | undefined => {
+  const rel = (doc as {palavras?: unknown} | null)?.palavras;
+  if (typeof rel !== 'string' || !rel.endsWith('.json')) return undefined;
+  try {
+    const palavras = projeto.lerJson<unknown>(rel).doc;
+    if (!Array.isArray(palavras)) return undefined;
+    const texto = palavras.map((p: {w?: unknown}) => (typeof p?.w === 'string' ? p.w : '')).filter(Boolean).join(' ');
+    return texto || undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/** O texto que um bloco de cenas mostra, com o número animado ("40%"). */
+const textoDoBloco = (b: DocCenas['cenas'][number]['blocos'][number]) => [
+  b.texto, ...(b.itens ?? []), b.tipo === 'numero' && b.ate !== undefined ? `${b.prefixo ?? ''}${b.ate}${b.sufixo ?? ''}` : '', b.rotulo,
+].filter(Boolean).join('\n');
+
+const registrarPesquisa = (servidor: McpServer, projeto: Projeto, autor: string, origem: string, rede: Rede | undefined) => {
+  servidor.registerTool('ler_fonte', {
+    description: 'Baixa uma página (lei, súmula, decisão, notícia de tribunal) e a guarda na pesquisa do projeto: texto limpo em pesquisa/fontes/<id>.txt, sha256, nível pelo catálogo de fontes e marcas de vigência ("(Revogado", "Redação dada pela"…). Devolve a fonte, os 3.000 primeiros caracteres e quantas páginas de 6.000 há (o resto vem por texto_da_fonte), e um "aviso" quando o texto parece página de bloqueio. A mesma url de novo atualiza a fonte com o mesmo id; se o texto mudou, os fatos dela são procurados de novo no texto novo ("fatos_reconferidos") e o texto antigo fica guardado ao lado ("texto_anterior"). "observacao" é a observação de quem baixou: texto livre que fica junto da fonte. Nada do texto é cortado nem anonimizado.',
+    inputSchema: {
+      url: z.string().url(),
+      observacao: z.string().optional().describe('observação de quem baixou sobre a fonte'),
+      titulo: z.string().optional().describe('sem ele, vale o <title> da página'),
+    },
+  }, seguro(async ({url, observacao, titulo}: {url: string; observacao?: string; titulo?: string}) => {
+    if (!rede) throw new ErroProjeto('este MCP não tem acesso à rede: abra o projeto no Estúdio ou use o MCP por stdio (mcp/nucleo.ts)', 'patch');
+    const r = await rede(url);
+    // página de erro não vira fonte: o Claude vê o começo da resposta ("Acesso Negado!") e procura outro caminho
+    if (r.status >= 400) {
+      const comeco = ehPdf(r.bytes, r.content_type) ? '(um PDF)' : textoDaResposta(r.bytes, r.content_type).texto.replace(/\s+/g, ' ').trim().slice(0, 200);
+      throw new ErroProjeto(`o site respondeu HTTP ${r.status} e nada foi gravado. Começo da resposta: ${comeco}`, 'nao_achado');
+    }
+    if (ehPdf(r.bytes, r.content_type)) {
+      throw new ErroProjeto('esta url é um PDF, e o Estúdio ainda não lê PDF: procure a versão em HTML da mesma norma ou decisão', 'patch');
+    }
+    const {bruto, ehHtml, avisoCharset, texto} = textoDaResposta(r.bytes, r.content_type);
+    const sha256 = hashTexto(texto);
+    const {nivel, catalogo} = nivelDe(r.url_final || url);
+    const orgao = CATALOGO_FONTES.find((c) => c.id === catalogo)?.orgao;
+    const nome = titulo?.trim() || (ehHtml ? tituloDoHtml(bruto) : undefined);
+    const fonte = projeto.alterarPesquisa((p) => {
+      const existente = p.fontes.find((f) => f.url === url);
+      const id = existente?.id ?? proximoId(p, 'fonte');
+      const obs = observacao?.trim() ? acrescentar(existente?.observacao, observacao, autor) : existente?.observacao;
+      const nova: Fonte = {
+        id,
+        url,
+        ...(r.url_final && r.url_final !== url ? {url_final: r.url_final} : {}),
+        ...(nome ? {titulo: nome} : {}),
+        ...(orgao ? {orgao} : {}),
+        nivel,
+        ...(catalogo ? {catalogo} : {}),
+        acessado_em: new Date().toISOString(),
+        http: r.status,
+        bytes: r.bytes.byteLength,
+        sha256,
+        arquivo: caminhoTextoFonte(id),
+        sinais_vigencia: sinaisDeVigencia(texto),
+        ...(obs ? {observacao: obs} : {}),
+        autor: existente?.autor ?? autor,
+      };
+      // texto novo não apaga o antigo: os fatos foram conferidos nele, então ele fica ao lado, com o sha256 no nome
+      const textoAnterior = existente && existente.sha256 !== sha256 ? projeto.guardarVersaoTextoFonte(id, existente.sha256) : undefined;
+      projeto.gravarTextoFonte(id, texto);
+      if (existente) p.fontes[p.fontes.indexOf(existente)] = nova;
+      else p.fontes.push(nova);
+      // o texto mudou: inicio e fim dos fatos desta fonte apontavam para o texto antigo; procura de novo cada trecho
+      // (achado, lugar, vigência em volta e estado). A afirmação, o trecho e os dígitos ficam como estavam.
+      const reconferidos: string[] = [];
+      if (existente && existente.sha256 !== sha256) {
+        for (const fato of p.fatos) {
+          if (fato.fonte_id !== id) continue;
+          const achou = acharTrecho(texto, fato.trecho);
+          fato.achado = achou.achado;
+          if (achou.inicio !== undefined) { fato.inicio = achou.inicio; fato.fim = achou.fim; } else { delete fato.inicio; delete fato.fim; }
+          fato.vigencia = achou.inicio !== undefined ? sinaisDeVigencia(entorno(texto, achou.inicio, achou.fim ?? achou.inicio)) : [];
+          fato.estado = estadoDoFato(fato.achado, fato.digitos.faltando);
+          reconferidos.push(fato.id);
+        }
+      }
+      return {fonte: nova, reconferidos, textoAnterior};
+    }, {autor, origem, rotulo: `fonte lida: ${new URL(url).hostname}`});
+    const aviso = [avisoCharset, avisoDoTexto(texto)].filter(Boolean).join('; ');
+    return {
+      ...fonte.fonte,
+      caracteres: texto.length,
+      paginas: paginar(texto).paginas,
+      ...(fonte.reconferidos.length ? {fatos_reconferidos: fonte.reconferidos} : {}),
+      ...(fonte.textoAnterior ? {texto_anterior: fonte.textoAnterior} : {}),
+      ...(aviso ? {aviso} : {}),
+      texto: texto.slice(0, CARACTERES_NA_LEITURA),
+    };
+  }));
+
+  servidor.registerTool('anotar_fonte', {
+    description: 'Acrescenta uma linha à observação de quem baixou de uma fonte, com data e autor. Nunca apaga o que já estava.',
+    inputSchema: {fonte_id: z.string(), observacao: z.string().min(1)},
+  }, seguro(({fonte_id, observacao}: {fonte_id: string; observacao: string}) => {
+    fonteDe(projeto, fonte_id);
+    return projeto.alterarPesquisa((p) => {
+      const f = p.fontes.find((x) => x.id === fonte_id)!;
+      f.observacao = acrescentar(f.observacao, observacao, autor);
+      return {ok: true, id: f.id, observacao: f.observacao};
+    }, {autor, origem, rotulo: `observação na fonte ${fonte_id}`});
+  }));
+
+  servidor.registerTool('registrar_fato', {
+    description: 'Registra um fato tirado de uma fonte já lida: a afirmação (como vai no vídeo) e o trecho LITERAL copiado do texto da fonte. O app procura o trecho no texto gravado (exato, parecido ou não encontrado), confere se cada número da afirmação aparece no trecho e anota as marcas de vigência em volta dele. Fica "trecho_confere" quando o trecho é exato e todos os números da afirmação estão nele: prova que o trecho existe na fonte e que os números batem, não que ele sustenta a afirmação. Nunca recusa: o que não confere (trecho fora do texto, número faltando, fonte que não está na pesquisa) fica "a_revisar" para a pessoa ver. Os números do localizador ("art. 477, § 6º") não precisam estar no trecho. Cite o id devolvido (F1, F2…) em "refs" do bloco do vídeo.',
+    inputSchema: {
+      // vazia não vira fato (é a única recusa além do pesquisa.json ilegível): a mensagem diz o que falta
+      afirmacao: z.string().min(1, 'afirmacao vazia: diga o que o trecho sustenta'),
+      fonte_id: z.string(),
+      // sem min(1): trecho vazio também entra, como não encontrado (nunca recusa)
+      trecho: z.string().describe('copiado tal e qual do texto da fonte'),
+      localizador: z.string().optional().describe('ex.: CLT, art. 477, § 6º'),
+      nota: z.string().optional(),
+    },
+  }, seguro(({afirmacao, fonte_id, trecho, localizador, nota}: {afirmacao: string; fonte_id: string; trecho: string; localizador?: string; nota?: string}) => {
+    // nunca recusa: fonte que não está na pesquisa, ou sem o texto na pasta (pasta clonada: pesquisa/fontes/ fica fora
+    // do git), e o fato entra do mesmo jeito, como não encontrado e com um aviso. Só o pesquisa.json ilegível impede
+    // gravar, porque gravar por cima apagaria a pesquisa (docs/pesquisa.md).
+    const temFonte = projeto.pesquisa().fontes.some((f) => f.id === fonte_id);
+    let texto: string | undefined;
+    try {
+      texto = temFonte ? projeto.lerTextoFonte(fonte_id) : undefined;
+    } catch {
+      texto = undefined;
+    }
+    const achou = texto !== undefined ? acharTrecho(texto, trecho) : {achado: 'nao' as const, inicio: undefined, fim: undefined};
+    const digitos = conferirDigitos(afirmacao, trecho, localizador);
+    const vigencia = texto !== undefined && achou.inicio !== undefined ? sinaisDeVigencia(entorno(texto, achou.inicio, achou.fim ?? achou.inicio)) : [];
+    const fato = projeto.alterarPesquisa((p) => {
+      const novo: Fato = {
+        id: proximoId(p, 'fato'),
+        afirmacao,
+        fonte_id,
+        ...(localizador?.trim() ? {localizador: localizador.trim()} : {}),
+        trecho,
+        ...(achou.inicio !== undefined ? {inicio: achou.inicio, fim: achou.fim} : {}),
+        achado: achou.achado,
+        digitos,
+        vigencia,
+        estado: estadoDoFato(achou.achado, digitos.faltando),
+        ...(nota?.trim() ? {nota: nota.trim()} : {}),
+        criado_em: new Date().toISOString(),
+        autor,
+      };
+      p.fatos.push(novo);
+      return novo;
+    }, {autor, origem, rotulo: `fato registrado (fonte ${fonte_id})`});
+    if (!temFonte) return {...fato, aviso: `a fonte ${fonte_id} não está na pesquisa: leia a url com ler_fonte e registre o fato de novo com o id certo`};
+    return texto === undefined ? {...fato, aviso: `o texto da fonte ${fonte_id} não está nesta pasta; leia a url de novo com ler_fonte para conferir o trecho`} : fato;
+  }));
+
+  servidor.registerTool('listar_pesquisa', {
+    description: 'Fontes (sem o texto) e fatos da pesquisa do projeto, com o que o app conferiu em cada fato (achado, dígitos faltando, vigência, estado). Com "fonte_id", só aquela fonte e os fatos dela (pesquisa grande pesa menos no contexto).',
+    inputSchema: {fonte_id: z.string().optional().describe('ex.: f1; sem ele, tudo')},
+  }, seguro(({fonte_id}: {fonte_id?: string}) => {
+    const p = projeto.pesquisa();
+    if (!fonte_id) return {fontes: p.fontes, fatos: p.fatos};
+    return {fontes: p.fontes.filter((f) => f.id === fonte_id), fatos: p.fatos.filter((f) => f.fonte_id === fonte_id)};
+  }));
+
+  servidor.registerTool('texto_da_fonte', {
+    description: `Texto limpo de uma fonte lida, em páginas de ${TAMANHO_PAGINA} caracteres (pagina começa em 1), ou o recorte inicio..fim (índices de caractere, os mesmos de inicio/fim dos fatos).`,
+    inputSchema: {
+      fonte_id: z.string(),
+      pagina: z.number().int().min(1).optional(),
+      inicio: z.number().int().min(0).optional(),
+      fim: z.number().int().min(0).optional(),
+    },
+  }, seguro(({fonte_id, pagina, inicio, fim}: {fonte_id: string; pagina?: number; inicio?: number; fim?: number}) => {
+    fonteDe(projeto, fonte_id);
+    const texto = projeto.lerTextoFonte(fonte_id);
+    if (inicio !== undefined || fim !== undefined) {
+      const de = Math.min(inicio ?? 0, texto.length);
+      const ate = Math.min(Math.max(fim ?? texto.length, de), texto.length);
+      return {fonte_id, inicio: de, fim: ate, caracteres: texto.length, texto: texto.slice(de, ate)};
+    }
+    return {fonte_id, caracteres: texto.length, ...paginar(texto, pagina ?? 1)};
+  }));
+
+  servidor.registerTool('checar_texto', {
+    description: 'Avisos das regras da Cliente sobre o texto do vídeo: termos que o Provimento 205/2021 da OAB veda ou pede cuidado, nomes de empresa e de pessoa, e números que não estão em nenhum fato da pesquisa. Passe "texto" ou um "documento" (todos os textos dele, inclusive a narração do roteiro da Cliente); no vídeo de cenas vem também a lista dos blocos com número e sem refs, e no documento, se o último texto (ou a narração) termina com a frase de fecho das regras. Só informa: nada é bloqueado.',
+    inputSchema: {documento: z.string().optional().describe('id do documento no manifesto'), texto: z.string().optional()},
+  }, seguro(({documento, texto: t}: {documento?: string; texto?: string}) => {
+    if (!documento && t === undefined) throw new ErroProjeto('passe "texto" ou "documento"', 'patch');
+    const fatos = projeto.pesquisa().fatos;
+    const avisos: Aviso[] = t !== undefined ? checarTexto(t, REGRAS_CLIENTE, {onde: 'texto', fatos}).avisos : [];
+    if (!documento) return {avisos};
+    const {doc} = projeto.lerJson<unknown>(projeto.arquivoDoDocumento(documento));
+    // a frase de fecho ("Ficou com alguma dúvida? Procure um advogado trabalhista.") vem no fim da narração ou, sem ela,
+    // no último texto do documento
+    const fecho = (ultimo: string | undefined) => ({frase: REGRAS_CLIENTE.texto.ultima_frase, termina: ultimo ? terminaComUltimaFrase(ultimo) : false});
+    if (ehDocCenas(doc)) {
+      const blocos_sem_refs: string[] = [];
+      let ultimo: string | undefined;
+      for (const cena of doc.cenas) {
+        for (const b of cena.blocos) {
+          const tb = textoDoBloco(b);
+          if (!tb) continue;
+          ultimo = tb;
+          avisos.push(...checarTexto(tb, REGRAS_CLIENTE, {onde: b.id, fatos}).avisos);
+          // os refs da cena valem para os blocos dela
+          if (numerosDe(tb).length && !b.refs?.length && !cena.refs?.length) blocos_sem_refs.push(b.id);
+        }
+      }
+      return {documento, avisos, blocos_sem_refs, ultima_frase: fecho(ultimo)};
+    }
+    const textos = textosDoJson(doc);
+    for (const {onde, texto: tx} of textos) avisos.push(...checarTexto(tx, REGRAS_CLIENTE, {onde, fatos}).avisos);
+    const narracao = narracaoDe(projeto, doc);
+    if (narracao) avisos.push(...checarTexto(narracao, REGRAS_CLIENTE, {onde: 'narração', fatos}).avisos);
+    return {documento, avisos, ultima_frase: fecho(narracao ?? textos[textos.length - 1]?.texto)};
   }));
 };

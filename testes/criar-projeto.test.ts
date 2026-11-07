@@ -70,6 +70,19 @@ describe('vídeo de cenas', () => {
     expect(resolverCenas({...doc, cenas: []}).props.duracao_ms).toBe(1000);
   });
 
+  it('repassa os refs da pesquisa no bloco e na cena, e não inventa quando faltam', () => {
+    const d: DocCenas = {...doc, cenas: [
+      {id: 'a', duracao_ms: 2000, refs: ['F1'], blocos: [{id: 'a1', tipo: 'texto', x: 0.1, y: 0.4, largura: 0.8, texto: 'Dez dias', refs: ['F3', 'F7']}]},
+      {id: 'b', duracao_ms: 2000, blocos: [{id: 'b1', tipo: 'titulo', x: 0.1, y: 0.4, largura: 0.8}]},
+    ]};
+    const {props} = resolverCenas(d);
+    expect(props.cenas[0].refs).toEqual(['F1']);
+    expect(props.cenas[0].blocos[0].refs).toEqual(['F3', 'F7']);
+    expect(props.cenas[1]).not.toHaveProperty('refs');
+    expect(props.cenas[1].blocos[0]).not.toHaveProperty('refs');
+    expect(comIdsNovos(d.cenas[0], d, 'cena').blocos[0].refs).toEqual(['F3', 'F7']);
+  });
+
   it('dá ids livres e duplica com ids novos', () => {
     expect(idLivre(doc, 'cena')).toBe('cena-2');
     const copia = comIdsNovos(doc.cenas[0], doc, 'cena');
@@ -103,9 +116,20 @@ describe('criar projeto', () => {
     expect(m.nome).toBe('C3 · Teste');
     expect(m.documentos.map((d) => d.id)).toEqual(['carrossel', 'capa', 'cena3d']);
     expect(existsSync(path.join(destino, 'video', 'palavras.json'))).toBe(true);
+    // o CLAUDE.md do projeto tem a seção "Pesquisa" (o caso de uso principal: carrossel narrado da Cliente), uma vez só
+    const md = readFileSync(path.join(destino, 'CLAUDE.md'), 'utf-8');
+    expect(md).toContain('## Como trabalhar');
+    expect(md.match(/## Pesquisa/g)).toHaveLength(1);
+    expect(md).toContain('`registrar_fato`');
+    expect(readFileSync(path.join(destino, '.gitignore'), 'utf-8')).toContain('pesquisa/fontes/');
+    // o próprio exemplo já traz a seção igual à que o app gera e a linha do .gitignore: mudou a seção, muda o exemplo
+    const doExemplo = readFileSync(path.join(EXEMPLO, 'CLAUDE.md'), 'utf-8').replace(/\r\n/g, '\n');
+    expect(doExemplo).toContain(planoDoProjeto({nome: 'x', modelo: 'modelo-carrossel'}).acrescentarAoClaudeMd);
+    expect(readFileSync(path.join(EXEMPLO, '.gitignore'), 'utf-8')).toContain('pesquisa/fontes/');
     const capa = gravarPlano(path.join(tmp, 'capa'), planoDoProjeto({nome: 'Capa', modelo: 'modelo-capa'}), EXEMPLO);
     expect(new Projeto(capa).manifesto().documentos).toHaveLength(1);
     expect(existsSync(path.join(capa, 'midia', 'logo-exemplo.png'))).toBe(true);
+    expect(readFileSync(path.join(capa, 'CLAUDE.md'), 'utf-8')).toContain('## Pesquisa');
   });
 
   it('documento novo não colide e entra no manifesto', () => {
@@ -133,5 +157,25 @@ describe('criar projeto', () => {
   it('CLAUDE.md fala só do que o projeto tem', () => {
     expect(claudeMd(['imagem'])).not.toContain('"tipo": "cenas"');
     expect(claudeMd(['video', '3d'])).toContain('Cena 3D');
+  });
+
+  it('CLAUDE.md ensina a pesquisa como visualizador, com as ferramentas do MCP', () => {
+    const md = claudeMd(['video']);
+    expect(md).toContain('## Pesquisa');
+    for (const f of ['ler_fonte', 'anotar_fonte', 'registrar_fato', 'listar_pesquisa', 'texto_da_fonte', 'checar_texto']) expect(md).toContain(`\`${f}\``);
+    expect(md).toContain('"refs": ["F3", "F7"]');
+    expect(md).toContain('observação de quem baixou');
+    expect(md).toContain('pesquisa/dossie.md');
+    expect(md).not.toMatch(/aprovad|marque .* como aprovado|a pessoa aprova/i);
+    expect(claudeMd(['imagem'])).toContain('## Pesquisa');
+    expect(claudeMd(['3d'])).not.toContain('## Pesquisa');
+    expect(md.indexOf('## Pesquisa')).toBeGreaterThan(md.indexOf('## Como trabalhar'));
+  });
+
+  it('o texto baixado das fontes fica fora do git', () => {
+    const plano = planoDoProjeto({nome: 'P', modelo: 'video-branco'});
+    const linhas = plano.arquivos['.gitignore'].split('\n');
+    expect(linhas).toContain('pesquisa/fontes/');
+    expect(linhas).not.toContain('pesquisa/');
   });
 });

@@ -1,5 +1,6 @@
 // O projeto aberto: observa a pasta (o que o agente grava pelo terminal chega à tela), guarda versões no git com calma
-// e monta as props do vídeo para a prévia.
+// e monta as props do vídeo para a prévia. A pesquisa (pesquisa/pesquisa.json e os textos em pesquisa/fontes/) passa
+// pelo mesmo aviso: a interface relê a pesquisa quando o arquivo mudado começa com "pesquisa/".
 import {execFile} from 'node:child_process';
 import {existsSync} from 'node:fs';
 import path from 'node:path';

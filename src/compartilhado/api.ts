@@ -6,6 +6,7 @@ import type {Formato} from '../nucleo/formatos';
 import type {Envelope} from '../nucleo/audio';
 import type {FonteArquivo, Marca} from '../nucleo/marca';
 import type {OpcoesExportarImagem, OpcoesExportarVideo} from '../nucleo/exportacao';
+import type {Pesquisa} from '../nucleo/pesquisa';
 
 export const CANAL = {
   abrirPasta: 'estudio:abrir-pasta',
@@ -75,6 +76,10 @@ export const CANAL = {
   exportarPaginas: 'estudio:exportar-paginas',
   exportarCancelar: 'estudio:exportar-cancelar',
   mostrarArquivo: 'estudio:mostrar-arquivo',
+  // pesquisa do projeto (pesquisa/pesquisa.json e pesquisa/fontes/), só leitura na interface
+  pesquisa: 'estudio:pesquisa',
+  textoFonte: 'estudio:texto-fonte',
+  abrirFonte: 'estudio:abrir-fonte',
 } as const;
 
 /** O projeto aberto. `estado` é o último que a pessoa viu (área, documento, seleção), para reabrir onde parou; `git`
@@ -222,6 +227,13 @@ export type ApiEstudio = {
   exportarPaginas: (o: PedidoExportarPaginas) => Promise<ResultadoExportarPaginas>;
   cancelarExportacao: () => void; // para a exportação em andamento; o exportarVideo resolve com cancelado: true
   mostrarArquivo: (caminho: string) => void; // abre a pasta com o arquivo marcado
+  // pesquisa (docs/pesquisa.md): a interface só lê; quem lê fontes e registra fatos é o Claude, pelo MCP
+  /** pesquisa/pesquisa.json (vazia se a pasta pesquisa/ ainda não existe). */
+  pesquisa: () => Promise<Pesquisa>;
+  /** Texto limpo da fonte (pesquisa/fontes/<id>.txt), inteiro ou o recorte inicio..fim; falha se o texto não está na pasta. */
+  textoFonte: (fonteId: string, inicio?: number, fim?: number) => Promise<string>;
+  /** Abre a url da fonte no navegador da pessoa; só http e https (devolve false para o resto). */
+  abrirFonte: (url: string) => Promise<boolean>;
 };
 
 /** Um arquivo da pasta de trilhas: nome sem extensão, caminho absoluto, subpasta e tamanho. */
