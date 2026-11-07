@@ -10,7 +10,7 @@ import type {Comentario, EstadoEditor, Manifesto, Modulo, OperacaoPatch} from '.
 import {aplicarMarcaAoPlano, dentroDoOneDrive, documentoNovo, gravarPlano, nomeDePasta, nomePadrao, pastaLivre, planoDoProjeto, regerarClaudeMd} from '../nucleo/criar-projeto';
 import {MODELOS} from '../nucleo/modelos';
 import {FORMATO_PADRAO, type Formato} from '../nucleo/formatos';
-import {argumentosDoRender, destinoDoFormato, fontesDaMarcaDagua, FORMATOS_IMAGEM_SAIDA, marcaDaguaDoDestino, nomesDosArquivos, type OpcoesExportarImagem,
+import {argumentosDoRender, destinoDoFormato, fontesDaMarcaDagua, FORMATOS_IMAGEM_SAIDA, legendasDasProps, marcaDaguaDoDestino, nomesDosArquivos, type OpcoesExportarImagem,
   type OpcoesExportarVideo} from '../nucleo/exportacao';
 import {ErroProjeto, Projeto, serializar} from '../nucleo/projeto';
 import {criarRede} from '../nucleo/ferramentas-mcp';
@@ -386,10 +386,12 @@ lidar(CANAL.exportar, async (documento: string, opcoes?: OpcoesExportarVideo): P
       const args = argumentosDoRender(o, plano.destino, formato, Number(props.duracao_ms) || 0);
       const destino = arquivoLivre(pasta, plano.nome, args.ext);
       parcial = destino;
-      // marca d'água do destino, se ligada: posicionada no tamanho do destino, em frações (vale com qualquer escala)
-      const marca = marcaDaguaDoDestino(o.marca_dagua?.[plano.destino.id], plano.destino, fontesMarca, o.proporcao_logo);
+      const propsDestino = fixo ? props : {...props, largura: args.largura, altura: args.altura};
+      // marca d'água do destino, se ligada: posicionada no tamanho do destino, em frações (vale com qualquer escala), fora
+      // da legenda que vai neste render (a das props do destino)
+      const marca = marcaDaguaDoDestino(o.marca_dagua?.[plano.destino.id], plano.destino, fontesMarca, o.proporcao_logo, legendasDasProps(propsDestino));
       await renderizarVideo(preparado, {
-        props: {...(fixo ? props : {...props, largura: args.largura, altura: args.altura}), ...(marca ? {marca_dagua: marca} : {})},
+        props: {...propsDestino, ...(marca ? {marca_dagua: marca} : {})},
         arquivo: destino, codec: args.codec, videoBitrate: args.videoBitrate, escala: fixo ? args.escala : 1, quadros: args.frameRange, cancelSignal,
       }, avisoDe(i, path.basename(destino)));
       arquivos.push(destino);

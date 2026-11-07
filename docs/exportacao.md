@@ -55,9 +55,17 @@ lista.
   coluna de ícones só começa no meio do quadro), embaixo à direita no 4:5 (dentro dos cortes 1:1 e 3:4 da grade) e em
   cima à direita no 16:9 (abaixo do título; embaixo ficam os controles e a marca do próprio canal). Escolhido o canto,
   `posicaoSegura` (`src/nucleo/zonas-seguras.ts`) acha a posição mais perto dele que fica dentro do quadro e dos cortes
-  (`miolo`) e fora das áreas cobertas e da área das legendas, a 3,5% do lado menor de cada borda. O quadrado só leva a
-  margem (as zonas do 4:5 não servem para 1:1). Um tamanho personalizado usa as zonas da proporção mais parecida. Se a
-  marca for grande demais para caber livre, o diálogo avisa.
+  (`miolo`) e fora das áreas cobertas da rede, da área das legendas automáticas do YouTube e da legenda do próprio
+  vídeo, a 3,5% do lado menor de cada borda. O quadrado só leva a margem (as zonas do 4:5 não servem para 1:1). Um
+  tamanho personalizado usa as zonas da proporção mais parecida. Se a marca não couber livre, o diálogo avisa.
+- **Fora da legenda:** com legenda no vídeo (frente Fala, `docs/legendas.md`), a marca não a cobre. A caixa da legenda
+  (`caixaDaLegenda`, em `exportacao.ts`) é o pior caso, com a mesma geometria do `Legendas.tsx`: de margem a margem da
+  área (a Faixa da marca, de borda a borda), na posição do estilo, com todas as linhas na letra dele, mais uma folga de
+  0,3 da letra. Ela entra em `posicaoSegura` como mais uma área a evitar. Por isso, no 4:5 e no 1:1 com a legenda
+  embaixo, a marca do canto de baixo sobe para logo acima dela, e no 9:16 com a legenda "Em cima", a do canto de cima
+  desce para logo abaixo dela. Com a legenda do outro lado ou oculta, a marca fica no canto de sempre. A legenda lida é a
+  das props que vão ao render daquele destino (`legendasDasProps`); a miniatura do diálogo põe a legenda na área livre
+  do destino (`legendasNoDestino`) e mostra a legenda e a marca onde o arquivo vai ter.
 - **Só na exportação:** a marca entra nas props (`marca_dagua`, já posicionada em frações do quadro) só quando o
   processo principal exporta, ou na miniatura do diálogo; o `registro.ts` desenha `src/composicoes/MarcaDagua.tsx` por
   cima da composição, fora da pilha de efeitos. O documento e a prévia do monitor nunca a veem. Com a marca desligada,
@@ -77,13 +85,17 @@ lista.
 - Canais novos no fim do `CANAL`: `prefsExportacao` e `gravarPrefsExportacao` (`src/main/ipc-exportacao.ts`, registrado
   no `main.ts` com uma linha). A assinatura de `renderizarVideo` não mudou: a frente Som entra depois do render.
 - `ZonaSegura` ganhou `miolo` (o contorno é o que sobra do corte); a sobreposição do monitor não mudou.
+- `posicaoSegura` aceita `evitar` (retângulos em frações, tratados como zonas cobertas), e `marcaDaguaDoDestino`
+  aceita as legendas do destino (`LegendasP`, de `legendasDasProps`). No laço de exportação do `main.ts`, a marca lê a
+  legenda das mesmas props que vão ao `renderizarVideo`.
 - Nenhuma dependência nova. O `Thumbnail` da miniatura é do `@remotion/player`, que o app já usa.
 
 ## Como foi conferido
 
-- `npm run typecheck` e `npm test` (150 testes: os 131 da `main` e 19 novos em `testes/movimento.test.ts` e
-  `testes/marca-dagua.test.ts`; entre eles, a marca fora das zonas em todo formato, canto e tamanho, as preferências
-  juntando por destino e o botão passando Inteira para Preencher com um Ctrl+Z só).
+- `npm run typecheck` e `npm test` (`testes/movimento.test.ts`, `testes/marca-dagua.test.ts` e
+  `testes/marca-dagua-legenda.test.ts`; entre eles, a marca fora das zonas em todo formato, canto e tamanho, as
+  preferências juntando por destino, o botão passando Inteira para Preencher com um Ctrl+Z só e a marca fora da legenda
+  em todo formato, estilo e posição de legenda, canto e tamanho até 10%).
 - Prévia web (`?vista`, porta 5204): "Escolher imagem" devolve fotos sintéticas e o kit da Cliente ganha um logo de exemplo
   (`scripts/previa-web/ponte.ts`); o movimento aparece no monitor e no inspetor, e o diálogo mostra a miniatura e
   lembra a escolha.
