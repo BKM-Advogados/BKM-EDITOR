@@ -9,6 +9,7 @@ import type {FonteArquivo, Marca} from '../nucleo/marca';
 import type {OpcoesExportarImagem, OpcoesExportarVideo, PrefsExportacao} from '../nucleo/exportacao';
 import type {Pesquisa} from '../nucleo/pesquisa';
 import type {EstadoModeloFundo} from '../nucleo/remover-fundo';
+import type {EstadoDaFala} from '../nucleo/legendas'; // frente Fala
 
 export const CANAL = {
   abrirPasta: 'estudio:abrir-pasta',
@@ -94,6 +95,7 @@ export const CANAL = {
   falaProgresso: 'estudio:fala-progresso',
   falaGravarSaida: 'estudio:fala-gravar-saida',
   falaEscolherLegenda: 'estudio:fala-escolher-legenda',
+  falaConferir: 'estudio:fala-conferir', // a transcrição ainda é do áudio como ele está (carimbo do palavras.json)
   // preferências da exportação por projeto, .estudio/exportacao.json (src/main/ipc-exportacao.ts; frente C)
   prefsExportacao: 'estudio:prefs-exportacao',
   gravarPrefsExportacao: 'estudio:gravar-prefs-exportacao',
@@ -278,6 +280,8 @@ export type ApiEstudio = {
     gravarSaida: (nome: string, texto: string) => Promise<string>;
     /** Diálogo para escolher um .srt ou .vtt; devolve nome e texto (null se cancelou). */
     escolherLegenda: () => Promise<{nome: string; texto: string} | null>;
+    /** Por arquivo de áudio: 'em_dia' (a transcrição é do áudio como ele está), 'velha' (a tomada mudou) ou 'falta'. */
+    conferir: (arquivos: string[]) => Promise<Record<string, EstadoDaFala>>;
   };
   // exportação (frente C): a escolha de marca d'água por destino, lembrada no projeto
   prefsExportacao: () => Promise<PrefsExportacao>;

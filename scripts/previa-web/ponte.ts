@@ -464,6 +464,8 @@ function falaSimulada(): ApiEstudio['fala'] {
       };
       entrada.click();
     }),
+    // a transcrição simulada é sempre do áudio como ele está
+    conferir: async (arquivos) => Object.fromEntries(arquivos.map((a) => [a, palavrasSimuladas.has(`${a}.palavras.json`) ? 'em_dia' : 'falta'] as const)),
   };
 }
 const lerJsonSemFala = api.lerJson;

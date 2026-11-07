@@ -5,9 +5,10 @@ import type {PedidoTranscricao, ProgressoTranscricao} from '../../../compartilha
 import {idLivre, type DocCenas, type PropsCenas} from '../../../nucleo/cenas';
 import {formatoDoVideo} from '../../../nucleo/formatos';
 import {
-  arquivoDasPalavras, clipesDeVoz, comTexto, dividirSegmento, juntarSegmentos, legendasDeArquivo, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt,
-  requebrar, substituirEmLote, type EstiloLegenda, type LegendasCenas, type OpcoesBusca, type SegmentoLegenda,
+  arquivoDaFala, arquivoDasPalavras, clipesDeVoz, comTexto, dividirSegmento, juntarSegmentos, legendasDeArquivo, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt,
+  requebrar, substituirEmLote, type EstadoDaFala, type EstiloLegenda, type LegendasCenas, type OpcoesBusca, type SegmentoLegenda,
 } from '../../../nucleo/legendas';
+import {confirmar} from '../../componentes/Dialogo';
 import {aplicar, avisar, loja, mensagemDe, selecionar, trocar} from '../../estado/loja';
 
 export const docDe = (documento: string) => loja.get().docs[documento]?.doc as DocCenas | undefined;
@@ -43,35 +44,48 @@ const ligar = () => {
   });
 };
 
-/** Se o arquivo já tem palavras.json (lerJson falha quando não tem). */
-export const temTranscricao = async (arquivo: string) => {
+/** Por arquivo de fala: 'em_dia' (a transcrição é do áudio como ele está), 'velha' (a tomada mudou depois da
+ *  transcrição) ou 'falta'. */
+export const estadoDasFalas = async (arquivos: string[]): Promise<Record<string, EstadoDaFala>> => {
   try {
-    const p = await window.estudio.lerJson<unknown[]>(arquivoDasPalavras(arquivo));
-    return Array.isArray(p) && p.length > 0;
+    return await window.estudio.fala.conferir(arquivos);
   } catch {
-    return false;
+    return Object.fromEntries(arquivos.map((a) => [a, 'falta' as const]));
   }
 };
 
-/** Transcreve no PC os clipes de voz (todos, uma faixa ou um clipe) que ainda não têm transcrição (ou todos, com
- *  `refazer`) e gera as legendas. Um arquivo por vez; Cancelar para no que estiver rodando. */
+const nomeCurto = (arquivo: string) => arquivo.split('/').pop() ?? arquivo;
+const clipesComLegenda = (d: DocCenas) => new Set((d.legendas?.segmentos ?? []).map((s) => s?.clipe).filter((c): c is string => Boolean(c)));
+const AVISO_CORRECOES = 'As palavras corrigidas à mão que ainda caem no tempo da fala ficam; divisões, junções, tempos ajustados e legendas apagadas '
+  + 'voltam ao automático. Ctrl+Z desfaz.';
+
+/** Transcreve no PC a fala dos clipes de voz (todos, uma faixa ou um clipe) que ainda não tem transcrição, ou cuja tomada
+ *  mudou depois dela, e gera as legendas que faltam. A fala do clipe de voz limpa é a do original. Clipe que já tem
+ *  legendas fica como está; se a tomada dele mudou, pergunta antes de refazer. `refazer`: transcreve tudo de novo e
+ *  refaz todas as legendas, também com confirmação. Um arquivo por vez; Cancelar para no que estiver rodando. */
 export const transcreverEGerar = async (documento: string, o: {clipe?: string; faixa?: string; refazer?: boolean; modelo?: PedidoTranscricao['modelo']} = {}) => {
   ligar();
   const d = docDe(documento);
   if (!d) return;
-  const arquivos = [...new Set(clipesDeVoz(d, o).map((c) => c.clipe.arquivo))];
+  const pedidos = clipesDeVoz(d, o);
+  const arquivos = [...new Set(pedidos.map(({clipe}) => arquivoDaFala(clipe)))];
   if (!arquivos.length) return avisar('Não há narração para transcrever: use "+ Áudio → Narração…" na linha do tempo.', 'info');
+  const comLegenda = clipesComLegenda(d);
+  if (o.refazer && !(await confirmar({titulo: 'Transcrever de novo e refazer as legendas?', botao: 'Transcrever de novo',
+    texto: `A fala de ${arquivos.length === 1 ? nomeCurto(arquivos[0]) : `${arquivos.length} arquivos`} é transcrita de novo e as legendas `
+      + `${pedidos.some(({clipe}) => comLegenda.has(clipe.id)) ? 'são refeitas. ' : 'são geradas. '}${AVISO_CORRECOES}`}))) return;
+  const estados = await estadoDasFalas(arquivos);
+  const fila = o.refazer ? arquivos : arquivos.filter((a) => estados[a] !== 'em_dia');
   try {
-    for (const [i, arquivo] of arquivos.entries()) {
-      if (!o.refazer && (await temTranscricao(arquivo))) continue;
-      andamento = {etapa: 'audio', mensagem: `Preparando ${arquivo.split('/').pop()}`, arquivo, progresso: 0};
+    for (const [i, arquivo] of fila.entries()) {
+      andamento = {etapa: 'audio', mensagem: `Preparando ${nomeCurto(arquivo)}`, arquivo, progresso: 0};
       avisarOuvintes();
       const r = await window.estudio.fala.transcrever({arquivo, modelo: o.modelo});
       if (!r.ok) {
         avisar(r.cancelado ? 'Transcrição cancelada.' : r.mensagem ?? 'A transcrição não terminou.', r.cancelado ? 'info' : 'erro');
         return;
       }
-      avisar(`Transcrito${arquivos.length > 1 ? ` (${i + 1} de ${arquivos.length})` : ''}: ${r.n} palavras em ${String(r.duracao_s).replace('.', ',')} s.`, 'ok');
+      avisar(`Transcrito${fila.length > 1 ? ` (${i + 1} de ${fila.length})` : ''}: ${r.n} palavras em ${String(r.duracao_s).replace('.', ',')} s.`, 'ok');
     }
   } catch (e) {
     avisar(mensagemDe(e), 'erro');
@@ -80,18 +94,31 @@ export const transcreverEGerar = async (documento: string, o: {clipe?: string; f
     andamento = null;
     avisarOuvintes();
   }
-  await gerarDasTranscricoes(documento, o);
+  let refazer: true | string[] = o.refazer ? true : [];
+  // a tomada mudou depois das legendas: as de agora são da fala antiga, mas podem ter correções; a pessoa decide
+  const mudaram = o.refazer ? [] : pedidos.filter(({clipe}) => comLegenda.has(clipe.id) && estados[arquivoDaFala(clipe)] === 'velha');
+  if (mudaram.length) {
+    const nomes = [...new Set(mudaram.map(({clipe}) => clipe.nome || nomeCurto(arquivoDaFala(clipe))))].join(', ');
+    const sim = await confirmar({titulo: 'O áudio mudou depois das legendas', botao: 'Refazer as legendas',
+      texto: `${nomes}: o áudio não é mais o da transcrição usada nas legendas, que ficaram com o texto e os tempos de antes. Refazer as legendas `
+        + `${mudaram.length === 1 ? 'desse clipe' : 'desses clipes'} com a fala nova? A correção à mão da tomada antiga não passa para a nova. Ctrl+Z desfaz.`});
+    if (sim) refazer = mudaram.map(({clipe}) => clipe.id);
+    else avisar(`As legendas de ${nomes} ficaram como estavam.`, 'info');
+  }
+  await gerarDasTranscricoes(documento, {clipe: o.clipe, faixa: o.faixa, refazer});
 };
 
 export const cancelarTranscricao = () => window.estudio.fala.cancelar();
 
-/** Legendas das transcrições já gravadas (o palavras.json de cada clipe de voz), no estilo atual. */
-export const gerarDasTranscricoes = async (documento: string, o: {clipe?: string; faixa?: string; estilo?: EstiloLegenda} = {}) => {
+/** Legendas das transcrições já gravadas (o palavras.json da fala de cada clipe de voz), no estilo atual. Gera só para
+ *  os clipes que ainda não têm legendas; `refazer` (true, ou ids de clipe) refaz as deles, levando as palavras corrigidas
+ *  à mão que ainda caem no tempo da fala. As legendas que não vêm de clipe (importadas, criadas à mão) ficam. */
+export const gerarDasTranscricoes = async (documento: string, o: {clipe?: string; faixa?: string; estilo?: EstiloLegenda; refazer?: boolean | string[]} = {}) => {
   const d = docDe(documento);
   if (!d) return;
   const lidas: Record<string, unknown> = {};
   for (const {clipe} of clipesDeVoz(d, o)) {
-    const c = arquivoDasPalavras(clipe.arquivo);
+    const c = arquivoDasPalavras(arquivoDaFala(clipe));
     if (c in lidas) continue;
     try {
       lidas[c] = await window.estudio.lerJson(c);
@@ -100,11 +127,24 @@ export const gerarDasTranscricoes = async (documento: string, o: {clipe?: string
     }
   }
   const f = formatoDoVideo(d);
-  const r = legendasDoDocumento(d, (c) => lidas[c], {largura: f.largura, altura: f.altura, clipe: o.clipe, faixa: o.faixa, estilo: o.estilo});
-  if (!r.clipes) return avisar('Nenhum clipe de voz tem transcrição ainda: clique em Transcrever.', 'info');
-  if (await gravarLegendas(documento, r.legendas, `legendas da fala (${r.legendas.segmentos.length})`)) {
-    avisar(`${r.legendas.segmentos.length} legendas geradas${r.faltam.length ? `; sem transcrição: ${r.faltam.map((a) => a.split('/').pop()).join(', ')}` : ''}. Ctrl+Z desfaz.`, 'ok');
+  const r = legendasDoDocumento(d, (c) => lidas[c], {largura: f.largura, altura: f.altura, clipe: o.clipe, faixa: o.faixa, estilo: o.estilo, refazer: o.refazer});
+  if (!r.clipes) {
+    return avisar(r.mantidos.length && !r.faltam.length ? 'Todos os clipes de voz já têm legendas. "Refazer as legendas" gera de novo, guardando as palavras corrigidas à mão.'
+      : 'Nenhum clipe de voz sem legendas tem transcrição ainda: clique em Transcrever.', 'info');
   }
+  if (await gravarLegendas(documento, r.legendas, `legendas da fala (${r.geradas})`)) {
+    const partes = [`${r.geradas} legendas geradas`];
+    if (r.corrigidas) partes.push(`${r.corrigidas} ${r.corrigidas === 1 ? 'palavra corrigida à mão ficou' : 'palavras corrigidas à mão ficaram'}`);
+    if (r.mantidos.length) partes.push(`${r.mantidos.length === 1 ? 'um clipe que já tinha legendas ficou' : `${r.mantidos.length} clipes que já tinham legendas ficaram`} como estava`);
+    if (r.faltam.length) partes.push(`sem transcrição: ${r.faltam.map(nomeCurto).join(', ')}`);
+    avisar(`${partes.join('; ')}. Ctrl+Z desfaz.`, 'ok');
+  }
+};
+
+/** Refaz as legendas dos clipes de voz (todos, uma faixa ou um clipe) a partir das transcrições, com confirmação. */
+export const refazerLegendas = async (documento: string, o: {clipe?: string; faixa?: string} = {}) => {
+  if (!(await confirmar({titulo: 'Refazer as legendas da fala?', botao: 'Refazer', texto: `As legendas dos clipes de voz são geradas de novo da transcrição. ${AVISO_CORRECOES}`}))) return;
+  await gerarDasTranscricoes(documento, {...o, refazer: true});
 };
 
 // ---------- editar ----------

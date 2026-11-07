@@ -3,16 +3,19 @@
 // transversal-N2), transcrição pelo original do clipe limpo com carimbo do áudio e "gerar" que só faz o que falta
 // (video-N4, som-N3, som-N4, transversal-N1), e o destino do transcrever longe do manifesto e dos documentos
 // (transversal-N6).
-import {readFileSync} from 'node:fs';
+import {mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync} from 'node:fs';
+import {tmpdir} from 'node:os';
 import path from 'node:path';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {describe, expect, it, vi} from 'vitest';
 import {Legendas} from '../src/composicoes/cenas/Legendas';
-import {novoDocCenas, resolverCenas} from '../src/nucleo/cenas';
+import {novoDocCenas, resolverCenas, type DocCenas} from '../src/nucleo/cenas';
+import {Projeto} from '../src/nucleo/projeto';
+import {fonteDoAudio, Transcritor} from '../src/main/transcricao';
 import {
-  areaDaLegenda, caracteresPorLinha, ENTRA_LEGENDA_MS, legendaNoAr, legendasDaFala, legendasNoDestino, resolverLegendas, SAI_LEGENDA_MS, type LegendasP, type PalavraLegenda,
-  type SegmentoLegendaP,
+  areaDaLegenda, arquivoDaFala, caracteresPorLinha, comTexto, conferirFala, ENTRA_LEGENDA_MS, legendaNoAr, legendasDaFala, legendasDoDocumento, legendasNoDestino, levarCorrecoes,
+  palavrasValidas, resolverLegendas, SAI_LEGENDA_MS, VERSAO_PALAVRAS, type LegendasP, type PalavraLegenda, type SegmentoLegenda, type SegmentoLegendaP,
 } from '../src/nucleo/legendas';
 
 const tela = vi.hoisted(() => ({quadro: 0, fps: 30, largura: 1080, altura: 1920}));
@@ -145,5 +148,104 @@ describe('legenda na área e na quebra de cada destino (video-N1, transversal-N2
     const d = novoDocCenas({largura: 1920, altura: 1080, fps: 30});
     const props = resolverCenas({...d, legendas: {segmentos: [{id: 'leg-1', em: 0, sai: 1000, texto: 'oi'}]}}).props;
     expect(props.legendas_cenas?.area).toEqual(areaDaLegenda(1920, 1080));
+  });
+});
+
+describe('a fala do clipe: original da voz limpa, carimbo do áudio e gerar só o que falta (video-N4, som-N3, som-N4, transversal-N1)', () => {
+  const PALAVRAS = FALA.slice(0, 40);
+  const lidas = (mapa: Record<string, unknown>) => (c: string) => mapa[c];
+  const docCom = (clipes: {id: string; arquivo: string; original?: string; em?: number}[], legendas?: DocCenas['legendas']): DocCenas => ({
+    ...novoDocCenas({largura: 1080, altura: 1920, fps: 30}),
+    audio: {faixas: [{id: 'voz', nome: 'Narração', papel: 'voz', clipes: clipes.map((c) => ({em: 0, duracao_ms: 20_000, ...c}))}]},
+    ...(legendas ? {legendas} : {}),
+  });
+  const gravadas = (sha256: string, palavras = PALAVRAS) => ({versao: VERSAO_PALAVRAS, fonte: {tamanho: 10, modificado_ms: 1, sha256}, palavras});
+
+  it('o clipe de voz limpa lê a transcrição do original, e as legendas registram o original', () => {
+    const c = {id: 'a', arquivo: 'midia/n.wav.media.limpo.wav', original: 'midia/n.wav'};
+    expect(arquivoDaFala(c)).toBe('midia/n.wav');
+    expect(arquivoDaFala({arquivo: 'midia/n.wav'})).toBe('midia/n.wav');
+    const r = legendasDoDocumento(docCom([c]), lidas({'midia/n.wav.palavras.json': gravadas('s1')}), {largura: 1080, altura: 1920});
+    expect(r.faltam).toEqual([]);
+    expect(r.geradas).toBeGreaterThan(3);
+    expect(r.legendas.origens).toEqual([{clipe: 'a', arquivo: 'midia/n.wav', palavras: 'midia/n.wav.palavras.json', em: 0, corte_ms: 0, sha256: 's1'}]);
+  });
+
+  it('gerar faz só o que falta: o clipe que já tem legendas (corrigidas à mão) fica igual, e o outro ganha as suas', () => {
+    const base = legendasDoDocumento(docCom([{id: 'a', arquivo: 'midia/a.wav'}]), lidas({'midia/a.wav.palavras.json': gravadas('sa')}), {largura: 1080, altura: 1920}).legendas;
+    const corrigida = {...base, segmentos: [...base.segmentos.map((s, i) => (i === 0 ? comTexto(s, s.texto.replace('Recebeu', 'RECEBEU')) : s)),
+      {id: 'manual', em: 30_000, sai: 31_000, texto: 'criada à mão'}]};
+    const doc = docCom([{id: 'a', arquivo: 'midia/a.wav'}, {id: 'b', arquivo: 'midia/b.wav', em: 22_000}], corrigida);
+    const mapa = {'midia/a.wav.palavras.json': gravadas('sa'), 'midia/b.wav.palavras.json': gravadas('sb')};
+    const r = legendasDoDocumento(doc, lidas(mapa), {largura: 1080, altura: 1920});
+    expect(r.mantidos).toEqual(['a']);
+    const semId = (ss: SegmentoLegenda[]) => ss.map(({id: _i, ...s}) => s);
+    expect(semId(r.legendas.segmentos.filter((s) => s.clipe === 'a'))).toEqual(semId(corrigida.segmentos.filter((s) => s.clipe === 'a')));
+    expect(r.legendas.segmentos.filter((s) => s.clipe === 'b').length).toBe(r.geradas);
+    expect(r.legendas.segmentos.some((s) => s.texto === 'criada à mão')).toBe(true);
+    expect(r.legendas.origens?.map((o) => o.clipe)).toEqual(['a', 'b']);
+    // nada a gerar: nenhum clipe novo
+    const tudo = legendasDoDocumento({...doc, legendas: r.legendas}, lidas(mapa), {largura: 1080, altura: 1920});
+    expect(tudo).toMatchObject({clipes: 0, geradas: 0, mantidos: ['a', 'b']});
+  });
+
+  it('refazer leva a palavra corrigida à mão da mesma tomada; da tomada regravada, não', () => {
+    const doc0 = docCom([{id: 'a', arquivo: 'midia/a.wav'}]);
+    const base = legendasDoDocumento(doc0, lidas({'midia/a.wav.palavras.json': gravadas('sa')}), {largura: 1080, altura: 1920}).legendas;
+    const s0 = base.segmentos[0];
+    const corrigida = {...base, segmentos: [comTexto(s0, s0.texto.replace('Recebeu', 'RECEBEU')), ...base.segmentos.slice(1)]};
+    // o clipe andou 2 s depois de gerar: a correção acha a palavra pelo tempo do arquivo
+    const doc = {...docCom([{id: 'a', arquivo: 'midia/a.wav', em: 2000}]), legendas: corrigida};
+    const mesma = legendasDoDocumento(doc, lidas({'midia/a.wav.palavras.json': gravadas('sa')}), {largura: 1080, altura: 1920, refazer: true});
+    expect(mesma.corrigidas).toBe(1);
+    expect(mesma.legendas.segmentos[0].texto.startsWith('RECEBEU')).toBe(true);
+    expect(mesma.legendas.segmentos[0].em).toBe(s0.em + 2000);
+    const outra = legendasDoDocumento(doc, lidas({'midia/a.wav.palavras.json': gravadas('outra-tomada')}), {largura: 1080, altura: 1920, refazer: ['a']});
+    expect(outra.corrigidas).toBe(0);
+    expect(outra.legendas.segmentos[0].texto.startsWith('Recebeu')).toBe(true);
+    // levarCorrecoes sozinho: sem origem do clipe, nada passa
+    expect(levarCorrecoes({segmentos: corrigida.segmentos}, 'a', PALAVRAS).n).toBe(0);
+  });
+
+  it('conferirFala: carimbo igual vale; outra data pede o sha256; outro tamanho ou sem carimbo é velha', () => {
+    const lido = {versao: VERSAO_PALAVRAS, fonte: {tamanho: 100, modificado_ms: 5000.4, sha256: 'abc'}, palavras: PALAVRAS};
+    expect(conferirFala(lido, {tamanho: 100, modificado_ms: 5000.9})).toBe('em_dia');
+    expect(conferirFala(lido, {tamanho: 100, modificado_ms: 9000})).toBe('conferir');
+    expect(conferirFala(lido, {tamanho: 101, modificado_ms: 5000})).toBe('velha');
+    expect(conferirFala(PALAVRAS, {tamanho: 100, modificado_ms: 5000})).toBe('velha');
+    expect(conferirFala({...lido, palavras: []}, {tamanho: 100, modificado_ms: 5000})).toBe('falta');
+    expect(palavrasValidas(lido)).toHaveLength(40);
+    expect(palavrasValidas(PALAVRAS)).toHaveLength(40);
+  });
+
+  it('Transcritor.conferir no disco: a tomada regravada com o mesmo nome fica velha; copiada com outra data, não', () => {
+    const pasta = mkdtempSync(path.join(tmpdir(), 'estudio-juncoes-fala-'));
+    try {
+      mkdirSync(path.join(pasta, 'midia'));
+      const audio = path.join(pasta, 'midia', 'narracao.wav');
+      writeFileSync(audio, Buffer.alloc(4096, 1));
+      const projeto = new Projeto(pasta);
+      const t = new Transcritor({pasta: path.join(pasta, 'modelos')});
+      expect(t.conferir(projeto, 'midia/narracao.wav')).toBe('falta');
+      const carimbar = () => projeto.gravarTexto('midia/narracao.wav.palavras.json', JSON.stringify({versao: VERSAO_PALAVRAS, fonte: fonteDoAudio(audio), palavras: PALAVRAS}));
+      carimbar();
+      expect(t.conferir(projeto, 'midia/narracao.wav')).toBe('em_dia');
+      // a mesma tomada com outra data (cópia, git clone): o sha256 confere
+      utimesSync(audio, new Date(2020, 0, 1), new Date(2020, 0, 1));
+      expect(t.conferir(projeto, 'midia/narracao.wav')).toBe('em_dia');
+      // outra tomada do mesmo tamanho
+      writeFileSync(audio, Buffer.alloc(4096, 2));
+      utimesSync(audio, new Date(2021, 0, 1), new Date(2021, 0, 1));
+      expect(t.conferir(projeto, 'midia/narracao.wav')).toBe('velha');
+      // outra tomada de outro tamanho
+      carimbar();
+      writeFileSync(audio, Buffer.alloc(8192, 3));
+      expect(t.conferir(projeto, 'midia/narracao.wav')).toBe('velha');
+      // a lista sem carimbo (versão 1) conta como velha
+      projeto.gravarTexto('midia/narracao.wav.palavras.json', JSON.stringify(PALAVRAS));
+      expect(t.conferir(projeto, 'midia/narracao.wav')).toBe('velha');
+    } finally {
+      rmSync(pasta, {recursive: true, force: true});
+    }
   });
 });

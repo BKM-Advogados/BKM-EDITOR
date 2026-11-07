@@ -91,12 +91,54 @@ describe('MCP: transcrever e legendas', () => {
     expect(doc.legendas?.origens?.[0]).toMatchObject({clipe: 'clipe-1', palavras: 'midia/narracao.wav.palavras.json', em: 500});
     expect(Math.max(...doc.legendas!.segmentos.map((s) => s.palavras!.length))).toBeLessThanOrEqual(4);
     expect(projeto.diario().at(-1)).toMatchObject({autor: 'agente', rotulo: expect.stringContaining('legendas da fala')});
-    // de novo: a transcrição já existe e não roda outra vez
+    // de novo: a transcrição já existe e não roda outra vez, e o clipe que já tem legendas fica como está
     pedidos.length = 0;
+    const antes = lerVideo().legendas;
     const r2 = await chamar(c, 'transcrever', {documento: 'video', faixa: 'narracao', estilo: 'classica'});
     expect(pedidos).toEqual([]);
     expect(r2.json.transcritos[0]).toMatchObject({ja_tinha: true});
-    expect(lerVideo().legendas?.estilo?.predefinicao).toBe('classica');
+    expect(r2.json).toMatchObject({geradas: 0, ja_tinham_legendas: ['clipe-1']});
+    expect(r2.json.nota).toContain('refazer_legendas');
+    expect(lerVideo().legendas).toEqual(antes);
+    // refazer_legendas refaz, no estilo pedido, e a palavra corrigida à mão fica
+    const atual = lerVideo();
+    const i = atual.legendas!.segmentos.findIndex((s) => s.texto.includes('cidade?'));
+    const seg = atual.legendas!.segmentos[i];
+    const j = seg.palavras!.findIndex((w) => w.w === 'cidade?');
+    projeto.aplicarPatch({documento: 'video/video.json', versao_base: projeto.lerJson('video/video.json').versao, autor: 'pessoa', origem: 'interface',
+      patch: [{op: 'replace', path: `/legendas/segmentos/${i}/texto`, value: seg.texto.replace('cidade?', 'Cidade?')},
+        {op: 'replace', path: `/legendas/segmentos/${i}/palavras/${j}/w`, value: 'Cidade?'}]});
+    const r3 = await chamar(c, 'transcrever', {documento: 'video', estilo: 'classica', refazer_legendas: true});
+    expect(r3.json).toMatchObject({corrigidas_a_mao_mantidas: 1});
+    expect(r3.json.geradas).toBeGreaterThan(10);
+    const refeitas = lerVideo().legendas!;
+    expect(refeitas.estilo?.predefinicao).toBe('classica');
+    expect(refeitas.segmentos.some((s) => s.texto.includes('Cidade?'))).toBe(true);
+    expect(refeitas.segmentos.some((s) => s.texto.includes('cidade?'))).toBe(false);
+  });
+
+  it('clipe de voz limpa: a fala é a do original, que já tem transcrição; tomada regravada transcreve de novo sem mexer nas legendas', async () => {
+    const estados: Record<string, 'em_dia' | 'velha' | 'falta'> = {};
+    const comConferir: TranscritorMcp = {...transcritor, conferir: (_p, arquivo) => estados[arquivo] ?? 'falta'};
+    const c = await conectar(comConferir);
+    const v = projeto.lerJson<DocCenas>('video/video.json');
+    projeto.aplicarPatch({documento: 'video/video.json', versao_base: v.versao, autor: 'pessoa', origem: 'interface', patch: [
+      {op: 'replace', path: '/audio/faixas/0/clipes/0/arquivo', value: 'midia/narracao.wav.media.limpo.wav'},
+      {op: 'add', path: '/audio/faixas/0/clipes/0/original', value: 'midia/narracao.wav'}]});
+    const antes = lerVideo().legendas;
+    estados['midia/narracao.wav'] = 'em_dia';
+    pedidos.length = 0;
+    const r = await chamar(c, 'transcrever', {documento: 'video'});
+    expect(pedidos).toEqual([]);
+    expect(r.json.transcritos).toEqual([{arquivo: 'midia/narracao.wav', palavras: 'midia/narracao.wav.palavras.json', ja_tinha: true}]);
+    expect(lerVideo().legendas).toEqual(antes);
+    // a pessoa regravou a narração com o mesmo nome: transcreve de novo, e as legendas esperam a decisão dela
+    estados['midia/narracao.wav'] = 'velha';
+    const r2 = await chamar(c, 'transcrever', {documento: 'video'});
+    expect(pedidos.map((x) => x.arquivo)).toEqual(['midia/narracao.wav']);
+    expect(r2.json.transcritos[0]).toMatchObject({audio_mudou: true});
+    expect(r2.json).toMatchObject({geradas: 0, legendas_de_audio_antigo: ['clipe-1']});
+    expect(lerVideo().legendas).toEqual(antes);
   });
 
   it('clipe que não existe vira erro claro', async () => {

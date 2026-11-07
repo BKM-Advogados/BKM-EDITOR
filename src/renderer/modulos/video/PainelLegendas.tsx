@@ -9,14 +9,14 @@ import type {EstadoTranscricao} from '../../../compartilhado/api';
 import {TEMA_NEUTRO, type DocCenas, type PropsCenas} from '../../../nucleo/cenas';
 import {formatoDoVideo} from '../../../nucleo/formatos';
 import {
-  arquivoDasPalavras, clipesDeVoz, localizar, POSICOES_LEGENDA, PREDEFINICOES_LEGENDA, resolverEstilo, segmentosEm, type EstiloLegenda, type IdEstiloLegenda, type PosicaoLegenda,
-  type SegmentoLegenda,
+  arquivoDaFala, arquivoDasPalavras, clipesDeVoz, localizar, POSICOES_LEGENDA, PREDEFINICOES_LEGENDA, resolverEstilo, segmentosEm, type EstiloLegenda, type IdEstiloLegenda, type PosicaoLegenda,
+  type EstadoDaFala, type SegmentoLegenda,
 } from '../../../nucleo/legendas';
 import {selecionar, trocar, useLoja} from '../../estado/loja';
 import {CabecalhoInspector, CampoCor, CampoDeslizante, CampoInterruptor, CampoSelecao, Secao} from '../../componentes/Campos';
 import {
-  assinarAndamento, cancelarTranscricao, dividir, editarTexto, excluirSegmento, exportarArquivo, gerarDasTranscricoes, importarArquivo, juntarComProxima, lerAndamento,
-  mudarEstilo, novaLegenda, substituirTudo, temTranscricao, transcreverEGerar, trocarPredefinicao,
+  assinarAndamento, cancelarTranscricao, dividir, editarTexto, estadoDasFalas, excluirSegmento, exportarArquivo, gerarDasTranscricoes, importarArquivo, juntarComProxima,
+  lerAndamento, mudarEstilo, novaLegenda, refazerLegendas, substituirTudo, transcreverEGerar, trocarPredefinicao,
 } from './acoes-legendas';
 import {aoQuadro, irPara, msAtual} from './tocador';
 import './legendas.css';
@@ -88,31 +88,40 @@ const Transcricao: React.FC<{documento: string; doc: DocCenas}> = ({documento, d
   const andamento = useSyncExternalStore(assinarAndamento, lerAndamento);
   const [estado, setEstado] = useState<EstadoTranscricao | null>(null);
   const [modelo, setModelo] = useState<'small' | 'base'>('small');
-  const [feitos, setFeitos] = useState<Record<string, boolean>>({});
+  const [falas, setFalas] = useState<Record<string, EstadoDaFala>>({});
   const clipes = clipesDeVoz(doc);
-  const arquivos = [...new Set(clipes.map((c) => c.clipe.arquivo))];
+  // a fala do clipe de voz limpa é a do original: limpar a voz não pede outra transcrição
+  const arquivos = [...new Set(clipes.map((c) => arquivoDaFala(c.clipe)))];
   const chave = arquivos.join('|');
   useEffect(() => {
     let vivo = true;
     void window.estudio.fala.estado(modelo).then((e) => vivo && setEstado(e)).catch(() => vivo && setEstado(null));
-    void Promise.all(arquivos.map(async (a) => [a, await temTranscricao(a)] as const)).then((r) => vivo && setFeitos(Object.fromEntries(r)));
+    void estadoDasFalas(arquivos).then((r) => vivo && setFalas(r));
     return () => {
       vivo = false;
     };
-  }, [chave, modelo, andamento === null]); // eslint-disable-line react-hooks/exhaustive-deps
-  const todos = arquivos.length > 0 && arquivos.every((a) => feitos[a]);
-  const algum = arquivos.some((a) => feitos[a]);
+  }, [chave, modelo, andamento === null, doc]); // eslint-disable-line react-hooks/exhaustive-deps
+  const comLegenda = new Set((doc.legendas?.segmentos ?? []).map((s) => s?.clipe));
+  const emDia = (a: string) => falas[a] === 'em_dia';
+  const algum = arquivos.some(emDia);
+  const faltaTranscrever = arquivos.some((a) => !emDia(a));
+  const faltaLegenda = clipes.some(({clipe}) => !comLegenda.has(clipe.id));
   return (
     <Secao titulo="Transcrever a fala" chave="legendas:transcrever">
       {!arquivos.length ? (
         <div className="nota-fala">Ponha a narração na linha do tempo ("+ Áudio → Narração…"): a fala dos clipes de voz vira legenda, com o nome do clipe ou da faixa como falante.</div>
       ) : (
         <div className="clipes-voz">
-          {clipes.map(({clipe, faixa}) => (
-            <div key={clipe.id} title={arquivoDasPalavras(clipe.arquivo)}>
-              {feitos[clipe.arquivo] ? <span className="ok">✓ </span> : '· '}{clipe.nome || clipe.arquivo.split('/').pop()} <span style={{color: 'var(--texto-3)'}}>({faixa.nome})</span>
-            </div>
-          ))}
+          {clipes.map(({clipe, faixa}) => {
+            const fala = arquivoDaFala(clipe);
+            const e = falas[fala];
+            return (
+              <div key={clipe.id} title={e === 'velha' ? `O áudio mudou depois da transcrição: ${fala}` : arquivoDasPalavras(fala)}>
+                {e === 'em_dia' ? <span className="ok">✓ </span> : e === 'velha' ? <span className="velha">↻ </span> : '· '}
+                {clipe.nome || clipe.arquivo.split('/').pop()} <span style={{color: 'var(--texto-3)'}}>({faixa.nome}{comLegenda.has(clipe.id) ? '' : ', sem legendas'})</span>
+              </div>
+            );
+          })}
         </div>
       )}
       {andamento ? (
@@ -123,13 +132,21 @@ const Transcricao: React.FC<{documento: string; doc: DocCenas}> = ({documento, d
         </div>
       ) : (
         <div className="linha-botoes">
-          <button className="bt principal mini" disabled={!arquivos.length || estado?.plataforma === false} onClick={() => void transcreverEGerar(documento, {modelo})}
-            title="Roda o whisper.cpp neste PC: nada sai da máquina">
-            <Mic /> {todos ? 'Gerar legendas de novo' : algum ? 'Transcrever o que falta' : 'Transcrever e gerar legendas'}
-          </button>
-          {algum && <button className="bt fantasma mini" onClick={() => void transcreverEGerar(documento, {modelo, refazer: true})} title="Transcreve de novo todos os clipes de voz">
-            <RefreshCw /> Transcrever de novo</button>}
-          {algum && !todos && <button className="bt fantasma mini" onClick={() => void gerarDasTranscricoes(documento)}>Só das transcritas</button>}
+          {faltaTranscrever ? (
+            <button className="bt principal mini" disabled={!arquivos.length || estado?.plataforma === false} onClick={() => void transcreverEGerar(documento, {modelo})}
+              title="Roda o whisper.cpp neste PC: nada sai da máquina. Os clipes que já têm legendas ficam como estão">
+              <Mic /> {algum ? 'Transcrever o que falta' : 'Transcrever e gerar legendas'}
+            </button>
+          ) : faltaLegenda ? (
+            <button className="bt principal mini" onClick={() => void gerarDasTranscricoes(documento)} title="Gera as legendas dos clipes que ainda não têm; as outras ficam como estão">
+              <Captions /> Gerar o que falta</button>
+          ) : (
+            <button className="bt principal mini" onClick={() => void refazerLegendas(documento)} title="Gera de novo as legendas da transcrição, guardando as palavras corrigidas à mão">
+              <Captions /> Refazer as legendas…</button>
+          )}
+          {algum && <button className="bt fantasma mini" onClick={() => void transcreverEGerar(documento, {modelo, refazer: true})} title="Transcreve de novo todos os clipes de voz e refaz as legendas">
+            <RefreshCw /> Transcrever de novo…</button>}
+          {algum && faltaTranscrever && faltaLegenda && <button className="bt fantasma mini" onClick={() => void gerarDasTranscricoes(documento)}>Só das transcritas</button>}
         </div>
       )}
       <CampoSelecao rotulo="Modelo" valor={modelo} opcoes={[['small', 'Small · erra pouco (190 MB)'], ['base', 'Base · 2× mais rápido (60 MB)']]} aoMudar={setModelo} />

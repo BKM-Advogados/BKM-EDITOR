@@ -117,7 +117,8 @@ export class SessaoProjeto {
       // o carrossel da Cliente: 1080×1920 a 30 qps até a animação dele aceitar outro formato
       const r = doc as Roteiro & DocVideo;
       if (typeof r.palavras !== 'string') return {erro: 'este vídeo não tem "tipo" nem narração (palavras); não sei montá-lo'};
-      const palavras = this.projeto.lerJson<Palavra[]>(r.palavras).doc;
+      const lido = this.projeto.lerJson<unknown>(r.palavras).doc;
+      const palavras = (Array.isArray(lido) ? lido : (lido as {palavras?: unknown} | null)?.palavras) as Palavra[]; // frente Fala: a transcrição na versão 2 traz a lista em `palavras`
       if (!Array.isArray(palavras) || !palavras.length) return {erro: `a transcrição da narração (${r.palavras}) está vazia`};
       const {props, trechos, avisos} = resolverRoteiro(r, palavras);
       return {

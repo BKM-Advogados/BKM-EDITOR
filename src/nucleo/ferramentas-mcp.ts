@@ -12,7 +12,7 @@ import {FORMATOS_IMAGEM, FORMATOS_VIDEO, formatoDoVideo} from './formatos';
 import {MARCAS_INICIAIS} from './marca';
 import {PastaMarcas} from './pasta-marcas';
 import {ehDocCenas, resolverCenas, type DocCenas} from './cenas';
-import {arquivoDasPalavras, clipesDeVoz, legendasDeArquivo, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt, type IdEstiloLegenda} from './legendas';
+import {arquivoDaFala, arquivoDasPalavras, clipesDeVoz, legendasDeArquivo, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt, type EstadoDaFala, type IdEstiloLegenda} from './legendas';
 import {CATALOGO_FONTES} from './catalogo-fontes';
 import {
   acharTrecho, caminhoTextoFonte, conferirDigitos, decodificarComAviso, entorno, estadoDoFato, hashTexto, limparHtml, nivelDe, numerosDe, paginar, proximoId,
@@ -301,7 +301,8 @@ const narracaoDe = (projeto: Projeto, doc: unknown): string | undefined => {
   const rel = (doc as {palavras?: unknown} | null)?.palavras;
   if (typeof rel !== 'string' || !rel.endsWith('.json')) return undefined;
   try {
-    const palavras = projeto.lerJson<unknown>(rel).doc;
+    const lido = projeto.lerJson<unknown>(rel).doc;
+    const palavras = Array.isArray(lido) ? lido : (lido as {palavras?: unknown} | null)?.palavras; // a transcrição da versão 2 (legendas.ts)
     if (!Array.isArray(palavras)) return undefined;
     const texto = palavras.map((p: {w?: unknown}) => (typeof p?.w === 'string' ? p.w : '')).filter(Boolean).join(' ');
     return texto || undefined;
@@ -522,6 +523,8 @@ const registrarPesquisa = (servidor: McpServer, projeto: Projeto, autor: string,
 export type TranscritorMcp = {
   transcrever: (projeto: Projeto, pedido: {arquivo: string; modelo?: 'base' | 'small'; vocabulario?: string; destino?: string}) =>
     Promise<{ok: boolean; palavras?: string; n?: number; duracao_s?: number; texto?: string; mensagem?: string; cancelado?: boolean}>;
+  /** A transcrição do arquivo ainda é do áudio como ele está (o carimbo do palavras.json)? Sem isto, vale a existência. */
+  conferir?: (projeto: Projeto, arquivo: string) => EstadoDaFala;
 };
 
 const LIMITE_TEXTO_TRANSCRITO = 4000;
@@ -537,7 +540,7 @@ const docCenasDe = (projeto: Projeto, documento?: string) => {
 
 const registrarFala = (servidor: McpServer, projeto: Projeto, autor: string, origem: string, transcritor: TranscritorMcp | undefined) => {
   servidor.registerTool('transcrever', {
-    description: 'Transcreve a fala no próprio PC (whisper.cpp, nada sai da máquina) e grava <arquivo>.palavras.json com o tempo de cada palavra ({w, s, e, p} em ms do arquivo), o formato que o carrossel da Cliente e as legendas leem. Dois usos: (1) "arquivo" (qualquer áudio ou vídeo do projeto, como a narração de um roteiro ou uma gravação para a pesquisa): devolve o texto; com "destino", grava em outro caminho (ex.: video/palavras.json do roteiro). (2) Vídeo de cenas: "clipe" ou "faixa" (ids de audio.faixas), ou nada para todas as faixas de voz; transcreve o que ainda não tem transcrição e, com legendas (padrão), gera as legendas do documento (segmentos por pausa, pontuação e largura, com o falante pelo nome do clipe ou da faixa). Na primeira vez baixa o whisper.cpp (9 MB) e o modelo (small, 190 MB) para %USERPROFILE%\\Estudio\\modelos\\whisper. Leva perto de metade da duração do áudio.',
+    description: 'Transcreve a fala no próprio PC (whisper.cpp, nada sai da máquina) e grava <arquivo>.palavras.json com o tempo de cada palavra ({w, s, e, p} em ms do arquivo), o formato que o carrossel da Cliente e as legendas leem. Dois usos: (1) "arquivo" (qualquer áudio ou vídeo do projeto, como a narração de um roteiro ou uma gravação para a pesquisa): devolve o texto; com "destino", grava em outro caminho (ex.: video/palavras.json do roteiro). (2) Vídeo de cenas: "clipe" ou "faixa" (ids de audio.faixas), ou nada para todas as faixas de voz; transcreve a fala que ainda não tem transcrição ou cuja tomada mudou depois dela (a do clipe de voz limpa é a do original) e, com legendas (padrão), gera as legendas dos clipes que ainda não têm (segmentos por pausa, pontuação e largura, com o falante pelo nome do clipe ou da faixa). Clipe que já tem legendas fica como está: para refazer, pergunte à pessoa e use refazer_legendas. Na primeira vez baixa o whisper.cpp (9 MB) e o modelo (small, 190 MB) para %USERPROFILE%\\Estudio\\modelos\\whisper. Leva perto de metade da duração do áudio.',
     inputSchema: {
       arquivo: z.string().optional().describe('caminho no projeto, ex.: midia/narracao.wav ou midia/video-exemplo.mp4'),
       destino: z.string().optional().describe('só com "arquivo": onde gravar as palavras (padrão: <arquivo>.palavras.json)'),
@@ -546,12 +549,13 @@ const registrarFala = (servidor: McpServer, projeto: Projeto, autor: string, ori
       faixa: z.string().optional().describe('id da faixa'),
       legendas: z.boolean().optional().describe('no vídeo de cenas, gerar as legendas (padrão: sim)'),
       estilo: z.enum(['classica', 'caixa', 'karaoke', 'faixa', 'discreta']).optional().describe('predefinição das legendas'),
-      refazer: z.boolean().optional().describe('transcrever de novo mesmo que o palavras.json já exista'),
+      refazer: z.boolean().optional().describe('transcrever de novo mesmo que a transcrição seja do áudio como ele está'),
+      refazer_legendas: z.boolean().optional().describe('refazer também as legendas dos clipes que já têm: as palavras corrigidas à mão que ainda caem no tempo da fala ficam; divisões, junções e tempos ajustados voltam ao automático. Pergunte à pessoa antes'),
       modelo: z.enum(['small', 'base']).optional().describe('small (padrão) erra menos; base é duas vezes mais rápido'),
       vocabulario: z.string().optional().describe('frase com termos que vão aparecer (nomes, siglas); o padrão puxa o vocabulário do direito do trabalho'),
     },
   }, seguro(async (a: {arquivo?: string; destino?: string; documento?: string; clipe?: string; faixa?: string; legendas?: boolean; estilo?: IdEstiloLegenda;
-    refazer?: boolean; modelo?: 'small' | 'base'; vocabulario?: string}) => {
+    refazer?: boolean; refazer_legendas?: boolean; modelo?: 'small' | 'base'; vocabulario?: string}) => {
     if (!transcritor) throw new ErroProjeto('este MCP não tem o transcritor: abra o projeto no Estúdio (no Windows) ou use o MCP por stdio (mcp/nucleo.ts)', 'patch');
     const pedido = (arquivo: string, destino?: string) => ({arquivo, destino, modelo: a.modelo, vocabulario: a.vocabulario});
     if (a.arquivo) {
@@ -566,26 +570,34 @@ const registrarFala = (servidor: McpServer, projeto: Projeto, autor: string, ori
     if (!clipes.length) {
       throw new ErroProjeto(a.clipe || a.faixa ? `clipe ou faixa não achado: ${a.clipe ?? a.faixa}` : 'o vídeo não tem clipe de narração: use "+ Áudio → Narração…" no app ou passe "arquivo"', 'nao_achado');
     }
-    const transcritos: {arquivo: string; palavras?: string; n?: number; duracao_s?: number; ja_tinha?: boolean}[] = [];
-    for (const arquivo of [...new Set(clipes.map((c) => c.clipe.arquivo))]) {
-      if (!a.refazer && projeto.existe(arquivoDasPalavras(arquivo))) {
+    const transcritos: {arquivo: string; palavras?: string; n?: number; duracao_s?: number; ja_tinha?: boolean; audio_mudou?: boolean}[] = [];
+    const estados: Record<string, EstadoDaFala> = {};
+    // a fala do clipe de voz limpa é a do original (mesmos tempos): limpar a voz não pede outra transcrição
+    for (const arquivo of [...new Set(clipes.map((c) => arquivoDaFala(c.clipe)))]) {
+      const estado = estados[arquivo] = transcritor.conferir ? transcritor.conferir(projeto, arquivo) : projeto.existe(arquivoDasPalavras(arquivo)) ? 'em_dia' : 'falta';
+      if (!a.refazer && estado === 'em_dia') {
         transcritos.push({arquivo, palavras: arquivoDasPalavras(arquivo), ja_tinha: true});
         continue;
       }
       const r = await transcritor.transcrever(projeto, pedido(arquivo));
       if (!r.ok) throw new ErroProjeto(r.mensagem ?? `a transcrição de ${arquivo} não terminou`, 'patch');
-      transcritos.push({arquivo, palavras: r.palavras, n: r.n, duracao_s: r.duracao_s});
+      transcritos.push({arquivo, palavras: r.palavras, n: r.n, duracao_s: r.duracao_s, ...(estado === 'velha' ? {audio_mudou: true} : {})});
     }
     if (a.legendas === false) return {documento: alvo, transcritos};
     // o documento pode ter mudado enquanto o whisper rodava: lê de novo e grava com a versão nova
     const atual = docCenasDe(projeto, alvo);
     const f = formatoDoVideo(atual.doc);
     const r = legendasDoDocumento(atual.doc, (c) => projeto.lerJson<unknown>(c).doc, {largura: f.largura, altura: f.altura, clipe: a.clipe, faixa: a.faixa,
-      estilo: a.estilo ? {...(atual.doc.legendas?.estilo ?? {}), predefinicao: a.estilo} : undefined});
+      estilo: a.estilo ? {...(atual.doc.legendas?.estilo ?? {}), predefinicao: a.estilo} : undefined, refazer: a.refazer_legendas === true});
+    // clipe com legendas da tomada antiga: não refaz sem a pessoa decidir
+    const desatualizadas = r.mantidos.filter((id) => clipes.some((c) => c.clipe.id === id && estados[arquivoDaFala(c.clipe)] === 'velha'));
+    const mantidos = r.mantidos.length ? {ja_tinham_legendas: r.mantidos, ...(desatualizadas.length ? {legendas_de_audio_antigo: desatualizadas} : {}),
+      nota: 'clipes que já tinham legendas ficaram como estavam; para refazer, pergunte à pessoa e chame de novo com refazer_legendas: true (as palavras corrigidas à mão no mesmo tempo ficam)'} : {};
+    if (!r.clipes) return {documento: alvo, transcritos, legendas: atual.doc.legendas?.segmentos?.length ?? 0, geradas: 0, ...mantidos, ...(r.faltam.length ? {sem_transcricao: r.faltam} : {})};
     const gravado = projeto.aplicarPatch({documento: atual.rel, versao_base: atual.versao, patch: [{op: 'add', path: '/legendas', value: r.legendas}], autor, origem,
-      rotulo: `legendas da fala (${r.legendas.segmentos.length})`});
-    return {documento: alvo, versao: gravado.versao, transcritos, legendas: r.legendas.segmentos.length, estilo: r.legendas.estilo?.predefinicao,
-      ...(r.faltam.length ? {sem_transcricao: r.faltam} : {}),
+      rotulo: `legendas da fala (${r.geradas})`});
+    return {documento: alvo, versao: gravado.versao, transcritos, legendas: r.legendas.segmentos.length, geradas: r.geradas, estilo: r.legendas.estilo?.predefinicao,
+      ...(r.corrigidas ? {corrigidas_a_mao_mantidas: r.corrigidas} : {}), ...mantidos, ...(r.faltam.length ? {sem_transcricao: r.faltam} : {}),
       primeiras: r.legendas.segmentos.slice(0, 5).map((s) => ({id: s.id, em: s.em, sai: s.sai, texto: s.texto, falante: s.falante}))};
   }));
 

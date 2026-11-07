@@ -55,9 +55,16 @@ conforme o processador (não medido em outra máquina).
 
 ### Formato do palavras.json
 
-`[{"w": "Recebeu", "s": 280, "e": 500, "p": 0.857}, …]`: palavra, começo e fim **em ms do arquivo** e a probabilidade
-média dos tokens. É o formato que o app já lê (o `video/palavras.json` do C2 e o tipo `Palavra` do resolvedor estão
-em ms; o brief dizia segundos, mas o app nunca leu segundos). O arquivo fica ao lado do áudio e entra no git.
+Ao lado do áudio, na **versão 2**: `{"versao": 2, "fonte": {"tamanho", "modificado_ms", "sha256"}, "modelo": "small",
+"palavras": [{"w": "Recebeu", "s": 280, "e": 500, "p": 0.857}, …]}`: palavra, começo e fim **em ms do arquivo** e a
+probabilidade média dos tokens (o app sempre leu ms; o brief dizia segundos). `fonte` é o carimbo do áudio transcrito,
+o mesmo do envelope do som: tamanho e data iguais, a transcrição vale; mesmo tamanho e outra data (cópia, git clone), o
+sha256 decide; outro tamanho, ou a lista sem carimbo da versão 1, conta como **velha** e é transcrita de novo. Assim a
+tomada regravada com o mesmo nome não fica com o texto da antiga. Com `destino` (o `video/palavras.json` do roteiro da
+Cliente) grava só a lista, o formato do roteiro; quem lê o roteiro aceita os dois. O arquivo entra no git.
+
+**Voz limpa:** a fala do clipe é a do arquivo da pessoa (`original`) quando o clipe toca a versão limpa, que tem os
+mesmos tempos (`arquivoDaFala`). Limpar a voz, ou voltar ao original, não pede outra transcrição nem tira o ✓.
 
 ### Falantes
 
@@ -73,7 +80,7 @@ Whisper em ONNX pelo `@huggingface/transformers` (Apache-2.0), sem executável �
 
 | Ferramenta | Entrada | Faz |
 |---|---|---|
-| `transcrever` | `arquivo?`, `destino?`, `documento?`, `clipe?`, `faixa?`, `legendas?`, `estilo?`, `refazer?`, `modelo?`, `vocabulario?` | Uma ferramenta para os dois usos do plano. Com `arquivo` (qualquer áudio ou vídeo do projeto: a narração de um roteiro da Cliente, uma gravação para a pesquisa), grava as palavras ao lado ou em `destino` (ex.: `video/palavras.json`) e devolve o texto (até 4.000 caracteres). No vídeo de cenas, transcreve os clipes de voz que ainda não têm transcrição (ou todos, com `refazer`) e gera as legendas do documento (padrão), pelo `aplicar_patch` de sempre (diário e versão) |
+| `transcrever` | `arquivo?`, `destino?`, `documento?`, `clipe?`, `faixa?`, `legendas?`, `estilo?`, `refazer?`, `refazer_legendas?`, `modelo?`, `vocabulario?` | Uma ferramenta para os dois usos do plano. Com `arquivo` (qualquer áudio ou vídeo do projeto: a narração de um roteiro da Cliente, uma gravação para a pesquisa), grava as palavras ao lado ou em `destino` (ex.: `video/palavras.json`) e devolve o texto (até 4.000 caracteres). No vídeo de cenas, transcreve a fala que ainda não tem transcrição ou cuja tomada mudou (ou toda, com `refazer`) e gera as legendas **dos clipes que ainda não têm** (padrão), pelo `aplicar_patch` de sempre (diário e versão). Clipe com legendas fica como está e volta em `ja_tinham_legendas` (e em `legendas_de_audio_antigo`, se a tomada mudou); `refazer_legendas` refaz, levando as palavras corrigidas à mão |
 | `exportar_legendas` | `documento?`, `formatos?`, `nome?`, `falantes_no_srt?` | `saidas/<título>.srt` e `.vtt`, nos tempos de saída |
 | `importar_legendas` | `arquivo`, `documento?`, `estilo?` | lê um SRT ou VTT do projeto e troca as legendas |
 
@@ -96,7 +103,7 @@ repositório. Sem transcritor, a ferramenta diz que não tem, sem falhar calada.
     {"id": "leg-1", "em": 500, "sai": 2750, "texto": "Recebeu proposta para mudar", "falante": "Narração", "clipe": "n1",
      "palavras": [{"w": "Recebeu", "s": 780, "e": 1000}, …]}
   ],
-  "origens": [{"clipe": "n1", "arquivo": "midia/narracao.wav", "palavras": "midia/narracao.wav.palavras.json", "em": 500, "corte_ms": 0}]
+  "origens": [{"clipe": "n1", "arquivo": "midia/narracao.wav", "palavras": "midia/narracao.wav.palavras.json", "em": 500, "corte_ms": 0, "sha256": "9f2c…"}]
 }
 ```
 
@@ -160,9 +167,14 @@ mesmo `renderMedia`, então o MP4 sai com a legenda; `legendas.oculto` tira do v
   selecionada aparam o começo e o fim; Delete exclui; o olho esconde do vídeo. Sem legendas, a faixa convida a
   transcrever ou importar.
 - **Painel das legendas** (`PainelLegendas.tsx`), no lugar das Propriedades quando a seleção é a faixa ou uma legenda:
-  - *Transcrever a fala*: os clipes de voz com ✓ quando já têm transcrição, o botão (Transcrever e gerar legendas,
-    Transcrever o que falta, Gerar legendas de novo, Transcrever de novo), o modelo (small ou base), o que ainda vai
-    baixar e, durante, o andamento com **Cancelar**.
+  - *Transcrever a fala*: os clipes de voz com ✓ quando a transcrição é do áudio como ele está, ↻ quando a tomada
+    mudou depois dela e "sem legendas" quando o clipe ainda não tem; o botão (Transcrever e gerar legendas, Transcrever
+    o que falta, Gerar o que falta, Refazer as legendas…, Transcrever de novo…), o modelo (small ou base), o que ainda
+    vai baixar e, durante, o andamento com **Cancelar**. **Gerar faz só o que falta:** transcreve a fala que falta ou
+    mudou e gera as legendas dos clipes que não têm; o clipe que já tem legendas fica como está. Refazer pede
+    confirmação e leva as palavras corrigidas à mão que ainda caem no tempo da fala (a mesma tomada, pelo sha256 da
+    origem); divisões, junções e tempos ajustados voltam ao automático. Se a tomada de um clipe com legendas mudou, o
+    app transcreve de novo e pergunta antes de refazer as legendas dele. Legendas importadas ou criadas à mão ficam.
   - *Estilo*: as cinco predefinições e os ajustes acima.
   - *Localizar e substituir* (fechada de início): sem diferença de caixa e acento por padrão, ou com; palavra inteira;
     conta as legendas achadas, destaca na lista e substitui em todas de uma vez (o tempo das palavras fica).
