@@ -215,13 +215,24 @@ describe('resolver: as legendas andam com o clipe', () => {
     expect(r.avisos.join(' ')).toContain('uma legenda está sem começo, fim ou texto');
   });
 
-  it('texto editado à mão (outro número de palavras) é o que aparece, com o tempo das palavras estimado', () => {
+  it('texto editado à mão (outro número de palavras) é o que aparece, com o tempo espalhado no das palavras gravadas', () => {
     const doc = base();
+    const gravadas = doc.legendas!.segmentos[0].palavras!;
     doc.legendas!.segmentos[0].texto = 'A primeira regra de todas.';
     const s = resolverCenas(doc).props.legendas_cenas!.segmentos[0];
     expect(s.palavras.map((p) => p.w)).toEqual(['A', 'primeira', 'regra', 'de', 'todas.']);
-    expect(s.palavras[0].s).toBe(s.em);
-    expect(s.palavras[4].e).toBe(s.sai);
+    expect(s.palavras[0].s).toBe(gravadas[0].s);
+    expect(s.palavras[4].e).toBe(gravadas[gravadas.length - 1].e);
+  });
+
+  it('texto corrigido por patch com o mesmo número de palavras guarda o tempo de cada uma (video-N5, transversal-N8)', () => {
+    const doc = base();
+    const s0 = doc.legendas!.segmentos[0];
+    const ws = s0.texto.split(' ');
+    doc.legendas!.segmentos[0].texto = [ws[0].toUpperCase(), ...ws.slice(1)].join(' ');
+    const s = resolverCenas(doc).props.legendas_cenas!.segmentos[0];
+    expect(s.palavras[0].w).toBe(ws[0].toUpperCase());
+    expect(s.palavras.map((p) => [p.s, p.e])).toEqual(s0.palavras!.map((p) => [p.s, p.e]));
   });
 
   it('o estilo pega as cores e a fonte do tema, e o que o documento muda por cima', () => {

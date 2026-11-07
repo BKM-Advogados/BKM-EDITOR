@@ -81,6 +81,8 @@ Whisper em ONNX pelo `@huggingface/transformers` (Apache-2.0), sem executável �
 | Ferramenta | Entrada | Faz |
 |---|---|---|
 | `transcrever` | `arquivo?`, `destino?`, `documento?`, `clipe?`, `faixa?`, `legendas?`, `estilo?`, `refazer?`, `refazer_legendas?`, `modelo?`, `vocabulario?` | Uma ferramenta para os dois usos do plano. Com `arquivo` (qualquer áudio ou vídeo do projeto: a narração de um roteiro da Cliente, uma gravação para a pesquisa), grava as palavras ao lado ou em `destino` (ex.: `video/palavras.json`; nunca o manifesto, um documento, `comentarios.json`, a pesquisa, `.estudio/` ou um .json que não seja lista de palavras, porque grava por cima e fora do diário) e devolve o texto (até 4.000 caracteres). No vídeo de cenas, transcreve a fala que ainda não tem transcrição ou cuja tomada mudou (ou toda, com `refazer`) e gera as legendas **dos clipes que ainda não têm** (padrão), pelo `aplicar_patch` de sempre (diário e versão). Clipe com legendas fica como está e volta em `ja_tinham_legendas` (e em `legendas_de_audio_antigo`, se a tomada mudou); `refazer_legendas` refaz, levando as palavras corrigidas à mão |
+| `ler_legendas` | `documento?`, `de?`, `ate?` | as legendas nos tempos da tela (id, em, sai, texto, falante), já com o clipe de voz no lugar em que está |
+| `editar_legenda` | `documento?`, `id`, `texto?`, `em?`, `sai?` | corrige o texto (cada palavra guarda o tempo da que estava no lugar, como na lista do app) e o tempo, dado como na tela: o app desconta o quanto o clipe andou desde que a legenda nasceu. Entrar e sair o mesmo tanto leva as palavras junto; mudar uma ponta apara |
 | `exportar_legendas` | `documento?`, `formatos?`, `nome?`, `falantes_no_srt?` | `saidas/<título>.srt` e `.vtt`, nos tempos de saída |
 | `importar_legendas` | `arquivo`, `documento?`, `estilo?` | lê um SRT ou VTT do projeto e troca as legendas |
 
@@ -107,9 +109,13 @@ repositório. Sem transcritor, a ferramenta diz que não tem, sem falhar calada.
 }
 ```
 
-Tempos em ms da linha do tempo do vídeo. Só `predefinicao` é obrigatória no estilo; o resto sobrescreve a
-predefinição, e as cores e a fonte vêm do `tema` (o kit de marca). `palavras` é opcional: sem ela (SRT importado, texto
-mudado à mão), o tempo de cada palavra é estimado pelo tamanho dela. `"\n"` no texto quebra a linha.
+Tempos em ms da linha do tempo do vídeo **de quando a legenda nasceu**: a legenda de um clipe anda com ele, e a tela
+mostra o tempo guardado mais o quanto o clipe andou (por isso o Claude lê e corrige por `ler_legendas` e
+`editar_legenda`, e o CLAUDE.md do projeto diz isso). Só `predefinicao` é obrigatória no estilo; o resto sobrescreve a
+predefinição, e as cores e a fonte vêm do `tema` (o kit de marca). `palavras` é opcional: sem ela (SRT importado), o
+tempo de cada palavra é estimado pelo tamanho dela. Texto mudado sem mexer em `palavras` (um patch) guarda o tempo:
+com o mesmo número de palavras, cada uma fica com o tempo da que estava no lugar; com outro, elas se espalham no tempo
+que as gravadas ocupavam (`palavrasDe`, a mesma regra do `comTexto` da lista). `"\n"` no texto quebra a linha.
 
 ### Gerar a partir da fala (`src/nucleo/legendas.ts`)
 

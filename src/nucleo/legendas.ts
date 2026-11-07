@@ -471,13 +471,26 @@ export const estimarPalavras = (texto: string, em: number, sai: number): Palavra
   });
 };
 
-/** As palavras do segmento: as gravadas, se ainda batem com o texto; senão, estimadas no tempo do segmento. */
+/** As palavras do segmento, sempre com o texto dele. Com as palavras gravadas e o mesmo número de palavras no texto,
+ *  cada uma fica com o tempo da que estava no lugar (o texto corrigido por patch, sem mexer em `palavras`, não perde o
+ *  compasso da fala); com outro número, espalham no tempo que as gravadas ocupavam. Sem palavras gravadas (SRT
+ *  importado), o tempo é estimado pelo tamanho dentro do segmento. É a regra do comTexto, que a lista do app usa. */
 export const palavrasDe = (s: SegmentoLegenda): PalavraLegenda[] => {
   const ws = tokensDe(s.texto);
-  if (Array.isArray(s.palavras) && s.palavras.length === ws.length && s.palavras.every((p, i) => p.w === ws[i] && Number.isFinite(p.s) && Number.isFinite(p.e))) {
-    return s.palavras.map((p) => ({...p}));
-  }
-  return estimarPalavras(s.texto, s.em, s.sai);
+  const gravadas = Array.isArray(s.palavras) && s.palavras.length && s.palavras.every((p) => p && Number.isFinite(p.s) && Number.isFinite(p.e)) ? s.palavras : undefined;
+  if (!gravadas || !ws.length) return estimarPalavras(s.texto, s.em, s.sai);
+  if (gravadas.length === ws.length) return gravadas.map((p, i) => ({w: ws[i], s: p.s, e: p.e}));
+  return estimarPalavras(s.texto, gravadas[0].s, gravadas[gravadas.length - 1].e);
+};
+
+/** Quanto a legenda anda na tela desde que nasceu: o "zero do arquivo" do clipe de voz agora (`em − corte_ms`) menos o
+ *  de quando ela foi gerada (`origens`). Tempo na tela = tempo guardado + deslocamento; 0 sem clipe ou sem origem. */
+export const deslocamentoDaLegenda = (s: {clipe?: string}, origens: OrigemLegendas[] | undefined, clipes: {id: string; em: number; corte_ms?: number}[]): number => {
+  if (!s.clipe) return 0;
+  const c = clipes.find((x) => x.id === s.clipe);
+  const o = (Array.isArray(origens) ? origens : []).find((x) => x.clipe === s.clipe);
+  if (!c || !o) return 0;
+  return ((Number(c.em) || 0) - (Number(c.corte_ms) || 0)) - ((Number(o.em) || 0) - (Number(o.corte_ms) || 0));
 };
 
 /** Troca o texto do segmento sem perder o tempo das palavras: com o mesmo número de palavras, cada uma fica com o tempo

@@ -160,6 +160,36 @@ describe('MCP: transcrever e legendas', () => {
     expect((await chamar(c, 'transcrever', {arquivo: 'midia/fonte.mp4', destino: 'video/palavras.json'})).erro).toBe(false);
   });
 
+  it('ler_legendas dá os tempos da tela; editar_legenda corrige texto e tempo sem perder o compasso (som-N7, video-N5)', async () => {
+    const c = await conectar(transcritor);
+    const mover = (em: number) => projeto.aplicarPatch({documento: 'video/video.json', versao_base: projeto.lerJson('video/video.json').versao, autor: 'pessoa',
+      origem: 'interface', patch: [{op: 'replace', path: '/audio/faixas/0/clipes/0/em', value: em}]});
+    mover(2500); // a pessoa arrastou a narração 2 s para a frente depois de gerar
+    const guardada = lerVideo().legendas!.segmentos[0];
+    const lidas = (await chamar(c, 'ler_legendas', {documento: 'video'})).json;
+    expect(lidas.legendas[0]).toMatchObject({id: guardada.id, em: guardada.em + 2000, sai: guardada.sai + 2000});
+    expect((await chamar(c, 'ler_legendas', {documento: 'video', de: guardada.sai + 2000, ate: guardada.sai + 2001})).json.legendas.map((s: {id: string}) => s.id)).not.toContain(guardada.id);
+    // texto: a palavra corrigida guarda o tempo dela
+    const ws = guardada.texto.split(' ');
+    const texto = [ws[0].toUpperCase(), ...ws.slice(1)].join(' ');
+    const r = await chamar(c, 'editar_legenda', {documento: 'video', id: guardada.id, texto});
+    expect(r.json.legenda).toMatchObject({texto, em: guardada.em + 2000});
+    const depois = lerVideo().legendas!.segmentos[0];
+    expect(depois.palavras!.map((p) => [p.w, p.s, p.e])).toEqual(guardada.palavras!.map((p, i) => [i ? p.w : ws[0].toUpperCase(), p.s, p.e]));
+    // tempo: o da tela vira o guardado; entrar e sair 300 ms depois leva as palavras junto
+    const tela = lidas.legendas[0];
+    const r2 = await chamar(c, 'editar_legenda', {documento: 'video', id: guardada.id, em: tela.em + 300, sai: tela.sai + 300});
+    expect(r2.json.legenda).toMatchObject({em: tela.em + 300, sai: tela.sai + 300});
+    const movida = lerVideo().legendas!.segmentos[0];
+    expect([movida.em, movida.sai]).toEqual([guardada.em + 300, guardada.sai + 300]);
+    expect(movida.palavras![0].s).toBe(guardada.palavras![0].s + 300);
+    expect((await chamar(c, 'editar_legenda', {documento: 'video', id: 'nao-ha', texto: 'x'})).texto).toContain('legenda não achada');
+    expect((await chamar(c, 'editar_legenda', {documento: 'video', id: guardada.id, em: tela.sai, sai: tela.sai + 50})).erro).toBe(true);
+    // volta ao lugar de antes, para os testes seguintes
+    await chamar(c, 'editar_legenda', {documento: 'video', id: guardada.id, texto: guardada.texto, em: tela.em, sai: tela.sai});
+    mover(500);
+  });
+
   it('clipe que não existe vira erro claro', async () => {
     const c = await conectar(transcritor);
     const r = await chamar(c, 'transcrever', {documento: 'video', clipe: 'nao-ha'});

@@ -12,7 +12,7 @@ import {FORMATOS_IMAGEM, FORMATOS_VIDEO, formatoDoVideo} from './formatos';
 import {MARCAS_INICIAIS} from './marca';
 import {PastaMarcas} from './pasta-marcas';
 import {ehDocCenas, resolverCenas, type DocCenas} from './cenas';
-import {arquivoDaFala, arquivoDasPalavras, clipesDeVoz, legendasDeArquivo, recusaDoDestinoNoProjeto, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt, type EstadoDaFala, type IdEstiloLegenda} from './legendas';
+import {arquivoDaFala, arquivoDasPalavras, clipesDeVoz, comTexto, deslocamentoDaLegenda, legendasDeArquivo, recusaDoDestinoNoProjeto, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt, type EstadoDaFala, type IdEstiloLegenda} from './legendas';
 import {CATALOGO_FONTES} from './catalogo-fontes';
 import {
   acharTrecho, caminhoTextoFonte, conferirDigitos, decodificarComAviso, entorno, estadoDoFato, hashTexto, limparHtml, nivelDe, numerosDe, paginar, proximoId,
@@ -601,6 +601,57 @@ const registrarFala = (servidor: McpServer, projeto: Projeto, autor: string, ori
     return {documento: alvo, versao: gravado.versao, transcritos, legendas: r.legendas.segmentos.length, geradas: r.geradas, estilo: r.legendas.estilo?.predefinicao,
       ...(r.corrigidas ? {corrigidas_a_mao_mantidas: r.corrigidas} : {}), ...mantidos, ...(r.faltam.length ? {sem_transcricao: r.faltam} : {}),
       primeiras: r.legendas.segmentos.slice(0, 5).map((s) => ({id: s.id, em: s.em, sai: s.sai, texto: s.texto, falante: s.falante}))};
+  }));
+
+  // as legendas nos tempos da tela: o documento guarda o tempo de quando a legenda nasceu, e o app soma o quanto o clipe
+  // de voz andou depois (origens); ler e corrigir por aqui evita o Claude escrever o tempo da tela no campo guardado
+  const naTela = (doc: DocCenas) => resolverCenas(doc).props.legendas_cenas?.segmentos ?? [];
+  const resumo = (s: {id: string; em: number; sai: number; texto: string; falante?: string}) => ({id: s.id, em: s.em, sai: s.sai, texto: s.texto, ...(s.falante ? {falante: s.falante} : {})});
+
+  servidor.registerTool('ler_legendas', {
+    description: 'As legendas do vídeo de cenas como aparecem na tela: id, em e sai em ms do vídeo (já com o clipe de voz no lugar em que está agora), texto e falante. "de" e "ate" (ms) pegam só as de um trecho. Para corrigir, use editar_legenda com esses tempos.',
+    inputSchema: {documento: z.string().optional(), de: z.number().optional().describe('ms do vídeo'), ate: z.number().optional().describe('ms do vídeo')},
+  }, seguro(({documento, de, ate}: {documento?: string; de?: number; ate?: number}) => {
+    const {alvo, doc} = docCenasDe(projeto, documento);
+    const todas = naTela(doc);
+    const lista = todas.filter((s) => (de === undefined || s.sai > de) && (ate === undefined || s.em < ate));
+    return {documento: alvo, total: todas.length, legendas: lista.slice(0, 300).map(resumo), ...(lista.length > 300 ? {cortado: true} : {})};
+  }));
+
+  servidor.registerTool('editar_legenda', {
+    description: 'Corrige uma legenda do vídeo de cenas pelo id: o texto (cada palavra fica com o tempo da que estava no lugar, como na lista do app) e/ou quando ela entra e sai, em ms do vídeo como aparece na tela (ler_legendas). Use no lugar de aplicar_patch em /legendas/segmentos: o tempo guardado lá é o de quando a legenda nasceu. Devolve a legenda como fica na tela.',
+    inputSchema: {
+      documento: z.string().optional(),
+      id: z.string().describe('id da legenda (leg-1, leg-2…)'),
+      texto: z.string().optional().describe('o texto corrigido; "\\n" quebra a linha'),
+      em: z.number().optional().describe('ms do vídeo em que entra, como na tela'),
+      sai: z.number().optional().describe('ms do vídeo em que sai, como na tela'),
+    },
+  }, seguro(({documento, id, texto, em, sai}: {documento?: string; id: string; texto?: string; em?: number; sai?: number}) => {
+    const {alvo, rel, doc, versao} = docCenasDe(projeto, documento);
+    const segs = Array.isArray(doc.legendas?.segmentos) ? doc.legendas.segmentos : [];
+    const i = segs.findIndex((s) => s?.id === id);
+    if (i < 0) throw new ErroProjeto(`legenda não achada: ${id} (ler_legendas lista os ids)`, 'nao_achado');
+    if (texto === undefined && em === undefined && sai === undefined) throw new ErroProjeto('diga o texto, o em ou o sai novos', 'patch');
+    let s = segs[i];
+    if (texto !== undefined) {
+      if (!texto.trim()) throw new ErroProjeto('texto vazio: para tirar a legenda, use aplicar_patch com remove em /legendas/segmentos/N', 'patch');
+      s = comTexto(s, texto);
+    }
+    if (em !== undefined || sai !== undefined) {
+      const desloc = deslocamentoDaLegenda(s, doc.legendas?.origens, (doc.audio?.faixas ?? []).flatMap((f) => f.clipes ?? []));
+      const novoEm = em !== undefined ? Math.round(em - desloc) : s.em;
+      const novoSai = sai !== undefined ? Math.round(sai - desloc) : s.sai;
+      if (novoEm + desloc < 0 || novoSai - novoEm < 200) throw new ErroProjeto('a legenda entra em 0 ms ou depois e dura pelo menos 200 ms', 'patch');
+      // entrar e sair o mesmo tanto mais cedo ou mais tarde leva as palavras junto; mudar só uma ponta apara
+      const d = novoEm - s.em;
+      const junto = d !== 0 && novoSai - s.sai === d && Array.isArray(s.palavras);
+      s = {...s, em: novoEm, sai: novoSai, ...(junto ? {palavras: s.palavras!.map((p) => ({...p, s: p.s + d, e: p.e + d}))} : {})};
+    }
+    const gravado = projeto.aplicarPatch({documento: rel, versao_base: versao, autor, origem, rotulo: `legenda ${id}`,
+      patch: [{op: 'test', path: `/legendas/segmentos/${i}/id`, value: id}, {op: 'replace', path: `/legendas/segmentos/${i}`, value: s}]});
+    const agora = naTela(projeto.lerJson<DocCenas>(rel).doc).find((x) => x.id === id);
+    return {ok: true, documento: alvo, versao: gravado.versao, legenda: agora ? resumo(agora) : null};
   }));
 
   servidor.registerTool('exportar_legendas', {
