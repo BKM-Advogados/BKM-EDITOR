@@ -16,7 +16,7 @@
 
 ## Instalar
 
-1. Rode o **`Estudio-Setup-0.2.0.exe`**.
+1. Rode o **`Estudio-Setup-0.3.0.exe`**.
 2. Na primeira vez, o Windows pode mostrar "O Windows protegeu o computador", porque o app ainda não tem assinatura
    digital. Clique em **Mais informações** e depois em **Executar assim mesmo**.
 3. O instalador não pede administrador. Ele instala na sua pasta de usuário (`%LocalAppData%\Programs\Estudio`), cria

@@ -206,7 +206,7 @@ const api: ApiEstudio = {
     d.titulo = titulo;
     return d;
   },
-  ambiente: async () => ({perfil: {nome: 'padrao', sessoes_claude: 4, escala_previa: 0.75, pixel_ratio: 1.5}, git: true, claude: true, versao: '0.2.0',
+  ambiente: async () => ({perfil: {nome: 'padrao', sessoes_claude: 4, escala_previa: 0.75, pixel_ratio: 1.5}, git: true, claude: true, versao: '0.3.0',
     pasta_padrao: 'C:\\Users\\pessoa\\Estudio'}),
   recentes: async () => structuredClone(recentes),
   esquecerRecente: async (raiz) => {
