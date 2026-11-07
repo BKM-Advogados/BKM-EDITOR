@@ -2,7 +2,8 @@
 // lista, número, imagem) que entram e saem em ms contados do começo da cena. Posição e tamanho são frações do quadro
 // (0 a 1), e a letra é uma fração do lado menor: trocar 9:16 por 16:9 não desmonta o layout. O som é opcional: `audio`
 // traz faixas (narração, música, efeitos) com clipes em ms da linha do tempo (audio.ts); a transcrição da narração fica
-// para a Onda B. O carrossel narrado da Cliente continua no resolvedor de roteiro.
+// para a Onda B. O carrossel narrado da Cliente continua no resolvedor de roteiro. `refs` (opcional, no bloco e na cena) cita
+// os fatos da pesquisa (`F3`, em pesquisa/pesquisa.json) que sustentam o que está escrito; o resolvedor só repassa.
 import {resolverAudio, type AudioCenas, type AudioP, type Envelope} from './audio';
 import type {Efeito} from './efeitos';
 import {formatoDoVideo, type Formato} from './formatos';
@@ -31,9 +32,10 @@ export type BlocoCenas = {
   cor?: string;
   peso?: number;
   alinhar?: 'esquerda' | 'centro' | 'direita';
+  refs?: string[]; // ids dos fatos da pesquisa (F1, F2…) que este bloco afirma
 };
 
-export type CenaCenas = {id: string; nome?: string; duracao_ms: number; fundo?: string; blocos: BlocoCenas[]};
+export type CenaCenas = {id: string; nome?: string; duracao_ms: number; fundo?: string; blocos: BlocoCenas[]; refs?: string[]};
 
 export type TemaCenas = {fundo: string; texto: string; destaque: string; suave: string; fonte: string};
 
@@ -113,7 +115,7 @@ export const comIdsNovos = <T>(obj: T, doc: unknown, base: string): T => {
 };
 
 export type BlocoCenasP = BlocoCenas & {origem: string; em: number; sai: number};
-export type CenaCenasP = {origem: string; id: string; nome?: string; tipo: 'cena'; n: number; t_in: number; t_out: number; fundo: string; blocos: BlocoCenasP[]};
+export type CenaCenasP = {origem: string; id: string; nome?: string; tipo: 'cena'; n: number; t_in: number; t_out: number; fundo: string; blocos: BlocoCenasP[]; refs?: string[]};
 export type PropsCenas = {
   composicao: 'VideoCenas';
   duracao_ms: number;
@@ -153,7 +155,8 @@ export const resolverCenas = (doc: DocCenas, opcoes: OpcoesResolver = {}): {prop
       if (numero(b.em, 0) > dur) avisos.push(`o bloco ${j + 1} da cena ${i + 1} entra depois do fim da cena`);
       return {...b, x: numero(b.x, 0.1), y: numero(b.y, 0.4), largura: numero(b.largura, 0.8), origem: `/cenas/${i}/blocos/${j}`, em: t_in + em, sai: t_in + sai};
     });
-    return {origem: `/cenas/${i}`, id: c.id, nome: c.nome, tipo: 'cena', n: i + 1, t_in, t_out, fundo: c.fundo ?? tema.fundo, blocos};
+    return {origem: `/cenas/${i}`, id: c.id, nome: c.nome, tipo: 'cena', n: i + 1, t_in, t_out, fundo: c.fundo ?? tema.fundo, blocos,
+      ...(Array.isArray(c.refs) ? {refs: c.refs} : {})};
   });
   const duracao_ms = Math.max(1000, t);
   const som = resolverAudio(doc.audio, duracao_ms, opcoes.envelopes);

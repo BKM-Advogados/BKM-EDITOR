@@ -28,6 +28,17 @@ const doc = (): DocCenas => ({
 });
 
 describe('lâmina', () => {
+  it('os fatos citados (refs) vão junto para as duas metades', () => {
+    const d = doc();
+    d.cenas[0].refs = ['F1'];
+    d.cenas[0].blocos[1].refs = ['F2', 'F5'];
+    const r = dividirCena(d, 'a', 2000)!;
+    expect(r.primeira.refs).toEqual(['F1']);
+    expect(r.segunda.refs).toEqual(['F1']);
+    expect(r.primeira.blocos.find((b) => b.id === 'a-texto')?.refs).toEqual(['F2', 'F5']);
+    expect(r.segunda.blocos.find((b) => b.tipo === 'texto')?.refs).toEqual(['F2', 'F5']);
+  });
+
   it('reparte os blocos: o de antes fica, o de depois vai, o que atravessa vai aparado para as duas', () => {
     const r = dividirCena(doc(), 'a', 2000)!;
     expect(r.indice).toBe(0);

@@ -1,0 +1,66 @@
+[
+  {
+    "id": "C1-01",
+    "pauta": "C1",
+    "afirmacao": "A empresa tem até 10 dias, contados do fim do contrato, para pagar a rescisão.",
+    "trecho": "§ 6o A entrega ao empregado de documentos que comprovem a comunicação da extinção contratual aos órgãos competentes bem como o pagamento dos valores constantes do instrumento de rescisão ou recibo de quitação deverão ser efetuados até dez dias contados a partir do término do contrato.",
+    "verdadeiro": true,
+    "localizador": "CLT, art. 477, § 6º"
+  },
+  {
+    "id": "C1-02",
+    "pauta": "C1",
+    "afirmacao": "Se a empresa atrasar a rescisão, ela paga ao trabalhador uma multa no valor de um salário.",
+    "trecho": "§ 8º - A inobservância do disposto no § 6º deste artigo sujeitará o infrator à multa de 160 BTN, por trabalhador, bem assim ao pagamento da multa a favor do empregado, em valor equivalente ao seu salário, devidamente corrigido pelo índice de variação do BTN, salvo quando, comprovadamente, o trabalhador der causa à mora.",
+    "verdadeiro": true,
+    "localizador": "CLT, art. 477, § 8º"
+  },
+  {
+    "id": "C1-05",
+    "pauta": "C1",
+    "afirmacao": "Trabalhador analfabeto tem de receber a rescisão em dinheiro ou depósito no banco, e não em cheque.",
+    "trecho": "§ 4o O pagamento a que fizer jus o empregado será efetuado: (Redação dada pela Lei nº 13.467, de 2017)\nI - em dinheiro, depósito bancário ou cheque visado, conforme acordem as partes; ou (Incluído pela Lei nº 13.467, de 2017)\nII - em dinheiro ou depósito bancário quando o empregado for analfabeto.",
+    "verdadeiro": true,
+    "localizador": "CLT, art. 477, § 4º, I e II"
+  },
+  {
+    "id": "C1-06",
+    "pauta": "C1",
+    "afirmacao": "A empresa tem até 15 dias, contados do fim do contrato, para pagar a rescisão.",
+    "trecho": "§ 6o A entrega ao empregado de documentos que comprovem a comunicação da extinção contratual aos órgãos competentes bem como o pagamento dos valores constantes do instrumento de rescisão ou recibo de quitação deverão ser efetuados até dez dias contados a partir do término do contrato.",
+    "verdadeiro": false,
+    "localizador": "CLT, art. 477, § 6º"
+  },
+  {
+    "id": "C1-08",
+    "pauta": "C1",
+    "afirmacao": "Mesmo se o atraso foi culpa do próprio trabalhador, a empresa tem de pagar a multa de um salário.",
+    "trecho": "§ 8º - A inobservância do disposto no § 6º deste artigo sujeitará o infrator à multa de 160 BTN, por trabalhador, bem assim ao pagamento da multa a favor do empregado, em valor equivalente ao seu salário, devidamente corrigido pelo índice de variação do BTN, salvo quando, comprovadamente, o trabalhador der causa à mora.",
+    "verdadeiro": false,
+    "localizador": "CLT, art. 477, § 8º"
+  },
+  {
+    "id": "C1-09",
+    "pauta": "C1",
+    "afirmacao": "Se o aviso prévio foi trabalhado, a empresa tem de pagar a rescisão no primeiro dia útil depois do fim do contrato.",
+    "trecho": "§ 6o A entrega ao empregado de documentos que comprovem a comunicação da extinção contratual aos órgãos competentes bem como o pagamento dos valores constantes do instrumento de rescisão ou recibo de quitação deverão ser efetuados até dez dias contados a partir do término do contrato. (Redação dada pela Lei nº 13.467, de 2017)\na) (revogado); (Redação dada pela Lei nº 13.467, de 2017)\nb) (revogado). (Redação dada pela Lei nº 13.467, de 2017)",
+    "verdadeiro": false,
+    "localizador": "CLT, art. 477, § 6º, alíneas a e b"
+  },
+  {
+    "id": "P17-01",
+    "pauta": "P17",
+    "afirmacao": "O recibo da rescisão tem de discriminar cada verba e seu valor, e a quitação vale só para essas parcelas.",
+    "trecho": "§ 2º - O instrumento de rescisão ou recibo de quitação, qualquer que seja a causa ou forma de dissolução do contrato, deve ter especificada a natureza de cada parcela paga ao empregado e discriminado o seu valor, sendo válida a quitação, apenas, relativamente às mesmas parcelas.",
+    "verdadeiro": true,
+    "localizador": "CLT, art. 477, § 2º"
+  },
+  {
+    "id": "P17-02",
+    "pauta": "P17",
+    "afirmacao": "Na rescisão, a empresa tem de anotar a carteira, comunicar a dispensa aos órgãos competentes e pagar as verbas no prazo.",
+    "trecho": "Art. 477. Na extinção do contrato de trabalho, o empregador deverá proceder à anotação na Carteira de Trabalho e Previdência Social, comunicar a dispensa aos órgãos competentes e realizar o pagamento das verbas rescisórias no prazo e na forma estabelecidos neste artigo.",
+    "verdadeiro": true,
+    "localizador": "CLT, art. 477, caput"
+  }
+]

@@ -1,0 +1,2 @@
+# recortes reais de páginas (testes/fixtures/pesquisa): guardados byte a byte, com as quebras de linha mistas do original
+testes/fixtures/pesquisa/*.htm -text

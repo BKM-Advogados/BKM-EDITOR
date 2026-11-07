@@ -3,9 +3,11 @@
 // atômica (os "test" falham antes de qualquer mudança), grava, e registra a mudança com o patch inverso no diário.
 import {createHash} from 'node:crypto';
 import {existsSync, mkdirSync, readFileSync, renameSync, writeFileSync, appendFileSync} from 'node:fs';
+import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import jsonpatch, {type Operation} from 'fast-json-patch';
 import type {ArquivoComentarios, Comentario, EntradaDiario, EntradaDocumento, EstadoEditor, Manifesto, OperacaoPatch} from './documentos';
+import {ARQUIVO_PESQUISA, caminhoTextoFonte, lerPesquisa, pesquisaVazia, type Pesquisa} from './pesquisa';
 
 export const PASTA_INTERNA = '.estudio';
 
@@ -208,6 +210,80 @@ export class Projeto {
     return this.alterarComentario(id, (c) => ({...c, estado: 'aberto', resolucao: undefined}));
   }
 
+  // ---------- pesquisa (src/nucleo/pesquisa.ts, docs/pesquisa.md) ----------
+  // pesquisa/pesquisa.json não é documento do manifesto; as mudanças vão para o diário com o caminho do arquivo, para a
+  // pessoa ver no Histórico quem leu cada fonte e registrou cada fato. O Ctrl+Z não as toca (são do agente).
+  pesquisa(): Pesquisa {
+    if (!this.existe(ARQUIVO_PESQUISA)) return pesquisaVazia();
+    return lerPesquisa(this.lerJson<unknown>(ARQUIVO_PESQUISA).doc);
+  }
+
+  gravarPesquisa(p: Pesquisa) {
+    this.gravarTexto(ARQUIVO_PESQUISA, serializar(p));
+  }
+
+  /** Muda a pesquisa (a função mexe na cópia que recebe) e registra no diário o patch e o inverso. */
+  alterarPesquisa<R>(mudar: (p: Pesquisa) => R, quem: {autor: string; origem: string; rotulo: string}): R {
+    const textoAntes = this.existe(ARQUIVO_PESQUISA) ? this.lerTexto(ARQUIVO_PESQUISA) : serializar(pesquisaVazia());
+    const antes = this.pesquisa();
+    const depois = structuredClone(antes);
+    const r = mudar(depois);
+    const texto = serializar(depois);
+    this.gravarTexto(ARQUIVO_PESQUISA, texto);
+    this.registrar({
+      seq: this.proximaSeq(),
+      em: new Date().toISOString(),
+      documento: ARQUIVO_PESQUISA,
+      autor: quem.autor,
+      origem: quem.origem,
+      rotulo: quem.rotulo,
+      versao_antes: versaoDe(textoAntes),
+      versao_depois: versaoDe(texto),
+      patch: jsonpatch.compare(antes, depois) as OperacaoPatch[],
+      inverso: jsonpatch.compare(depois, antes) as OperacaoPatch[],
+    });
+    return r;
+  }
+
+  /** Texto limpo de uma fonte (pesquisa/fontes/<id>.txt, fora do git). O primeiro texto gravado põe a pasta no
+   *  .gitignore de projetos criados antes da pesquisa existir. */
+  gravarTextoFonte(id: string, texto: string) {
+    this.gravarTexto(caminhoTextoFonte(idDeFonte(id)), texto);
+    const ignorar = this.existe('.gitignore') ? this.lerTexto('.gitignore') : '';
+    if (!ignorar.split(/\r?\n/).some((l) => /^\/?pesquisa\/fontes\/?$/.test(l.trim()))) {
+      this.gravarTexto('.gitignore', `${ignorar}${ignorar && !ignorar.endsWith('\n') ? '\n' : ''}pesquisa/fontes/\n`);
+    }
+  }
+
+  /** Antes de a fonte relida com outro texto gravar por cima: o texto antigo (em que os fatos foram conferidos) passa
+   *  para pesquisa/fontes/<id>.<8 primeiros do sha256 antigo>.txt. Nada da fonte se apaga. Devolve o caminho, ou
+   *  undefined se não havia texto na pasta. */
+  guardarVersaoTextoFonte(id: string, sha256Antigo: string): string | undefined {
+    const atual = caminhoTextoFonte(idDeFonte(id));
+    if (!this.existe(atual)) return undefined;
+    const sha8 = /^[0-9a-f]{8}/i.exec(sha256Antigo)?.[0]?.toLowerCase() ?? 'anterior';
+    const destino = atual.replace(/\.txt$/, `.${sha8}.txt`);
+    renameSync(this.caminho(atual), this.caminho(destino));
+    return destino;
+  }
+
+  lerTextoFonte(id: string): string {
+    const rel = caminhoTextoFonte(idDeFonte(id));
+    if (!this.existe(rel)) throw new ErroProjeto(textoFonteFaltando(id, rel), 'nao_achado');
+    return this.lerTexto(rel);
+  }
+
+  /** O mesmo, sem travar quem chama: o painel Pesquisa pede o texto inteiro pelo processo principal. */
+  async lerTextoFonteSemTravar(id: string): Promise<string> {
+    const rel = caminhoTextoFonte(idDeFonte(id));
+    try {
+      return await readFile(this.caminho(rel), 'utf-8');
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') throw new ErroProjeto(textoFonteFaltando(id, rel), 'nao_achado');
+      throw e;
+    }
+  }
+
   // ---------- estado do editor ----------
   estado(): EstadoEditor | null {
     const rel = path.join(PASTA_INTERNA, 'estado.json');
@@ -218,6 +294,14 @@ export class Projeto {
     this.gravarTexto(path.join(PASTA_INTERNA, 'estado.json'), serializar(e));
   }
 }
+
+const textoFonteFaltando = (id: string, rel: string) => `o texto da fonte ${id} não está nesta pasta (${rel} fica fora do git); leia a url de novo com ler_fonte`;
+
+/** Id de fonte (f1, f2…) conferido antes de virar nome de arquivo. */
+const idDeFonte = (id: string) => {
+  if (!/^f\d+$/.test(id)) throw new ErroProjeto(`id de fonte inválido: ${id} (é f1, f2…)`, 'nao_achado');
+  return id;
+};
 
 /** Valor de um JSON Pointer dentro do documento (undefined se não existir). */
 export const valorEm = (doc: unknown, ponteiro: string): unknown => {
