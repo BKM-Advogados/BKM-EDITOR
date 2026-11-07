@@ -1,5 +1,5 @@
 import {contextBridge, ipcRenderer, type IpcRendererEvent} from 'electron';
-import {CANAL, type ApiEstudio, type EventoConversa, type Mudanca, type Progresso, type Retangulo} from '../compartilhado/api';
+import {CANAL, type ApiEstudio, type EventoConversa, type Mudanca, type Progresso, type ProgressoTranscricao, type Retangulo} from '../compartilhado/api';
 
 const ouvir = <A extends unknown[]>(canal: string, cb: (...a: A) => void) => {
   const h = (_e: IpcRendererEvent, ...a: A) => cb(...a);
@@ -95,6 +95,15 @@ const api: ApiEstudio = {
   pesquisa: () => ipcRenderer.invoke(CANAL.pesquisa),
   textoFonte: (fonteId, inicio, fim) => ipcRenderer.invoke(CANAL.textoFonte, fonteId, inicio, fim),
   abrirFonte: (url) => ipcRenderer.invoke(CANAL.abrirFonte, url),
+  // frente Fala: transcrição local e legendas (src/main/transcricao.ts)
+  fala: {
+    estado: (modelo) => ipcRenderer.invoke(CANAL.falaEstado, modelo),
+    transcrever: (p) => ipcRenderer.invoke(CANAL.falaTranscrever, p),
+    cancelar: () => ipcRenderer.send(CANAL.falaCancelar),
+    aoProgresso: (cb) => ouvir<[ProgressoTranscricao & {arquivo: string}]>(CANAL.falaProgresso, cb),
+    gravarSaida: (nome, texto) => ipcRenderer.invoke(CANAL.falaGravarSaida, nome, texto),
+    escolherLegenda: () => ipcRenderer.invoke(CANAL.falaEscolherLegenda),
+  },
 };
 
 contextBridge.exposeInMainWorld('estudio', api);

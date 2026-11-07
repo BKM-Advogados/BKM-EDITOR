@@ -22,6 +22,7 @@ import {ServidorMidia} from './servidor-midia';
 import {SessaoProjeto} from './sessao-projeto';
 import {Terminais} from './terminais';
 import {registrarIpcAudio} from './ipc-audio';
+import {registrarIpcFala} from './ipc-fala'; // frente Fala
 
 // o mesmo id do instalador (electron-builder.yml): a barra de tarefas agrupa a janela com o atalho
 app.setAppUserModelId('br.com.bkmadvogados.estudio');
@@ -461,3 +462,6 @@ app.on('window-all-closed', () => {
   midia.parar();
   app.quit();
 });
+
+// frente Fala: transcrição local e legendas (ipc-fala.ts); o mesmo transcritor atende a ferramenta transcrever do MCP
+registrarIpcFala({lidar, confiavel, janela: () => janela, projeto: exigirProjeto, enviar, raizApp: app.getAppPath(), empacotado: app.isPackaged, buscar: (u, i) => net.fetch(u, i)});

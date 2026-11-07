@@ -8,10 +8,11 @@ import {z} from 'zod';
 import {ErroProjeto, valorEm, type Projeto} from './projeto';
 import type {Modulo, OperacaoPatch} from './documentos';
 import {documentoNovo} from './criar-projeto';
-import {FORMATOS_IMAGEM, FORMATOS_VIDEO} from './formatos';
+import {FORMATOS_IMAGEM, FORMATOS_VIDEO, formatoDoVideo} from './formatos';
 import {MARCAS_INICIAIS} from './marca';
 import {PastaMarcas} from './pasta-marcas';
-import {ehDocCenas, type DocCenas} from './cenas';
+import {ehDocCenas, resolverCenas, type DocCenas} from './cenas';
+import {arquivoDasPalavras, clipesDeVoz, legendasDeArquivo, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt, type IdEstiloLegenda} from './legendas';
 import {CATALOGO_FONTES} from './catalogo-fontes';
 import {
   acharTrecho, caminhoTextoFonte, conferirDigitos, decodificarComAviso, entorno, estadoDoFato, hashTexto, limparHtml, nivelDe, numerosDe, paginar, proximoId,
@@ -104,7 +105,7 @@ export const criarRede = (buscar: Buscar = (url, init) => fetch(url, init), opco
 
 // ---------- ferramentas ----------
 
-export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, autor: string, origem: string, rede?: Rede) => {
+export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, autor: string, origem: string, rede?: Rede, transcritor?: TranscritorMcp) => {
   servidor.registerTool('projeto_info', {
     description: 'Nome do projeto, documentos (id, módulo, caminho), quantos comentários estão abertos e quantas fontes e fatos a pesquisa tem.',
     inputSchema: {},
@@ -237,6 +238,8 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
     if (!alvo) throw new ErroProjeto('o projeto não tem documento para receber o kit', 'nao_achado');
     return {ok: true, documento: alvo, ...marcas.aplicar(projeto, id, alvo, {autor, origem})};
   }));
+
+  registrarFala(servidor, projeto, autor, origem, transcritor); // frente Fala: transcrever e legendas
 };
 
 // ---------- pesquisa: fontes e fatos (src/nucleo/pesquisa.ts, docs/pesquisa.md) ----------
@@ -507,5 +510,116 @@ const registrarPesquisa = (servidor: McpServer, projeto: Projeto, autor: string,
     const narracao = narracaoDe(projeto, doc);
     if (narracao) avisos.push(...checarTexto(narracao, REGRAS_CLIENTE, {onde: 'narração', fatos}).avisos);
     return {documento, avisos, ultima_frase: fecho(narracao ?? textos[textos.length - 1]?.texto)};
+  }));
+};
+
+// ---------- frente Fala: transcrição local e legendas (src/nucleo/legendas.ts, src/main/transcricao.ts, docs/legendas.md) ----------
+
+/** O que o MCP precisa do transcritor do processo principal (src/main/transcricao.ts): sem ele, a ferramenta avisa. */
+export type TranscritorMcp = {
+  transcrever: (projeto: Projeto, pedido: {arquivo: string; modelo?: 'base' | 'small'; vocabulario?: string; destino?: string}) =>
+    Promise<{ok: boolean; palavras?: string; n?: number; duracao_s?: number; texto?: string; mensagem?: string; cancelado?: boolean}>;
+};
+
+const LIMITE_TEXTO_TRANSCRITO = 4000;
+
+const docCenasDe = (projeto: Projeto, documento?: string) => {
+  const alvo = documento ?? projeto.estado()?.documento ?? projeto.manifesto().documentos.find((d) => d.modulo === 'video')?.id;
+  if (!alvo) throw new ErroProjeto('o projeto não tem vídeo de cenas', 'nao_achado');
+  const rel = projeto.arquivoDoDocumento(alvo);
+  const lido = projeto.lerJson<unknown>(rel);
+  if (!ehDocCenas(lido.doc)) throw new ErroProjeto(`${alvo} não é um vídeo de cenas: para o carrossel da Cliente, transcreva o "arquivo" da narração`, 'patch');
+  return {alvo, rel, doc: lido.doc, versao: lido.versao};
+};
+
+const registrarFala = (servidor: McpServer, projeto: Projeto, autor: string, origem: string, transcritor: TranscritorMcp | undefined) => {
+  servidor.registerTool('transcrever', {
+    description: 'Transcreve a fala no próprio PC (whisper.cpp, nada sai da máquina) e grava <arquivo>.palavras.json com o tempo de cada palavra ({w, s, e, p} em ms do arquivo), o formato que o carrossel da Cliente e as legendas leem. Dois usos: (1) "arquivo" (qualquer áudio ou vídeo do projeto, como a narração de um roteiro ou uma gravação para a pesquisa): devolve o texto; com "destino", grava em outro caminho (ex.: video/palavras.json do roteiro). (2) Vídeo de cenas: "clipe" ou "faixa" (ids de audio.faixas), ou nada para todas as faixas de voz; transcreve o que ainda não tem transcrição e, com legendas (padrão), gera as legendas do documento (segmentos por pausa, pontuação e largura, com o falante pelo nome do clipe ou da faixa). Na primeira vez baixa o whisper.cpp (9 MB) e o modelo (small, 190 MB) para %USERPROFILE%\\Estudio\\modelos\\whisper. Leva perto de metade da duração do áudio.',
+    inputSchema: {
+      arquivo: z.string().optional().describe('caminho no projeto, ex.: midia/narracao.wav ou midia/video-exemplo.mp4'),
+      destino: z.string().optional().describe('só com "arquivo": onde gravar as palavras (padrão: <arquivo>.palavras.json)'),
+      documento: z.string().optional().describe('id do vídeo de cenas (padrão: o que a pessoa está vendo)'),
+      clipe: z.string().optional().describe('id do clipe de voz'),
+      faixa: z.string().optional().describe('id da faixa'),
+      legendas: z.boolean().optional().describe('no vídeo de cenas, gerar as legendas (padrão: sim)'),
+      estilo: z.enum(['classica', 'caixa', 'karaoke', 'faixa', 'discreta']).optional().describe('predefinição das legendas'),
+      refazer: z.boolean().optional().describe('transcrever de novo mesmo que o palavras.json já exista'),
+      modelo: z.enum(['small', 'base']).optional().describe('small (padrão) erra menos; base é duas vezes mais rápido'),
+      vocabulario: z.string().optional().describe('frase com termos que vão aparecer (nomes, siglas); o padrão puxa o vocabulário do direito do trabalho'),
+    },
+  }, seguro(async (a: {arquivo?: string; destino?: string; documento?: string; clipe?: string; faixa?: string; legendas?: boolean; estilo?: IdEstiloLegenda;
+    refazer?: boolean; modelo?: 'small' | 'base'; vocabulario?: string}) => {
+    if (!transcritor) throw new ErroProjeto('este MCP não tem o transcritor: abra o projeto no Estúdio (no Windows) ou use o MCP por stdio (mcp/nucleo.ts)', 'patch');
+    const pedido = (arquivo: string, destino?: string) => ({arquivo, destino, modelo: a.modelo, vocabulario: a.vocabulario});
+    if (a.arquivo) {
+      if (a.destino !== undefined && !a.destino.endsWith('.json')) throw new ErroProjeto('o destino das palavras termina em .json', 'caminho');
+      const r = await transcritor.transcrever(projeto, pedido(a.arquivo, a.destino));
+      if (!r.ok) throw new ErroProjeto(r.mensagem ?? 'a transcrição não terminou', 'patch');
+      const t = r.texto ?? '';
+      return {...r, texto: t.slice(0, LIMITE_TEXTO_TRANSCRITO), ...(t.length > LIMITE_TEXTO_TRANSCRITO ? {texto_cortado: true} : {})};
+    }
+    const {alvo, doc} = docCenasDe(projeto, a.documento);
+    const clipes = clipesDeVoz(doc, {clipe: a.clipe, faixa: a.faixa});
+    if (!clipes.length) {
+      throw new ErroProjeto(a.clipe || a.faixa ? `clipe ou faixa não achado: ${a.clipe ?? a.faixa}` : 'o vídeo não tem clipe de narração: use "+ Áudio → Narração…" no app ou passe "arquivo"', 'nao_achado');
+    }
+    const transcritos: {arquivo: string; palavras?: string; n?: number; duracao_s?: number; ja_tinha?: boolean}[] = [];
+    for (const arquivo of [...new Set(clipes.map((c) => c.clipe.arquivo))]) {
+      if (!a.refazer && projeto.existe(arquivoDasPalavras(arquivo))) {
+        transcritos.push({arquivo, palavras: arquivoDasPalavras(arquivo), ja_tinha: true});
+        continue;
+      }
+      const r = await transcritor.transcrever(projeto, pedido(arquivo));
+      if (!r.ok) throw new ErroProjeto(r.mensagem ?? `a transcrição de ${arquivo} não terminou`, 'patch');
+      transcritos.push({arquivo, palavras: r.palavras, n: r.n, duracao_s: r.duracao_s});
+    }
+    if (a.legendas === false) return {documento: alvo, transcritos};
+    // o documento pode ter mudado enquanto o whisper rodava: lê de novo e grava com a versão nova
+    const atual = docCenasDe(projeto, alvo);
+    const f = formatoDoVideo(atual.doc);
+    const r = legendasDoDocumento(atual.doc, (c) => projeto.lerJson<unknown>(c).doc, {largura: f.largura, altura: f.altura, clipe: a.clipe, faixa: a.faixa,
+      estilo: a.estilo ? {...(atual.doc.legendas?.estilo ?? {}), predefinicao: a.estilo} : undefined});
+    const gravado = projeto.aplicarPatch({documento: atual.rel, versao_base: atual.versao, patch: [{op: 'add', path: '/legendas', value: r.legendas}], autor, origem,
+      rotulo: `legendas da fala (${r.legendas.segmentos.length})`});
+    return {documento: alvo, versao: gravado.versao, transcritos, legendas: r.legendas.segmentos.length, estilo: r.legendas.estilo?.predefinicao,
+      ...(r.faltam.length ? {sem_transcricao: r.faltam} : {}),
+      primeiras: r.legendas.segmentos.slice(0, 5).map((s) => ({id: s.id, em: s.em, sai: s.sai, texto: s.texto, falante: s.falante}))};
+  }));
+
+  servidor.registerTool('exportar_legendas', {
+    description: 'Grava as legendas do vídeo de cenas em saidas/<nome>.srt e/ou .vtt, nos tempos de saída (já com o clipe de voz no lugar em que está). O VTT leva o falante na marca de voz (<v Nome>).',
+    inputSchema: {
+      documento: z.string().optional(),
+      formatos: z.array(z.enum(['srt', 'vtt'])).optional().describe('padrão: os dois'),
+      nome: z.string().optional().describe('nome do arquivo sem extensão (padrão: o título do vídeo)'),
+      falantes_no_srt: z.boolean().optional().describe('"Nome: " antes do texto no SRT'),
+    },
+  }, seguro(({documento, formatos, nome, falantes_no_srt}: {documento?: string; formatos?: ('srt' | 'vtt')[]; nome?: string; falantes_no_srt?: boolean}) => {
+    const {alvo, doc} = docCenasDe(projeto, documento);
+    const segs = resolverCenas(doc).props.legendas_cenas?.segmentos ?? [];
+    if (!segs.length) throw new ErroProjeto('o vídeo não tem legendas: gere com transcrever ou importe com importar_legendas', 'nao_achado');
+    const titulo = nome?.trim() || projeto.manifesto().documentos.find((d) => d.id === alvo)?.titulo || alvo;
+    const lista: ('srt' | 'vtt')[] = formatos?.length ? formatos : ['srt', 'vtt'];
+    const arquivos = lista.map((ext) => {
+      const rel = `saidas/${nomeDoArquivoDeLegenda(titulo, ext)}`;
+      projeto.gravarTexto(rel, ext === 'srt' ? paraSrt(segs, {falantes: falantes_no_srt}) : paraVtt(segs));
+      return rel;
+    });
+    return {ok: true, documento: alvo, legendas: segs.length, arquivos};
+  }));
+
+  servidor.registerTool('importar_legendas', {
+    description: 'Lê um SRT ou VTT do projeto e põe no vídeo de cenas como legendas (troca as que havia). O tempo de cada palavra é estimado pelo tamanho dela; o falante vem da marca de voz do VTT.',
+    inputSchema: {arquivo: z.string().describe('caminho no projeto, ex.: midia/legendas.srt'), documento: z.string().optional(),
+      estilo: z.enum(['classica', 'caixa', 'karaoke', 'faixa', 'discreta']).optional()},
+  }, seguro(({arquivo, documento, estilo}: {arquivo: string; documento?: string; estilo?: IdEstiloLegenda}) => {
+    if (!projeto.existe(arquivo)) throw new ErroProjeto(`o arquivo não está no projeto: ${arquivo}`, 'nao_achado');
+    const {alvo, rel, doc, versao} = docCenasDe(projeto, documento);
+    const {legendas, avisos} = legendasDeArquivo(projeto.lerTexto(arquivo), arquivo, estilo ? {...(doc.legendas?.estilo ?? {}), predefinicao: estilo} : doc.legendas?.estilo);
+    if (!legendas.segmentos.length) throw new ErroProjeto(`nenhuma legenda lida de ${arquivo}: ${avisos.join('; ')}`, 'patch');
+    const {origens: _o, ...antes} = doc.legendas ?? {segmentos: []};
+    const gravado = projeto.aplicarPatch({documento: rel, versao_base: versao, patch: [{op: 'add', path: '/legendas', value: {...antes, ...legendas}}],
+      autor, origem, rotulo: `legendas importadas de ${arquivo.split('/').pop()}`});
+    return {ok: true, documento: alvo, versao: gravado.versao, legendas: legendas.segmentos.length, ...(avisos.length ? {avisos} : {})};
   }));
 };
