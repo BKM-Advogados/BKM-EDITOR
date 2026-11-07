@@ -105,7 +105,7 @@ describe('limpeza de voz', () => {
     const a = await limparVoz([suja], TAXA, 'forte');
     const b = await limparVoz([suja], TAXA, 'forte');
     expect(a.canais[0]).toEqual(b.canais[0]);
-  });
+  }, 20_000); // DSP em estéreo: passa de 5 s quando a suíte inteira roda junto (integração da rodada 2)
 
   it('cancelar para no meio, com LimpezaCancelada; o andamento chega a 1', async () => {
     const {suja} = vozComRuido();
