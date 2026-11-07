@@ -159,5 +159,7 @@ export const movimentoEmTodas = async (documento: string) => {
   const r = patchMovimentoEmTodas(d);
   if (!r.n) return avisar('Nenhuma imagem no vídeo: acrescente um bloco de imagem antes.', 'info');
   const rotulo = r.acao === 'por' ? `movimento em ${r.n} ${r.n === 1 ? 'imagem' : 'imagens'}` : `tirar o movimento de ${r.n} ${r.n === 1 ? 'imagem' : 'imagens'}`;
-  if (await aplicar(documento, r.patch, rotulo)) avisar(`${rotulo[0].toUpperCase()}${rotulo.slice(1)}. Ctrl+Z desfaz.`, 'ok');
+  // as que estavam em Inteira passam para Preencher no mesmo patch (senão as faixas vazias andam junto; video-D12)
+  const preencher = r.preencher ? `; ${r.preencher === r.n ? (r.n === 1 ? 'ela passou' : 'todas passaram') : r.preencher === 1 ? '1 passou' : `${r.preencher} passaram`} para o encaixe Preencher` : '';
+  if (await aplicar(documento, r.patch, rotulo)) avisar(`${rotulo[0].toUpperCase()}${rotulo.slice(1)}${preencher}. Ctrl+Z desfaz.`, 'ok');
 };

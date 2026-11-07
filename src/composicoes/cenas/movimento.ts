@@ -3,7 +3,8 @@
 // bloco (0 no `em`, 1 no `sai`) e aplica a escala e o deslocamento no <Img>, dentro da caixa com o excesso escondido.
 // O deslocamento é fração da própria caixa e nunca passa da folga que a escala dá, então a borda da imagem não aparece
 // (no encaixe "Preencher"); como tudo é relativo à caixa, vale igual nos quatro formatos. O botão "Movimento em todas as
-// imagens" (CenasVideo) usa `patchMovimentoEmTodas`, que alterna os tipos para as fotos seguidas não repetirem o gesto.
+// imagens" (CenasVideo) usa `patchMovimentoEmTodas`, que alterna os tipos para as fotos seguidas não repetirem o gesto e
+// passa para Preencher as que estavam em Inteira (lá as faixas vazias andariam junto com a foto; video-D12).
 import type {BlocoCenas, DocCenas, MovimentoImagem} from '../../nucleo/cenas';
 import type {OperacaoPatch} from '../../nucleo/documentos';
 
@@ -61,20 +62,27 @@ export const transformDoMovimento = (m: MovimentoImagem | undefined, p: number):
   return `translate(${n(q.x * 100)}%, ${n(q.y * 100)}%) scale(${n(q.escala)})`;
 };
 
+/** Imagem com movimento no encaixe Inteira (`conter`, o padrão do bloco novo): as faixas vazias passeiam junto com a
+ *  foto dentro da caixa. O inspetor avisa com o botão "Preencher". */
+export const movimentoEmInteira = (b: Pick<BlocoCenas, 'tipo' | 'ajuste' | 'movimento'>) => b.tipo === 'imagem' && !!b.movimento && b.ajuste !== 'cobrir';
+
 /** Patch do botão da barra: põe movimento nas imagens que estão paradas, alternando a SEQUENCIA_MOVIMENTO pela ordem do
- *  vídeo; se todas já se movem, tira de todas (o mesmo botão desfaz o "de uma vez"). Cada operação confere o id do bloco. */
-export const patchMovimentoEmTodas = (doc: DocCenas): {patch: OperacaoPatch[]; n: number; acao: 'por' | 'tirar'} => {
+ *  vídeo, e passa para Preencher as que estavam em Inteira (`preencher` conta quantas), no mesmo patch: um Ctrl+Z
+ *  desfaz as duas coisas. Se todas já se movem, tira de todas (o mesmo botão desfaz o "de uma vez") e deixa o encaixe
+ *  como está. As imagens que já se moviam não mudam, nem o encaixe. Cada operação confere o id do bloco. */
+export const patchMovimentoEmTodas = (doc: DocCenas): {patch: OperacaoPatch[]; n: number; acao: 'por' | 'tirar'; preencher: number} => {
   const imagens: {caminho: string; b: BlocoCenas}[] = [];
   (doc.cenas ?? []).forEach((c, i) => (c.blocos ?? []).forEach((b, j) => {
     if (b?.tipo === 'imagem') imagens.push({caminho: `/cenas/${i}/blocos/${j}`, b});
   }));
   const teste = (caminho: string, b: BlocoCenas): OperacaoPatch[] => (typeof b.id === 'string' ? [{op: 'test', path: `${caminho}/id`, value: b.id}] : []);
   const paradas = imagens.filter((x) => !x.b.movimento);
-  if (!imagens.length) return {patch: [], n: 0, acao: 'por'};
+  if (!imagens.length) return {patch: [], n: 0, acao: 'por', preencher: 0};
   if (!paradas.length) {
-    return {patch: imagens.flatMap((x) => [...teste(x.caminho, x.b), {op: 'remove', path: `${x.caminho}/movimento`} as OperacaoPatch]), n: imagens.length, acao: 'tirar'};
+    return {patch: imagens.flatMap((x) => [...teste(x.caminho, x.b), {op: 'remove', path: `${x.caminho}/movimento`} as OperacaoPatch]), n: imagens.length, acao: 'tirar', preencher: 0};
   }
   const patch = imagens.flatMap((x, i): OperacaoPatch[] => (x.b.movimento ? []
-    : [...teste(x.caminho, x.b), {op: 'add', path: `${x.caminho}/movimento`, value: {tipo: SEQUENCIA_MOVIMENTO[i % SEQUENCIA_MOVIMENTO.length]}}]));
-  return {patch, n: paradas.length, acao: 'por'};
+    : [...teste(x.caminho, x.b), {op: 'add', path: `${x.caminho}/movimento`, value: {tipo: SEQUENCIA_MOVIMENTO[i % SEQUENCIA_MOVIMENTO.length]}},
+      ...(x.b.ajuste === 'cobrir' ? [] : [{op: 'add', path: `${x.caminho}/ajuste`, value: 'cobrir'} as OperacaoPatch])]));
+  return {patch, n: paradas.length, acao: 'por', preencher: paradas.filter((x) => x.b.ajuste !== 'cobrir').length};
 };

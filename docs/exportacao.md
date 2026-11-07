@@ -24,13 +24,17 @@ válido e sai igual, pixel por pixel.
 O movimento dura o tempo em que o bloco está na tela (do `em` ao `sai`). A conta fica em
 `src/composicoes/cenas/movimento.ts`: escala e deslocamento em frações da própria caixa, aplicados no `<Img>` dentro da
 caixa com o excesso escondido. O deslizar nunca passa da folga que a escala dá, então a borda da foto não aparece no
-encaixe "Preencher" (`ajuste: "cobrir"`). Em "Inteira" (`conter`) a foto pode ter faixas vazias, e elas se movem junto.
-Como tudo é relativo à caixa, o mesmo documento serve nos quatro formatos.
+encaixe "Preencher" (`ajuste: "cobrir"`). Em "Inteira" (`conter`, o padrão do bloco novo) a foto pode ter faixas vazias,
+e elas se moveriam junto: por isso o botão abaixo passa essas imagens para Preencher, e o inspetor avisa quando uma
+imagem com movimento está em Inteira (`movimentoEmInteira`). Como tudo é relativo à caixa, o mesmo documento serve nos
+quatro formatos.
 
-Na interface: o grupo **Movimento** no inspetor do bloco de imagem (tipo, intensidade, suave) e o botão
+Na interface: o grupo **Movimento** no inspetor do bloco de imagem (tipo, intensidade, suave; com movimento em
+Inteira, a linha "Em Inteira, as faixas vazias andam junto com a foto" e o botão **Preencher**) e o botão
 **Movimento em todas as imagens** na barra da lista de cenas, que põe movimento nas imagens paradas alternando
-aproximar, deslizar para a direita, afastar e deslizar para a esquerda; quando todas já se movem, o mesmo botão tira de
-todas. Tudo passa pelo diário (Ctrl+Z desfaz).
+aproximar, deslizar para a direita, afastar e deslizar para a esquerda e, no mesmo patch, passa para Preencher as que
+estavam em Inteira (um Ctrl+Z desfaz as duas coisas). As imagens que já se moviam ficam como estão. Quando todas já se
+movem, o mesmo botão tira o movimento de todas e deixa o encaixe como está. Tudo passa pelo diário.
 
 Limite conhecido: a lâmina (Ctrl+K) que corta uma imagem com movimento deixa o movimento inteiro em cada metade (ele
 recomeça no corte).
@@ -77,9 +81,9 @@ lista.
 
 ## Como foi conferido
 
-- `npm run typecheck` e `npm test` (147 testes: os 131 da `main` e 16 novos em `testes/movimento.test.ts` e
-  `testes/marca-dagua.test.ts`; entre eles, a marca fora das zonas em todo formato, canto e tamanho, e as preferências
-  juntando por destino).
+- `npm run typecheck` e `npm test` (150 testes: os 131 da `main` e 19 novos em `testes/movimento.test.ts` e
+  `testes/marca-dagua.test.ts`; entre eles, a marca fora das zonas em todo formato, canto e tamanho, as preferências
+  juntando por destino e o botão passando Inteira para Preencher com um Ctrl+Z só).
 - Prévia web (`?vista`, porta 5204): "Escolher imagem" devolve fotos sintéticas e o kit da Cliente ganha um logo de exemplo
   (`scripts/previa-web/ponte.ts`); o movimento aparece no monitor e no inspetor, e o diálogo mostra a miniatura e
   lembra a escolha.
