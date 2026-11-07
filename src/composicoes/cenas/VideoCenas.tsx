@@ -7,6 +7,7 @@
 import React from 'react';
 import {AbsoluteFill, Easing, getRemotionEnvironment, Html5Audio, Img, interpolate, Sequence, spring, useCurrentFrame, useVideoConfig} from 'remotion';
 import {CamadaEfeitos} from '../efeitos/CamadaEfeitos';
+import {Legendas} from './Legendas'; // frente Fala
 import {fonte} from '../fontes';
 import {definirBaseMidia, midia} from '../midia';
 import {volumeDoClipe, type AudioP, type ClipeAudioP, type FaixaAudioP} from '../../nucleo/audio';
@@ -146,6 +147,7 @@ export const VideoCenas: React.FC<PropsCenas> = (p) => {
           );
         })}
       </CamadaEfeitos>
+      <Legendas legendas={p.legendas_cenas} />
       <Som audio={p.audio} duracao_ms={p.duracao_ms} />
     </AbsoluteFill>
   );

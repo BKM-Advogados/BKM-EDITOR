@@ -7,6 +7,7 @@ import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
 import {Projeto} from '../src/nucleo/projeto';
 import {criarRede, registrarFerramentas} from '../src/nucleo/ferramentas-mcp';
+import {Transcritor} from '../src/main/transcricao';
 
 const arg = (nome: string) => {
   const i = process.argv.indexOf(nome);
@@ -14,7 +15,9 @@ const arg = (nome: string) => {
 };
 
 const servidor = new McpServer({name: 'estudio', version: '0.1.0'});
-registrarFerramentas(servidor, new Projeto(path.resolve(arg('--projeto') ?? process.cwd())), arg('--autor') ?? 'agente', 'mcp', criarRede());
+// a transcrição local acha o ffmpeg no node_modules do repositório (dist-mcp/ fica na raiz)
+registrarFerramentas(servidor, new Projeto(path.resolve(arg('--projeto') ?? process.cwd())), arg('--autor') ?? 'agente', 'mcp', criarRede(),
+  new Transcritor({raizApp: path.resolve(__dirname, '..')}));
 
 servidor.connect(new StdioServerTransport()).catch((e: unknown) => {
   process.stderr.write(`estudio MCP: ${String(e)}\n`);

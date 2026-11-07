@@ -8,10 +8,16 @@ import type http from 'node:http';
 import path from 'node:path';
 import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {StreamableHTTPServerTransport} from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import {registrarFerramentas, type Rede} from '../nucleo/ferramentas-mcp';
+import {registrarFerramentas, type Rede, type TranscritorMcp} from '../nucleo/ferramentas-mcp';
 import type {Projeto} from '../nucleo/projeto';
 
 type Aba = {origem: string; arquivo: string};
+
+// frente Fala: o transcritor local (transcricao.ts) chega depois do construtor, pelo registro do IPC da fala
+let transcritorMcp: TranscritorMcp | undefined;
+export const definirTranscritorMcp = (t: TranscritorMcp) => {
+  transcritorMcp = t;
+};
 
 export class McpHttp {
   private abas = new Map<string, Aba>();
@@ -51,7 +57,7 @@ export class McpHttp {
     let corpo = '';
     for await (const pedaco of req) corpo += pedaco;
     const servidor = new McpServer({name: 'estudio', version: '0.1.0'});
-    registrarFerramentas(servidor, projeto, 'agente', aba.origem, this.rede);
+    registrarFerramentas(servidor, projeto, 'agente', aba.origem, this.rede, transcritorMcp);
     const transporte = new StreamableHTTPServerTransport({sessionIdGenerator: undefined, enableJsonResponse: true});
     res.on('close', () => {
       void transporte.close();
