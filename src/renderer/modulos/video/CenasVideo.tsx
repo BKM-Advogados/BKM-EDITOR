@@ -2,16 +2,16 @@
 // número da parte, o título, o início e a duração, e pode recolher; cada bloco tem o filete da família e o ícone do
 // tipo. A cena em que a cabeça está ganha uma marca vermelha (lê o tempo parado da loja, não o de cada quadro).
 // Clicar seleciona e leva a prévia ao tempo do objeto. No topo, criar cena e bloco, a lâmina (divide a cena na cabeça,
-// Ctrl+K), duplicar e excluir (Ctrl+D e Delete fazem o mesmo).
+// Ctrl+K), o movimento em todas as imagens (Ken Burns de uma vez), duplicar e excluir (Ctrl+D e Delete fazem o mesmo).
 import React, {useState} from 'react';
-import {ChevronDown, ChevronRight, CopyPlus, Plus, Scissors, Trash2} from 'lucide-react';
+import {ChevronDown, ChevronRight, CopyPlus, ImagePlay, Plus, Scissors, Trash2} from 'lucide-react';
 import {ehDocCenas, TIPOS_BLOCO_CENAS, type TipoBlocoCenas} from '../../../nucleo/cenas';
 import {documentosDe, loja, selecionar, useLoja} from '../../estado/loja';
 import {numeroBr} from '../../componentes/Campos';
 import {BotaoMenu} from '../../componentes/Menu';
 import {formatarCurto, irPara} from './tocador';
 import {resumoBloco, tipoDe} from './tipos';
-import {adicionarBloco, adicionarCena, dividirNaCabeca, duplicarSelecao, excluirSelecao, TIPOS_CLIENTE} from './acoes';
+import {adicionarBloco, adicionarCena, dividirNaCabeca, duplicarSelecao, excluirSelecao, movimentoEmTodas, TIPOS_CLIENTE} from './acoes';
 
 type Cena = {tipo?: string; nome?: string; tag?: string; titulo?: string; linhas?: {t: string}[]; blocos?: {tipo: string; texto?: string; id?: string}[]};
 type CenaP = {origem?: string; tipo: string; n?: number; t_in: number; t_out: number; blocos?: {origem?: string; em: number}[]};
@@ -33,6 +33,7 @@ export const CenasVideo: React.FC = () => {
     ? (Object.keys(TIPOS_BLOCO_CENAS) as TipoBlocoCenas[]).map((t) => ({tipo: t, nome: TIPOS_BLOCO_CENAS[t].nome}))
     : TIPOS_CLIENTE.map(({tipo, nome}) => ({tipo, nome}));
   const temSelecao = selecao?.documento === documento && /^\/cenas\/\d+/.test(selecao.caminho);
+  const imagens = deCenas ? doc.cenas.flatMap((c) => c.blocos ?? []).filter((b) => b.tipo === 'imagem') : [];
 
   const cenasP = ((montado && 'props' in montado ? montado.props.cenas : undefined) ?? []) as CenaP[];
   const daCena = (i: number) => cenasP.find((c) => c.origem === `/cenas/${i}`);
@@ -77,6 +78,10 @@ export const CenasVideo: React.FC = () => {
         <span className="espaco" />
         <button className="bti" disabled={!deCenas} onClick={() => void dividirNaCabeca(documento)}
           title={deCenas ? 'Dividir a cena na cabeça (lâmina)  Ctrl+K' : 'No carrossel narrado as cenas seguem a narração'}><Scissors size={14} /></button>
+        <button className={`bti${imagens.length && imagens.every((b) => b.movimento) ? ' ligado' : ''}`} disabled={!imagens.length} onClick={() => void movimentoEmTodas(documento)}
+          title={!imagens.length ? 'Movimento em todas as imagens: o vídeo ainda não tem bloco de imagem'
+            : imagens.every((b) => b.movimento) ? 'Tirar o movimento de todas as imagens'
+            : 'Movimento em todas as imagens (Ken Burns): aproxima, desliza e afasta, alternando, nas que estão paradas'}><ImagePlay size={14} /></button>
         <button className="bti" disabled={!temSelecao} onClick={() => void duplicarSelecao(documento)} title="Duplicar  Ctrl+D"><CopyPlus size={14} /></button>
         <button className="bti" disabled={!temSelecao} onClick={() => void excluirSelecao(documento)} title="Excluir  Delete"><Trash2 size={14} /></button>
       </div>

@@ -11,6 +11,7 @@ import {fonte} from '../fontes';
 import {definirBaseMidia, midia} from '../midia';
 import {volumeDoClipe, type AudioP, type ClipeAudioP, type FaixaAudioP} from '../../nucleo/audio';
 import {TIPOS_BLOCO_CENAS, type BlocoCenasP, type CenaCenasP, type PropsCenas, type TemaCenas} from '../../nucleo/cenas';
+import {transformDoMovimento} from './movimento';
 
 const clamp = {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'} as const;
 
@@ -78,9 +79,10 @@ const Bloco: React.FC<{b: BlocoCenasP; t0: number; tema: TemaCenas; familia: str
   }
   if (b.tipo === 'imagem') {
     const altura = (b.altura ?? 0.4) * H;
+    const movimento = transformDoMovimento(b.movimento, lin(b.em, b.sai - b.em, Easing.linear)); // Ken Burns (movimento.ts)
     return (
-      <div data-origem={b.origem} data-bloco-id={b.id} style={{...base, height: altura, transform: `scale(${0.96 + 0.04 * m})`}}>
-        {b.src ? <Img src={midia(b.src)} style={{width: '100%', height: '100%', objectFit: b.ajuste === 'cobrir' ? 'cover' : 'contain', display: 'block'}} />
+      <div data-origem={b.origem} data-bloco-id={b.id} style={{...base, height: altura, transform: `scale(${0.96 + 0.04 * m})`, ...(movimento ? {overflow: 'hidden'} : {})}}>
+        {b.src ? <Img src={midia(b.src)} style={{width: '100%', height: '100%', objectFit: b.ajuste === 'cobrir' ? 'cover' : 'contain', display: 'block', transform: movimento}} />
           : <div style={{width: '100%', height: '100%', border: `${Math.max(2, menor * 0.004)}px dashed ${tema.suave}`, borderRadius: menor * 0.01, display: 'flex',
             alignItems: 'center', justifyContent: 'center', fontSize: menor * 0.03, color: tema.suave, fontWeight: 500}}>Escolha a imagem em Propriedades</div>}
       </div>

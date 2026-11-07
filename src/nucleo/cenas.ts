@@ -33,7 +33,12 @@ export type BlocoCenas = {
   peso?: number;
   alinhar?: 'esquerda' | 'centro' | 'direita';
   refs?: string[]; // ids dos fatos da pesquisa (F1, F2…) que este bloco afirma
+  movimento?: MovimentoImagem; // imagem: zoom dinâmico (Ken Burns) enquanto o bloco está na tela; sem ele, parada (frente C)
 };
+
+/** Ken Burns do bloco de imagem (composicoes/cenas/movimento.ts): aproximar, afastar ou deslizar para um lado.
+ *  `intensidade` é quanto a imagem cresce (0,05 a 0,4; padrão 0,15); `suave` (padrão sim) começa e termina devagar. */
+export type MovimentoImagem = {tipo: 'aproximar' | 'afastar' | 'esquerda' | 'direita' | 'cima' | 'baixo'; intensidade?: number; suave?: boolean};
 
 export type CenaCenas = {id: string; nome?: string; duracao_ms: number; fundo?: string; blocos: BlocoCenas[]; refs?: string[]};
 

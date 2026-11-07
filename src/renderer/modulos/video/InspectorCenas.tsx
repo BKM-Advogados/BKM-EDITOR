@@ -16,6 +16,7 @@ import {formatarTempo} from './tocador';
 import {resumoBloco, tipoDe} from './tipos';
 import {duplicarSelecao, excluirSelecao} from './acoes';
 import {duplicarSelecaoAudio, excluirSelecaoAudio, ICONES_PAPEL, partesAudio, trocarArquivoDoClipe} from './acoes-audio';
+import {CamposMovimento} from './CamposMovimento';
 
 const pct = (v: number | undefined, padrao: number) => Math.round((v ?? padrao) * 1000) / 10;
 const ALINHAR: [NonNullable<BlocoCenas['alinhar']>, string][] = [['esquerda', 'Esquerda'], ['centro', 'Centro'], ['direita', 'Direita']];
@@ -152,6 +153,7 @@ const PropsBloco: React.FC<{documento: string; caminho: string; b: BlocoCenas; f
                 <CampoLeitura rotulo="Arquivo">{b.src ? b.src.split('/').pop() : 'nenhum'}</CampoLeitura>
                 <div style={{padding: '2px 8px 6px'}}><button className="bt" onClick={() => void escolherImagem()}><ImagePlus size={14} />{b.src ? 'Trocar imagem…' : 'Escolher imagem…'}</button></div>
                 <CampoSelecao rotulo="Encaixe" valor={b.ajuste ?? 'conter'} opcoes={[['conter', 'Inteira'], ['cobrir', 'Preencher']]} aoMudar={campo('ajuste', 'encaixe')} />
+                <CamposMovimento documento={documento} caminho={caminho} b={b} />{/* Ken Burns (frente C) */}
               </>
             )}
           </Secao>
