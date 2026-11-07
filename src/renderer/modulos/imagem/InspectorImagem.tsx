@@ -1,16 +1,21 @@
 // Inspector da imagem: propriedades da camada selecionada (posição e tamanho, e as do tipo) ou, sem seleção, a
 // prancheta (tamanho, fundo, comum a todas as páginas), a página ativa (nome) quando há várias e a pilha de efeitos
 // numa linha. Cada campo grava um patch ao sair dele, ao soltar o controle ou ao fechar o seletor de cor; enquanto o
-// controle mexe, o monitor mostra o valor pela prévia ao vivo. O "visível" não aparece aqui: é o olho da lista.
+// controle mexe, o monitor mostra o valor pela prévia ao vivo. O "visível" não aparece aqui: é o olho da lista. Abaixo
+// das propriedades do tipo, o acabamento (sombra, contorno, degradê: Acabamento.tsx), o recorte por máscara e, na
+// imagem, "Remover fundo" e "Voltar ao original" (removerFundo.ts).
 import React from 'react';
-import {ChevronRight, Copy, FileJson, Image as IconeImagem, Link} from 'lucide-react';
+import {ChevronRight, Copy, FileJson, Image as IconeImagem, Link, Scissors, Undo2, Unlink, WandSparkles} from 'lucide-react';
 import type {CamadaImagem, DocImagem, OperacaoPatch} from '../../../nucleo/documentos';
 import {baseCamadas, paginaDoCaminho} from '../../../nucleo/carrossel';
+import {mascaraDe, mascarasEmUso, patchRecortar, patchSoltar, podeRecortar} from '../../../nucleo/acabamento';
 import {aplicar, avisar, loja, patchTrocar, trocar, useLoja} from '../../estado/loja';
 import {CabecalhoInspector, CampoCor, CampoDeslizante, CampoLeitura, CampoNumero, CampoSelecao, CampoTexto, Secao, copiar} from '../../componentes/Campos';
 import {IconeEfeitos} from '../../componentes/Icones';
 import {FONTES, PADRAO, caminhoNoProjeto, definirPrevia, docValido, indiceDe, rotuloCamada, usarDocumentoImagem, usarPaginaAtiva, type PaginaAtiva} from './comum';
 import {renomearPagina} from './acoes';
+import {SecaoFundoDegrade, SecoesAcabamento, usarKitDaImagem} from './Acabamento';
+import {removerFundoDaCamada, voltarAoOriginal} from './removerFundo';
 import {iconeCamada} from './CamadasImagem';
 
 const PESOS: [string, string][] = ['100', '200', '300', '400', '500', '600', '700', '800', '900'].map((p) => [p, p]);
@@ -23,7 +28,18 @@ const TAMANHOS: {nome: string; l: number; a: number}[] = [
   {nome: 'A4 a 300 dpi', l: 2480, a: 3508},
 ];
 
-const InspectorCamada: React.FC<{documento: string; caminho: string; c: CamadaImagem}> = ({documento, caminho, c}) => {
+const InspectorCamada: React.FC<{documento: string; caminho: string; c: CamadaImagem; doc: DocImagem; camadas: CamadaImagem[]; i: number; base: string}> = ({documento, caminho, c, doc, camadas, i, base}) => {
+  const kit = usarKitDaImagem(doc);
+  const [ocupado, setOcupado] = React.useState(false);
+  const iMascara = mascaraDe(camadas, i);
+  const iFoto = mascarasEmUso(camadas).get(i);
+  const naoRecorta = podeRecortar(camadas, i);
+  const recortar = () => void aplicar(documento, patchRecortar(camadas, base, i), `recortar ${c.id} pela camada ${camadas[i + 1]?.id}`);
+  const soltarRecorte = () => void aplicar(documento, patchSoltar(camadas, base, i), `soltar o recorte de ${c.id}`);
+  const tirarFundo = () => {
+    setOcupado(true);
+    void removerFundoDaCamada(documento, caminho, c).finally(() => setOcupado(false));
+  };
   const gravar = (campo: keyof CamadaImagem) => (v: unknown) => void trocar(documento, `${caminho}/${campo}`, v, `${campo} de ${c.id}`);
   const positivo = (campo: keyof CamadaImagem) => (v: number) => (v > 0 ? gravar(campo)(v) : avisar(`${campo} precisa ser maior que zero`, 'erro'));
   const ver = (campo: keyof CamadaImagem) => (valor: unknown) => definirPrevia({documento, caminho: `${caminho}/${campo}`, valor});
@@ -82,8 +98,39 @@ const InspectorCamada: React.FC<{documento: string; caminho: string; c: CamadaIm
             <CampoTexto rotulo="Arquivo" valor={c.src ?? ''} dica="caminho dentro da pasta do projeto, ex.: midia/logo-exemplo.png"
               invalido={(v) => (caminhoNoProjeto(v) ? null : 'use um caminho dentro do projeto')} aoMudar={(v) => gravar('src')(caminhoNoProjeto(v))} />
             <CampoSelecao rotulo="Ajuste" valor={c.ajuste ?? PADRAO.ajuste} opcoes={[['cobrir', 'Cobrir (corta)'], ['conter', 'Conter (inteira)']]} aoMudar={gravar('ajuste')} />
+            {c.src_original && <CampoLeitura rotulo="Original" dica="O arquivo de antes do remover fundo, intocado">{c.src_original}</CampoLeitura>}
+            <div className="linha-botoes" style={{display: 'flex', gap: 6, flexWrap: 'wrap', padding: '4px 0'}}>
+              <button type="button" className="bt mini" disabled={ocupado || !c.src} onClick={tirarFundo}
+                title="Modelo local MODNet (retrato, Apache-2.0): grava midia/<arquivo>.sem-fundo.png e não mexe no original. Na primeira vez baixa o modelo (26 MB).">
+                <WandSparkles />{ocupado ? 'Removendo…' : 'Remover fundo'}
+              </button>
+              {c.src_original && <button type="button" className="bt fantasma mini" onClick={() => void voltarAoOriginal(documento, caminho, c)} title={`Volta a ${c.src_original}`}><Undo2 />Voltar ao original</button>}
+            </div>
           </Secao>
         )}
+
+        {(c.tipo === 'imagem' || iFoto !== undefined) && (
+          <Secao titulo="Recorte" chave="imagem:recorte">
+            {iMascara >= 0 ? (
+              <>
+                <CampoLeitura rotulo="Máscara" dica="A foto aparece só dentro desta camada (a de cima). Arraste a foto para escolher o pedaço; a máscara fica onde está">{rotuloCamada(camadas[iMascara])}</CampoLeitura>
+                <div style={{display: 'flex', justifyContent: 'flex-end', padding: '4px 0'}}><button type="button" className="bt fantasma mini" onClick={soltarRecorte}><Unlink />Soltar</button></div>
+              </>
+            ) : iFoto !== undefined ? (
+              <>
+                <CampoLeitura rotulo="Recorta" dica="Esta camada é a moldura da foto de baixo: arrastar leva a foto junto; duplo clique no monitor escolhe a foto">{rotuloCamada(camadas[iFoto])}</CampoLeitura>
+                <div style={{display: 'flex', justifyContent: 'flex-end', padding: '4px 0'}}><button type="button" className="bt fantasma mini" onClick={soltarRecorte}><Unlink />Soltar</button></div>
+              </>
+            ) : (
+              <div style={{display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0'}}>
+                <span className="vazio" style={{flex: 1, padding: 0, textAlign: 'left'}}>{naoRecorta ? `Para recortar: ${naoRecorta} (forma ou texto logo acima).` : `Recortar pela camada de cima: ${rotuloCamada(camadas[i + 1])}.`}</span>
+                <button type="button" className="bt mini" disabled={Boolean(naoRecorta)} onClick={recortar}><Scissors />Recortar</button>
+              </div>
+            )}
+          </Secao>
+        )}
+
+        <SecoesAcabamento documento={documento} caminho={caminho} c={c} kit={kit} recortada={iMascara >= 0 ? rotuloCamada(camadas[iMascara]) : undefined} />
       </div>
     </div>
   );
@@ -99,6 +146,7 @@ const InspectorDocumento: React.FC<{documento: string; doc: DocImagem; ativa: Pa
   const positivo = (campo: 'largura' | 'altura') => (v: number) =>
     v > 0 ? void trocar(documento, `/${campo}`, Math.round(v), `${campo} da imagem`) : avisar(`${campo} precisa ser maior que zero`, 'erro');
   const pronto = TAMANHOS.find((t) => t.l === doc.largura && t.a === doc.altura);
+  const kit = usarKitDaImagem(doc);
   const tamanho = (l: number, a: number, rotulo: string) => {
     const atual = loja.get().docs[documento]?.doc;
     const patch: OperacaoPatch[] = [...(l !== doc.largura ? patchTrocar(atual, '/largura', l) : []), ...(a !== doc.altura ? patchTrocar(atual, '/altura', a) : [])];
@@ -127,6 +175,7 @@ const InspectorDocumento: React.FC<{documento: string; doc: DocImagem; ativa: Pa
           <CampoCor rotulo="Fundo" valor={doc.fundo} aoVer={(valor) => definirPrevia({documento, caminho: '/fundo', valor})}
             aoMudar={(v) => void trocar(documento, '/fundo', v, 'fundo da imagem')} />
         </Secao>
+        <SecaoFundoDegrade documento={documento} doc={doc} kit={kit} />
         <section className="secao">
           <div className="secao-titulo" role="button" tabIndex={0} title="Editar a pilha na área Efeitos (4)"
             onClick={() => loja.definir({area: 'efeitos', alvoEfeitos: documento, selecao: null})}
@@ -154,7 +203,7 @@ export const InspectorImagem: React.FC = () => {
   const base = p >= 0 ? baseCamadas(doc, p) : null;
   const caminho = base && selecao && indiceDe(selecao.caminho, base) >= 0 ? selecao.caminho : null;
   const c = caminho && base ? ativa.paginas[p]?.camadas[indiceDe(caminho, base)] : undefined;
-  if (caminho && c) return <InspectorCamada key={caminho} documento={documento} caminho={caminho} c={c} />;
+  if (caminho && c && base) return <InspectorCamada key={caminho} documento={documento} caminho={caminho} c={c} doc={doc} camadas={ativa.paginas[p].camadas} i={indiceDe(caminho, base)} base={base} />;
   return <InspectorDocumento documento={documento} doc={doc} ativa={ativa} />;
 };
 

@@ -128,6 +128,15 @@ export const esperarFontes = async (nomes: string[]) => {
 // ---------- prévia ao vivo ----------
 // Controle deslizante ou seletor de cor sendo mexido: o monitor mostra o valor na hora, o patch só sai ao soltar.
 export type Previa = {documento: string; caminho: string; valor: unknown} | null;
+
+/** Cópia de `obj` com `valor` no caminho relativo ("sombra/desfoque", "degrade/paradas/1/cor"); o resto fica igual. */
+export const comValor = <T,>(obj: T, caminho: string, valor: unknown): T => {
+  const [chave, ...resto] = caminho.split('/').map((x) => x.replace(/~1/g, '/').replace(/~0/g, '~'));
+  const base = (obj && typeof obj === 'object' ? obj : {}) as Record<string, unknown>;
+  const novo: Record<string, unknown> | unknown[] = Array.isArray(base) ? [...base] : {...base};
+  (novo as Record<string, unknown>)[chave] = resto.length ? comValor(base[chave], resto.join('/'), valor) : valor;
+  return novo as T;
+};
 let previa: Previa = null;
 const ouvintes = new Set<() => void>();
 export const definirPrevia = (p: Previa) => {

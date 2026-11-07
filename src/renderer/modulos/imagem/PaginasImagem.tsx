@@ -131,7 +131,7 @@ export const PaginasImagem: React.FC<{documento: string; doc: DocImagem}> = ({do
                 if (alvo?.i !== i || alvo.lado !== lado) setAlvo({i, lado});
               }}
               onDrop={(e) => (e.preventDefault(), soltar(i, ladoDe(e)))}>
-              <Miniatura pagina={pg} largura={doc.largura} altura={doc.altura} fundo={doc.fundo} alturaCaixa={ALTURA_MINI} />
+              <Miniatura pagina={pg} largura={doc.largura} altura={doc.altura} fundo={doc.fundo} fundoDegrade={doc.fundo_degrade} alturaCaixa={ALTURA_MINI} />
               <span className="legenda">
                 <b>{i + 1}</b>
                 {renomeando === i ? (
