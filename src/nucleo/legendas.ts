@@ -519,6 +519,39 @@ export const resolverLegendas = (leg: LegendasCenas | undefined, ctx: {audio?: A
 /** Os segmentos que aparecem em `ms` (pode haver mais de um quando duas vozes se sobrepõem). */
 export const segmentosEm = (segmentos: SegmentoLegendaP[], ms: number) => segmentos.filter((s) => ms >= s.em && ms < s.sai);
 
+export const ENTRA_LEGENDA_MS = 120; // a legenda acende em 120 ms antes de `em`
+export const SAI_LEGENDA_MS = 120; // e apaga em 120 ms depois de `sai`
+
+/** A legenda da tela em `ms`, uma só: a que está no ar (com duas vozes ao mesmo tempo, a que começou por último). Na fala
+ *  contínua, em que uma sai quando a outra entra, a troca é no quadro, sem as duas juntas. No silêncio entre duas, a que
+ *  sai apaga na primeira metade do vão e a que entra acende na segunda, cada uma em até 120 ms. `entrada` (0 a 1) é o
+ *  quanto a legenda já entrou, para a subida dela; `opacidade` junta entrada e saída. */
+export const legendaNoAr = (segmentos: SegmentoLegendaP[], ms: number): {s: SegmentoLegendaP; opacidade: number; entrada: number} | null => {
+  let atual: SegmentoLegendaP | undefined;
+  let antes: SegmentoLegendaP | undefined;
+  let depois: SegmentoLegendaP | undefined;
+  for (const s of segmentos) {
+    if (s.em <= ms && ms < s.sai) {
+      if (!atual || s.em >= atual.em) atual = s;
+    } else if (s.sai <= ms) {
+      if (!antes || s.sai > antes.sai) antes = s;
+    } else if (!depois || s.em < depois.em) depois = s;
+  }
+  if (atual) return {s: atual, opacidade: 1, entrada: 1};
+  const fim = antes?.sai ?? -Infinity;
+  const ini = depois?.em ?? Infinity;
+  const metade = (ini - fim) / 2;
+  if (antes && ms - fim < metade) {
+    const o = 1 - (ms - fim) / Math.min(SAI_LEGENDA_MS, metade);
+    return o > 0 ? {s: antes, opacidade: o, entrada: 1} : null;
+  }
+  if (depois) {
+    const e = 1 - (ini - ms) / Math.min(ENTRA_LEGENDA_MS, metade);
+    return e > 0 ? {s: depois, opacidade: e, entrada: e} : null;
+  }
+  return null;
+};
+
 // ---------- SRT e VTT ----------
 
 const doisDig = (n: number, d = 2) => String(Math.floor(n)).padStart(d, '0');

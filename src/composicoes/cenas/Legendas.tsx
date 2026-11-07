@@ -3,13 +3,9 @@
 // preenche. A legenda fica dentro da área segura do destino (o que a interface de cada rede cobre, zonas-seguras.ts),
 // por cima dos efeitos. Entra no VideoCenas com uma linha; sem `legendas_cenas` nas props, não desenha nada.
 import React from 'react';
-import {interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
+import {useCurrentFrame, useVideoConfig} from 'remotion';
 import {fonte} from '../fontes';
-import type {EstiloLegendaP, LegendasP, PalavraLegenda, SegmentoLegendaP} from '../../nucleo/legendas';
-
-const clamp = {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'} as const;
-const ENTRA_MS = 120;
-const SAI_MS = 120;
+import {legendaNoAr, type EstiloLegendaP, type LegendasP, type PalavraLegenda, type SegmentoLegendaP} from '../../nucleo/legendas';
 
 /** "#RRGGBB" (ou "#RGB") com transparência, para a caixa translúcida atrás da linha. */
 export const comAlfa = (cor: string, alfa: number) => {
@@ -48,10 +44,7 @@ const linhasDe = (s: SegmentoLegendaP): PalavraLegenda[][] => {
   return out.filter((l) => l.length);
 };
 
-const Segmento: React.FC<{s: SegmentoLegendaP; ms: number; e: EstiloLegendaP; tam: number; familia: string}> = ({s, ms, e, tam, familia}) => {
-  const entra = interpolate(ms, [s.em - ENTRA_MS, s.em], [0, 1], clamp);
-  const sai = interpolate(ms, [s.sai, s.sai + SAI_MS], [1, 0], clamp);
-  const o = Math.min(entra, sai);
+const Segmento: React.FC<{s: SegmentoLegendaP; ms: number; e: EstiloLegendaP; tam: number; familia: string; o: number; entra: number}> = ({s, ms, e, tam, familia, o, entra}) => {
   const sombra = e.sombra ? `0 ${tam * 0.06}px ${tam * 0.18}px rgba(0,0,0,0.85), 0 0 ${tam * 0.04}px rgba(0,0,0,0.9)` : 'none';
   const contorno = e.sombra && e.peso >= 700 ? {WebkitTextStroke: `${Math.max(1, tam * 0.035)}px rgba(0,0,0,0.75)`, paintOrder: 'stroke fill'} : {};
   const linhaCaixa: React.CSSProperties = e.caixa === 'linha'
@@ -75,8 +68,9 @@ export const Legendas: React.FC<{legendas?: LegendasP}> = ({legendas}) => {
   const {fps, width: W, height: H} = useVideoConfig();
   if (!legendas || legendas.oculto || !legendas.segmentos.length) return null;
   const ms = (frame / fps) * 1000;
-  const ativos = legendas.segmentos.filter((s) => ms >= s.em - ENTRA_MS && ms < s.sai + SAI_MS);
-  if (!ativos.length) return null;
+  // uma legenda por quadro: na fala contínua a próxima toma o lugar da que sai, sem as duas empilhadas (legendaNoAr)
+  const noAr = legendaNoAr(legendas.segmentos, ms);
+  if (!noAr) return null;
   const e = legendas.estilo;
   const a = legendas.area;
   const tam = e.tam * Math.min(W, H);
@@ -86,12 +80,12 @@ export const Legendas: React.FC<{legendas?: LegendasP}> = ({legendas}) => {
     : {bottom: (1 - a.base) * H};
   // a faixa da marca vai de lado a lado e acende e apaga com a fala
   const faixa = e.caixa === 'faixa';
-  const acesa = Math.max(...ativos.map((s) => Math.min(interpolate(ms, [s.em - ENTRA_MS, s.em], [0, 1], clamp), interpolate(ms, [s.sai, s.sai + SAI_MS], [1, 0], clamp))));
+  const acesa = noAr.opacidade;
   return (
     <div data-legendas style={{position: 'absolute', left: faixa ? 0 : a.esq * W, right: faixa ? 0 : a.dir * W, ...vertical, display: 'flex', flexDirection: 'column',
       alignItems: 'center', gap: tam * 0.3, pointerEvents: 'none',
       ...(faixa ? {background: comAlfa(e.fundo, 0.96 * acesa), padding: `${tam * 0.4}px ${a.esq * W}px`} : {})}}>
-      {ativos.map((s) => <Segmento key={s.id} s={s} ms={ms} e={e} tam={tam} familia={familia} />)}
+      <Segmento key={noAr.s.id} s={noAr.s} ms={ms} e={e} tam={tam} familia={familia} o={noAr.opacidade} entra={noAr.entrada} />
     </div>
   );
 };

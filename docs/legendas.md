@@ -139,8 +139,11 @@ do décimo de baixo dos controles do YouTube; no 4:5, dentro da área de título
 
 ### Composição
 
-`src/composicoes/cenas/Legendas.tsx`, uma linha no `VideoCenas.tsx`, por cima dos efeitos. Mostra o segmento da hora
-(mais de um, se duas vozes se sobrepõem), entra e sai em 120 ms e acende a palavra pelo tempo dela. A exportação usa o
+`src/composicoes/cenas/Legendas.tsx`, uma linha no `VideoCenas.tsx`, por cima dos efeitos. Mostra **uma legenda por
+quadro** (`legendaNoAr`): a da fala da hora (com duas vozes ao mesmo tempo, a que começou por último). Na fala corrida,
+em que uma legenda sai no mesmo ms em que a próxima entra, a troca é no quadro, sem as duas empilhadas. No silêncio entre
+duas, a que sai apaga na primeira metade do vão e a que entra acende na segunda, cada uma em até 120 ms. A palavra
+acende pelo tempo dela. A exportação usa o
 mesmo `renderMedia`, então o MP4 sai com a legenda; `legendas.oculto` tira do vídeo e mantém a lista e o SRT.
 
 ### Na tela
