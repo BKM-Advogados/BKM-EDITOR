@@ -6,14 +6,16 @@
 // Som: "escolher arquivo de áudio" devolve um WAV sintético (uma narração, depois uma música, alternando), como URL de
 // blob que o <audio> e o Web Audio tocam de verdade; o envelope medido fica em memória e entra nas props como no app.
 import jsonpatch, {type Operation} from 'fast-json-patch';
-import type {ApiEstudio, InfoProjeto, MarcaInfo, Mudanca, NovoProjeto, Preferencias, Progresso, Recente, Trilha} from '../../src/compartilhado/api';
+import type {ApiEstudio, InfoProjeto, MarcaInfo, Mudanca, NovoProjeto, Preferencias, Progresso, Recente, ResultadoLimpezaVoz, Trilha} from '../../src/compartilhado/api';
 import type {EntradaDocumento, Manifesto, Modulo} from '../../src/nucleo/documentos';
-import type {Envelope} from '../../src/nucleo/audio';
+import type {Envelope, IntensidadeLimpeza} from '../../src/nucleo/audio';
+import {LimpezaCancelada, limparVoz} from '../../src/nucleo/limpeza-voz';
+import {medirMistura, type FonteAudio, type MedidasLoudness} from '../../src/nucleo/loudness';
 import type {Fato, Fonte, Pesquisa} from '../../src/nucleo/pesquisa';
 import {novoDocCenas, resolverCenas, type DocCenas} from '../../src/nucleo/cenas';
 import {idDeMarca, MARCA_NEUTRO, MARCAS_INICIAIS, patchDaMarca, temaDaMarca, type Marca} from '../../src/nucleo/marca';
 import {MODELOS} from '../../src/nucleo/modelos';
-import {codificarWav, musicaSintetica, narracaoSintetica, TAXA} from '../audio-sintetico';
+import {codificarWav, decodificarWav, musicaSintetica, narracaoSintetica, TAXA} from '../audio-sintetico';
 import {argumentosDoRender, destinoDoFormato, nomesDosArquivos, type OpcoesExportarVideo} from '../../src/nucleo/exportacao';
 
 type Proj = {raiz: string; manifesto: Manifesto; docs: Record<string, unknown>; versao: number};
@@ -304,6 +306,16 @@ const api: ApiEstudio = {
     },
     listarTrilhas: async () => ({pasta: prefs.pasta_trilhas, trilhas: TRILHAS}),
     importarTrilha: async (caminho) => wavSintetico('musica', `${TRILHAS.find((t) => t.caminho === caminho)?.nome ?? 'trilha'}.wav`),
+    // frente Som (rodada 2): simulação no fim do arquivo
+    limparVoz: (arquivo, intensidade) => limparNaPrevia(arquivo, intensidade),
+    cancelarLimpeza: async () => cancelarLimpezaNaPrevia(),
+    aoProgressoLimpeza: (cb) => {
+      ouvintesLimpeza.add(cb);
+      return () => {
+        ouvintesLimpeza.delete(cb);
+      };
+    },
+    medirLoudness: (documento) => medirNaPrevia(documento),
   },
   marcas: {
     listar: async () => structuredClone(marcas),
@@ -359,3 +371,53 @@ const api: ApiEstudio = {
 };
 
 (window as unknown as {estudio: ApiEstudio}).estudio = api;
+
+// ---------- frente Som (rodada 2): limpeza de voz e medidor de loudness, com o mesmo núcleo do app ----------
+// A limpeza roda de verdade sobre o WAV sintético (a narração tem um pouco de "sala" nas pausas): o resultado vira outro
+// blob, com o envelope já medido, como o processo principal grava midia/<arquivo>.limpo.wav. O medidor mixa os blobs à
+// taxa deles (22,05 kHz) com o medirMistura do núcleo, como o loudness.ts faz com os arquivos decodificados a 48 kHz.
+const ouvintesLimpeza = new Set<(p: {arquivo: string; progresso: number}) => void>();
+let limpando: {parar: boolean} | null = null;
+const amostrasDe = async (url: string) => decodificarWav(new Uint8Array(await (await fetch(url)).arrayBuffer()));
+const vez0 = () => new Promise<void>((ok) => setTimeout(ok, 0));
+
+async function limparNaPrevia(arquivo: string, intensidade: IntensidadeLimpeza): Promise<ResultadoLimpezaVoz> {
+  if (limpando) throw new Error('já há uma limpeza de voz em andamento');
+  if (!audios.has(arquivo)) throw new Error('na prévia web só limpa o áudio sintético desta sessão');
+  const eu = (limpando = {parar: false});
+  try {
+    const {canais, taxa} = await amostrasDe(arquivo);
+    const r = await limparVoz(canais, taxa, intensidade, {pausar: vez0, cancelado: () => eu.parar,
+      aoProgresso: (f) => ouvintesLimpeza.forEach((cb) => cb({arquivo, progresso: Math.round(f * 100)}))});
+    const url = URL.createObjectURL(new Blob([codificarWav(r.canais, taxa)], {type: 'audio/wav'}));
+    audios.set(url, {url, nome: `${audios.get(arquivo)!.nome} (limpa)`});
+    envelopes[url] = r.envelope;
+    mudou(`${url}.envelope.json`);
+    return {arquivo: url, medidas: r.medidas, duracao_ms: r.envelope.duracao_ms};
+  } catch (e) {
+    if (e instanceof LimpezaCancelada) return {cancelado: true};
+    throw e;
+  } finally {
+    limpando = null;
+  }
+}
+
+function cancelarLimpezaNaPrevia() {
+  if (limpando) limpando.parar = true;
+  return Boolean(limpando);
+}
+
+async function medirNaPrevia(documento: string): Promise<MedidasLoudness | {erro: string}> {
+  const {props} = resolverCenas(aberto!.docs[documento] as DocCenas, {envelopes});
+  if (!props.audio?.faixas.length) return {erro: 'este vídeo não tem som'};
+  const fontes: Record<string, FonteAudio | undefined> = {};
+  // o WAV de 16 bits chega ao ffmpeg do render em pacotes de 4096 bytes: o volume muda a cada um (FonteAudio.pacote)
+  for (const f of props.audio.faixas) {
+    for (const c of f.clipes) {
+      if (c.arquivo in fontes || !audios.has(c.arquivo)) continue;
+      const a = await amostrasDe(c.arquivo);
+      fontes[c.arquivo] = {...a, pacote: 4096 / (2 * a.canais.length)};
+    }
+  }
+  return medirMistura(props.audio, fontes, {duracao_ms: props.duracao_ms, fps: props.fps, taxa: TAXA, pausar: vez0});
+}

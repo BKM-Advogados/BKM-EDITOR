@@ -3,7 +3,8 @@
 import type {Comentario, EntradaDiario, EntradaDocumento, EstadoEditor, Manifesto, Modulo, OperacaoPatch} from '../nucleo/documentos';
 import type {IdModelo} from '../nucleo/modelos';
 import type {Formato} from '../nucleo/formatos';
-import type {Envelope} from '../nucleo/audio';
+import type {Envelope, IntensidadeLimpeza, LimpezaClipe} from '../nucleo/audio';
+import type {MedidasLoudness} from '../nucleo/loudness';
 import type {FonteArquivo, Marca} from '../nucleo/marca';
 import type {OpcoesExportarImagem, OpcoesExportarVideo} from '../nucleo/exportacao';
 import type {Pesquisa} from '../nucleo/pesquisa';
@@ -65,6 +66,11 @@ export const CANAL = {
   audioGravarEnvelope: 'estudio:audio-gravar-envelope',
   audioListarTrilhas: 'estudio:audio-listar-trilhas',
   audioImportarTrilha: 'estudio:audio-importar-trilha',
+  // limpeza de voz e medidor de loudness (src/main/limpeza-voz.ts e loudness.ts)
+  audioLimparVoz: 'estudio:audio-limpar-voz',
+  audioLimpezaCancelar: 'estudio:audio-limpeza-cancelar',
+  audioLimpezaProgresso: 'estudio:audio-limpeza-progresso',
+  audioMedirLoudness: 'estudio:audio-medir-loudness',
   marcasListar: 'estudio:marcas-listar',
   marcasGravar: 'estudio:marcas-gravar',
   marcasCriar: 'estudio:marcas-criar',
@@ -209,6 +215,13 @@ export type ApiEstudio = {
     listarTrilhas: () => Promise<{pasta: string; trilhas: Trilha[]}>;
     /** Copia uma trilha da biblioteca para midia/; devolve o caminho no projeto. */
     importarTrilha: (caminho: string) => Promise<string>;
+    /** Limpa a voz de um arquivo do projeto em midia/<arquivo>.limpo.wav (o original fica intacto); uma por vez. */
+    limparVoz: (arquivo: string, intensidade: IntensidadeLimpeza) => Promise<ResultadoLimpezaVoz>;
+    /** Para a limpeza em andamento (o limparVoz resolve com cancelado: true); false se não havia nenhuma. */
+    cancelarLimpeza: () => Promise<boolean>;
+    aoProgressoLimpeza: (cb: (p: {arquivo: string; progresso: number}) => void) => () => void;
+    /** Loudness da mistura, da narração e de cada faixa do vídeo, como o render vai soar (BS.1770). */
+    medirLoudness: (documento: string) => Promise<MedidasLoudness | {erro: string}>;
   };
   // kits de marca (pasta marcas/ das preferências) e as fontes próprias do projeto aberto (pasta fontes/)
   marcas: {
@@ -238,6 +251,9 @@ export type ApiEstudio = {
 
 /** Um arquivo da pasta de trilhas: nome sem extensão, caminho absoluto, subpasta e tamanho. */
 export type Trilha = {nome: string; caminho: string; pasta: string; tamanho_kb: number};
+
+/** Voz limpa: o arquivo gravado (caminho no projeto), o que foi medido antes e depois e a duração; ou a pessoa cancelou. */
+export type ResultadoLimpezaVoz = {arquivo: string; medidas: LimpezaClipe; duracao_ms: number} | {cancelado: true};
 
 /** Páginas já desenhadas pela interface (PNG em data URL) com o número que aparece no nome do arquivo (1 = 01.png). */
 export type PedidoExportarPaginas = {documento: string; paginas: {png: string; numero: number}[]; pdf: boolean};
