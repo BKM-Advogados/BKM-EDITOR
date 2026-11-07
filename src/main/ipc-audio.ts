@@ -1,10 +1,13 @@
 // IPC do som do vídeo de cenas: grava o envelope que a interface mediu (midia/<arquivo>.envelope.json), lista a pasta de
 // trilhas das preferências e copia uma trilha de lá para midia/. Também lê os envelopes do disco para as props da
 // composição (sessao-projeto.ts), para a prévia e a exportação verem o mesmo ducking. Registrado no main.ts com uma linha.
-import {copyFileSync, existsSync, mkdirSync, readdirSync, statSync} from 'node:fs';
+// O envelope leva o carimbo do arquivo medido (tamanho, data e sha256): a tomada nova gravada com o mesmo nome, ou o
+// envelope de outra versão da conta, conta como não medido, e a linha do tempo mede de novo.
+import {createHash} from 'node:crypto';
+import {closeSync, copyFileSync, existsSync, mkdirSync, openSync, readdirSync, readSync, statSync, type Stats} from 'node:fs';
 import path from 'node:path';
 import {CANAL, type Preferencias, type Trilha} from '../compartilhado/api';
-import {ehEnvelope, type Envelope} from '../nucleo/audio';
+import {conferirEnvelope, ehEnvelope, type Envelope} from '../nucleo/audio';
 import type {DocCenas} from '../nucleo/cenas';
 import {ErroProjeto, type Projeto} from '../nucleo/projeto';
 
@@ -13,16 +16,63 @@ const MAX_TRILHAS = 500;
 
 export const arquivoDoEnvelope = (arquivo: string) => `${arquivo}.envelope.json`;
 
-/** Envelope gravado ao lado do arquivo, se houver e estiver inteiro. */
+/** sha256 de um arquivo, lido em pedaços de 1 MB (a narração inteira não precisa caber na memória). */
+export const sha256DoArquivo = (abs: string) => {
+  const h = createHash('sha256');
+  const fd = openSync(abs, 'r');
+  try {
+    const buf = Buffer.allocUnsafe(1 << 20);
+    for (let n = readSync(fd, buf, 0, buf.length, null); n > 0; n = readSync(fd, buf, 0, buf.length, null)) h.update(buf.subarray(0, n));
+  } finally {
+    closeSync(fd);
+  }
+  return h.digest('hex');
+};
+
+// por caminho + tamanho + data: o arquivo de mesmo tamanho e outra data (cópia, git clone) é lido uma vez por sessão
+const shas = new Map<string, string>();
+const shaGuardado = (abs: string, st: Stats) => {
+  const chave = `${abs}|${st.size}|${st.mtimeMs}`;
+  let s = shas.get(chave);
+  if (!s) {
+    s = sha256DoArquivo(abs);
+    if (shas.size >= 256) shas.delete(shas.keys().next().value!);
+    shas.set(chave, s);
+  }
+  return s;
+};
+
+/** Envelope gravado ao lado do arquivo, se houver, estiver inteiro, for da versão atual e ainda for do arquivo como ele
+ *  está (o carimbo confere); senão undefined, e a interface mede de novo. */
 export const lerEnvelope = (p: Projeto, arquivo: string): Envelope | undefined => {
   try {
     const rel = arquivoDoEnvelope(arquivo);
     if (!p.existe(rel)) return undefined;
     const {doc} = p.lerJson<unknown>(rel);
-    return ehEnvelope(doc) ? doc : undefined;
+    if (!ehEnvelope(doc)) return undefined;
+    const abs = p.caminho(arquivo);
+    const st = statSync(abs);
+    const estado = conferirEnvelope(doc, {tamanho: st.size, modificado_ms: st.mtimeMs});
+    return estado === 'em_dia' || (estado === 'conferir' && doc.fonte?.sha256 === shaGuardado(abs, st)) ? doc : undefined;
   } catch {
     return undefined;
   }
+};
+
+/** Grava o envelope de `arquivo` com o carimbo do arquivo como ele está agora (tamanho, data, sha256). Se o envelope
+ *  trouxer `fonte` (o tamanho e o sha256 dos bytes que a interface mediu) e o arquivo tiver mudado no meio, recusa.
+ *  `sha256`: o de quem acabou de gravar o arquivo (a limpeza), para não ler de novo. */
+export const gravarEnvelope = (p: Projeto, arquivo: string, envelope: Envelope, sha256?: string) => {
+  const abs = p.caminho(arquivo);
+  const st = statSync(abs);
+  const sha = sha256 ?? sha256DoArquivo(abs);
+  const medido = envelope.fonte;
+  if (medido && (medido.tamanho !== st.size || (medido.sha256 && medido.sha256 !== sha))) {
+    throw new ErroProjeto(`${arquivo} mudou enquanto era medido; a linha do tempo mede de novo`, 'conflito');
+  }
+  const rel = arquivoDoEnvelope(arquivo);
+  p.gravarTexto(rel, `${JSON.stringify({...envelope, fonte: {tamanho: st.size, modificado_ms: st.mtimeMs, sha256: sha}})}\n`);
+  return rel;
 };
 
 /** Envelopes de todos os clipes do documento, por arquivo (o resolvedor recebe isto em `opcoes.envelopes`). */

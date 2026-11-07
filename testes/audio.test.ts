@@ -1,17 +1,17 @@
 // Som do vídeo de cenas: envelope com ponderação K, ducking medido, resolução das faixas (fades, limites, avisos) e o
 // IPC de áudio (envelope ao lado do arquivo, biblioteca de trilhas).
-import {mkdirSync, mkdtempSync, rmSync, writeFileSync} from 'node:fs';
+import {mkdirSync, mkdtempSync, rmSync, statSync, utimesSync, writeFileSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {afterAll, describe, expect, it} from 'vitest';
 import {
-  calcularDucking, DUCKING_PADRAO, envelopeDeAmostras, fatorFades, ganhoDeDb, JANELA_MS, nivelDeReferencia, novaFaixaAudio, novoAudioCenas, papelDe, referenciaDeJanelas,
+  calcularDucking, conferirEnvelope, DUCKING_PADRAO, ehEnvelope, envelopeDeAmostras, fatorFades, ganhoDeDb, JANELA_MS, nivelDeReferencia, novaFaixaAudio, novoAudioCenas, papelDe, referenciaDeJanelas,
   resolverAudio, SILENCIO_DB, volumeDoClipe, type Envelope,
 } from '../src/nucleo/audio';
 import {novoDocCenas, resolverCenas, type DocCenas} from '../src/nucleo/cenas';
 import {gravarPlano, planoDoProjeto} from '../src/nucleo/criar-projeto';
 import {Projeto} from '../src/nucleo/projeto';
-import {arquivoDoEnvelope, importarTrilha, lerEnvelopes, listarTrilhas} from '../src/main/ipc-audio';
+import {arquivoDoEnvelope, gravarEnvelope, importarTrilha, lerEnvelope, lerEnvelopes, listarTrilhas, sha256DoArquivo} from '../src/main/ipc-audio';
 
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'estudio-audio-'));
 afterAll(() => rmSync(tmp, {recursive: true, force: true}));
@@ -29,7 +29,7 @@ const envelope = (duracao_ms: number, base: number, trechos: [number, number, nu
     const tr = trechos.find(([a, b]) => t >= a && t < b);
     db.push(tr ? tr[2] : base);
   }
-  return {versao: 1, janela_ms: JANELA_MS, duracao_ms, db};
+  return {versao: 2, janela_ms: JANELA_MS, duracao_ms, db};
 };
 
 describe('envelope', () => {
@@ -202,7 +202,7 @@ describe('ipc de áudio', () => {
     const raiz = gravarPlano(path.join(tmp, 'proj'), planoDoProjeto({nome: 'Som', modelo: 'video-branco'}));
     const p = new Projeto(raiz);
     writeFileSync(path.join(raiz, 'midia', 'voz.wav'), 'x');
-    p.gravarTexto(arquivoDoEnvelope('midia/voz.wav'), JSON.stringify(envelope(1000, -20)));
+    gravarEnvelope(p, 'midia/voz.wav', envelope(1000, -20));
     p.gravarTexto(arquivoDoEnvelope('midia/quebrado.wav'), '{"versao": 2}');
     const doc = {...novoDocCenas({largura: 1080, altura: 1920, fps: 30}), audio: {faixas: [{id: 'f', nome: 'Narração', clipes: [
       {id: 'a', arquivo: 'midia/voz.wav', em: 0, duracao_ms: 1000}, {id: 'b', arquivo: 'midia/quebrado.wav', em: 0, duracao_ms: 1000}, {id: 'c', arquivo: 'midia/nada.wav', em: 0, duracao_ms: 1000},
@@ -211,6 +211,63 @@ describe('ipc de áudio', () => {
     expect(envs['midia/voz.wav']?.db).toHaveLength(20);
     expect(envs['midia/quebrado.wav']).toBeUndefined();
     expect(envs['midia/nada.wav']).toBeUndefined();
+  });
+
+  it('som-D14: o envelope sai na versão 2, e o da 0.3.0 (versão 1, ponderação K antiga) conta como não medido', () => {
+    expect(envelopeDeAmostras([seno(300, 0.2, 48000)], 48000).versao).toBe(2);
+    expect(ehEnvelope({...envelope(1000, -20), versao: 1})).toBe(false);
+    expect(ehEnvelope({...envelope(1000, -20), fonte: {tamanho: 'x'}})).toBe(false);
+    const raiz = gravarPlano(path.join(tmp, 'proj-v1'), planoDoProjeto({nome: 'Som v1', modelo: 'video-branco'}));
+    const p = new Projeto(raiz);
+    writeFileSync(path.join(raiz, 'midia', 'voz.wav'), 'tomada');
+    p.gravarTexto(arquivoDoEnvelope('midia/voz.wav'), JSON.stringify({...envelope(1000, -20), versao: 1}));
+    expect(lerEnvelope(p, 'midia/voz.wav')).toBeUndefined(); // a interface mede de novo
+    gravarEnvelope(p, 'midia/voz.wav', envelope(1000, -20));
+    expect(lerEnvelope(p, 'midia/voz.wav')?.versao).toBe(2);
+  });
+
+  it('som-D2: o envelope guarda tamanho, data e sha256; tomada regravada com o mesmo nome deixa de valer, a mesma copiada vale', () => {
+    const raiz = gravarPlano(path.join(tmp, 'proj-tomada'), planoDoProjeto({nome: 'Tomada', modelo: 'video-branco'}));
+    const p = new Projeto(raiz);
+    const abs = path.join(raiz, 'midia', 'narracao.wav');
+    const regravar = (texto: string, quando: Date) => {
+      writeFileSync(abs, texto);
+      utimesSync(abs, quando, quando);
+    };
+    regravar('tomada um', new Date('2026-11-01T10:00:00Z'));
+    gravarEnvelope(p, 'midia/narracao.wav', envelope(30000, -20));
+    const gravado = lerEnvelope(p, 'midia/narracao.wav');
+    expect(gravado?.fonte).toEqual({tamanho: 9, modificado_ms: statSync(abs).mtimeMs, sha256: sha256DoArquivo(abs)});
+    // a mesma tomada com outra data (cópia, git clone em outro PC): o sha256 confere e o envelope vale
+    regravar('tomada um', new Date('2026-11-03T10:00:00Z'));
+    expect(lerEnvelope(p, 'midia/narracao.wav')).toBeDefined();
+    // outra tomada do mesmo tamanho: o sha256 não confere
+    regravar('tomada 2!', new Date('2026-11-04T10:00:00Z'));
+    expect(lerEnvelope(p, 'midia/narracao.wav')).toBeUndefined();
+    // outra tomada mais longa: o tamanho não confere; o clipe de 40 s não é mais encolhido aos 30 s do envelope velho
+    regravar('a tomada nova, mais longa', new Date('2026-11-05T10:00:00Z'));
+    expect(lerEnvelope(p, 'midia/narracao.wav')).toBeUndefined();
+    const doc = {...novoDocCenas({largura: 1080, altura: 1920, fps: 30}), audio: {faixas: [{id: 'f', nome: 'Narração', papel: 'voz' as const, clipes: [
+      {id: 'a', arquivo: 'midia/narracao.wav', em: 0, duracao_ms: 40000}]}]}};
+    const {props, avisos} = resolverCenas(doc, {envelopes: lerEnvelopes(p, doc)});
+    expect(props.audio?.faixas[0].clipes[0].duracao_ms).toBe(40000);
+    expect(avisos.join(' ')).toMatch(/ainda não foi medido/);
+    // com o envelope velho, o mesmo documento encolhia o clipe (o defeito)
+    expect(resolverCenas(doc, {envelopes: {'midia/narracao.wav': envelope(30000, -20)}}).props.audio?.faixas[0].clipes[0].duracao_ms).toBe(30000);
+    // a interface manda o tamanho e o sha256 do que mediu: se o arquivo mudou no meio, o processo principal recusa
+    expect(() => gravarEnvelope(p, 'midia/narracao.wav', {...envelope(30000, -20), fonte: {tamanho: 9, sha256: gravado!.fonte!.sha256}})).toThrow(/mudou enquanto era medido/);
+    gravarEnvelope(p, 'midia/narracao.wav', {...envelope(40000, -20), fonte: {tamanho: 25, sha256: sha256DoArquivo(abs)}});
+    expect(lerEnvelope(p, 'midia/narracao.wav')?.duracao_ms).toBe(40000);
+  });
+
+  it('confere o envelope pelo carimbo: tamanho, depois data, depois o sha256', () => {
+    const env = envelope(1000, -20);
+    const agora = {tamanho: 100, modificado_ms: 1_700_000_000_000.25};
+    expect(conferirEnvelope(env, agora)).toBe('velho'); // sem carimbo
+    expect(conferirEnvelope({...env, fonte: {tamanho: 100, modificado_ms: 1_700_000_000_000.9, sha256: 'a'}}, agora)).toBe('em_dia');
+    expect(conferirEnvelope({...env, fonte: {tamanho: 100, modificado_ms: 1_600_000_000_000, sha256: 'a'}}, agora)).toBe('conferir');
+    expect(conferirEnvelope({...env, fonte: {tamanho: 100, modificado_ms: 1_600_000_000_000}}, agora)).toBe('velho');
+    expect(conferirEnvelope({...env, fonte: {tamanho: 99, modificado_ms: agora.modificado_ms, sha256: 'a'}}, agora)).toBe('velho');
   });
 
   it('lista a pasta de trilhas (dois níveis, só áudio) e importa só de lá', () => {

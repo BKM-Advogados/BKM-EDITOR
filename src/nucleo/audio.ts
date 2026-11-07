@@ -34,8 +34,13 @@ export type FaixaAudio = {id: string; nome: string; papel?: PapelFaixa; volume?:
 export type AudioCenas = {faixas: FaixaAudio[]; alvo_lufs?: number; pico_dbtp?: number};
 
 /** Loudness por janela do arquivo, em dB com ponderação K (o mesmo número do LUFS, por janela). `db` tem uma entrada
- *  por `janela_ms`; SILENCIO_DB é "nada". Gravado em midia/<arquivo>.envelope.json pela interface. */
-export type Envelope = {versao: 1; janela_ms: number; duracao_ms: number; db: number[]};
+ *  por `janela_ms`; SILENCIO_DB é "nada". Gravado em midia/<arquivo>.envelope.json pelo processo principal, com `fonte`:
+ *  o arquivo como ele estava quando foi medido (tamanho, data e sha256), para remedir quando a tomada for regravada com o
+ *  mesmo nome. A versão sobe quando a conta muda: a 2 veio com a ponderação K do libebur128 (rodada 2), e o envelope da
+ *  versão 1 (0.3.0) conta como não medido. */
+export const VERSAO_ENVELOPE = 2;
+export type FonteDoEnvelope = {tamanho: number; modificado_ms?: number; sha256?: string};
+export type Envelope = {versao: typeof VERSAO_ENVELOPE; janela_ms: number; duracao_ms: number; db: number[]; fonte?: FonteDoEnvelope};
 
 export const JANELA_MS = 50;
 export const SILENCIO_DB = -100;
@@ -154,12 +159,25 @@ export const envelopeDeAmostras = (canais: Float32Array[], taxa: number, janela_
     const potencia = soma[j] / Math.max(1, amostras);
     db[j] = potencia > 0 ? Math.max(SILENCIO_DB, Math.round((-0.691 + 10 * Math.log10(potencia)) * 10) / 10) : SILENCIO_DB;
   }
-  return {versao: 1, janela_ms, duracao_ms: Math.round((n / taxa) * 1000), db};
+  return {versao: VERSAO_ENVELOPE, janela_ms, duracao_ms: Math.round((n / taxa) * 1000), db};
 };
 
+/** Envelope inteiro e na versão atual; o da versão 1 (0.3.0) não passa, para ser medido de novo com a conta nova. */
 export const ehEnvelope = (e: unknown): e is Envelope => {
   const o = e as Partial<Envelope> | null;
-  return Boolean(o && o.versao === 1 && typeof o.janela_ms === 'number' && o.janela_ms > 0 && typeof o.duracao_ms === 'number' && Array.isArray(o.db));
+  const f = o?.fonte as Partial<FonteDoEnvelope> | undefined;
+  return Boolean(o && o.versao === VERSAO_ENVELOPE && typeof o.janela_ms === 'number' && o.janela_ms > 0 && typeof o.duracao_ms === 'number' && Array.isArray(o.db)
+    && (f === undefined || (typeof f === 'object' && f !== null && typeof f.tamanho === 'number' && (f.modificado_ms === undefined || typeof f.modificado_ms === 'number')
+      && (f.sha256 === undefined || typeof f.sha256 === 'string'))));
+};
+
+/** O envelope ainda é do arquivo como ele está agora? 'em_dia': mesmo tamanho e mesma data; 'conferir': mesmo tamanho e
+ *  outra data (cópia, git clone), e só o sha256 decide; 'velho': outro tamanho, ou envelope sem carimbo. */
+export const conferirEnvelope = (env: Envelope, atual: {tamanho: number; modificado_ms: number}): 'em_dia' | 'conferir' | 'velho' => {
+  const f = env.fonte;
+  if (!f || f.tamanho !== atual.tamanho) return 'velho';
+  if (typeof f.modificado_ms === 'number' && Math.floor(f.modificado_ms) === Math.floor(atual.modificado_ms)) return 'em_dia';
+  return f.sha256 ? 'conferir' : 'velho';
 };
 
 export const mediana = (xs: number[]): number | null => {
