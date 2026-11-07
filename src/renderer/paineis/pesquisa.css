@@ -1,0 +1,50 @@
+/* Painel Pesquisa: cartões de fonte e de fato no molde dos Comentários (fundo-2, borda fina, 6 px de raio) e o texto
+   da fonte paginado. Os selos só informam: verde quando conferiu, laranja de aviso no resto; não há vermelho de erro.
+   Usa os tokens do :root (estilo.css). As etiquetas de fato do inspetor do vídeo (.etiqueta-fato) também moram aqui. */
+.pesquisa .painel-topo .rotulo { flex: none; }
+.pesq-filtro { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--borda); color: var(--texto-3); flex: none; }
+.pesq-filtro .campo { flex: 1; min-width: 0; }
+
+.pesq-cartao { border: 1px solid var(--borda); border-radius: 6px; padding: 8px; margin-bottom: 8px; background: var(--fundo-2);
+  display: flex; flex-direction: column; gap: 4px; overflow-wrap: anywhere; }
+.pesq-cartao.fato { cursor: pointer; }
+.pesq-cartao.fato:hover { border-color: var(--borda-forte); }
+.pesq-cartao.aberto { border-color: var(--acento); }
+.pesq-cabeca, .pesq-rodape { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pesq-cabeca b { font-size: var(--tam-2); }
+.pesq-cabeca .esp, .pesq-rodape .esp { flex: 1; }
+.pesq-cabeca .rotulo, .pesq-rodape .rotulo { text-transform: none; }
+
+.pesq-selo { font: var(--peso-forte) var(--tam-1) var(--fonte); padding: 1px 5px; border-radius: 3px; background: var(--fundo-4); color: var(--texto-2); white-space: nowrap; }
+.pesq-selo.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); }
+.pesq-selo.aviso { color: var(--aviso); background: color-mix(in srgb, var(--aviso) 14%, transparent); }
+.pesq-selo.nivel-1 { color: var(--acento); background: var(--acento-fraco); }
+
+.pesq-titulo { font-weight: var(--peso-forte); color: var(--texto); }
+.pesq-url { font: var(--tam-1) var(--fonte-mono); color: var(--texto-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pesq-sinais { display: flex; flex-wrap: wrap; gap: 4px; }
+.pesq-observacao { border-left: 2px solid var(--borda-forte); padding-left: 8px; margin: 2px 0; }
+.pesq-observacao-texto { white-space: pre-wrap; color: var(--texto); }
+
+.pesq-afirmacao { color: var(--texto); white-space: pre-wrap; }
+.pesq-trecho { margin: 2px 0; padding: 4px 8px; border-left: 2px solid var(--acento); background: var(--fundo-1); color: var(--texto-2);
+  white-space: pre-wrap; font-size: var(--tam-2); }
+.pesq-falta { color: var(--aviso); font-size: var(--tam-2); }
+.pesq-nota { color: var(--texto-2); font-style: italic; white-space: pre-wrap; }
+
+.pesq-texto { border-top: 1px solid var(--borda); margin-top: 4px; padding-top: 4px; }
+.pesq-paginas { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.pesq-texto-corpo { max-height: 360px; overflow: auto; margin-top: 4px; padding: 6px 8px; background: var(--fundo-1); border-radius: var(--raio);
+  white-space: pre-wrap; font: var(--tam-2)/1.5 var(--fonte); color: var(--texto); user-select: text; }
+.pesq-texto-corpo mark { background: color-mix(in srgb, var(--comentario) 35%, transparent); color: var(--texto); border-radius: 2px; }
+.pesq-texto-aviso { color: var(--aviso); font-size: var(--tam-2); padding: 6px 0; }
+.pesq-texto-aviso .rotulo { display: block; text-transform: none; margin-top: 2px; }
+.pesq-erro { padding: 6px 8px; border-bottom: 1px solid var(--borda); flex: none; }
+
+/* etiquetas de fato no inspetor do vídeo de cenas: id e, quando a pesquisa tem o fato, a afirmação cortada */
+.etiquetas-fato { display: flex; flex-wrap: wrap; gap: 4px; padding: 2px 8px 6px; }
+.etiqueta.etiqueta-fato { max-width: 100%; cursor: pointer; }
+.etiqueta-fato .afirmacao { font-weight: normal; color: var(--texto-3); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.etiqueta-fato.sem-fato { color: var(--aviso); }
+.etiqueta-fato button { display: inline-flex; flex: none; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; }
+.etiqueta-fato button:hover { color: var(--texto); }

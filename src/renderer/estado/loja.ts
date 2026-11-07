@@ -1,10 +1,11 @@
 // Estado da interface: projeto aberto, área, documentos carregados (com a versão de cada um), seleção, tempo,
-// comentários e diário. Toda mudança de documento sai daqui como JSON Patch para o processo principal; quando o arquivo
+// comentários, diário e a pesquisa (só leitura: pesquisa/pesquisa.json). Toda mudança de documento sai daqui como JSON Patch para o processo principal; quando o arquivo
 // muda no disco (pela interface ou pelo agente no terminal), o documento é relido e a tela acompanha.
 import {useRef, useSyncExternalStore} from 'react';
 import type {InfoProjeto, PropsVideo} from '../../compartilhado/api';
 import type {Comentario, DocImagem, EntradaDiario, Modulo, OperacaoPatch} from '../../nucleo/documentos';
 import type {Efeito} from '../../nucleo/efeitos';
+import type {Pesquisa} from '../../nucleo/pesquisa'; // só o tipo: pesquisa.ts usa node:crypto
 import {indicePagina, paginasDe} from '../../nucleo/carrossel';
 
 export type Area = 'video' | 'imagem' | '3d' | 'efeitos';
@@ -26,6 +27,9 @@ export type Estado = {
   diario: EntradaDiario[];
   modoComentario: boolean;
   comentarioAberto?: string;
+  pesquisa: Pesquisa | null; // null = ainda não lida; a interface só mostra, quem grava é o Claude pelo MCP
+  erroPesquisa?: string; // pesquisa/pesquisa.json não pôde ser lido: o painel mostra o motivo em vez de "carregando"
+  fatoAberto?: string; // fato pedido de fora do painel Pesquisa (etiqueta do inspetor): o painel vem à frente e mostra
   aviso?: Aviso;
   zoomLinha: number | null; // pixels por segundo da linha do tempo; null = ajustar à janela (vale no Vídeo e em Efeitos)
   ultimaMudancaAgente?: number; // seq da última mudança do agente vista
@@ -36,7 +40,7 @@ export type Estado = {
 };
 
 const INICIAL: Estado = {info: null, area: 'video', ativo: {}, docs: {}, props: {}, selecao: null, tempo_ms: 0, comentarios: [], diario: [], modoComentario: false, zoomLinha: null,
-  paginaAtiva: {}};
+  paginaAtiva: {}, pesquisa: null, erroPesquisa: undefined, fatoAberto: undefined}; // os opcionais da pesquisa ficam aqui para a troca de projeto zerá-los
 let estado: Estado = INICIAL;
 const ouvintes = new Set<() => void>();
 
@@ -100,6 +104,29 @@ export const carregarDoc = async (id: string) => {
 };
 
 export const carregarComentarios = async () => loja.definir({comentarios: await window.estudio.comentarios()});
+// a pesquisa chega depois de o projeto trocar? descarta (a resposta é do projeto anterior)
+export const carregarPesquisa = async () => {
+  const raiz = estado.info?.raiz;
+  try {
+    const pesquisa = await window.estudio.pesquisa();
+    if (estado.info?.raiz === raiz) loja.definir({pesquisa, erroPesquisa: undefined});
+  } catch (e) {
+    // a última pesquisa lida fica na tela; sem nenhuma, o painel mostra o motivo
+    if (estado.info?.raiz === raiz) loja.definir({erroPesquisa: mensagemDe(e)});
+  }
+};
+// "ver o fato" de fora do painel (etiqueta do inspetor): marca o fato e a casca traz o painel Pesquisa para a frente
+const aoVerFato = new Set<(id: string) => void>();
+export const quandoVerFato = (f: (id: string) => void) => {
+  aoVerFato.add(f);
+  return () => {
+    aoVerFato.delete(f);
+  };
+};
+export const verFato = (id: string) => {
+  loja.definir({fatoAberto: id});
+  aoVerFato.forEach((f) => f(id));
+};
 export const carregarDiario = async () => {
   const diario = await window.estudio.diario();
   const ultimaAgente = [...diario].reverse().find((d) => d.autor === 'agente');
@@ -143,7 +170,7 @@ export const abrirProjeto = async (info: InfoProjeto) => {
       zoomLinha: estado.zoomLinha, pedidoClaude: estado.pedidoClaude});
     if (info.aviso) avisar(info.aviso, 'info');
   }
-  await Promise.all([...info.manifesto.documentos.map((d) => carregarDoc(d.id)), carregarComentarios(), carregarDiario()]);
+  await Promise.all([...info.manifesto.documentos.map((d) => carregarDoc(d.id)), carregarComentarios(), carregarDiario(), ...(mesmo ? [] : [carregarPesquisa()])]);
   // a página do carrossel em que a pessoa parou só se resolve com o documento lido (o estado guarda o caminho, a loja o id)
   const ult = info.estado;
   if (!mesmo && ult?.documento && ult.pagina && estado.info?.raiz === info.raiz) {
@@ -185,6 +212,8 @@ export const observarProjeto = () =>
     if (!info) return;
     if (arquivo === 'comentarios.json') return void carregarComentarios();
     if (arquivo.startsWith('.estudio/diario')) return void carregarDiario();
+    // pesquisa.json ou o texto de uma fonte (pesquisa/fontes/<id>.txt): a lista relê; o texto aberto relê pelo sha256
+    if (arquivo.startsWith('pesquisa/')) return void carregarPesquisa();
     if (arquivo === 'estudio.json') return void window.estudio.projetoAtual().then((i) => i && abrirProjeto(i));
     // envelope de áudio medido (midia/x.wav.envelope.json): as props dos vídeos ganham a forma de onda e o ducking
     if (arquivo.endsWith('.envelope.json')) return void info.manifesto.documentos.filter((d) => d.modulo === 'video').forEach((d) => void carregarDoc(d.id));

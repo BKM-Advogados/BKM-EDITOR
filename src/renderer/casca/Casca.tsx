@@ -2,16 +2,17 @@
 // próprio arranjo de painéis (como as páginas do Resolve e os workspaces do Blender); o terminal é o mesmo em todas.
 // A barra tem o menu de costume dos editores (Novo, Abrir, Abrir recente, Duplicar, Fechar, Preferências), o nome do
 // projeto renomeável com um clique, o "Salvo" (tudo grava na hora; Ctrl+S marca um ponto de restauração) e o Exportar,
-// que abre o diálogo de exportação do documento da área (componentes/DialogoExportar.tsx).
+// que abre o diálogo de exportação do documento da área (componentes/DialogoExportar.tsx). No grupo do inspetor, ao lado
+// de Comentários e Histórico, fica o painel Pesquisa (só leitura: fontes e fatos de pesquisa/pesquisa.json).
 import React, {Suspense, useCallback, useEffect, useRef, useState} from 'react';
 import {DockviewReact, type DockviewApi, type DockviewReadyEvent, type DockviewTheme, type IDockviewPanelHeaderProps, type IDockviewPanelProps} from 'dockview-react';
 import 'dockview-react/dist/styles/dockview.css';
 import {Blend, BookOpen, Box, Check, Copy, Download, Film, FilePlus2, FolderOpen, FolderSearch, History, Home, Image as ImageIcon, LayoutPanelLeft, ListTree,
-  MessageSquare, MessageSquarePlus, MonitorPlay, Palette, Plus, Rows3, Settings, SlidersHorizontal, Sparkle, Undo2, X} from 'lucide-react';
+  MessageSquare, MessageSquarePlus, MonitorPlay, Palette, Plus, Quote, Rows3, Settings, SlidersHorizontal, Sparkle, Undo2, X} from 'lucide-react';
 import type {Preferencias, Recente} from '../../compartilhado/api';
 import type {Modulo} from '../../nucleo/documentos';
 import {FORMATOS_IMAGEM, FORMATOS_VIDEO} from '../../nucleo/formatos';
-import {abrirProjeto, avisar, criarDocumento, desfazer, fecharProjeto, loja, mensagemDe, useLoja, type Area} from '../estado/loja';
+import {abrirProjeto, avisar, criarDocumento, desfazer, fecharProjeto, loja, mensagemDe, quandoVerFato, useLoja, type Area} from '../estado/loja';
 import {pedirTexto} from '../componentes/Dialogo';
 import type {PaineisDoModulo} from './contrato';
 import {PaineisVideo} from '../modulos/video/paineis';
@@ -20,6 +21,7 @@ import {PaineisEfeitos} from '../modulos/efeitos/paineis';
 import {abrirDialogoExportar, RaizDialogoExportar} from '../componentes/DialogoExportar';
 import {Comentarios} from '../paineis/Comentarios';
 import {Historico} from '../paineis/Historico';
+import {Pesquisa} from '../paineis/Pesquisa';
 import {Rodape} from './Rodape';
 import {PainelMarca} from './PainelMarca';
 import './casca.css';
@@ -62,7 +64,7 @@ const PorArea: React.FC<{parte: 'Lista' | 'Monitor' | 'Inspector' | 'Linha'}> = 
 // sustentam a área não têm ×; os outros mostram o × ao passar o mouse.
 const ICONES_ABA: Record<string, React.ReactNode> = {
   monitor: <MonitorPlay size={14} />, linha: <Rows3 size={14} />, lista: <ListTree size={14} />, inspector: <SlidersHorizontal size={14} />,
-  comentarios: <MessageSquare size={14} />, historico: <History size={14} />, terminal: <Sparkle size={14} />,
+  comentarios: <MessageSquare size={14} />, historico: <History size={14} />, pesquisa: <Quote size={14} />, terminal: <Sparkle size={14} />,
 };
 const ESSENCIAIS = new Set(['monitor', 'linha', 'lista', 'inspector', 'terminal']);
 const AbaDoPainel: React.FC<IDockviewPanelHeaderProps> = ({api}) => {
@@ -92,15 +94,17 @@ const componentes: Record<string, React.FC<IDockviewPanelProps>> = {
   linha: () => <PorArea parte="Linha" />,
   comentarios: () => <Comentarios />,
   historico: () => <Historico />,
+  pesquisa: () => <Pesquisa />,
   terminal: () => <Suspense fallback={<Carregando />}><Terminal /></Suspense>,
 };
 
 // faixas de layout de docs/tela.md: C (compacta) abaixo de 1600x800, P (padrão) acima; cada área x faixa guarda o seu.
 // No Vídeo, o arranjo depende também do formato: vertical (V) quer o monitor em coluna, horizontal (H) quer largura.
+// A versão na chave sobe quando entra painel novo no arranjo padrão (v6: Pesquisa), para os layouts gravados o verem.
 type Faixa = 'C' | 'P';
 type Orientacao = 'V' | 'H';
 const faixaAtual = (): Faixa => (window.innerWidth < 1600 || window.innerHeight < 800 ? 'C' : 'P');
-const CHAVE = (area: Area, faixa: Faixa, o: Orientacao) => `estudio:layout:v5:${area}:${faixa}${area === 'video' ? `:${o}` : ''}`;
+const CHAVE = (area: Area, faixa: Faixa, o: Orientacao) => `estudio:layout:v6:${area}:${faixa}${area === 'video' ? `:${o}` : ''}`;
 const lerLayout = (area: Area, faixa: Faixa, o: Orientacao) => {
   try {
     const t = localStorage.getItem(CHAVE(area, faixa, o));
@@ -126,6 +130,7 @@ const layoutPadrao = (api: DockviewApi, area: Area, faixa: Faixa, o: Orientacao)
     if (comLista) api.addPanel({id: 'lista', component: 'lista', title: 'Lista', position: {referencePanel: 'inspector', direction: 'within'}});
     api.addPanel({id: 'comentarios', component: 'comentarios', title: 'Comentários', position: {referencePanel: 'inspector', direction: 'within'}});
     api.addPanel({id: 'historico', component: 'historico', title: 'Histórico', position: {referencePanel: 'inspector', direction: 'within'}});
+    api.addPanel({id: 'pesquisa', component: 'pesquisa', title: 'Pesquisa', position: {referencePanel: 'inspector', direction: 'within'}});
     api.getPanel('inspector')?.api.setActive();
   };
   api.addPanel({id: 'monitor', component: 'monitor', title: 'Monitor'});
@@ -291,6 +296,15 @@ export const Casca: React.FC = () => {
   useEffect(() => {
     if (api.current && areaMontada.current === 'video' && orientacaoMontada.current !== orientacao) montar('video');
   }, [orientacao, montar]);
+
+  // etiqueta de fato no inspetor: o painel Pesquisa vem à frente (e volta ao grupo do inspetor se tinha sido fechado)
+  useEffect(() => quandoVerFato(() => {
+    const d = api.current;
+    if (!d) return;
+    const p = d.getPanel('pesquisa') ?? d.addPanel({id: 'pesquisa', component: 'pesquisa', title: 'Pesquisa',
+      ...(d.getPanel('inspector') ? {position: {referencePanel: 'inspector', direction: 'within' as const}} : {})});
+    p.api.setActive();
+  }), []);
 
   const marcarVersao = async () => {
     const r = await window.estudio.marcarVersao();

@@ -2,12 +2,14 @@
 // nada, porque a posição é relativa ao quadro) e as cores do tema. Cena: nome, duração e fundo. Bloco: conteúdo,
 // tempo (segundos na cena), posição e tamanho em % do quadro e a letra em px do formato atual. Faixa de áudio: nome,
 // papel, volume, mudo e o ducking (música); clipe: arquivo, tempo, corte, volume, fades e mudo, com o que foi medido.
+// Bloco e cena mostram em "Fatos citados" os `refs` (ids dos fatos da pesquisa) como etiquetas, com a afirmação ao lado;
+// clicar leva ao fato no painel Pesquisa e o × tira um da lista.
 import React from 'react';
-import {Clapperboard, CopyPlus, Film, FileAudio, FileJson, ImagePlus, Link, Trash2} from 'lucide-react';
+import {Clapperboard, CopyPlus, Film, FileAudio, FileJson, ImagePlus, Link, Quote, Trash2, X} from 'lucide-react';
 import {ALVO_LU_MAX, ALVO_LU_MIN, DUCKING_PADRAO, PAPEIS, type ClipeAudio, type ClipeAudioP, type FaixaAudio, type FaixaAudioP, type PapelFaixa} from '../../../nucleo/audio';
 import {TIPOS_BLOCO_CENAS, type BlocoCenas, type CenaCenas, type DocCenas, type PropsCenas} from '../../../nucleo/cenas';
 import {FORMATOS_VIDEO, formatoDoVideo, rotuloFormato} from '../../../nucleo/formatos';
-import {avisar, mensagemDe, trocar, useLoja, valorEm} from '../../estado/loja';
+import {avisar, mensagemDe, trocar, useLoja, valorEm, verFato} from '../../estado/loja';
 import {CabecalhoInspector, CampoCor, CampoDeslizante, CampoInterruptor, CampoLeitura, CampoNumero, CampoSelecao, CampoTexto, Secao, copiar, numeroBr} from '../../componentes/Campos';
 import type {ItemMenu} from '../../componentes/Menu';
 import {formatarTempo} from './tocador';
@@ -58,6 +60,42 @@ const ResumoVideo: React.FC<{documento: string; doc: DocCenas; titulo: string; d
   );
 };
 
+/** Os fatos que o bloco (ou a cena) cita, um por etiqueta. Tirar um grava `refs` sem ele (ou some com o campo). */
+const FatosCitados: React.FC<{documento: string; caminho: string; refs?: string[]; nome: string}> = ({documento, caminho, refs, nome}) => {
+  const lista = Array.isArray(refs) ? refs : [];
+  // a afirmação de cada fato vem da pesquisa da loja (pesquisa/pesquisa.json); ainda não lida, só o id
+  const fatos = useLoja((e) => e.pesquisa?.fatos);
+  const tirar = (id: string) => {
+    const resto = lista.filter((r) => r !== id);
+    void trocar(documento, `${caminho}/refs`, resto.length ? resto : undefined, `tirar o fato ${id} ${nome}`);
+  };
+  return (
+    <Secao titulo={lista.length ? `Fatos citados (${lista.length})` : 'Fatos citados'} chave="cenas:refs">
+      {lista.length ? (
+        <div className="etiquetas-fato">
+          {lista.map((id) => {
+            const fato = fatos?.find((f) => f.id === id);
+            const sem = Boolean(fatos && !fato); // id que não está na pesquisa: só aviso, o bloco segue igual
+            return (
+              <span key={id} className={`etiqueta etiqueta-fato${sem ? ' sem-fato' : ''}`} onClick={() => verFato(id)}
+                title={fato ? `${id}: ${fato.afirmacao}\n${fato.estado === 'trecho_confere' ? 'trecho confere' : 'a revisar'} · clique para ver no painel Pesquisa`
+                  : sem ? `O ${id} não está na pesquisa deste projeto` : `Fato ${id} da pesquisa`}>
+                <Quote />
+                {id}
+                {fato && <span className="afirmacao">{fato.afirmacao}</span>}
+                <button type="button" aria-label={`Tirar o fato ${id}`} title="Tirar este fato da lista"
+                  onClick={(e) => (e.stopPropagation(), tirar(id))}><X /></button>
+              </span>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="vazio">Nenhum fato da pesquisa citado. Peça ao Claude para ligar a este bloco os fatos que sustentam o texto.</div>
+      )}
+    </Secao>
+  );
+};
+
 const PropsCena: React.FC<{documento: string; caminho: string; c: CenaCenas; n: number; menu: ItemMenu[]}> = ({documento, caminho, c, n, menu}) => (
   <div className="painel">
     <CabecalhoInspector icone={<Clapperboard />} nome={c.nome || `Cena ${n}`} sub={`Cena ${n} · ${numeroBr((c.duracao_ms ?? 0) / 1000, 1)} s`} dica={caminho} menu={menu} />
@@ -68,6 +106,7 @@ const PropsCena: React.FC<{documento: string; caminho: string; c: CenaCenas; n: 
           aoMudar={(v) => (v >= 0.3 ? void trocar(documento, `${caminho}/duracao_ms`, Math.round(v * 1000), `duração: ${numeroBr(v, 1)} s`) : avisar('A cena precisa de pelo menos 0,3 s', 'erro'))} />
         <CampoCor rotulo="Fundo" valor={c.fundo ?? ''} aoMudar={(v) => void trocar(documento, `${caminho}/fundo`, v, 'fundo da cena')} />
       </Secao>
+      {c.refs?.length ? <FatosCitados documento={documento} caminho={caminho} refs={c.refs} nome="da cena" /> : null}
       <div className="vazio">Arraste a ponta azul da cena na linha do tempo para mudar a duração.</div>
     </div>
   </div>
@@ -141,6 +180,7 @@ const PropsBloco: React.FC<{documento: string; caminho: string; b: BlocoCenas; f
               <CampoCor rotulo="Cor" valor={b.cor ?? ''} aoMudar={campo('cor', 'cor')} />
             </Secao>
           )}
+          <FatosCitados documento={documento} caminho={caminho} refs={b.refs} nome="do bloco" />
         </div>
       </div>
     );
