@@ -24,6 +24,7 @@ import {SessaoProjeto} from './sessao-projeto';
 import {Terminais} from './terminais';
 import {registrarIpcAudio} from './ipc-audio';
 import {registrarIpcFala} from './ipc-fala'; // frente Fala
+import {legendasNoDestino, type LegendasP} from '../nucleo/legendas'; // frente Fala: legendas no tamanho de cada destino
 import {registrarPrefsExportacao} from './ipc-exportacao';
 import {apagarLimposSemUso, registrarIpcLimpeza} from './limpeza-voz';
 import {registrarIpcLoudness} from './loudness';
@@ -387,9 +388,11 @@ lidar(CANAL.exportar, async (documento: string, opcoes?: OpcoesExportarVideo): P
       const destino = arquivoLivre(pasta, plano.nome, args.ext);
       parcial = destino;
       // marca d'água do destino, se ligada: posicionada no tamanho do destino, em frações (vale com qualquer escala)
+      // legendas na área segura e na quebra do destino, não do documento (frente Fala; a área fica em legendas_cenas.area)
+      const legendas = !fixo && props.legendas_cenas ? legendasNoDestino(props.legendas_cenas as LegendasP, args.largura, args.altura, formato) : undefined;
       const marca = marcaDaguaDoDestino(o.marca_dagua?.[plano.destino.id], plano.destino, fontesMarca, o.proporcao_logo);
       await renderizarVideo(preparado, {
-        props: {...(fixo ? props : {...props, largura: args.largura, altura: args.altura}), ...(marca ? {marca_dagua: marca} : {})},
+        props: {...(fixo ? props : {...props, largura: args.largura, altura: args.altura}), ...(legendas ? {legendas_cenas: legendas} : {}), ...(marca ? {marca_dagua: marca} : {})},
         arquivo: destino, codec: args.codec, videoBitrate: args.videoBitrate, escala: fixo ? args.escala : 1, quadros: args.frameRange, cancelSignal,
       }, avisoDe(i, path.basename(destino)));
       arquivos.push(destino);

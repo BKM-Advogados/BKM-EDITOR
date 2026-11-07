@@ -516,6 +516,26 @@ export const resolverLegendas = (leg: LegendasCenas | undefined, ctx: {audio?: A
   return {segmentos, estilo: resolverEstilo(leg.estilo, ctx.tema), area: areaDaLegenda(ctx.largura, ctx.altura), oculto: Boolean(leg.oculto)};
 };
 
+/** As legendas para outro tamanho de quadro (um destino da exportação, como o Reels de um vídeo 16:9): a área segura do
+ *  destino e, onde a legenda não cabe nas linhas do estilo nesse tamanho, ela dividida em pedaços que cabem, pela mesma
+ *  regra da quebra e dentro dela. Nada se junta com a vizinha: o que a pessoa dividiu, juntou ou corrigiu fica. Na mesma
+ *  proporção do documento (`doc`), só a área é refeita, para o arquivo sair igual à prévia. */
+export const legendasNoDestino = (leg: LegendasP, largura: number, altura: number, doc?: {largura: number; altura: number}): LegendasP => {
+  const area = areaDaLegenda(largura, altura);
+  if (doc && Math.abs(largura / altura - doc.largura / doc.altura) < 0.01) return {...leg, area};
+  const e = leg.estilo;
+  const quebra: OpcoesQuebra = {max_caracteres: caracteresPorLinha({predefinicao: e.id, tam: e.tam, maiusculas: e.maiusculas}, largura, altura) * e.linhas,
+    max_palavras: e.max_palavras};
+  const cabe = (ps: PalavraLegenda[]) => ps.reduce((n, p, i) => n + p.w.length + (i ? 1 : 0), 0) <= quebra.max_caracteres && (!quebra.max_palavras || ps.length <= quebra.max_palavras);
+  const segmentos = leg.segmentos.flatMap((s): SegmentoLegendaP[] => {
+    if (s.palavras.length < 2 || cabe(s.palavras)) return [s];
+    const pedacos = quebrarEmSegmentos(s.palavras, quebra);
+    return pedacos.map((x, k) => ({...s, id: k ? `${s.id}.${k + 1}` : s.id, texto: x.texto, palavras: x.palavras ?? [],
+      em: k ? Math.max(s.em, x.em) : s.em, sai: k === pedacos.length - 1 ? s.sai : Math.min(s.sai, x.sai)}));
+  });
+  return {...leg, segmentos, area};
+};
+
 /** Os segmentos que aparecem em `ms` (pode haver mais de um quando duas vozes se sobrepõem). */
 export const segmentosEm = (segmentos: SegmentoLegendaP[], ms: number) => segmentos.filter((s) => ms >= s.em && ms < s.sai);
 

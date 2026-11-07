@@ -137,6 +137,13 @@ ponto ao lado diz quando difere do padrão do estilo).
 (`src/nucleo/zonas-seguras.ts`): no 9:16, entre 250 px de cima e 484 px de baixo e a 140 px dos lados; no 16:9, fora
 do décimo de baixo dos controles do YouTube; no 4:5, dentro da área de título de 90%.
 
+**Em cada destino da exportação** (`legendasNoDestino`, no laço do `main.ts`): o vídeo 16:9 exportado também em 9:16
+leva a legenda para a área do 9:16, e a legenda que não cabe nas linhas do estilo nesse tamanho é dividida em pedaços
+que cabem, pela mesma regra da quebra e dentro dela (nada se junta com a vizinha; o que a pessoa dividiu, juntou ou
+corrigiu fica). No caminho contrário, só a área muda. Na mesma proporção do documento o arquivo sai igual à prévia. A
+área de cada destino fica em `props.legendas_cenas.area`, no formato de sempre, para quem precisar desviar dela (a marca
+d'água).
+
 ### Composição
 
 `src/composicoes/cenas/Legendas.tsx`, uma linha no `VideoCenas.tsx`, por cima dos efeitos. Mostra **uma legenda por

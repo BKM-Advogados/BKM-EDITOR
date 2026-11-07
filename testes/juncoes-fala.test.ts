@@ -9,9 +9,10 @@ import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {describe, expect, it, vi} from 'vitest';
 import {Legendas} from '../src/composicoes/cenas/Legendas';
-import {novoDocCenas} from '../src/nucleo/cenas';
+import {novoDocCenas, resolverCenas} from '../src/nucleo/cenas';
 import {
-  ENTRA_LEGENDA_MS, legendaNoAr, legendasDaFala, resolverLegendas, SAI_LEGENDA_MS, type LegendasP, type PalavraLegenda, type SegmentoLegendaP,
+  areaDaLegenda, caracteresPorLinha, ENTRA_LEGENDA_MS, legendaNoAr, legendasDaFala, legendasNoDestino, resolverLegendas, SAI_LEGENDA_MS, type LegendasP, type PalavraLegenda,
+  type SegmentoLegendaP,
 } from '../src/nucleo/legendas';
 
 const tela = vi.hoisted(() => ({quadro: 0, fps: 30, largura: 1080, altura: 1920}));
@@ -99,5 +100,50 @@ describe('uma legenda por quadro (video-N3)', () => {
     tela.quadro = Math.round((s.sai / 1000) * tela.fps);
     const html = renderToStaticMarkup(React.createElement(Legendas, {legendas: faixa}));
     expect(html.match(/data-legenda=/g)?.length).toBe(1);
+  });
+});
+
+describe('legenda na área e na quebra de cada destino (video-N1, transversal-N2)', () => {
+  const palavras = (l: LegendasP) => l.segmentos.flatMap((s) => s.palavras.map((p) => `${p.w}@${p.s}`));
+
+  it('16:9 exportado em 9:16: a área do 9:16, fora dos 484 px de baixo, e cada legenda cabe em duas linhas', () => {
+    const doc = legendasC2('classica', 1920, 1080);
+    const reels = legendasNoDestino(doc, 1080, 1920, {largura: 1920, altura: 1080});
+    expect(reels.area).toEqual(areaDaLegenda(1080, 1920));
+    expect(reels.area.base).toBeLessThan(1 - 484 / 1920);
+    const max = caracteresPorLinha({predefinicao: 'classica'}, 1080, 1920) * 2;
+    expect(caracteresPorLinha({predefinicao: 'classica'}, 1920, 1080) * 2).toBeGreaterThan(max);
+    expect(doc.segmentos.some((s) => s.texto.length > max)).toBe(true);
+    for (const s of reels.segmentos) expect(s.texto.length).toBeLessThanOrEqual(max);
+    expect(reels.segmentos.length).toBeGreaterThan(doc.segmentos.length);
+    // nenhuma palavra some ou muda de tempo; os pedaços ficam dentro da legenda de onde vieram, em ordem e sem sobrepor
+    expect(palavras(reels)).toEqual(palavras(doc));
+    reels.segmentos.forEach((s, i) => {
+      const mae = doc.segmentos.find((m) => m.origem === s.origem)!;
+      expect(s.em).toBeGreaterThanOrEqual(mae.em);
+      expect(s.sai).toBeLessThanOrEqual(mae.sai);
+      if (i) expect(s.em).toBeGreaterThanOrEqual(reels.segmentos[i - 1].sai);
+    });
+    expect(new Set(reels.segmentos.map((s) => s.id)).size).toBe(reels.segmentos.length);
+  });
+
+  it('9:16 exportado em 16:9: desce para a área do 16:9 e não divide nada', () => {
+    const doc = legendasC2('karaoke');
+    const yt = legendasNoDestino(doc, 1920, 1080, {largura: 1080, altura: 1920});
+    expect(yt.area).toEqual(areaDaLegenda(1920, 1080));
+    expect(yt.area.base).toBeGreaterThan(doc.area.base);
+    expect(yt.segmentos).toEqual(doc.segmentos);
+  });
+
+  it('na mesma proporção do documento sai igual à prévia', () => {
+    const doc = legendasC2('classica');
+    const menor = legendasNoDestino(doc, 720, 1280, {largura: 1080, altura: 1920});
+    expect(menor).toEqual(doc);
+  });
+
+  it('a prévia do documento segue com a área do formato dele', () => {
+    const d = novoDocCenas({largura: 1920, altura: 1080, fps: 30});
+    const props = resolverCenas({...d, legendas: {segmentos: [{id: 'leg-1', em: 0, sai: 1000, texto: 'oi'}]}}).props;
+    expect(props.legendas_cenas?.area).toEqual(areaDaLegenda(1920, 1080));
   });
 });
