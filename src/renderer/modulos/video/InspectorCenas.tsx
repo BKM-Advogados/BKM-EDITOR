@@ -3,10 +3,13 @@
 // tempo (segundos na cena), posição e tamanho em % do quadro e a letra em px do formato atual. Faixa de áudio: nome,
 // papel, volume, mudo e o ducking (música); clipe: arquivo, tempo, corte, volume, fades e mudo, com o que foi medido.
 // Bloco e cena mostram em "Fatos citados" os `refs` (ids dos fatos da pesquisa) como etiquetas, com a afirmação ao lado;
-// clicar leva ao fato no painel Pesquisa e o × tira um da lista.
-import React from 'react';
-import {Clapperboard, CopyPlus, Film, FileAudio, FileJson, ImagePlus, Link, Quote, Trash2, X} from 'lucide-react';
-import {ALVO_LU_MAX, ALVO_LU_MIN, DUCKING_PADRAO, PAPEIS, type ClipeAudio, type ClipeAudioP, type FaixaAudio, type FaixaAudioP, type PapelFaixa} from '../../../nucleo/audio';
+// clicar leva ao fato no painel Pesquisa e o × tira um da lista. O som tem ainda o loudness (o alvo do arquivo exportado
+// e os medidores da narração e da mistura no resumo do vídeo; o da faixa no inspetor dela) e, no clipe de voz, a limpeza.
+import React, {useState, useSyncExternalStore} from 'react';
+import {Clapperboard, CopyPlus, Film, FileAudio, FileJson, ImagePlus, Link, Quote, Sparkles, Trash2, Undo2, X} from 'lucide-react';
+import {ALVO_LU_MAX, ALVO_LU_MIN, ALVO_LUFS_MAX, ALVO_LUFS_MIN, ALVO_LUFS_PADRAO, DUCKING_PADRAO, PAPEIS, PICO_DBTP_MAX, PICO_DBTP_MIN, PICO_DBTP_PADRAO, type AudioP,
+  type ClipeAudio, type ClipeAudioP, type FaixaAudio, type FaixaAudioP, type IntensidadeLimpeza, type PapelFaixa} from '../../../nucleo/audio';
+import {INTENSIDADE_PADRAO, INTENSIDADES} from '../../../nucleo/limpeza-voz';
 import {TIPOS_BLOCO_CENAS, type BlocoCenas, type CenaCenas, type DocCenas, type PropsCenas} from '../../../nucleo/cenas';
 import {FORMATOS_VIDEO, formatoDoVideo, rotuloFormato} from '../../../nucleo/formatos';
 import {avisar, mensagemDe, trocar, useLoja, valorEm, verFato} from '../../estado/loja';
@@ -15,11 +18,43 @@ import type {ItemMenu} from '../../componentes/Menu';
 import {formatarTempo} from './tocador';
 import {resumoBloco, tipoDe} from './tipos';
 import {duplicarSelecao, excluirSelecao} from './acoes';
-import {duplicarSelecaoAudio, excluirSelecaoAudio, ICONES_PAPEL, partesAudio, trocarArquivoDoClipe} from './acoes-audio';
+import {andamentoLimpeza, assinarLimpeza, cancelarLimpeza, duplicarSelecaoAudio, excluirSelecaoAudio, ICONES_PAPEL, limparVozDoClipe, partesAudio, trocarArquivoDoClipe,
+  voltarAoOriginal} from './acoes-audio';
+import {lufsTexto, MedidorLoudness, useMedidasLoudness} from './MedidorLoudness';
 
 const pct = (v: number | undefined, padrao: number) => Math.round((v ?? padrao) * 1000) / 10;
 const ALINHAR: [NonNullable<BlocoCenas['alinhar']>, string][] = [['esquerda', 'Esquerda'], ['centro', 'Centro'], ['direita', 'Direita']];
 const PESOS: [string, string][] = [['400', 'Normal'], ['500', 'Médio'], ['600', 'Seminegrito'], ['700', 'Negrito'], ['800', 'Extranegrito']];
+
+const sinal = (v: number) => `${v < 0 ? '−' : '+'}${Math.abs(v).toFixed(1).replace('.', ',')}`;
+
+/** O alvo do arquivo exportado e os medidores da narração e da mistura (como o render vai soar). */
+const SecaoLoudness: React.FC<{documento: string; doc: DocCenas}> = ({documento, doc}) => {
+  const {r, erro, medindo} = useMedidasLoudness(documento);
+  const alvo = doc.audio?.alvo_lufs ?? ALVO_LUFS_PADRAO;
+  const pico = doc.audio?.pico_dbtp ?? PICO_DBTP_PADRAO;
+  const i = r?.mistura.integrado_lufs ?? null;
+  const ganho = i === null ? null : Math.round((alvo - i) * 10) / 10;
+  const picoDepois = ganho !== null && r?.mistura.pico_dbtp !== null && r?.mistura.pico_dbtp !== undefined ? r.mistura.pico_dbtp + ganho : null;
+  const notaMistura = ganho === null ? undefined : Math.abs(ganho) <= 0.5 ? 'já no alvo' : <>na exportação: {sinal(ganho)} dB até {lufsTexto(alvo, 0)} LUFS
+    {picoDepois !== null && picoDepois > pico ? <>; o limitador segura o pico em {lufsTexto(pico)} dBTP</> : null}</>;
+  const campo = (k: 'alvo_lufs' | 'pico_dbtp', min: number, max: number, padrao: number, nome: string, unidade: string) => (v: number) =>
+    v >= min && v <= max ? void trocar(documento, `/audio/${k}`, v === padrao ? undefined : Math.round(v * 10) / 10, `${nome}: ${numeroBr(v, 1)} ${unidade}`)
+      : avisar(`${nome[0].toUpperCase()}${nome.slice(1)} vai de ${min} a ${max} ${unidade}`, 'erro');
+  return (
+    <Secao titulo="Loudness" chave="cenas:loudness">
+      <CampoNumero rotulo="Alvo" unidade="LUFS" passo={1} valor={alvo} padrao={ALVO_LUFS_PADRAO} dica="Loudness integrado do arquivo exportado; −14 é o das redes (YouTube, Instagram, Spotify)"
+        aoMudar={campo('alvo_lufs', ALVO_LUFS_MIN, ALVO_LUFS_MAX, ALVO_LUFS_PADRAO, 'o alvo de loudness', 'LUFS')} />
+      <CampoNumero rotulo="Pico máximo" unidade="dBTP" passo={0.5} valor={pico} padrao={PICO_DBTP_PADRAO} dica="Pico verdadeiro máximo do arquivo exportado"
+        aoMudar={campo('pico_dbtp', PICO_DBTP_MIN, PICO_DBTP_MAX, PICO_DBTP_PADRAO, 'o pico máximo', 'dBTP')} />
+      {(r?.voz || (!r && medindo)) && <MedidorLoudness titulo="Narração" m={r?.voz} alvo={alvo} pico={pico} medindo={medindo} />}
+      <MedidorLoudness titulo="Mistura" m={r?.mistura} alvo={alvo} pico={pico} medindo={medindo} nota={notaMistura} />
+      {erro && <div className="vazio" style={{color: 'var(--erro)'}}>Não deu para medir: {erro}</div>}
+      {r?.faltando.length ? <div className="vazio">Ficaram fora da medida (não abriram): {r.faltando.map((a) => a.split('/').pop()).join(', ')}</div> : null}
+      <div className="vazio">Na exportação, o arquivo final é medido e o ganho corrigido até o alvo (±0,5 LU), com o pico até {lufsTexto(pico)} dBTP. A mistura entre as faixas não muda.</div>
+    </Secao>
+  );
+};
 
 const ResumoVideo: React.FC<{documento: string; doc: DocCenas; titulo: string; duracao: number; avisos: string[]; erro?: string}> = ({documento, doc, titulo, duracao, avisos, erro}) => {
   const f = formatoDoVideo(doc);
@@ -52,6 +87,7 @@ const ResumoVideo: React.FC<{documento: string; doc: DocCenas; titulo: string; d
           <CampoCor rotulo="Destaque" valor={tema.destaque ?? '#70B8FF'} aoMudar={(v) => void trocar(documento, '/tema/destaque', v, 'cor de destaque')} />
           <CampoCor rotulo="Texto suave" valor={tema.suave ?? '#A3ABB5'} aoMudar={(v) => void trocar(documento, '/tema/suave', v, 'cor do texto suave')} />
         </Secao>
+        {nClipes > 0 && <SecaoLoudness documento={documento} doc={doc} />}
         {erro && <Secao titulo="Não deu para montar o vídeo"><div className="texto-livre" style={{color: 'var(--erro)'}}>{erro}</div></Secao>}
         {avisos.length > 0 && <Secao titulo={`Avisos (${avisos.length})`}><div className="avisos-roteiro">{avisos.map((a, i) => <div key={i}>{a}</div>)}</div></Secao>}
         <div className="vazio">Clique num bloco no monitor, na lista ou na linha do tempo para editar. "**trecho**" no texto sai na cor de destaque.</div>
@@ -190,7 +226,23 @@ const PAPEL_OPCOES = (Object.keys(PAPEIS) as PapelFaixa[]).map((p): [PapelFaixa,
 const pctDe = (v: number | undefined) => Math.round((v ?? 1) * 100);
 const dbTexto = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `${v.toFixed(1).replace('.', ',')} dB`);
 
-const PropsFaixa: React.FC<{documento: string; caminho: string; f: FaixaAudio; fp?: FaixaAudioP; menu: ItemMenu[]}> = ({documento, caminho, f, fp, menu}) => {
+/** O loudness da faixa sozinha na mistura; música e efeitos dizem quantos LU ficam abaixo da narração enquanto ela fala. */
+const LoudnessDaFaixa: React.FC<{documento: string; fp?: FaixaAudioP; nome: string; mudo: boolean; som?: AudioP}> = ({documento, fp, nome, mudo, som}) => {
+  const {r, medindo} = useMedidasLoudness(documento);
+  const m = fp ? r?.faixas[fp.origem] : undefined;
+  const abaixo = m?.abaixo_da_voz_lu;
+  const nota = mudo ? 'faixa muda: fica fora da mistura'
+    : abaixo !== null && abaixo !== undefined ? `sob a voz: ${numeroBr(abaixo, 1)} LU abaixo da narração (mediana; a casa mixa de 18 a 23)`
+      : abaixo === null ? 'calada enquanto a narração fala' : undefined;
+  return (
+    <Secao titulo="Loudness" chave="audio:loudness">
+      <MedidorLoudness titulo={nome} m={mudo ? null : m} alvo={fp?.papel === 'voz' ? som?.alvo_lufs ?? ALVO_LUFS_PADRAO : null} pico={som?.pico_dbtp ?? PICO_DBTP_PADRAO}
+        medindo={medindo && !mudo} nota={nota} />
+    </Secao>
+  );
+};
+
+const PropsFaixa: React.FC<{documento: string; caminho: string; f: FaixaAudio; fp?: FaixaAudioP; som?: AudioP; menu: ItemMenu[]}> = ({documento, caminho, f, fp, som, menu}) => {
   const papel = fp?.papel ?? 'efeitos';
   const Icone = ICONES_PAPEL[papel];
   const campo = (k: keyof FaixaAudio, rotulo: string) => (v: unknown) => void trocar(documento, `${caminho}/${k}`, v, `${rotulo} da faixa ${f.nome}`);
@@ -233,8 +285,45 @@ const PropsFaixa: React.FC<{documento: string; caminho: string; f: FaixaAudio; f
             <div className="vazio">A casa mixa música e efeitos bem baixos: de 18 a 23 LU abaixo da voz.</div>
           </Secao>
         )}
+        {n > 0 && <LoudnessDaFaixa documento={documento} fp={fp} nome={f.nome} mudo={Boolean(f.mudo)} som={som} />}
       </div>
     </div>
+  );
+};
+
+/** Limpeza de voz do clipe: intensidade, Limpar (com andamento e Cancelar) e, já limpo, o que mudou e "Voltar ao original". */
+const SecaoLimpeza: React.FC<{documento: string; caminho: string; c: ClipeAudio}> = ({documento, caminho, c}) => {
+  const andamento = useSyncExternalStore(assinarLimpeza, andamentoLimpeza);
+  const [intensidade, setIntensidade] = useState<IntensidadeLimpeza>(c.limpeza?.intensidade ?? INTENSIDADE_PADRAO);
+  const aqui = andamento?.documento === documento && andamento.caminho === caminho;
+  const l = c.original ? c.limpeza : undefined;
+  return (
+    <Secao titulo="Limpeza de voz" chave="audio:limpeza">
+      {c.original && (
+        <CampoLeitura rotulo="Limpa" dica={`O clipe toca ${c.arquivo}; o original (${c.original}) continua em midia/`}>
+          {l ? INTENSIDADES[l.intensidade]?.nome ?? l.intensidade : c.original.split('/').pop()}
+        </CampoLeitura>
+      )}
+      {l && <CampoLeitura rotulo="Ruído" dica="Ruído de fundo nas pausas (as 10 % janelas mais quietas), antes e depois">{dbTexto(l.ruido_antes_db)} → <b>{dbTexto(l.ruido_depois_db)}</b></CampoLeitura>}
+      {l && <CampoLeitura rotulo="Voz" dica="Nível da voz (mediana, ponderação K) antes e depois">{dbTexto(l.voz_antes_db)} → {dbTexto(l.voz_depois_db)}</CampoLeitura>}
+      <CampoSelecao rotulo="Intensidade" valor={intensidade} opcoes={(Object.keys(INTENSIDADES) as IntensidadeLimpeza[]).map((k): [IntensidadeLimpeza, string] => [k, INTENSIDADES[k].nome])}
+        aoMudar={setIntensidade} />
+      {aqui ? (
+        <div className="limpeza-andamento">
+          <div className="som-andamento"><span style={{width: `${andamento.progresso}%`}} /></div>
+          <span className="ler">{andamento.progresso} %</span>
+          <button className="bt" onClick={cancelarLimpeza}><X size={14} />Cancelar</button>
+        </div>
+      ) : (
+        <div className="limpeza-botoes">
+          <button className="bt" disabled={Boolean(andamento)} onClick={() => void limparVozDoClipe(documento, caminho, intensidade)}>
+            <Sparkles size={14} />{c.original ? 'Limpar de novo' : 'Limpar voz'}
+          </button>
+          {c.original && <button className="bt" disabled={Boolean(andamento)} onClick={() => void voltarAoOriginal(documento, caminho)}><Undo2 size={14} />Voltar ao original</button>}
+        </div>
+      )}
+      <div className="vazio">Tira o zumbido e o ruído de fundo das pausas, corta o grave e o chiado e suaviza o "s". Grava um arquivo novo em midia/; o original não muda.</div>
+    </Secao>
   );
 };
 
@@ -277,6 +366,7 @@ const PropsClipe: React.FC<{documento: string; caminho: string; c: ClipeAudio; c
               </CampoLeitura>
             )}
           </Secao>
+          {(papel === 'voz' || c.original) && <SecaoLimpeza key={caminho} documento={documento} caminho={caminho} c={c} />}
           <div className="vazio">Arraste o clipe na linha do tempo para mudar onde começa; as alças aparam o começo e o fim. Faixa: {faixa.nome}.</div>
         </div>
       </div>
@@ -302,7 +392,7 @@ export const InspectorCenas: React.FC<{documento: string}> = ({documento}) => {
       {rotulo: 'Copiar caminho', icone: <Link className="i14" />, acao: () => copiar(caminho, `Caminho ${caminho} copiado`)},
       {rotulo: 'Copiar JSON', icone: <FileJson className="i14" />, acao: () => copiar(JSON.stringify(valorEm(doc, caminho), null, 2), 'JSON copiado')},
     ];
-    if (pa.clipe === null) return <PropsFaixa documento={documento} caminho={caminho} f={faixaDoc} fp={fp} menu={menuAudio} />;
+    if (pa.clipe === null) return <PropsFaixa documento={documento} caminho={caminho} f={faixaDoc} fp={fp} som={(props as PropsCenas | null)?.audio} menu={menuAudio} />;
     const clipe = faixaDoc.clipes?.[pa.clipe];
     if (clipe) {
       return <PropsClipe documento={documento} caminho={caminho} c={clipe} cp={fp?.clipes.find((c) => c.origem === caminho)} faixa={faixaDoc} papel={fp?.papel ?? 'efeitos'} menu={menuAudio}
