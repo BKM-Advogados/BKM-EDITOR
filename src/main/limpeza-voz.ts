@@ -5,7 +5,8 @@
 // uma linha (registrarIpcLimpeza).
 // As versões limpas ficam fora do git do projeto (o commit automático faz git add -A, e cada uma tem dezenas de MB): a
 // primeira limpeza acrescenta as regras ao .gitignore, em projeto novo ou antigo. Na abertura do projeto, a versão que
-// nenhum documento cita mais (a intensidade testada e trocada, a de antes do "Voltar ao original") é apagada.
+// nem os documentos nem o diário (o Ctrl+Z) citam é apagada: na prática, a que sobrou de uma limpeza que não chegou ao
+// documento.
 import {createHash} from 'node:crypto';
 import {mkdirSync, readdirSync, renameSync, rmSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
@@ -62,9 +63,11 @@ export const versoesLimpas = (p: Projeto) => {
   return out.sort();
 };
 
-/** Na abertura do projeto: apaga a versão limpa (e o envelope dela) que nenhum documento cita. Só na abertura, para o
- *  desfazer da sessão nunca procurar um arquivo apagado; e só se todos os documentos abrirem (na dúvida, não apaga).
- *  Procura o caminho no texto de cada documento, para valer qualquer campo que o cite. Devolve o que apagou. */
+/** Na abertura do projeto: apaga a versão limpa (e o envelope dela) que nem os documentos nem o diário citam. O diário
+ *  conta porque o Ctrl+Z lê o .estudio/diario.jsonl do disco e atravessa sessões: depois de reabrir, desfazer "Limpar de
+ *  novo" volta o clipe para a versão de antes, que tem de estar lá. Procura o caminho no texto de cada documento e nos
+ *  patches e inversos de cada entrada do diário, para valer qualquer campo que o cite. Na dúvida (documento ou diário que
+ *  não abre), não apaga nada. Só na abertura, nunca no meio da sessão. Devolve o que apagou. */
 export const apagarLimposSemUso = (p: Projeto): string[] => {
   try {
     const candidatos = versoesLimpas(p);
@@ -74,6 +77,8 @@ export const apagarLimposSemUso = (p: Projeto): string[] => {
       JSON.parse(t); // documento quebrado no meio de uma gravação: não apaga nada
       return t;
     });
+    // o diário inteiro: o desfazer anda para trás até a primeira entrada (linha quebrada: diario() lança e nada se apaga)
+    for (const e of p.diario()) textos.push(JSON.stringify(e.patch), JSON.stringify(e.inverso));
     const apagados: string[] = [];
     for (const rel of candidatos) {
       if (textos.some((t) => t.includes(JSON.stringify(rel)))) continue;
