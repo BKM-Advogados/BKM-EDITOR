@@ -121,6 +121,13 @@ O **Exportar** da barra da casca (Ctrl+Shift+E) continua chamando `exportarPng`,
 num carrossel sai só o fundo. Ao integrar com o diálogo de exportação (sessão C), chamar `exportarCarrossel` quando
 `temPaginas(doc)`.
 
+## Acabamento nas páginas
+
+Sombra, contorno, degradê, máscara de recorte e remover fundo (rodada 2, `docs/imagem.md`) valem em qualquer página:
+são campos da camada, e os caminhos levam a página (`/paginas/2/camadas/1/sombra`). O fundo em degradê
+(`fundo_degrade`) é do documento, como o `fundo`: vale em todas as páginas. As miniaturas da barra mostram o
+acabamento; o "Exportar carrossel" e o PDF saem com ele, pelo mesmo canvas da prévia.
+
 ## Limites conhecidos
 
 - Comentários ancorados em `/camadas/N` de uma prancheta que virou carrossel ficam com o caminho antigo; o pino ainda
