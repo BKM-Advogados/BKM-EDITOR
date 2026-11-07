@@ -70,6 +70,7 @@ o login próprio do Claude Code). Depois é só pedir: "crie 5 cenas sobre féri
 | **Imagem** | camadas (imagem, texto, forma), mover, redimensionar, ordem, visível, exportar PNG, JPG ou WebP com qualidade e escala; **carrossel** de várias páginas (barra de páginas, PageUp/PageDown, "Novo carrossel" com campos por página) e exportar PNG por página + PDF para o LinkedIn (`docs/carrossel.md`) | o mesmo (`paginas[]`, `estado_do_editor` diz a página) |
 | **3D** | cena Three.js sob demanda, gizmo mover/girar/escala (W/E/R), luzes, câmera, animar | o mesmo |
 | **Efeitos** | pilha de efeitos no vídeo ou na imagem, com prévia ao vivo e pré-ajustes | o campo `efeitos` |
+| **Pesquisa** (só visualizador: fato é fato, nada se aprova nem bloqueia, nada da fonte é censurado) | painel no grupo do inspetor com as fontes (órgão, nível, data, vigência, observação, abrir e ver o texto) e os fatos (trecho literal, selo exato/parecido/não encontrado, dígitos que faltam, "trecho confere" ou "a revisar"); no vídeo de cenas, os fatos que o bloco cita (`refs`) aparecem como etiquetas no inspetor (`docs/pesquisa.md`) | `ler_fonte`, `anotar_fonte`, `registrar_fato`, `listar_pesquisa`, `texto_da_fonte`, `checar_texto` |
 
 Área sem documento mostra o que falta e cria com um clique no formato do destino.
 
@@ -106,8 +107,9 @@ Em todas as áreas:
 
 O agente recebe: `projeto_info`, `estado_do_editor`, `ler_documento`, `aplicar_patch` (com `versao_base` e `test`),
 `criar_documento`, `renomear_projeto`, `listar_comentarios`, `ler_comentario`, `responder_comentario`,
-`resolver_comentario`, `listar_mudancas` e `aplicar_marca`. Cada projeto novo leva um `CLAUDE.md` com o formato dos
-documentos dele e o que o kit de marca põe no `tema`.
+`resolver_comentario`, `listar_mudancas`, `aplicar_marca` e, para a pesquisa, `ler_fonte`, `anotar_fonte`,
+`registrar_fato`, `listar_pesquisa`, `texto_da_fonte` e `checar_texto`. Cada projeto novo leva um `CLAUDE.md` com o
+formato dos documentos dele, o que o kit de marca põe no `tema` e a seção "Pesquisa" (fontes, fatos e `refs`).
 
 ## Como é feito
 
@@ -132,7 +134,7 @@ Os documentos de desenho estão em `docs/`. A pesquisa de uso que deu origem à 
 ## Testes
 
 ```bash
-npm test            # 86 testes: resolvedor × Python, MCP por stdio e HTTP, conversa (claude falso), criar projeto, vídeo de cenas, formatos, som e ducking, kit de marca e fontes, carrossel e PDF, lâmina, exportação, zonas seguras
+npm test            # 131 testes: resolvedor × Python, MCP por stdio e HTTP, conversa (claude falso), criar projeto, vídeo de cenas, formatos, som e ducking, kit de marca e fontes, carrossel e PDF, lâmina, exportação, zonas seguras, pesquisa (fontes, fatos e leitor de números)
 npm run typecheck
 npm run e2e         # com o app aberto via ESTUDIO_DEPURAR_PORTA=9471
 ```

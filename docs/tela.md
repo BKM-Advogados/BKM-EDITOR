@@ -12,7 +12,7 @@ Este documento conversa com `docs/desempenho.md` (orçamentos de RAM e GPU) e co
 2. **O mesmo esqueleto nas quatro áreas:**
    - **Estrutura à esquerda:** cenas e blocos, camadas, objetos, pilha de efeitos.
    - **Monitor no centro**, com o trilho de ferramentas colado nele.
-   - **Propriedades à direita do monitor**, com as abas Comentários e Histórico no mesmo grupo.
+   - **Propriedades à direita do monitor**, com as abas Comentários, Histórico e Pesquisa no mesmo grupo.
    - **Terminal do agente na coluna da extrema direita.**
    - **Linha do tempo embaixo**, onde houver tempo.
 3. **O terminal fica sempre no mesmo lugar, na extrema direita, e não embaixo.** Embaixo é da linha do tempo, e a altura é o recurso escasso: são 636 px úteis no pior caso comum. A largura sobra, ainda mais com o C2 em 9:16 [B §1][B40]. O agente nunca muda de lugar entre áreas.
@@ -128,10 +128,11 @@ Glossário único em pt-BR. O id é o usado no código.
 | Propriedades | `inspector` | Inspector contextual do que está selecionado |
 | Comentários | `comentarios` | Lista de comentários (todos, ou só os do objeto) |
 | Histórico | `historico` | Diário de mudanças: cada patch, com autor (pessoa ou agente) |
+| Pesquisa | `pesquisa` | Fontes e fatos da pesquisa (`pesquisa/pesquisa.json`), só para ver: selos, vigência, observação de quem baixou, texto da fonte (`docs/pesquisa.md`) |
 | Linha do tempo | `linha` | Tempo (Vídeo, e Efeitos com alvo vídeo) |
 | Terminal | `terminal` | Abas de sessões `claude`, dentro de um painel só |
 
-**Componentes, não telas:** Estrutura, Propriedades, Comentários, Histórico e Terminal são os mesmos componentes em todas as áreas. O que muda entre áreas é o documento e o schema [A §6.2].
+**Componentes, não telas:** Estrutura, Propriedades, Comentários, Histórico, Pesquisa e Terminal são os mesmos componentes em todas as áreas. O que muda entre áreas é o documento e o schema [A §6.2].
 
 ---
 
