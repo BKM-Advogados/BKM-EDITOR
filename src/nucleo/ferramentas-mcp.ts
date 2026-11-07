@@ -6,7 +6,7 @@
 import type {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {z} from 'zod';
 import {ErroProjeto, valorEm, type Projeto} from './projeto';
-import type {Modulo, OperacaoPatch} from './documentos';
+import type {DocImagem, Modulo, OperacaoPatch} from './documentos';
 import {documentoNovo} from './criar-projeto';
 import {FORMATOS_IMAGEM, FORMATOS_VIDEO} from './formatos';
 import {MARCAS_INICIAIS} from './marca';
@@ -18,6 +18,8 @@ import {
   sinaisDeVigencia, tituloDoHtml, TAMANHO_PAGINA, type Fato, type Fonte,
 } from './pesquisa';
 import {checarTexto, REGRAS_CLIENTE, terminaComUltimaFrase, type Aviso} from './regras';
+import {acharCamada} from './carrossel';
+import {MODELO_FUNDO, patchSemFundo, patchVoltarAoOriginal, removedorDeFundo} from './remover-fundo';
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x, null, 2)}]});
 const erro = (e: unknown) => ({
@@ -237,6 +239,8 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
     if (!alvo) throw new ErroProjeto('o projeto não tem documento para receber o kit', 'nao_achado');
     return {ok: true, documento: alvo, ...marcas.aplicar(projeto, id, alvo, {autor, origem})};
   }));
+
+  registrarAcabamento(servidor, projeto, autor, origem); // acabamento da imagem (rodada 2, B2)
 };
 
 // ---------- pesquisa: fontes e fatos (src/nucleo/pesquisa.ts, docs/pesquisa.md) ----------
@@ -507,5 +511,42 @@ const registrarPesquisa = (servidor: McpServer, projeto: Projeto, autor: string,
     const narracao = narracaoDe(projeto, doc);
     if (narracao) avisos.push(...checarTexto(narracao, REGRAS_CLIENTE, {onde: 'narração', fatos}).avisos);
     return {documento, avisos, ultima_frase: fecho(narracao ?? textos[textos.length - 1]?.texto)};
+  }));
+};
+
+// ---------- acabamento da imagem: remover fundo (src/nucleo/remover-fundo.ts, docs/imagem.md) ----------
+// Sombra, contorno, degradê e máscara o Claude faz por aplicar_patch (são campos da camada); remover fundo precisa do
+// modelo, que roda na janela do app: o processo principal registra quem executa (src/main/remover-fundo.ts).
+
+const registrarAcabamento = (servidor: McpServer, projeto: Projeto, autor: string, origem: string) => {
+  servidor.registerTool('remover_fundo', {
+    description: `Tira o fundo de uma camada de imagem com o modelo local ${MODELO_FUNDO.nome}, ${MODELO_FUNDO.licenca}: feito para pessoa (cabelo, ombros), não para logo ou objeto. Grava midia/<arquivo>.sem-fundo.png sem tocar no original e troca o src da camada, guardando o original em src_original; com voltar: true, a camada volta ao original. Na primeira vez baixa o modelo (${Math.round(MODELO_FUNDO.bytes / 1024 / 1024)} MB) e leva alguns segundos a mais. Só com o app do Estúdio aberto.`,
+    inputSchema: {
+      documento: z.string().describe('id do documento de imagem'),
+      camada: z.string().describe('id da camada (ex.: foto-1, em qualquer página) ou caminho (/camadas/2, /paginas/1/camadas/0)'),
+      voltar: z.boolean().optional().describe('true: volta ao arquivo original'),
+    },
+  }, seguro(async ({documento, camada, voltar}: {documento: string; camada: string; voltar?: boolean}) => {
+    const rel = projeto.arquivoDoDocumento(documento);
+    const lido = projeto.lerJson<DocImagem>(rel);
+    const achada = acharCamada(lido.doc, camada);
+    if (!achada) throw new ErroProjeto(`camada não achada: ${camada}`, 'nao_achado');
+    if (achada.c.tipo !== 'imagem' || !achada.c.src) throw new ErroProjeto(`${camada} não é uma camada de imagem com arquivo`, 'patch');
+    if (voltar) {
+      const patch = patchVoltarAoOriginal(achada.c, achada.caminho);
+      if (!patch.length) throw new ErroProjeto(`${achada.c.id} não guardou o original: já está nele`, 'patch');
+      const r = projeto.aplicarPatch({documento, versao_base: lido.versao, patch, autor, origem, rotulo: `${achada.c.id} volta ao original`});
+      return {ok: true, camada: achada.caminho, src: achada.c.src_original, versao: r.versao};
+    }
+    const executar = removedorDeFundo();
+    if (!executar) throw new Error('remover fundo só funciona com o app do Estúdio aberto: o modelo roda na janela dele');
+    const original = achada.c.src_original ?? achada.c.src;
+    const {caminho: novo, ms} = await executar(original);
+    // o modelo leva segundos: a camada é achada de novo pelo id, na versão de agora
+    const agora = projeto.lerJson<DocImagem>(rel);
+    const depois = acharCamada(agora.doc, achada.c.id);
+    if (!depois) throw new ErroProjeto(`a camada ${achada.c.id} sumiu enquanto o fundo era removido; o arquivo ficou em ${novo}`, 'conflito');
+    const r = projeto.aplicarPatch({documento, versao_base: agora.versao, patch: patchSemFundo(depois.c, depois.caminho, novo), autor, origem, rotulo: `fundo removido de ${achada.c.id}`});
+    return {ok: true, camada: depois.caminho, src: novo, src_original: original, modelo: MODELO_FUNDO.id, tempo_modelo_ms: ms, versao: r.versao};
   }));
 };

@@ -22,6 +22,7 @@ import {ServidorMidia} from './servidor-midia';
 import {SessaoProjeto} from './sessao-projeto';
 import {Terminais} from './terminais';
 import {registrarIpcAudio} from './ipc-audio';
+import {registrarRemoverFundo} from './remover-fundo';
 
 // o mesmo id do instalador (electron-builder.yml): a barra de tarefas agrupa a janela com o atalho
 app.setAppUserModelId('br.com.bkmadvogados.estudio');
@@ -413,6 +414,9 @@ lidar(CANAL.metricas, (): Metricas => {
 registrarExportarPaginas(lidar, CANAL.exportarPaginas, {projeto: exigirProjeto, mostrar: (arquivo) => shell.showItemInFolder(arquivo)});
 
 registrarIpcAudio(lidar, exigirProjeto, () => memoria.prefs()); // som do vídeo de cenas
+// acabamento da imagem (rodada 2, B2): remover fundo, com o modelo em ~/Estudio/modelos e o pedido do MCP à janela
+registrarRemoverFundo(lidar, {enviar, projeto: exigirProjeto, pasta: path.join(app.getPath('home'), 'Estudio', 'modelos'), buscar: (u, i) => net.fetch(u, i),
+  ouvir: (canal, f) => ipcMain.on(canal, (e, ...a) => (confiavel(e), f(...(a as never[]))))});
 
 ipcMain.on(CANAL.gravarEstado, (e, estado: Omit<EstadoEditor, 'atualizado_em'>) => {
   confiavel(e);

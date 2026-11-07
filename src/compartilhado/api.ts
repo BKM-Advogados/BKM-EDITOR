@@ -7,6 +7,7 @@ import type {Envelope} from '../nucleo/audio';
 import type {FonteArquivo, Marca} from '../nucleo/marca';
 import type {OpcoesExportarImagem, OpcoesExportarVideo} from '../nucleo/exportacao';
 import type {Pesquisa} from '../nucleo/pesquisa';
+import type {EstadoModeloFundo} from '../nucleo/remover-fundo';
 
 export const CANAL = {
   abrirPasta: 'estudio:abrir-pasta',
@@ -80,6 +81,14 @@ export const CANAL = {
   pesquisa: 'estudio:pesquisa',
   textoFonte: 'estudio:texto-fonte',
   abrirFonte: 'estudio:abrir-fonte',
+  // acabamento da imagem (rodada 2, B2): remover fundo com modelo local (src/main/remover-fundo.ts)
+  removerFundoModelo: 'estudio:remover-fundo-modelo',
+  removerFundoBaixar: 'estudio:remover-fundo-baixar',
+  removerFundoLer: 'estudio:remover-fundo-ler',
+  removerFundoGravar: 'estudio:remover-fundo-gravar',
+  removerFundoProgresso: 'estudio:remover-fundo-progresso',
+  removerFundoPedido: 'estudio:remover-fundo-pedido',
+  removerFundoResposta: 'estudio:remover-fundo-resposta',
 } as const;
 
 /** O projeto aberto. `estado` é o último que a pessoa viu (área, documento, seleção), para reabrir onde parou; `git`
@@ -234,7 +243,22 @@ export type ApiEstudio = {
   textoFonte: (fonteId: string, inicio?: number, fim?: number) => Promise<string>;
   /** Abre a url da fonte no navegador da pessoa; só http e https (devolve false para o resto). */
   abrirFonte: (url: string) => Promise<boolean>;
+  // acabamento da imagem (rodada 2, B2): o modelo baixa no primeiro uso; a interface roda o ONNX e o main grava o PNG
+  removerFundo: {
+    modelo: () => Promise<EstadoModeloFundo>;
+    /** Baixa o modelo se faltar (o andamento sai em aoProgresso). */
+    baixar: () => Promise<EstadoModeloFundo>;
+    /** Os bytes do modelo, com o SHA-256 conferido. */
+    ler: () => Promise<Uint8Array>;
+    /** Grava o PNG (data URL) em midia/<arquivo>.sem-fundo.png; devolve o caminho no projeto. */
+    gravar: (src: string, png: string) => Promise<string>;
+    aoProgresso: (cb: (p: {recebidos: number; total: number}) => void) => () => void;
+    /** Pedido da ferramenta remover_fundo do MCP: a interface calcula e devolve por responder. */
+    aoPedido: (cb: (id: string, src: string) => void) => () => void;
+    responder: (id: string, r: RespostaFundo) => void;
+  };
 };
+
 
 /** Um arquivo da pasta de trilhas: nome sem extensão, caminho absoluto, subpasta e tamanho. */
 export type Trilha = {nome: string; caminho: string; pasta: string; tamanho_kb: number};
@@ -242,6 +266,9 @@ export type Trilha = {nome: string; caminho: string; pasta: string; tamanho_kb: 
 /** Páginas já desenhadas pela interface (PNG em data URL) com o número que aparece no nome do arquivo (1 = 01.png). */
 export type PedidoExportarPaginas = {documento: string; paginas: {png: string; numero: number}[]; pdf: boolean};
 export type ResultadoExportarPaginas = {ok: boolean; pasta?: string; pdf?: string; arquivos?: string[]; mostrar?: string; mensagem?: string};
+
+/** O PNG sem fundo (data URL) que a interface devolve a um pedido do MCP, com o tempo do modelo. */
+export type RespostaFundo = {ok: boolean; png?: string; ms?: number; mensagem?: string};
 
 declare global {
   interface Window {
