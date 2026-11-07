@@ -17,6 +17,7 @@ import {idDeMarca, MARCA_NEUTRO, MARCAS_INICIAIS, patchDaMarca, temaDaMarca, typ
 import {MODELOS} from '../../src/nucleo/modelos';
 import {codificarWav, decodificarWav, musicaSintetica, narracaoSintetica, TAXA} from '../audio-sintetico';
 import {argumentosDoRender, destinoDoFormato, nomesDosArquivos, normalizarPrefsExportacao, type OpcoesExportarVideo, type PrefsExportacao} from '../../src/nucleo/exportacao';
+import {caminhoSemFundo, MODELO_FUNDO} from '../../src/nucleo/remover-fundo';
 
 type Proj = {raiz: string; manifesto: Manifesto; docs: Record<string, unknown>; versao: number};
 const projetos = new Map<string, Proj>();
@@ -377,6 +378,19 @@ const api: ApiEstudio = {
     prefsExportacao.set(aberto?.raiz ?? '', novo);
     return structuredClone(novo);
   },
+  // acabamento da imagem (rodada 2, B2): simulação no fim do arquivo
+  removerFundo: {
+    modelo: async () => fundoNaPrevia.estado(),
+    baixar: () => fundoNaPrevia.baixar(),
+    ler: async () => fundoNaPrevia.ler(),
+    gravar: (src, png) => fundoNaPrevia.gravar(src, png),
+    aoProgresso: (cb) => {
+      fundoNaPrevia.ouvintes.add(cb);
+      return () => fundoNaPrevia.ouvintes.delete(cb);
+    },
+    aoPedido: () => nada,
+    responder: nada,
+  },
 };
 
 (window as unknown as {estudio: ApiEstudio}).estudio = api;
@@ -529,3 +543,59 @@ async function medirNaPrevia(documento: string): Promise<MedidasLoudness | {erro
   }
   return medirMistura(props.audio, fontes, {duracao_ms: props.duracao_ms, fps: props.fps, taxa: TAXA, pausar: vez0});
 }
+
+// ---------- remover fundo (acabamento da imagem, rodada 2, B2) ----------
+// O modelo vem de testes/saida/modelos/modnet/model.onnx quando está ali (o Vite serve a pasta) ou do mesmo endereço do
+// app, em memória, com o mesmo SHA-256 conferido. O PNG sem fundo fica num blob em memória: o fetch da página é
+// embrulhado para devolver o blob a quem busca o caminho dele (a prévia e a exportação buscam a mídia por fetch).
+const fundoNaPrevia = (() => {
+  const semFundo = new Map<string, Blob>();
+  const ouvintes = new Set<(p: {recebidos: number; total: number}) => void>();
+  let bytes: Uint8Array | null = null;
+  const buscar = window.fetch.bind(window);
+  window.fetch = (entrada, init) => {
+    const url = typeof entrada === 'string' ? entrada : entrada instanceof URL ? entrada.href : entrada.url;
+    const caminho = decodeURIComponent(new URL(url, location.href).pathname).replace(/^\/+/, '');
+    const b = semFundo.get(caminho);
+    return b ? Promise.resolve(new Response(b, {headers: {'Content-Type': 'image/png'}})) : buscar(entrada, init);
+  };
+  const LOCAL = `/testes/saida/modelos/${MODELO_FUNDO.id}/${MODELO_FUNDO.arquivo}`;
+  const estado = () => ({pronto: Boolean(bytes), id: MODELO_FUNDO.id, nome: MODELO_FUNDO.nome, licenca: MODELO_FUNDO.licenca, bytes: MODELO_FUNDO.bytes,
+    pasta: `C:\\Users\\pessoa\\Estudio\\modelos\\${MODELO_FUNDO.id}`});
+  const baixar = async () => {
+    if (bytes) return estado();
+    let r = await buscar(LOCAL).catch(() => null);
+    if (!r?.ok || Number(r.headers.get('content-length')) !== MODELO_FUNDO.bytes) r = await buscar(MODELO_FUNDO.url);
+    if (!r.ok || !r.body) throw new Error(`o download do modelo respondeu ${r.status}`);
+    const partes: Uint8Array[] = [];
+    let recebidos = 0;
+    const leitor = r.body.getReader();
+    for (;;) {
+      const {done, value} = await leitor.read();
+      if (done) break;
+      partes.push(value);
+      recebidos += value.byteLength;
+      ouvintes.forEach((f) => f({recebidos, total: MODELO_FUNDO.bytes}));
+    }
+    const tudo = new Uint8Array(recebidos);
+    let k = 0;
+    for (const p of partes) {
+      tudo.set(p, k);
+      k += p.byteLength;
+    }
+    const sha = [...new Uint8Array(await crypto.subtle.digest('SHA-256', tudo))].map((x) => x.toString(16).padStart(2, '0')).join('');
+    if (sha !== MODELO_FUNDO.sha256) throw new Error(`o modelo baixado não confere (SHA-256 ${sha.slice(0, 12)}…)`);
+    bytes = tudo;
+    return estado();
+  };
+  const ler = () => {
+    if (!bytes) throw new Error('o modelo de remover fundo ainda não foi baixado');
+    return bytes.slice();
+  };
+  const gravar = async (src: string, png: string) => {
+    const caminho = caminhoSemFundo(src);
+    semFundo.set(caminho, await (await buscar(png)).blob());
+    return caminho;
+  };
+  return {estado, baixar, ler, gravar, ouvintes};
+})();

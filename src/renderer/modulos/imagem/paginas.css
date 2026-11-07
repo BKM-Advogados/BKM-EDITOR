@@ -2,6 +2,9 @@
    miniaturas das páginas na ordem, a ativa com a borda do acento, e as ações à direita. Arrastar uma miniatura sobre
    outra reordena; o alvo mostra um filete do acento no lado em que a página vai cair. */
 .monitor-grade.com-paginas { grid-template-rows: minmax(0, 1fr) auto var(--transporte); }
+/* o menu de zoom do monitor da imagem abre para cima: o transporte não corta o que passa dele (o overflow: hidden comum
+   escondia o menu inteiro) e fica acima da barra de páginas na pilha */
+.transporte.transporte-imagem { overflow: visible; position: relative; z-index: 2; }
 .paginas { grid-column: 1 / -1; display: flex; align-items: stretch; gap: 6px; height: 92px; padding: 6px 8px 4px; background: var(--fundo-1);
   border-top: 1px solid var(--borda); min-width: 0; container-type: inline-size; }
 .paginas .rolagem { flex: 1; min-width: 0; display: flex; gap: 6px; overflow-x: auto; overflow-y: hidden; padding: 2px 2px 0; scrollbar-width: thin; }

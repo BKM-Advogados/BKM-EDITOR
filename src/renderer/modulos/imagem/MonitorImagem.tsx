@@ -5,24 +5,28 @@
 // proporção), com um patch só ao soltar. Com a ferramenta de comentário (M), clicar abre um balão ancorado na camada e
 // no ponto da imagem; os pinos mostram os comentários do documento. Num carrossel, o monitor mostra a página ativa (a
 // barra de páginas fica entre a peça e o transporte, PaginasImagem.tsx) e os caminhos das camadas levam a página.
+// Foto recortada por máscara: o clique escolhe a máscara e arrastá-la leva a foto junto; o duplo clique escolhe a foto,
+// que então anda e muda de tamanho dentro da máscara sem mexer nela.
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import {Check, ChevronDown, Download, Hand, ImagePlus, MessageSquarePlus, MousePointer2, Square, Type, X, ZoomIn} from 'lucide-react';
 import type {CamadaImagem, Comentario, DocImagem, OperacaoPatch} from '../../../nucleo/documentos';
 import {paginaDoCaminho, temPaginas} from '../../../nucleo/carrossel';
+import {mascarasEmUso} from '../../../nucleo/acabamento';
 import {CamadaEfeitos} from '../../../composicoes/efeitos/CamadaEfeitos';
 import {aplicar, comentar, loja, patchTrocar, selecionar, useLoja} from '../../estado/loja';
 import {SemDocumento} from '../../componentes/SemDocumento';
 import {BotaoMenu, usarFora} from '../../componentes/Menu';
 import {Trilho, teclaLivre} from '../../componentes/Trilho';
-import {definirPrevia, docValido, indiceDe, irParaPagina, rotuloCamada, usarDocumentoImagem, usarPaginaAtiva, usarPrevia, visivel} from './comum';
+import {comValor, definirPrevia, docValido, indiceDe, irParaPagina, rotuloCamada, usarDocumentoImagem, usarPaginaAtiva, usarPrevia, visivel} from './comum';
 import {novaForma, novaImagem, novoTexto} from './acoes';
 import {exportarPng} from './exportarPng';
 import {exportarPagina} from './exportarPaginas';
 import {PaginasImagem} from './PaginasImagem';
-import {Camada} from './Prancheta';
+import {CamadasDaPagina, FundoPintado} from './Prancheta';
 
 type Geometria = {x: number; y: number; largura: number; altura: number};
-type Gesto = Geometria & {i: number; id: string};
+// `junto`: a foto que a máscara arrastada leva (mesmo deslocamento)
+type Gesto = Geometria & {i: number; id: string; junto?: {i: number; id: string; x: number; y: number}};
 type Arrasto = {x0: number; y0: number; modo: 'mover' | 'redimensionar'; base: Gesto; rot: number; alvo: Gesto | null};
 type Ferramenta = 'mover' | 'mao' | 'zoom' | 'texto' | 'forma';
 
@@ -102,11 +106,13 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
   const camadasPag = ativa?.camadas ?? [];
   // camadas como aparecem: a página, mais o campo em prévia (inspector) e o arrasto em curso
   const camadas = useMemo(() => {
-    const p = previa && previa.documento === documento && previa.caminho.startsWith(`${base}/`) ? /^(\d+)\/(\w+)$/.exec(previa.caminho.slice(base.length + 1)) : null;
+    const p = previa && previa.documento === documento && previa.caminho.startsWith(`${base}/`) ? /^(\d+)\/(.+)$/.exec(previa.caminho.slice(base.length + 1)) : null;
     return camadasPag.map((c, i) => {
       let r = c;
-      if (p && Number(p[1]) === i) r = {...r, [p[2]]: previa!.valor};
+      if (p && Number(p[1]) === i) r = comValor(r, p[2], previa!.valor);
       if (gesto && gesto.i === i && gesto.id === c.id) r = {...r, x: gesto.x, y: gesto.y, largura: gesto.largura, altura: gesto.altura};
+      const j = gesto?.junto;
+      if (j && j.i === i && j.id === c.id) r = {...r, x: j.x + gesto!.x - camadasPag[gesto!.i].x, y: j.y + gesto!.y - camadasPag[gesto!.i].y};
       return r;
     });
   }, [camadasPag, base, previa, gesto, documento]);
@@ -186,6 +192,8 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
   if (!valido || !ativa) return <div className="vazio" style={{color: 'var(--erro)'}}>o documento {documento} não tem a lista "camadas" nem "paginas"</div>;
 
   const fundo = previa && previa.documento === documento && previa.caminho === '/fundo' ? String(previa.valor) : doc.fundo;
+  const fundoDegrade = previa && previa.documento === documento && previa.caminho.startsWith('/fundo_degrade/')
+    ? comValor(doc.fundo_degrade, previa.caminho.slice('/fundo_degrade/'.length), previa.valor) : doc.fundo_degrade;
   const iSel = editavel && selecao?.documento === documento ? indiceDe(selecao.caminho, base) : -1;
   const sel = iSel >= 0 ? camadas[iSel] : undefined;
   const iHover = hover && hover !== selecao?.caminho ? indiceDe(hover, base) : -1;
@@ -221,6 +229,15 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
     if (ferr !== 'mover') return;
     const caminho = caminhoSob(ev.clientX, ev.clientY);
     if (editavel) selecionar(caminho ? {documento, caminho} : null);
+  };
+
+  // duplo clique numa foto recortada: escolhe a foto (para mover e escalar dentro da máscara)
+  const duploClique = (ev: React.MouseEvent) => {
+    if (!editavel || modoComentario || ferr !== 'mover') return;
+    for (const el of document.elementsFromPoint(ev.clientX, ev.clientY)) {
+      const foto = ((el as HTMLElement).closest?.('[data-foto]') as HTMLElement | null)?.dataset.foto;
+      if (foto && palco.current?.contains(el)) return selecionar({documento, caminho: foto});
+    }
   };
 
   const mover = (ev: React.MouseEvent) => {
@@ -287,8 +304,11 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
     if (!c || ev.button !== 0 || ferr !== 'mover') return;
     ev.stopPropagation();
     ev.currentTarget.setPointerCapture(ev.pointerId);
+    // a máscara de uma foto recortada leva a foto quando anda (não quando muda de tamanho: isso recorta outro pedaço)
+    const iFoto = modo === 'mover' ? mascarasEmUso(camadasPag).get(iSel) : undefined;
+    const foto = iFoto !== undefined ? camadasPag[iFoto] : undefined;
     arrasto.current = {x0: ev.clientX, y0: ev.clientY, modo, rot: c.rotacao ?? 0, alvo: null,
-      base: {i: iSel, id: c.id, x: c.x, y: c.y, largura: c.largura, altura: c.altura}};
+      base: {i: iSel, id: c.id, x: c.x, y: c.y, largura: c.largura, altura: c.altura, ...(foto ? {junto: {i: iFoto!, id: foto.id, x: foto.x, y: foto.y}} : {})}};
   };
 
   const durante = (ev: React.PointerEvent) => {
@@ -325,8 +345,11 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
     const atual = loja.get().docs[documento]?.doc;
     const caminho = `${base}/${g.i}`;
     const mudancas = CAMPOS.flatMap((k) => (g[k] !== a.base[k] ? patchTrocar(atual, `${caminho}/${k}`, g[k]) : []));
+    const j = g.junto;
+    const daFoto = j && mudancas.length ? [{op: 'test', path: `${base}/${j.i}/id`, value: j.id} as OperacaoPatch,
+      ...patchTrocar(atual, `${base}/${j.i}/x`, j.x + g.x - a.base.x), ...patchTrocar(atual, `${base}/${j.i}/y`, j.y + g.y - a.base.y)] : [];
     if (mudancas.length) {
-      const patch: OperacaoPatch[] = [{op: 'test', path: `${caminho}/id`, value: g.id}, ...mudancas];
+      const patch: OperacaoPatch[] = [{op: 'test', path: `${caminho}/id`, value: g.id}, ...mudancas, ...daFoto];
       await aplicar(documento, patch, a.modo === 'mover' ? `mover camada ${g.id}` : `tamanho da camada ${g.id}`);
     }
     setGesto(null);
@@ -390,7 +413,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
           onPointerDown={(e) => comecarPanoramica(e)} onPointerMove={(e) => durantePanoramica(e)}
           onPointerUp={() => setTimeout(() => (panoramica.current = null), 0)}>
           {w > 0 && h > 0 && <div className="palco xadrez" ref={palco} style={{width: W * escala, height: H * escala, margin: 'auto', cursor}}
-            onClick={clicar} onMouseMove={mover} onMouseLeave={() => {
+            onClick={clicar} onDoubleClick={duploClique} onMouseMove={mover} onMouseLeave={() => {
               setHover(null);
               if (coords.current) coords.current.textContent = '';
             }}
@@ -403,7 +426,8 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
               background: fundo, overflow: 'hidden', userSelect: 'none'}}>
               <CamadaEfeitos efeitos={previaEfeitos ?? doc.efeitos} quadro={0}>
                 <div style={{position: 'absolute', inset: 0, background: fundo}} />
-                {camadas.map((c, i) => visivel(c) && <Camada key={c.id || i} c={c} caminho={`${base}/${i}`} escala={escala} />)}
+                {fundoDegrade !== undefined && <FundoPintado degrade={fundoDegrade} largura={W} altura={H} escala={escala} />}
+                <CamadasDaPagina camadas={camadas} base={base} escala={escala} largura={W} altura={H} />
               </CamadaEfeitos>
             </div>
             <div className="sobreposicao">
@@ -446,7 +470,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
           </div>}
         </div>
         {editavel && <PaginasImagem documento={documento} doc={doc} />}
-        <div className="transporte">
+        <div className="transporte transporte-imagem">
           <BotaoMenu className="bt mini zoom-bt" lado="esquerda" acima titulo={zoom === null ? 'Zoom: ajustado ao painel' : 'Zoom'} icone={null}
             rotulo={<>{Math.round(escala * 100)}%<ChevronDown className="i12" /></>}
             itens={[

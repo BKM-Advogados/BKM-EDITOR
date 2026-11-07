@@ -46,8 +46,8 @@ describe('MCP estudio', () => {
     const {tools} = await cliente.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
       'anotar_fonte', 'aplicar_marca', 'aplicar_patch', 'checar_texto', 'criar_documento', 'estado_do_editor', 'exportar_legendas', 'importar_legendas', 'ler_comentario',
-      'ler_documento', 'ler_fonte', 'listar_comentarios', 'listar_mudancas', 'listar_pesquisa', 'projeto_info', 'registrar_fato', 'renomear_projeto', 'resolver_comentario',
-      'responder_comentario', 'texto_da_fonte', 'transcrever',
+      'ler_documento', 'ler_fonte', 'listar_comentarios', 'listar_mudancas', 'listar_pesquisa', 'projeto_info', 'registrar_fato', 'remover_fundo', 'renomear_projeto',
+      'resolver_comentario', 'responder_comentario', 'texto_da_fonte', 'transcrever',
     ]);
   });
 

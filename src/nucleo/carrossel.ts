@@ -229,3 +229,20 @@ export const patchCarrossel = (modelo: DocImagem): OperacaoPatch[] => [
   {op: 'add', path: '/camadas', value: []},
   {op: 'add', path: '/paginas', value: modelo.paginas},
 ];
+
+/** Camada pelo id ("foto-1", em qualquer página) ou pelo caminho ("/camadas/2", "/paginas/1/camadas/0"): o caminho
+ *  atual dela e ela; null se não há (as ferramentas do MCP aceitam os dois jeitos). */
+export const acharCamada = (doc: DocImagem, ref: string): {caminho: string; c: CamadaImagem} | null => {
+  const paginas = paginasDe(doc);
+  for (let p = 0; p < paginas.length; p++) {
+    const base = baseCamadas(doc, p);
+    const camadas = Array.isArray(paginas[p]?.camadas) ? paginas[p].camadas : [];
+    const i = ref.startsWith('/') ? indiceNaBase(ref, base) : camadas.findIndex((c) => c?.id === ref);
+    if (i >= 0 && camadas[i]) return {caminho: `${base}/${i}`, c: camadas[i]};
+  }
+  return null;
+};
+
+/** Caminhos de todas as camadas com este id (duplicar página repete os ids das camadas). */
+export const caminhosDoId = (doc: DocImagem, id: string): string[] =>
+  paginasDe(doc).flatMap((pg, p) => (Array.isArray(pg?.camadas) ? pg.camadas : []).flatMap((c, i) => (c?.id === id ? [`${baseCamadas(doc, p)}/${i}`] : [])));

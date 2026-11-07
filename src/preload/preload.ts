@@ -111,6 +111,16 @@ const api: ApiEstudio = {
   // exportação (frente C)
   prefsExportacao: () => ipcRenderer.invoke(CANAL.prefsExportacao),
   gravarPrefsExportacao: (p) => ipcRenderer.invoke(CANAL.gravarPrefsExportacao, p),
+  // acabamento da imagem (rodada 2, B2)
+  removerFundo: {
+    modelo: () => ipcRenderer.invoke(CANAL.removerFundoModelo),
+    baixar: () => ipcRenderer.invoke(CANAL.removerFundoBaixar),
+    ler: () => ipcRenderer.invoke(CANAL.removerFundoLer),
+    gravar: (src, png) => ipcRenderer.invoke(CANAL.removerFundoGravar, src, png),
+    aoProgresso: (cb) => ouvir<[{recebidos: number; total: number}]>(CANAL.removerFundoProgresso, cb),
+    aoPedido: (cb) => ouvir<[string, string]>(CANAL.removerFundoPedido, cb),
+    responder: (id, r) => ipcRenderer.send(CANAL.removerFundoResposta, id, r),
+  },
 };
 
 contextBridge.exposeInMainWorld('estudio', api);

@@ -42,7 +42,26 @@ export type CamadaImagem = {
   forma?: 'retangulo' | 'elipse';
   preenchimento?: string;
   raio?: number;
+  // acabamento (src/nucleo/acabamento.ts, docs/imagem.md): o mesmo desenho na prévia e no PNG
+  sombra?: Sombra;
+  contorno?: Contorno;
+  degrade?: Degrade; // texto e forma: no lugar de `cor` e `preenchimento`
+  mascara?: string; // imagem: id da forma ou do texto logo acima, que a recorta
+  src_original?: string; // imagem: o arquivo de antes do "remover fundo", para voltar
 };
+
+/** Sombra projetada, na direção da página (não gira com a camada). Desfoque e deslocamento em px do documento. */
+export type Sombra = {cor?: string; opacidade?: number; desfoque?: number; x?: number; y?: number};
+
+/** Contorno: por fora (padrão), centrado na borda ou por dentro. */
+export type Contorno = {cor?: string; espessura: number; posicao?: 'fora' | 'centro' | 'dentro'};
+
+/** Parada do degradê: cor, posição de 0 a 1 e opacidade de 0 a 1. */
+export type ParadaDegrade = {cor: string; posicao: number; opacidade?: number};
+
+/** Degradê na caixa da camada (ou da prancheta). Linear: `angulo` como no CSS (180 = de cima para baixo, o padrão).
+ *  Radial: elipse do centro (x e y de 0 a 1, padrão o meio) até o canto mais longe. */
+export type Degrade = {tipo: 'linear' | 'radial'; angulo?: number; centro?: {x: number; y: number}; paradas: ParadaDegrade[]};
 
 /** Uma página (prancheta) do carrossel: as camadas dela, no tamanho comum do documento. */
 export type PaginaImagem = {
@@ -62,6 +81,7 @@ export type DocImagem = {
   camadas: CamadaImagem[]; // de baixo para cima; num carrossel fica vazia e cada página tem as suas
   paginas?: PaginaImagem[];
   efeitos?: Efeito[];
+  fundo_degrade?: Degrade; // por cima da cor de `fundo`, em todas as páginas (acabamento, docs/imagem.md)
 };
 
 // ---------- 3D ----------
