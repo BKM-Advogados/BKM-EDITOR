@@ -242,3 +242,7 @@ export const acharCamada = (doc: DocImagem, ref: string): {caminho: string; c: C
   }
   return null;
 };
+
+/** Caminhos de todas as camadas com este id (duplicar página repete os ids das camadas). */
+export const caminhosDoId = (doc: DocImagem, id: string): string[] =>
+  paginasDe(doc).flatMap((pg, p) => (Array.isArray(pg?.camadas) ? pg.camadas : []).flatMap((c, i) => (c?.id === id ? [`${baseCamadas(doc, p)}/${i}`] : [])));

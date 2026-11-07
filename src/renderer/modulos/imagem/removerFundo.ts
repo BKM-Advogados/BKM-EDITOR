@@ -1,7 +1,7 @@
 // Remover fundo pela interface. O botão do inspector (e o pedido da ferramenta remover_fundo do Claude, que chega do
 // processo principal) seguem o mesmo caminho: o modelo baixa no primeiro uso (a pessoa confirma, com nome, tamanho e
 // licença; o andamento aparece no aviso), os bytes vão uma vez para o Web Worker (removerFundo.worker.ts), a foto do
-// projeto vai como arquivo e o PNG sem fundo volta para o main gravar em midia/<arquivo>.sem-fundo.png. A camada passa
+// projeto vai como arquivo e o PNG sem fundo volta para o main gravar em midia/<arquivo>.<código>.sem-fundo.png. A camada passa
 // a usar o novo e guarda o original em src_original ("Voltar ao original").
 import type {CamadaImagem} from '../../../nucleo/documentos';
 import {patchSemFundo, patchVoltarAoOriginal} from '../../../nucleo/remover-fundo';

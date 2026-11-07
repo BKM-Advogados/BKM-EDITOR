@@ -110,9 +110,12 @@ Sombra, contorno, degradê e máscara são campos da camada: `aplicar_patch` com
 Para a foto no círculo: uma camada de imagem e, logo acima dela, uma forma `elipse` com o id que vai em `mascara`.
 
 `remover_fundo` (no fim de `ferramentas-mcp.ts`): `{documento, camada, voltar?}`, com a camada pelo id (em qualquer
-página) ou pelo caminho. Pede o PNG à janela do app, grava `midia/<arquivo>.sem-fundo.png`, troca o `src` e guarda o
-original em `src_original` (de novo, roda do original). `voltar: true` devolve o original. Fora do app (MCP por stdio)
-avisa que precisa do app aberto. A primeira vez baixa o modelo, com o andamento na tela.
+página) ou pelo caminho. Id repetido em mais de uma camada (página duplicada repete os ids) é recusado com a lista dos
+caminhos: passe o caminho. Pede o PNG à janela do app, grava `midia/<arquivo>.<código>.sem-fundo.png`, troca o `src` e
+guarda o original em `src_original` (de novo, roda do original). Depois do modelo, a camada é lida de novo no mesmo
+caminho e tem de ter o mesmo id; se a pilha mudou nesse meio-tempo, o documento não muda e a resposta diz onde ficou
+o recorte. `voltar: true` devolve o original. Fora do app (MCP por stdio) avisa que precisa do app aberto. A primeira
+vez baixa o modelo, com o andamento na tela.
 
 ## Remover fundo
 
@@ -137,14 +140,19 @@ Escolhido por ser o menor que dá conta de retrato. Proibidos pela regra comum e
 não fica), mandando o andamento para o aviso da tela. Ao ler, confere o SHA-256 de novo (corrompido é apagado). Os
 bytes vão uma vez para um **Web Worker** da interface, que roda o **onnxruntime-web 1.30.0** (MIT) em WASM, numa
 thread (a janela não é cross-origin isolated): decodifica a foto, reduz para a entrada, roda o modelo, amplia o alfa
-para a foto inteira com suavização e codifica o PNG. O processo principal grava `midia/<arquivo>.sem-fundo.png` (de
-um arquivo fora de `midia/`, o sem fundo vai para `midia/`); o arquivo da pessoa nunca é sobrescrito. A camada troca
-o `src` e guarda `src_original`. Sem o modelo, nada quebra: a função só fica indisponível com o aviso.
+para a foto inteira com suavização e codifica o PNG. O processo principal grava `midia/<arquivo>.<código>.sem-fundo.png`
+ao lado do original (de um arquivo fora de `midia/`, dentro de `midia/`). O código são 8 hexadecimais do caminho do
+original: o mesmo original cai sempre no mesmo arquivo, e dois originais de mesmo nome (`midia/ana.jpg` e
+`fotos/ana.png`) não se pisam. O PNG leva dentro um bloco `tEXt` "Estudio-original" com o caminho do original; antes de
+gravar por cima de um arquivo que já existe, a marca tem de ser do mesmo original, senão o recorte vai para o nome
+seguinte (`-2`, `-3`…). O arquivo da pessoa e o recorte de outra foto nunca são sobrescritos. A camada troca o `src`
+e guarda `src_original`. Sem o modelo, nada quebra: a função só fica indisponível com o aviso.
 
 **Por que `onnxruntime-web` no renderer, e não `onnxruntime-node` no processo principal.** Pelo empacotamento: o
 `-node` é módulo nativo (DLLs do runtime), que teria de sair do asar com configuração no Forge e iria inteiro no
 instalador; neste PC o antivírus já bloqueou executável e DLL rodados do terminal. O `-web` é JavaScript e WASM, roda
-igual no app e na prévia web (onde foi medido), e no Web Worker não trava a tela nem o processo principal. O WASM não
+igual no app e na prévia web (onde o caminho foi montado e conferido, com modelo falso: o modelo real não rodou), e
+no Web Worker não trava a tela nem o processo principal. O WASM não
 passa pelo CSP da página (o worker é carregado como arquivo, sem a meta da `index.html`).
 
 **O runtime WASM vai no instalador.** O `ort-wasm-simd-threaded.wasm` (14,2 MB; 3,7 MB comprimido) é referenciado pelo
@@ -152,8 +160,11 @@ próprio pacote e o Vite o empacota com o worker; tirar exigiria mexer na config
 modelo baixa no primeiro uso. Se a regra "binário fora do instalador" valer também para ele, o caminho é baixar o
 `.wasm` como o modelo e passar por `env.wasm.wasmBinary` (o código já carrega o modelo assim).
 
-**Tempo e memória medidos**: ver o relato da frente (`rodada-2/notas/B2-imagem.md`); a medição precisa do modelo
-baixado e de uma foto de retrato.
+**Tempo e memória: não medidos.** O modelo real não foi baixado nem rodou nesta frente (o responsável pediu para não baixar
+em 07/11/2026). O que foi feito: o fluxo inteiro com um modelo falso nos testes (download em pedaços, SHA-256, arquivo
+estragado apagado, gravação sem sobrescrever, patch, ferramenta do MCP) e o build do Vite com o worker e o WASM. Para
+medir: o modelo em `testes/saida/modelos/modnet/model.onnx` e `npx tsx scripts/comparar-imagem.mjs --foto
+<retrato.jpg>` (tempo do modelo, tempo total e memória do navegador), ou o botão no app.
 
 ## Licenças desta frente
 

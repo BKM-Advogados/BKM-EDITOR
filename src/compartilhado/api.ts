@@ -250,7 +250,7 @@ export type ApiEstudio = {
     baixar: () => Promise<EstadoModeloFundo>;
     /** Os bytes do modelo, com o SHA-256 conferido. */
     ler: () => Promise<Uint8Array>;
-    /** Grava o PNG (data URL) em midia/<arquivo>.sem-fundo.png; devolve o caminho no projeto. */
+    /** Grava o PNG (data URL) em midia/<arquivo>.<código>.sem-fundo.png; devolve o caminho no projeto. */
     gravar: (src: string, png: string) => Promise<string>;
     aoProgresso: (cb: (p: {recebidos: number; total: number}) => void) => () => void;
     /** Pedido da ferramenta remover_fundo do MCP: a interface calcula e devolve por responder. */

@@ -1,6 +1,7 @@
 // Remover fundo, o lado do processo principal: baixa o modelo no primeiro uso para %USERPROFILE%\Estudio\modelos\<id>\
 // (endereço com revisão travada, SHA-256 conferido, progresso para a janela), entrega os bytes à interface, que roda o
-// ONNX num Web Worker, e grava o PNG que volta em midia/<arquivo>.sem-fundo.png sem tocar no arquivo da pessoa. A
+// ONNX num Web Worker, e grava o PNG que volta em midia/<arquivo>.<código>.sem-fundo.png sem tocar no arquivo da pessoa
+// nem no recorte de outra foto (marca de origem dentro do PNG). A
 // ferramenta remover_fundo do MCP também passa por aqui: pede o PNG à janela (que pode estar em qualquer área) e o
 // patch fica por conta da ferramenta. Sem o modelo, nada quebra: a função só fica indisponível com o aviso. Sem
 // Electron neste arquivo: o registro recebe `lidar`, `ouvir`, `enviar` e a rede do main.ts, e os testes chamam
@@ -10,7 +11,7 @@ import {createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, rmSy
 import path from 'node:path';
 import {CANAL, type RespostaFundo} from '../compartilhado/api';
 import {ErroProjeto, type Projeto} from '../nucleo/projeto';
-import {caminhoSemFundo, definirRemovedorDeFundo, MODELO_FUNDO, type EstadoModeloFundo, type ModeloFundo} from '../nucleo/remover-fundo';
+import {caminhoSemFundo, chaveDoOriginal, definirRemovedorDeFundo, MODELO_FUNDO, type EstadoModeloFundo, type ModeloFundo} from '../nucleo/remover-fundo';
 
 export type Buscar = (url: string, init: RequestInit) => Promise<Response>;
 
@@ -75,14 +76,75 @@ export const lerModelo = (pasta: string, m: ModeloFundo = MODELO_FUNDO) => {
   return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 };
 
-/** Grava o PNG (data URL) ao lado do original, em midia/; devolve o caminho no projeto. Nunca escreve no original. */
+// ---------- marca de origem no PNG ----------
+// O recorte leva no próprio PNG um bloco tEXt "Estudio-original" com o caminho do original (o mesmo usado no código do
+// nome). Antes de gravar por cima de um arquivo que já existe, a marca tem de ser do mesmo original; senão o recorte
+// vai para o nome seguinte ("-2", "-3"…) e o arquivo que estava lá fica intacto.
+const CHAVE_ORIGEM = 'Estudio-original';
+const ASSINATURA_PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const TABELA_CRC = Array.from({length: 256}, (_, n) => {
+  let c = n;
+  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  return c >>> 0;
+});
+const crc32 = (b: Buffer) => {
+  let c = 0xffffffff;
+  for (const x of b) c = TABELA_CRC[(c ^ x) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+};
+
+/** O PNG com o bloco da origem logo depois do IHDR (o caminho vai em encodeURIComponent: o tEXt é Latin-1). */
+export const marcarOrigem = (png: Buffer, original: string) => {
+  if (png.length < 33 || !png.subarray(0, 8).equals(ASSINATURA_PNG)) throw new Error('a janela não devolveu um PNG');
+  const fimIhdr = 8 + 12 + png.readUInt32BE(8);
+  const tipoEDados = Buffer.from(`tEXt${CHAVE_ORIGEM}\0${encodeURIComponent(chaveDoOriginal(original))}`, 'latin1');
+  const bloco = Buffer.alloc(8 + tipoEDados.length);
+  bloco.writeUInt32BE(tipoEDados.length - 4, 0);
+  tipoEDados.copy(bloco, 4);
+  bloco.writeUInt32BE(crc32(tipoEDados), 4 + tipoEDados.length);
+  return Buffer.concat([png.subarray(0, fimIhdr), bloco, png.subarray(fimIhdr)]);
+};
+
+/** O original marcado num PNG; null se não é PNG ou não tem a marca (arquivo que o Estúdio não fez). */
+export const origemMarcada = (png: Buffer): string | null => {
+  if (png.length < 8 || !png.subarray(0, 8).equals(ASSINATURA_PNG)) return null;
+  for (let i = 8; i + 12 <= png.length;) {
+    const n = png.readUInt32BE(i);
+    const tipo = png.toString('latin1', i + 4, i + 8);
+    if (tipo === 'tEXt') {
+      const texto = png.toString('latin1', i + 8, i + 8 + n);
+      const zero = texto.indexOf('\0');
+      if (texto.slice(0, zero) === CHAVE_ORIGEM) {
+        try {
+          return decodeURIComponent(texto.slice(zero + 1));
+        } catch {
+          return null;
+        }
+      }
+    }
+    if (tipo === 'IDAT' || tipo === 'IEND') break; // a marca do Estúdio vem antes da imagem
+    i += 12 + n;
+  }
+  return null;
+};
+
+/** Grava o PNG (data URL) ao lado do original, em midia/ (caminhoSemFundo), com a marca da origem; devolve o caminho
+ *  no projeto. O mesmo original grava por cima do recorte dele; arquivo de outro original, ou que não é recorte do
+ *  Estúdio, nunca é sobrescrito: o recorte vai para "-2", "-3"… Nunca escreve no original. */
 export const gravarSemFundo = (projeto: Pick<Projeto, 'caminho'>, src: string, png: string) => {
-  const rel = caminhoSemFundo(src).replace(/\\/g, '/');
-  if (rel === src.replace(/\\/g, '/')) throw new ErroProjeto('o arquivo sem fundo não pode ser o original', 'caminho');
-  const abs = projeto.caminho(rel);
-  mkdirSync(path.dirname(abs), {recursive: true});
-  writeFileSync(abs, Buffer.from(png.replace(/^data:image\/png;base64,/, ''), 'base64'));
-  return rel;
+  const base = caminhoSemFundo(src);
+  const chave = chaveDoOriginal(src);
+  if (chaveDoOriginal(base) === chave) throw new ErroProjeto('o arquivo sem fundo não pode ser o original', 'caminho');
+  const bytes = marcarOrigem(Buffer.from(png.replace(/^data:image\/png;base64,/, ''), 'base64'), src);
+  for (let n = 1; n <= 99; n++) {
+    const rel = n === 1 ? base : base.replace(/\.sem-fundo\.png$/, `-${n}.sem-fundo.png`);
+    const abs = projeto.caminho(rel);
+    if (existsSync(abs) && origemMarcada(readFileSync(abs)) !== chave) continue;
+    mkdirSync(path.dirname(abs), {recursive: true});
+    writeFileSync(abs, bytes);
+    return rel;
+  }
+  throw new ErroProjeto(`não achei nome livre para o recorte de ${src} em midia/`, 'caminho');
 };
 
 type Lidar = <A extends unknown[], R>(canal: string, f: (...a: A) => R | Promise<R>) => void;

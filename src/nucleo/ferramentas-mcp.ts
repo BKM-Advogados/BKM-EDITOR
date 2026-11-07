@@ -18,7 +18,7 @@ import {
   sinaisDeVigencia, tituloDoHtml, TAMANHO_PAGINA, type Fato, type Fonte,
 } from './pesquisa';
 import {checarTexto, REGRAS_CLIENTE, terminaComUltimaFrase, type Aviso} from './regras';
-import {acharCamada} from './carrossel';
+import {acharCamada, caminhosDoId} from './carrossel';
 import {MODELO_FUNDO, patchSemFundo, patchVoltarAoOriginal, removedorDeFundo} from './remover-fundo';
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x, null, 2)}]});
@@ -520,15 +520,18 @@ const registrarPesquisa = (servidor: McpServer, projeto: Projeto, autor: string,
 
 const registrarAcabamento = (servidor: McpServer, projeto: Projeto, autor: string, origem: string) => {
   servidor.registerTool('remover_fundo', {
-    description: `Tira o fundo de uma camada de imagem com o modelo local ${MODELO_FUNDO.nome}, ${MODELO_FUNDO.licenca}: feito para pessoa (cabelo, ombros), não para logo ou objeto. Grava midia/<arquivo>.sem-fundo.png sem tocar no original e troca o src da camada, guardando o original em src_original; com voltar: true, a camada volta ao original. Na primeira vez baixa o modelo (${Math.round(MODELO_FUNDO.bytes / 1024 / 1024)} MB) e leva alguns segundos a mais. Só com o app do Estúdio aberto.`,
+    description: `Tira o fundo de uma camada de imagem com o modelo local ${MODELO_FUNDO.nome}, ${MODELO_FUNDO.licenca}: feito para pessoa (cabelo, ombros), não para logo ou objeto. Grava midia/<arquivo>.<código>.sem-fundo.png sem tocar no original (nem no recorte de outra foto) e troca o src da camada, guardando o original em src_original; com voltar: true, a camada volta ao original. Na primeira vez baixa o modelo (${Math.round(MODELO_FUNDO.bytes / 1024 / 1024)} MB) e leva alguns segundos a mais. Só com o app do Estúdio aberto.`,
     inputSchema: {
       documento: z.string().describe('id do documento de imagem'),
-      camada: z.string().describe('id da camada (ex.: foto-1, em qualquer página) ou caminho (/camadas/2, /paginas/1/camadas/0)'),
+      camada: z.string().describe('id da camada (ex.: foto-1, em qualquer página; id repetido em página duplicada pede o caminho) ou caminho (/camadas/2, /paginas/1/camadas/0)'),
       voltar: z.boolean().optional().describe('true: volta ao arquivo original'),
     },
   }, seguro(async ({documento, camada, voltar}: {documento: string; camada: string; voltar?: boolean}) => {
     const rel = projeto.arquivoDoDocumento(documento);
     const lido = projeto.lerJson<DocImagem>(rel);
+    // por id, só se ele for de uma camada só: página duplicada repete os ids, e aí quem diz qual é o caminho
+    const mesmos = camada.startsWith('/') ? [] : caminhosDoId(lido.doc, camada);
+    if (mesmos.length > 1) throw new ErroProjeto(`o id ${camada} está em ${mesmos.length} camadas (${mesmos.join(', ')}): passe o caminho da que é para recortar`, 'patch');
     const achada = acharCamada(lido.doc, camada);
     if (!achada) throw new ErroProjeto(`camada não achada: ${camada}`, 'nao_achado');
     if (achada.c.tipo !== 'imagem' || !achada.c.src) throw new ErroProjeto(`${camada} não é uma camada de imagem com arquivo`, 'patch');
@@ -542,10 +545,15 @@ const registrarAcabamento = (servidor: McpServer, projeto: Projeto, autor: strin
     if (!executar) throw new Error('remover fundo só funciona com o app do Estúdio aberto: o modelo roda na janela dele');
     const original = achada.c.src_original ?? achada.c.src;
     const {caminho: novo, ms} = await executar(original);
-    // o modelo leva segundos: a camada é achada de novo pelo id, na versão de agora
+    // o modelo leva segundos: a camada é lida de novo no mesmo caminho, na versão de agora, e tem de ser a mesma (pelo
+    // id); se a pilha mudou nesse meio-tempo, nada é gravado no documento (o id sozinho não basta: página duplicada
+    // repete os ids, e o patch cairia em outra página)
     const agora = projeto.lerJson<DocImagem>(rel);
-    const depois = acharCamada(agora.doc, achada.c.id);
-    if (!depois) throw new ErroProjeto(`a camada ${achada.c.id} sumiu enquanto o fundo era removido; o arquivo ficou em ${novo}`, 'conflito');
+    const depois = acharCamada(agora.doc, achada.caminho);
+    if (!depois || depois.c.id !== achada.c.id) {
+      throw new ErroProjeto(`a camada ${achada.c.id} saiu de ${achada.caminho} enquanto o fundo era removido (${depois ? `agora ali está ${depois.c.id}` : 'o caminho não existe mais'}); `
+        + `o documento não mudou e o recorte ficou em ${novo}: chame de novo com o caminho atual`, 'conflito');
+    }
     const r = projeto.aplicarPatch({documento, versao_base: agora.versao, patch: patchSemFundo(depois.c, depois.caminho, novo), autor, origem, rotulo: `fundo removido de ${achada.c.id}`});
     return {ok: true, camada: depois.caminho, src: novo, src_original: original, modelo: MODELO_FUNDO.id, tempo_modelo_ms: ms, versao: r.versao};
   }));

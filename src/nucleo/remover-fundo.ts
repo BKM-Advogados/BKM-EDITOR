@@ -2,7 +2,7 @@
 // arquivo sem fundo e os patches da camada. Só regras, sem disco nem rede: o processo principal baixa e grava
 // (src/main/remover-fundo.ts), a interface roda o ONNX num Web Worker (src/renderer/modulos/imagem/removerFundo*.ts) e
 // a ferramenta remover_fundo do MCP usa as mesmas funções. O arquivo da pessoa nunca é sobrescrito: o resultado vai
-// para midia/<arquivo>.sem-fundo.png e a camada guarda o original em `src_original`. Ver docs/imagem.md.
+// para midia/<arquivo>.<código>.sem-fundo.png e a camada guarda o original em `src_original`. Ver docs/imagem.md.
 import type {CamadaImagem, OperacaoPatch} from './documentos';
 
 /** Um modelo de segmentação baixável. `bytes` e `sha256` conferem o arquivo; a entrada é RGB normalizada
@@ -60,11 +60,29 @@ export const tamanhoDaEntrada = (iw: number, ih: number, m: Pick<ModeloFundo, 'l
   return {w: arredondar(iw), h: arredondar(ih)};
 };
 
-/** "midia/foto.jpg" → "midia/foto.sem-fundo.png"; arquivo fora de midia/ ganha o sem fundo dentro dela
- *  ("fotos/ana.jpg" → "midia/ana.sem-fundo.png"). Do original, se a camada já está sem fundo. */
+/** Caminho do original como chave: barras normais, sem "./" e em minúsculas (no Windows, "Ana.jpg" e "ana.jpg" são o
+ *  mesmo arquivo). */
+export const chaveDoOriginal = (src: string) => src.replace(/\\/g, '/').replace(/^(\.\/)+/, '').replace(/^\/+/, '').toLowerCase();
+
+/** Código de 8 hexadecimais do caminho do original (FNV-1a de 32 bits): o mesmo original dá sempre o mesmo. */
+export const codigoDoOriginal = (src: string) => {
+  let h = 0x811c9dc5;
+  for (const ch of chaveDoOriginal(src)) {
+    h ^= ch.codePointAt(0)!;
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8, '0');
+};
+
+
+/** "midia/ana.jpg" → "midia/ana.1a2b3c4d.sem-fundo.png", ao lado do original; de fora de midia/, dentro dela
+ *  ("fotos/ana.png" → "midia/ana.<outro código>.sem-fundo.png"). O código vem do caminho do original: o mesmo original
+ *  cai sempre no mesmo arquivo, e dois originais de mesmo nome (outra pasta, outra extensão) não se pisam. */
 export const caminhoSemFundo = (src: string) => {
-  const semExt = src.replace(/\\/g, '/').replace(/\.sem-fundo\.png$/i, '').replace(/\.[^./]+$/, '');
-  return `${semExt.startsWith('midia/') ? semExt : `midia/${semExt.split('/').pop()}`}.sem-fundo.png`;
+  const limpo = src.replace(/\\/g, '/').replace(/^(\.\/)+/, '');
+  const semExt = limpo.replace(/\.[^./]+$/, '');
+  const pasta = semExt.startsWith('midia/') ? semExt : `midia/${semExt.split('/').pop()}`;
+  return `${pasta}.${codigoDoOriginal(limpo)}.sem-fundo.png`;
 };
 
 /** Patch que troca a imagem da camada pela sem fundo e guarda o original (só da primeira vez). */

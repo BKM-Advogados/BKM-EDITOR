@@ -101,7 +101,7 @@ const InspectorCamada: React.FC<{documento: string; caminho: string; c: CamadaIm
             {c.src_original && <CampoLeitura rotulo="Original" dica="O arquivo de antes do remover fundo, intocado">{c.src_original}</CampoLeitura>}
             <div className="linha-botoes" style={{display: 'flex', gap: 6, flexWrap: 'wrap', padding: '4px 0'}}>
               <button type="button" className="bt mini" disabled={ocupado || !c.src} onClick={tirarFundo}
-                title="Modelo local MODNet (retrato, Apache-2.0): grava midia/<arquivo>.sem-fundo.png e não mexe no original. Na primeira vez baixa o modelo (26 MB).">
+                title="Modelo local MODNet (retrato, Apache-2.0): grava midia/<arquivo>.<código>.sem-fundo.png e não mexe no original. Na primeira vez baixa o modelo (26 MB).">
                 <WandSparkles />{ocupado ? 'Removendo…' : 'Remover fundo'}
               </button>
               {c.src_original && <button type="button" className="bt fantasma mini" onClick={() => void voltarAoOriginal(documento, caminho, c)} title={`Volta a ${c.src_original}`}><Undo2 />Voltar ao original</button>}
