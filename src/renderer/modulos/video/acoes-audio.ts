@@ -1,10 +1,11 @@
 // Ações de som do vídeo de cenas pela interface, como JSON Patch (o mesmo caminho das outras edições: diário, desfazer,
 // o Claude vê): adicionar clipe (do computador ou da biblioteca de trilhas), trocar o arquivo, duplicar, excluir, mover
-// e aparar na linha do tempo. O documento sem `audio` ganha as três faixas (narração, música, efeitos) no primeiro
-// clipe. Cada patch confere o id do que vai mexer, para não pisar no que o agente mudou por baixo.
+// e aparar na linha do tempo, limpar a voz e voltar ao original. O documento sem `audio` ganha as três faixas (narração,
+// música, efeitos) no primeiro clipe. Cada patch confere o id do que vai mexer, para não pisar no que o agente mudou por baixo.
 import {Mic, Music, Volume2, type LucideIcon} from 'lucide-react';
 import {ehDocCenas, idLivre, type DocCenas} from '../../../nucleo/cenas';
-import {DURACAO_CLIPE_MIN, nomeDoClipe, novaFaixaAudio, novoAudioCenas, PAPEIS, papelDe, type ClipeAudio, type Envelope, type FaixaAudio, type PapelFaixa} from '../../../nucleo/audio';
+import {DURACAO_CLIPE_MIN, nomeDoClipe, novaFaixaAudio, novoAudioCenas, PAPEIS, papelDe, type ClipeAudio, type Envelope, type FaixaAudio, type IntensidadeLimpeza,
+  type PapelFaixa} from '../../../nucleo/audio';
 import type {OperacaoPatch} from '../../../nucleo/documentos';
 import {aplicar, avisar, loja, mensagemDe, patchTrocar, selecionar, valorEm} from '../../estado/loja';
 import {msAtual} from './tocador';
@@ -124,7 +125,9 @@ export const trocarArquivoDoClipe = async (documento: string, caminho: string) =
     const d = docDe(documento);
     const c = valorEm(d, caminho) as ClipeAudio | undefined;
     if (!c) return;
+    // arquivo novo não é mais a voz limpa de antes: some o original e o que a limpeza mediu
     const patch = [...testeId(caminho, c.id), ...patchTrocar(d, `${caminho}/arquivo`, arq), ...patchTrocar(d, `${caminho}/corte_ms`, undefined),
+      ...patchTrocar(d, `${caminho}/original`, undefined), ...patchTrocar(d, `${caminho}/limpeza`, undefined),
       ...(c.duracao_ms > env.duracao_ms ? patchTrocar(d, `${caminho}/duracao_ms`, Math.max(DURACAO_CLIPE_MIN, env.duracao_ms)) : [])];
     await aplicar(documento, patch, `arquivo do clipe: ${arq.split('/').pop()}`);
   } catch (e) {
@@ -179,4 +182,69 @@ export const excluirSelecaoAudio = async (documento: string) => {
     selecionar(p.clipe === null ? null : {documento, caminho: `/audio/faixas/${p.faixa}`});
     avisar(`${p.clipe === null ? 'Faixa excluída' : 'Clipe excluído'}. Ctrl+Z desfaz.`, 'ok');
   }
+};
+
+// ---------- limpeza de voz (src/main/limpeza-voz.ts): uma por vez, com andamento e Cancelar ----------
+export type AndamentoLimpeza = {arquivo: string; progresso: number; documento: string; caminho: string} | null;
+let andamento: AndamentoLimpeza = null;
+const ouvintesLimpeza = new Set<() => void>();
+const mudouLimpeza = (a: AndamentoLimpeza) => {
+  andamento = a;
+  ouvintesLimpeza.forEach((f) => f());
+};
+let ligado = false;
+const ouvirProgresso = () => {
+  if (ligado) return;
+  ligado = true;
+  window.estudio.audio.aoProgressoLimpeza((p) => {
+    if (andamento?.arquivo === p.arquivo) mudouLimpeza({...andamento, progresso: p.progresso});
+  });
+};
+export const assinarLimpeza = (f: () => void) => {
+  ouvirProgresso();
+  ouvintesLimpeza.add(f);
+  return () => {
+    ouvintesLimpeza.delete(f);
+  };
+};
+export const andamentoLimpeza = () => andamento;
+export const cancelarLimpeza = () => void window.estudio.audio.cancelarLimpeza();
+
+const db1 = (v: number | null) => (v === null ? '—' : v.toFixed(1).replace('.', ',').replace('-', '−'));
+
+/** Limpa a voz do clipe: o processo principal grava midia/<arquivo>.limpo.wav a partir do original (nunca do já limpo)
+ *  e o clipe passa a apontar para ele, guardando o original e as medidas. Corte e duração ficam: o tamanho é o mesmo. */
+export const limparVozDoClipe = async (documento: string, caminho: string, intensidade: IntensidadeLimpeza) => {
+  const c = valorEm(docDe(documento), caminho) as ClipeAudio | undefined;
+  if (!c) return;
+  if (andamento) return avisar('Já há uma limpeza de voz em andamento; espere ou cancele.', 'info');
+  const origem = c.original ?? c.arquivo;
+  ouvirProgresso();
+  mudouLimpeza({arquivo: origem, progresso: 0, documento, caminho});
+  try {
+    const r = await window.estudio.audio.limparVoz(origem, intensidade);
+    if ('cancelado' in r) return avisar('Limpeza cancelada; o clipe continua como estava.', 'info');
+    const d = docDe(documento); // o documento pode ter mudado enquanto limpava
+    const agora = valorEm(d, caminho) as ClipeAudio | undefined;
+    if (!agora || agora.id !== c.id) return avisar(`A voz limpa ficou em ${r.arquivo}, mas o clipe mudou de lugar; troque o arquivo dele à mão.`, 'info');
+    const patch = [...testeId(caminho, c.id), ...patchTrocar(d, `${caminho}/arquivo`, r.arquivo), ...patchTrocar(d, `${caminho}/original`, origem),
+      ...patchTrocar(d, `${caminho}/limpeza`, r.medidas)];
+    if (await aplicar(documento, patch, `limpar voz (${intensidade}): ${nomeDoClipe(c)}`)) {
+      avisar(`Voz limpa: ruído nas pausas de ${db1(r.medidas.ruido_antes_db)} para ${db1(r.medidas.ruido_depois_db)} dB. "Voltar ao original" desfaz.`, 'ok');
+    }
+  } catch (e) {
+    avisar(mensagemDe(e), 'erro');
+  } finally {
+    mudouLimpeza(null);
+  }
+};
+
+/** O clipe volta a tocar o arquivo da pessoa; o .limpo.wav fica em midia/ e é regravado se ela limpar de novo. */
+export const voltarAoOriginal = async (documento: string, caminho: string) => {
+  const d = docDe(documento);
+  const c = valorEm(d, caminho) as ClipeAudio | undefined;
+  if (!c?.original) return;
+  const patch = [...testeId(caminho, c.id), ...patchTrocar(d, `${caminho}/arquivo`, c.original), ...patchTrocar(d, `${caminho}/original`, undefined),
+    ...patchTrocar(d, `${caminho}/limpeza`, undefined)];
+  if (await aplicar(documento, patch, `voltar ao original: ${nomeDoClipe(c)}`)) avisar('O clipe voltou ao arquivo original. Ctrl+Z desfaz.', 'ok');
 };

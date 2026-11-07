@@ -85,6 +85,7 @@ export const renderizarVideo = async (p: Preparado, r: RenderVideo, aviso: (x: P
     concurrency: Math.max(1, Math.floor(os.cpus().length / 2)),
     onProgress: ({progress}) => aviso({tipo: 'progresso', etapa: 'renderizando', progresso: progress * 100}),
   });
+  await (await import('./loudness')).igualarLoudness({arquivo: r.arquivo, props: r.props, binarios: p.binariesDirectory, cancelSignal: r.cancelSignal, aviso}); // frente Som
   return r.arquivo;
 };
 

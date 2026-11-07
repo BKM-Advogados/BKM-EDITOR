@@ -25,6 +25,8 @@ import {Terminais} from './terminais';
 import {registrarIpcAudio} from './ipc-audio';
 import {registrarIpcFala} from './ipc-fala'; // frente Fala
 import {registrarPrefsExportacao} from './ipc-exportacao';
+import {apagarLimposSemUso, registrarIpcLimpeza} from './limpeza-voz';
+import {registrarIpcLoudness} from './loudness';
 
 // o mesmo id do instalador (electron-builder.yml): a barra de tarefas agrupa a janela com o atalho
 app.setAppUserModelId('br.com.bkmadvogados.estudio');
@@ -143,6 +145,7 @@ const abrirProjeto = async (raiz: string) => {
   });
   midia.servir(raiz);
   regerarClaudeMd(raiz); // o Claude conhece os campos desta versão também nos projetos criados antes dela
+  apagarLimposSemUso(sessao.projeto); // frente Som: as versões limpas da voz que nenhum documento cita (limpeza-voz.ts)
   await sessao.abrir();
   memoria.lembrar(raiz, manifesto.nome);
   tituloDaJanela(manifesto.nome);
@@ -451,6 +454,9 @@ ipcMain.on(CANAL.mostrarArquivo, (e, caminho: string) => {
 const marcas = registrarIpcMarcas({lidar, janela: () => janela, memoria, midia, exigirProjeto, exemplo: pastaDoExemplo()});
 
 registrarPrefsExportacao(lidar, exigirProjeto); // marca d'água por destino, lembrada no projeto (frente C)
+// frente Som (rodada 2): limpeza de voz (limpeza-voz.ts) e medidor de loudness da mistura (loudness.ts)
+registrarIpcLimpeza(lidar, exigirProjeto, enviar);
+registrarIpcLoudness(lidar, exigirProjeto, (documento) => (exigirProjeto(), sessao!.propsVideo(documento, midia.base)));
 
 app.on('ready', async () => {
   await midia.iniciar();

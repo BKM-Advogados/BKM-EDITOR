@@ -20,15 +20,27 @@ export type ClipeAudio = {
   fade_in_ms?: number;
   fade_out_ms?: number;
   mudo?: boolean;
+  original?: string; // voz limpa: o arquivo da pessoa, intacto ("Voltar ao original" põe de volta em `arquivo`)
+  limpeza?: LimpezaClipe; // o que a limpeza de voz fez e mediu (limpeza-voz.ts)
 };
+
+/** Limpeza de voz gravada no clipe: a intensidade usada e o ruído nas pausas e a voz antes e depois, em dB (ponderação K). */
+export type LimpezaClipe = {intensidade: IntensidadeLimpeza; ruido_antes_db: number; ruido_depois_db: number; voz_antes_db: number | null; voz_depois_db: number | null};
+export type IntensidadeLimpeza = 'leve' | 'media' | 'forte';
 
 export type FaixaAudio = {id: string; nome: string; papel?: PapelFaixa; volume?: number; mudo?: boolean; ducking?: Ducking; clipes: ClipeAudio[]};
 
-export type AudioCenas = {faixas: FaixaAudio[]};
+/** `alvo_lufs` e `pico_dbtp`: o loudness integrado e o pico verdadeiro máximo do arquivo exportado (padrão −14 e −1). */
+export type AudioCenas = {faixas: FaixaAudio[]; alvo_lufs?: number; pico_dbtp?: number};
 
 /** Loudness por janela do arquivo, em dB com ponderação K (o mesmo número do LUFS, por janela). `db` tem uma entrada
- *  por `janela_ms`; SILENCIO_DB é "nada". Gravado em midia/<arquivo>.envelope.json pela interface. */
-export type Envelope = {versao: 1; janela_ms: number; duracao_ms: number; db: number[]};
+ *  por `janela_ms`; SILENCIO_DB é "nada". Gravado em midia/<arquivo>.envelope.json pelo processo principal, com `fonte`:
+ *  o arquivo como ele estava quando foi medido (tamanho, data e sha256), para remedir quando a tomada for regravada com o
+ *  mesmo nome. A versão sobe quando a conta muda: a 2 veio com a ponderação K do libebur128 (rodada 2), e o envelope da
+ *  versão 1 (0.3.0) conta como não medido. */
+export const VERSAO_ENVELOPE = 2;
+export type FonteDoEnvelope = {tamanho: number; modificado_ms?: number; sha256?: string};
+export type Envelope = {versao: typeof VERSAO_ENVELOPE; janela_ms: number; duracao_ms: number; db: number[]; fonte?: FonteDoEnvelope};
 
 export const JANELA_MS = 50;
 export const SILENCIO_DB = -100;
@@ -42,6 +54,13 @@ export const DUCKING_PADRAO = {alvo_lu: 20, ataque_ms: 80, soltura_ms: 500} as c
 export const ALVO_LU_MIN = 6;
 export const ALVO_LU_MAX = 36;
 export const DURACAO_CLIPE_MIN = 100;
+// o arquivo exportado: −14 LUFS integrado (YouTube, Instagram, Spotify) e pico verdadeiro até −1 dBTP
+export const ALVO_LUFS_PADRAO = -14;
+export const PICO_DBTP_PADRAO = -1;
+export const ALVO_LUFS_MIN = -30;
+export const ALVO_LUFS_MAX = -9;
+export const PICO_DBTP_MIN = -6;
+export const PICO_DBTP_MAX = 0;
 
 export const PAPEIS: Record<PapelFaixa, {nome: string; nome_faixa: string; id: string; volume: number}> = {
   voz: {nome: 'Narração', nome_faixa: 'Narração', id: 'narracao', volume: 1},
@@ -76,33 +95,32 @@ export const novaFaixaAudio = (papel: PapelFaixa, id: string): FaixaAudio => ({
 /** Som novo do documento: narração, música e efeitos, vazios. */
 export const novoAudioCenas = (): AudioCenas => ({faixas: [novaFaixaAudio('voz', 'narracao'), novaFaixaAudio('musica', 'musica'), novaFaixaAudio('efeitos', 'efeitos')]});
 
-export const nomeDoClipe = (c: {nome?: string; arquivo: string}) => c.nome || c.arquivo.split('/').pop() || c.arquivo;
+/** O nome que a linha do tempo mostra: o dado, ou o do arquivo; a voz limpa mostra o do original, com "(limpa)". */
+export const nomeDoClipe = (c: {nome?: string; arquivo: string; original?: string}) =>
+  c.nome || (c.original ? `${c.original.split('/').pop()} (limpa)` : c.arquivo.split('/').pop() || c.arquivo);
 
 // ---------- envelope: ponderação K e loudness por janela ----------
-type Biquad = {b0: number; b1: number; b2: number; a1: number; a2: number};
+export type Biquad = {b0: number; b1: number; b2: number; a1: number; a2: number};
 
-// coeficientes do BS.1770 para qualquer taxa de amostragem (prateleira alta de +4 dB em 1,5 kHz e passa-altas RLB em
-// 38 Hz), como o pyloudnorm os deriva
-const prateleiraAlta = (taxa: number, ganhoDb = 4, q = 1 / Math.SQRT2, fc = 1500): Biquad => {
-  const A = Math.pow(10, ganhoDb / 40);
-  const w0 = (2 * Math.PI * fc) / taxa;
-  const alfa = Math.sin(w0) / (2 * q);
-  const cos = Math.cos(w0);
-  const a0 = A + 1 - (A - 1) * cos + 2 * Math.sqrt(A) * alfa;
-  return {
-    b0: (A * (A + 1 + (A - 1) * cos + 2 * Math.sqrt(A) * alfa)) / a0,
-    b1: (-2 * A * (A - 1 + (A + 1) * cos)) / a0,
-    b2: (A * (A + 1 + (A - 1) * cos - 2 * Math.sqrt(A) * alfa)) / a0,
-    a1: (2 * (A - 1 - (A + 1) * cos)) / a0,
-    a2: (A + 1 - (A - 1) * cos - 2 * Math.sqrt(A) * alfa) / a0,
-  };
+// coeficientes do BS.1770 para qualquer taxa de amostragem (prateleira alta de ~+4 dB perto de 1,7 kHz e passa-altas RLB
+// em 38 Hz), com as constantes do libebur128 (as mesmas do ffmpeg): a 48 kHz dão os coeficientes da tabela da norma
+const prateleiraAlta = (taxa: number): Biquad => {
+  const f0 = 1681.974450955533;
+  const ganho = 3.999843853973347;
+  const q = 0.7071752369554196;
+  const k = Math.tan((Math.PI * f0) / taxa);
+  const vh = Math.pow(10, ganho / 20);
+  const vb = Math.pow(vh, 0.4996667741545416);
+  const a0 = 1 + k / q + k * k;
+  return {b0: (vh + (vb * k) / q + k * k) / a0, b1: (2 * (k * k - vh)) / a0, b2: (vh - (vb * k) / q + k * k) / a0, a1: (2 * (k * k - 1)) / a0, a2: (1 - k / q + k * k) / a0};
 };
-const passaAltas = (taxa: number, q = 0.5, fc = 38): Biquad => {
-  const w0 = (2 * Math.PI * fc) / taxa;
-  const alfa = Math.sin(w0) / (2 * q);
-  const cos = Math.cos(w0);
-  const a0 = 1 + alfa;
-  return {b0: (1 + cos) / 2 / a0, b1: -(1 + cos) / a0, b2: (1 + cos) / 2 / a0, a1: (-2 * cos) / a0, a2: (1 - alfa) / a0};
+const passaAltas = (taxa: number): Biquad => {
+  const f0 = 38.13547087602444;
+  const q = 0.5003270373238773;
+  const k = Math.tan((Math.PI * f0) / taxa);
+  const a0 = 1 + k / q + k * k;
+  // o numerador do passa-altas é 1, −2, 1 sem normalizar, como na norma (o ganho em 1 kHz fica no −0,691)
+  return {b0: 1, b1: -2, b2: 1, a1: (2 * (k * k - 1)) / a0, a2: (1 - k / q + k * k) / a0};
 };
 const filtrar = (x: Float32Array, f: Biquad): Float32Array => {
   const y = new Float32Array(x.length);
@@ -122,6 +140,9 @@ const filtrar = (x: Float32Array, f: Biquad): Float32Array => {
 /** Sinal com a ponderação K (o que se mede antes de tirar o LUFS). */
 export const ponderacaoK = (amostras: Float32Array, taxa: number) => filtrar(filtrar(amostras, prateleiraAlta(taxa)), passaAltas(taxa));
 
+/** Os dois biquads da ponderação K, em ordem (prateleira e passa-altas), para quem filtra aos pedaços (loudness.ts). */
+export const coeficientesK = (taxa: number): [Biquad, Biquad] => [prateleiraAlta(taxa), passaAltas(taxa)];
+
 /** Envelope de um áudio decodificado: potência média por janela (somada entre canais, como o BS.1770) em dB. */
 export const envelopeDeAmostras = (canais: Float32Array[], taxa: number, janela_ms = JANELA_MS): Envelope => {
   const n = canais[0]?.length ?? 0;
@@ -138,12 +159,25 @@ export const envelopeDeAmostras = (canais: Float32Array[], taxa: number, janela_
     const potencia = soma[j] / Math.max(1, amostras);
     db[j] = potencia > 0 ? Math.max(SILENCIO_DB, Math.round((-0.691 + 10 * Math.log10(potencia)) * 10) / 10) : SILENCIO_DB;
   }
-  return {versao: 1, janela_ms, duracao_ms: Math.round((n / taxa) * 1000), db};
+  return {versao: VERSAO_ENVELOPE, janela_ms, duracao_ms: Math.round((n / taxa) * 1000), db};
 };
 
+/** Envelope inteiro e na versão atual; o da versão 1 (0.3.0) não passa, para ser medido de novo com a conta nova. */
 export const ehEnvelope = (e: unknown): e is Envelope => {
   const o = e as Partial<Envelope> | null;
-  return Boolean(o && o.versao === 1 && typeof o.janela_ms === 'number' && o.janela_ms > 0 && typeof o.duracao_ms === 'number' && Array.isArray(o.db));
+  const f = o?.fonte as Partial<FonteDoEnvelope> | undefined;
+  return Boolean(o && o.versao === VERSAO_ENVELOPE && typeof o.janela_ms === 'number' && o.janela_ms > 0 && typeof o.duracao_ms === 'number' && Array.isArray(o.db)
+    && (f === undefined || (typeof f === 'object' && f !== null && typeof f.tamanho === 'number' && (f.modificado_ms === undefined || typeof f.modificado_ms === 'number')
+      && (f.sha256 === undefined || typeof f.sha256 === 'string'))));
+};
+
+/** O envelope ainda é do arquivo como ele está agora? 'em_dia': mesmo tamanho e mesma data; 'conferir': mesmo tamanho e
+ *  outra data (cópia, git clone), e só o sha256 decide; 'velho': outro tamanho, ou envelope sem carimbo. */
+export const conferirEnvelope = (env: Envelope, atual: {tamanho: number; modificado_ms: number}): 'em_dia' | 'conferir' | 'velho' => {
+  const f = env.fonte;
+  if (!f || f.tamanho !== atual.tamanho) return 'velho';
+  if (typeof f.modificado_ms === 'number' && Math.floor(f.modificado_ms) === Math.floor(atual.modificado_ms)) return 'em_dia';
+  return f.sha256 ? 'conferir' : 'velho';
 };
 
 export const mediana = (xs: number[]): number | null => {
@@ -257,7 +291,7 @@ export type ClipeAudioP = {
   ducking?: ResultadoDucking;
 };
 export type FaixaAudioP = {origem: string; id: string; nome: string; papel: PapelFaixa; volume: number; mudo: boolean; ducking?: DuckingP; clipes: ClipeAudioP[]};
-export type AudioP = {faixas: FaixaAudioP[]};
+export type AudioP = {faixas: FaixaAudioP[]; alvo_lufs: number; pico_dbtp: number};
 
 const seg = (ms: number) => (ms / 1000).toLocaleString('pt-BR', {maximumFractionDigits: 1});
 
@@ -323,7 +357,12 @@ export const resolverAudio = (audio: AudioCenas | undefined, duracao_video: numb
     }
   }
   if (semEnvelopeVoz) avisos.push(`${semEnvelopeVoz === 1 ? 'um clipe de narração ainda não foi medido' : `${semEnvelopeVoz} clipes de narração ainda não foram medidos`}; a música cai o tempo todo sob ${semEnvelopeVoz === 1 ? 'ele' : 'eles'}`);
-  return {audio: {faixas}, avisos};
+  // o alvo do arquivo exportado (loudness.ts mede o arquivo final e corrige o ganho até ele)
+  const alvo_lufs = limitar(numero(audio.alvo_lufs, ALVO_LUFS_PADRAO), ALVO_LUFS_MIN, ALVO_LUFS_MAX);
+  if (audio.alvo_lufs !== undefined && numero(audio.alvo_lufs, NaN) !== alvo_lufs) avisos.push(`o alvo de loudness ${String(audio.alvo_lufs)} LUFS está fora de ${ALVO_LUFS_MIN} a ${ALVO_LUFS_MAX}; vai com ${alvo_lufs}`);
+  const pico_dbtp = limitar(numero(audio.pico_dbtp, PICO_DBTP_PADRAO), PICO_DBTP_MIN, PICO_DBTP_MAX);
+  if (audio.pico_dbtp !== undefined && numero(audio.pico_dbtp, NaN) !== pico_dbtp) avisos.push(`o pico máximo ${String(audio.pico_dbtp)} dBTP está fora de ${PICO_DBTP_MIN} a ${PICO_DBTP_MAX}; vai com ${pico_dbtp}`);
+  return {audio: {faixas, alvo_lufs, pico_dbtp}, avisos};
 };
 
 /** Fator dos fades em `t_ms` desde o começo do clipe (0 a 1). */

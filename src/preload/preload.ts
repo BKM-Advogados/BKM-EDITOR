@@ -78,6 +78,10 @@ const api: ApiEstudio = {
     gravarEnvelope: (arquivo, envelope) => ipcRenderer.invoke(CANAL.audioGravarEnvelope, arquivo, envelope),
     listarTrilhas: () => ipcRenderer.invoke(CANAL.audioListarTrilhas),
     importarTrilha: (caminho) => ipcRenderer.invoke(CANAL.audioImportarTrilha, caminho),
+    limparVoz: (arquivo, intensidade) => ipcRenderer.invoke(CANAL.audioLimparVoz, arquivo, intensidade),
+    cancelarLimpeza: () => ipcRenderer.invoke(CANAL.audioLimpezaCancelar),
+    aoProgressoLimpeza: (cb) => ouvir<[{arquivo: string; progresso: number}]>(CANAL.audioLimpezaProgresso, cb),
+    medirLoudness: (documento) => ipcRenderer.invoke(CANAL.audioMedirLoudness, documento),
   },
   marcas: {
     listar: () => ipcRenderer.invoke(CANAL.marcasListar),

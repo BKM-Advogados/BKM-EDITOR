@@ -547,3 +547,23 @@ input[type="range"]:focus-visible { outline: none; }
 .biblioteca .meta { color: var(--texto-3); font-size: var(--tam-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .biblioteca .rodape { display: flex; align-items: center; gap: 4px; border-top: 1px solid var(--borda); padding-top: 6px; }
 .biblioteca .rodape .espaco { flex: 1; }
+/* frente Som (rodada 2): medidor de loudness (MedidorLoudness.tsx) e limpeza de voz no inspetor */
+.medidor { margin: 4px 8px 8px; padding: 6px 8px; border: 1px solid var(--borda); border-radius: var(--raio); background: var(--fundo-1); display: flex; flex-direction: column; gap: 4px; }
+.medidor.medindo { opacity: 0.7; }
+.medidor .topo { display: flex; align-items: baseline; gap: 8px; }
+.medidor .titulo { flex: 1; color: var(--texto-2); font-size: var(--tam-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.medidor .integrado { color: var(--texto-2); font-size: var(--tam-1); white-space: nowrap; }
+.medidor .integrado b { color: var(--texto); font-size: var(--tam-4); font-variant-numeric: tabular-nums; }
+.medidor .integrado.ok b { color: var(--ok); }
+.medidor .escala { position: relative; height: 8px; border-radius: 4px; background: var(--fundo-4); overflow: hidden; }
+.medidor .escala .cheia { position: absolute; left: 0; top: 0; bottom: 0; background: var(--trilha-audio); opacity: 0.55; }
+.medidor .escala .alvo { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--texto); }
+.medidor .escala .curto { position: absolute; top: 1px; bottom: 1px; width: 3px; margin-left: -1px; border-radius: 1px; background: var(--acento); opacity: 0; transition: left 0.08s linear; }
+.medidor .linhas { display: flex; justify-content: space-between; gap: 8px; color: var(--texto-3); font-size: var(--tam-1); font-variant-numeric: tabular-nums; }
+.medidor .linhas b { color: var(--texto-2); font-weight: 500; }
+.medidor .linhas .alto { color: var(--aviso); }
+.medidor .nota { color: var(--texto-3); font-size: var(--tam-1); }
+.limpeza-botoes { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 8px 6px; }
+.limpeza-andamento { display: flex; align-items: center; gap: 8px; padding: 2px 8px 6px; }
+.som-andamento { flex: 1; height: 6px; border-radius: 3px; background: var(--fundo-4); overflow: hidden; }
+.som-andamento > span { display: block; height: 100%; background: var(--trilha-audio); transition: width 0.15s; }
