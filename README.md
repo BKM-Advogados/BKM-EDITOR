@@ -65,9 +65,9 @@ o login próprio do Claude Code). Depois é só pedir: "crie 5 cenas sobre féri
 
 | Área | Na tela | Pelo Claude (MCP `estudio`) |
 |---|---|---|
-| **Vídeo de cenas** (o que se começa do zero) | qualquer formato; cenas com duração própria e blocos de título, texto, lista, número e imagem; posição em % do quadro (trocar 9:16 por 16:9 não desmonta nada); criar, duplicar (Ctrl+D) e excluir (Delete) cena e bloco; arrastar bloco no quadro e na linha do tempo; alça da cena muda a duração; propriedades com formato, cores, tempo em segundos e letra em px | `ler_documento`, `aplicar_patch`, `criar_documento` |
+| **Vídeo de cenas** (o que se começa do zero) | qualquer formato; cenas com duração própria e blocos de título, texto, lista, número e imagem; posição em % do quadro (trocar 9:16 por 16:9 não desmonta nada); criar, duplicar (Ctrl+D) e excluir (Delete) cena e bloco; arrastar bloco no quadro e na linha do tempo; alça da cena muda a duração; propriedades com formato, cores, tempo em segundos e letra em px; faixas de som, limpeza de voz e medidor de loudness; legendas da fala; movimento nas imagens | `ler_documento`, `aplicar_patch`, `criar_documento`, `transcrever`, `exportar_legendas`, `importar_legendas` |
 | **Carrossel narrado da Cliente** | o C2 real, com blocos presos às palavras da narração (`palavra@ms`), linha do tempo com a fala, arrastar bloco = entrar em outra palavra; criar bloco, duplicar e excluir partes | o mesmo, no `video/roteiro.json` |
-| **Imagem** | camadas (imagem, texto, forma), mover, redimensionar, ordem, visível, exportar PNG, JPG ou WebP com qualidade e escala; **carrossel** de várias páginas (barra de páginas, PageUp/PageDown, "Novo carrossel" com campos por página) e exportar PNG por página + PDF para o LinkedIn (`docs/carrossel.md`) | o mesmo (`paginas[]`, `estado_do_editor` diz a página) |
+| **Imagem** | camadas (imagem, texto, forma), mover, redimensionar, ordem, visível, exportar PNG, JPG ou WebP com qualidade e escala; **carrossel** de várias páginas (barra de páginas, PageUp/PageDown, "Novo carrossel" com campos por página) e exportar PNG por página + PDF para o LinkedIn (`docs/carrossel.md`); sombra, contorno, degradê, foto dentro de forma ou texto e remover fundo (`docs/imagem.md`) | o mesmo (`paginas[]`, `estado_do_editor` diz a página) e `remover_fundo` |
 | **3D** | cena Three.js sob demanda, gizmo mover/girar/escala (W/E/R), luzes, câmera, animar | o mesmo |
 | **Efeitos** | pilha de efeitos no vídeo ou na imagem, com prévia ao vivo e pré-ajustes | o campo `efeitos` |
 | **Pesquisa** (só visualizador: fato é fato, nada se aprova nem bloqueia, nada da fonte é censurado) | painel no grupo do inspetor com as fontes (órgão, nível, data, vigência, observação, abrir e ver o texto) e os fatos (trecho literal, selo exato/parecido/não encontrado, dígitos que faltam, "trecho confere" ou "a revisar"); no vídeo de cenas, os fatos que o bloco cita (`refs`) aparecem como etiquetas no inspetor (`docs/pesquisa.md`) | `ler_fonte`, `anotar_fonte`, `registrar_fato`, `listar_pesquisa`, `texto_da_fonte`, `checar_texto` |
@@ -96,6 +96,25 @@ cada um, estão em `src/nucleo/zonas-seguras.ts`; a escolha é da interface, nã
 blocos ficam na metade em que começam e os que atravessam o corte vão para as duas, aparados; a segunda cena nasce com
 ids novos. Ctrl+Z desfaz.
 
+Rodada 2 (07/11/2026), tudo no próprio PC:
+
+- **Som** (`docs/audio.md`): limpeza de voz por clipe em três intensidades, sem tocar no arquivo da pessoa ("Voltar ao
+  original"); medidor de loudness BS.1770 da narração, da mistura e da faixa; a exportação mede o arquivo final e corrige
+  até o alvo (padrão −14 LUFS e pico de −1 dBTP).
+- **Legendas** (`docs/legendas.md`): transcrição local com o whisper.cpp, palavra falada em destaque, cinco estilos com as
+  cores do tema, lista para corrigir e localizar e substituir, faixa na linha do tempo, SRT e VTT de ida e volta. As
+  legendas andam com o clipe de voz.
+- **Movimento** (`docs/exportacao.md`): zoom e deslize suaves nas imagens do vídeo de cenas; "Movimento em todas as
+  imagens" passa as que estão em Inteira para Preencher no mesmo Ctrl+Z.
+- **Marca d'água por rede** (`docs/exportacao.md`): logo ou assinatura do kit em cada destino, fora das zonas cobertas,
+  lembrada no projeto e desenhada só na exportação.
+- **Acabamento da imagem** (`docs/imagem.md`): sombra, contorno, degradê (inclusive no fundo), foto recortada por forma
+  ou texto e remover fundo com o MODNet, iguais na tela, no PNG e no PDF.
+
+Os modelos não vêm no instalador: baixam no primeiro uso para `%USERPROFILE%\Estudio\modelos` (whisper.cpp 9 MB e
+modelo small 190 MB; MODNet 26 MB), com SHA-256 conferido. Licenças: whisper.cpp, modelos Whisper e onnxruntime-web MIT;
+MODNet Apache-2.0.
+
 Em todas as áreas:
 
 - **Comentar (M):** clique no quadro. O comentário fica ancorado no objeto (caminho JSON e id), no tempo e no ponto.
@@ -107,9 +126,11 @@ Em todas as áreas:
 
 O agente recebe: `projeto_info`, `estado_do_editor`, `ler_documento`, `aplicar_patch` (com `versao_base` e `test`),
 `criar_documento`, `renomear_projeto`, `listar_comentarios`, `ler_comentario`, `responder_comentario`,
-`resolver_comentario`, `listar_mudancas`, `aplicar_marca` e, para a pesquisa, `ler_fonte`, `anotar_fonte`,
-`registrar_fato`, `listar_pesquisa`, `texto_da_fonte` e `checar_texto`. Cada projeto novo leva um `CLAUDE.md` com o
-formato dos documentos dele, o que o kit de marca põe no `tema` e a seção "Pesquisa" (fontes, fatos e `refs`).
+`resolver_comentario`, `listar_mudancas`, `aplicar_marca`, `transcrever`, `exportar_legendas`, `importar_legendas`,
+`remover_fundo` e, para a pesquisa, `ler_fonte`, `anotar_fonte`, `registrar_fato`, `listar_pesquisa`, `texto_da_fonte` e
+`checar_texto`. Cada projeto leva um `CLAUDE.md` com o formato dos documentos dele, o que o kit de marca põe no `tema` e a
+seção "Pesquisa" (fontes, fatos e `refs`). A parte escrita pelo app fica entre as marcas `estudio:inicio` e `estudio:fim`
+e é refeita ao abrir o projeto, para valer também nos projetos criados antes; o que estiver fora das marcas fica.
 
 ## Como é feito
 
@@ -134,7 +155,7 @@ Os documentos de desenho estão em `docs/`. A pesquisa de uso que deu origem à 
 ## Testes
 
 ```bash
-npm test            # 131 testes: resolvedor × Python, MCP por stdio e HTTP, conversa (claude falso), criar projeto, vídeo de cenas, formatos, som e ducking, kit de marca e fontes, carrossel e PDF, lâmina, exportação, zonas seguras, pesquisa (fontes, fatos e leitor de números)
+npm test            # 270 testes: resolvedor × Python, MCP por stdio e HTTP, conversa (claude falso), criar projeto e CLAUDE.md, vídeo de cenas, formatos, som e ducking, limpeza de voz e loudness, legendas e transcrição, movimento, marca d'água, kit de marca e fontes, carrossel e PDF, acabamento e remover fundo, lâmina, exportação, zonas seguras, pesquisa (fontes, fatos e leitor de números)
 npm run typecheck
 npm run e2e         # com o app aberto via ESTUDIO_DEPURAR_PORTA=9471
 ```
@@ -146,7 +167,10 @@ renderiza um vídeo de cenas de teste em 9:16, 4:5 e 16:9 fora do Electron, em `
 
 - **Neste PC o Electron de desenvolvimento está bloqueado pelo Bitdefender** (GravityZone): o app instalado roda, mas
   `npm run dev` e o e2e precisam de exceção para a pasta do projeto. A prévia web cobre a interface.
-- **Onda B** (briefing): transcrição local da narração (whisper.cpp), importar mídia e painel Mídia, o Carrossel Cliente como
+- **Rodada 2 sem teste no app real:** o remover fundo só rodou com um modelo falso, a limpeza de voz foi medida e não
+  ouvida, e o IPC da limpeza, do medidor, da transcrição e da marca d'água nunca rodou no Electron.
+- **Pesquisa de qualidade** (`tasks/estudio-qualidade-2026-11-07`): defeitos conferidos no código e a barra do que falta.
+- **Onda B** (briefing): importar mídia e painel Mídia, o Carrossel Cliente como
   modelo do tipo cenas (a paleta e as fontes dele já vêm do kit `cliente`), o Claude que planeja (perguntas e Plano do vídeo
   antes de montar), chip de formato no monitor, primeiros passos e "Salvar como modelo".
 - **Memória (app empacotado, 05/11/2026):** 307 MB parado no vídeo; 547 MB com as quatro áreas e o 3D. A tela inicial
