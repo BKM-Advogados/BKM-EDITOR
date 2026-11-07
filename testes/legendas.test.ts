@@ -10,7 +10,7 @@ import {afterAll, describe, expect, it} from 'vitest';
 import {novoDocCenas, resolverCenas, type DocCenas} from '../src/nucleo/cenas';
 import {
   areaDaLegenda, carimboLegenda, caracteresPorLinha, comTexto, dividirSegmento, estimarPalavras, juntarSegmentos, legendasDaFala, legendasDeArquivo, legendasDoDocumento,
-  lerLegendas, linhasDaLegenda, localizar, palavrasDe, palavrasDoClipe, paraSrt, paraVtt, PREDEFINICOES_LEGENDA, quebrarEmSegmentos, requebrar, resolverEstilo,
+  lerLegendas, linhasDaLegenda, localizar, nomeDoFalante, palavrasDe, palavrasDoClipe, paraSrt, paraVtt, PREDEFINICOES_LEGENDA, quebrarEmSegmentos, requebrar, resolverEstilo,
   resolverLegendas, substituirEmLote, type LegendasCenas, type PalavraLegenda, type SegmentoLegenda,
 } from '../src/nucleo/legendas';
 import {norm} from '../src/nucleo/roteiro/resolver';
@@ -101,6 +101,19 @@ describe('quebrar as palavras em legendas', () => {
     expect(Math.max(...tres.map((s) => s.palavras!.length))).toBeLessThanOrEqual(3);
   });
 
+  it('a palavra que sobra no fim da frase não fica sozinha: divide o texto com a legenda anterior', () => {
+    const ws = 'Primeira regra, a mudança de casa depende da sua concordância.'.split(' ').map((w, i) => ({w, s: i * 300, e: i * 300 + 250}));
+    expect(quebrarEmSegmentos(ws, {max_caracteres: 50}).map((s) => s.texto)).toEqual(['Primeira regra, a mudança de casa', 'depende da sua concordância.']);
+    // no corte por número de palavras, o artigo ou a preposição passa para a próxima
+    const fraca = 'Com o fim da produção de aço na usina'.split(' ').map((w, i) => ({w, s: i * 300, e: i * 300 + 250}));
+    // ("na usina" sobrou curta e se equilibra com a anterior)
+    const r = quebrarEmSegmentos(fraca, {max_caracteres: 50, max_palavras: 4}).map((s) => s.texto);
+    expect(r).toEqual(['Com o fim', 'da produção', 'de aço na usina']);
+    // frase que acabou na anterior não se mistura
+    const duas = quebrarEmSegmentos([{w: 'Sim.', s: 0, e: 200}, {w: 'Ok.', s: 300, e: 500}], {max_caracteres: 50});
+    expect(duas.map((s) => s.texto)).toEqual(['Sim.', 'Ok.']);
+  });
+
   it('legenda curta ganha tempo até 0,7 s, sem invadir a próxima', () => {
     const r = quebrarEmSegmentos([{w: 'Sim.', s: 0, e: 150}, {w: 'Não.', s: 400, e: 600}, {w: 'Talvez.', s: 3000, e: 3200}], {max_caracteres: 42});
     expect(r.map((s) => [s.em, s.sai])).toEqual([[0, 400], [400, 1100], [3000, 3700]]);
@@ -141,6 +154,13 @@ describe('legendas a partir da fala dos clipes', () => {
       {clipe: 'clipe-1', arquivo: 'midia/fala.wav', palavras: 'midia/fala.wav.palavras.json', em: 1000, corte_ms: 500},
       {clipe: 'clipe-2', arquivo: 'midia/dra.wav', palavras: 'midia/dra.wav.palavras.json', em: 12000, corte_ms: 0},
     ]);
+  });
+
+  it('nome de arquivo não é falante', () => {
+    expect(nomeDoFalante({nome: 'fala.wav', arquivo: 'midia/fala.wav'})).toBeUndefined();
+    expect(nomeDoFalante({nome: 'fala', arquivo: 'midia/fala.wav'})).toBeUndefined();
+    expect(nomeDoFalante({nome: 'narração sintética.wav', arquivo: 'blob:http://x/1'})).toBeUndefined();
+    expect(nomeDoFalante({nome: ' Dra. Ana ', arquivo: 'midia/dra.wav'})).toBe('Dra. Ana');
   });
 
   it('sem transcrição o clipe vai em "faltam"; pedir um clipe só troca as legendas dele', () => {
@@ -409,6 +429,7 @@ describe('transcritor: zip e download conferido', () => {
     await expect(baixarConferido({url: 'https://exemplo/m.bin', destino: outro, bytes: dados.length, sha256: '0'.repeat(64), buscar})).rejects.toThrow(/não confere/);
     expect(existsSync(outro) || existsSync(`${outro}.parcial`)).toBe(false);
     await expect(baixarConferido({url: 'https://exemplo/m.bin', destino: outro, bytes: 10, sha256, buscar})).rejects.toThrow(/passou do tamanho/);
+    expect(existsSync(`${outro}.parcial`)).toBe(false); // apagado depois de fechar, não antes
     await expect(baixarConferido({url: 'https://exemplo/x', destino: outro, bytes: 10, sha256, buscar: async () => new Response('nada', {status: 404})})).rejects.toThrow(/HTTP 404/);
   });
 });

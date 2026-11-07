@@ -83,21 +83,40 @@ export const baixarConferido = async (o: {url: string; destino: string; bytes: n
   if (!r.ok || !r.body) throw new Error(`não deu para baixar ${o.url}: HTTP ${r.status}`);
   const hash = createHash('sha256');
   const arquivo = createWriteStream(parcial);
+  // erro de escrita (disco cheio, pasta sumida) vira rejeição, nunca um 'error' solto que derruba o processo principal
+  let erroEscrita: Error | null = null;
+  arquivo.on('error', (e) => (erroEscrita = e));
+  const dreno = () => new Promise<void>((ok, falha) => {
+    const fim = (e?: Error) => {
+      arquivo.off('drain', fim);
+      arquivo.off('error', fim);
+      if (e) falha(e);
+      else ok();
+    };
+    arquivo.on('drain', fim);
+    arquivo.on('error', fim);
+  });
   let recebido = 0;
   try {
     const leitor = r.body.getReader();
     for (;;) {
       const {done, value} = await leitor.read();
       if (done) break;
+      if (erroEscrita) throw erroEscrita;
       recebido += value.byteLength;
-      if (recebido > o.bytes * 1.01 + 1024) throw new Error(`o arquivo passou do tamanho esperado (${o.bytes} bytes): ${o.url}`);
+      if (recebido > o.bytes * 1.01 + 1024) {
+        await leitor.cancel().catch(() => undefined);
+        throw new Error(`o arquivo passou do tamanho esperado (${o.bytes} bytes): ${o.url}`);
+      }
       hash.update(value);
-      if (!arquivo.write(value)) await new Promise<void>((ok) => arquivo.once('drain', () => ok()));
+      if (!arquivo.write(value)) await dreno();
       o.andamento?.(recebido, o.bytes);
     }
     await new Promise<void>((ok, falha) => arquivo.end((e?: Error | null) => (e ? falha(e) : ok())));
+    if (erroEscrita) throw erroEscrita;
   } catch (e) {
-    arquivo.destroy();
+    // espera o arquivo fechar antes de apagar: aberto pela metade, ele voltaria depois do rmSync
+    await new Promise<void>((ok) => (arquivo.closed ? ok() : (arquivo.once('close', () => ok()), arquivo.destroy())));
     rmSync(parcial, {force: true});
     if (o.sinal?.aborted) throw new Cancelado();
     throw e;

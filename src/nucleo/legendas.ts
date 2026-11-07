@@ -63,7 +63,7 @@ export const PREDEFINICOES_LEGENDA: Record<IdEstiloLegenda, Predefinicao> = {
     tam: 0.068, peso: 800, maiusculas: true, caixa: 'nenhuma', destaque: 'caixa', apagadas: false, sombra: true, linhas: 2, max_palavras: 3},
   karaoke: {id: 'karaoke', nome: 'Karaokê', descricao: 'As palavras acendem conforme são ditas, como no carrossel da Cliente', posicao: 'baixo', tam: 0.056, peso: 700,
     maiusculas: false, caixa: 'nenhuma', destaque: 'cor', apagadas: true, sombra: true, linhas: 2, max_palavras: 4},
-  faixa: {id: 'faixa', nome: 'Faixa da marca', descricao: 'Faixa no fundo da marca, de lado a lado, com a palavra falada sublinhada', posicao: 'baixo', tam: 0.04,
+  faixa: {id: 'faixa', nome: 'Faixa da marca', descricao: 'Faixa na cor de destaque da marca, de lado a lado, com a palavra falada sublinhada', posicao: 'baixo', tam: 0.04,
     peso: 600, maiusculas: false, caixa: 'faixa', destaque: 'sublinhado', apagadas: false, sombra: false, linhas: 2},
   discreta: {id: 'discreta', nome: 'Discreta', descricao: 'Pequena, sem caixa nem destaque, com sombra para ler em qualquer fundo', posicao: 'baixo', tam: 0.034,
     peso: 500, maiusculas: false, caixa: 'nenhuma', destaque: 'nenhum', apagadas: false, sombra: true, linhas: 2},
@@ -112,6 +112,8 @@ export const MAX_SEGMENTO_MS = 6000;
 export const MIN_SEGMENTO_MS = 700;
 const SEGURA_MS = 250; // a legenda fica um pouco depois da última palavra
 const FIM_DE_FRASE = /[.?!…]["'”»)]*$/;
+// artigo, preposição e conjunção não terminam legenda quando dá para evitar ("a mudança de | casa")
+const PALAVRA_FRACA = /^(a|o|as|os|um|uma|uns|umas|de|da|do|das|dos|em|na|no|nas|nos|e|ou|que|para|pra|por|pela|pelo|com|se|ao|à|aos|às|sem|sua|seu)$/i;
 const PAUSA_DE_FRASE = /[,;:]["'”»)]*$/;
 
 /** Junta o que o Whisper às vezes separa ("25 %", "seguro -desemprego") e tira palavras vazias. */
@@ -144,19 +146,28 @@ export const quebrarEmSegmentos = (palavras: PalavraLegenda[], o: OpcoesQuebra):
     if (atual.length) grupos.push(atual);
     atual = [];
   };
+  // corte por largura, por número de palavras ou por tempo: a legenda não termina em artigo ou preposição, que passa
+  // para a próxima ("Com o fim | da produção")
+  const fecharSemFraca = () => {
+    const ultima = atual[atual.length - 1];
+    if (atual.length > 1 && PALAVRA_FRACA.test(ultima.w)) {
+      atual.pop();
+      fechar();
+      atual = [ultima];
+    } else fechar();
+  };
   for (const p of juntarPedacos(palavras)) {
     if (atual.length) {
       const ultima = atual[atual.length - 1];
       if (p.s - ultima.e >= pausa) fechar();
-      else if (tamanho([...atual, p]) > o.max_caracteres) fechar();
-      else if (o.max_palavras && atual.length >= o.max_palavras) fechar();
-      else if (p.e - atual[0].s > maxMs) fechar();
+      else if (tamanho([...atual, p]) > o.max_caracteres || (o.max_palavras && atual.length >= o.max_palavras) || p.e - atual[0].s > maxMs) fecharSemFraca();
     }
     atual.push(p);
     if (FIM_DE_FRASE.test(p.w)) fechar();
     else if (PAUSA_DE_FRASE.test(p.w) && tamanho(atual) >= o.max_caracteres * 0.5) fechar();
   }
   fechar();
+  equilibrar(grupos, o, tamanho, pausa);
   const min = o.min_ms ?? MIN_SEGMENTO_MS;
   const segura = o.segura_ms ?? SEGURA_MS;
   return grupos.map((g, i) => {
@@ -167,6 +178,33 @@ export const quebrarEmSegmentos = (palavras: PalavraLegenda[], o: OpcoesQuebra):
     sai = Math.max(sai, g[g.length - 1].e);
     return {em, sai, texto: g.map((p) => p.w).join(' '), palavras: g.map((p) => ({...p}))};
   });
+};
+
+/** A legenda curta que sobrou da largura no meio de uma frase ("concordância." sozinha) divide o texto com a anterior:
+ *  o corte mais equilibrado que caiba nas duas, de preferência depois de vírgula. */
+const equilibrar = (grupos: PalavraLegenda[][], o: OpcoesQuebra, tamanho: (ws: PalavraLegenda[]) => number, pausa: number) => {
+  for (let i = 1; i < grupos.length; i++) {
+    const a = grupos[i - 1];
+    const b = grupos[i];
+    if (tamanho(b) >= o.max_caracteres * 0.35 || FIM_DE_FRASE.test(a[a.length - 1].w) || b[0].s - a[a.length - 1].e >= pausa) continue;
+    const todas = [...a, ...b];
+    let melhor = a.length;
+    let nota = Math.max(tamanho(a), tamanho(b));
+    for (let k = 1; k < todas.length; k++) {
+      const x = todas.slice(0, k);
+      const y = todas.slice(k);
+      if (tamanho(x) > o.max_caracteres || tamanho(y) > o.max_caracteres) continue;
+      if (o.max_palavras && (x.length > o.max_palavras || y.length > o.max_palavras)) continue;
+      const ultima = x[x.length - 1].w;
+      const n = Math.max(tamanho(x), tamanho(y)) - (PAUSA_DE_FRASE.test(ultima) ? o.max_caracteres * 0.15 : 0) + (PALAVRA_FRACA.test(ultima) ? o.max_caracteres * 0.1 : 0);
+      if (n < nota) {
+        nota = n;
+        melhor = k;
+      }
+    }
+    grupos[i - 1] = todas.slice(0, melhor);
+    grupos[i] = todas.slice(melhor);
+  }
 };
 
 type ClipeFala = {id: string; arquivo: string; nome?: string; em: number; duracao_ms: number; corte_ms?: number};
@@ -185,6 +223,16 @@ export const palavrasDoClipe = (palavras: PalavraLegenda[], clipe: ClipeFala): P
     .map((p) => ({w: p.w, s: Math.round(clipe.em + Math.max(p.s, corte) - corte), e: Math.round(clipe.em + Math.min(p.e, fim) - corte)}));
 };
 
+/** O nome que a pessoa deu ao clipe, se deu: nome de arquivo ("narracao.wav", ou o do próprio clipe sem a extensão) não
+ *  é falante. */
+export const nomeDoFalante = (c: {nome?: string; arquivo: string}) => {
+  const n = c.nome?.trim();
+  if (!n) return undefined;
+  const arq = c.arquivo.split('/').pop() ?? '';
+  if (n === arq || n === arq.replace(/\.[^.]+$/, '') || /\.(wav|mp3|m4a|ogg|aac|flac|mp4|mov|webm|mkv)$/i.test(n)) return undefined;
+  return n;
+};
+
 /** Legendas de um ou mais clipes de voz, cada um com as palavras transcritas dele (ms do arquivo). O falante é o nome do
  *  clipe, se a pessoa deu um, ou o da faixa. Os ids saem `leg-1`, `leg-2`… na ordem do tempo. */
 export const legendasDaFala = (fontes: {clipe: ClipeFala; faixa: {nome?: string}; palavras: PalavraLegenda[]; caminhoPalavras: string}[], o: {
@@ -194,7 +242,7 @@ export const legendasDaFala = (fontes: {clipe: ClipeFala; faixa: {nome?: string}
   const p = PREDEFINICOES_LEGENDA[estilo.predefinicao] ?? PREDEFINICOES_LEGENDA.classica;
   const quebra: OpcoesQuebra = {max_caracteres: caracteresPorLinha(estilo, o.largura, o.altura) * p.linhas, max_palavras: p.max_palavras, ...o.quebra};
   const segs = fontes.flatMap((f) => {
-    const falante = f.clipe.nome?.trim() || f.faixa.nome?.trim() || undefined;
+    const falante = nomeDoFalante(f.clipe) || f.faixa.nome?.trim() || undefined;
     return quebrarEmSegmentos(palavrasDoClipe(f.palavras, f.clipe), quebra).map((s) => ({...s, ...(falante ? {falante} : {}), clipe: f.clipe.id}));
   }).sort((a, b) => a.em - b.em);
   return {
@@ -402,15 +450,18 @@ const numero = (v: unknown): number | null => (typeof v === 'number' && Number.i
 export const resolverEstilo = (e: EstiloLegenda | undefined, tema: TemaCenas): EstiloLegendaP => {
   const p = PREDEFINICOES_LEGENDA[e?.predefinicao ?? 'classica'] ?? PREDEFINICOES_LEGENDA.classica;
   const tam = numero(e?.tam);
+  // a faixa da marca é da cor de destaque, com o texto (e o sublinhado da palavra falada) na cor do fundo: no fundo do
+  // próprio vídeo ela sumiria
+  const faixa = p.caixa === 'faixa';
   return {
     ...p,
     posicao: e?.posicao === 'meio' || e?.posicao === 'cima' || e?.posicao === 'baixo' ? e.posicao : p.posicao,
     tam: tam !== null && tam > 0.01 && tam < 0.3 ? tam : p.tam,
     maiusculas: typeof e?.maiusculas === 'boolean' ? e.maiusculas : p.maiusculas,
-    cor: e?.cor || tema.texto,
-    cor_destaque: e?.cor_destaque || tema.destaque,
+    cor: e?.cor || (faixa ? tema.fundo : tema.texto),
+    cor_destaque: e?.cor_destaque || (faixa ? tema.fundo : tema.destaque),
     cor_suave: tema.suave,
-    fundo: e?.fundo || tema.fundo,
+    fundo: e?.fundo || (faixa ? tema.destaque : tema.fundo),
     fonte: e?.fonte || tema.fonte,
     falante: Boolean(e?.falante),
   };

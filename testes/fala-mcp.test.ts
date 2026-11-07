@@ -83,8 +83,9 @@ describe('MCP: transcrever e legendas', () => {
     expect(r.erro).toBe(false);
     expect(pedidos).toEqual([{arquivo: 'midia/narracao.wav', modelo: undefined, vocabulario: undefined, destino: undefined}]);
     expect(r.json.legendas).toBeGreaterThan(20);
-    // karaokê: até 4 palavras por legenda; a primeira palavra da narração começa no zero do arquivo, que está em 500 ms
-    expect(r.json.primeiras[0]).toMatchObject({id: 'leg-1', em: 500, texto: 'Recebeu proposta para mudar', falante: 'Narração'});
+    // karaokê: até 4 palavras por legenda, e "de cidade?" não fica sozinha; a primeira palavra da narração começa no zero
+    // do arquivo, que está em 500 ms
+    expect(r.json.primeiras.slice(0, 2)).toMatchObject([{id: 'leg-1', em: 500, texto: 'Recebeu proposta', falante: 'Narração'}, {texto: 'para mudar de cidade?'}]);
     const doc = lerVideo();
     expect(doc.legendas?.estilo?.predefinicao).toBe('karaoke');
     expect(doc.legendas?.origens?.[0]).toMatchObject({clipe: 'clipe-1', palavras: 'midia/narracao.wav.palavras.json', em: 500});

@@ -27,7 +27,9 @@ const Palavra: React.FC<{p: PalavraLegenda; ms: number; e: EstiloLegendaP; tam: 
     : ativa && e.destaque === 'caixa' ? e.fundo
     : e.apagadas && !dita ? comAlfa(e.cor, 0.45) : e.cor;
   const estilo: React.CSSProperties = {color: cor, whiteSpace: 'pre', borderRadius: tam * 0.18, transition: 'none'};
-  if (ativa && e.destaque === 'caixa') Object.assign(estilo, {background: e.cor_destaque, padding: `0 ${tam * 0.16}px`, margin: `0 ${-tam * 0.16}px`, boxDecorationBreak: 'clone'});
+  // dentro da caixa a palavra fica limpa: sem o contorno e a sombra que as outras levam para ler sobre o vídeo
+  if (ativa && e.destaque === 'caixa') Object.assign(estilo, {background: e.cor_destaque, padding: `0 ${tam * 0.16}px`, margin: `0 ${-tam * 0.16}px`, boxDecorationBreak: 'clone',
+    textShadow: 'none', WebkitTextStroke: '0'});
   if (ativa && e.destaque === 'sublinhado') Object.assign(estilo, {textDecoration: 'underline', textDecorationColor: e.cor_destaque, textDecorationThickness: Math.max(2, tam * 0.08),
     textUnderlineOffset: tam * 0.14});
   return <><span style={estilo}>{texto}</span>{ultima ? null : ' '}</>;
