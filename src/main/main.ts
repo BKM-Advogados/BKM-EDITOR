@@ -10,7 +10,8 @@ import type {Comentario, EstadoEditor, Manifesto, Modulo, OperacaoPatch} from '.
 import {aplicarMarcaAoPlano, dentroDoOneDrive, documentoNovo, gravarPlano, nomeDePasta, nomePadrao, pastaLivre, planoDoProjeto} from '../nucleo/criar-projeto';
 import {MODELOS} from '../nucleo/modelos';
 import {FORMATO_PADRAO, type Formato} from '../nucleo/formatos';
-import {argumentosDoRender, destinoDoFormato, FORMATOS_IMAGEM_SAIDA, nomesDosArquivos, type OpcoesExportarImagem, type OpcoesExportarVideo} from '../nucleo/exportacao';
+import {argumentosDoRender, destinoDoFormato, fontesDaMarcaDagua, FORMATOS_IMAGEM_SAIDA, marcaDaguaDoDestino, nomesDosArquivos, type OpcoesExportarImagem,
+  type OpcoesExportarVideo} from '../nucleo/exportacao';
 import {ErroProjeto, Projeto, serializar} from '../nucleo/projeto';
 import {criarRede} from '../nucleo/ferramentas-mcp';
 import {prepararRender, renderizarVideo} from './exportar';
@@ -22,6 +23,7 @@ import {ServidorMidia} from './servidor-midia';
 import {SessaoProjeto} from './sessao-projeto';
 import {Terminais} from './terminais';
 import {registrarIpcAudio} from './ipc-audio';
+import {registrarPrefsExportacao} from './ipc-exportacao';
 
 // o mesmo id do instalador (electron-builder.yml): a barra de tarefas agrupa a janela com o atalho
 app.setAppUserModelId('br.com.bkmadvogados.estudio');
@@ -370,14 +372,17 @@ lidar(CANAL.exportar, async (documento: string, opcoes?: OpcoesExportarVideo): P
     enviar(CANAL.progresso, {...x, arquivo, indice: indice + 1, total: planos.length});
     if (x.tipo === 'progresso' && x.progresso !== undefined) janela?.setProgressBar((indice + x.progresso / 100) / planos.length);
   };
+  const fontesMarca = fontesDaMarcaDagua(props);
   try {
     const preparado = await prepararRender({raizApp: app.getAppPath(), empacotado: app.isPackaged, aviso: avisoDe(0, '')});
     for (const [i, plano] of planos.entries()) {
       const args = argumentosDoRender(o, plano.destino, formato, Number(props.duracao_ms) || 0);
       const destino = arquivoLivre(pasta, plano.nome, args.ext);
       parcial = destino;
+      // marca d'água do destino, se ligada: posicionada no tamanho do destino, em frações (vale com qualquer escala)
+      const marca = marcaDaguaDoDestino(o.marca_dagua?.[plano.destino.id], plano.destino, fontesMarca, o.proporcao_logo);
       await renderizarVideo(preparado, {
-        props: fixo ? props : {...props, largura: args.largura, altura: args.altura},
+        props: {...(fixo ? props : {...props, largura: args.largura, altura: args.altura}), ...(marca ? {marca_dagua: marca} : {})},
         arquivo: destino, codec: args.codec, videoBitrate: args.videoBitrate, escala: fixo ? args.escala : 1, quadros: args.frameRange, cancelSignal,
       }, avisoDe(i, path.basename(destino)));
       arquivos.push(destino);
@@ -441,6 +446,8 @@ ipcMain.on(CANAL.mostrarArquivo, (e, caminho: string) => {
 
 // kits de marca e fontes próprias (ipc-marcas.ts): a pasta das preferências, servida também pelo servidor de mídia
 const marcas = registrarIpcMarcas({lidar, janela: () => janela, memoria, midia, exigirProjeto, exemplo: pastaDoExemplo()});
+
+registrarPrefsExportacao(lidar, exigirProjeto); // marca d'água por destino, lembrada no projeto (frente C)
 
 app.on('ready', async () => {
   await midia.iniciar();

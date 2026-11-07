@@ -5,7 +5,7 @@ import type {IdModelo} from '../nucleo/modelos';
 import type {Formato} from '../nucleo/formatos';
 import type {Envelope} from '../nucleo/audio';
 import type {FonteArquivo, Marca} from '../nucleo/marca';
-import type {OpcoesExportarImagem, OpcoesExportarVideo} from '../nucleo/exportacao';
+import type {OpcoesExportarImagem, OpcoesExportarVideo, PrefsExportacao} from '../nucleo/exportacao';
 import type {Pesquisa} from '../nucleo/pesquisa';
 
 export const CANAL = {
@@ -80,6 +80,9 @@ export const CANAL = {
   pesquisa: 'estudio:pesquisa',
   textoFonte: 'estudio:texto-fonte',
   abrirFonte: 'estudio:abrir-fonte',
+  // preferências da exportação por projeto, .estudio/exportacao.json (src/main/ipc-exportacao.ts; frente C)
+  prefsExportacao: 'estudio:prefs-exportacao',
+  gravarPrefsExportacao: 'estudio:gravar-prefs-exportacao',
 } as const;
 
 /** O projeto aberto. `estado` é o último que a pessoa viu (área, documento, seleção), para reabrir onde parou; `git`
@@ -234,6 +237,10 @@ export type ApiEstudio = {
   textoFonte: (fonteId: string, inicio?: number, fim?: number) => Promise<string>;
   /** Abre a url da fonte no navegador da pessoa; só http e https (devolve false para o resto). */
   abrirFonte: (url: string) => Promise<boolean>;
+  // exportação (frente C): a escolha de marca d'água por destino, lembrada no projeto
+  prefsExportacao: () => Promise<PrefsExportacao>;
+  /** Junta por destino ao que já estava e devolve o arquivo inteiro. */
+  gravarPrefsExportacao: (p: PrefsExportacao) => Promise<PrefsExportacao>;
 };
 
 /** Um arquivo da pasta de trilhas: nome sem extensão, caminho absoluto, subpasta e tamanho. */

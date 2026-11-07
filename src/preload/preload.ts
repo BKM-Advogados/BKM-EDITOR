@@ -95,6 +95,9 @@ const api: ApiEstudio = {
   pesquisa: () => ipcRenderer.invoke(CANAL.pesquisa),
   textoFonte: (fonteId, inicio, fim) => ipcRenderer.invoke(CANAL.textoFonte, fonteId, inicio, fim),
   abrirFonte: (url) => ipcRenderer.invoke(CANAL.abrirFonte, url),
+  // exportação (frente C)
+  prefsExportacao: () => ipcRenderer.invoke(CANAL.prefsExportacao),
+  gravarPrefsExportacao: (p) => ipcRenderer.invoke(CANAL.gravarPrefsExportacao, p),
 };
 
 contextBridge.exposeInMainWorld('estudio', api);
