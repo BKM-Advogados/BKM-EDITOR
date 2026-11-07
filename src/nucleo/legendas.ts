@@ -272,6 +272,60 @@ export type PalavrasGravadas = {versao: typeof VERSAO_PALAVRAS; fonte: FonteDaFa
  *  há transcrição. */
 export type EstadoDaFala = 'em_dia' | 'velha' | 'falta';
 
+/** Caminho no projeto comparável: barras para a frente, sem "." e "..", sem diferença de caixa (o Windows não tem). */
+const chaveDoCaminho = (c: string) => {
+  const out: string[] = [];
+  for (const p of c.replace(/\\/g, '/').split('/')) {
+    if (!p || p === '.') continue;
+    if (p === '..') out.pop();
+    else out.push(p);
+  }
+  return out.join('/').toLowerCase();
+};
+
+/** Por que o `destino` das palavras (o transcrever de um arquivo, para o roteiro da Cliente) não serve, ou null se serve. A
+ *  transcrição grava por cima, fora do diário: o destino é um .json que não é do app (manifesto, documento, comentários,
+ *  pesquisa, .estudio/) e, se já existe, uma lista de palavras. `atual`: o que está no destino, se ele existe (doc
+ *  undefined quando não deu para ler). */
+export const recusaDoDestino = (destino: string, documentos: string[], atual?: {doc: unknown}): string | null => {
+  const outro = ': escolha outro caminho, como video/palavras.json';
+  const k = chaveDoCaminho(destino);
+  if (!k.endsWith('.json')) return 'o destino das palavras termina em .json';
+  if (k === 'estudio.json') return `${destino} é o manifesto do projeto${outro}`;
+  if (documentos.some((d) => chaveDoCaminho(d) === k)) return `${destino} é um documento do projeto${outro}`;
+  if (k === 'comentarios.json') return `${destino} guarda os comentários da pessoa${outro}`;
+  if (k === 'pesquisa/pesquisa.json') return `${destino} é a pesquisa do projeto${outro}`;
+  if (k.startsWith('.estudio/')) return `${destino} é do app${outro}`;
+  if (atual && !palavrasValidas(atual.doc).length && !(Array.isArray(atual.doc) && !atual.doc.length)) {
+    return `${destino} já existe e não é uma lista de palavras${outro}`;
+  }
+  return null;
+};
+
+/** recusaDoDestino com o que o projeto tem: os documentos do manifesto e o que já está no destino. */
+export const recusaDoDestinoNoProjeto = (projeto: {manifesto(): {documentos: {caminho: string}[]}; existe(c: string): boolean; lerJson<T>(c: string): {doc: T}},
+  destino: string): string | null => {
+  let documentos: string[] = [];
+  try {
+    documentos = projeto.manifesto().documentos.map((d) => d.caminho);
+  } catch {
+    /* manifesto ilegível: o resto da regra vale */
+  }
+  let atual: {doc: unknown} | undefined;
+  try {
+    if (projeto.existe(destino)) {
+      try {
+        atual = {doc: projeto.lerJson<unknown>(destino).doc};
+      } catch {
+        atual = {doc: undefined};
+      }
+    }
+  } catch {
+    /* fora do projeto: quem grava recusa */
+  }
+  return recusaDoDestino(destino, documentos, atual);
+};
+
 /** O carimbo do palavras.json lido, se for da versão 2. */
 export const fonteDaFala = (x: unknown): FonteDaFala | undefined => {
   const o = x as Partial<PalavrasGravadas> | null;

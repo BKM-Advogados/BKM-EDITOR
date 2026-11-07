@@ -16,7 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {inflateRawSync} from 'node:zlib';
 import {CANAL, type EstadoTranscricao, type PedidoTranscricao, type ProgressoTranscricao, type ResultadoTranscricao} from '../compartilhado/api';
-import {arquivoDasPalavras, conferirFala, fonteDaFala, palavrasValidas, VERSAO_PALAVRAS, type EstadoDaFala, type FonteDaFala, type PalavrasGravadas} from '../nucleo/legendas';
+import {arquivoDasPalavras, conferirFala, fonteDaFala, palavrasValidas, recusaDoDestinoNoProjeto, VERSAO_PALAVRAS, type EstadoDaFala, type FonteDaFala, type PalavrasGravadas} from '../nucleo/legendas';
 import type {Palavra} from '../nucleo/roteiro/resolver';
 import {ErroProjeto, type Projeto} from '../nucleo/projeto';
 import {getCompositorPackage} from './compositor-package';
@@ -420,6 +420,9 @@ export class Transcritor {
     if (this.atual) throw new ErroProjeto(`já há uma transcrição em andamento (${this.atual.arquivo}); espere ou cancele`, 'patch');
     const rel = pedido.arquivo;
     if (typeof rel !== 'string' || !projeto.existe(rel)) throw new ErroProjeto(`o arquivo não está no projeto: ${String(rel)}`, 'nao_achado');
+    // a lista de palavras grava por cima, fora do diário: nunca no manifesto, num documento ou noutro arquivo do app
+    const recusa = pedido.destino === undefined ? null : recusaDoDestinoNoProjeto(projeto, String(pedido.destino));
+    if (recusa) throw new ErroProjeto(recusa, 'caminho');
     const controle = new AbortController();
     this.atual = {controle, arquivo: rel};
     const t0 = Date.now();

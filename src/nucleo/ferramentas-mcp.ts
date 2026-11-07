@@ -12,7 +12,7 @@ import {FORMATOS_IMAGEM, FORMATOS_VIDEO, formatoDoVideo} from './formatos';
 import {MARCAS_INICIAIS} from './marca';
 import {PastaMarcas} from './pasta-marcas';
 import {ehDocCenas, resolverCenas, type DocCenas} from './cenas';
-import {arquivoDaFala, arquivoDasPalavras, clipesDeVoz, legendasDeArquivo, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt, type EstadoDaFala, type IdEstiloLegenda} from './legendas';
+import {arquivoDaFala, arquivoDasPalavras, clipesDeVoz, legendasDeArquivo, recusaDoDestinoNoProjeto, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt, type EstadoDaFala, type IdEstiloLegenda} from './legendas';
 import {CATALOGO_FONTES} from './catalogo-fontes';
 import {
   acharTrecho, caminhoTextoFonte, conferirDigitos, decodificarComAviso, entorno, estadoDoFato, hashTexto, limparHtml, nivelDe, numerosDe, paginar, proximoId,
@@ -543,7 +543,7 @@ const registrarFala = (servidor: McpServer, projeto: Projeto, autor: string, ori
     description: 'Transcreve a fala no próprio PC (whisper.cpp, nada sai da máquina) e grava <arquivo>.palavras.json com o tempo de cada palavra ({w, s, e, p} em ms do arquivo), o formato que o carrossel da Cliente e as legendas leem. Dois usos: (1) "arquivo" (qualquer áudio ou vídeo do projeto, como a narração de um roteiro ou uma gravação para a pesquisa): devolve o texto; com "destino", grava em outro caminho (ex.: video/palavras.json do roteiro). (2) Vídeo de cenas: "clipe" ou "faixa" (ids de audio.faixas), ou nada para todas as faixas de voz; transcreve a fala que ainda não tem transcrição ou cuja tomada mudou depois dela (a do clipe de voz limpa é a do original) e, com legendas (padrão), gera as legendas dos clipes que ainda não têm (segmentos por pausa, pontuação e largura, com o falante pelo nome do clipe ou da faixa). Clipe que já tem legendas fica como está: para refazer, pergunte à pessoa e use refazer_legendas. Na primeira vez baixa o whisper.cpp (9 MB) e o modelo (small, 190 MB) para %USERPROFILE%\\Estudio\\modelos\\whisper. Leva perto de metade da duração do áudio.',
     inputSchema: {
       arquivo: z.string().optional().describe('caminho no projeto, ex.: midia/narracao.wav ou midia/video-exemplo.mp4'),
-      destino: z.string().optional().describe('só com "arquivo": onde gravar as palavras (padrão: <arquivo>.palavras.json)'),
+      destino: z.string().optional().describe('só com "arquivo": onde gravar a lista de palavras, um .json próprio como video/palavras.json (padrão: <arquivo>.palavras.json). Nunca o manifesto, um documento, comentarios.json, a pesquisa ou .estudio/'),
       documento: z.string().optional().describe('id do vídeo de cenas (padrão: o que a pessoa está vendo)'),
       clipe: z.string().optional().describe('id do clipe de voz'),
       faixa: z.string().optional().describe('id da faixa'),
@@ -559,7 +559,9 @@ const registrarFala = (servidor: McpServer, projeto: Projeto, autor: string, ori
     if (!transcritor) throw new ErroProjeto('este MCP não tem o transcritor: abra o projeto no Estúdio (no Windows) ou use o MCP por stdio (mcp/nucleo.ts)', 'patch');
     const pedido = (arquivo: string, destino?: string) => ({arquivo, destino, modelo: a.modelo, vocabulario: a.vocabulario});
     if (a.arquivo) {
-      if (a.destino !== undefined && !a.destino.endsWith('.json')) throw new ErroProjeto('o destino das palavras termina em .json', 'caminho');
+      // grava por cima, fora do diário: nunca no manifesto, num documento, nos comentários, na pesquisa ou em .estudio/
+      const recusa = a.destino === undefined ? null : recusaDoDestinoNoProjeto(projeto, a.destino);
+      if (recusa) throw new ErroProjeto(recusa, 'caminho');
       const r = await transcritor.transcrever(projeto, pedido(a.arquivo, a.destino));
       if (!r.ok) throw new ErroProjeto(r.mensagem ?? 'a transcrição não terminou', 'patch');
       const t = r.texto ?? '';

@@ -141,6 +141,25 @@ describe('MCP: transcrever e legendas', () => {
     expect(lerVideo().legendas).toEqual(antes);
   });
 
+  it('o destino nunca é o manifesto, um documento ou outro arquivo do app (transversal-N6)', async () => {
+    const c = await conectar(transcritor);
+    writeFileSync(path.join(pasta, 'midia', 'config.json'), '{"a": 1}');
+    const antes = {manifesto: readFileSync(path.join(pasta, 'estudio.json'), 'utf-8'), video: readFileSync(path.join(pasta, 'video', 'video.json'), 'utf-8')};
+    pedidos.length = 0;
+    for (const [destino, motivo] of [['estudio.json', 'manifesto'], ['video/video.json', 'documento'], ['Video/../ESTUDIO.json', 'manifesto'],
+      ['video\\video.json', 'documento'], ['comentarios.json', 'comentários'], ['pesquisa/pesquisa.json', 'pesquisa'], ['.estudio/estado.json', 'do app'],
+      ['midia/config.json', 'não é uma lista de palavras'], ['video/palavras.txt', 'termina em .json']]) {
+      const r = await chamar(c, 'transcrever', {arquivo: 'midia/fonte.mp4', destino});
+      expect(r.erro, destino).toBe(true);
+      expect(r.texto, destino).toContain(motivo);
+    }
+    expect(pedidos).toEqual([]);
+    expect(readFileSync(path.join(pasta, 'estudio.json'), 'utf-8')).toBe(antes.manifesto);
+    expect(readFileSync(path.join(pasta, 'video', 'video.json'), 'utf-8')).toBe(antes.video);
+    // a lista de palavras que já existe pode ser regravada
+    expect((await chamar(c, 'transcrever', {arquivo: 'midia/fonte.mp4', destino: 'video/palavras.json'})).erro).toBe(false);
+  });
+
   it('clipe que não existe vira erro claro', async () => {
     const c = await conectar(transcritor);
     const r = await chamar(c, 'transcrever', {documento: 'video', clipe: 'nao-ha'});

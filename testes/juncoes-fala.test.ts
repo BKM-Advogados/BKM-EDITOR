@@ -14,7 +14,7 @@ import {novoDocCenas, resolverCenas, type DocCenas} from '../src/nucleo/cenas';
 import {Projeto} from '../src/nucleo/projeto';
 import {fonteDoAudio, Transcritor} from '../src/main/transcricao';
 import {
-  areaDaLegenda, arquivoDaFala, caracteresPorLinha, comTexto, conferirFala, ENTRA_LEGENDA_MS, legendaNoAr, legendasDaFala, legendasDoDocumento, legendasNoDestino, levarCorrecoes,
+  areaDaLegenda, arquivoDaFala, recusaDoDestino, caracteresPorLinha, comTexto, conferirFala, ENTRA_LEGENDA_MS, legendaNoAr, legendasDaFala, legendasDoDocumento, legendasNoDestino, levarCorrecoes,
   palavrasValidas, resolverLegendas, SAI_LEGENDA_MS, VERSAO_PALAVRAS, type LegendasP, type PalavraLegenda, type SegmentoLegenda, type SegmentoLegendaP,
 } from '../src/nucleo/legendas';
 
@@ -244,6 +244,43 @@ describe('a fala do clipe: original da voz limpa, carimbo do áudio e gerar só 
       // a lista sem carimbo (versão 1) conta como velha
       projeto.gravarTexto('midia/narracao.wav.palavras.json', JSON.stringify(PALAVRAS));
       expect(t.conferir(projeto, 'midia/narracao.wav')).toBe('velha');
+    } finally {
+      rmSync(pasta, {recursive: true, force: true});
+    }
+  });
+});
+
+describe('destino das palavras (transversal-N6)', () => {
+  it('recusa o manifesto, os documentos, os comentários, a pesquisa, .estudio/ e o .json que não é lista de palavras', () => {
+    const docs = ['video/video.json', 'imagem/capa.json'];
+    expect(recusaDoDestino('video/palavras.json', docs)).toBeNull();
+    expect(recusaDoDestino('video/palavras.json', docs, {doc: FALA})).toBeNull();
+    expect(recusaDoDestino('video/palavras.json', docs, {doc: []})).toBeNull();
+    expect(recusaDoDestino('./estudio.json', docs)).toContain('manifesto');
+    expect(recusaDoDestino('midia/../Estudio.JSON', docs)).toContain('manifesto');
+    expect(recusaDoDestino('imagem\\capa.json', docs)).toContain('documento');
+    expect(recusaDoDestino('comentarios.json', docs)).toContain('comentários');
+    expect(recusaDoDestino('.estudio/diario.json', docs)).toContain('do app');
+    expect(recusaDoDestino('midia/x.json', docs, {doc: {tipo: 'cenas'}})).toContain('não é uma lista de palavras');
+    expect(recusaDoDestino('midia/x.json', docs, {doc: undefined})).toContain('não é uma lista de palavras');
+    expect(recusaDoDestino('midia/x.txt', docs)).toContain('.json');
+  });
+
+  it('o Transcritor recusa antes de transcrever (vale também para o pedido pela interface)', async () => {
+    const pasta = mkdtempSync(path.join(tmpdir(), 'estudio-juncoes-destino-'));
+    try {
+      mkdirSync(path.join(pasta, 'midia'));
+      mkdirSync(path.join(pasta, 'video'));
+      writeFileSync(path.join(pasta, 'midia', 'narracao.wav'), 'RIFF');
+      const manifesto = JSON.stringify({formato: 1, nome: 'x', documentos: [{id: 'video', modulo: 'video', caminho: 'video/video.json', titulo: 'V'}]});
+      writeFileSync(path.join(pasta, 'estudio.json'), manifesto);
+      writeFileSync(path.join(pasta, 'video', 'video.json'), '{}');
+      const projeto = new Projeto(pasta);
+      const t = new Transcritor({pasta: path.join(pasta, 'modelos')});
+      await expect(t.transcrever(projeto, {arquivo: 'midia/narracao.wav', destino: 'estudio.json'})).rejects.toThrow('manifesto');
+      await expect(t.transcrever(projeto, {arquivo: 'midia/narracao.wav', destino: 'video/video.json'})).rejects.toThrow('documento');
+      expect(readFileSync(path.join(pasta, 'estudio.json'), 'utf-8')).toBe(manifesto);
+      expect(t.estado().ocupado).toBeUndefined();
     } finally {
       rmSync(pasta, {recursive: true, force: true});
     }
