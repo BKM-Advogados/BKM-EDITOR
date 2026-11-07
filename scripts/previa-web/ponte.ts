@@ -14,7 +14,7 @@ import {novoDocCenas, resolverCenas, type DocCenas} from '../../src/nucleo/cenas
 import {idDeMarca, MARCA_NEUTRO, MARCAS_INICIAIS, patchDaMarca, temaDaMarca, type Marca} from '../../src/nucleo/marca';
 import {MODELOS} from '../../src/nucleo/modelos';
 import {codificarWav, musicaSintetica, narracaoSintetica, TAXA} from '../audio-sintetico';
-import {argumentosDoRender, destinoDoFormato, nomesDosArquivos, type OpcoesExportarVideo} from '../../src/nucleo/exportacao';
+import {argumentosDoRender, destinoDoFormato, nomesDosArquivos, normalizarPrefsExportacao, type OpcoesExportarVideo, type PrefsExportacao} from '../../src/nucleo/exportacao';
 
 type Proj = {raiz: string; manifesto: Manifesto; docs: Record<string, unknown>; versao: number};
 const projetos = new Map<string, Proj>();
@@ -357,6 +357,14 @@ const api: ApiEstudio = {
     return true;
   },
   fala: falaSimulada(), // frente Fala: transcrição simulada (no fim do arquivo)
+  // exportação (frente C): a marca d'água por destino fica em memória, por projeto, como o .estudio/exportacao.json
+  prefsExportacao: async () => structuredClone(prefsExportacao.get(aberto?.raiz ?? '') ?? {}),
+  gravarPrefsExportacao: async (p) => {
+    const atual = prefsExportacao.get(aberto?.raiz ?? '') ?? {};
+    const novo = normalizarPrefsExportacao({...atual, marca_dagua: {...atual.marca_dagua, ...normalizarPrefsExportacao(p).marca_dagua}});
+    prefsExportacao.set(aberto?.raiz ?? '', novo);
+    return structuredClone(novo);
+  },
 };
 
 (window as unknown as {estudio: ApiEstudio}).estudio = api;
@@ -434,3 +442,29 @@ function falaSimulada(): ApiEstudio['fala'] {
 }
 const lerJsonSemFala = api.lerJson;
 api.lerJson = (async (caminho: string) => (palavrasSimuladas.has(caminho) ? structuredClone(palavrasSimuladas.get(caminho)) : lerJsonSemFala(caminho))) as ApiEstudio['lerJson'];
+// ---------- vídeo curto (frente C): fotos e logo de mentira ----------
+// "Escolher imagem" devolve uma de três fotos sintéticas (SVG em data URL, com céu, sol, morros e uma grade fina para
+// o Ken Burns ficar visível); o kit da Cliente aplicado ganha um logo de exemplo no tema, para a marca d'água ter o que pôr.
+const svg = (s: string) => `data:image/svg+xml;utf8,${encodeURIComponent(s)}`;
+const FOTOS = [['#3E6FA8', '#F2C46B', '#2E5E3A'], ['#7A4E8C', '#F28C6B', '#3D3A5E'], ['#1F7A8C', '#F5E6A8', '#5E4A2E']].map(([ceu, sol, morro], i) => svg(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000"><defs><linearGradient id="c" x1="0" y1="0" x2="0" y2="1">`
+  + `<stop offset="0" stop-color="${ceu}"/><stop offset="1" stop-color="${sol}"/></linearGradient></defs><rect width="1600" height="1000" fill="url(#c)"/>`
+  + `<circle cx="${400 + i * 400}" cy="380" r="120" fill="${sol}"/><path d="M0 720 Q400 520 800 700 T1600 640 V1000 H0Z" fill="${morro}"/>`
+  + `<path d="M0 820 Q500 700 1000 840 T1600 800 V1000 H0Z" fill="#000" opacity="0.25"/>`
+  + Array.from({length: 15}, (_, k) => `<path d="M${(k + 1) * 100} 0V1000" stroke="#fff" stroke-opacity="0.12"/>`).join('')
+  + Array.from({length: 9}, (_, k) => `<path d="M0 ${(k + 1) * 100}H1600" stroke="#fff" stroke-opacity="0.12"/>`).join('')
+  + `<text x="60" y="110" font-family="sans-serif" font-size="64" font-weight="700" fill="#fff">Foto ${i + 1}</text></svg>`));
+const LOGO_EXEMPLO = svg('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="200" viewBox="0 0 600 200"><rect width="600" height="200" rx="24" fill="#C88155"/>'
+  + '<text x="40" y="138" font-family="sans-serif" font-size="110" font-weight="800" fill="#F4F0EA">Cliente</text>'
+  + '<text x="230" y="125" font-family="sans-serif" font-size="46" font-weight="600" fill="#F4F0EA">ADVOGADOS</text></svg>');
+const prefsExportacao = new Map<string, PrefsExportacao>();
+let vezFoto = 0;
+const escolherMidiaOriginal = api.escolherMidia;
+api.escolherMidia = async (tipo) => (tipo === 'imagem' ? FOTOS[vezFoto++ % FOTOS.length] : escolherMidiaOriginal(tipo));
+const aplicarOriginal = api.marcas.aplicar;
+api.marcas.aplicar = async (id, documento) => {
+  const r = await aplicarOriginal(id, documento);
+  const tema = (aberto!.docs[documento] as {tema?: Record<string, unknown>}).tema;
+  if (id === 'cliente' && tema) tema.logo = LOGO_EXEMPLO;
+  return r;
+};

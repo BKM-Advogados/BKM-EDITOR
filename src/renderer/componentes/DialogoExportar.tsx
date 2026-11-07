@@ -1,22 +1,29 @@
 // Diálogo de exportar (Ctrl+Shift+E), o único lugar por onde algo "sai" do projeto (tela.md): antes, os destinos (uma ou
 // mais proporções), formato, qualidade, escala, trecho, nome e a estimativa de tamanho (bitrate × duração); durante, o
-// andamento de verdade e Cancelar; no fim, os arquivos e "Mostrar na pasta". O vídeo passa pelo processo principal
+// andamento de verdade e Cancelar; no fim, os arquivos e "Mostrar na pasta". No vídeo, cada destino tem a sua marca
+// d'água (logo ou assinatura do kit, canto, tamanho, opacidade), com a miniatura de um quadro real ao lado, lembrada no
+// projeto (.estudio/exportacao.json) quando se exporta. O vídeo passa pelo processo principal
 // (renderMedia); a imagem é desenhada aqui mesmo (exportarPng) e só o arquivo vai ao principal. Fica fora do React de
 // quem chama, como o Dialogo.tsx: `abrirDialogoExportar(documento)` abre e <RaizDialogoExportar/>, montada na casca, desenha.
-import React, {useEffect, useState, useSyncExternalStore} from 'react';
-import {CircleCheck, FolderOpen, X} from 'lucide-react';
+import React, {useEffect, useMemo, useState, useSyncExternalStore} from 'react';
+import {Thumbnail} from '@remotion/player';
+import {ArrowDownLeft, ArrowDownRight, ArrowUpLeft, ArrowUpRight, CircleCheck, FolderOpen, Stamp, X} from 'lucide-react';
 import type {Progresso, ResultadoExportacao} from '../../compartilhado/api';
+import {COMPOSICOES, composicaoDe} from '../../composicoes/registro';
 import type {DocImagem} from '../../nucleo/documentos';
 import {paginasDe, temPaginas} from '../../nucleo/carrossel';
 import {
-  CODECS, destinoDoFormato, ESCALAS_IMAGEM, ESCALAS_VIDEO, estimarExportacao, formatarBytes, FORMATOS_IMAGEM_SAIDA, nomesDosArquivos, QUALIDADES, trechoValido,
-  type CodecVideo, type Destino, type FormatoImagem, type OpcoesExportarVideo, type QualidadeVideo,
+  CANTOS_MARCA, CODECS, configPadraoMarca, destinoDoFormato, ESCALAS_IMAGEM, ESCALAS_VIDEO, estimarExportacao, fontesDaMarcaDagua, formatarBytes, FORMATOS_IMAGEM_SAIDA,
+  marcaDaguaDoDestino, nomesDosArquivos, normalizarConfigMarca, OPACIDADE_MARCA, QUALIDADES, TAMANHO_MARCA, trechoValido,
+  type CodecVideo, type ConfigMarcaDagua, type Destino, type FontesMarcaDagua, type FormatoImagem, type MarcaDaguaP, type OpcoesExportarVideo, type QualidadeVideo,
 } from '../../nucleo/exportacao';
-import {FORMATO_PADRAO, FORMATOS_VIDEO, type Formato} from '../../nucleo/formatos';
+import {FORMATO_PADRAO, FORMATOS_VIDEO, proporcaoDe, type Formato} from '../../nucleo/formatos';
+import {conjuntoDe, zonasDaMarca, type CantoMarca} from '../../nucleo/zonas-seguras';
 import {avisar, useLoja} from '../estado/loja';
 import {exportarPng, type SaidaPng} from '../modulos/imagem/exportarPng';
 import {exportarCarrossel} from '../modulos/imagem/exportarPaginas';
 import {numeroBr} from './Campos';
+import '../modulos/video/zonas-seguras.css';
 import './dialogo-exportar.css';
 
 let aberto: string | null = null;
@@ -113,6 +120,86 @@ const Pronto: React.FC<{arquivos: string[]; pasta?: string; erro?: string; cance
   </>
 );
 
+// ---------- marca d'água ----------
+const ICONES_CANTO: Record<CantoMarca, React.FC<{size?: number}>> = {'sup-esq': ArrowUpLeft, 'sup-dir': ArrowUpRight, 'inf-esq': ArrowDownLeft, 'inf-dir': ArrowDownRight};
+const pct = (v: number) => `${Math.round(v * 100)}%`;
+/** Endereço de um arquivo de mídia das props (o mesmo cálculo do midia.ts, sem mexer na base que a prévia usa). */
+const urlDaMidia = (base: unknown, src: string) =>
+  /^[a-z][a-z0-9+.-]*:/i.test(src) ? src : `${String(base ?? '').replace(/\/+$/, '')}/${src.split('/').map(encodeURIComponent).join('/')}`;
+
+/** Um quadro do vídeo no tamanho do destino, com a marca d'água e as zonas da rede apagadas por cima: a composição de
+ *  verdade (Thumbnail do Remotion), como a exportação vai desenhar. */
+const Miniatura: React.FC<{props: Record<string, unknown>; largura: number; altura: number; fixo: boolean; fps: number; duracaoMs: number; marca: MarcaDaguaP | null}> =
+  ({props, largura, altura, fixo, fps, duracaoMs, marca}) => {
+    const tempo = useLoja((e) => e.tempo_ms);
+    const total = Math.max(1, Math.ceil((duracaoMs / 1000) * fps));
+    // o quadro em que a cabeça parou; no começo do vídeo, 1,5 s adiante (o primeiro bloco ainda está entrando)
+    const quadro = Math.min(total - 1, Math.round(((tempo > 500 ? tempo : 1500) / 1000) * fps));
+    const entrada = useMemo(() => ({...props, ...(fixo ? {} : {largura, altura}), ...(marca ? {marca_dagua: marca} : {})}), [props, fixo, largura, altura, marca]);
+    const escala = Math.min(150 / largura, 150 / altura);
+    const zonas = conjuntoDe(zonasDaMarca(largura, altura))?.zonas ?? [];
+    return (
+      <div className="miniatura-exp" style={{width: Math.round(largura * escala), height: Math.round(altura * escala)}} title={`${largura}×${altura} · quadro em ${numeroBr(quadro / fps, 1)} s`}>
+        <Thumbnail component={COMPOSICOES[composicaoDe(props)]} inputProps={entrada} compositionWidth={largura} compositionHeight={altura} durationInFrames={total} fps={fps}
+          frameToDisplay={quadro} style={{width: '100%', height: '100%'}} />
+        <div className="zonas-seguras" aria-hidden="true">
+          {zonas.map((z, i) => <div key={i} className={`zona ${z.tipo}`} style={{left: `${z.x * 100}%`, top: `${z.y * 100}%`, width: `${z.largura * 100}%`, height: `${z.altura * 100}%`}} />)}
+        </div>
+      </div>
+    );
+  };
+
+/** A marca d'água do destino em edição: ligar, logo ou assinatura, canto, tamanho e opacidade, com a miniatura ao lado.
+ *  Com vários destinos marcados, os botões de cima escolhem qual se edita (cada um guarda a sua escolha). */
+const OpcoesMarca: React.FC<{destinos: Destino[]; atual: Destino; editar: (id: string) => void; config: (d: Destino) => ConfigMarcaDagua;
+  mudar: (d: Destino, m: Partial<ConfigMarcaDagua>) => void; fontes: FontesMarcaDagua; marca: MarcaDaguaP | null; miniatura: React.ReactNode}> =
+  ({destinos, atual, editar, config, mudar, fontes, marca, miniatura}) => {
+    const c = config(atual);
+    const nomeDe = (d: Destino) => (d.id === 'personalizado' ? `${d.largura}×${d.altura}` : proporcaoDe(d.largura, d.altura));
+    const conteudos = [fontes.logo ? {valor: 'logo' as const, nome: 'Logo', dica: 'O logo do kit de marca'} : null,
+      fontes.assinatura ? {valor: 'assinatura' as const, nome: 'Assinatura', dica: fontes.assinatura} : null].filter((x) => x !== null);
+    return (
+      <div className="md-exp">
+        <div className="md-campos">
+          {destinos.length > 1 && (
+            <Segmentos valor={atual.id} aoMudar={editar} opcoes={destinos.map((d) => ({valor: d.id, nome: nomeDe(d),
+              dica: `${nomeDe(d)}: ${config(d).ligada ? 'com' : 'sem'} marca d'água`}))} />
+          )}
+          <label className="escolha-exp"><input type="checkbox" checked={c.ligada} onChange={(e) => mudar(atual, {ligada: e.target.checked})} />
+            {destinos.length > 1 ? `Marca d'água no ${nomeDe(atual)}` : 'Pôr marca d\'água'}</label>
+          {c.ligada && (
+            <>
+              <div className="md-linha"><span className="rot2">Conteúdo</span>
+                {conteudos.length > 1 ? <Segmentos valor={c.conteudo} aoMudar={(v) => mudar(atual, {conteudo: v})} opcoes={conteudos} />
+                  : <span className="nota">{fontes.logo ? 'o logo do kit' : `a assinatura ${fontes.assinatura}`}</span>}
+              </div>
+              <div className="md-linha"><span className="rot2">Canto</span>
+                <span className="cantos">
+                  {CANTOS_MARCA.map((k) => {
+                    const Icone = ICONES_CANTO[k.id];
+                    return <button key={k.id} type="button" className={`bti${k.id === c.canto ? ' ligado' : ''}`} title={k.nome} aria-label={k.nome} onClick={() => mudar(atual, {canto: k.id})}><Icone size={13} /></button>;
+                  })}
+                </span>
+              </div>
+              <div className="md-linha"><span className="rot2">Tamanho</span>
+                <input type="range" min={TAMANHO_MARCA.min * 100} max={TAMANHO_MARCA.max * 100} step={0.5} value={c.tamanho * 100} aria-label="Tamanho da marca d'água"
+                  onChange={(e) => mudar(atual, {tamanho: Number(e.target.value) / 100})} />
+                <span className="nota">{pct(c.tamanho)} do lado menor</span>
+              </div>
+              <div className="md-linha"><span className="rot2">Opacidade</span>
+                <input type="range" min={OPACIDADE_MARCA.min * 100} max={OPACIDADE_MARCA.max * 100} step={5} value={c.opacidade * 100} aria-label="Opacidade da marca d'água"
+                  onChange={(e) => mudar(atual, {opacidade: Number(e.target.value) / 100})} />
+                <span className="nota">{pct(c.opacidade)}</span>
+              </div>
+              {marca && !marca.segura && <div className="erro-exp">Grande demais para ficar fora das zonas da rede neste canto: diminua o tamanho.</div>}
+            </>
+          )}
+        </div>
+        {miniatura}
+      </div>
+    );
+  };
+
 // ---------- vídeo ----------
 type FaseVideo = {tipo: 'opcoes'} | {tipo: 'exportando'; a: Andamento} | {tipo: 'pronto'; r: ResultadoExportacao};
 
@@ -136,6 +223,21 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
   const [ate, setAte] = useState(numeroBr(duracaoMs / 1000, 1));
   const [nome, setNome] = useState(titulo);
   const [fase, setFase] = useState<FaseVideo>({tipo: 'opcoes'});
+  // marca d'água: a escolha de cada destino (a guardada no projeto por baixo do que se mexeu aqui) e o destino em edição
+  const fontesMarca = useMemo(() => fontesDaMarcaDagua(props), [props]);
+  const [marcas, setMarcas] = useState<Record<string, ConfigMarcaDagua>>({});
+  const [editando, setEditando] = useState(doDocumento.id);
+  const [proporcaoLogo, setProporcaoLogo] = useState<number>();
+
+  useEffect(() => {
+    window.estudio.prefsExportacao().then((p) => setMarcas((m) => ({...p.marca_dagua, ...m}))).catch(() => undefined);
+  }, []);
+  useEffect(() => {
+    if (!fontesMarca.logo) return;
+    const img = new Image();
+    img.onload = () => img.naturalWidth > 0 && img.naturalHeight > 0 && setProporcaoLogo(img.naturalWidth / img.naturalHeight);
+    img.src = urlDaMidia(props?.base_midia, fontesMarca.logo);
+  }, [fontesMarca.logo, props?.base_midia]);
 
   useEffect(() => {
     if (fase.tipo !== 'exportando') return;
@@ -152,7 +254,15 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
   };
   const trecho = trechoLigado ? {de_ms: Math.round(lerSegundos(de) * 1000), ate_ms: Math.round(lerSegundos(ate) * 1000)} : null;
   const trechoOk = !trechoLigado || trechoValido(trecho, duracaoMs);
-  const opcoes: OpcoesExportarVideo = {destinos, codec, qualidade, escala, trecho, nome: nome.trim() || undefined};
+  const configMarca = (d: Destino) => normalizarConfigMarca(marcas[d.id], configPadraoMarca(d, fontesMarca));
+  const mudarMarca = (d: Destino, m: Partial<ConfigMarcaDagua>) => setMarcas((ms) => ({...ms, [d.id]: {...configMarca(d), ...m}}));
+  const emEdicao = destinos.find((d) => d.id === editando) ?? destinos[0];
+  // o carrossel da Cliente só sai no tamanho dele; o vídeo de cenas, no do destino
+  const medidaDe = (d: Destino) => (fixo ? {largura: formato.largura, altura: formato.altura} : d);
+  const marcaDe = (d: Destino) => marcaDaguaDoDestino(configMarca(d), medidaDe(d), fontesMarca, proporcaoLogo);
+  const temMarca = Boolean(fontesMarca.logo || fontesMarca.assinatura);
+  const opcoes: OpcoesExportarVideo = {destinos, codec, qualidade, escala, trecho, nome: nome.trim() || undefined,
+    ...(temMarca ? {marca_dagua: Object.fromEntries(destinos.map((d) => [d.id, configMarca(d)])), ...(proporcaoLogo ? {proporcao_logo: proporcaoLogo} : {})} : {})};
   const estimativa = estimarExportacao(opcoes, formato, duracaoMs, comAudio);
   const ext = CODECS.find((c) => c.id === codec)!.ext;
   const nomes = nomesDosArquivos(nome.trim() || titulo, destinos, formato);
@@ -165,6 +275,8 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
   const exportar = async () => {
     if (!podeExportar) return avisar(!destinos.length ? 'Marque pelo menos um destino.' : 'O trecho precisa ficar dentro do vídeo e ter pelo menos 0,1 s.', 'info');
     setFase({tipo: 'exportando', a: {mensagem: 'Começando…'}});
+    // a escolha da marca d'água fica no projeto para a próxima vez (sem ela, a exportação segue igual)
+    if (Object.keys(marcas).length) window.estudio.gravarPrefsExportacao({marca_dagua: marcas}).catch(() => undefined);
     const r = await window.estudio.exportarVideo(documento, opcoes);
     setFase({tipo: 'pronto', r});
     if (r.ok) avisar(`Exportado: ${(r.arquivos ?? []).map(nomeDoArquivo).join(', ')}`, 'ok');
@@ -195,7 +307,8 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
               <label key={f.id} className={`${marcado(f.id) ? 'marcado' : ''}${desligado ? ' desligado' : ''}`}
                 title={desligado ? 'O carrossel narrado da Cliente é fixo em 1080×1920: só sai em 9:16' : `${f.destino}${f.id === doDocumento.id ? ' · o formato deste vídeo' : ''}`}>
                 <input type="checkbox" checked={marcado(f.id)} disabled={desligado} onChange={() => alternar(d)} />
-                <span>{f.nome} <span className="medida">{f.proporcao}</span></span>
+                <span>{f.nome} <span className="medida">{f.proporcao}</span>
+                  {temMarca && marcado(f.id) && configMarca(d).ligada && <span className="md-ico" title="Com marca d'água"><Stamp size={11} /></span>}</span>
                 <span className="medida">{f.largura}×{f.altura}</span>
                 <span className="tam">{marcado(f.id) ? tamanhoDe(f.id) : ''}</span>
               </label>
@@ -211,6 +324,14 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
             <span className="tam">{marcado('personalizado') ? tamanhoDe('personalizado') : ''}</span>
           </label>
         </div>
+      </Linha>
+      <Linha rotulo="Marca d'água">
+        {!temMarca ? <span className="nota">O tema deste vídeo não tem logo nem assinatura: aplique um kit de marca (menu → Marca…) para pôr a marca d'água.</span>
+          : !emEdicao ? <span className="nota">Marque um destino.</span>
+          : (
+            <OpcoesMarca destinos={destinos} atual={emEdicao} editar={setEditando} config={configMarca} mudar={mudarMarca} fontes={fontesMarca} marca={marcaDe(emEdicao)}
+              miniatura={props && <Miniatura props={props} {...medidaDe(emEdicao)} fixo={fixo} fps={formato.fps} duracaoMs={duracaoMs} marca={marcaDe(emEdicao)} />} />
+          )}
       </Linha>
       <Linha rotulo="Formato">
         <select className="campo" value={codec} onChange={(e) => setCodec(e.target.value as CodecVideo)}>

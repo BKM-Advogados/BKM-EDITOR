@@ -1,7 +1,10 @@
 // Opções de exportação e as contas que a interface e o processo principal partilham: destinos (proporções), qualidade em
 // bitrate, escala, trecho, o nome de cada arquivo e a estimativa de tamanho (bitrate × duração). Nada aqui toca disco nem
-// o Remotion: `argumentosDoRender` só traduz as opções para o que o renderMedia recebe.
+// o Remotion: `argumentosDoRender` só traduz as opções para o que o renderMedia recebe. No fim, a marca d'água por
+// destino: o que o diálogo guarda (ConfigMarcaDagua) e o que a composição desenha (MarcaDaguaP, já posicionada).
 import {FORMATOS_VIDEO, proporcaoDe, type Formato} from './formatos';
+import {MARCA_CLIENTE} from './marca';
+import {CANTO_PADRAO, posicaoSegura, zonasDaMarca, zonaSugerida, type CantoMarca} from './zonas-seguras';
 
 export type CodecVideo = 'h264' | 'h265' | 'webm';
 export type QualidadeVideo = 'alta' | 'media' | 'leve';
@@ -15,6 +18,8 @@ export type OpcoesExportarVideo = {
   escala: number; // 1, 0,75 ou 0,5
   trecho?: Trecho | null; // sem trecho, o vídeo inteiro
   nome?: string; // base do nome do arquivo; sem ela, o título do documento
+  marca_dagua?: Record<string, ConfigMarcaDagua>; // por id de destino; ausente ou desligada, sai sem marca
+  proporcao_logo?: number; // largura ÷ altura do logo, medida pela interface (sem ela, 3)
 };
 
 export type FormatoImagem = 'png' | 'jpg' | 'webp';
@@ -129,4 +134,93 @@ export const estimarExportacao = (o: OpcoesExportarVideo, formato: Formato, dura
     return {destino: d, largura: a.largura, altura: a.altura, bytes: estimarBytes(Number.parseInt(a.videoBitrate, 10), a.duracaoMs, comAudio)};
   });
   return {porDestino, total: porDestino.reduce((s, x) => s + x.bytes, 0)};
+};
+
+// ---------- marca d'água por destino ----------
+// O logo ou a assinatura do kit de marca (tema.logo e tema.assinatura no vídeo de cenas; logo e marca.insta no carrossel
+// da Cliente), por cima da composição, só na exportação. Cada destino tem a sua escolha, lembrada por projeto em
+// .estudio/exportacao.json; o canto padrão e a posição fina saem das zonas seguras da rede (posicaoSegura).
+export type ConteudoMarca = 'logo' | 'assinatura';
+/** `tamanho`: altura da marca, fração do lado menor do quadro; `opacidade` de 0,2 a 1. */
+export type ConfigMarcaDagua = {ligada: boolean; conteudo: ConteudoMarca; canto: CantoMarca; tamanho: number; opacidade: number};
+/** O que a composição recebe em `props.marca_dagua`: o arquivo (caminho de mídia, como o tema) ou o texto e a caixa em
+ *  frações do quadro, encostada do lado do canto (`alinhar`). `segura: false` quando nenhuma posição livre coube. */
+export type MarcaDaguaP = {logo?: string; texto?: string; fonte?: string; x: number; y: number; largura: number; altura: number; alinhar: 'esquerda' | 'direita';
+  opacidade: number; segura: boolean};
+/** Preferências de exportação do projeto (.estudio/exportacao.json). */
+export type PrefsExportacao = {marca_dagua?: Record<string, ConfigMarcaDagua>};
+export type FontesMarcaDagua = {logo?: string; assinatura?: string; fonte?: string};
+
+export const TAMANHO_MARCA = {min: 0.03, max: 0.15, padrao: 0.06};
+export const OPACIDADE_MARCA = {min: 0.2, max: 1, padrao: 0.85};
+const MARGEM_MARCA = 0.035; // da borda e das zonas, fração do lado menor
+const PROPORCAO_LOGO_PADRAO = 3;
+export const CANTOS_MARCA: {id: CantoMarca; nome: string}[] = [
+  {id: 'sup-esq', nome: 'Em cima, à esquerda'}, {id: 'sup-dir', nome: 'Em cima, à direita'},
+  {id: 'inf-esq', nome: 'Embaixo, à esquerda'}, {id: 'inf-dir', nome: 'Embaixo, à direita'},
+];
+
+const limitar = (v: unknown, faixa: {min: number; max: number; padrao: number}) =>
+  typeof v === 'number' && Number.isFinite(v) ? Math.min(faixa.max, Math.max(faixa.min, v)) : faixa.padrao;
+const textoDe = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+
+/** Logo, assinatura e fonte que as props do vídeo oferecem; o carrossel da Cliente escreve na IBM Plex Sans do manual. */
+export const fontesDaMarcaDagua = (props: Record<string, unknown> | null | undefined): FontesMarcaDagua => {
+  const tema = (props?.tema ?? {}) as Record<string, unknown>;
+  const marca = (props?.marca ?? {}) as Record<string, unknown>;
+  const fonte = textoDe(tema.fonte) ?? (props && props.composicao !== 'VideoCenas' ? MARCA_CLIENTE.fontes.texto : undefined);
+  return {logo: textoDe(tema.logo) ?? textoDe(props?.logo), assinatura: textoDe(tema.assinatura) ?? textoDe(marca.insta) ?? textoDe(marca.site), ...(fonte ? {fonte} : {})};
+};
+
+/** A escolha de partida de um destino: desligada, o logo se houver, o canto livre da rede, 6% do lado menor, 85%. */
+export const configPadraoMarca = (destino: {largura: number; altura: number}, fontes: FontesMarcaDagua = {}): ConfigMarcaDagua => ({
+  ligada: false,
+  conteudo: fontes.logo || !fontes.assinatura ? 'logo' : 'assinatura',
+  canto: CANTO_PADRAO[zonaSugerida(destino.largura, destino.altura)],
+  tamanho: TAMANHO_MARCA.padrao,
+  opacidade: OPACIDADE_MARCA.padrao,
+});
+
+/** Lê uma escolha guardada com calma: campo fora do lugar volta ao `padrao`. */
+export const normalizarConfigMarca = (x: unknown, padrao: ConfigMarcaDagua): ConfigMarcaDagua => {
+  const o = (x && typeof x === 'object' ? x : {}) as Record<string, unknown>;
+  return {
+    ligada: typeof o.ligada === 'boolean' ? o.ligada : padrao.ligada,
+    conteudo: o.conteudo === 'logo' || o.conteudo === 'assinatura' ? o.conteudo : padrao.conteudo,
+    canto: CANTOS_MARCA.some((c) => c.id === o.canto) ? (o.canto as CantoMarca) : padrao.canto,
+    tamanho: limitar(o.tamanho ?? padrao.tamanho, TAMANHO_MARCA),
+    opacidade: limitar(o.opacidade ?? padrao.opacidade, OPACIDADE_MARCA),
+  };
+};
+
+/** O arquivo de preferências inteiro: só os destinos com nome de id e escolha legível. */
+export const normalizarPrefsExportacao = (x: unknown): PrefsExportacao => {
+  const o = (x && typeof x === 'object' ? x : {}) as Record<string, unknown>;
+  const md = (o.marca_dagua && typeof o.marca_dagua === 'object' ? o.marca_dagua : {}) as Record<string, unknown>;
+  const marca_dagua = Object.fromEntries(Object.entries(md).filter(([id, v]) => /^[a-z0-9-]{1,40}$/.test(id) && v && typeof v === 'object')
+    .map(([id, v]) => [id, normalizarConfigMarca(v, configPadraoMarca(FORMATOS_VIDEO.find((f) => f.id === id) ?? FORMATOS_VIDEO[0]))]));
+  return Object.keys(marca_dagua).length ? {marca_dagua} : {};
+};
+
+/** Largura aproximada de uma linha de texto (px): 0,6 da letra por caractere, a média larga de uma sem serifa. */
+const larguraDoTexto = (texto: string, letra: number) => Math.ceil(texto.length * letra * 0.6);
+
+/** A marca de um destino, pronta para a composição, ou null (desligada ou sem logo nem assinatura no kit). Se o conteúdo
+ *  pedido faltar, vai o outro. A caixa tem a altura do `tamanho` e a largura do logo (pela proporção) ou do texto, até
+ *  60% do quadro; a posição é a livre mais perto do canto. */
+export const marcaDaguaDoDestino = (c: ConfigMarcaDagua | null | undefined, destino: {largura: number; altura: number}, fontes: FontesMarcaDagua,
+  proporcaoLogo?: number): MarcaDaguaP | null => {
+  if (!c?.ligada || !(destino.largura > 0 && destino.altura > 0)) return null;
+  const logo = (c.conteudo === 'logo' || !fontes.assinatura) && fontes.logo ? fontes.logo : undefined;
+  const texto = logo ? undefined : fontes.assinatura;
+  if (!logo && !texto) return null;
+  const menor = Math.min(destino.largura, destino.altura);
+  const altura = limitar(c.tamanho, TAMANHO_MARCA) * menor;
+  const proporcao = proporcaoLogo && Number.isFinite(proporcaoLogo) && proporcaoLogo > 0 ? Math.min(8, Math.max(0.2, proporcaoLogo)) : PROPORCAO_LOGO_PADRAO;
+  const largura = Math.min(0.6 * destino.largura, logo ? altura * proporcao : larguraDoTexto(texto!, altura * 0.8));
+  const canto = CANTOS_MARCA.some((x) => x.id === c.canto) ? c.canto : CANTO_PADRAO[zonaSugerida(destino.largura, destino.altura)];
+  const pos = posicaoSegura(zonasDaMarca(destino.largura, destino.altura), canto, destino, {largura, altura}, MARGEM_MARCA * menor);
+  const n = (v: number) => Math.round(v * 1e5) / 1e5;
+  return {...(logo ? {logo} : {texto}), ...(texto && fontes.fonte ? {fonte: fontes.fonte} : {}), x: n(pos.x), y: n(pos.y), largura: n(largura / destino.largura),
+    altura: n(altura / destino.altura), alinhar: canto.endsWith('dir') ? 'direita' : 'esquerda', opacidade: limitar(c.opacidade, OPACIDADE_MARCA), segura: pos.segura};
 };

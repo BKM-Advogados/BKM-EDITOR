@@ -5,7 +5,7 @@ import type {IdModelo} from '../nucleo/modelos';
 import type {Formato} from '../nucleo/formatos';
 import type {Envelope} from '../nucleo/audio';
 import type {FonteArquivo, Marca} from '../nucleo/marca';
-import type {OpcoesExportarImagem, OpcoesExportarVideo} from '../nucleo/exportacao';
+import type {OpcoesExportarImagem, OpcoesExportarVideo, PrefsExportacao} from '../nucleo/exportacao';
 import type {Pesquisa} from '../nucleo/pesquisa';
 
 export const CANAL = {
@@ -87,6 +87,9 @@ export const CANAL = {
   falaProgresso: 'estudio:fala-progresso',
   falaGravarSaida: 'estudio:fala-gravar-saida',
   falaEscolherLegenda: 'estudio:fala-escolher-legenda',
+  // preferências da exportação por projeto, .estudio/exportacao.json (src/main/ipc-exportacao.ts; frente C)
+  prefsExportacao: 'estudio:prefs-exportacao',
+  gravarPrefsExportacao: 'estudio:gravar-prefs-exportacao',
 } as const;
 
 /** O projeto aberto. `estado` é o último que a pessoa viu (área, documento, seleção), para reabrir onde parou; `git`
@@ -254,6 +257,10 @@ export type ApiEstudio = {
     /** Diálogo para escolher um .srt ou .vtt; devolve nome e texto (null se cancelou). */
     escolherLegenda: () => Promise<{nome: string; texto: string} | null>;
   };
+  // exportação (frente C): a escolha de marca d'água por destino, lembrada no projeto
+  prefsExportacao: () => Promise<PrefsExportacao>;
+  /** Junta por destino ao que já estava e devolve o arquivo inteiro. */
+  gravarPrefsExportacao: (p: PrefsExportacao) => Promise<PrefsExportacao>;
 };
 
 // ---------- frente Fala ----------

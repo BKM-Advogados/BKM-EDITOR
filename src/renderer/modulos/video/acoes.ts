@@ -2,7 +2,9 @@
 // diário, desfazer, o Claude vê). Cada patch confere o id do que vai mexer, para não pisar no que o agente mudou por
 // baixo. No vídeo de cenas vale tudo; no carrossel narrado da Cliente, cena nova precisa de uma palavra da narração, então só
 // partes podem sair e blocos podem entrar (o resolvedor põe o bloco 300 ms depois do começo da cena). A lâmina (Ctrl+K)
-// divide a cena na cabeça pelo núcleo (cenas-dividir.ts).
+// divide a cena na cabeça pelo núcleo (cenas-dividir.ts); "Movimento em todas as imagens" põe o Ken Burns de uma vez
+// (composicoes/cenas/movimento.ts).
+import {patchMovimentoEmTodas} from '../../../composicoes/cenas/movimento';
 import {comIdsNovos, ehDocCenas, idLivre, novaCenaCenas, novoBlocoCenas, TIPOS_BLOCO_CENAS, type TipoBlocoCenas} from '../../../nucleo/cenas';
 import {dividirCena, PEDACO_MIN_MS} from '../../../nucleo/cenas-dividir';
 import type {OperacaoPatch} from '../../../nucleo/documentos';
@@ -147,4 +149,17 @@ export const dividirNaCabeca = async (documento: string) => {
     selecionar({documento, caminho: `/cenas/${i + 1}`});
     avisar('Cena dividida. Ctrl+Z desfaz.', 'ok');
   }
+};
+
+/** "Movimento em todas as imagens": Ken Burns nas imagens paradas, alternando aproximar, deslizar e afastar; quando
+ *  todas já se movem, o mesmo botão tira o movimento de todas. */
+export const movimentoEmTodas = async (documento: string) => {
+  const d = doc(documento);
+  if (!ehDocCenas(d)) return avisar('O movimento das imagens é do vídeo de cenas.', 'info');
+  const r = patchMovimentoEmTodas(d);
+  if (!r.n) return avisar('Nenhuma imagem no vídeo: acrescente um bloco de imagem antes.', 'info');
+  const rotulo = r.acao === 'por' ? `movimento em ${r.n} ${r.n === 1 ? 'imagem' : 'imagens'}` : `tirar o movimento de ${r.n} ${r.n === 1 ? 'imagem' : 'imagens'}`;
+  // as que estavam em Inteira passam para Preencher no mesmo patch (senão as faixas vazias andam junto; video-D12)
+  const preencher = r.preencher ? `; ${r.preencher === r.n ? (r.n === 1 ? 'ela passou' : 'todas passaram') : r.preencher === 1 ? '1 passou' : `${r.preencher} passaram`} para o encaixe Preencher` : '';
+  if (await aplicar(documento, r.patch, rotulo)) avisar(`${rotulo[0].toUpperCase()}${rotulo.slice(1)}${preencher}. Ctrl+Z desfaz.`, 'ok');
 };

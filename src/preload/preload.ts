@@ -104,6 +104,9 @@ const api: ApiEstudio = {
     gravarSaida: (nome, texto) => ipcRenderer.invoke(CANAL.falaGravarSaida, nome, texto),
     escolherLegenda: () => ipcRenderer.invoke(CANAL.falaEscolherLegenda),
   },
+  // exportação (frente C)
+  prefsExportacao: () => ipcRenderer.invoke(CANAL.prefsExportacao),
+  gravarPrefsExportacao: (p) => ipcRenderer.invoke(CANAL.gravarPrefsExportacao, p),
 };
 
 contextBridge.exposeInMainWorld('estudio', api);
