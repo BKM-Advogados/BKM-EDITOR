@@ -1,18 +1,25 @@
 // Teste de exportação com som, fora do Electron: monta um projeto de cenas com narração e música sintéticas (WAV), mede os
 // envelopes como a interface faria, resolve as props (ducking incluído), empacota as composições, renderiza o MP4 com o
-// renderMedia e confere que o arquivo saiu com faixa de áudio. Uso: npx tsx scripts/exportar-teste-som.mjs
-// Saída em testes/saida/exportar-teste/ (ignorada pelo git). Se o Chrome Headless do Remotion não puder rodar neste PC,
-// o script diz onde parou.
+// renderMedia e confere que o arquivo saiu com faixa de áudio. Depois confere o medidor da tela (a mistura medida pelo
+// núcleo, como o loudness.ts faz) contra o loudnorm do ffmpeg no MP4 e passa o MP4 pela correção de loudness da
+// exportação (src/main/loudness.ts): o arquivo final tem de sair entre −15 e −13 LUFS com pico até −1 dBTP.
+// Uso: npx tsx scripts/exportar-teste-som.mjs [--voz-real]   (--voz-real: a narração do exemplo da Cliente no lugar da
+// sintética, com picos altos, para a correção precisar do limitador). Saída em testes/saida/exportar-teste/ (ignorada
+// pelo git). Se o Chrome Headless do Remotion não puder rodar neste PC, o script diz onde parou.
 import {existsSync, mkdirSync, rmSync, writeFileSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {envelopeDeAmostras} from '../src/nucleo/audio.ts';
 import {novoDocCenas, resolverCenas} from '../src/nucleo/cenas.ts';
+import {medirMistura} from '../src/nucleo/loudness.ts';
+import {decodificarAudio, gravarWav} from '../src/main/ffmpeg-som.ts';
+import {igualarLoudness, medirArquivo} from '../src/main/loudness.ts';
 import {codificarWav, decodificarWav, musicaSintetica, narracaoSintetica, TAXA} from './audio-sintetico.ts';
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const saida = path.join(raiz, 'testes', 'saida', 'exportar-teste');
+const vozReal = process.argv.includes('--voz-real');
+const saida = path.join(raiz, 'testes', 'saida', vozReal ? 'exportar-teste-voz-real' : 'exportar-teste');
 const publica = path.join(saida, 'publico'); // vira a pasta pública do pacote: staticFile('midia/x.wav') acha os arquivos
 const t0 = Date.now();
 const log = (m) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1).padStart(5)} s] ${m}`);
@@ -20,17 +27,21 @@ const log = (m) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1).padStar
 rmSync(saida, {recursive: true, force: true});
 mkdirSync(path.join(publica, 'midia'), {recursive: true});
 
-// 1. mídia sintética e envelopes (o mesmo cálculo da interface, a partir do WAV)
-const arquivos = {'midia/narracao.wav': narracaoSintetica(12), 'midia/musica.wav': musicaSintetica(14)};
+// 1. mídia sintética (ou a voz do exemplo) e envelopes (o mesmo cálculo da interface, a partir do WAV)
+const fontesWav = {};
+if (vozReal) {
+  const c2 = await decodificarAudio(path.join(raiz, 'exemplos', 'exemplo', 'midia', 'video-exemplo.mp4'));
+  fontesWav['midia/narracao.wav'] = gravarWav([c2.canais[0].slice(0, Math.round(12 * c2.taxa))], c2.taxa);
+} else fontesWav['midia/narracao.wav'] = codificarWav([narracaoSintetica(12)], TAXA);
+fontesWav['midia/musica.wav'] = codificarWav([musicaSintetica(14)], TAXA);
 const envelopes = {};
-for (const [rel, amostras] of Object.entries(arquivos)) {
-  const wav = codificarWav([amostras], TAXA);
+for (const [rel, wav] of Object.entries(fontesWav)) {
   writeFileSync(path.join(publica, rel), wav);
   const {canais, taxa} = decodificarWav(wav);
   envelopes[rel] = envelopeDeAmostras(canais, taxa);
   writeFileSync(path.join(publica, `${rel}.envelope.json`), JSON.stringify(envelopes[rel]));
 }
-log(`mídia e envelopes em ${publica}`);
+log(`mídia e envelopes em ${publica}${vozReal ? ' (narração: os 12 primeiros segundos do exemplo da Cliente)' : ''}`);
 
 // 2. documento: três cenas (12 s), narração a partir de 0,5 s e música do começo ao fim com fade
 const doc = {
@@ -82,7 +93,32 @@ try {
     console.error('FALHOU: o MP4 saiu sem faixa de áudio');
     process.exit(2);
   }
-  console.log('\nOK: o MP4 saiu com som. Abra o arquivo e ouça: a música cai quando a narração fala (0,5 s a 12 s) e volta nas pausas.');
+
+  // 4. o medidor da tela: a mistura que o núcleo mede (fontes a 48 kHz em estéreo, como o loudness.ts decodifica)
+  etapa = 'medidor × ffmpeg';
+  const fontes = {};
+  for (const rel of Object.keys(fontesWav)) fontes[rel] = await decodificarAudio(path.join(publica, rel), {taxa: 48000, canais: 2});
+  const medidas = await medirMistura(props.audio, fontes, {duracao_ms: props.duracao_ms, fps: props.fps, taxa: 48000});
+  const antes = await medirArquivo(arquivo);
+  const dif = medidas.mistura.integrado_lufs - antes.i;
+  log(`medidor × ffmpeg no MP4: mistura ${medidas.mistura.integrado_lufs} × ${antes.i} LUFS (diferença ${dif.toFixed(2)} LU) · pico ${medidas.mistura.pico_dbtp} × ${antes.tp} dBTP · narração sozinha ${medidas.voz?.integrado_lufs} LUFS`);
+  writeFileSync(path.join(saida, 'medidas.json'), JSON.stringify({...medidas, mistura: {...medidas.mistura, curto_prazo: undefined}, voz: {...medidas.voz, curto_prazo: undefined}, faixas: undefined}, null, 2));
+
+  // 5. a correção de loudness da exportação, no próprio MP4 (é a linha que o exportar.ts chama depois do render)
+  etapa = 'igualar o loudness';
+  const r = await igualarLoudness({arquivo, props, aviso: (p) => p.mensagem && log(p.mensagem)});
+  const depois = await medirArquivo(arquivo);
+  const meta2 = await getVideoMetadata(arquivo);
+  log(`loudness: ${r.antes.i} → ${depois.i} LUFS · pico ${r.antes.tp} → ${depois.tp} dBTP · ${r.tentativas} passada(s) de correção, modo ${r.modo ?? "—"} · `
+    + `vídeo ${meta2.codec} ${meta2.durationInSeconds.toFixed(2)} s, áudio ${meta2.audioCodec}`);
+  const okLoudness = depois.i >= -15 && depois.i <= -13 && depois.tp <= -1;
+  const okMedidor = Math.abs(dif) <= 0.5;
+  if (!okLoudness || !okMedidor) {
+    console.error(`FALHOU: ${okLoudness ? '' : `o MP4 saiu com ${depois.i} LUFS e pico ${depois.tp} dBTP (pede −15 a −13 e até −1); `}${okMedidor ? '' : `o medidor difere ${dif.toFixed(2)} LU do ffmpeg`}`);
+    process.exit(3);
+  }
+  console.log(`\nOK: o MP4 saiu com som, no alvo (${depois.i} LUFS, pico ${depois.tp} dBTP), e o medidor bate com o ffmpeg (${dif.toFixed(2)} LU).`
+    + ' Abra o arquivo e ouça: a música cai quando a narração fala (0,5 s a 12 s) e volta nas pausas.');
 } catch (e) {
   console.error(`\nFALHOU na etapa "${etapa}": ${e?.message ?? e}`);
   if (!existsSync(path.join(raiz, 'node_modules', '@remotion', 'renderer'))) console.error('(falta node_modules: rode npm install)');
