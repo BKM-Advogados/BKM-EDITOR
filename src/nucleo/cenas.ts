@@ -7,6 +7,7 @@
 import {resolverAudio, type AudioCenas, type AudioP, type Envelope} from './audio';
 import type {Efeito} from './efeitos';
 import {formatoDoVideo, type Formato} from './formatos';
+import {resolverLegendas, type LegendasCenas, type LegendasP} from './legendas'; // frente Fala: legendas (docs/legendas.md)
 
 export type TipoBlocoCenas = 'titulo' | 'texto' | 'lista' | 'numero' | 'imagem';
 
@@ -39,7 +40,9 @@ export type CenaCenas = {id: string; nome?: string; duracao_ms: number; fundo?: 
 
 export type TemaCenas = {fundo: string; texto: string; destaque: string; suave: string; fonte: string};
 
-export type DocCenas = {tipo: 'cenas'; formato: Formato; tema: TemaCenas; cenas: CenaCenas[]; efeitos?: Efeito[]; audio?: AudioCenas};
+export type DocCenas = {tipo: 'cenas'; formato: Formato; tema: TemaCenas; cenas: CenaCenas[]; efeitos?: Efeito[]; audio?: AudioCenas;
+  legendas?: LegendasCenas; // frente Fala: segmentos com tempo, palavras e falante, e o estilo (legendas.ts)
+};
 
 export const TEMA_NEUTRO: TemaCenas = {fundo: '#111418', texto: '#F2F2F2', destaque: '#70B8FF', suave: '#A3ABB5', fonte: 'Inter'};
 
@@ -127,6 +130,7 @@ export type PropsCenas = {
   efeitos: Efeito[];
   audio?: AudioP;
   base_midia?: string;
+  legendas_cenas?: LegendasP; // frente Fala (o nome não é "legendas" porque a linha do tempo lê esse do carrossel da Cliente)
 };
 
 /** O que o resolvedor recebe de fora do documento: os envelopes já medidos, por arquivo (midia/x.wav). */
@@ -161,9 +165,10 @@ export const resolverCenas = (doc: DocCenas, opcoes: OpcoesResolver = {}): {prop
   const duracao_ms = Math.max(1000, t);
   const som = resolverAudio(doc.audio, duracao_ms, opcoes.envelopes);
   avisos.push(...som.avisos);
+  const legendas = resolverLegendas(doc.legendas, {audio: som.audio, largura: formato.largura, altura: formato.altura, tema, duracao_ms}, avisos); // frente Fala
   return {
     props: {composicao: 'VideoCenas', duracao_ms, largura: formato.largura, altura: formato.altura, fps: formato.fps, tema, cenas,
-      efeitos: doc.efeitos ?? [], ...(som.audio ? {audio: som.audio} : {})},
+      efeitos: doc.efeitos ?? [], ...(som.audio ? {audio: som.audio} : {}), ...(legendas ? {legendas_cenas: legendas} : {})},
     avisos,
   };
 };

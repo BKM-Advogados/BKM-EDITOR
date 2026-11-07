@@ -80,6 +80,13 @@ export const CANAL = {
   pesquisa: 'estudio:pesquisa',
   textoFonte: 'estudio:texto-fonte',
   abrirFonte: 'estudio:abrir-fonte',
+  // frente Fala: transcrição local e legendas (src/main/transcricao.ts, docs/legendas.md)
+  falaEstado: 'estudio:fala-estado',
+  falaTranscrever: 'estudio:fala-transcrever',
+  falaCancelar: 'estudio:fala-cancelar',
+  falaProgresso: 'estudio:fala-progresso',
+  falaGravarSaida: 'estudio:fala-gravar-saida',
+  falaEscolherLegenda: 'estudio:fala-escolher-legenda',
 } as const;
 
 /** O projeto aberto. `estado` é o último que a pessoa viu (área, documento, seleção), para reabrir onde parou; `git`
@@ -234,7 +241,29 @@ export type ApiEstudio = {
   textoFonte: (fonteId: string, inicio?: number, fim?: number) => Promise<string>;
   /** Abre a url da fonte no navegador da pessoa; só http e https (devolve false para o resto). */
   abrirFonte: (url: string) => Promise<boolean>;
+  // frente Fala (docs/legendas.md): transcrição local com o whisper.cpp e as legendas do vídeo de cenas
+  fala: {
+    /** O que está instalado (binário, modelos, ffmpeg) e o que ainda baixa no primeiro uso. */
+    estado: (modelo?: string) => Promise<EstadoTranscricao>;
+    /** Transcreve um arquivo do projeto e grava <arquivo>.palavras.json; o andamento sai em aoProgresso. */
+    transcrever: (p: PedidoTranscricao) => Promise<ResultadoTranscricao>;
+    cancelar: () => void;
+    aoProgresso: (cb: (p: ProgressoTranscricao & {arquivo: string}) => void) => () => void;
+    /** Grava texto em saidas/<nome> (SRT, VTT); devolve o caminho absoluto. */
+    gravarSaida: (nome: string, texto: string) => Promise<string>;
+    /** Diálogo para escolher um .srt ou .vtt; devolve nome e texto (null se cancelou). */
+    escolherLegenda: () => Promise<{nome: string; texto: string} | null>;
+  };
 };
+
+// ---------- frente Fala ----------
+/** Pedido de transcrição: um arquivo do projeto (normalmente midia/…), o trecho opcional e o modelo. */
+export type PedidoTranscricao = {arquivo: string; de_ms?: number; dur_ms?: number; modelo?: 'base' | 'small'; idioma?: string; destino?: string;
+  vocabulario?: string}; // vocabulario: o começo de conversa do whisper (padrão: termos do direito do trabalho)
+export type ProgressoTranscricao = {etapa: 'baixando' | 'audio' | 'transcrevendo' | 'pronto' | 'cancelado'; mensagem: string; progresso?: number};
+export type ResultadoTranscricao = {ok: boolean; arquivo: string; palavras?: string; n?: number; modelo?: string; duracao_s?: number; texto?: string; cancelado?: boolean; mensagem?: string};
+export type EstadoTranscricao = {pasta: string; modelo: string; modelos: {id: string; nome: string; mb: number; instalado: boolean}[]; pronto: boolean; falta: string[];
+  ffmpeg: boolean; ocupado?: string; plataforma: boolean};
 
 /** Um arquivo da pasta de trilhas: nome sem extensão, caminho absoluto, subpasta e tamanho. */
 export type Trilha = {nome: string; caminho: string; pasta: string; tamanho_kb: number};
