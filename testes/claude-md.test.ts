@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {afterAll, describe, expect, it} from 'vitest';
 import {MARCA_CLAUDE_FIM, MARCA_CLAUDE_INICIO, claudeMd, claudeMdAtualizado, gravarPlano, planoDoProjeto, regerarClaudeMd} from '../src/nucleo/criar-projeto';
+import {EFEITOS} from '../src/nucleo/efeitos';
 
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'estudio-claude-md-'));
 afterAll(() => rmSync(tmp, {recursive: true, force: true}));
@@ -46,6 +47,35 @@ describe('CLAUDE.md do projeto', () => {
     expect(imagem).not.toContain('`transcrever`');
     expect(imagem).toContain('o MCP não exporta');
     expect(imagem).not.toContain('Exporta PNG por página e PDF.');
+  });
+
+  it('legendas: em e sai são do vídeo de quando a legenda nasceu, e a correção é por editar_legenda (som-N7, video-N5, transversal-N8)', () => {
+    const video = claudeMd(['video']);
+    expect(video).toContain('**de quando a legenda nasceu**');
+    for (const f of ['ler_legendas', 'editar_legenda']) expect(video).toContain(`\`${f}\``);
+    expect(video).toContain('Não\n  escreva `texto`, `palavras`, `em` ou `sai` de legenda por `aplicar_patch`');
+    expect(video).not.toContain('texto por patch nos segmentos');
+    expect(claudeMd(['imagem'])).not.toContain('`editar_legenda`');
+  });
+
+  it('efeitos: todos os tipos da lista do app, com a faixa do valor, no vídeo e na imagem (tres-efeitos-N2)', () => {
+    for (const modulos of [['video'], ['imagem']] as const) {
+      const md = claudeMd([...modulos]);
+      const trecho = md.slice(md.indexOf('- Efeitos'), md.indexOf('- Kit de marca'));
+      const listados = [...trecho.split('Tipos e faixa do `valor`:')[1].matchAll(/`(\w+)` (−?\d+) a (\d+)/g)].map((m) => [m[1], Number(m[2].replace('−', '-')), Number(m[3])]);
+      expect(listados).toEqual(EFEITOS.map((d) => [d.tipo, d.min, d.max]));
+      expect(trecho).toContain('preto e branco é `saturacao` 0');
+      expect(trecho).toContain('não invente');
+    }
+    expect(claudeMd(['3d'])).not.toContain('- Efeitos');
+  });
+
+  it('3D: tipos de objeto e de luz, vetores [x, y, z], intensidade e câmera (tres-efeitos-N2)', () => {
+    const md = claudeMd(['3d']);
+    for (const t of ['caixa', 'esfera', 'cilindro', 'cone', 'toro', 'plano', 'ambiente', 'direcional', 'ponto']) expect(md).toContain(`\`${t}\``);
+    for (const c of ['`posicao`', '`rotacao`', '`escala`', '`cor`', '`metalico`', '`rugosidade`', '`gira`', '`intensidade`', '`camera`', '`alvo`', '`fov`']) expect(md).toContain(c);
+    expect(md).toContain('[x, y, z]');
+    expect(md).toContain('[-90, 0, 0]');
   });
 
   it('a lista de "Como trabalhar" é numerada em sequência', () => {
