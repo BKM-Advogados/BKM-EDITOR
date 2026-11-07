@@ -6,7 +6,7 @@
 // Som: "escolher arquivo de áudio" devolve um WAV sintético (uma narração, depois uma música, alternando), como URL de
 // blob que o <audio> e o Web Audio tocam de verdade; o envelope medido fica em memória e entra nas props como no app.
 import jsonpatch, {type Operation} from 'fast-json-patch';
-import type {ApiEstudio, InfoProjeto, MarcaInfo, Mudanca, NovoProjeto, Preferencias, Progresso, Recente, Trilha} from '../../src/compartilhado/api';
+import type {ApiEstudio, InfoProjeto, MarcaInfo, Mudanca, NovoProjeto, Preferencias, Progresso, ProgressoTranscricao, Recente, Trilha} from '../../src/compartilhado/api';
 import type {EntradaDocumento, Manifesto, Modulo} from '../../src/nucleo/documentos';
 import type {Envelope} from '../../src/nucleo/audio';
 import type {Fato, Fonte, Pesquisa} from '../../src/nucleo/pesquisa';
@@ -356,6 +356,81 @@ const api: ApiEstudio = {
     window.open(url, '_blank', 'noopener');
     return true;
   },
+  fala: falaSimulada(), // frente Fala: transcrição simulada (no fim do arquivo)
 };
 
 (window as unknown as {estudio: ApiEstudio}).estudio = api;
+
+// ---------- frente Fala: transcrição simulada (docs/legendas.md) ----------
+// "Transcrever" anda de mentira (baixando, tirando o áudio, transcrevendo) e grava em memória palavras em pt-BR no ritmo
+// da narração sintética (frases de 2,3 a 3,2 s com pausa de 1 s, as mesmas de audio-sintetico.ts), para a lista, a faixa
+// e a composição terem o que mostrar. Exportar SRT/VTT baixa o arquivo pelo navegador; importar abre o seletor de arquivo.
+const palavrasSimuladas = new Map<string, {w: string; s: number; e: number; p: number}[]>();
+const FRASES_SIMULADAS = ['Recebeu proposta para mudar de cidade?', 'Antes de responder, entenda as regras.', 'A mudança depende da sua concordância.',
+  'Mas existem exceções importantes.', 'O empregador paga transporte e frete.', 'Peça a proposta por escrito.'];
+function falaSimulada(): ApiEstudio['fala'] {
+  const ouvintes = new Set<(p: ProgressoTranscricao & {arquivo: string}) => void>();
+  let cancelada = false;
+  const avisar = (p: ProgressoTranscricao & {arquivo: string}) => ouvintes.forEach((f) => f(p));
+  return {
+    estado: async () => ({pasta: 'C:\\Users\\pessoa\\Estudio\\modelos\\whisper', modelo: 'small', pronto: false, ffmpeg: true, plataforma: true,
+      falta: ['whisper.cpp v1.9.5 (b5454) (9 MB)', 'modelo ggml-small-q5_1.bin (190 MB)'],
+      modelos: [{id: 'small', nome: 'Small', mb: 190, instalado: false}, {id: 'base', nome: 'Base', mb: 60, instalado: false}]}),
+    transcrever: async ({arquivo}) => {
+      cancelada = false;
+      const etapas: [ProgressoTranscricao['etapa'], string, number][] = [['baixando', 'Baixando o modelo ggml-small-q5_1.bin (190 MB)', 12], ['audio', 'Tirando o áudio', 3],
+        ['transcrevendo', 'Transcrevendo com o modelo ggml-small-q5_1.bin', 20]];
+      for (const [etapa, mensagem, passos] of etapas) {
+        for (let i = 0; i <= passos; i++) {
+          if (cancelada) {
+            avisar({etapa: 'cancelado', mensagem: 'Transcrição cancelada', arquivo});
+            return {ok: false, arquivo, cancelado: true, mensagem: 'Transcrição cancelada'};
+          }
+          avisar({etapa, mensagem, progresso: (i / passos) * 100, arquivo});
+          await esperar(60);
+        }
+      }
+      const palavras: {w: string; s: number; e: number; p: number}[] = [];
+      for (let t = 0.3, k = 0; t < 12 - 0.4 && k < FRASES_SIMULADAS.length; k++) {
+        const fim = Math.min(12 - 0.2, t + 2.3 + (k % 3) * 0.45);
+        const ws = FRASES_SIMULADAS[k].split(' ');
+        const passo = (fim - t) / ws.length;
+        ws.forEach((w, i) => palavras.push({w, s: Math.round((t + i * passo) * 1000), e: Math.round((t + (i + 0.85) * passo) * 1000), p: 0.97}));
+        t = fim + 1 + (k % 2) * 0.2;
+      }
+      palavrasSimuladas.set(`${arquivo}.palavras.json`, palavras);
+      mudou(`${arquivo}.palavras.json`);
+      avisar({etapa: 'pronto', mensagem: `${palavras.length} palavras`, progresso: 100, arquivo});
+      return {ok: true, arquivo, palavras: `${arquivo}.palavras.json`, n: palavras.length, modelo: 'small', duracao_s: 2.1, texto: palavras.map((p) => p.w).join(' ')};
+    },
+    cancelar: () => {
+      cancelada = true;
+    },
+    aoProgresso: (cb) => {
+      ouvintes.add(cb);
+      return () => {
+        ouvintes.delete(cb);
+      };
+    },
+    gravarSaida: async (nome, texto) => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([texto], {type: 'text/plain;charset=utf-8'}));
+      a.download = nome;
+      a.click();
+      return `${pastaSaidas()}\\${nome}`;
+    },
+    escolherLegenda: () => new Promise((ok) => {
+      const entrada = document.createElement('input');
+      entrada.type = 'file';
+      entrada.accept = '.srt,.vtt';
+      entrada.onchange = () => {
+        const f = entrada.files?.[0];
+        if (!f) return ok(null);
+        void f.text().then((texto) => ok({nome: f.name, texto}));
+      };
+      entrada.click();
+    }),
+  };
+}
+const lerJsonSemFala = api.lerJson;
+api.lerJson = (async (caminho: string) => (palavrasSimuladas.has(caminho) ? structuredClone(palavrasSimuladas.get(caminho)) : lerJsonSemFala(caminho))) as ApiEstudio['lerJson'];

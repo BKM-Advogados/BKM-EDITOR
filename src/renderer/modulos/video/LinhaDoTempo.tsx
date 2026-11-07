@@ -8,6 +8,7 @@
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore} from 'react';
 import {Maximize2, Mic, Music, Plus, Volume2, ZoomIn, ZoomOut} from 'lucide-react';
 import type {AudioP} from '../../../nucleo/audio';
+import type {LegendasP} from '../../../nucleo/legendas'; // frente Fala
 import type {Palavra, TrechoNarracao} from '../../../nucleo/roteiro/resolver';
 import {aplicar, loja, patchTrocar, selecionar, trocar, useLoja, valorEm} from '../../estado/loja';
 import {BotaoMenu} from '../../componentes/Menu';
@@ -17,6 +18,7 @@ import {adicionarClipeAudio} from './acoes-audio';
 import {BibliotecaTrilhas} from './BibliotecaTrilhas';
 import {medirPendentes} from './envelope';
 import {FaixasAudio} from './FaixasAudio';
+import {FaixaLegendas} from './FaixaLegendas'; // frente Fala
 import {aoQuadro, irPara, msAtual, tocando} from './tocador';
 import {tipoDe} from './tipos';
 
@@ -458,6 +460,7 @@ export const LinhaDoTempo: React.FC = () => {
             </div>
           )}
           {deCenas && props.audio && <FaixasAudio documento={documento} audio={props.audio} x={x} pxs={pxs} duracaoVideo={props.duracao_ms} aoBuscar={buscar} />}
+          {deCenas && <FaixaLegendas documento={documento} legendas={(props as {legendas_cenas?: LegendasP}).legendas_cenas} x={x} pxs={pxs} aoBuscar={buscar} />}
           <div className="cabeca" ref={cabeca} />
         </div>
       </div>

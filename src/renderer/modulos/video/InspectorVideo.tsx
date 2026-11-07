@@ -12,6 +12,7 @@ import type {ItemMenu} from '../../componentes/Menu';
 import {FPS, formatarTempo, irPara} from './tocador';
 import {resumoBloco, tipoDe} from './tipos';
 import {InspectorCenas} from './InspectorCenas';
+import {PainelLegendas} from './PainelLegendas'; // frente Fala
 
 type NomeSecao = 'Tempo' | 'Conteúdo' | 'Posição e tamanho' | 'Outros';
 const SECOES: NomeSecao[] = ['Tempo', 'Conteúdo', 'Posição e tamanho', 'Outros'];
@@ -149,6 +150,7 @@ export const InspectorVideo: React.FC = () => {
   const selecao = useLoja((e) => e.selecao);
   const palavras = usarPalavras((lido?.doc as {palavras?: string} | undefined)?.palavras);
   if (!documento || !lido) return <div className="vazio">Sem vídeo ainda: crie no monitor.</div>;
+  if (ehDocCenas(lido.doc) && selecao?.documento === documento && selecao.caminho.startsWith('/legendas')) return <PainelLegendas documento={documento} />; // frente Fala
   if (ehDocCenas(lido.doc)) return <InspectorCenas documento={documento} />;
   const caminho = selecao?.documento === documento ? selecao.caminho : null;
   const obj = caminho ? (valorEm(lido.doc, caminho) as Record<string, unknown> | undefined) : undefined;

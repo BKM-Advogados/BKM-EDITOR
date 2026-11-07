@@ -1,0 +1,55 @@
+/* Frente Fala: faixa de legendas na linha do tempo e o painel das legendas no inspector (docs/legendas.md). A cor da
+   família é a do texto (azul), com um tom próprio para não confundir com os blocos. */
+.lt .trilha.legendas { height: 30px; border-top: 1px solid var(--borda); }
+.lt .trilha.legendas.sel { background: var(--acento-fraco); }
+.lt .trilha.legendas > .rotulo-faixa > svg.lucide { color: #f5d90a; }
+.lt .trilha.legendas.oculta .legenda { opacity: 0.4; }
+.lt .trilha.legendas.oculta .rotulo-faixa .bti { color: var(--aviso); }
+.lt .legenda { position: absolute; top: 3px; bottom: 3px; border-radius: var(--raio-1); background: #33300c; box-shadow: inset 0 2px 0 #f5d90a; overflow: hidden;
+  cursor: grab; white-space: nowrap; }
+.lt .legenda:hover { filter: brightness(1.15); }
+.lt .legenda .txt { position: absolute; left: 5px; right: 4px; top: 5px; font-size: var(--tam-1); color: var(--texto); overflow: hidden; text-overflow: ellipsis;
+  pointer-events: none; }
+.lt .legenda.sel { outline: 2px solid var(--texto); outline-offset: -1px; z-index: 2; overflow: visible; }
+.lt .legenda .alc { position: absolute; top: 0; bottom: 0; width: 6px; background: var(--texto); cursor: ew-resize; z-index: 1; }
+.lt .legenda .alc.ini { left: -1px; border-radius: 2px 0 0 2px; }
+.lt .legenda .alc.fim { right: -1px; border-radius: 0 2px 2px 0; }
+.lt .convite-legendas { position: absolute; left: 120px; top: 7px; font-size: var(--tam-1); color: var(--texto-3); cursor: pointer; white-space: nowrap; }
+.lt .convite-legendas:hover { color: var(--texto); }
+
+/* painel */
+.painel-legendas .linha-botoes { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 10px; }
+.painel-legendas .nota-fala { padding: 4px 10px 8px; color: var(--texto-3); font-size: var(--tam-1); line-height: 1.5; }
+.painel-legendas .nota-fala b { color: var(--texto-2); font-weight: var(--peso-forte); }
+.painel-legendas .andamento { margin: 4px 10px 8px; }
+.painel-legendas .andamento .barra { height: 4px; border-radius: 2px; background: var(--fundo-4); overflow: hidden; margin: 4px 0; }
+.painel-legendas .andamento .barra > div { height: 100%; background: var(--acento); transition: width 0.2s; }
+.painel-legendas .andamento .msg { font-size: var(--tam-1); color: var(--texto-2); display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.painel-legendas .clipes-voz { padding: 0 10px 6px; display: flex; flex-direction: column; gap: 3px; font-size: var(--tam-1); color: var(--texto-2); }
+.painel-legendas .clipes-voz .ok { color: var(--ok); }
+.painel-legendas .predefs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 6px 10px; }
+.painel-legendas .predef { text-align: left; border: 1px solid var(--borda-forte); border-radius: var(--raio-2); padding: 6px 8px; background: var(--fundo-1); color: var(--texto-2);
+  cursor: pointer; font: inherit; font-size: var(--tam-1); line-height: 1.35; }
+.painel-legendas .predef:hover { border-color: var(--texto-3); color: var(--texto); }
+.painel-legendas .predef.ligado { border-color: var(--acento); background: var(--acento-fundo); color: var(--texto); }
+.painel-legendas .predef b { display: block; color: var(--texto); font-size: var(--tam-2); margin-bottom: 2px; }
+.painel-legendas .busca { display: flex; flex-direction: column; gap: 6px; padding: 6px 10px; }
+.painel-legendas .busca input[type='text'] { width: 100%; }
+.painel-legendas .busca .opcoes { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: var(--tam-1); color: var(--texto-2); }
+.painel-legendas .lista-legendas { display: flex; flex-direction: column; }
+.painel-legendas .item-legenda { display: grid; grid-template-columns: auto 1fr auto; gap: 2px 8px; padding: 6px 8px 6px 10px; border-bottom: 1px solid var(--borda); align-items: start; }
+.painel-legendas .item-legenda.agora { background: rgba(245, 217, 10, 0.07); box-shadow: inset 2px 0 0 #f5d90a; }
+.painel-legendas .item-legenda.sel { background: var(--acento-fraco); box-shadow: inset 2px 0 0 var(--acento); }
+.painel-legendas .item-legenda.achado textarea { border-color: var(--comentario); }
+.painel-legendas .item-legenda .tempo { font: 11px/1.4 var(--fonte-mono); color: var(--texto-3); background: none; border: 0; padding: 2px 0; cursor: pointer; text-align: left;
+  white-space: nowrap; }
+.painel-legendas .item-legenda .tempo:hover { color: var(--acento); }
+.painel-legendas .item-legenda .falante { grid-column: 2; font-size: 10px; color: var(--texto-3); text-transform: uppercase; letter-spacing: 0.04em; }
+.painel-legendas .item-legenda textarea { grid-column: 2; grid-row: 1; width: 100%; min-height: 22px; resize: vertical; background: var(--fundo-1); color: var(--texto);
+  border: 1px solid var(--borda); border-radius: var(--raio); padding: 3px 6px; font: inherit; font-size: var(--tam-2); line-height: 1.4; field-sizing: content; }
+.painel-legendas .item-legenda textarea:focus { border-color: var(--acento); outline: none; }
+.painel-legendas .item-legenda .acoes-item { grid-column: 3; grid-row: 1 / span 2; display: flex; flex-direction: column; gap: 1px; }
+.painel-legendas .item-legenda .acoes-item .bti { width: 22px; height: 22px; color: var(--texto-3); }
+.painel-legendas .item-legenda .acoes-item .bti:hover { color: var(--texto); }
+.painel-legendas .item-legenda .acoes-item .bti:disabled { opacity: 0.3; }
+.painel-legendas .contagem { color: var(--texto-3); font-weight: normal; }
