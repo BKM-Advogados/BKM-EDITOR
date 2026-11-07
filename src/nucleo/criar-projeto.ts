@@ -180,13 +180,30 @@ export const claudeMd = (modulos: Modulo[]) => {
       '  `mudo` e, na música, `ducking` {ativo, alvo_lu (quanto fica abaixo da voz; padrão 20), ataque_ms, soltura_ms}; cada',
       '  `clipes[]` com `id`, `arquivo` (em `midia/`), `em` (ms na linha do tempo), `duracao_ms`, `corte_ms`, `volume`,',
       '  `fade_in_ms`, `fade_out_ms` e `mudo`. O que ficar fora do vídeo vira aviso, não erro (detalhe em docs/audio.md do app).',
+      '  Loudness: `audio.alvo_lufs` (padrão −14) e `audio.pico_dbtp` (padrão −1) são o alvo do arquivo exportado; a exportação',
+      '  mede o arquivo final e corrige o ganho. A limpeza de voz se faz na tela, por clipe: o app troca o `arquivo` pelo WAV',
+      '  limpo, guarda o da pessoa em `original` e as medidas em `limpeza`. Não escreva `original` nem `limpeza` à mão.',
+      '  Movimento no bloco `imagem` (zoom dinâmico): `movimento` {`tipo` (`aproximar`, `afastar`, `esquerda`, `direita`,',
+      '  `cima`, `baixo`), `intensidade` (0,05 a 0,4; padrão 0,15), `suave` (padrão sim)}. Fica limpo com `ajuste: "cobrir"`.',
+      '  Legendas (opcional): `legendas` {`segmentos`, `estilo`, `oculto`}. Cada segmento tem `id`, `em` e `sai` em ms na linha',
+      '  do tempo do vídeo, `texto` ("\\n" quebra a linha), `palavras` [{w, s, e} em ms] e `falante`. O `estilo` tem',
+      '  `predefinicao` (`classica`, `caixa`, `karaoke`, `faixa`, `discreta`), `posicao` (`baixo`, `meio`, `cima`), `tam`,',
+      '  `maiusculas`, `falante`, `cor`, `cor_destaque`, `fundo` e `fonte` (padrão: os do `tema`). `origens` e o `clipe` de',
+      '  cada segmento são do app, para as legendas andarem com o clipe de voz: não mexa. Gere com `transcrever`; corrija o',
+      '  texto por patch nos segmentos.',
     );
   }
   if (tem('imagem')) {
     linhas.push(
       '- Imagem: `largura`, `altura`, `fundo` e `camadas` (`imagem`, `texto`, `forma`) de baixo para cima, com `efeitos`. Um',
       '  carrossel tem `paginas[]` (cada uma com `id`, `nome` e as suas `camadas`; a raiz fica com `camadas: []`) e as camadas',
-      '  se endereçam por `/paginas/P/camadas/N`; `estado_do_editor` diz a página ativa. Exporta PNG por página e PDF.',
+      '  se endereçam por `/paginas/P/camadas/N`; `estado_do_editor` diz a página ativa.',
+      '  Acabamento por camada: `sombra` {cor, opacidade, desfoque, x, y}; `contorno` {cor, espessura, posicao: `fora`,',
+      '  `centro` ou `dentro`}; `degrade` {`tipo` (`linear` ou `radial`), `angulo` (180 = de cima para baixo), `centro` {x, y},',
+      '  `paradas` [{cor, posicao de 0 a 1, opacidade}]}, no lugar da cor em texto e forma. `fundo_degrade`, na raiz do',
+      '  documento, vai por cima do `fundo` em todas as páginas. Foto dentro de forma ou texto: na camada de imagem, `mascara`',
+      '  é o id da forma ou do texto logo acima dela. `remover_fundo` troca o `src` pelo recorte e guarda o original em',
+      '  `src_original`. A pessoa exporta PNG por página e PDF pelo app; o MCP não exporta.',
     );
   }
   if (tem('3d')) linhas.push('- Cena 3D: objetos com `posicao`, `rotacao` em graus, `escala` e `cor`; luzes; câmera.');
@@ -210,25 +227,68 @@ export const claudeMd = (modulos: Modulo[]) => {
       '  `pesquisa/fontes/<id>.txt` (fora do git). `pesquisa/dossie.md` é o rascunho do skill `pesquisa-juridica`.',
     );
   }
-  linhas.push(
-    '',
-    '## Como trabalhar',
-    '',
-    '1. `estado_do_editor` diz o que a pessoa está vendo e o que está selecionado.',
-    '2. `ler_documento` devolve o JSON e a `versao`; `aplicar_patch` muda com JSON Patch (RFC 6902) e `versao_base`.',
-    '   Ponha um `test` no valor que vai trocar. Se o documento mudou por baixo, leia de novo e refaça.',
-    '3. `criar_documento` cria vídeo, imagem ou cena 3D no projeto; `renomear_projeto` muda o nome.',
-    '4. `listar_comentarios`, `ler_comentario`, `responder_comentario` e `resolver_comentario` cuidam dos pedidos da pessoa.',
-    '5. `listar_mudancas` mostra o que a pessoa mudou à mão desde a sua última olhada.',
-  );
-  if (tem('video') || tem('imagem')) linhas.push('6. `aplicar_marca` troca o kit de marca (cores, fonte, logo e fontes próprias) de um documento.');
+  const passos = [
+    '`estado_do_editor` diz o que a pessoa está vendo e o que está selecionado.',
+    '`ler_documento` devolve o JSON e a `versao`; `aplicar_patch` muda com JSON Patch (RFC 6902) e `versao_base`.\n   Ponha um `test` no valor que vai trocar. Se o documento mudou por baixo, leia de novo e refaça.',
+    '`criar_documento` cria vídeo, imagem ou cena 3D no projeto; `renomear_projeto` muda o nome.',
+    '`listar_comentarios`, `ler_comentario`, `responder_comentario` e `resolver_comentario` cuidam dos pedidos da pessoa.',
+    '`listar_mudancas` mostra o que a pessoa mudou à mão desde a sua última olhada.',
+  ];
+  if (tem('video') || tem('imagem')) passos.push('`aplicar_marca` troca o kit de marca (cores, fonte, logo e fontes próprias) de um documento.');
+  if (tem('video')) {
+    passos.push('`transcrever` transcreve a fala no próprio PC: grava `<arquivo>.palavras.json` e, no vídeo de cenas, gera as\n   legendas. `exportar_legendas` grava SRT e VTT em `saidas/`; `importar_legendas` lê um SRT ou VTT do projeto.');
+  }
+  if (tem('imagem')) passos.push('`remover_fundo` tira o fundo de uma foto de pessoa com o modelo local; com `voltar: true`, volta ao original.');
+  linhas.push('', '## Como trabalhar', '', ...passos.map((t, i) => `${i + 1}. ${t}`));
   if (tem('video') || tem('imagem')) linhas.push(...secaoPesquisa());
-  linhas.push(
-    '',
-    'Tudo o que você faz cai nos documentos, e a pessoa edita depois. Não grave fora da pasta do projeto.',
-    '',
-  );
-  return linhas.join('\n');
+  linhas.push('', FIM_DO_TEXTO);
+  return [MARCA_CLAUDE_INICIO, ...linhas, MARCA_CLAUDE_FIM, ''].join('\n');
+};
+
+// ---------- CLAUDE.md refeito ao abrir ----------
+/** O texto que o app escreve no CLAUDE.md fica entre estas marcas e é refeito a cada abertura do projeto, para o Claude
+ *  conhecer os campos da versão instalada. O que a pessoa ou o Claude escrever fora das marcas fica como está. */
+export const MARCA_CLAUDE_INICIO = '<!-- estudio:inicio · parte escrita pelo app e refeita ao abrir o projeto; escreva fora destas marcas -->';
+export const MARCA_CLAUDE_FIM = '<!-- estudio:fim -->';
+// até a 0.3.0 o app escrevia o texto sem marcas: ele começa com o título e esta frase e termina com FIM_DO_TEXTO
+const TITULO = '# Projeto do Estúdio';
+const FRASE_DO_APP = 'Esta pasta é um projeto do Estúdio, aberto no app. A pessoa edita na interface; você edita pelas ferramentas do MCP';
+const FIM_DO_TEXTO = 'Tudo o que você faz cai nos documentos, e a pessoa edita depois. Não grave fora da pasta do projeto.';
+
+/** O CLAUDE.md novo a partir do atual, ou null se nada muda. Sem arquivo: o texto gerado. Com as marcas: troca só o que
+ *  está entre elas. Texto antigo do app, sem marcas: troca pelo gerado e guarda depois dele o que a pessoa escreveu antes
+ *  ou depois. Outro texto (o CLAUDE.md escrito à mão do carrossel da Cliente, ou um da pessoa): não mexe. */
+export const claudeMdAtualizado = (atual: string | null, modulos: Modulo[]): string | null => {
+  const gerado = claudeMd(modulos);
+  if (atual === null) return gerado;
+  const texto = atual.replace(/\r\n/g, '\n');
+  const i = texto.indexOf(MARCA_CLAUDE_INICIO);
+  const f = i >= 0 ? texto.indexOf(MARCA_CLAUDE_FIM, i) : -1;
+  let novo: string | null = null;
+  if (i >= 0 && f > i) {
+    novo = texto.slice(0, i) + gerado.trimEnd() + texto.slice(f + MARCA_CLAUDE_FIM.length);
+  } else if (texto.includes(FRASE_DO_APP) && texto.includes(FIM_DO_TEXTO)) {
+    const antes = texto.slice(0, Math.max(0, texto.indexOf(TITULO))).trim();
+    const depois = texto.slice(texto.indexOf(FIM_DO_TEXTO) + FIM_DO_TEXTO.length).trim();
+    novo = `${[gerado.trimEnd(), antes, depois].filter(Boolean).join('\n\n')}\n`;
+  }
+  return novo === null || novo === texto ? null : novo;
+};
+
+/** Refaz a parte do app no CLAUDE.md de um projeto, pelos módulos que o manifesto tem. Devolve se gravou. Nunca lança:
+ *  um CLAUDE.md que não dá para atualizar não impede abrir o projeto. */
+export const regerarClaudeMd = (raiz: string): boolean => {
+  try {
+    const manifesto = JSON.parse(readFileSync(path.join(raiz, 'estudio.json'), 'utf-8')) as Manifesto;
+    const modulos = [...new Set((manifesto.documentos ?? []).map((d) => d.modulo))];
+    const arq = path.join(raiz, 'CLAUDE.md');
+    const novo = claudeMdAtualizado(existsSync(arq) ? readFileSync(arq, 'utf-8') : null, modulos);
+    if (novo === null) return false;
+    writeFileSync(arq, novo, 'utf-8');
+    return true;
+  } catch {
+    return false;
+  }
 };
 
 // ---------- plano do projeto ----------

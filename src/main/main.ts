@@ -7,7 +7,7 @@ import os from 'node:os';
 import {CANAL, type InfoProjeto, type Metricas, type NovoProjeto, type Perfil, type Preferencias, type Progresso, type ResultadoExportacao, type Retangulo} from '../compartilhado/api';
 import {Conversas, contaClaude} from './conversa';
 import type {Comentario, EstadoEditor, Manifesto, Modulo, OperacaoPatch} from '../nucleo/documentos';
-import {aplicarMarcaAoPlano, dentroDoOneDrive, documentoNovo, gravarPlano, nomeDePasta, nomePadrao, pastaLivre, planoDoProjeto} from '../nucleo/criar-projeto';
+import {aplicarMarcaAoPlano, dentroDoOneDrive, documentoNovo, gravarPlano, nomeDePasta, nomePadrao, pastaLivre, planoDoProjeto, regerarClaudeMd} from '../nucleo/criar-projeto';
 import {MODELOS} from '../nucleo/modelos';
 import {FORMATO_PADRAO, type Formato} from '../nucleo/formatos';
 import {argumentosDoRender, destinoDoFormato, FORMATOS_IMAGEM_SAIDA, nomesDosArquivos, type OpcoesExportarImagem, type OpcoesExportarVideo} from '../nucleo/exportacao';
@@ -134,10 +134,12 @@ const abrirProjeto = async (raiz: string) => {
       } catch {
         /* manifesto quebrado no meio de uma gravação: a próxima mudança acerta */
       }
+      regerarClaudeMd(raiz); // documento de outro módulo criado depois: o CLAUDE.md ganha a seção dele
     }
     enviar(CANAL.mudou, {arquivo});
   });
   midia.servir(raiz);
+  regerarClaudeMd(raiz); // o Claude conhece os campos desta versão também nos projetos criados antes dela
   await sessao.abrir();
   memoria.lembrar(raiz, manifesto.nome);
   tituloDaJanela(manifesto.nome);
