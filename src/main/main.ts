@@ -22,7 +22,7 @@ import {ServidorMidia} from './servidor-midia';
 import {SessaoProjeto} from './sessao-projeto';
 import {Terminais} from './terminais';
 import {registrarIpcAudio} from './ipc-audio';
-import {registrarIpcLimpeza} from './limpeza-voz';
+import {apagarLimposSemUso, registrarIpcLimpeza} from './limpeza-voz';
 import {registrarIpcLoudness} from './loudness';
 
 // o mesmo id do instalador (electron-builder.yml): a barra de tarefas agrupa a janela com o atalho
@@ -140,6 +140,7 @@ const abrirProjeto = async (raiz: string) => {
     enviar(CANAL.mudou, {arquivo});
   });
   midia.servir(raiz);
+  apagarLimposSemUso(sessao.projeto); // frente Som: as versões limpas da voz que nenhum documento cita (limpeza-voz.ts)
   await sessao.abrir();
   memoria.lembrar(raiz, manifesto.nome);
   tituloDaJanela(manifesto.nome);

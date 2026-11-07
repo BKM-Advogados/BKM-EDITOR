@@ -57,7 +57,8 @@ ITU-R BS.1770 e tira a potência média por janela de 50 ms) e pede ao processo 
 `midia/<arquivo>.envelope.json`:
 
 ```json
-{"versao": 1, "janela_ms": 50, "duracao_ms": 12000, "db": [-100, -41.3, -22.7, ...]}
+{"versao": 2, "janela_ms": 50, "duracao_ms": 12000, "db": [-100, -41.3, -22.7, ...],
+ "fonte": {"tamanho": 1152044, "modificado_ms": 1762531200123.4, "sha256": "9f2c…"}}
 ```
 
 `db` é o loudness de cada janela, no mesmo número do LUFS; `-100` é silêncio. O arquivo é pequeno (20 números por
@@ -65,6 +66,15 @@ segundo) e entra no git do projeto. Quem lê é o processo principal (`sessao-pr
 `resolverCenas`), então a prévia, a exportação e o Claude (pelo `ler_documento`) veem a mesma forma de onda e o mesmo
 ducking. Um clipe cujo arquivo ainda não tem envelope (projeto vindo de outro PC, arquivo trocado à mão) é medido em
 segundo plano assim que o vídeo abre; até lá o ducking usa níveis típicos (narração a −20, música a −14) e avisa.
+
+**Versão e carimbo.** `fonte` é o arquivo de áudio como estava quando foi medido: o processo principal carimba o tamanho,
+a data e o sha256 ao gravar (e recusa se a interface mediu bytes que não são mais os do disco). Ao ler, o envelope vale
+se o tamanho e a data conferem; com o mesmo tamanho e outra data (cópia, `git clone`), só o sha256 decide (lido uma vez
+por sessão); com outro tamanho, ou sem carimbo, ou de outra `versao`, conta como não medido e a linha do tempo mede de
+novo. A versão sobe quando a conta muda: a 2 veio com a ponderação K do libebur128, e os envelopes da 0.3.0 (versão 1)
+são medidos de novo na primeira abertura. Tomada nova gravada com o mesmo nome com o app aberto (pelo terminal, pelo
+Claude): a interface esquece a medida daquele arquivo, monta de novo os vídeos que o tocam e mede outra vez; o clipe não
+fica preso à duração da tomada velha.
 
 ## Ducking: relativo e medido
 
@@ -102,6 +112,15 @@ Cancelar; já limpo, o ruído e a voz antes e depois, "Limpar de novo" e "Voltar
 (`src/main/limpeza-voz.ts`) decodifica o original com o ffmpeg do compositor do Remotion, limpa com
 `src/nucleo/limpeza-voz.ts` e grava o `.limpo.wav` (16 bits, a taxa e os canais do original) com o envelope ao lado. Limpar
 de novo parte sempre do original. O tamanho e o alinhamento não mudam: corte e duração do clipe continuam valendo.
+
+**Fora do git.** Cada versão limpa tem dezenas de MB (2 min estéreo a 44,1 kHz são 21 MB por intensidade), e o commit
+automático do projeto faz `git add -A`. A primeira limpeza acrescenta ao `.gitignore` do projeto, antes de gravar o WAV,
+as linhas `*.limpo.wav`, `*.limpo-leve.wav`, `*.limpo-forte.wav` e o envelope de cada uma (`*.limpo.wav.envelope.json`…),
+com um comentário; vale para projeto novo e antigo, e o `GITIGNORE` de `criar-projeto.ts` não muda. A versão limpa se
+refaz a partir do original ("Limpar de novo", que é determinístico). **Sobras:** na abertura do projeto, a versão limpa
+(nome `<arquivo>.<ext>.limpo[-leve|-forte].wav`) que nenhum documento cita é apagada com o envelope; só na abertura, para
+o desfazer da sessão nunca procurar um arquivo apagado, e só se todos os documentos abrirem. Um documento antigo tirado do
+git que aponte para uma versão apagada faz o render parar com o nome do arquivo; "Limpar de novo" a refaz.
 
 O ffmpeg do Remotion vem enxuto (só `aformat`, `atrim`, `adelay`, `apad`, `amix`, `aresample`, `loudnorm`, `volume`,
 `silencedetect` e poucos outros de áudio; sem `afftdn`, `highpass`, `lowpass`, `deesser`, `arnndn` nem `ebur128`). Por isso
@@ -218,9 +237,11 @@ para depois: por ora a pasta é da pessoa.
 - `src/nucleo/cenas.ts`: `audio` no documento e nas props; `resolverCenas(doc, {envelopes})`.
 - `src/composicoes/cenas/VideoCenas.tsx`: `<Som>` com um `<Html5Audio>` por clipe.
 - `src/nucleo/loudness.ts`: medidor BS.1770 aos pedaços e `medirMistura`. `src/nucleo/limpeza-voz.ts`: a limpeza.
-- `src/main/ipc-audio.ts`: grava o envelope, lista a pasta de trilhas, importa trilha; `lerEnvelopes` para as props.
+- `src/main/ipc-audio.ts`: grava o envelope com o carimbo (`gravarEnvelope`), lista a pasta de trilhas, importa trilha;
+  `lerEnvelopes` para as props (só o envelope em dia).
 - `src/main/ffmpeg-som.ts`: acha e roda o ffmpeg do Remotion, decodifica para amostras, lê e grava WAV.
-- `src/main/limpeza-voz.ts` (IPC `audio:limpar-voz`, `audio:limpeza-cancelar`, evento `audio:limpeza-progresso`) e
+- `src/main/limpeza-voz.ts` (IPC `audio:limpar-voz`, `audio:limpeza-cancelar`, evento `audio:limpeza-progresso`; as
+  regras do `.gitignore` e `apagarLimposSemUso`, chamado na abertura do projeto) e
   `src/main/loudness.ts` (`igualarLoudness` da exportação e o IPC `audio:medir-loudness`), registrados no `main.ts`.
 - `src/renderer/modulos/video/`: `envelope.ts` (mede com Web Audio), `acoes-audio.ts` (patches, limpar e voltar ao
   original), `FaixasAudio.tsx` (linha do tempo), `BibliotecaTrilhas.tsx`, `MedidorLoudness.tsx`, e as partes de áudio em
@@ -233,4 +254,6 @@ para depois: por ora a pasta é da pessoa.
 
 O formato acima vale para o `aplicar_patch`: `audio.alvo_lufs` e `audio.pico_dbtp` mudam o alvo da exportação; num clipe
 limpo, trocar `arquivo` à mão deixa `original` e `limpeza` desatualizados (apague os dois, ou use "Voltar ao original").
+Os `*.limpo*.wav` ficam fora do git (estão no `.gitignore`) e se refazem do original; não os versione. Gravar uma tomada
+nova por cima de um áudio de `midia/` é seguro: o envelope dele deixa de valer e a interface mede de novo.
 A limpeza de voz e a medição são da interface (precisam do ffmpeg do processo principal); o Claude não as dispara pelo MCP.

@@ -1,11 +1,32 @@
 // Limpeza de voz: com uma "voz" sintética (sílabas com harmônicos e pausas) e ruído conhecido, o ruído nas pausas cai e a
 // voz fica no nível; o grave abaixo de 80 Hz some; o tamanho não muda; cancelar para. E as peças do processo principal
 // que não rodam o ffmpeg: o nome do arquivo limpo, o WAV (ler e gravar, inclusive o do pipe) e o que o ffmpeg conta da entrada.
-import {describe, expect, it} from 'vitest';
+import {execFileSync} from 'node:child_process';
+import {existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {afterAll, describe, expect, it} from 'vitest';
 import {envelopeDeAmostras} from '../src/nucleo/audio';
+import {gravarPlano, planoDoProjeto} from '../src/nucleo/criar-projeto';
 import {INTENSIDADES, LimpezaCancelada, limparVoz, medirRuido} from '../src/nucleo/limpeza-voz';
+import {Projeto} from '../src/nucleo/projeto';
 import {amostrasPorPacote, gravarWav, lerEntrada, lerWav} from '../src/main/ffmpeg-som';
-import {arquivoLimpo} from '../src/main/limpeza-voz';
+import {arquivoDoEnvelope, lerEnvelope} from '../src/main/ipc-audio';
+import {apagarLimposSemUso, arquivoLimpo, garantirForaDoGit, limparArquivo, REGRAS_GIT, versoesLimpas} from '../src/main/limpeza-voz';
+
+const tmp = mkdtempSync(path.join(os.tmpdir(), 'estudio-limpeza-'));
+afterAll(() => rmSync(tmp, {recursive: true, force: true}));
+const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-c', 'core.autocrlf=false', ...args], {cwd, encoding: 'utf-8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe']});
+const temGit = (() => {
+  try {
+    execFileSync('git', ['--version'], {windowsHide: true});
+    return true;
+  } catch {
+    return false;
+  }
+})();
+const FFMPEG = path.join('node_modules', '@remotion', `compositor-${process.platform}-${process.arch}${process.platform === 'win32' ? '-msvc' : ''}`, process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
+const projetoNovo = (nome: string) => new Projeto(gravarPlano(path.join(tmp, nome), planoDoProjeto({nome, modelo: 'video-branco'})));
 
 const TAXA = 48000;
 const gerador = (semente: number) => {
@@ -150,5 +171,82 @@ describe('processo principal (sem ffmpeg)', () => {
     expect(amostrasPorPacote({codec: 'pcm_s16le', canais: 2})).toBe(1024);
     expect(amostrasPorPacote({codec: 'mp3', canais: 2})).toBe(1152);
     expect(lerEntrada('nada')).toBeNull();
+  });
+});
+
+describe('versões limpas fora do git (som-D13)', () => {
+  it('a regra entra no .gitignore uma vez, no projeto que já tem um e no que não tem', () => {
+    const p = projetoNovo('Regra');
+    const antes = readFileSync(p.caminho('.gitignore'), 'utf-8');
+    expect(garantirForaDoGit(p)).toBe(true);
+    const depois = readFileSync(p.caminho('.gitignore'), 'utf-8');
+    expect(depois.startsWith(antes)).toBe(true); // o que havia fica
+    for (const r of REGRAS_GIT) expect(depois.split('\n')).toContain(r);
+    expect(REGRAS_GIT).toEqual(expect.arrayContaining(['*.limpo.wav', '*.limpo-leve.wav', '*.limpo-forte.wav', '*.limpo.wav.envelope.json']));
+    expect(garantirForaDoGit(p)).toBe(false);
+    expect(readFileSync(p.caminho('.gitignore'), 'utf-8')).toBe(depois);
+    // projeto antigo sem .gitignore (ou com um sem quebra de linha no fim)
+    rmSync(p.caminho('.gitignore'));
+    expect(garantirForaDoGit(p)).toBe(true);
+    expect(readFileSync(p.caminho('.gitignore'), 'utf-8').split('\n')).toContain('*.limpo-forte.wav');
+    writeFileSync(p.caminho('.gitignore'), 'saidas/');
+    garantirForaDoGit(p);
+    expect(readFileSync(p.caminho('.gitignore'), 'utf-8').split('\n').slice(0, 2)).toEqual(['saidas/', expect.stringMatching(/^# Estúdio/)]);
+  });
+
+  it.skipIf(!temGit)('o git do projeto ignora as três intensidades e os envelopes delas, e não o original', () => {
+    const p = projetoNovo('Git');
+    git(p.raiz, 'init', '-q');
+    garantirForaDoGit(p);
+    const limpos = (['leve', 'media', 'forte'] as const).map((i) => arquivoLimpo('midia/sub/narracao.wav', i));
+    for (const f of ['midia/sub/narracao.wav', ...limpos, ...limpos.map(arquivoDoEnvelope), 'midia/sub/narracao.wav.envelope.json']) p.gravarTexto(f, 'x');
+    git(p.raiz, 'add', '-A'); // o que o commit automático faz
+    const entrou = git(p.raiz, 'diff', '--cached', '--name-only').split('\n').filter(Boolean);
+    expect(entrou).toContain('midia/sub/narracao.wav');
+    expect(entrou).toContain('midia/sub/narracao.wav.envelope.json');
+    expect(entrou.filter((f) => f.includes('.limpo'))).toEqual([]);
+  });
+
+  it('na abertura apaga a versão que nenhum documento cita, com o envelope; a citada, o original e o arquivo da pessoa ficam', () => {
+    const p = projetoNovo('Sobras');
+    const doc = p.manifesto().documentos.find((d) => d.modulo === 'video')!;
+    const forte = arquivoLimpo('midia/narracao.wav', 'forte');
+    const sobras = [arquivoLimpo('midia/narracao.wav'), arquivoLimpo('midia/narracao.wav', 'leve'), arquivoLimpo('midia/antiga.mp3')];
+    for (const f of ['midia/narracao.wav', 'midia/minha voz.limpo.wav', forte, ...sobras]) {
+      p.gravarTexto(f, 'x');
+      if (f.includes('.wav.limpo') || f.includes('.mp3.limpo')) p.gravarTexto(arquivoDoEnvelope(f), '{}');
+    }
+    const d = p.lerJson<Record<string, unknown>>(doc.caminho).doc;
+    p.gravarTexto(doc.caminho, JSON.stringify({...d, audio: {faixas: [{id: 'f', nome: 'Narração', papel: 'voz', clipes: [
+      {id: 'a', arquivo: forte, original: 'midia/narracao.wav', em: 0, duracao_ms: 1000}]}]}}, null, 2));
+    expect(versoesLimpas(p)).toEqual([...sobras, forte].sort());
+    expect(apagarLimposSemUso(p).sort()).toEqual([...sobras].sort());
+    for (const f of sobras) {
+      expect(existsSync(p.caminho(f))).toBe(false);
+      expect(existsSync(p.caminho(arquivoDoEnvelope(f)))).toBe(false);
+    }
+    for (const f of [forte, arquivoDoEnvelope(forte), 'midia/narracao.wav', 'midia/minha voz.limpo.wav']) expect(existsSync(p.caminho(f))).toBe(true);
+    // documento quebrado no meio de uma gravação: na dúvida, não apaga nada
+    p.gravarTexto(arquivoLimpo('midia/narracao.wav'), 'x');
+    p.gravarTexto(doc.caminho, '{"audio": ');
+    expect(apagarLimposSemUso(p)).toEqual([]);
+    expect(existsSync(p.caminho(arquivoLimpo('midia/narracao.wav')))).toBe(true);
+  });
+
+  it.skipIf(!temGit || !existsSync(FFMPEG))('limpar de verdade (ffmpeg do Remotion): .gitignore antes do WAV, que fica fora do git, e envelope carimbado', async () => {
+    const p = projetoNovo('Limpar');
+    git(p.raiz, 'init', '-q');
+    writeFileSync(p.caminho('.gitignore'), 'saidas/\n'); // projeto antigo, sem a regra
+    writeFileSync(p.caminho('midia/narracao.wav'), gravarWav([vozComRuido().suja], TAXA));
+    const r = await limparArquivo(p, 'midia/narracao.wav', 'media');
+    expect(r.arquivo).toBe('midia/narracao.wav.limpo.wav');
+    expect(readFileSync(p.caminho('.gitignore'), 'utf-8').split('\n')).toContain('*.limpo.wav');
+    const env = lerEnvelope(p, r.arquivo); // o carimbo confere com o WAV gravado
+    expect(env?.versao).toBe(2);
+    expect(env?.fonte?.tamanho).toBe(readFileSync(p.caminho(r.arquivo)).length);
+    git(p.raiz, 'add', '-A');
+    const entrou = git(p.raiz, 'diff', '--cached', '--name-only').split('\n').filter(Boolean);
+    expect(entrou).toEqual(expect.arrayContaining(['.gitignore', 'midia/narracao.wav']));
+    expect(entrou.filter((f) => f.includes('.limpo'))).toEqual([]);
   });
 });
