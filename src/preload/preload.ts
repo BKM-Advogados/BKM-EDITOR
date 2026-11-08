@@ -82,6 +82,7 @@ const api: ApiEstudio = {
     cancelarLimpeza: () => ipcRenderer.invoke(CANAL.audioLimpezaCancelar),
     aoProgressoLimpeza: (cb) => ouvir<[{arquivo: string; progresso: number}]>(CANAL.audioLimpezaProgresso, cb),
     medirLoudness: (documento) => ipcRenderer.invoke(CANAL.audioMedirLoudness, documento),
+    salvarTomada: (wav) => ipcRenderer.invoke(CANAL.audioSalvarTomada, wav),
   },
   marcas: {
     listar: () => ipcRenderer.invoke(CANAL.marcasListar),

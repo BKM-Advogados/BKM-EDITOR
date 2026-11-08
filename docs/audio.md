@@ -289,10 +289,35 @@ resolvedor (e o Claude o vê nos avisos do documento).
 | `dividir_clipe` | divide o clipe em `em_ms` (ou onde está a cabeça) na grade de quadros, levando as legendas | livre |
 | `copiar_clipe` | copia o clipe na mesma faixa (depois do original ou em `em_ms`), com as legendas | livre |
 | `crossfade` | crossfade entre dois clipes da mesma faixa: `duracao_ms`, `curva`, `modo` | livre |
+| `preparar_teleprompter` | grava o texto (ou o das cenas) em `teleprompter`, com a velocidade, e estima a duração da leitura; quem grava é a pessoa | livre |
+| `adicionar_clipe_audio` | põe um arquivo de áudio do projeto numa faixa (narração, música ou efeito), com o volume do efeito na medida da casa | livre |
 
 Classe **livre**: grava no diário como o agente e tem Reverter. Nenhuma lê a web, baixa modelo ou toca em arquivo de
 fora do projeto. Como chegar vindo de outro módulo: a seleção de um clipe de áudio (`estado_do_editor`) diz o `clipe`; o
 `em_ms` omitido usa a cabeça gravada em `estado.json`. Como voltar: `listar_mudancas` + Reverter, ou Ctrl+Z na tela.
+
+## Gravar a narração com teleprompter (rodada 3)
+
+"+ Áudio" › "Gravar narração…" abre o gravador (`GravadorNarracao.tsx`). **Texto:** vem do campo `teleprompter` do vídeo
+(`{texto, palavras_por_minuto?, tamanho?, espelhar?}`, que a IA também escreve) ou do botão "Texto das cenas" (títulos, textos
+e listas, uma cena por parágrafo). **Teleprompter:** depois de uma contagem de 3 s o texto rola na velocidade pedida
+(padrão 150 palavras por minuto, de 60 a 260), com a palavra da vez em destaque e as lidas esmaecidas; a conta de tempo é de
+`src/nucleo/gravacao.ts`: 60 000/ppm ms por palavra, mais 250 ms depois de vírgula, 500 ms depois de ponto e 600 ms por
+parágrafo. "Espelhar" inverte o texto para um espelho de teleprompter. **Monitoramento:** "Ouvir a mim mesmo (fones)" liga um
+ganho à parte do microfone para o destino; vem desligado, porque sem fones o microfone pega o alto-falante. **Medidor:** pico em
+dBFS ao vivo; passou de −0,5 dB a barra fica vermelha e, ao parar, a tomada avisa que pode ter cortado.
+
+**Captura.** `getUserMedia` com `echoCancellation`, `noiseSuppression` e `autoGainControl` **desligados**, mono, 48 kHz; o
+`AudioContext` abre a 48 kHz e, se o sistema não conceder, a gravação não começa. As amostras vêm de um `ScriptProcessorNode`
+(o `AudioWorklet` pediria um módulo que o `script-src 'self'` da janela só aceita empacotado). Ao parar, o WAV é PCM de
+**24 bits**, 48 kHz (`codificarWavPcm`), o processo principal confere o cabeçalho (`salvarTomada`, canal `audio:salvar-tomada`) e grava
+`midia/narracao-gravada.wav` (`-2`, `-3`… sem nunca sobrescrever), e `adicionarClipeAudio` põe o clipe na narração **medindo o
+envelope** na hora. A limpeza de voz é um passo à parte, a pedido, e o original fica.
+
+**Medido (testes):** o WAV de 24 bits volta com erro < 1e-6; o ffmpeg do Remotion o decodifica (erro < 1e-5) e o envelope de um
+seno de 0,5 a 300 Hz sai a −9,7 dB. **Não medido:** o microfone de verdade, a latência do monitoramento e a rolagem do
+teleprompter na tela (o Electron não roda neste PC; a prévia web não tem microfone). Se o Windows bloquear o microfone, a
+mensagem manda para Configurações › Privacidade › Microfone.
 
 ## Pasta de trilhas
 
@@ -306,6 +331,7 @@ para depois: por ora a pasta é da pessoa.
 - `src/nucleo/audio.ts`: tipos, envelope (ponderação K), referência por mediana, `calcularDucking`, `resolverAudio`,
   `volumeDoClipe`. Puro, sem disco.
 - `src/nucleo/cenas.ts`: `audio` no documento e nas props; `resolverCenas(doc, {envelopes})`.
+- `src/nucleo/gravacao.ts`: WAV PCM, medidor e teleprompter. `src/main/ipc-gravacao.ts`: salva a tomada. `src/renderer/modulos/video/gravador.ts` e `GravadorNarracao.tsx`: a captura e o painel.
 - `src/nucleo/clipes-audio.ts`: `dividirClipe`, `copiarClipe`, `crossfadeEntre`, `volumeDoEfeito` (puros, em JSON Patch).
   `src/nucleo/mcp-som.ts`: as ferramentas MCP do som (`registrarSom`, uma linha em `ferramentas-mcp.ts`).
 - `src/composicoes/cenas/VideoCenas.tsx`: `<Som>` com um `<Html5Audio>` por clipe.
@@ -319,7 +345,7 @@ para depois: por ora a pasta é da pessoa.
 - `src/renderer/modulos/video/`: `envelope.ts` (mede com Web Audio), `acoes-audio.ts` (patches, limpar e voltar ao
   original), `FaixasAudio.tsx` (linha do tempo), `BibliotecaTrilhas.tsx`, `MedidorLoudness.tsx`, e as partes de áudio em
   `LinhaDoTempo.tsx` e `InspectorCenas.tsx`.
-- `testes/audio.test.ts`, `testes/loudness.test.ts`, `testes/limpeza-voz.test.ts`, `testes/clipes-audio.test.ts`, `testes/mcp-som.test.ts`; `scripts/audio-sintetico.ts` (WAV de
+- `testes/audio.test.ts`, `testes/loudness.test.ts`, `testes/limpeza-voz.test.ts`, `testes/clipes-audio.test.ts`, `testes/mcp-som.test.ts`, `testes/gravacao.test.ts`; `scripts/audio-sintetico.ts` (WAV de
   teste da prévia web e do script de exportação), `scripts/limpeza-teste.mjs` e `scripts/exportar-teste-som.mjs`.
 - Prévia web: a ponte limpa e mede de verdade (o mesmo núcleo) sobre os WAV sintéticos.
 
@@ -337,3 +363,7 @@ um efeito sonoro novo por `aplicar_patch`, ponha `volume` no clipe para a median
 interface faz essa conta; um efeito a 100 % passa por cima da narração). Duas músicas na mesma faixa só se sobrepõem
 com `fade_out_ms` e `fade_in_ms` iguais ao tempo da sobreposição (e `fade_*_curva: "potencia"`): senão o documento avisa
 que tocam juntas.
+
+Para a pessoa gravar a narração: `preparar_teleprompter` (ou o campo `teleprompter` por patch) deixa o texto pronto; peça a ela para abrir
+"+ Áudio" › "Gravar narração…" (o microfone é dela). Depois da gravação, o clipe já está na faixa de narração; `adicionar_clipe_audio`
+serve para pôr outro arquivo de `midia/` (a tomada de outra pessoa, uma música, um efeito).

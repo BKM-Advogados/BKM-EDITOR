@@ -16,6 +16,7 @@ import {teclaLivre} from '../../componentes/Trilho';
 import {ancoraPerto} from './ancoras';
 import {adicionarClipeAudio} from './acoes-audio';
 import {BibliotecaTrilhas} from './BibliotecaTrilhas';
+import {GravadorNarracao} from './GravadorNarracao'; // frente Som (rodada 3)
 import {medirPendentes} from './envelope';
 import {FaixasAudio} from './FaixasAudio';
 import {FaixaLegendas} from './FaixaLegendas'; // frente Fala
@@ -71,6 +72,7 @@ export const AcoesLinhaDoTempo: React.FC<{noCabecalho?: boolean}> = ({noCabecalh
     };
   }, [cab]);
   const [biblioteca, setBiblioteca] = useState(false);
+  const [gravador, setGravador] = useState(false);
   if (!m) return null;
   const minimo = Math.min(m.ajuste, 2);
   const pxs = zoom ?? m.ajuste;
@@ -83,12 +85,14 @@ export const AcoesLinhaDoTempo: React.FC<{noCabecalho?: boolean}> = ({noCabecalh
           <BotaoMenu titulo="Adicionar áudio: narração, música ou efeito (copia o arquivo para midia/)" icone={<Plus size={13} />} rotulo="Áudio" className="bt fantasma mini" lado="esquerda"
             itens={[
               {rotulo: 'Narração…', icone: <Mic className="i14" />, acao: () => void adicionarClipeAudio(documento, 'voz')},
+              {rotulo: 'Gravar narração…', icone: <Mic className="i14" />, acao: () => setGravador(true)},
               {rotulo: 'Música…', icone: <Music className="i14" />, acao: () => void adicionarClipeAudio(documento, 'musica')},
               {rotulo: 'Efeito sonoro…', icone: <Volume2 className="i14" />, acao: () => void adicionarClipeAudio(documento, 'efeitos')},
               'sep',
               {rotulo: 'Música da biblioteca…', icone: <Music className="i14" />, acao: () => setBiblioteca(true)},
             ]} />
           {biblioteca && <BibliotecaTrilhas documento={documento} aoFechar={() => setBiblioteca(false)} />}
+          {gravador && <GravadorNarracao documento={documento} aoFechar={() => setGravador(false)} />}
         </span>
       )}
       <button className={`bti${zoom === null ? ' ligado' : ''}`} onClick={() => m.zoom(null)} title="Ajustar à janela  Shift+Z"><Maximize2 /></button>

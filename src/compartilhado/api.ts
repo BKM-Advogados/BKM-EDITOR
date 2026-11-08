@@ -73,6 +73,7 @@ export const CANAL = {
   audioLimpezaCancelar: 'estudio:audio-limpeza-cancelar',
   audioLimpezaProgresso: 'estudio:audio-limpeza-progresso',
   audioMedirLoudness: 'estudio:audio-medir-loudness',
+  audioSalvarTomada: 'estudio:audio-salvar-tomada', // frente Som (rodada 3): a narração gravada na interface
   marcasListar: 'estudio:marcas-listar',
   marcasGravar: 'estudio:marcas-gravar',
   marcasCriar: 'estudio:marcas-criar',
@@ -243,6 +244,8 @@ export type ApiEstudio = {
     aoProgressoLimpeza: (cb: (p: {arquivo: string; progresso: number}) => void) => () => void;
     /** Loudness da mistura, da narração e de cada faixa do vídeo, como o render vai soar (BS.1770). */
     medirLoudness: (documento: string) => Promise<MedidasLoudness | {erro: string}>;
+    /** Grava a tomada que a interface capturou (WAV PCM 48 kHz) em midia/; devolve o caminho no projeto. */
+    salvarTomada: (wav: ArrayBuffer) => Promise<string>;
   };
   // kits de marca (pasta marcas/ das preferências) e as fontes próprias do projeto aberto (pasta fontes/)
   marcas: {

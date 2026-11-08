@@ -567,3 +567,19 @@ input[type="range"]:focus-visible { outline: none; }
 .limpeza-andamento { display: flex; align-items: center; gap: 8px; padding: 2px 8px 6px; }
 .som-andamento { flex: 1; height: 6px; border-radius: 3px; background: var(--fundo-4); overflow: hidden; }
 .som-andamento > span { display: block; height: 100%; background: var(--trilha-audio); transition: width 0.15s; }
+
+/* frente Som (rodada 3): gravador de narração com teleprompter */
+.gravador { left: 0; top: calc(100% + 4px); width: 420px; display: flex; flex-direction: column; padding: 8px; gap: 8px; }
+.gravador .topo { display: flex; align-items: center; gap: 6px; }
+.gravador .topo > svg.lucide { color: var(--trilha-audio); flex: none; }
+.gravador .prompter { position: relative; height: 180px; overflow: auto; padding: 10px; border-radius: var(--raio); background: var(--fundo-3); line-height: 1.5; }
+.gravador .prompter.espelho p { transform: scaleX(-1); }
+.gravador .prompter textarea { width: 100%; height: 100%; resize: none; font-size: 13px; }
+.gravador .prompter p { margin: 0; font-weight: 600; }
+.gravador .prompter .lida { color: var(--texto-2); }
+.gravador .prompter .vez { background: var(--acento-fundo); border-radius: 3px; }
+.gravador .contagem { position: absolute; inset: 0; display: grid; place-items: center; font-size: 64px; font-weight: 700; background: var(--fundo-3); z-index: 1; }
+.gravador .linha-gravador { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.gravador .nivel { flex: 1; min-width: 80px; height: 8px; border-radius: 4px; background: var(--fundo-4); overflow: hidden; }
+.gravador .nivel > span { display: block; height: 100%; background: var(--trilha-audio); transition: width 0.08s; }
+.gravador .nivel.cortou > span { background: var(--erro); }

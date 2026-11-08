@@ -5,8 +5,9 @@
 // Dividir e copiar levam as legendas do clipe (docs/audio.md): o segmento que fica inteiro de um lado vai com aquele
 // clipe, o que o corte atravessa é partido na palavra do corte (dividirSegmento), e o clipe novo ganha a `origem` do
 // clipe de onde veio, para as legendas dele seguirem o clipe se ele for movido ou aparado depois.
-import {dbDeGanho, DURACAO_CLIPE_MIN, ehCurvaFade, ganhoDeDb, mediana, papelDe, VOZ_SEM_MEDIDA_DB, type AudioP, type ClipeAudio, type CurvaFade, type FaixaAudio} from './audio';
-import {idLivre, type DocCenas} from './cenas';
+import {dbDeGanho, DURACAO_CLIPE_MIN, ehCurvaFade, ganhoDeDb, mediana, nivelDeReferencia, novaFaixaAudio, novoAudioCenas, PAPEIS, papelDe, VOZ_SEM_MEDIDA_DB, type AudioP, type ClipeAudio, type CurvaFade, type Envelope, type FaixaAudio,
+  type PapelFaixa} from './audio';
+import {idLivre, resolverCenas, type DocCenas} from './cenas';
 import type {OperacaoPatch} from './documentos';
 import {formatoDoVideo} from './formatos';
 import {arquivoDaFala, arquivoDasPalavras, deslocamentoDaLegenda, dividirSegmento, palavrasDe, type LegendasCenas, type OrigemLegendas, type SegmentoLegenda} from './legendas';
@@ -315,4 +316,55 @@ export const volumeDoEfeito = (efeito_db: number | null | undefined, voz_db: num
   if (efeito_db === null || efeito_db === undefined) return 1;
   const v = ganhoDeDb((voz_db ?? VOZ_SEM_MEDIDA_DB) - lu - efeito_db);
   return Math.min(1, Math.max(0.001, Math.round(v * 1000) / 1000));
+};
+
+// ---------- clipe novo pelo MCP (adicionar_clipe_audio, escolher_trilha) ----------
+
+export type ClipeNovo = {patch: OperacaoPatch[]; clipe: ClipeAudio; caminho: string; faixa: string; avisos: string[]};
+const FADE_MUSICA_FINAL_MS = 1500;
+
+/** Põe um arquivo de áudio do projeto numa faixa do papel pedido (a primeira do papel; sem ela, cria a faixa, e sem `audio`,
+ *  as três). Sem `em_ms`, a música e a narração entram onde a faixa acaba (no zero, se vazia). A música vai até o fim do
+ *  vídeo, com fade de saída; o efeito entra 20 LU abaixo da voz (som-D4). `duracao_ms` ou o envelope dão o tamanho do clipe. */
+export const clipeNovoNaFaixa = (doc: DocCenas, o: {arquivo: string; papel: PapelFaixa; em_ms?: number; duracao_ms?: number; volume?: number; envelope?: Envelope; nome?: string},
+  envelopes: Record<string, Envelope | undefined> = {}): ClipeNovo | Recusa => {
+  const inteira = o.duracao_ms ?? o.envelope?.duracao_ms;
+  if (inteira === undefined || !(inteira >= DURACAO_CLIPE_MIN)) return {erro: `diga duracao_ms (≥ ${DURACAO_CLIPE_MIN}): ${o.arquivo} ainda não foi medido e o MCP não decodifica áudio (o app mede ao abrir o vídeo)`};
+  const props = resolverCenas(doc, {envelopes}).props;
+  const duracaoVideo = props.duracao_ms;
+  const avisos: string[] = [];
+  const faixas = Array.isArray(doc.audio?.faixas) ? doc.audio!.faixas : null;
+  const base = faixas ? null : novoAudioCenas();
+  const lista = faixas ?? base!.faixas;
+  let indice = lista.findIndex((f) => papelDe(f) === o.papel);
+  let criarFaixa = false;
+  if (indice < 0) {
+    indice = lista.length;
+    criarFaixa = true;
+  }
+  const faixa = criarFaixa ? novaFaixaAudio(o.papel, idLivre(doc, PAPEIS[o.papel].id)) : lista[indice];
+  const clipes = Array.isArray(faixa.clipes) ? faixa.clipes : [];
+  const fim = clipes.reduce((m, c) => Math.max(m, num(c.em, 0) + num(c.duracao_ms, 0)), 0);
+  const em = r3(Math.max(0, o.em_ms ?? (o.papel === 'efeitos' || fim >= duracaoVideo - DURACAO_CLIPE_MIN ? 0 : fim)));
+  const duracao = r3(o.papel === 'musica' && duracaoVideo > 0 ? Math.max(DURACAO_CLIPE_MIN, Math.min(inteira, duracaoVideo - em)) : inteira);
+  const clipe: ClipeAudio = {id: idLivre(doc, 'clipe'), arquivo: o.arquivo, em, duracao_ms: duracao, ...(o.nome ? {nome: o.nome} : {})};
+  if (o.papel === 'musica' && duracao > FADE_MUSICA_FINAL_MS * 2) clipe.fade_out_ms = FADE_MUSICA_FINAL_MS;
+  if (o.volume !== undefined) clipe.volume = Math.min(1, Math.max(0, o.volume));
+  else if (o.papel === 'efeitos' && o.envelope) {
+    const v = volumeDoEfeito(nivelDeReferencia(o.envelope), nivelDaVoz(props.audio));
+    if (v < 1) clipe.volume = v;
+  }
+  if (o.papel === 'musica') {
+    const sobre = clipes.find((c) => num(c.em, 0) < em + duracao && num(c.em, 0) + num(c.duracao_ms, 0) > em);
+    if (sobre) avisos.push(`a música entra por cima de "${sobre.nome ?? sobre.arquivo}" (${seg(num(sobre.em, 0))} s a ${seg(num(sobre.em, 0) + num(sobre.duracao_ms, 0))} s): faça um crossfade entre as duas, ou silencie uma`);
+  }
+  const caminhoFaixa = `/audio/faixas/${indice}`;
+  if (base) {
+    base.faixas[indice].clipes.push(clipe);
+    return {patch: [{op: 'add', path: '/audio', value: base}], clipe, caminho: `${caminhoFaixa}/clipes/0`, faixa: base.faixas[indice].id, avisos};
+  }
+  if (criarFaixa) return {patch: [{op: 'add', path: caminhoFaixa, value: {...faixa, clipes: [clipe]}}], clipe, caminho: `${caminhoFaixa}/clipes/0`, faixa: faixa.id, avisos};
+  const j = clipes.length;
+  return {patch: [{op: 'test', path: `${caminhoFaixa}/id`, value: faixa.id}, Array.isArray(faixa.clipes) ? {op: 'add', path: `${caminhoFaixa}/clipes/${j}`, value: clipe} : {op: 'add', path: `${caminhoFaixa}/clipes`, value: [clipe]}],
+    clipe, caminho: `${caminhoFaixa}/clipes/${j}`, faixa: faixa.id, avisos};
 };

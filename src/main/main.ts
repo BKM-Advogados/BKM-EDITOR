@@ -23,6 +23,7 @@ import {ServidorMidia} from './servidor-midia';
 import {SessaoProjeto} from './sessao-projeto';
 import {Terminais} from './terminais';
 import {registrarIpcAudio} from './ipc-audio';
+import {registrarIpcGravacao} from './ipc-gravacao'; // frente Som (rodada 3)
 import {registrarIpcFala} from './ipc-fala'; // frente Fala
 import {legendasNoDestino, type LegendasP} from '../nucleo/legendas'; // frente Fala: legendas no tamanho de cada destino
 import {registrarPrefsExportacao} from './ipc-exportacao';
@@ -430,6 +431,7 @@ lidar(CANAL.metricas, (): Metricas => {
 registrarExportarPaginas(lidar, CANAL.exportarPaginas, {projeto: exigirProjeto, mostrar: (arquivo) => shell.showItemInFolder(arquivo)});
 
 registrarIpcAudio(lidar, exigirProjeto, () => memoria.prefs()); // som do vídeo de cenas
+registrarIpcGravacao(lidar, exigirProjeto); // frente Som (rodada 3): salvar a narração gravada
 // acabamento da imagem (rodada 2, B2): remover fundo, com o modelo em ~/Estudio/modelos e o pedido do MCP à janela
 registrarRemoverFundo(lidar, {enviar, projeto: exigirProjeto, pasta: path.join(app.getPath('home'), 'Estudio', 'modelos'), buscar: (u, i) => net.fetch(u, i),
   ouvir: (canal, f) => ipcMain.on(canal, (e, ...a) => (confiavel(e), f(...(a as never[]))))});

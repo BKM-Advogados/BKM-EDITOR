@@ -317,6 +317,12 @@ const api: ApiEstudio = {
       };
     },
     medirLoudness: (documento) => medirNaPrevia(documento),
+    // frente Som (rodada 3): a tomada gravada vira um blob que o clipe toca, como o arquivo em midia/ no app
+    salvarTomada: async (wav) => {
+      const url = URL.createObjectURL(new Blob([wav], {type: 'audio/wav'}));
+      audios.set(url, {url, nome: 'narração gravada.wav'});
+      return url;
+    },
   },
   marcas: {
     listar: async () => structuredClone(marcas),

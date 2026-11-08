@@ -5,9 +5,10 @@
 // Chamado por uma linha no fim de registrarFerramentas (ferramentas-mcp.ts).
 import type {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {z} from 'zod';
-import {CURVAS_FADE, ehEnvelope, type CurvaFade} from './audio';
+import {CURVAS_FADE, ehEnvelope, type CurvaFade, type Envelope, type PapelFaixa} from './audio';
 import {ehDocCenas, type DocCenas} from './cenas';
-import {copiarClipe, crossfadeEntre, dividirClipe, recusou, type ModoCrossfade} from './clipes-audio';
+import {clipeNovoNaFaixa, copiarClipe, crossfadeEntre, dividirClipe, recusou, type ModoCrossfade} from './clipes-audio';
+import {duracaoDoTeleprompter, PPM_PADRAO, textoDasCenas} from './gravacao';
 import {ErroProjeto, type Projeto} from './projeto';
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x, null, 2)}]});
@@ -33,23 +34,23 @@ const docDe = (projeto: Projeto, documento?: string) => {
   return {alvo, rel, doc: lido.doc as DocCenas, versao: lido.versao};
 };
 
-/** Duração de cada arquivo de áudio já medido (do .envelope.json ao lado), para o crossfade saber a sobra. */
-const duracoesDosArquivos = (projeto: Projeto, doc: DocCenas) => {
-  const out: Record<string, number | undefined> = {};
-  for (const f of doc.audio?.faixas ?? []) {
-    for (const c of f.clipes ?? []) {
-      if (typeof c.arquivo !== 'string' || c.arquivo in out) continue;
-      try {
-        const rel = `${c.arquivo}.envelope.json`;
-        const env = projeto.existe(rel) ? projeto.lerJson<unknown>(rel).doc : undefined;
-        out[c.arquivo] = ehEnvelope(env) ? env.duracao_ms : undefined;
-      } catch {
-        out[c.arquivo] = undefined;
-      }
-    }
+/** O envelope de um arquivo de áudio do projeto (o .envelope.json ao lado), se existir e for da versão atual. */
+const envelopeDe = (projeto: Projeto, arquivo: string): Envelope | undefined => {
+  try {
+    const rel = `${arquivo}.envelope.json`;
+    const env = projeto.existe(rel) ? projeto.lerJson<unknown>(rel).doc : undefined;
+    return ehEnvelope(env) ? env : undefined;
+  } catch {
+    return undefined;
   }
+};
+const envelopesDe = (projeto: Projeto, doc: DocCenas) => {
+  const out: Record<string, Envelope | undefined> = {};
+  for (const f of doc.audio?.faixas ?? []) for (const c of f.clipes ?? []) if (typeof c.arquivo === 'string' && !(c.arquivo in out)) out[c.arquivo] = envelopeDe(projeto, c.arquivo);
   return out;
 };
+/** Duração de cada arquivo de áudio já medido, para o crossfade saber a sobra. */
+const duracoesDosArquivos = (projeto: Projeto, doc: DocCenas) => Object.fromEntries(Object.entries(envelopesDe(projeto, doc)).map(([a, e]) => [a, e?.duracao_ms]));
 
 const seg = (ms: number) => (ms / 1000).toLocaleString('pt-BR', {maximumFractionDigits: 2});
 
@@ -106,5 +107,45 @@ export const registrarSom = (servidor: McpServer, projeto: Projeto, autor: strin
     return {ok: true, documento: alvo, versao: gravado.versao, duracao_ms: r.duracao_ms, curva: r.curva,
       desce: {id: r.de.id, em: r.de.em, duracao_ms: r.de.duracao_ms}, sobe: {id: r.para.id, em: r.para.em, duracao_ms: r.para.duracao_ms},
       ...(r.mudancas.length ? {mudancas: r.mudancas} : {}), ...(r.avisos.length ? {avisos: r.avisos} : {})};
+  }));
+  servidor.registerTool('preparar_teleprompter', {
+    description: 'Grava no vídeo de cenas o texto que a pessoa vai ler ao gravar a narração (campo teleprompter). Sem texto, usa os títulos, textos e listas das cenas. Quem grava é a pessoa: em "+ Áudio" › "Gravar narração…" o texto rola na velocidade pedida, com monitoramento e medidor. A tomada entra sozinha na faixa de narração. Devolve a duração estimada da leitura.',
+    inputSchema: {
+      texto: z.string().max(60000).optional().describe('o texto da narração; uma linha em branco separa os parágrafos'),
+      palavras_por_minuto: z.number().min(60).max(260).optional().describe(`velocidade da leitura (padrão ${PPM_PADRAO})`),
+      espelhar: z.boolean().optional().describe('espelha o texto, para ler num espelho de teleprompter'),
+      documento: z.string().optional().describe('id do vídeo; sem ele, o que a pessoa está vendo'),
+    },
+  }, seguro(({texto, palavras_por_minuto, espelhar, documento}: {texto?: string; palavras_por_minuto?: number; espelhar?: boolean; documento?: string}) => {
+    const {alvo, rel, doc, versao} = docDe(projeto, documento);
+    const t = (texto ?? textoDasCenas(doc)).trim();
+    if (!t) throw new ErroProjeto('não há texto: passe "texto" ou escreva títulos e textos nas cenas', 'patch');
+    const novo = {texto: t, ...(palavras_por_minuto !== undefined ? {palavras_por_minuto} : doc.teleprompter?.palavras_por_minuto !== undefined ? {palavras_por_minuto: doc.teleprompter.palavras_por_minuto} : {}),
+      ...((espelhar ?? doc.teleprompter?.espelhar) ? {espelhar: true} : {})};
+    const gravado = projeto.aplicarPatch({documento: rel, versao_base: versao, patch: [{op: doc.teleprompter ? 'replace' : 'add', path: '/teleprompter', value: novo}], autor, origem, rotulo: 'texto do teleprompter'});
+    return {ok: true, documento: alvo, versao: gravado.versao, palavras: t.split(/\s+/).filter(Boolean).length,
+      duracao_estimada_s: Math.round(duracaoDoTeleprompter(t, novo.palavras_por_minuto) / 1000), usou_o_texto_das_cenas: texto === undefined};
+  }));
+
+  servidor.registerTool('adicionar_clipe_audio', {
+    description: 'Põe um arquivo de áudio do projeto numa faixa do vídeo de cenas (narração, música ou efeito): cria a faixa se faltar. Sem em_ms, narração e música entram onde a faixa acaba. A música não passa do fim do vídeo e sai em fade; o efeito entra 20 LU abaixo da voz. O tamanho vem do envelope medido pelo app, ou de duracao_ms.',
+    inputSchema: {
+      arquivo: z.string().describe('caminho no projeto, ex.: midia/narracao-gravada.wav'),
+      papel: z.enum(['voz', 'musica', 'efeitos']),
+      em_ms: z.number().min(0).optional().describe('onde o clipe começa, em ms do vídeo'),
+      duracao_ms: z.number().min(100).optional().describe('só se o arquivo ainda não foi medido'),
+      volume: z.number().min(0).max(1).optional(),
+      documento: z.string().optional().describe('id do vídeo; sem ele, o que a pessoa está vendo'),
+    },
+  }, seguro(({arquivo, papel, em_ms, duracao_ms, volume, documento}: {arquivo: string; papel: PapelFaixa; em_ms?: number; duracao_ms?: number; volume?: number; documento?: string}) => {
+    if (!/\.(wav|mp3|m4a|ogg|aac)$/i.test(arquivo)) throw new ErroProjeto('só áudio: wav, mp3, m4a, ogg ou aac', 'patch');
+    if (!projeto.existe(arquivo)) throw new ErroProjeto(`o arquivo não está no projeto: ${arquivo}`, 'nao_achado');
+    const {alvo, rel, doc, versao} = docDe(projeto, documento);
+    const envelope = envelopeDe(projeto, arquivo);
+    const r = clipeNovoNaFaixa(doc, {arquivo, papel, em_ms, duracao_ms, volume, envelope}, envelopesDe(projeto, doc));
+    if (recusou(r)) throw new ErroProjeto(r.erro, 'patch');
+    const gravado = projeto.aplicarPatch({documento: rel, versao_base: versao, patch: r.patch, autor, origem, rotulo: `${papel === 'voz' ? 'narração' : papel === 'musica' ? 'música' : 'efeito'}: ${arquivo.split('/').pop()}`});
+    return {ok: true, documento: alvo, versao: gravado.versao, caminho: r.caminho, faixa: r.faixa, clipe: {id: r.clipe.id, em: r.clipe.em, duracao_ms: r.clipe.duracao_ms, ...(r.clipe.volume !== undefined ? {volume: r.clipe.volume} : {})},
+      ...(r.avisos.length ? {avisos: r.avisos} : {})};
   }));
 };
