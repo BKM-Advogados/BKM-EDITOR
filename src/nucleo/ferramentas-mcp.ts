@@ -522,8 +522,9 @@ const registrarPesquisa = (servidor: McpServer, projeto: Projeto, autor: string,
 
 /** O que o MCP precisa do transcritor do processo principal (src/main/transcricao.ts): sem ele, a ferramenta avisa. */
 export type TranscritorMcp = {
-  transcrever: (projeto: Projeto, pedido: {arquivo: string; modelo?: 'base' | 'small'; vocabulario?: string; destino?: string}) =>
-    Promise<{ok: boolean; palavras?: string; n?: number; duracao_s?: number; texto?: string; mensagem?: string; cancelado?: boolean}>;
+  /** `sinal`: o do pedido do MCP; aborta quando a conversa é interrompida (Esc) ou a conexão cai. */
+  transcrever: (projeto: Projeto, pedido: {arquivo: string; modelo?: 'base' | 'small'; vocabulario?: string; destino?: string; pela_ia?: boolean},
+    andamento?: (p: unknown) => void, sinal?: AbortSignal) => Promise<{ok: boolean; palavras?: string; n?: number; duracao_s?: number; texto?: string; mensagem?: string; cancelado?: boolean}>;
   /** A transcrição do arquivo ainda é do áudio como ele está (o carimbo do palavras.json)? Sem isto, vale a existência. */
   conferir?: (projeto: Projeto, arquivo: string) => EstadoDaFala;
 };
@@ -537,6 +538,15 @@ const docCenasDe = (projeto: Projeto, documento?: string) => {
   const lido = projeto.lerJson<unknown>(rel);
   if (!ehDocCenas(lido.doc)) throw new ErroProjeto(`${alvo} não é um vídeo de cenas: para o carrossel da Cliente, transcreva o "arquivo" da narração`, 'patch');
   return {alvo, rel, doc: lido.doc, versao: lido.versao};
+};
+
+/** Como `seguro`, passando o sinal do pedido (o SDK aborta quando o cliente cancela ou a conexão fecha). */
+const seguroComSinal = <A,>(f: (a: A, sinal?: AbortSignal) => unknown) => async (a: A, extra?: {signal?: AbortSignal}) => {
+  try {
+    return texto(await f(a, extra?.signal));
+  } catch (e) {
+    return erro(e);
+  }
 };
 
 const registrarFala = (servidor: McpServer, projeto: Projeto, autor: string, origem: string, transcritor: TranscritorMcp | undefined) => {
@@ -555,15 +565,16 @@ const registrarFala = (servidor: McpServer, projeto: Projeto, autor: string, ori
       modelo: z.enum(['small', 'base']).optional().describe('small (padrão) erra menos; base é duas vezes mais rápido'),
       vocabulario: z.string().optional().describe('frase com termos que vão aparecer (nomes, siglas); o padrão puxa o vocabulário do direito do trabalho'),
     },
-  }, seguro(async (a: {arquivo?: string; destino?: string; documento?: string; clipe?: string; faixa?: string; legendas?: boolean; estilo?: IdEstiloLegenda;
-    refazer?: boolean; refazer_legendas?: boolean; modelo?: 'small' | 'base'; vocabulario?: string}) => {
+  }, seguroComSinal(async (a: {arquivo?: string; destino?: string; documento?: string; clipe?: string; faixa?: string; legendas?: boolean; estilo?: IdEstiloLegenda;
+    refazer?: boolean; refazer_legendas?: boolean; modelo?: 'small' | 'base'; vocabulario?: string}, sinal?: AbortSignal) => {
     if (!transcritor) throw new ErroProjeto('este MCP não tem o transcritor: abra o projeto no Estúdio (no Windows) ou use o MCP por stdio (mcp/nucleo.ts)', 'patch');
-    const pedido = (arquivo: string, destino?: string) => ({arquivo, destino, modelo: a.modelo, vocabulario: a.vocabulario});
+    // pela_ia: a tela mostra o andamento e o Cancelar dizendo que foi a IA que pediu (transversal-N4)
+    const pedido = (arquivo: string, destino?: string) => ({arquivo, destino, modelo: a.modelo, vocabulario: a.vocabulario, pela_ia: true});
     if (a.arquivo) {
       // grava por cima, fora do diário: nunca no manifesto, num documento, nos comentários, na pesquisa ou em .estudio/
       const recusa = a.destino === undefined ? null : recusaDoDestinoNoProjeto(projeto, a.destino);
       if (recusa) throw new ErroProjeto(recusa, 'caminho');
-      const r = await transcritor.transcrever(projeto, pedido(a.arquivo, a.destino));
+      const r = await transcritor.transcrever(projeto, pedido(a.arquivo, a.destino), undefined, sinal);
       if (!r.ok) throw new ErroProjeto(r.mensagem ?? 'a transcrição não terminou', 'patch');
       const t = r.texto ?? '';
       return {...r, texto: t.slice(0, LIMITE_TEXTO_TRANSCRITO), ...(t.length > LIMITE_TEXTO_TRANSCRITO ? {texto_cortado: true} : {})};
@@ -582,7 +593,7 @@ const registrarFala = (servidor: McpServer, projeto: Projeto, autor: string, ori
         transcritos.push({arquivo, palavras: arquivoDasPalavras(arquivo), ja_tinha: true});
         continue;
       }
-      const r = await transcritor.transcrever(projeto, pedido(arquivo));
+      const r = await transcritor.transcrever(projeto, pedido(arquivo), undefined, sinal);
       if (!r.ok) throw new ErroProjeto(r.mensagem ?? `a transcrição de ${arquivo} não terminou`, 'patch');
       transcritos.push({arquivo, palavras: r.palavras, n: r.n, duracao_s: r.duracao_s, ...(estado === 'velha' ? {audio_mudou: true} : {})});
     }

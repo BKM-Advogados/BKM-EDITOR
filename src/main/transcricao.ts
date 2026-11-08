@@ -329,7 +329,9 @@ export const rodarWhisper = async (o: {cli: string; modelo: ModeloWhisper; arqui
 
 // ---------- o transcritor: um de cada vez, com andamento e cancelar ----------
 
-export type OpcoesTranscritor = {pasta?: string; raizApp?: string; empacotado?: boolean; buscar?: Buscar; modelo?: IdModeloWhisper};
+export type OpcoesTranscritor = {pasta?: string; raizApp?: string; empacotado?: boolean; buscar?: Buscar; modelo?: IdModeloWhisper;
+  /** Recebe o andamento de toda transcrição, a do botão e a que a IA pede pelo MCP: o IPC manda à tela. (transversal-N4) */
+  aoAndamento?: (p: ProgressoTranscricao & {arquivo: string}) => void};
 
 export class Transcritor {
   private atual: {controle: AbortController; arquivo: string} | null = null;
@@ -416,7 +418,7 @@ export class Transcritor {
 
   /** Transcreve um arquivo do projeto (ou o trecho `de_ms`+`dur_ms` dele) e grava midia/<arquivo>.palavras.json com o
    *  carimbo do áudio; com `destino`, grava só a lista de palavras nele. */
-  async transcrever(projeto: Projeto, pedido: PedidoTranscricao, andamento: Andamento = () => undefined): Promise<ResultadoTranscricao> {
+  async transcrever(projeto: Projeto, pedido: PedidoTranscricao, andamento: Andamento = () => undefined, sinal?: AbortSignal): Promise<ResultadoTranscricao> {
     if (this.atual) throw new ErroProjeto(`já há uma transcrição em andamento (${this.atual.arquivo}); espere ou cancele`, 'patch');
     const rel = pedido.arquivo;
     if (typeof rel !== 'string' || !projeto.existe(rel)) throw new ErroProjeto(`o arquivo não está no projeto: ${String(rel)}`, 'nao_achado');
@@ -425,21 +427,30 @@ export class Transcritor {
     if (recusa) throw new ErroProjeto(recusa, 'caminho');
     const controle = new AbortController();
     this.atual = {controle, arquivo: rel};
+    // o pedido que chega pelo MCP traz o sinal dele: Esc na conversa ou a conexão que cai param o whisper (transversal-N4)
+    const pararPeloPedido = () => controle.abort();
+    if (sinal?.aborted) controle.abort();
+    sinal?.addEventListener('abort', pararPeloPedido, {once: true});
+    const tela = this.o.aoAndamento;
+    const avisar: Andamento = (p) => {
+      andamento(p);
+      tela?.({...p, arquivo: rel, ...(pedido.pela_ia ? {pela_ia: true} : {})});
+    };
     const t0 = Date.now();
     const temp = path.join(os.tmpdir(), `estudio-fala-${process.pid}-${Date.now()}`);
     try {
       const modelo = MODELOS_WHISPER[pedido.modelo ?? this.o.modelo ?? MODELO_PADRAO] ?? MODELOS_WHISPER[MODELO_PADRAO];
-      const pecas = await this.preparar(modelo.id, andamento, controle.signal);
+      const pecas = await this.preparar(modelo.id, avisar, controle.signal);
       mkdirSync(temp, {recursive: true});
       // o carimbo é do áudio que o ffmpeg vai ler agora: se a tomada mudar no meio, a próxima conferência pede de novo
       const fonte = fonteDoAudio(projeto.caminho(rel));
       const wav = path.join(temp, 'fala.wav');
-      andamento({etapa: 'audio', mensagem: `Tirando o áudio de ${path.basename(rel)}`, progresso: 0});
+      avisar({etapa: 'audio', mensagem: `Tirando o áudio de ${path.basename(rel)}`, progresso: 0});
       await extrairAudio({ffmpeg: pecas.ffmpeg!, entrada: projeto.caminho(rel), saida: wav, de_ms: pedido.de_ms, dur_ms: pedido.dur_ms, sinal: controle.signal});
-      andamento({etapa: 'transcrevendo', mensagem: `Transcrevendo com o modelo ${modelo.arquivo}`, progresso: 0});
+      avisar({etapa: 'transcrevendo', mensagem: `Transcrevendo com o modelo ${modelo.arquivo}`, progresso: 0});
       const palavras = await rodarWhisper({cli: pecas.cli, modelo, arquivoModelo: pecas.modelo, wav, idioma: pedido.idioma ?? 'pt', sinal: controle.signal,
         prompt: pedido.vocabulario ?? PROMPT_PADRAO,
-        andamento: (pct) => andamento({etapa: 'transcrevendo', mensagem: `Transcrevendo com o modelo ${modelo.arquivo}`, progresso: pct})});
+        andamento: (pct) => avisar({etapa: 'transcrevendo', mensagem: `Transcrevendo com o modelo ${modelo.arquivo}`, progresso: pct})});
       // o tempo das palavras conta do começo do arquivo, mesmo quando só um trecho foi transcrito
       const desloc = pedido.de_ms ?? 0;
       const finais = palavras.map((p) => ({...p, s: p.s + desloc, e: p.e + desloc}));
@@ -449,16 +460,17 @@ export class Transcritor {
       projeto.gravarTexto(destino, `${JSON.stringify(pedido.destino ? finais : gravado)}\n`);
       const r: ResultadoTranscricao = {ok: true, arquivo: rel, palavras: destino, n: finais.length, modelo: modelo.id, duracao_s: Math.round((Date.now() - t0) / 100) / 10,
         texto: finais.map((p) => p.w).join(' ')};
-      andamento({etapa: 'pronto', mensagem: `${finais.length} palavras em ${r.duracao_s} s`, progresso: 100});
+      avisar({etapa: 'pronto', mensagem: `${finais.length} palavras em ${r.duracao_s} s`, progresso: 100});
       return r;
     } catch (e) {
       if (e instanceof Cancelado || controle.signal.aborted) {
-        andamento({etapa: 'cancelado', mensagem: 'Transcrição cancelada'});
+        avisar({etapa: 'cancelado', mensagem: 'Transcrição cancelada'});
         return {ok: false, arquivo: rel, cancelado: true, mensagem: 'Transcrição cancelada'};
       }
       throw e;
     } finally {
       this.atual = null;
+      sinal?.removeEventListener('abort', pararPeloPedido);
       rmSync(temp, {recursive: true, force: true});
     }
   }
@@ -473,12 +485,12 @@ export class Transcritor {
 type Lidar = <A extends unknown[], R>(canal: string, f: (...a: A) => R | Promise<R>) => void;
 
 export const registrarIpcTranscricao = (lidar: Lidar, o: {projeto: () => Projeto; enviar: (canal: string, ...a: unknown[]) => void; aoCancelar: (f: () => void) => void} & OpcoesTranscritor) => {
-  const transcritor = new Transcritor(o);
+  // o andamento de toda transcrição vai à tela, também quando a IA pede pelo MCP
+  const transcritor = new Transcritor({...o, aoAndamento: (p) => o.enviar(CANAL.falaProgresso, p)});
   lidar(CANAL.falaEstado, (modelo?: IdModeloWhisper) => transcritor.estado(modelo));
   lidar(CANAL.falaConferir, (arquivos: string[]) => Object.fromEntries((Array.isArray(arquivos) ? arquivos : []).filter((a) => typeof a === 'string').slice(0, 200)
     .map((a) => [a, transcritor.conferir(o.projeto(), a)])));
-  lidar(CANAL.falaTranscrever, (pedido: PedidoTranscricao) =>
-    transcritor.transcrever(o.projeto(), pedido, (p) => o.enviar(CANAL.falaProgresso, {...p, arquivo: pedido.arquivo})));
+  lidar(CANAL.falaTranscrever, (pedido: PedidoTranscricao) => transcritor.transcrever(o.projeto(), {...pedido, pela_ia: undefined}));
   o.aoCancelar(() => transcritor.cancelar());
   return transcritor;
 };

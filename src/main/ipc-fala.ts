@@ -12,6 +12,9 @@ import {registrarIpcTranscricao, type Buscar} from './transcricao';
 
 type Lidar = <A extends unknown[], R>(canal: string, f: (...a: A) => R | Promise<R>) => void;
 const LIMITE_LEGENDA = 5 * 1024 * 1024;
+let transcritorAtual: {cancelar: () => void} | null = null;
+/** Para a transcrição em andamento (a do botão ou a que a IA pediu): o main.ts chama ao fechar o projeto. */
+export const cancelarFala = () => transcritorAtual?.cancelar();
 
 export const registrarIpcFala = (o: {lidar: Lidar; confiavel: (e: IpcMainEvent) => void; janela: () => BrowserWindow | null; projeto: () => Projeto;
   enviar: (canal: string, ...a: unknown[]) => void; raizApp: string; empacotado: boolean; buscar?: Buscar}) => {
@@ -44,5 +47,6 @@ export const registrarIpcFala = (o: {lidar: Lidar; confiavel: (e: IpcMainEvent) 
     return {nome: path.basename(arquivo), texto, codificacao};
   });
   definirTranscritorMcp(transcritor);
+  transcritorAtual = transcritor;
   return transcritor;
 };

@@ -35,6 +35,9 @@ export const assinarAndamento = (f: () => void) => {
 };
 export const lerAndamento = () => andamento;
 let ligado = false;
+/** Passa a ouvir o andamento das transcrições: as do botão e as que a IA pede pelo MCP (transversal-N4). O painel liga
+ *  ao abrir, para o andamento e o Cancelar aparecerem também quando quem pediu foi a IA. */
+export const ouvirAndamento = () => ligar();
 const ligar = () => {
   if (ligado) return;
   ligado = true;

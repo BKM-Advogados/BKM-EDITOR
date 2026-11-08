@@ -81,7 +81,7 @@ describe('MCP: transcrever e legendas', () => {
     pedidos.length = 0;
     const r = await chamar(c, 'transcrever', {documento: 'video', estilo: 'karaoke'});
     expect(r.erro).toBe(false);
-    expect(pedidos).toEqual([{arquivo: 'midia/narracao.wav', modelo: undefined, vocabulario: undefined, destino: undefined}]);
+    expect(pedidos).toEqual([{arquivo: 'midia/narracao.wav', modelo: undefined, vocabulario: undefined, destino: undefined, pela_ia: true}]);
     expect(r.json.legendas).toBeGreaterThan(20);
     // karaokê: até 4 palavras por legenda, e "de cidade?" não fica sozinha; a primeira palavra da narração começa no zero
     // do arquivo, que está em 500 ms
@@ -223,6 +223,28 @@ describe('MCP: transcrever e legendas', () => {
     const r = await chamar(c, 'importar_legendas', {documento: 'video', arquivo: 'midia/ansi.srt'});
     expect(r.json).toMatchObject({ok: true, legendas: 1, codificacao: 'windows-1252'});
     expect(lerVideo().legendas!.segmentos[0].texto).toBe('rescisão e aviso prévio');
+  });
+
+  it('o transcrever da IA marca pela_ia e para quando a conversa é interrompida (transversal-N4)', async () => {
+    const visto = {pela_ia: undefined as boolean | undefined, abortado: false};
+    const lento: TranscritorMcp = {
+      transcrever: (_p, pedido, _a, sinal) => new Promise((ok) => {
+        visto.pela_ia = pedido.pela_ia;
+        sinal?.addEventListener('abort', () => {
+          visto.abortado = true;
+          ok({ok: false, cancelado: true, mensagem: 'Transcrição cancelada'});
+        });
+      }),
+    };
+    const c = await conectar(lento);
+    const antes = readFileSync(path.join(pasta, 'video', 'video.json'), 'utf-8');
+    const chamada = c.callTool({name: 'transcrever', arguments: {documento: 'video', refazer: true}}).catch((e: Error) => e);
+    await new Promise((ok) => setTimeout(ok, 30));
+    expect(visto.pela_ia).toBe(true);
+    await c.close(); // o Esc fecha o pedido HTTP; aqui, o cliente fecha o transporte
+    await chamada;
+    expect(visto.abortado).toBe(true);
+    expect(readFileSync(path.join(pasta, 'video', 'video.json'), 'utf-8')).toBe(antes);
   });
 
   it('exportar_legendas não grava por cima do SRT que já está em saidas/ (fala-D11)', async () => {

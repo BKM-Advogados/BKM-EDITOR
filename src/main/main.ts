@@ -23,7 +23,7 @@ import {ServidorMidia} from './servidor-midia';
 import {SessaoProjeto} from './sessao-projeto';
 import {Terminais} from './terminais';
 import {registrarIpcAudio} from './ipc-audio';
-import {registrarIpcFala} from './ipc-fala'; // frente Fala
+import {cancelarFala, registrarIpcFala} from './ipc-fala'; // frente Fala
 import {legendasNoDestino, type LegendasP} from '../nucleo/legendas'; // frente Fala: legendas no tamanho de cada destino
 import {registrarPrefsExportacao} from './ipc-exportacao';
 import {apagarLimposSemUso, registrarIpcLimpeza} from './limpeza-voz';
@@ -118,6 +118,7 @@ const guardarMiniatura = async () => {
 
 // ---------- abrir, fechar, criar ----------
 const fecharSessao = async () => {
+  cancelarFala(); // frente Fala: o whisper para junto com o projeto (transversal-N4)
   await guardarMiniatura().catch(() => undefined);
   terminais.fecharTodos();
   conversas.fecharTodas();

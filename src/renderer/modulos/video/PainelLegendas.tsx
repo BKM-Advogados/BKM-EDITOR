@@ -16,7 +16,7 @@ import {selecionar, trocar, useLoja} from '../../estado/loja';
 import {CabecalhoInspector, CampoCor, CampoDeslizante, CampoInterruptor, CampoSelecao, Secao} from '../../componentes/Campos';
 import {
   assinarAndamento, cancelarTranscricao, dividir, editarTexto, estadoDasFalas, excluirSegmento, exportarArquivo, gerarDasTranscricoes, importarArquivo, juntarComProxima,
-  lerAndamento, mudarEstilo, novaLegenda, refazerLegendas, substituirTudo, transcreverEGerar, trocarPredefinicao,
+  lerAndamento, mudarEstilo, ouvirAndamento, novaLegenda, refazerLegendas, substituirTudo, transcreverEGerar, trocarPredefinicao,
 } from './acoes-legendas';
 import {aoQuadro, irPara, msAtual} from './tocador';
 import './legendas.css';
@@ -86,6 +86,7 @@ const ItemLegenda: React.FC<{documento: string; s: SegmentoLegenda; em: number; 
 
 const Transcricao: React.FC<{documento: string; doc: DocCenas}> = ({documento, doc}) => {
   const andamento = useSyncExternalStore(assinarAndamento, lerAndamento);
+  useEffect(() => ouvirAndamento(), []);
   const [estado, setEstado] = useState<EstadoTranscricao | null>(null);
   const [modelo, setModelo] = useState<'small' | 'base'>('small');
   const [falas, setFalas] = useState<Record<string, EstadoDaFala>>({});
@@ -128,7 +129,7 @@ const Transcricao: React.FC<{documento: string; doc: DocCenas}> = ({documento, d
       )}
       {andamento ? (
         <div className="andamento">
-          <div className="msg"><span>{andamento.mensagem}{andamento.progresso !== undefined ? ` · ${Math.round(andamento.progresso)}%` : ''}</span>
+          <div className="msg"><span>{andamento.pela_ia ? 'A IA pediu: ' : ''}{andamento.mensagem}{andamento.progresso !== undefined ? ` · ${Math.round(andamento.progresso)}%` : ''}</span>
             <button className="bt fantasma mini" onClick={cancelarTranscricao}><X /> Cancelar</button></div>
           <div className="barra"><div style={{width: `${Math.max(2, andamento.progresso ?? 0)}%`}} /></div>
         </div>
