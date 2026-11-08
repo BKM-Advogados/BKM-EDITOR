@@ -2,12 +2,9 @@
 // imagem (cobrir/conter), fontes e a prévia ao vivo de um campo antes do patch. Prévia, exportação e inspector usam as
 // mesmas regras para darem o mesmo pixel.
 import {useSyncExternalStore} from 'react';
-import {loadFont as Archivo} from '@remotion/google-fonts/Archivo';
-import {loadFont as IBMPlexMono} from '@remotion/google-fonts/IBMPlexMono';
-import {loadFont as IBMPlexSans} from '@remotion/google-fonts/IBMPlexSans';
 import type {CamadaImagem, DocImagem, MarcaDoDocumento, PaginaImagem} from '../../../nucleo/documentos';
 import {baseCamadas, idLivre, indiceNaBase, paginaDoCaminho, paginasDe, slug} from '../../../nucleo/carrossel';
-import {fonte, listarFontes} from '../../../composicoes/fontes';
+import {aguardarFontes, fonte, listarFontes} from '../../../composicoes/fontes';
 import {loja, useLoja, type Estado} from '../../estado/loja';
 
 export const ENTRELINHA = 1.15;
@@ -105,11 +102,8 @@ export const idNovo = (base: string, camadas: CamadaImagem[]) => idLivre(camadas
 
 // ---------- fontes ----------
 // O font-family vem do carregador das composições (fonte()), que funciona fora do Remotion: o delayRender só conta
-// um handle quando não há render. Para exportar é preciso esperar os arquivos: o carregador baixa por fetch e o
-// document.fonts.ready não enxerga esse download. Chamar o loadFont com as mesmas opções reaproveita o mesmo cache.
-type Carregador = (estilo: 'normal', opcoes: {subsets: string[]; ignoreTooManyRequestsWarning: boolean}) => {waitUntilDone: () => Promise<void>};
-const CARREGADORES: Record<string, Carregador> = {Archivo, IBMPlexMono, IBMPlexSans} as unknown as Record<string, Carregador>;
-
+// um handle quando não há render. Para exportar é preciso esperar os arquivos (as quatro famílias do app e as de arquivo
+// do kit ou do projeto): aguardarFontes espera cada variante terminar de carregar, ou de falhar e cair na fonte do sistema.
 /** As fontes do seletor da imagem: primeiro as do kit da peça ("@titulo" e as outras, que seguem o kit), depois as de
  *  arquivo (do kit e do projeto), as do Google que o app tem e a do sistema. A fonte que a camada já usa entra mesmo que
  *  não seja de nenhuma lista, para o seletor nunca ficar em branco. */
@@ -133,11 +127,7 @@ export const familiaCss = (nome?: string) => {
 };
 
 export const esperarFontes = async (nomes: string[]) => {
-  await Promise.all([...new Set(nomes)].map((n) => {
-    familiaCss(n);
-    const carregar = CARREGADORES[n.replace(/\s+/g, '')];
-    return carregar?.('normal', {subsets: ['latin', 'latin-ext'], ignoreTooManyRequestsWarning: true}).waitUntilDone().catch(() => undefined);
-  }));
+  await aguardarFontes(nomes.map((n) => (GENERICAS.has(n) ? '' : n)).filter(Boolean));
   await document.fonts.ready;
 };
 
