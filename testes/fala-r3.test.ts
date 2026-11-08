@@ -452,10 +452,11 @@ describe('legendas na exportação: queimar, só o SRT ou os dois, por destino',
     const segs = [{em: 0, sai: 1000, texto: 'Recebeu proposta'}];
     const ha = new Set(['Mudar - 9x16.srt']);
     const r = arquivosDeLegendaDoVideo('Mudar - 9x16', segs, null, (n) => ha.has(n));
-    expect(r.map((a) => a.nome)).toEqual(['Mudar - 9x16 (2).srt', 'Mudar - 9x16.pt_BR.srt']);
+    expect(r.map((a) => a.nome)).toEqual(['Mudar - 9x16 (2).srt', 'Mudar - 9x16.pt_BR.srt', 'Mudar - 9x16.vtt']);
     expect(r[0].texto).toBe(paraSrt(segs));
     expect(arquivosDeLegendaDoVideo('x', segs, {de_ms: 5000, ate_ms: 6000}, () => false)).toEqual([]);
   });
+    expect(r[2].texto.startsWith('WEBVTT')).toBe(true);
 
   it('o SRT de fora guarda as palavras repartidas pelo tamanho, marcadas como estimadas', () => {
     const {legendas} = legendasDeArquivo('1\n00:00:01,000 --> 00:00:02,000\nRecebeu proposta\n', 'x.srt');

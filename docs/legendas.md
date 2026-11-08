@@ -235,10 +235,10 @@ O diálogo Exportar ganha a linha **Legendas** quando o vídeo tem legenda, com 
 | Escolha | Vídeo | Ao lado |
 |---|---|---|
 | No vídeo (padrão) | legenda queimada | nada |
-| Só o SRT | sem legenda (a miniatura e a marca d'água também a ignoram) | `<nome do vídeo>.srt` e `.pt_BR.srt` |
-| Os dois | legenda queimada; no 16:9, acima da faixa onde o YouTube mostra as legendas automáticas | `<nome do vídeo>.srt` e `.pt_BR.srt` |
+| Só o SRT | sem legenda (a miniatura e a marca d'água também a ignoram) | `<nome do vídeo>.srt`, `.pt_BR.srt` e `.vtt` |
+| Os dois | legenda queimada; no 16:9, acima da faixa onde o YouTube mostra as legendas automáticas | `<nome do vídeo>.srt`, `.pt_BR.srt` e `.vtt` |
 
-O SRT leva o mesmo nome do arquivo de vídeo (com o sufixo do destino, como "Mudar - 9x16.srt"), sai nos tempos do
+O SRT (e o VTT, que leva o falante) leva o mesmo nome do arquivo de vídeo (com o sufixo do destino, como "Mudar - 9x16.srt"), sai nos tempos do
 arquivo (com trecho, contado do zero do trecho) e não grava por cima: se o nome existe, "(2)". O `.pt_BR.srt` é o
 nome que o Facebook usa para reconhecer o idioma; o YouTube e o LinkedIn aceitam qualquer um dos dois. A escolha vai
 em `OpcoesExportarVideo.legendas` (id do destino → `video` | `srt` | `ambos`); sem ela, tudo sai como antes.

@@ -359,7 +359,7 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
                 </label>
               );
             })}
-            <span className="nota">O SRT sai com o nome do vídeo e como .pt_BR.srt (o Facebook pede), sem gravar por cima do que já está em saidas/.</span>
+            <span className="nota">O SRT sai com o nome do vídeo, como .pt_BR.srt (o Facebook pede) e em .vtt, sem gravar por cima do que já está em saidas/.</span>
           </div>
         </Linha>
       )}
