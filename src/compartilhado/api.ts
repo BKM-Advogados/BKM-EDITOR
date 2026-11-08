@@ -4,6 +4,7 @@ import type {Comentario, EntradaDiario, EntradaDocumento, EstadoEditor, Manifest
 import type {IdModelo} from '../nucleo/modelos';
 import type {Formato} from '../nucleo/formatos';
 import type {Envelope, IntensidadeLimpeza, LimpezaClipe} from '../nucleo/audio';
+import type {FichaFaixa} from '../nucleo/biblioteca-musicas';
 import type {MedidasLoudness} from '../nucleo/loudness';
 import type {FonteArquivo, Marca} from '../nucleo/marca';
 import type {OpcoesExportarImagem, OpcoesExportarVideo, PrefsExportacao} from '../nucleo/exportacao';
@@ -316,7 +317,8 @@ export type EstadoTranscricao = {pasta: string; modelo: string; modelos: {id: st
   ffmpeg: boolean; ocupado?: string; plataforma: boolean};
 
 /** Um arquivo da pasta de trilhas: nome sem extensão, caminho absoluto, subpasta e tamanho. */
-export type Trilha = {nome: string; caminho: string; pasta: string; tamanho_kb: number};
+/** `ficha`: a licença conferida da faixa (biblioteca-musicas.ts); `recusa`: a ficha existe mas não serve (NC, ND, sem crédito…). */
+export type Trilha = {nome: string; caminho: string; pasta: string; tamanho_kb: number; ficha?: FichaFaixa; recusa?: string};
 
 /** Voz limpa: o arquivo gravado (caminho no projeto), o que foi medido antes e depois e a duração; ou a pessoa cancelou. */
 export type ResultadoLimpezaVoz = {arquivo: string; medidas: LimpezaClipe; duracao_ms: number} | {cancelado: true};

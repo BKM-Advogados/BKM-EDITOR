@@ -76,8 +76,11 @@ describe('ducking', () => {
     expect(r.reducao_db).toBe(26); // −14 − (−20 − 20)
     expect(r.ganho).toHaveLength(100);
     expect(r.ganho[10]).toBe(1); // 0,5 s: sem voz
-    expect(r.ganho[20]).toBeCloseTo(ganhoDeDb(-13), 2); // primeira janela com voz: meio do ataque de 100 ms
-    expect(r.ganho[21]).toBeCloseTo(ganhoDeDb(-26), 3); // ataque completo
+    // som-D6: o ataque de 100 ms começa 100 ms ANTES da voz (que entra na janela 20) e chega ao fundo antes da primeira sílaba
+    expect(r.ganho[17]).toBe(1);
+    expect(r.ganho[18]).toBeCloseTo(ganhoDeDb(-13), 2); // meio do ataque
+    expect(r.ganho[19]).toBeCloseTo(ganhoDeDb(-26), 3); // ataque completo, na janela anterior à voz
+    expect(r.ganho[20]).toBeCloseTo(ganhoDeDb(-26), 3); // primeira janela com voz: já no fundo
     expect(r.ganho[50]).toBeCloseTo(ganhoDeDb(-26), 3); // 2,5 s: sob a voz
     expect(r.ganho[65]).toBeCloseTo(ganhoDeDb(-26 * 0.4), 2); // 3,25 s: metade da soltura de 500 ms, mais ou menos
     expect(r.ganho[75]).toBe(1); // 3,75 s: soltou
@@ -307,7 +310,11 @@ describe('ipc de áudio', () => {
     const raiz = gravarPlano(path.join(tmp, 'proj2'), planoDoProjeto({nome: 'Som 2', modelo: 'video-branco'}));
     const p = new Projeto(raiz);
     expect(importarTrilha(p, pasta, lista[2].caminho)).toBe('midia/piano.ogg');
-    expect(importarTrilha(p, pasta, lista[2].caminho)).toBe('midia/piano (2).ogg');
+    expect(importarTrilha(p, pasta, lista[2].caminho)).toBe('midia/piano.ogg'); // som-D12: a mesma trilha não vira outra cópia
+    writeFileSync(path.join(pasta, 'b.mp3'), 'outro b');
+    mkdirSync(path.join(p.raiz, 'midia'), {recursive: true});
+    writeFileSync(path.join(p.raiz, 'midia', 'b.mp3'), 'b de outro projeto');
+    expect(importarTrilha(p, pasta, path.join(pasta, 'b.mp3'))).toBe('midia/b (2).mp3'); // bytes diferentes com o mesmo nome: cópia nova
     expect(() => importarTrilha(p, pasta, path.join(tmp, 'proj', 'midia', 'voz.wav'))).toThrow(/pasta de trilhas/);
     expect(() => importarTrilha(p, pasta, path.join(pasta, 'capa.jpg'))).toThrow(/formato/);
   });

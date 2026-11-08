@@ -6,9 +6,11 @@
 import type {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {z} from 'zod';
 import {CURVAS_FADE, ehEnvelope, type CurvaFade, type Envelope, type PapelFaixa} from './audio';
-import {ehDocCenas, type DocCenas} from './cenas';
+import {ehDocCenas, resolverCenas, type DocCenas} from './cenas';
 import {clipeNovoNaFaixa, copiarClipe, crossfadeEntre, dividirClipe, recusou, type ModoCrossfade} from './clipes-audio';
+import {arquivoDaFicha, creditosDas, validarFicha, type FichaFaixa} from './biblioteca-musicas';
 import {duracaoDoTeleprompter, PPM_PADRAO, textoDasCenas} from './gravacao';
+import {importarTrilha, listarTrilhas, pastaTrilhas} from './pasta-trilhas';
 import {ErroProjeto, type Projeto} from './projeto';
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x, null, 2)}]});
@@ -51,6 +53,17 @@ const envelopesDe = (projeto: Projeto, doc: DocCenas) => {
 };
 /** Duração de cada arquivo de áudio já medido, para o crossfade saber a sobra. */
 const duracoesDosArquivos = (projeto: Projeto, doc: DocCenas) => Object.fromEntries(Object.entries(envelopesDe(projeto, doc)).map(([a, e]) => [a, e?.duracao_ms]));
+
+/** O que o resolvedor sabe do vídeo e o JSON cru não mostra (som-D11): os avisos e, por clipe, o nível medido e o ducking (quanto a
+ *  música cai sob a voz). O `ler_documento` junta isto ao documento de cenas, para o Claude decidir com os números e não no chute. */
+export const medidasDoVideo = (projeto: Projeto, doc: unknown): Record<string, unknown> => {
+  if (!ehDocCenas(doc)) return {};
+  const {props, avisos} = resolverCenas(doc, {envelopes: envelopesDe(projeto, doc)});
+  const r1 = (v: number | null | undefined) => (typeof v === 'number' ? Math.round(v * 10) / 10 : undefined);
+  const som = props.audio?.faixas.map((f) => ({id: f.id, papel: f.papel, clipes: f.clipes.map((c) => ({id: c.id, nivel_db: r1(c.nivel_db),
+    ...(c.ducking ? {ducking: {reducao_db: r1(c.ducking.reducao_db), voz_db: r1(c.ducking.voz_db), musica_db: r1(c.ducking.musica_db), medido: c.ducking.medido}} : {})}))}));
+  return {...(avisos.length ? {avisos} : {}), ...(som?.length ? {som} : {})};
+};
 
 const seg = (ms: number) => (ms / 1000).toLocaleString('pt-BR', {maximumFractionDigits: 2});
 
@@ -147,5 +160,73 @@ export const registrarSom = (servidor: McpServer, projeto: Projeto, autor: strin
     const gravado = projeto.aplicarPatch({documento: rel, versao_base: versao, patch: r.patch, autor, origem, rotulo: `${papel === 'voz' ? 'narração' : papel === 'musica' ? 'música' : 'efeito'}: ${arquivo.split('/').pop()}`});
     return {ok: true, documento: alvo, versao: gravado.versao, caminho: r.caminho, faixa: r.faixa, clipe: {id: r.clipe.id, em: r.clipe.em, duracao_ms: r.clipe.duracao_ms, ...(r.clipe.volume !== undefined ? {volume: r.clipe.volume} : {})},
       ...(r.avisos.length ? {avisos: r.avisos} : {})};
+  }));
+  // ---------- biblioteca de músicas livres (biblioteca-musicas.ts): a pasta de trilhas, com a ficha de licença de cada faixa ----------
+  servidor.registerTool('listar_trilhas', {
+    description: 'Lista as trilhas da pasta de trilhas da pessoa (músicas e efeitos), com a licença conferida de cada uma quando há ficha: autor, humor, duração e se a ficha foi recusada (licença NC, ND ou sem crédito). O "id" (ou o nome) vai em escolher_trilha.',
+    inputSchema: {
+      busca: z.string().optional().describe('parte do nome, do autor, do gênero ou do humor'),
+      so_com_ficha: z.boolean().optional().describe('só as faixas com licença conferida'),
+    },
+  }, seguro(({busca, so_com_ficha}: {busca?: string; so_com_ficha?: boolean}) => {
+    const pasta = pastaTrilhas();
+    const q = busca?.trim().toLowerCase();
+    const todas = listarTrilhas(pasta).filter((t) => !so_com_ficha || t.ficha);
+    const vistas = todas.filter((t) => !q || [t.nome, t.pasta, t.ficha?.autor, t.ficha?.genero, t.ficha?.humor, t.ficha?.titulo].some((x) => x?.toLowerCase().includes(q)));
+    return {pasta, total: todas.length, trilhas: vistas.slice(0, 100).map((t) => ({id: t.ficha?.id ?? t.nome, nome: t.nome, ...(t.pasta ? {pasta: t.pasta} : {}),
+      ...(t.ficha ? {titulo: t.ficha.titulo, autor: t.ficha.autor, licenca: t.ficha.licenca, humor: t.ficha.humor, duracao_s: t.ficha.duracao_s ?? undefined, atribuicao: t.ficha.atribuicao}
+        : t.recusa ? {recusada: t.recusa} : {sem_ficha: true})})),
+      ...(vistas.length > 100 ? {cortado: true} : {})};
+  }));
+
+  servidor.registerTool('escolher_trilha', {
+    description: 'Traz uma trilha da pasta de trilhas para o vídeo: copia para midia/ (a mesma trilha não é copiada duas vezes) e põe um clipe na faixa de música (ou de efeitos), com a ficha de licença junto. Recusa a trilha cuja ficha é NC, ND ou sem crédito. O tamanho vem do envelope medido pelo app ou da duração da ficha. Traz arquivo de fora do projeto: pede a confirmação da pessoa.',
+    inputSchema: {
+      trilha: z.string().describe('o id da ficha, o nome do arquivo sem extensão ou o caminho relativo na pasta de trilhas (listar_trilhas)'),
+      papel: z.enum(['musica', 'efeitos']).optional().describe('padrão: musica'),
+      em_ms: z.number().min(0).optional().describe('onde o clipe começa, em ms do vídeo; padrão: onde a faixa acaba'),
+      documento: z.string().optional().describe('id do vídeo; sem ele, o que a pessoa está vendo'),
+    },
+  }, seguro(({trilha, papel, em_ms, documento}: {trilha: string; papel?: 'musica' | 'efeitos'; em_ms?: number; documento?: string}) => {
+    const pasta = pastaTrilhas();
+    const chave = trilha.trim().toLowerCase().replace(/\\/g, '/');
+    const lista = listarTrilhas(pasta);
+    const achadas = lista.filter((t) => t.ficha?.id === chave || t.nome.toLowerCase() === chave || `${t.pasta ? `${t.pasta}/` : ''}${t.nome}`.toLowerCase() === chave);
+    if (!achadas.length) throw new ErroProjeto(`trilha não achada: ${trilha} (listar_trilhas mostra as da pasta ${pasta})`, 'nao_achado');
+    if (achadas.length > 1) throw new ErroProjeto(`${achadas.length} trilhas com esse nome (${achadas.map((t) => `${t.pasta ? `${t.pasta}/` : ''}${t.nome}`).join(', ')}): use o id da ficha ou o caminho`, 'patch');
+    const t = achadas[0];
+    if (t.recusa) throw new ErroProjeto(`a ficha de ${t.nome} foi recusada: ${t.recusa}`, 'patch');
+    const {alvo, rel, doc, versao} = docDe(projeto, documento);
+    const arquivo = importarTrilha(projeto, pasta, t.caminho);
+    const duracao = t.ficha?.duracao_s ? Math.round(t.ficha.duracao_s * 1000) : undefined;
+    const r = clipeNovoNaFaixa(doc, {arquivo, papel: papel ?? 'musica', em_ms, duracao_ms: envelopeDe(projeto, arquivo) ? undefined : duracao, envelope: envelopeDe(projeto, arquivo),
+      nome: t.ficha?.titulo}, envelopesDe(projeto, doc));
+    if (recusou(r)) throw new ErroProjeto(r.erro, 'patch');
+    const gravado = projeto.aplicarPatch({documento: rel, versao_base: versao, patch: r.patch, autor, origem, rotulo: `trilha: ${t.ficha?.titulo ?? t.nome}`});
+    return {ok: true, documento: alvo, versao: gravado.versao, arquivo, caminho: r.caminho, clipe: {id: r.clipe.id, em: r.clipe.em, duracao_ms: r.clipe.duracao_ms},
+      ...(t.ficha ? {licenca: t.ficha.licenca, creditar: t.ficha.atribuicao ?? null} : {aviso_licenca: 'a trilha não tem ficha de licença: a licença é da pessoa'}),
+      ...(r.avisos.length ? {avisos: r.avisos} : {})};
+  }));
+
+  servidor.registerTool('creditos_das_musicas', {
+    description: 'Os créditos que as músicas do vídeo pedem (licença CC BY), prontos para a descrição do vídeo, e quais arquivos de música não têm ficha de licença.',
+    inputSchema: {documento: z.string().optional().describe('id do vídeo; sem ele, o que a pessoa está vendo')},
+  }, seguro(({documento}: {documento?: string}) => {
+    const {alvo, doc} = docDe(projeto, documento);
+    const fichas: {arquivo: string; ficha: FichaFaixa}[] = [];
+    const sem: string[] = [];
+    const vistos = new Set<string>();
+    for (const f of doc.audio?.faixas ?? []) {
+      if (f.papel !== 'musica' || f.mudo) continue;
+      for (const c of f.clipes ?? []) {
+        if (c.mudo || vistos.has(c.arquivo)) continue;
+        vistos.add(c.arquivo);
+        const rel = arquivoDaFicha(c.arquivo);
+        const v = projeto.existe(rel) ? validarFicha(projeto.lerJson<unknown>(rel).doc) : null;
+        if (v?.ficha) fichas.push({arquivo: c.arquivo, ficha: v.ficha});
+        else sem.push(v ? `${c.arquivo} (ficha recusada: ${v.erros.join('; ')})` : c.arquivo);
+      }
+    }
+    return {documento: alvo, ...creditosDas(fichas), ...(sem.length ? {sem_ficha: sem} : {})};
   }));
 };

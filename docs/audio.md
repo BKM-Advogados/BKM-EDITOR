@@ -63,8 +63,9 @@ ITU-R BS.1770 e tira a potência média por janela de 50 ms) e pede ao processo 
 
 `db` é o loudness de cada janela, no mesmo número do LUFS; `-100` é silêncio. O arquivo é pequeno (20 números por
 segundo) e entra no git do projeto. Quem lê é o processo principal (`sessao-projeto.ts` passa os envelopes ao
-`resolverCenas`), então a prévia, a exportação e o Claude (pelo `ler_documento`) veem a mesma forma de onda e o mesmo
-ducking. Um clipe cujo arquivo ainda não tem envelope (projeto vindo de outro PC, arquivo trocado à mão) é medido em
+`resolverCenas`), então a prévia, a exportação e o Claude veem o mesmo ducking: o `ler_documento` do vídeo de cenas traz, além
+do JSON, os avisos do resolvedor e o `som` medido (nível e ducking de cada clipe: redução, voz, música e se foi medido), para o
+Claude decidir com os números (som-D11); com `caminho`, devolve só o trecho. Um clipe cujo arquivo ainda não tem envelope (projeto vindo de outro PC, arquivo trocado à mão) é medido em
 segundo plano assim que o vídeo abre; até lá o ducking usa níveis típicos (narração a −20, música a −14) e avisa.
 
 **Versão e carimbo.** `fonte` é o arquivo de áudio como estava quando foi medido: o processo principal carimba o tamanho,

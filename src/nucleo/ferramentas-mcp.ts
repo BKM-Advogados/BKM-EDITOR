@@ -21,7 +21,7 @@ import {
 import {checarTexto, REGRAS_CLIENTE, terminaComUltimaFrase, type Aviso} from './regras';
 import {acharCamada, caminhosDoId} from './carrossel';
 import {MODELO_FUNDO, patchSemFundo, patchVoltarAoOriginal, removedorDeFundo} from './remover-fundo';
-import {registrarSom} from './mcp-som'; // frente Som (rodada 3)
+import {medidasDoVideo, registrarSom} from './mcp-som'; // frente Som (rodada 3)
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x, null, 2)}]});
 const erro = (e: unknown) => ({
@@ -141,12 +141,12 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   }));
 
   servidor.registerTool('ler_documento', {
-    description: 'Lê um documento (pelo id do manifesto ou caminho). Devolve o JSON e a versão, que vai em versao_base no aplicar_patch. Com "caminho", devolve só aquele trecho.',
+    description: 'Lê um documento (pelo id do manifesto ou caminho). Devolve o JSON e a versão, que vai em versao_base no aplicar_patch. No vídeo de cenas traz também os avisos do resolvedor e o som medido (nível e ducking de cada clipe). Com "caminho", devolve só aquele trecho.',
     inputSchema: {documento: z.string(), caminho: z.string().optional().describe('JSON Pointer, ex.: /cenas/2/blocos/1')},
   }, seguro(({documento, caminho}: {documento: string; caminho?: string}) => {
     const rel = projeto.arquivoDoDocumento(documento);
     const {doc, versao} = projeto.lerJson(rel);
-    return {documento: rel, versao, conteudo: caminho ? valorEm(doc, caminho) : doc};
+    return {documento: rel, versao, conteudo: caminho ? valorEm(doc, caminho) : doc, ...(caminho ? {} : medidasDoVideo(projeto, doc))}; // frente Som: avisos e som medido (som-D11)
   }));
 
   servidor.registerTool('aplicar_patch', {

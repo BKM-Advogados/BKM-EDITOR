@@ -270,6 +270,17 @@ describe('MCP: teleprompter e clipe de áudio', () => {
     expect(resolverAudio(lerVideo().audio, 12000).avisos.join(' ')).toMatch(/tocam juntas/);
   });
 
+  it('som-D11: ler_documento traz o nível e o ducking medidos de cada clipe e os avisos do resolvedor; com caminho, só o trecho', async () => {
+    const r = await chamar('ler_documento', {documento: 'video'});
+    const voz = r.json.som.find((f: {papel: string}) => f.papel === 'voz');
+    const musica = r.json.som.find((f: {papel: string}) => f.papel === 'musica');
+    expect(typeof voz.clipes[0].nivel_db).toBe('number');
+    expect(musica.clipes[0].ducking).toMatchObject({medido: false}); // a cama ainda não foi medida: o ducking supõe o nível típico
+    expect(typeof musica.clipes[0].ducking.reducao_db).toBe('number');
+    expect(r.json.avisos.join(' ')).toMatch(/ainda não foi medida|tocam juntas/);
+    expect((await chamar('ler_documento', {documento: 'video', caminho: '/audio'})).json.som).toBeUndefined();
+  });
+
   it('recusa arquivo que não é áudio, que não existe, ou ainda sem medida e sem duracao_ms', async () => {
     expect((await chamar('adicionar_clipe_audio', {documento: 'video', arquivo: 'video/video.json', papel: 'voz'})).erro).toBe(true);
     expect((await chamar('adicionar_clipe_audio', {documento: 'video', arquivo: 'midia/nada.wav', papel: 'voz'})).texto).toMatch(/não está no projeto/);

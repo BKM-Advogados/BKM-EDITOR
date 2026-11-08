@@ -280,7 +280,10 @@ export const calcularDucking = (o: {
   const sobe = janela / ataque;
   const desce = janela / soltura;
   for (let k = 0; k < n; k++) {
-    const alvoP = reducao_db > 0 && haVozEm(o.musica.em + k * janela + janela / 2) ? 1 : 0;
+    // som-D6: a música começa a cair `ataque` ms ANTES de a voz entrar (a voz já está lá ou entra dentro do ataque), para chegar
+    // ao fundo quando a primeira sílaba sai; a soltura continua depois que a voz acaba (olhar à frente só vale para o começo)
+    const t = o.musica.em + k * janela + janela / 2;
+    const alvoP = reducao_db > 0 && (haVozEm(t) || haVozEm(t + ataque)) ? 1 : 0;
     p = alvoP > p ? Math.min(alvoP, p + sobe) : Math.max(alvoP, p - desce);
     ganho[k] = reducao_db > 0 ? Math.round(ganhoDeDb(-p * reducao_db) * 1000) / 1000 : 1;
   }
@@ -411,4 +414,35 @@ export const volumeDoClipe = (f: {volume: number; mudo: boolean}, c: ClipeAudioP
   if (f.mudo || c.mudo) return 0;
   const duck = c.ducking ? c.ducking.ganho[limitar(Math.floor(t_ms / c.ducking.janela_ms), 0, c.ducking.ganho.length - 1)] ?? 1 : 1;
   return limitar(f.volume * c.volume * fatorFades(c, t_ms) * duck, 0, 1);
+};
+
+// ---------- etiquetas de áudio do Player (som-D10) ----------
+export const ETIQUETAS_AUDIO_MIN = 12; // o Player da prévia monta um pool de <audio> compartilhado; o padrão dele é 5
+export const ETIQUETAS_AUDIO_MAX = 48;
+
+/** Quantos clipes tocam ao mesmo tempo no pico, contando os mesmos que o VideoCenas monta (faixa e clipe não mudos, dentro do vídeo). */
+export const picoDeClipesSimultaneos = (audio: AudioP | undefined): number => {
+  const eventos: [number, number][] = [];
+  for (const f of audio?.faixas ?? []) {
+    if (f.mudo) continue;
+    for (const c of f.clipes) {
+      if (c.mudo || c.fora) continue;
+      eventos.push([c.em, 1], [c.em + c.duracao_ms, -1]);
+    }
+  }
+  eventos.sort((a, b) => a[0] - b[0] || a[1] - b[1]); // no mesmo instante, o que acaba sai antes de o outro entrar
+  let agora = 0;
+  let pico = 0;
+  for (const [, d] of eventos) {
+    agora += d;
+    if (agora > pico) pico = agora;
+  }
+  return pico;
+};
+
+/** O pool de <audio> da prévia para o pico do vídeo: o mínimo de 12, e em degraus (12, 24, 48) para o Player não ser remontado
+ *  a cada clipe novo. Com mais de 48 clipes juntos, o resto fica sem som na prévia (o render não tem esse limite). */
+export const etiquetasDeAudio = (audio: AudioP | undefined) => {
+  const pico = picoDeClipesSimultaneos(audio) + 1; // uma de folga para a troca de clipe no mesmo quadro
+  return pico <= ETIQUETAS_AUDIO_MIN ? ETIQUETAS_AUDIO_MIN : pico <= 24 ? 24 : ETIQUETAS_AUDIO_MAX;
 };

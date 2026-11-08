@@ -3,31 +3,17 @@
 // composição (sessao-projeto.ts), para a prévia e a exportação verem o mesmo ducking. Registrado no main.ts com uma linha.
 // O envelope leva o carimbo do arquivo medido (tamanho, data e sha256): a tomada nova gravada com o mesmo nome, ou o
 // envelope de outra versão da conta, conta como não medido, e a linha do tempo mede de novo.
-import {createHash} from 'node:crypto';
-import {closeSync, copyFileSync, existsSync, mkdirSync, openSync, readdirSync, readSync, statSync, type Stats} from 'node:fs';
-import path from 'node:path';
-import {CANAL, type Preferencias, type Trilha} from '../compartilhado/api';
+import {statSync, type Stats} from 'node:fs';
+import {CANAL, type Preferencias} from '../compartilhado/api';
 import {conferirEnvelope, ehEnvelope, type Envelope} from '../nucleo/audio';
 import type {DocCenas} from '../nucleo/cenas';
+import {EXTENSOES_AUDIO, importarTrilha, listarTrilhas, sha256DoArquivo} from '../nucleo/pasta-trilhas';
 import {ErroProjeto, type Projeto} from '../nucleo/projeto';
-
-export const EXTENSOES_AUDIO = ['wav', 'mp3', 'm4a', 'ogg', 'aac'];
-const MAX_TRILHAS = 500;
 
 export const arquivoDoEnvelope = (arquivo: string) => `${arquivo}.envelope.json`;
 
-/** sha256 de um arquivo, lido em pedaços de 1 MB (a narração inteira não precisa caber na memória). */
-export const sha256DoArquivo = (abs: string) => {
-  const h = createHash('sha256');
-  const fd = openSync(abs, 'r');
-  try {
-    const buf = Buffer.allocUnsafe(1 << 20);
-    for (let n = readSync(fd, buf, 0, buf.length, null); n > 0; n = readSync(fd, buf, 0, buf.length, null)) h.update(buf.subarray(0, n));
-  } finally {
-    closeSync(fd);
-  }
-  return h.digest('hex');
-};
+// sha256DoArquivo, listarTrilhas e importarTrilha moraram aqui; foram para src/nucleo/pasta-trilhas.ts (o MCP também os usa)
+export {EXTENSOES_AUDIO, importarTrilha, listarTrilhas, sha256DoArquivo};
 
 // por caminho + tamanho + data: o arquivo de mesmo tamanho e outra data (cópia, git clone) é lido uma vez por sessão
 const shas = new Map<string, string>();
@@ -84,61 +70,6 @@ export const lerEnvelopes = (p: Projeto, doc: DocCenas): Record<string, Envelope
     }
   }
   return out;
-};
-
-/** Arquivos de áudio da pasta de trilhas (até dois níveis), em ordem de nome; cria a pasta se não existir. */
-export const listarTrilhas = (pasta: string, profundidade = 2): Trilha[] => {
-  mkdirSync(pasta, {recursive: true});
-  const out: Trilha[] = [];
-  const andar = (dir: string, nivel: number) => {
-    let entradas: string[];
-    try {
-      entradas = readdirSync(dir).sort((a, b) => a.localeCompare(b, 'pt-BR'));
-    } catch {
-      return;
-    }
-    for (const nome of entradas) {
-      if (out.length >= MAX_TRILHAS) return;
-      const abs = path.join(dir, nome);
-      let st;
-      try {
-        st = statSync(abs);
-      } catch {
-        continue;
-      }
-      if (st.isDirectory()) {
-        if (nivel < profundidade && !nome.startsWith('.')) andar(abs, nivel + 1);
-      } else if (EXTENSOES_AUDIO.includes(path.extname(nome).slice(1).toLowerCase())) {
-        out.push({nome: path.basename(nome, path.extname(nome)), caminho: abs, pasta: path.relative(pasta, dir).split(path.sep).join('/'), tamanho_kb: Math.round(st.size / 1024)});
-      }
-    }
-  };
-  andar(pasta, 0);
-  return out;
-};
-
-/** Arquivo que ainda não existe em `pasta`: "Nome.mp3", "Nome (2).mp3"... */
-const arquivoLivre = (pasta: string, base: string, ext: string) => {
-  let p = path.join(pasta, `${base}.${ext}`);
-  for (let n = 2; existsSync(p); n++) p = path.join(pasta, `${base} (${n}).${ext}`);
-  return p;
-};
-
-const dentroDe = (pasta: string, arquivo: string) => {
-  const rel = path.relative(path.resolve(pasta), path.resolve(arquivo));
-  return Boolean(rel) && !rel.startsWith('..') && !path.isAbsolute(rel);
-};
-
-/** Copia uma trilha da biblioteca para midia/ do projeto; devolve o caminho no projeto ("midia/trilha.mp3"). */
-export const importarTrilha = (p: Projeto, pastaTrilhas: string, caminho: string) => {
-  if (!dentroDe(pastaTrilhas, caminho)) throw new ErroProjeto('só entram arquivos da pasta de trilhas das preferências', 'caminho');
-  const ext = path.extname(caminho).slice(1).toLowerCase();
-  if (!EXTENSOES_AUDIO.includes(ext)) throw new ErroProjeto(`formato não tocável: .${ext} (vale ${EXTENSOES_AUDIO.join(', ')})`, 'caminho');
-  if (!existsSync(caminho)) throw new ErroProjeto(`a trilha não existe mais: ${caminho}`, 'nao_achado');
-  const destino = arquivoLivre(p.caminho('midia'), path.basename(caminho, path.extname(caminho)), ext);
-  mkdirSync(path.dirname(destino), {recursive: true});
-  copyFileSync(caminho, destino);
-  return path.relative(p.raiz, destino).split(path.sep).join('/');
 };
 
 type Lidar = <A extends unknown[], R>(canal: string, f: (...a: A) => R | Promise<R>) => void;

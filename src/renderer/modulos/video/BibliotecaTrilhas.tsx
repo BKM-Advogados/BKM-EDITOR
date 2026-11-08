@@ -1,11 +1,12 @@
 // Biblioteca de trilhas: a pasta de músicas e efeitos da pessoa (Preferências › pasta de trilhas, padrão Estudio\trilhas),
-// listada num popover com filtro. Clicar numa trilha copia para midia/ e põe na faixa de música. Dá para trocar a pasta
-// e abri-la no Explorador por aqui mesmo. A curadoria de músicas livres (licença conferida) fica para depois: por ora a
-// pasta é da pessoa.
+// listada num popover com filtro. Clicar numa trilha copia para midia/ (uma vez só) e põe na faixa de música. Dá para trocar
+// a pasta e abri-la no Explorador por aqui mesmo. A trilha com ficha (biblioteca-musicas.ts) mostra a licença conferida e o
+// autor; a de ficha recusada (NC, ND, sem crédito) não pode ser escolhida; a sem ficha é da pessoa.
 import React, {useEffect, useState} from 'react';
 import {FolderOpen, FolderSearch, Music, RefreshCw} from 'lucide-react';
 import type {Trilha} from '../../../compartilhado/api';
 import {avisar, mensagemDe} from '../../estado/loja';
+import {LICENCAS_LIVRES} from '../../../nucleo/biblioteca-musicas';
 import {usarFora} from '../../componentes/Menu';
 import {adicionarDaBiblioteca} from './acoes-audio';
 
@@ -38,7 +39,7 @@ export const BibliotecaTrilhas: React.FC<{documento: string; aoFechar: () => voi
     }
   };
   const f = filtro.trim().toLowerCase();
-  const vistas = (lista?.trilhas ?? []).filter((t) => !f || `${t.pasta}/${t.nome}`.toLowerCase().includes(f));
+  const vistas = (lista?.trilhas ?? []).filter((t) => !f || `${t.pasta}/${t.nome} ${t.ficha?.autor ?? ''} ${t.ficha?.humor ?? ''} ${t.ficha?.genero ?? ''}`.toLowerCase().includes(f));
   return (
     <div ref={caixa} className="flutuante biblioteca" role="dialog" aria-label="Biblioteca de trilhas">
       <div className="topo">
@@ -53,9 +54,14 @@ export const BibliotecaTrilhas: React.FC<{documento: string; aoFechar: () => voi
         {lista && !lista.trilhas.length && <div className="vazio">A pasta está vazia. Ponha mp3, wav, m4a, ogg ou aac em<br /><code>{lista.pasta}</code></div>}
         {lista && lista.trilhas.length > 0 && !vistas.length && <div className="vazio">Nada com "{filtro}".</div>}
         {vistas.map((t) => (
-          <button key={t.caminho} className="trilha-item" disabled={ocupado !== null} onClick={() => void escolher(t)} title={t.caminho}>
-            <span className="nome">{t.nome}</span>
-            <span className="meta">{t.pasta ? `${t.pasta} · ` : ''}{t.tamanho_kb >= 1024 ? `${(t.tamanho_kb / 1024).toFixed(1)} MB` : `${t.tamanho_kb} KB`}</span>
+          <button key={t.caminho} className="trilha-item" disabled={ocupado !== null || Boolean(t.recusa)}
+            title={t.recusa ? `Ficha recusada: ${t.recusa}` : t.ficha ? `${t.ficha.titulo} · ${t.ficha.autor} · licença conferida em ${t.ficha.conferido_em}
+${t.ficha.url_pagina}` : t.caminho}
+            onClick={() => void escolher(t)}>
+            <span className="nome">{t.ficha?.titulo ?? t.nome}</span>
+            {t.ficha && <span className="meta" style={{color: 'var(--trilha-audio)'}}>{LICENCAS_LIVRES[t.ficha.licenca].nome}</span>}
+            {t.recusa && <span className="meta" style={{color: 'var(--erro)'}}>licença recusada</span>}
+            <span className="meta">{t.ficha?.autor ?? (t.pasta ? `${t.pasta} · ` : '')}{t.ficha ? ' · ' : ''}{t.tamanho_kb >= 1024 ? `${(t.tamanho_kb / 1024).toFixed(1)} MB` : `${t.tamanho_kb} KB`}</span>
             {ocupado === t.caminho && <span className="meta">medindo…</span>}
           </button>
         ))}

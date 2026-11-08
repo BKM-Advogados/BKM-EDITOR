@@ -3,7 +3,7 @@
 // menos a do clipe inteiro, fica abaixo de −60 dB. O do crossfade, também: no meio, a soma fica a ±1 dB do nível de antes.
 import jsonpatch, {type Operation} from 'fast-json-patch';
 import {describe, expect, it} from 'vitest';
-import {dbDeGanho, ganhoDaCurva, JANELA_MS, nivelDeReferencia, resolverAudio, volumeDoClipe, type ClipeAudio, type CurvaFade, type Envelope} from '../src/nucleo/audio';
+import {calcularDucking, dbDeGanho, etiquetasDeAudio, ganhoDaCurva, ganhoDeDb, picoDeClipesSimultaneos, JANELA_MS, nivelDeReferencia, resolverAudio, volumeDoClipe, type ClipeAudio, type CurvaFade, type Envelope} from '../src/nucleo/audio';
 import {novoDocCenas, resolverCenas, type DocCenas} from '../src/nucleo/cenas';
 import {acharClipe, copiarClipe, crossfadeEntre, dividirClipe, EFEITO_ABAIXO_DA_VOZ_LU, nivelDaVoz, recusou, volumeDoEfeito, type Copia, type Crossfade, type Divisao} from '../src/nucleo/clipes-audio';
 import type {LegendasCenas} from '../src/nucleo/legendas';
@@ -376,5 +376,45 @@ describe('efeito na medida da casa (som-D4) e música sobre música (som-D7)', (
     const mix = mixar(depois, {'midia/a.wav': A, 'midia/b.wav': B});
     expect(db(rms(mix, 2000, 3000)) - db(rms(A, 2000, 3000))).toBeCloseTo(0, 1);
     expect(db(rms(mix, 7000, 8000)) - db(rms(B, 7000, 8000) )).toBeCloseTo(0, 1);
+  });
+});
+
+describe('prévia com muitos áudios (som-D10) e ducking que antecipa a voz (som-D6)', () => {
+  it('som-D10: o pool de áudio do Player cobre o pico de clipes juntos (11 efeitos + narração + música = 13)', () => {
+    const efeitos = Array.from({length: 11}, (_, i) => ({id: `e${i}`, arquivo: 'midia/e.wav', em: 1000 + i * 10, duracao_ms: 3000}));
+    const d: DocCenas = {...doc([], undefined), audio: {faixas: [
+      {id: 'narracao', nome: 'Narração', papel: 'voz', clipes: [{id: 'n', arquivo: 'midia/n.wav', em: 0, duracao_ms: 8000}]},
+      {id: 'musica', nome: 'Música', papel: 'musica', clipes: [{id: 'm', arquivo: 'midia/m.wav', em: 0, duracao_ms: 8000}]},
+      {id: 'efeitos', nome: 'Efeitos', papel: 'efeitos', clipes: efeitos},
+    ]}};
+    const {audio} = resolverAudio(d.audio, 12000);
+    expect(picoDeClipesSimultaneos(audio)).toBe(13);
+    expect(etiquetasDeAudio(audio)).toBe(24); // o 13º áudio quebrava a prévia com o pool fixo de 12
+    // clipe mudo, faixa muda e clipe fora do vídeo não contam; clipes em sequência (um acaba quando o outro começa) também não somam
+    const seq = doc([{id: 'a', arquivo: 'a', em: 0, duracao_ms: 1000}, {id: 'b', arquivo: 'b', em: 1000, duracao_ms: 1000, mudo: false}, {id: 'c', arquivo: 'c', em: 500, duracao_ms: 100, mudo: true}]);
+    expect(picoDeClipesSimultaneos(resolverAudio(seq.audio, 12000).audio)).toBe(1);
+    expect(etiquetasDeAudio(undefined)).toBe(12);
+    const muitos = doc(Array.from({length: 60}, (_, i) => ({id: `x${i}`, arquivo: 'x', em: 0, duracao_ms: 1000})));
+    expect(etiquetasDeAudio(resolverAudio(muitos.audio, 12000).audio)).toBe(48);
+  });
+
+  it('som-D6: a música já está no fundo quando a voz entra (antes, o ataque de 80 ms começava só depois da primeira sílaba)', () => {
+    const env = (n: number, v: number, trechos: [number, number, number][] = []): Envelope => ({versao: 2, janela_ms: 50, duracao_ms: n, db: Array.from({length: n / 50}, (_, i) => trechos.find(([a, b]) => i * 50 >= a && i * 50 < b)?.[2] ?? v)});
+    const r = calcularDucking({
+      musica: {em: 0, duracao_ms: 6000, corte_ms: 0, ganho_db: 0, env: env(6000, -14)},
+      vozes: [{em: 0, duracao_ms: 6000, corte_ms: 0, ganho_db: 0, env: env(6000, -20, [[0, 2000, -100], [4000, 6000, -100]])}],
+      alvo_lu: 20, ataque_ms: 80, soltura_ms: 500,
+    });
+    const k = 2000 / 50; // a janela em que a voz entra
+    const noFundo = ganhoDeDb(-r.reducao_db);
+    expect(r.reducao_db).toBeGreaterThan(10);
+    // na janela da primeira sílaba a música já está no fundo (a 1 dB do alvo); antes do ataque ela ainda está solta
+    expect(db(r.ganho[k])).toBeLessThanOrEqual(db(noFundo) + 1);
+    expect(r.ganho[k - 5]).toBeCloseTo(1, 2);
+    mostrar('ducking: ganho na janela da primeira sílaba', db(r.ganho[k]).toFixed(1), 'dB; alvo', (-r.reducao_db).toFixed(1), 'dB');
+    // a soltura não antecipa: com a voz parando em 4000 ms, a música só começa a subir depois disso
+    const fim = 4000 / 50;
+    expect(db(r.ganho[fim - 1])).toBeLessThanOrEqual(db(noFundo) + 0.5);
+    expect(r.ganho[fim + 3]).toBeGreaterThan(r.ganho[fim - 1]);
   });
 });
