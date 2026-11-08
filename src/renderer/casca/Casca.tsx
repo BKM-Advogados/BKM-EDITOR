@@ -14,6 +14,7 @@ import type {Modulo} from '../../nucleo/documentos';
 import {FORMATOS_IMAGEM, FORMATOS_VIDEO} from '../../nucleo/formatos';
 import {abrirProjeto, avisar, criarDocumento, desfazer, fecharProjeto, loja, mensagemDe, quandoVerFato, useLoja, type Area} from '../estado/loja';
 import {pedirTexto} from '../componentes/Dialogo';
+import {acaoDeArquivo} from './atalhos';
 import type {PaineisDoModulo} from './contrato';
 import {PaineisVideo} from '../modulos/video/paineis';
 import {PaineisImagem} from '../modulos/imagem/paineis';
@@ -330,7 +331,9 @@ export const Casca: React.FC = () => {
       const digitando = /INPUT|TEXTAREA|SELECT/.test(alvo.tagName) || alvo.isContentEditable || alvo.closest('.xterm');
       if (document.querySelector('.dialogo-fundo')) return;
       const k = ev.key.toLowerCase();
-      // Alt+1 a 4, Ctrl+' e os Ctrl de arquivo valem até com o terminal em foco (escuta na captura, antes do xterm)
+      // Alt+1 a 4, Ctrl+' e Ctrl+S valem até com o terminal em foco (escuta na captura, antes do xterm). Ctrl+O, N e W são
+      // de arquivo só fora do terminal, onde o Ctrl+W apaga uma palavra (transversal-D4, atalhos.ts)
+      const arquivo = acaoDeArquivo(ev, Boolean(alvo.closest('.xterm')));
       if (ev.altKey && !ev.ctrlKey && /^Digit[1-4]$/.test(ev.code)) {
         ev.preventDefault();
         ev.stopPropagation();
@@ -340,13 +343,13 @@ export const Casca: React.FC = () => {
         ev.stopPropagation();
         api.current?.getPanel('terminal')?.api.setActive();
         (document.querySelector('.conversa .caixa-pedido textarea, .terminal-corpo textarea') as HTMLTextAreaElement | null)?.focus();
-      } else if (ev.ctrlKey && !ev.altKey && !ev.shiftKey && k === 'o') {
+      } else if (arquivo === 'abrir') {
         ev.preventDefault();
         void abrirRef.current();
-      } else if (ev.ctrlKey && !ev.altKey && !ev.shiftKey && k === 'n') {
+      } else if (arquivo === 'novo') {
         ev.preventDefault();
         novoProjeto();
-      } else if (ev.ctrlKey && !ev.altKey && !ev.shiftKey && k === 'w') {
+      } else if (arquivo === 'fechar') {
         ev.preventDefault();
         voltarAoInicio();
       } else if (ev.ctrlKey && !ev.altKey && !ev.shiftKey && k === 's') {
