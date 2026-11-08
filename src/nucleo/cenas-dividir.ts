@@ -36,9 +36,12 @@ export const dividirCena = (doc: DocCenas, idCena: string, tMs: number): Divisao
       depois.push({...b, em: em - t, ...(sai !== undefined ? {sai: Math.max(em - t, sai - t)} : {})});
     } else if (sai === undefined || sai > t) {
       // atravessa o corte: fica nas duas; na primeira acaba no corte (sai explícito vira o fim dela, sem sai já é o fim),
-      // na segunda começa no zero
-      antes.push(sai === undefined ? b : {...b, sai: t});
-      depois.push({...b, em: 0, ...(sai !== undefined ? {sai: sai - t} : {})});
+      // na segunda começa no zero. As duas ficam marcadas para a composição emendar o bloco (video-D1): a primeira não o
+      // apaga no corte (`segue_ms`) e a segunda não o faz entrar de novo nem reconta o número ou recomeça o Ken Burns
+      // (`desde_ms`); as marcas somam se o bloco já vinha de outro corte
+      const resto = (sai ?? dur) - t;
+      antes.push({...b, ...(sai !== undefined ? {sai: t} : {}), segue_ms: resto + numero(b.segue_ms, 0)});
+      depois.push({...b, em: 0, desde_ms: numero(b.desde_ms, 0) + (t - em), ...(sai !== undefined ? {sai: sai - t} : {})});
     } else antes.push(b); // termina antes do corte
   }
   const primeira: CenaCenas = {...cena, duracao_ms: t, blocos: antes};

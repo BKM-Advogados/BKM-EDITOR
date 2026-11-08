@@ -14,6 +14,7 @@ import {volumeDoClipe, type AudioP, type ClipeAudioP, type FaixaAudioP} from '..
 import {TIPOS_BLOCO_CENAS, type BlocoCenasP, type CenaCenasP, type PropsCenas, type TemaCenas} from '../../nucleo/cenas';
 import {transformDoMovimento} from './movimento';
 import {casasDoNumero, formatarNumero} from '../formatar-numero';
+import {tempoDoBloco} from './continuidade';
 
 const clamp = {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'} as const;
 
@@ -38,8 +39,10 @@ const Bloco: React.FC<{b: BlocoCenasP; t0: number; tema: TemaCenas; familia: str
   const padrao = TIPOS_BLOCO_CENAS[b.tipo] ?? TIPOS_BLOCO_CENAS.texto;
   const tam = (b.tam ?? padrao.tam) * menor;
   const cor = b.cor ?? (b.tipo === 'texto' ? tema.suave : tema.texto);
-  const m = mola(b.em);
-  const saida = 1 - lin(b.sai - 250, 250);
+  // lâmina (video-D1): o bloco que atravessa o corte entra, conta e se move como um bloco só, e não some no corte
+  const tempo = tempoDoBloco(b);
+  const m = mola(tempo.inicio);
+  const saida = tempo.segue ? 1 : 1 - lin(b.sai - 250, 250);
   const alinhar = b.alinhar === 'esquerda' ? 'left' : b.alinhar === 'direita' ? 'right' : 'center';
   const base: React.CSSProperties = {position: 'absolute', left: b.x * W, top: b.y * H, width: b.largura * W, fontFamily: familia, color: cor,
     fontSize: tam, fontWeight: b.peso ?? padrao.peso, lineHeight: b.tipo === 'titulo' ? 1.08 : 1.3, textAlign: alinhar, opacity: Math.min(1, m * 1.4) * saida,
@@ -50,7 +53,7 @@ const Bloco: React.FC<{b: BlocoCenasP; t0: number; tema: TemaCenas; familia: str
     return (
       <div data-origem={b.origem} data-bloco-id={b.id} style={{...base, opacity: saida, transform: undefined, display: 'flex', flexDirection: 'column', gap: tam * 0.55}}>
         {itens.map((it, i) => {
-          const mi = mola(b.em + i * 450);
+          const mi = mola(tempo.inicio + i * 450);
           return (
             <div key={i} style={{display: 'flex', alignItems: 'baseline', gap: tam * 0.5, opacity: Math.min(1, mi * 1.5), transform: `translateX(${(1 - mi) * menor * 0.05}px)`,
               justifyContent: alinhar === 'center' ? 'center' : alinhar === 'right' ? 'flex-end' : 'flex-start'}}>
@@ -63,7 +66,7 @@ const Bloco: React.FC<{b: BlocoCenasP; t0: number; tema: TemaCenas; familia: str
     );
   }
   if (b.tipo === 'numero') {
-    const p = lin(b.em, 1100, Easing.inOut(Easing.cubic));
+    const p = lin(tempo.inicio, 1100, Easing.inOut(Easing.cubic));
     const de = b.de ?? 0;
     const ate = b.ate ?? 0;
     const valor = formatarNumero(de + (ate - de) * p, casasDoNumero(b)); // casas dos valores, ou o campo `casas` (video-D8)
@@ -80,7 +83,7 @@ const Bloco: React.FC<{b: BlocoCenasP; t0: number; tema: TemaCenas; familia: str
   }
   if (b.tipo === 'imagem') {
     const altura = (b.altura ?? 0.4) * H;
-    const movimento = transformDoMovimento(b.movimento, lin(b.em, b.sai - b.em, Easing.linear)); // Ken Burns (movimento.ts)
+    const movimento = transformDoMovimento(b.movimento, lin(tempo.inicio, tempo.total, Easing.linear)); // Ken Burns (movimento.ts)
     return (
       <div data-origem={b.origem} data-bloco-id={b.id} style={{...base, height: altura, transform: `scale(${0.96 + 0.04 * m})`, ...(movimento ? {overflow: 'hidden'} : {})}}>
         {b.src ? <Img src={midia(b.src)} style={{width: '100%', height: '100%', objectFit: b.ajuste === 'cobrir' ? 'cover' : 'contain', display: 'block', transform: movimento}} />
@@ -96,11 +99,12 @@ const Bloco: React.FC<{b: BlocoCenasP; t0: number; tema: TemaCenas; familia: str
   );
 };
 
-const Cena: React.FC<{c: CenaCenasP; tema: TemaCenas; familia: string; dur: number; ultima: boolean}> = ({c, tema, familia, dur, ultima}) => {
-  const frame = useCurrentFrame();
-  const o = ultima ? 1 : interpolate(frame, [dur - 6, dur], [1, 0], clamp);
+// O fundo da cena fica sólido até o último quadro: o corte entre cenas é limpo (video-D2). Antes a cena inteira, fundo
+// junto, apagava nos 6 últimos quadros e aparecia o fundo do tema por baixo (um pisca escuro entre duas cenas claras, e sem
+// os efeitos, tres-efeitos-D4). Quem some antes do corte são os blocos, que já saem em 250 ms antes do `sai`.
+const Cena: React.FC<{c: CenaCenasP; tema: TemaCenas; familia: string}> = ({c, tema, familia}) => {
   return (
-    <AbsoluteFill style={{backgroundColor: c.fundo, opacity: o}} data-cena={c.origem}>
+    <AbsoluteFill style={{backgroundColor: c.fundo}} data-cena={c.origem}>
       {c.blocos.map((b) => <Bloco key={b.id ?? b.origem} b={b} t0={c.t_in} tema={tema} familia={familia} />)}
     </AbsoluteFill>
   );
@@ -139,12 +143,14 @@ export const VideoCenas: React.FC<PropsCenas> = (p) => {
   return (
     <AbsoluteFill style={{backgroundColor: p.tema.fundo}}>
       <CamadaEfeitos efeitos={p.efeitos} quadro={frame}>
+        {/* o fundo do tema também dentro da camada: os efeitos valem nele (tres-efeitos-D4) */}
+        <AbsoluteFill style={{backgroundColor: p.tema.fundo}} />
         {p.cenas.map((c, i) => {
           const de = q(c.t_in);
           const dur = Math.max(1, q(c.t_out) - de);
           return (
             <Sequence key={c.id ?? i} from={de} durationInFrames={dur}>
-              <Cena c={c} tema={p.tema} familia={familia} dur={dur} ultima={i === p.cenas.length - 1} />
+              <Cena c={c} tema={p.tema} familia={familia} />
             </Sequence>
           );
         })}

@@ -35,6 +35,8 @@ export type BlocoCenas = {
   alinhar?: 'esquerda' | 'centro' | 'direita';
   refs?: string[]; // ids dos fatos da pesquisa (F1, F2…) que este bloco afirma
   movimento?: MovimentoImagem; // imagem: zoom dinâmico (Ken Burns) enquanto o bloco está na tela; sem ele, parada (frente C)
+  desde_ms?: number; // lâmina: o bloco já estava na tela há tanto quando esta cena começa (a segunda metade continua a primeira) (frente C)
+  segue_ms?: number; // lâmina: o bloco continua na cena seguinte por mais tanto depois do `sai` (não some no corte) (frente C)
   casas?: number; // número: casas decimais (0 a 4); sem ele, as dos valores, e duas em dinheiro (R$) com centavos (frente C)
 };
 
