@@ -483,7 +483,7 @@ const registrarPesquisa = (servidor: McpServer, projeto: Projeto, autor: string,
   }));
 
   servidor.registerTool('checar_texto', {
-    description: 'Avisos das regras da Cliente sobre o texto do vídeo: termos que o Provimento 205/2021 da OAB veda ou pede cuidado, nomes de empresa e de pessoa, e números que não estão em nenhum fato da pesquisa. Passe "texto" ou um "documento" (todos os textos dele, inclusive a narração do roteiro da Cliente); no vídeo de cenas vem também a lista dos blocos com número e sem refs, e no documento, se o último texto (ou a narração) termina com a frase de fecho das regras. Só informa: nada é bloqueado.',
+    description: 'Avisos das regras da Cliente sobre o texto do vídeo: termos que o Provimento 205/2021 da OAB veda ou pede cuidado, nomes de empresa e de pessoa, e números que não estão em nenhum fato da pesquisa. Passe "texto" ou um "documento" (todos os textos dele, inclusive a narração do roteiro da Cliente e as legendas do vídeo de cenas); no vídeo de cenas vem também a lista dos blocos com número e sem refs, e no documento, se o último texto (ou a narração) termina com a frase de fecho das regras. Só informa: nada é bloqueado.',
     inputSchema: {documento: z.string().optional().describe('id do documento no manifesto'), texto: z.string().optional()},
   }, seguro(({documento, texto: t}: {documento?: string; texto?: string}) => {
     if (!documento && t === undefined) throw new ErroProjeto('passe "texto" ou "documento"', 'patch');
@@ -493,7 +493,10 @@ const registrarPesquisa = (servidor: McpServer, projeto: Projeto, autor: string,
     const {doc} = projeto.lerJson<unknown>(projeto.arquivoDoDocumento(documento));
     // a frase de fecho ("Ficou com alguma dúvida? Procure um advogado trabalhista.") vem no fim da narração ou, sem ela,
     // no último texto do documento
-    const fecho = (ultimo: string | undefined) => ({frase: REGRAS_CLIENTE.texto.ultima_frase, termina: ultimo ? terminaComUltimaFrase(ultimo) : false});
+    // No vídeo de cenas a fala também vai à tela pelas legendas: o fecho vale se o último bloco OU a última legenda o traz
+    // (transversal-N5).
+    const fecho = (ultimo: string | undefined, ...outros: (string | undefined)[]) =>
+      ({frase: REGRAS_CLIENTE.texto.ultima_frase, termina: [ultimo, ...outros].some((x) => Boolean(x) && terminaComUltimaFrase(x!))});
     if (ehDocCenas(doc)) {
       const blocos_sem_refs: string[] = [];
       let ultimo: string | undefined;
@@ -507,7 +510,11 @@ const registrarPesquisa = (servidor: McpServer, projeto: Projeto, autor: string,
           if (numerosDe(tb).length && !b.refs?.length && !cena.refs?.length) blocos_sem_refs.push(b.id);
         }
       }
-      return {documento, avisos, blocos_sem_refs, ultima_frase: fecho(ultimo)};
+      // legendas queimadas na tela (frente Fala): cada segmento passa pelas mesmas regras, com "legenda <id>" em `onde`
+      const segmentos = (doc.legendas?.segmentos ?? []).filter((s) => typeof s?.texto === 'string' && s.texto.trim());
+      for (const s of segmentos) avisos.push(...checarTexto(s.texto, REGRAS_CLIENTE, {onde: `legenda ${s.id}`, fatos}).avisos);
+      const ultimaLegenda = segmentos.reduce<(typeof segmentos)[number] | undefined>((a, s) => (!a || s.sai >= a.sai ? s : a), undefined)?.texto;
+      return {documento, avisos, blocos_sem_refs, ultima_frase: fecho(ultimo, ultimaLegenda)};
     }
     const textos = textosDoJson(doc);
     for (const {onde, texto: tx} of textos) avisos.push(...checarTexto(tx, REGRAS_CLIENTE, {onde, fatos}).avisos);

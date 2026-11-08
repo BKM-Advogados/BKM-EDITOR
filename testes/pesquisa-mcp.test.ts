@@ -195,9 +195,9 @@ describe('pesquisa pelo MCP', () => {
     expect(r.avisos).toEqual(expect.arrayContaining([
       expect.objectContaining({tipo: 'empresa', termo: 'Empresa', onde: '/cenas/0/linhas/0/t'}),
       expect.objectContaining({tipo: 'empresa', termo: 'usiminas', onde: '/cenas/0/tag'}),
-      // a narração (video/palavras.json) termina em "Procure um advogado trabalhista."
-      expect.objectContaining({tipo: 'oab', termo: 'advogado', onde: 'narração'}),
     ]));
+    // a narração (video/palavras.json) termina em "Procure um advogado trabalhista.": o fecho certo não avisa (transversal-D18)
+    expect(r.avisos.filter((a) => a.onde === 'narração' && a.termo === 'advogado')).toEqual([]);
     expect(r.ultima_frase).toEqual({frase: 'Ficou com alguma dúvida? Procure um advogado trabalhista.', termina: true});
     await cliente.close();
   });
