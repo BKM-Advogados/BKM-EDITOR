@@ -45,7 +45,7 @@ describe('MCP estudio', () => {
   it('lista as ferramentas', async () => {
     const {tools} = await cliente.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
-      'anotar_fonte', 'aplicar_marca', 'aplicar_patch', 'checar_texto', 'cor_da_marca', 'criar_documento', 'editar_legenda', 'estado_do_editor', 'exportar_legendas', 'fonte_da_marca', 'importar_legendas',
+      'anotar_fonte', 'aplicar_marca', 'aplicar_patch', 'buscar_icone', 'checar_texto', 'cor_da_marca', 'criar_documento', 'editar_legenda', 'estado_do_editor', 'exportar_legendas', 'fonte_da_marca', 'importar_legendas', 'inserir_icone',
       'ler_comentario', 'ler_documento', 'ler_fonte', 'ler_legendas', 'listar_comentarios', 'listar_mudancas', 'listar_pesquisa', 'projeto_info', 'registrar_fato', 'remover_fundo', 'renomear_projeto',
       'resolver_comentario', 'responder_comentario', 'texto_da_fonte', 'transcrever', 'ver_marca',
     ]);
@@ -102,6 +102,23 @@ describe('MCP estudio', () => {
     const naoHa = await chamar('aplicar_marca', {id: 'inexistente', documento: criado.dado.id});
     expect(naoHa.erro).toBe(true);
     expect(String(naoHa.dado)).toContain('não achado');
+  });
+
+  it('busca ícones em português e insere um na imagem, na cor do kit (frente Marca)', async () => {
+    const achou = await chamar('buscar_icone', {consulta: 'balança', limite: 3});
+    expect(achou.erro).toBe(false);
+    expect(achou.dado.icones[0].nome).toBe('scale');
+    const r = await chamar('inserir_icone', {documento: 'capa', icone: 'scale', cor: '#FFFFFF', tamanho: 120});
+    expect(r.erro).toBe(false);
+    expect(r.dado).toMatchObject({ok: true, documento: 'capa', icone: 'scale', id: 'icone-1'});
+    const depois = await chamar('ler_documento', {documento: 'capa', caminho: r.dado.camada});
+    expect(depois.dado.conteudo).toMatchObject({tipo: 'forma', forma: 'icone', icone: 'scale', largura: 120, preenchimento: '#FFFFFF'});
+    const nao = await chamar('inserir_icone', {documento: 'capa', icone: 'balanca'});
+    expect(nao.erro).toBe(true);
+    expect(String(nao.dado)).toContain('parecidos: scale');
+    const semKit = await chamar('cor_da_marca', {documento: 'capa', camada: r.dado.camada, campo: 'preenchimento', nome: 'destaque'});
+    expect(semKit.erro).toBe(false);
+    expect(semKit.dado).toMatchObject({valor: '@destaque'});
   });
 
   it('lê uma fonte pela rede do Node (o fetch do MCP por stdio) e registra um fato', async () => {

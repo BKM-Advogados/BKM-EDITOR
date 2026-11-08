@@ -25,3 +25,16 @@ export const formaNova = (doc: Pick<DocImagem, 'largura' | 'altura'>, caixa?: {x
     x: Math.round(c.x), y: Math.round(c.y), largura: Math.max(4, Math.round(c.largura)), altura: Math.max(4, Math.round(c.altura)),
   };
 };
+
+export type OpcoesIcone = {x?: number; y?: number; tamanho?: number; cor?: string; espessura?: number};
+
+/** Ícone novo do Lucide: quadrado de 16% do menor lado, no centro (ou com o canto no ponto dado), na cor de destaque do kit
+ *  (referência "@destaque"). A caixa é quadrada porque o ícone é; `largura` e `altura` mudam depois como as de uma forma. */
+export const iconeNovo = (doc: Pick<DocImagem, 'largura' | 'altura'>, nome: string, o: OpcoesIcone = {}): Omit<CamadaImagem, 'id'> => {
+  const lado = Math.max(8, Math.round(o.tamanho ?? Math.min(doc.largura, doc.altura) * 0.16));
+  return {
+    nome: `Ícone · ${nome}`, tipo: 'forma', forma: 'icone', icone: nome, preenchimento: o.cor ?? '@destaque', raio: 0,
+    ...(o.espessura !== undefined ? {icone_espessura: o.espessura} : {}),
+    x: Math.round(o.x ?? (doc.largura - lado) / 2), y: Math.round(o.y ?? (doc.altura - lado) / 2), largura: lado, altura: lado,
+  };
+};

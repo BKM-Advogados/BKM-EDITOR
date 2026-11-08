@@ -1,0 +1,8 @@
+/* Busca de ícones do trilho da imagem (BuscaIcones.tsx). */
+.busca-icones { display: flex; flex-direction: column; gap: 8px; width: 292px; padding: 8px; }
+.busca-icones-campo { display: flex; align-items: center; gap: 6px; color: var(--texto-3); }
+.busca-icones-campo .campo { flex: 1; }
+.busca-icones-grade { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; max-height: 260px; overflow-y: auto; }
+.busca-icones-item { display: grid; place-items: center; aspect-ratio: 1; padding: 0; border: 1px solid transparent; border-radius: var(--raio); background: var(--fundo-3); color: var(--texto); cursor: pointer; }
+.busca-icones-item:hover, .busca-icones-item:focus-visible { border-color: var(--texto-2); }
+.busca-icones-grade .vazio { grid-column: 1 / -1; }

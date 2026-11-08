@@ -55,9 +55,12 @@ export const degradeDe = (d: unknown): (Required<Pick<Degrade, 'tipo' | 'angulo'
   return {tipo: g.tipo === 'radial' ? 'radial' : 'linear', angulo: numero(g.angulo, 180), centro, paradas};
 };
 
+/** Um ícone do Lucide (forma "icone" com o nome dele): sempre pintado em canvas, como traço vetorial. */
+export const ehIcone = (c: Pick<CamadaImagem, 'tipo' | 'forma' | 'icone'>) => c.tipo === 'forma' && c.forma === 'icone' && typeof c.icone === 'string' && c.icone !== '';
+
 /** A camada pede o caminho do acabamento (canvas na prévia)? Sem nada disso, a prévia continua em DOM. */
 export const temAcabamento = (c: CamadaImagem) =>
-  Boolean(sombraDe(c) || contornoDe(c) || (c.tipo !== 'imagem' && degradeDe(c.degrade)));
+  Boolean(ehIcone(c) || sombraDe(c) || contornoDe(c) || (c.tipo !== 'imagem' && degradeDe(c.degrade)));
 
 // ---------- geometria do degradê (a mesma do CSS) ----------
 

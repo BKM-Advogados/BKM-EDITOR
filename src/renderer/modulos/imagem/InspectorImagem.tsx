@@ -10,6 +10,7 @@ import type {CamadaImagem, DocImagem, OperacaoPatch} from '../../../nucleo/docum
 import {baseCamadas, paginaDoCaminho} from '../../../nucleo/carrossel';
 import {mascaraDe, mascarasEmUso, patchRecortar, patchSoltar, podeRecortar} from '../../../nucleo/acabamento';
 import {resolverFonte} from '../../../nucleo/cor-marca';
+import {existeIcone, sugerirIcones} from '../../../nucleo/icones';
 import {aplicar, avisar, loja, patchTrocar, trocar, useLoja} from '../../estado/loja';
 import {CabecalhoInspector, CampoCor, CampoDeslizante, CampoLeitura, CampoNumero, CampoSelecao, CampoTexto, Secao, copiar} from '../../componentes/Campos';
 import {IconeEfeitos} from '../../componentes/Icones';
@@ -44,7 +45,7 @@ const InspectorCamada: React.FC<{documento: string; caminho: string; c: CamadaIm
   const gravar = (campo: keyof CamadaImagem) => (v: unknown) => void trocar(documento, `${caminho}/${campo}`, v, `${campo} de ${c.id}`);
   const positivo = (campo: keyof CamadaImagem) => (v: number) => (v > 0 ? gravar(campo)(v) : avisar(`${campo} precisa ser maior que zero`, 'erro'));
   const ver = (campo: keyof CamadaImagem) => (valor: unknown) => definirPrevia({documento, caminho: `${caminho}/${campo}`, valor});
-  const sub = c.tipo === 'texto' ? `Texto · ${resolverFonte(c.fonte ?? PADRAO.fonte, doc.marca)} ${c.peso ?? PADRAO.peso}` : c.tipo === 'imagem' ? `Imagem · ${c.src ?? ''}` : `Forma · ${c.forma === 'elipse' ? 'elipse' : 'retângulo'}`;
+  const sub = c.tipo === 'texto' ? `Texto · ${resolverFonte(c.fonte ?? PADRAO.fonte, doc.marca)} ${c.peso ?? PADRAO.peso}` : c.tipo === 'imagem' ? `Imagem · ${c.src ?? ''}` : c.forma === 'icone' ? `Ícone · ${c.icone ?? ''}` : `Forma · ${c.forma === 'elipse' ? 'elipse' : 'retângulo'}`;
 
   return (
     <div className="painel">
@@ -83,7 +84,18 @@ const InspectorCamada: React.FC<{documento: string; caminho: string; c: CamadaIm
           </Secao>
         )}
 
-        {c.tipo === 'forma' && (
+        {c.tipo === 'forma' && c.forma === 'icone' && (
+          <Secao titulo="Ícone" chave="imagem:icone">
+            <CampoTexto rotulo="Ícone" valor={c.icone ?? ''} dica="Nome do ícone do Lucide, em inglês e com hífen (scale, file-text). Para achar em português, use Inserir ícone no trilho."
+              invalido={(v) => (existeIcone(v.trim()) ? null : `não existe: ${sugerirIcones(v, 3).join(', ') || 'procure no trilho'}`)} aoMudar={(v) => gravar('icone')(v.trim())} />
+            <CampoCor rotulo="Cor" valor={c.preenchimento ?? PADRAO.preenchimento} aoVer={ver('preenchimento')} aoMudar={gravar('preenchimento')} />
+            <CampoNumero rotulo="Traço" valor={c.icone_espessura ?? 2} padrao={2} aoRedefinir={() => gravar('icone_espessura')(undefined)}
+              dica="Espessura do traço na grade de 24 do ícone: 2 é o do Lucide; cresce e encolhe com o tamanho"
+              aoMudar={(v) => (v > 0 ? gravar('icone_espessura')(v) : avisar('o traço precisa ser maior que zero', 'erro'))} />
+          </Secao>
+        )}
+
+        {c.tipo === 'forma' && c.forma !== 'icone' && (
           <Secao titulo="Forma" chave="imagem:forma">
             <CampoSelecao rotulo="Forma" valor={c.forma ?? 'retangulo'} opcoes={[['retangulo', 'Retângulo'], ['elipse', 'Elipse']]} aoMudar={gravar('forma')} />
             <CampoCor rotulo="Preenchimento" valor={c.preenchimento ?? PADRAO.preenchimento} aoVer={ver('preenchimento')} aoMudar={gravar('preenchimento')} />

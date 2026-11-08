@@ -1,14 +1,16 @@
 // Ferramentas do MCP para a marca na imagem (rodada 3, frente Marca): ver o kit do documento, pôr uma cor ou uma fonte do kit
-// numa camada e (mais adiante) inserir ícone. O que a pessoa faz no campo de cor e no seletor de fonte a IA faz aqui: a
+// numa camada e buscar e inserir ícones do Lucide. O que a pessoa faz no campo de cor e no seletor de fonte a IA faz aqui: a
 // camada recebe a referência ("@destaque", "@titulo"), não uma cópia do valor, e acompanha o kit quando ele troca. Todas
 // são da classe `livre` (gravam no diário com o autor e têm Reverter); nenhuma lê a web nem traz arquivo de fora.
 // Descrições curtas e esquemas sem z.any() nem união solta, porque o Gemini, o DeepSeek (modo strict) e os modelos locais
 // recusam o resto. Quem registra é ferramentas-mcp.ts, com uma linha.
 import type {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {z} from 'zod';
-import {acharCamada, caminhosDoId} from './carrossel';
+import {acharCamada, baseCamadas, caminhosDoId, idLivre, paginasDe} from './carrossel';
+import {iconeNovo, type OpcoesIcone} from './camadas-novas';
 import {ehDocCenas} from './cenas';
 import {amostrasDaMarca, avisoDeContraste, ehReferenciaCor, resolverCor} from './cor-marca';
+import {buscarIcones, etiquetasDoIcone, existeIcone, sugerirIcones, VERSAO_LUCIDE} from './icones';
 import type {CamadaImagem, DocImagem, MarcaDoDocumento, OperacaoPatch} from './documentos';
 import {MARCA_NEUTRO, marcaDoKit} from './marca';
 import {ErroProjeto, type Projeto} from './projeto';
@@ -132,6 +134,8 @@ export const registrarMarca = (servidor: McpServer, projeto: Projeto, autor: str
     return {alvo, doc: lido.doc, versao: lido.versao};
   };
 
+  registrarIcones(servidor, projeto, autor, origem, imagem);
+
   servidor.registerTool('ver_marca', {
     description: 'Mostra o kit de marca do documento: nome, cores (com o nome que se usa em cor_da_marca) e fontes. Sem documento, o que a pessoa está vendo.',
     inputSchema: {documento: z.string().optional().describe('id do documento')},
@@ -167,6 +171,63 @@ export const registrarMarca = (servidor: McpServer, projeto: Projeto, autor: str
     const r = patchFonteDaMarca(doc, camada, papel);
     const gravado = projeto.aplicarPatch({documento: alvo, versao_base: versao, patch: r.patch, autor, origem, rotulo: `${r.camada}: fonte ${r.valor}`});
     return {ok: true, documento: alvo, camada: r.camada, valor: r.valor, fonte: r.fonte, versao: gravado.versao, ...(r.avisos.length ? {avisos: r.avisos} : {})};
+  }));
+};
+
+
+// ---------- ícones ----------
+export type PedidoIcone = {icone: string; pagina?: string; x?: number; y?: number; tamanho?: number; cor?: string; espessura?: number};
+
+/** O patch que insere um ícone do Lucide na página (a primeira, sem `pagina`): forma "icone" na cor do kit. */
+export const patchInserirIcone = (doc: DocImagem, p: PedidoIcone) => {
+  const nome = p.icone.trim().toLowerCase().replace(/\s+/g, '-');
+  if (!existeIcone(nome)) {
+    const parecidos = sugerirIcones(p.icone, 5);
+    throw new ErroProjeto(`ícone não achado: ${p.icone}${parecidos.length ? ` (parecidos: ${parecidos.join(', ')}; buscar_icone procura em português)` : ''}`, 'nao_achado');
+  }
+  const paginas = paginasDe(doc);
+  const i = p.pagina === undefined ? 0 : paginas.findIndex((x) => x.id === p.pagina);
+  if (i < 0) throw new ErroProjeto(`página não achada: ${p.pagina} (ids: ${paginas.map((x) => x.id).join(', ')})`, 'nao_achado');
+  const camadas = Array.isArray(paginas[i].camadas) ? paginas[i].camadas : [];
+  const {marca, semKit} = kitDa(doc);
+  const avisos: string[] = [];
+  const o: OpcoesIcone = {x: p.x, y: p.y, tamanho: p.tamanho, espessura: p.espessura};
+  if (p.cor !== undefined && p.cor.trim()) {
+    const c = p.cor.trim();
+    o.cor = /^(#|rgb|hsl)/i.test(c) ? c : referenciaDeCor(c, marca);
+  }
+  if (semKit && (o.cor === undefined || ehReferenciaCor(o.cor))) avisos.push('a imagem ainda não tem kit: a cor vem do neutro até aplicar_marca');
+  const camada = {id: idLivre(camadas, 'icone'), ...iconeNovo(doc, nome, o)};
+  const base = baseCamadas(doc, i);
+  return {patch: [{op: 'add', path: `${base}/-`, value: camada}] as OperacaoPatch[], id: camada.id, caminho: `${base}/${camadas.length}`, icone: nome, pagina: paginas[i].id, avisos};
+};
+
+export const registrarIcones = (servidor: McpServer, projeto: Projeto, autor: string, origem: string, imagem: (documento?: string) => {alvo: string; doc: DocImagem; versao: string}) => {
+  servidor.registerTool('buscar_icone', {
+    description: `Procura ícones do Lucide (${VERSAO_LUCIDE}, 2000 ícones) por palavra em português ou inglês: "balança", "contrato", "prazo", "clock". Devolve os nomes, do mais certo ao menos, para inserir_icone.`,
+    inputSchema: {consulta: z.string().describe('uma ou mais palavras'), limite: z.number().int().min(1).max(40).optional().describe('quantos nomes, até 40 (padrão 12)')},
+  }, seguro(({consulta, limite}: {consulta: string; limite?: number}) => {
+    const r = buscarIcones(consulta, limite ?? 12);
+    return {consulta, achados: r.length, icones: r.map((x) => ({nome: x.nome, etiquetas: etiquetasDoIcone(x.nome).split(' ').slice(0, 6).join(' ')}))};
+  }));
+
+  servidor.registerTool('inserir_icone', {
+    description: 'Insere um ícone do Lucide como forma na imagem, na cor de destaque do kit (por referência). Depois é uma forma comum: aplicar_patch muda x, y, largura, altura, rotacao, sombra; cor_da_marca troca a cor (campo preenchimento); icone_espessura é o traço.',
+    inputSchema: {
+      documento: z.string().optional().describe('id do documento de imagem'),
+      icone: z.string().describe('nome do ícone, ex.: scale (veja buscar_icone)'),
+      pagina: z.string().optional().describe('id da página do carrossel (padrão a primeira)'),
+      x: z.number().optional().describe('canto esquerdo, em px (padrão centro)'),
+      y: z.number().optional().describe('canto de cima, em px (padrão centro)'),
+      tamanho: z.number().optional().describe('lado em px (padrão 16% do menor lado)'),
+      cor: z.string().optional().describe('nome da cor do kit (destaque) ou #RRGGBB'),
+      espessura: z.number().optional().describe('traço na grade de 24 (padrão 2)'),
+    },
+  }, seguro((a: PedidoIcone & {documento?: string}) => {
+    const {alvo, doc, versao} = imagem(a.documento);
+    const r = patchInserirIcone(doc, a);
+    const gravado = projeto.aplicarPatch({documento: alvo, versao_base: versao, patch: r.patch, autor, origem, rotulo: `ícone ${r.icone} em ${r.pagina}`});
+    return {ok: true, documento: alvo, camada: r.caminho, id: r.id, icone: r.icone, pagina: r.pagina, versao: gravado.versao, ...(r.avisos.length ? {avisos: r.avisos} : {})};
   }));
 };
 

@@ -39,7 +39,7 @@ export type CamadaImagem = {
   peso?: number;
   cor?: string;
   alinhar?: 'esquerda' | 'centro' | 'direita';
-  forma?: 'retangulo' | 'elipse';
+  forma?: 'retangulo' | 'elipse' | 'icone'; // 'icone': um ícone do Lucide (campo `icone`), pintado como traço na cor de `preenchimento`
   preenchimento?: string;
   raio?: number;
   // acabamento (src/nucleo/acabamento.ts, docs/imagem.md): o mesmo desenho na prévia e no PNG
@@ -48,6 +48,9 @@ export type CamadaImagem = {
   degrade?: Degrade; // texto e forma: no lugar de `cor` e `preenchimento`
   mascara?: string; // imagem: id da forma ou do texto logo acima, que a recorta
   src_original?: string; // imagem: o arquivo de antes do "remover fundo", para voltar
+  // ícones (frente Marca, rodada 3, src/nucleo/icones.ts): forma 'icone'; a cor é `preenchimento` (ou `degrade`)
+  icone?: string; // nome do ícone do Lucide, em inglês e com hífen: "scale", "file-text"
+  icone_espessura?: number; // espessura do traço na grade de 24 do ícone (padrão 2); acompanha a caixa
 };
 
 /** Sombra projetada, na direção da página (não gira com a camada). Desfoque e deslocamento em px do documento. */

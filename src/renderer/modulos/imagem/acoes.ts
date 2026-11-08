@@ -2,7 +2,7 @@
 // mover, renomear, excluir, "Novo carrossel"). O trilho do monitor e a barra de páginas usam estas funções; cada uma é
 // um patch e deixa a seleção (ou a página ativa) no que acabou de nascer. As camadas entram sempre na página ativa.
 import type {CamadaImagem, DocImagem} from '../../../nucleo/documentos';
-import {formaNova, textoNovo} from '../../../nucleo/camadas-novas';
+import {formaNova, iconeNovo, textoNovo} from '../../../nucleo/camadas-novas';
 import {docCarrossel, patchCarrossel, patchDuplicarPagina, patchExcluirPagina, patchMoverPagina, patchNovaPagina, patchRenomearPagina, type ResultadoPaginas} from '../../../nucleo/carrossel';
 import {aplicar, avisar, criarDocumento, loja, selecionar} from '../../estado/loja';
 import {pedirTexto} from '../../componentes/Dialogo';
@@ -29,6 +29,9 @@ export const novoTexto = (documento: string, doc: DocImagem, ponto?: {x: number;
 /** Forma nova: na caixa desenhada ou, sem caixa, um quadrado de 30% no centro (ou no ponto clicado). */
 export const novaForma = (documento: string, doc: DocImagem, caixa?: {x: number; y: number; largura: number; altura: number}) =>
   adicionarCamada(documento, 'forma', formaNova(doc, caixa));
+
+/** Ícone novo do Lucide no centro da página ativa, na cor de destaque do kit. */
+export const novoIcone = (documento: string, doc: DocImagem, nome: string) => adicionarCamada(documento, 'icone', iconeNovo(doc, nome));
 
 export const novaImagem = async (documento: string, doc: DocImagem, bruto: string) => {
   const src = caminhoNoProjeto(bruto);
