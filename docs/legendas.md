@@ -78,13 +78,20 @@ Whisper em ONNX pelo `@huggingface/transformers` (Apache-2.0), sem executável �
 
 ## Pelo Claude (MCP `estudio`)
 
-| Ferramenta | Entrada | Faz |
-|---|---|---|
-| `transcrever` | `arquivo?`, `destino?`, `documento?`, `clipe?`, `faixa?`, `legendas?`, `estilo?`, `refazer?`, `refazer_legendas?`, `modelo?`, `vocabulario?` | Uma ferramenta para os dois usos do plano. Com `arquivo` (qualquer áudio ou vídeo do projeto: a narração de um roteiro da Cliente, uma gravação para a pesquisa), grava as palavras ao lado ou em `destino` (ex.: `video/palavras.json`; nunca o manifesto, um documento, `comentarios.json`, a pesquisa, `.estudio/` ou um .json que não seja lista de palavras, porque grava por cima e fora do diário) e devolve o texto (até 4.000 caracteres). No vídeo de cenas, transcreve a fala que ainda não tem transcrição ou cuja tomada mudou (ou toda, com `refazer`) e gera as legendas **dos clipes que ainda não têm** (padrão), pelo `aplicar_patch` de sempre (diário e versão). Clipe com legendas fica como está e volta em `ja_tinham_legendas` (e em `legendas_de_audio_antigo`, se a tomada mudou); `refazer_legendas` refaz, levando as palavras corrigidas à mão |
-| `ler_legendas` | `documento?`, `de?`, `ate?` | as legendas nos tempos da tela (id, em, sai, texto, falante), já com o clipe de voz no lugar em que está |
-| `editar_legenda` | `documento?`, `id`, `texto?`, `em?`, `sai?` | corrige o texto (cada palavra guarda o tempo da que estava no lugar, como na lista do app) e o tempo, dado como na tela: o app desconta o quanto o clipe andou desde que a legenda nasceu. Entrar e sair o mesmo tanto leva as palavras junto; mudar uma ponta apara |
-| `exportar_legendas` | `documento?`, `formatos?`, `nome?`, `falantes_no_srt?` | `saidas/<título>.srt` e `.vtt`, nos tempos de saída |
-| `importar_legendas` | `arquivo`, `documento?`, `estilo?` | lê um SRT ou VTT do projeto e troca as legendas |
+Classe de permissão (regras da rodada 3): `livre` grava no diário e tem Reverter; `cartao` baixa modelo, lê a web, traz
+arquivo de fora do projeto, exporta, apaga ou reverte mudança de outro autor.
+
+| Ferramenta | Classe | Entrada | Faz |
+|---|---|---|---|
+| `transcrever` | `cartao` (na primeira vez baixa o whisper.cpp e o modelo, 200 MB) | `arquivo?`, `destino?`, `documento?`, `clipe?`, `faixa?`, `legendas?`, `estilo?`, `refazer?`, `refazer_legendas?`, `modelo?`, `vocabulario?` | Uma ferramenta para os dois usos do plano. Com `arquivo` (qualquer áudio ou vídeo do projeto: a narração de um roteiro da Cliente, uma gravação para a pesquisa), grava as palavras ao lado ou em `destino` (ex.: `video/palavras.json`; nunca o manifesto, um documento, `comentarios.json`, a pesquisa, `.estudio/` ou um .json que não seja lista de palavras, porque grava por cima e fora do diário) e devolve o texto (até 4.000 caracteres). No vídeo de cenas, transcreve a fala que ainda não tem transcrição ou cuja tomada mudou (ou toda, com `refazer`) e gera as legendas **dos clipes que ainda não têm** (padrão), pelo `aplicar_patch` de sempre (diário e versão). Clipe com legendas fica como está e volta em `ja_tinham_legendas` (e em `legendas_de_audio_antigo`, se a tomada mudou); `refazer_legendas` refaz, levando as palavras corrigidas à mão |
+| `ler_legendas` | `livre` (só lê) | `documento?`, `de?`, `ate?` | as legendas nos tempos da tela (id, em, sai, texto, falante), já com o clipe de voz no lugar em que está |
+| `editar_legenda` | `livre` | `documento?`, `id`, `texto?`, `em?`, `sai?` | corrige o texto (cada palavra guarda o tempo da que estava no lugar, como na lista do app) e o tempo, dado como na tela: o app desconta o quanto o clipe andou desde que a legenda nasceu. Entrar e sair o mesmo tanto leva as palavras junto (sem sair do trecho do clipe: recusa e diz quanto dá); mudar uma ponta apara |
+| `exportar_legendas` | `cartao` (exporta) | `documento?`, `formatos?`, `nome?`, `falantes_no_srt?`, `sobrescrever?` | `saidas/<título>.srt` e `.vtt`, nos tempos de saída; com o nome tomado, `<título> (2).srt` (só grava por cima com `sobrescrever`) |
+| `importar_legendas` | `livre` | `arquivo`, `documento?`, `estilo?` | lê um SRT ou VTT do projeto (UTF-8, UTF-16 ou Windows-1252, pelos bytes) e troca as legendas |
+
+O `transcrever` pedido pela IA mostra o andamento e o Cancelar no painel das legendas ("A IA pediu: …"), como o do
+botão. O pedido leva o sinal do MCP: Esc na conversa, ou a conexão que cai, para o whisper e o ffmpeg sem gravar nada;
+fechar o projeto também para (`cancelarFala` no `fecharSessao`).
 
 O transcritor chega ao MCP pelo processo principal: no app, `ipc-fala.ts` entrega a `definirTranscritorMcp`
 (`mcp-http.ts`); no MCP por stdio, `mcp/nucleo.ts` monta um `Transcritor` que acha o ffmpeg no `node_modules` do
@@ -199,6 +206,25 @@ leva o falante na marca de voz (`<v Nome>`) e escapa `&`, `<` e `>`. A leitura a
 `MM:SS.mmm`, vírgula ou ponto nos milésimos, ajustes de cue, `NOTE`, `STYLE`, `REGION`, etiquetas (`<i>`, `<c.x>`,
 `<font>`, `{\an8}`) e carimbos de palavra do VTT; o que não entende vira aviso. Ida e volta sem perder um milissegundo
 (teste). Ao importar, o tempo de cada palavra é estimado.
+
+## Rodada 3 (08/11/2026)
+
+Correções da área:
+
+- **SRT em ANSI** (video-N6): `textoDeLegenda` decide pelos bytes: UTF-8 válido, UTF-16 com BOM, senão Windows-1252.
+- **Legenda no monitor** (transversal-N7): o segmento leva `data-origem` e recebe o clique; clicar seleciona, M comenta.
+- **Tomada trocada** (som-N2): a origem guarda o arquivo transcrito; `mesmaTomada` aceita o arquivo do clipe ou o
+  original da voz limpa. Clipe que trocou de arquivo deixa as legendas onde nasceram, com aviso; o painel marca
+  "legendas de outro arquivo" e "Atualizar as legendas…" pergunta antes de refazer.
+- **Legenda fora do clipe** (som-N6): sem palavra no trecho do clipe vira aviso; só o clipe aparado corta a ponta da
+  legenda. Arrastar para na borda do clipe (`limitesDoArrasto`) e o `editar_legenda` recusa dizendo quanto dá.
+- **SRT sem gravar por cima** (fala-D11): `nomeLivreDaLegenda` dá "Título (2).srt".
+- **IA transcrevendo** (transversal-N4): andamento e Cancelar na tela, Esc e fechar o projeto param o whisper.
+
+Para o Som (fala-D12 é dele): `legendasAoDividirClipe(legendas, {clipe, novo, em_ms, clipes})` e
+`legendasAoDuplicarClipe(legendas, {clipe, novo})` devolvem as legendas novas, para gravar no mesmo patch que divide ou
+duplica o clipe. No dividir, `em_ms` é o tempo da tela do corte e `clipes` são os clipes antes da divisão; o clipe novo
+começa em `em_ms` com `corte_ms + (em_ms − em)`.
 
 ## Arquivos
 
