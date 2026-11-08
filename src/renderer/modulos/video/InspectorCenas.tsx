@@ -182,6 +182,9 @@ const PropsBloco: React.FC<{documento: string; caminho: string; b: BlocoCenas; f
                 <CampoTexto rotulo="Antes" valor={b.prefixo ?? ''} aoMudar={(v) => campo('prefixo', 'prefixo')(v || undefined)} />
                 <CampoTexto rotulo="Depois" valor={b.sufixo ?? ''} aoMudar={(v) => campo('sufixo', 'sufixo')(v || undefined)} />
                 <CampoTexto rotulo="Legenda" valor={b.rotulo ?? ''} aoMudar={(v) => campo('rotulo', 'legenda')(v || undefined)} />
+                <CampoSelecao rotulo="Casas decimais" valor={b.casas === undefined ? 'auto' : String(b.casas)}
+                  opcoes={[['auto', 'Automático'], ['0', '0'], ['1', '1'], ['2', '2'], ['3', '3']]} padrao="auto"
+                  aoMudar={(v) => campo('casas', 'casas decimais')(v === 'auto' ? undefined : Number(v))} />{/* video-D8 (frente C) */}
               </>
             )}
             {b.tipo === 'imagem' && (

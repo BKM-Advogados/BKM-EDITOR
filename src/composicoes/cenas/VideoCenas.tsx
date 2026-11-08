@@ -13,6 +13,7 @@ import {definirBaseMidia, midia} from '../midia';
 import {volumeDoClipe, type AudioP, type ClipeAudioP, type FaixaAudioP} from '../../nucleo/audio';
 import {TIPOS_BLOCO_CENAS, type BlocoCenasP, type CenaCenasP, type PropsCenas, type TemaCenas} from '../../nucleo/cenas';
 import {transformDoMovimento} from './movimento';
+import {casasDoNumero, formatarNumero} from '../formatar-numero';
 
 const clamp = {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'} as const;
 
@@ -65,8 +66,7 @@ const Bloco: React.FC<{b: BlocoCenasP; t0: number; tema: TemaCenas; familia: str
     const p = lin(b.em, 1100, Easing.inOut(Easing.cubic));
     const de = b.de ?? 0;
     const ate = b.ate ?? 0;
-    const casas = Number.isInteger(de) && Number.isInteger(ate) ? 0 : 1;
-    const valor = (de + (ate - de) * p).toLocaleString('pt-BR', {minimumFractionDigits: casas, maximumFractionDigits: casas});
+    const valor = formatarNumero(de + (ate - de) * p, casasDoNumero(b)); // casas dos valores, ou o campo `casas` (video-D8)
     return (
       <div data-origem={b.origem} data-bloco-id={b.id} style={base}>
         <div style={{lineHeight: 0.95, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em'}}>

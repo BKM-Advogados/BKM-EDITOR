@@ -35,6 +35,7 @@ export type BlocoCenas = {
   alinhar?: 'esquerda' | 'centro' | 'direita';
   refs?: string[]; // ids dos fatos da pesquisa (F1, F2…) que este bloco afirma
   movimento?: MovimentoImagem; // imagem: zoom dinâmico (Ken Burns) enquanto o bloco está na tela; sem ele, parada (frente C)
+  casas?: number; // número: casas decimais (0 a 4); sem ele, as dos valores, e duas em dinheiro (R$) com centavos (frente C)
 };
 
 /** Ken Burns do bloco de imagem (composicoes/cenas/movimento.ts): aproximar, afastar ou deslizar para um lado.
