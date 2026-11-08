@@ -7,6 +7,7 @@ import type {Envelope, IntensidadeLimpeza, LimpezaClipe} from '../nucleo/audio';
 import type {MedidasLoudness} from '../nucleo/loudness';
 import type {FonteArquivo, Marca} from '../nucleo/marca';
 import type {OpcoesExportarImagem, OpcoesExportarVideo, PrefsExportacao} from '../nucleo/exportacao';
+import type {PedidoContrasteDestino, ResultadoContraste} from '../main/contraste-marca'; // só os tipos (frente C)
 import type {Pesquisa} from '../nucleo/pesquisa';
 import type {EstadoModeloFundo} from '../nucleo/remover-fundo';
 import type {EstadoDaFala} from '../nucleo/legendas'; // frente Fala
@@ -99,6 +100,7 @@ export const CANAL = {
   // preferências da exportação por projeto, .estudio/exportacao.json (src/main/ipc-exportacao.ts; frente C)
   prefsExportacao: 'estudio:prefs-exportacao',
   gravarPrefsExportacao: 'estudio:gravar-prefs-exportacao',
+  medirContrasteMarca: 'estudio:medir-contraste-marca', // contraste da marca d'água com o fundo, num quadro de verdade (src/main/contraste-marca.ts)
   // acabamento da imagem (rodada 2, B2): remover fundo com modelo local (src/main/remover-fundo.ts)
   removerFundoModelo: 'estudio:remover-fundo-modelo',
   removerFundoBaixar: 'estudio:remover-fundo-baixar',
@@ -287,6 +289,8 @@ export type ApiEstudio = {
   prefsExportacao: () => Promise<PrefsExportacao>;
   /** Junta por destino ao que já estava e devolve o arquivo inteiro. */
   gravarPrefsExportacao: (p: PrefsExportacao) => Promise<PrefsExportacao>;
+  /** Renderiza três quadros do destino sem a marca e com ela e mede o contraste (mínimo 3:1); leva alguns segundos. */
+  medirContrasteMarca: (documento: string, pedido: PedidoContrasteDestino) => Promise<ResultadoContraste>;
   // acabamento da imagem (rodada 2, B2): o modelo baixa no primeiro uso; a interface roda o ONNX e o main grava o PNG
   removerFundo: {
     modelo: () => Promise<EstadoModeloFundo>;

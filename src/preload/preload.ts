@@ -112,6 +112,7 @@ const api: ApiEstudio = {
   // exportação (frente C)
   prefsExportacao: () => ipcRenderer.invoke(CANAL.prefsExportacao),
   gravarPrefsExportacao: (p) => ipcRenderer.invoke(CANAL.gravarPrefsExportacao, p),
+  medirContrasteMarca: (documento, pedido) => ipcRenderer.invoke(CANAL.medirContrasteMarca, documento, pedido),
   // acabamento da imagem (rodada 2, B2)
   removerFundo: {
     modelo: () => ipcRenderer.invoke(CANAL.removerFundoModelo),

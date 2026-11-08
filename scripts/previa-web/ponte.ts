@@ -378,6 +378,15 @@ const api: ApiEstudio = {
     prefsExportacao.set(aberto?.raiz ?? '', novo);
     return structuredClone(novo);
   },
+  // contraste da marca d'água (frente C): na prévia web não há render; devolve uma medida de exemplo, 2,1:1 sem placa e 9:1 com ela
+  medirContrasteMarca: async (_documento, pedido) => {
+    await new Promise((r) => setTimeout(r, 600));
+    const placa = Boolean(pedido.config.placa);
+    const fundo: [number, number, number] = placa ? [23, 26, 25] : [200, 190, 180];
+    const marca: [number, number, number] = [244, 240, 234];
+    const contraste = placa ? 15 : 1.4;
+    return {ok: true, avaliacao: {contraste, ok: contraste >= 3, quadro_ms: 2000, fundo, marca, medidas: [{quadro_ms: 2000, fundo, marca, contraste}]}};
+  },
   // acabamento da imagem (rodada 2, B2): simulação no fim do arquivo
   removerFundo: {
     modelo: async () => fundoNaPrevia.estado(),

@@ -10,6 +10,8 @@ import {Thumbnail} from '@remotion/player';
 import {ArrowDownLeft, ArrowDownRight, ArrowUpLeft, ArrowUpRight, CircleCheck, FolderOpen, Stamp, X} from 'lucide-react';
 import type {Progresso, ResultadoExportacao} from '../../compartilhado/api';
 import {COMPOSICOES, composicaoDe} from '../../composicoes/registro';
+import {fonte as familiaDaFonte} from '../../composicoes/fontes';
+import {CONTRASTE_MINIMO, placaParaMarca, type AvaliacaoContraste, type CorDaPlaca} from '../../nucleo/contraste';
 import type {DocImagem} from '../../nucleo/documentos';
 import {paginasDe, temPaginas} from '../../nucleo/carrossel';
 import {
@@ -131,6 +133,7 @@ const urlDaMidia = (base: unknown, src: string) =>
 /** Um quadro do vídeo no tamanho do destino, com a marca d'água e as zonas da rede apagadas por cima: a composição de
  *  verdade (Thumbnail do Remotion), como a exportação vai desenhar. A legenda vai na área do destino, a mesma de que a
  *  marca se afasta. */
+type EstadoContraste = 'medindo' | {avaliacao: AvaliacaoContraste} | {erro: string};
 type Sobreposto = {a: string; b: string; caixa: {x: number; y: number; largura: number; altura: number}[]};
 
 const Miniatura: React.FC<{props: Record<string, unknown>; largura: number; altura: number; fixo: boolean; fps: number; duracaoMs: number; marca: MarcaDaguaP | null;
@@ -221,8 +224,9 @@ const PreviaDosDestinos: React.FC<{destinos: Destino[]; props: Record<string, un
 /** A marca d'água do destino em edição: ligar, logo ou assinatura, canto, tamanho e opacidade, com a miniatura ao lado.
  *  Com vários destinos marcados, os botões de cima escolhem qual se edita (cada um guarda a sua escolha). */
 const OpcoesMarca: React.FC<{destinos: Destino[]; atual: Destino; editar: (id: string) => void; config: (d: Destino) => ConfigMarcaDagua;
-  mudar: (d: Destino, m: Partial<ConfigMarcaDagua>) => void; fontes: FontesMarcaDagua; marca: MarcaDaguaP | null; miniatura: React.ReactNode}> =
-  ({destinos, atual, editar, config, mudar, fontes, marca, miniatura}) => {
+  mudar: (d: Destino, m: Partial<ConfigMarcaDagua>) => void; fontes: FontesMarcaDagua; marca: MarcaDaguaP | null; miniatura: React.ReactNode;
+  contraste?: EstadoContraste; aoMedir: (placa?: CorDaPlaca | null) => void}> =
+  ({destinos, atual, editar, config, mudar, fontes, marca, miniatura, contraste, aoMedir}) => {
     const c = config(atual);
     const nomeDe = (d: Destino) => (d.id === 'personalizado' ? `${d.largura}×${d.altura}` : proporcaoDe(d.largura, d.altura));
     const conteudos = [fontes.logo ? {valor: 'logo' as const, nome: 'Logo', dica: 'O logo do kit de marca'} : null,
@@ -259,6 +263,26 @@ const OpcoesMarca: React.FC<{destinos: Destino[]; atual: Destino; editar: (id: s
                 <input type="range" min={OPACIDADE_MARCA.min * 100} max={OPACIDADE_MARCA.max * 100} step={5} value={c.opacidade * 100} aria-label="Opacidade da marca d'água"
                   onChange={(e) => mudar(atual, {opacidade: Number(e.target.value) / 100})} />
                 <span className="nota">{pct(c.opacidade)}</span>
+              </div>
+              <div className="md-linha"><span className="rot2">Placa</span>
+                <Segmentos valor={c.placa ?? 'nenhuma'} aoMudar={(v) => mudar(atual, {placa: v === 'nenhuma' ? undefined : v})}
+                  opcoes={[{valor: 'nenhuma', nome: 'Nenhuma'}, {valor: 'escura', nome: 'Escura', dica: 'Fundo grafite atrás da marca'}, {valor: 'clara', nome: 'Clara', dica: 'Fundo osso atrás da marca'}]} />
+              </div>
+              <div className="md-linha" data-contraste><span className="rot2">Contraste</span>
+                <button type="button" className="bt mini" disabled={contraste === 'medindo'} onClick={() => aoMedir()}
+                  title="Renderiza três quadros do vídeo neste formato, sem a marca e com ela, e mede o contraste (mínimo 3:1)">{contraste === 'medindo' ? 'Medindo…' : 'Conferir'}</button>
+                {contraste && contraste !== 'medindo' && ('erro' in contraste
+                  ? <span className="nota" style={{color: 'var(--erro)'}}>{contraste.erro}</span>
+                  : (
+                    <span className="nota" data-resultado-contraste style={{color: contraste.avaliacao.ok ? 'var(--ok)' : 'var(--aviso)'}}>
+                      {contraste.avaliacao.contraste === null ? 'a marca não apareceu nos quadros medidos'
+                        : `${numeroBr(contraste.avaliacao.contraste, 1)}:1 ${contraste.avaliacao.ok ? `(mínimo ${CONTRASTE_MINIMO}:1)` : `— abaixo de ${CONTRASTE_MINIMO}:1`}`}
+                    </span>
+                  ))}
+                {contraste && contraste !== 'medindo' && 'avaliacao' in contraste && !contraste.avaliacao.ok && (
+                  <button type="button" className="bt mini" onClick={() => aoMedir(placaParaMarca(contraste.avaliacao.marca ?? [255, 255, 255]))}
+                    title="Põe uma placa atrás da marca e mede de novo">Usar placa {placaParaMarca(contraste.avaliacao.marca ?? [255, 255, 255]) === 'escura' ? 'escura' : 'clara'}</button>
+                )}
               </div>
               {marca && !marca.segura && <div className="erro-exp">Grande demais para ficar fora das zonas da rede e da legenda neste canto: diminua o tamanho ou troque o canto.</div>}
             </>
@@ -311,6 +335,25 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
   const [marcas, setMarcas] = useState<Record<string, ConfigMarcaDagua>>({});
   const [editando, setEditando] = useState(doDocumento.id);
   const [proporcaoLogo, setProporcaoLogo] = useState<number>();
+  const [proporcaoTexto, setProporcaoTexto] = useState<number>(); // largura ÷ altura da assinatura na fonte do kit, medida aqui (não estimada)
+  const [contrastes, setContrastes] = useState<Record<string, EstadoContraste>>({});
+  useEffect(() => {
+    const texto = fontesMarca.assinatura;
+    if (!texto) return;
+    let vivo = true;
+    const familia = familiaDaFonte(fontesMarca.fonte || 'Inter');
+    const medir = () => {
+      const c = document.createElement('canvas').getContext('2d');
+      if (!c || !vivo) return;
+      c.font = `600 100px ${familia}`;
+      const w = c.measureText(texto).width;
+      if (w > 0) setProporcaoTexto((w / 100) * 0.8); // a marca escreve a 0,8 da altura da caixa
+    };
+    document.fonts.load(`600 100px ${familia}`, texto).then(medir, medir);
+    return () => {
+      vivo = false;
+    };
+  }, [fontesMarca.assinatura, fontesMarca.fonte]);
 
   useEffect(() => {
     window.estudio.prefsExportacao().then((p) => setMarcas((m) => ({...p.marca_dagua, ...m}))).catch(() => undefined);
@@ -355,17 +398,33 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
   const trecho = trechoLigado ? encostarTrecho({de_ms: Math.round(lerSegundos(de) * 1000), ate_ms: Math.round(lerSegundos(ate) * 1000)}, duracaoMs) : null;
   const trechoOk = !trechoLigado || trechoValido(trecho, duracaoMs);
   const configMarca = (d: Destino) => normalizarConfigMarca(marcas[d.id], configPadraoMarca(d, fontesMarca));
-  const mudarMarca = (d: Destino, m: Partial<ConfigMarcaDagua>) => setMarcas((ms) => ({...ms, [d.id]: {...configMarca(d), ...m}}));
+  const mudarMarca = (d: Destino, m: Partial<ConfigMarcaDagua>) => {
+    setMarcas((ms) => ({...ms, [d.id]: {...configMarca(d), ...m}}));
+    setContrastes((c) => (d.id in c ? Object.fromEntries(Object.entries(c).filter(([k]) => k !== d.id)) : c)); // a medida era de outra marca
+  };
+  // o contraste com o fundo, medido em três quadros de verdade (processo principal); `placa` aplica a placa e mede de novo
+  const medirContraste = async (d: Destino, placa?: CorDaPlaca | null) => {
+    const config = placa ? {...configMarca(d), placa} : configMarca(d);
+    if (placa) setMarcas((ms) => ({...ms, [d.id]: config}));
+    setContrastes((c) => ({...c, [d.id]: 'medindo'}));
+    try {
+      const r = await window.estudio.medirContrasteMarca(documento, {destino: d, config, ...(proporcaoLogo ? {proporcao_logo: proporcaoLogo} : {}),
+        ...(proporcaoTexto ? {proporcao_texto: proporcaoTexto} : {}), ...(trecho ? {trecho} : {})});
+      setContrastes((c) => ({...c, [d.id]: r.ok ? {avaliacao: r.avaliacao} : {erro: r.mensagem}}));
+    } catch (e) {
+      setContrastes((c) => ({...c, [d.id]: {erro: e instanceof Error ? e.message : String(e)}}));
+    }
+  };
   const emEdicao = destinos.find((d) => d.id === editando) ?? destinos[0];
   // o carrossel da Cliente só sai no tamanho dele; o vídeo de cenas, no do destino
   const medidaDe = (d: Destino) => (fixo ? {largura: formato.largura, altura: formato.altura} : d);
   // a legenda de cada destino na área livre dele: a marca se afasta dela, e a miniatura a desenha ali
   const legendas = useMemo(() => legendasDasProps(props), [props]);
   const legendasDe = (d: Destino) => (fixo ? legendas : legendasNoDestino(legendas, medidaDe(d)));
-  const marcaDe = (d: Destino) => marcaDaguaDoDestino(configMarca(d), medidaDe(d), fontesMarca, proporcaoLogo, legendasDe(d));
+  const marcaDe = (d: Destino) => marcaDaguaDoDestino(configMarca(d), medidaDe(d), fontesMarca, proporcaoLogo, legendasDe(d), proporcaoTexto);
   const temMarca = Boolean(fontesMarca.logo || fontesMarca.assinatura);
   const opcoes: OpcoesExportarVideo = {destinos, codec, qualidade, escala, trecho, nome: nome.trim() || undefined,
-    ...(temMarca ? {marca_dagua: Object.fromEntries(destinos.map((d) => [d.id, configMarca(d)])), ...(proporcaoLogo ? {proporcao_logo: proporcaoLogo} : {})} : {})};
+    ...(temMarca ? {marca_dagua: Object.fromEntries(destinos.map((d) => [d.id, configMarca(d)])), ...(proporcaoLogo ? {proporcao_logo: proporcaoLogo} : {}), ...(proporcaoTexto ? {proporcao_texto: proporcaoTexto} : {})} : {})};
   const estimativa = estimarExportacao(opcoes, formato, duracaoMs, comAudio);
   const ext = CODECS.find((c) => c.id === codec)!.ext;
   const nomes = nomesDosArquivos(nome.trim() || titulo, destinos, formato);
@@ -437,6 +496,7 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
           : !emEdicao ? <span className="nota">Marque um destino.</span>
           : (
             <OpcoesMarca destinos={destinos} atual={emEdicao} editar={setEditando} config={configMarca} mudar={mudarMarca} fontes={fontesMarca} marca={marcaDe(emEdicao)}
+              contraste={contrastes[emEdicao.id]} aoMedir={(placa) => void medirContraste(emEdicao, placa)}
               miniatura={props && <Miniatura props={props} {...medidaDe(emEdicao)} fixo={fixo} fps={formato.fps} duracaoMs={duracaoMs} marca={marcaDe(emEdicao)}
                 legendas={legendasDe(emEdicao)} />} />
           )}
