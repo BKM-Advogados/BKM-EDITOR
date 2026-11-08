@@ -153,3 +153,21 @@ Conferido: `testes/dialogo-exportar.test.ts`, `testes/contraste.test.ts`, `teste
 Trecho num vídeo de 47,383 s, miniaturas por formato com a sobreposição destacada, o fluxo Conferir → Usar placa); e, fora do
 Electron, a medida num render de verdade (logo claro em fundo claro quase invisível; com placa escura 8,4:1; assinatura branca em
 fundo claro 1,4:1). Na prévia web o "Conferir" devolve uma medida de exemplo (não há render lá).
+
+### Rodada 3: ferramentas MCP da marca d'água
+
+Código: `src/nucleo/mcp-exportar.ts` (uma linha em `registrarFerramentas`), `src/nucleo/prefs-exportacao.ts` (ler e gravar
+`.estudio/exportacao.json`, o mesmo código que o diálogo usa) e `src/nucleo/contraste.ts` (o pedido, o registro de quem mede e o texto
+da medida). Teste: `testes/mcp-exportar.test.ts`; a cadeia inteira, com render de verdade, em `scripts/medir-contraste-mcp-teste.mjs`.
+
+| ferramenta | classe de permissão | o que faz |
+|---|---|---|
+| `marca_dagua` | `livre` | Lê ou muda a marca d'água de um destino (`reels`, `feed`, `quadrado`, `youtube`, `personalizado`): `ligada`, `conteudo` (`logo` ou `assinatura`), `canto`, `tamanho`, `opacidade`, `placa` (`escura`, `clara` ou `nenhuma`). Sem campo de mudança, só mostra. Grava `.estudio/exportacao.json` e a mudança entra no diário (autor, origem, patch e inverso). Esse arquivo não é documento: o Reverter do Histórico não o toca, e para desfazer se chama a ferramenta de novo com o `antes` que a resposta traz. |
+| `medir_contraste_marca` | `livre` | Renderiza três quadros do destino (25%, 50% e 75%) sem a marca e com ela e devolve o contraste do pior (mínimo 3:1) com o que fazer se ficou abaixo. Os campos de marca opcionais testam outra escolha sem gravar. **Só com o app aberto** (quem renderiza é o processo principal); fora dele devolve erro. Não grava nada nem exporta; leva uns 15 s por destino e usa CPU. |
+
+Para o guia da IA (texto para o `claudeMd`): **a marca d'água não é campo do documento**: é uma escolha por destino, em
+`.estudio/exportacao.json`, e só se muda pela ferramenta `marca_dagua` (não por `aplicar_patch`). Ligue a marca no destino que a pessoa
+pediu e rode `medir_contraste_marca`: abaixo de 3:1 a marca não lê no fundo (logo claro em fundo claro, por exemplo), e a resposta diz
+qual placa pôr atrás (`placa: "escura"` ou `"clara"`); depois de pôr, meça de novo. Sem logo nem assinatura no kit do projeto, a
+exportação sai sem marca e a medida avisa. A largura da assinatura é medida no diálogo (canvas); pela ferramenta vale a estimativa de
+0,6 da letra por caractere para o encaixe, e o contraste, que é lido nos pixels, não depende dela.

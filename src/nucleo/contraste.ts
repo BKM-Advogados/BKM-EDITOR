@@ -2,6 +2,8 @@
 // menos 3:1 (o mínimo do WCAG para elementos gráficos e texto grande). A conta é pura; quem mede os pixels é o processo
 // principal (src/main/contraste-marca.ts), que renderiza um quadro do destino sem a marca e outro com ela e acha, na caixa da
 // marca, o fundo e a cor que a marca tem de fato na tela (já com a opacidade).
+import type {ConfigMarcaDagua, Destino, OpcoesExportarVideo} from './exportacao';
+
 export type RGB = [number, number, number]; // 0 a 255
 
 export const CONTRASTE_MINIMO = 3;
@@ -71,4 +73,44 @@ export const medirNaCaixa = (sem: Uint8Array, com: Uint8Array, limiar = 3): {fun
   const m: [number, number, number] = [0, 0, 0];
   for (const {i} of usados) for (let k = 0; k < 3; k++) m[k] += com[i * 3 + k];
   return {fundo, marca: [m[0] / usados.length, m[1] / usados.length, m[2] / usados.length]};
+};
+
+// ---------- o pedido e o resultado da medida, e quem mede ----------
+// O diálogo de exportar (IPC) e o MCP (medir_contraste_marca) pedem a mesma medida; quem renderiza os quadros é o processo principal,
+// que se registra aqui ao subir, como o removedor de fundo (src/nucleo/remover-fundo.ts). Fora do app não há quem meça.
+
+export type PedidoContrasteDestino = {
+  destino: Destino;
+  config: ConfigMarcaDagua;
+  proporcao_logo?: number;
+  proporcao_texto?: number;
+  trecho?: OpcoesExportarVideo['trecho'];
+};
+export type ResultadoContraste = {ok: true; avaliacao: AvaliacaoContraste} | {ok: false; mensagem: string};
+export type MedidorDeContraste = (documento: string, pedido: PedidoContrasteDestino) => Promise<ResultadoContraste>;
+
+let medidor: MedidorDeContraste | null = null;
+export const definirMedidorDeContraste = (f: MedidorDeContraste | null) => {
+  medidor = f;
+};
+export const medidorDeContraste = () => medidor;
+
+const br = (n: number, casas = 1) => n.toFixed(casas).replace('.', ',');
+
+/** A medida em texto curto para quem lê pelo MCP: o pior quadro, cada quadro e, se ficou abaixo do mínimo, o que fazer. */
+export const textoDoContraste = (a: AvaliacaoContraste, destino: string, placaAtual?: CorDaPlaca, minimo = CONTRASTE_MINIMO): string => {
+  if (a.contraste === null) {
+    return `Contraste da marca em ${destino}: não deu para medir, a marca não apareceu nos quadros medidos. Confira a opacidade e se o kit tem logo ou assinatura.`;
+  }
+  const linhas = [
+    `Contraste da marca em ${destino}: ${br(a.contraste)}:1 no pior quadro (${br((a.quadro_ms ?? 0) / 1000)} s); o mínimo é ${minimo}:1, ${a.ok ? 'passa' : 'NÃO passa'}.`,
+    ...a.medidas.map((m) => `  ${br(m.quadro_ms / 1000)} s: ${m.contraste === null ? 'a marca não apareceu' : `${br(m.contraste)}:1`}`),
+  ];
+  if (!a.ok) {
+    const sugerida = a.marca ? placaParaMarca(a.marca) : 'escura';
+    linhas.push(placaAtual
+      ? `Mesmo com a placa ${placaAtual}, ficou abaixo: troque a placa para "${placaAtual === 'escura' ? 'clara' : 'escura'}", ou use a outra opção de conteúdo (logo ou assinatura).`
+      : `Para passar: marca_dagua com placa "${sugerida}" (uma placa ${sugerida} atrás da marca) ou outro canto.`);
+  }
+  return linhas.join('\n');
 };

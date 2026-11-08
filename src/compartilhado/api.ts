@@ -7,7 +7,7 @@ import type {Envelope, IntensidadeLimpeza, LimpezaClipe} from '../nucleo/audio';
 import type {MedidasLoudness} from '../nucleo/loudness';
 import type {FonteArquivo, Marca} from '../nucleo/marca';
 import type {OpcoesExportarImagem, OpcoesExportarVideo, PrefsExportacao} from '../nucleo/exportacao';
-import type {PedidoContrasteDestino, ResultadoContraste} from '../main/contraste-marca'; // só os tipos (frente C)
+import type {PedidoContrasteDestino, ResultadoContraste} from '../nucleo/contraste'; // só os tipos (frente C)
 import type {Pesquisa} from '../nucleo/pesquisa';
 import type {EstadoModeloFundo} from '../nucleo/remover-fundo';
 import type {EstadoDaFala} from '../nucleo/legendas'; // frente Fala

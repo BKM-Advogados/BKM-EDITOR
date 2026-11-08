@@ -66,6 +66,11 @@ toro ou plano, `posicao`, `rotacao` em graus, `escala`, `cor`, `metalico` e `rug
 segundo para a prévia). Um valor com o tipo errado vira o padrão na tela e fica avisado no inspetor; corrija o JSON em vez de
 contar com isso.
 
+**Granulado e rotação.** O granulado é o mesmo na prévia, no vídeo e no PNG (o `feTurbulence` do SVG, com a mesma frequência, as
+mesmas oitavas e a mesma semente; ao exportar em escala 2 o grão cresce com a imagem). Na cena 3D, `rotacao` e `gira` valem como
+Euler XYZ em graus; ao girar um objeto pelo gizmo além de 90° em Y, o app grava a forma da mesma pose mais perto da rotação de antes
+(25° + 100° vira `[0, 125, 0]`, não `[180, 55, 180]`), e você pode escrever ângulos de qualquer tamanho (125, 385, −170).
+
 **Permissão.** Nenhuma ferramenta MCP nova nesta parte: o que a IA grava passa por `aplicar_patch` (classe `livre`: vai ao
 diário e tem Reverter).
 

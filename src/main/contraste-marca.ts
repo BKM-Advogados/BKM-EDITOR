@@ -8,8 +8,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {CANAL} from '../compartilhado/api';
 import type {Progresso, PropsVideo} from '../compartilhado/api';
-import {avaliarContraste, medirNaCaixa, quadrosParaMedir, razaoDeContraste, type AvaliacaoContraste, type MedidaContraste} from '../nucleo/contraste';
-import {fontesDaMarcaDagua, legendasDasProps, marcaDaguaDoDestino, type ConfigMarcaDagua, type Destino, type MarcaDaguaP, type OpcoesExportarVideo} from '../nucleo/exportacao';
+import {avaliarContraste, definirMedidorDeContraste, medirNaCaixa, quadrosParaMedir, razaoDeContraste, type AvaliacaoContraste, type MedidaContraste, type PedidoContrasteDestino, type ResultadoContraste} from '../nucleo/contraste';
+import {fontesDaMarcaDagua, legendasDasProps, marcaDaguaDoDestino, type MarcaDaguaP} from '../nucleo/exportacao';
 import type {Projeto} from '../nucleo/projeto';
 import {rodarFfmpeg} from './ffmpeg-som';
 import type {Preparado} from './exportar';
@@ -69,20 +69,15 @@ export const medirContrasteDaMarca = async (p: Preparado, pedido: PedidoContrast
 };
 
 // ---------- IPC: o diálogo de exportar pede a medida de um destino ----------
-export type PedidoContrasteDestino = {
-  destino: Destino;
-  config: ConfigMarcaDagua;
-  proporcao_logo?: number;
-  proporcao_texto?: number;
-  trecho?: OpcoesExportarVideo['trecho'];
-};
-export type ResultadoContraste = {ok: true; avaliacao: AvaliacaoContraste} | {ok: false; mensagem: string};
+// Os tipos do pedido e do resultado moram em src/nucleo/contraste.ts (o MCP usa os mesmos); a medida também fica registrada lá
+// (definirMedidorDeContraste) para a ferramenta medir_contraste_marca chamar a mesma conta, só com o app aberto.
+export type {PedidoContrasteDestino, ResultadoContraste};
 
 type Lidar = <A extends unknown[], R>(canal: string, f: (...a: A) => R | Promise<R>) => void;
 
 /** Uma linha no main.ts: o canal `medirContrasteMarca`. `preparar` devolve o navegador e as composições (o mesmo da exportação). */
 export const registrarContrasteMarca = (lidar: Lidar, projeto: () => Projeto, propsDe: (documento: string) => PropsVideo, preparar: (aviso: (p: Progresso) => void) => Promise<Preparado>) => {
-  lidar(CANAL.medirContrasteMarca, async (documento: string, pedido: PedidoContrasteDestino): Promise<ResultadoContraste> => {
+  const medir = async (documento: string, pedido: PedidoContrasteDestino): Promise<ResultadoContraste> => {
     projeto();
     const montado = propsDe(documento);
     if ('erro' in montado) return {ok: false, mensagem: montado.erro};
@@ -101,6 +96,8 @@ export const registrarContrasteMarca = (lidar: Lidar, projeto: () => Projeto, pr
     } catch (e) {
       return {ok: false, mensagem: (e as Error).message};
     }
-  });
+  };
+  lidar(CANAL.medirContrasteMarca, medir);
+  definirMedidorDeContraste(medir);
 };
 
