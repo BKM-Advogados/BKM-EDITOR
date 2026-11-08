@@ -122,6 +122,14 @@ const api: ApiEstudio = {
     aoPedido: (cb) => ouvir<[string, string]>(CANAL.removerFundoPedido, cb),
     responder: (id, r) => ipcRenderer.send(CANAL.removerFundoResposta, id, r),
   },
+  // frente Música
+  musica: {
+    levar: (p) => ipcRenderer.invoke(CANAL.musicaLevar, p),
+    concluir: (t) => ipcRenderer.invoke(CANAL.musicaConcluir, t),
+    cancelar: (t, descartar) => ipcRenderer.invoke(CANAL.musicaCancelar, t, descartar),
+    depoisDeMudar: (documento) => ipcRenderer.invoke(CANAL.musicaDepoisDeMudar, documento),
+    porNoVideo: (o) => ipcRenderer.invoke(CANAL.musicaPorNoVideo, o),
+  },
 };
 
 contextBridge.exposeInMainWorld('estudio', api);

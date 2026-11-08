@@ -427,51 +427,69 @@ export const renderizarMusica = (doc: DocMusica, fontes: Record<string, FonteAud
   const faltando = new Set<string>();
   const algumSoloCanal = m.canais.some((c) => c.solo);
   const algumSoloFaixa = m.faixas.some((f) => f.solo);
-  const barramentos = new Map<string, Float32Array[]>();
+  // o cache guarda três camadas: o som seco de cada canal, cada faixa já processada (EQ, compressor, volume e pan) e o
+  // retorno do reverb; mexer num volume refaz só aquela faixa (e o reverb, se ela manda para ele). No fim, sai do cache o
+  // que este render não usou (as batidas de cada peça ficam: são pequenas)
+  const usadas = new Set<string>();
+  const doCache = <T,>(chave: string, fazer: () => T): T => {
+    usadas.add(chave);
+    let v = cache.get(chave) as T | undefined;
+    if (v === undefined) {
+      v = fazer();
+      cache.set(chave, v as never);
+    }
+    return v;
+  };
+  const secos = new Map<string, {chave: string; som: Float32Array[]}[]>();
   for (const canal of m.canais) {
     if (canal.mudo || (algumSoloCanal && !canal.solo)) continue;
     const chave = chaveDoCanal(m, canal, n, taxa, fontes);
-    let seco = cache.get(chave) as Float32Array[] | undefined;
-    if (!seco) {
-      seco = canal.tipo === 'bateria' ? renderBateria(m, canal, n, taxa, cache) : renderAudio(m, canal, n, taxa, fontes, faltando);
-      if (!faltando.size) cache.set(chave, seco);
-    } else if (canal.tipo === 'audio') {
+    const faltavam = faltando.size;
+    let som: Float32Array[];
+    if (canal.tipo === 'bateria') som = doCache(chave, () => renderBateria(m, canal, n, taxa, cache));
+    else {
+      const antes = cache.get(chave) as Float32Array[] | undefined;
+      som = antes ?? renderAudio(m, canal, n, taxa, fontes, faltando);
+      if (!antes && faltando.size === faltavam) cache.set(chave, som);
+      if (cache.has(chave)) usadas.add(chave);
       for (const c of m.clipes) if (c.canal === canal.id && c.audio && !fontes[c.audio]) faltando.add(c.audio);
     }
-    const bus = barramentos.get(canal.faixa_mixer);
-    if (!bus) barramentos.set(canal.faixa_mixer, [Float32Array.from(seco[0]), Float32Array.from(seco[1])]);
-    else for (let k = 0; k < 2; k++) for (let i = 0; i < n; i++) bus[k][i] += seco[k][i];
+    secos.set(canal.faixa_mixer, [...(secos.get(canal.faixa_mixer) ?? []), {chave, som}]);
   }
   const L = new Float32Array(n), R = new Float32Array(n);
-  const envio = [new Float32Array(n), new Float32Array(n)];
-  let temEnvio = false;
+  const envios: {chave: string; som: Float32Array[]; quanto: number}[] = [];
   const faixas: Record<string, Float32Array[]> = {};
   for (const f of m.faixas) {
-    const bus = barramentos.get(f.id);
-    if (!bus || f.mudo || (algumSoloFaixa && !f.solo)) continue;
-    processarFaixa(bus, f, taxa);
+    const entram = secos.get(f.id);
+    if (!entram || f.mudo || (algumSoloFaixa && !f.solo)) continue;
+    const chave = `faixa:${JSON.stringify({f: {...f, mudo: false, solo: false, reverb: 0}, de: entram.map((e) => e.chave)})}`;
+    const bus = doCache(chave, () => {
+      const b = [Float32Array.from(entram[0].som[0]), Float32Array.from(entram[0].som[1])];
+      for (const e of entram.slice(1)) for (let k = 0; k < 2; k++) for (let i = 0; i < n; i++) b[k][i] += e.som[k][i];
+      processarFaixa(b, f, taxa);
+      return b;
+    });
     for (let i = 0; i < n; i++) {
       L[i] += bus[0][i];
       R[i] += bus[1][i];
     }
-    if (f.reverb > 0) {
-      temEnvio = true;
-      for (let i = 0; i < n; i++) {
-        envio[0][i] += bus[0][i] * f.reverb;
-        envio[1][i] += bus[1][i] * f.reverb;
-      }
-    }
+    if (f.reverb > 0) envios.push({chave, som: bus, quanto: f.reverb});
     if (o.porFaixa) faixas[f.id] = bus;
   }
-  if (temEnvio) {
+  if (envios.length) {
     const r = m.master.reverb;
-    const volta = reverberar(envio, r.tamanho, r.amortecimento, taxa);
+    const volta = doCache(`reverb:${JSON.stringify({r: [r.tamanho, r.amortecimento], e: envios.map((e) => [e.chave, e.quanto]), taxa})}`, () => {
+      const envio = [new Float32Array(n), new Float32Array(n)];
+      for (const e of envios) for (let k = 0; k < 2; k++) for (let i = 0; i < n; i++) envio[k][i] += e.som[k][i] * e.quanto;
+      return reverberar(envio, r.tamanho, r.amortecimento, taxa);
+    });
     const g = ganhoDeDb(r.volume_db);
     for (let i = 0; i < n; i++) {
       L[i] += volta[0][i] * g;
       R[i] += volta[1][i] * g;
     }
   }
+  for (const k of [...cache.keys()]) if (!usadas.has(k) && !k.startsWith('peca:')) cache.delete(k);
   const gm = ganhoDeDb(m.master.volume_db);
   if (gm !== 1) for (let i = 0; i < n; i++) {
     L[i] *= gm;

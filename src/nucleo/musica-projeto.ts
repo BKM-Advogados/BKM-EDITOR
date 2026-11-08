@@ -7,8 +7,9 @@ import {rmSync, statSync} from 'node:fs';
 import type {DocCenas} from './cenas';
 import {ehDocCenas} from './cenas';
 import {ehDocMusica, type DocMusica} from './musica';
-import {ehRenderDeMusica, medidaDoRender, patchAtualizarLigados, renderDaMusica} from './musica-video';
-import {serializar, type Projeto} from './projeto';
+import {acharClipePorId, caminhoPorId, ehRenderDeMusica, medidaDoRender, patchAtualizarLigados, patchClipeNovo, patchLigarClipe, renderDaMusica} from './musica-video';
+import type {OperacaoPatch} from './documentos';
+import {ErroProjeto, serializar, type Projeto} from './projeto';
 import {ARQUIVO_TRANSICOES, lerRegistro, type BaseProjeto} from './transicoes';
 
 // ---------- .gitignore ----------
@@ -171,4 +172,33 @@ export const depoisDeMudarMusica = async (p: Projeto, idMusica: string) => {
   } catch (e) {
     return {render, trocados, renderizado: false as const, aviso: `o render não saiu: ${(e as Error).message}`};
   }
+};
+
+/** "Pôr no vídeo": um clipe novo ligado à música (na faixa dada ou na de música do vídeo), ou um clipe existente que
+ *  passa a tocá-la (`substituir`). A tela e a ferramenta por_no_video usam esta mesma função. */
+export const porNoVideo = (p: Projeto, o: {musica: string; video?: string; faixa?: string; em_ms?: number; substituir?: string}, quem: {autor: string; origem: string}) => {
+  const doc = lerMusica(p, o.musica);
+  const idMusica = p.manifesto().documentos.find((d) => d.id === o.musica || d.caminho === o.musica)!.id;
+  const idVideo = o.video ?? doc.video?.documento ?? p.manifesto().documentos.find((d) => d.modulo === 'video')?.id;
+  if (!idVideo) throw new ErroProjeto('o projeto não tem vídeo', 'nao_achado');
+  const relVideo = p.arquivoDoDocumento(idVideo);
+  const lido = p.lerJson<unknown>(relVideo);
+  if (!ehDocCenas(lido.doc)) throw new ErroProjeto(`${idVideo} não é um vídeo de cenas`, 'patch');
+  const v = lido.doc as DocCenas;
+  const render = renderDaMusica(idMusica, doc, assinaturaDe(p));
+  let patch: OperacaoPatch[];
+  let caminho: string;
+  if (o.substituir) {
+    const alvo = acharClipePorId(v, o.substituir);
+    if (!alvo?.clipe || alvo.ci === undefined) throw new ErroProjeto(`clipe não achado no vídeo: ${o.substituir}`, 'nao_achado');
+    patch = patchLigarClipe({...alvo, clipe: alvo.clipe, ci: alvo.ci}, idMusica, render);
+    caminho = caminhoPorId(alvo.faixa.id, alvo.clipe.id);
+  } else {
+    const titulo = p.manifesto().documentos.find((d) => d.id === idMusica)?.titulo;
+    const novo = patchClipeNovo(v, {idMusica, nome: titulo, faixa: o.faixa, em_ms: o.em_ms ?? doc.video?.em_ms ?? 0, render});
+    patch = novo.patch;
+    caminho = novo.caminho;
+  }
+  const r = p.aplicarPatch({documento: relVideo, versao_base: lido.versao, patch, autor: quem.autor, origem: quem.origem, rotulo: `música ${idMusica} no vídeo`});
+  return {seq: r.entrada.seq, documento: idVideo, caminho, render, musica: idMusica};
 };

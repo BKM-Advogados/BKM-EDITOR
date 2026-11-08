@@ -10,6 +10,7 @@ import type {OpcoesExportarImagem, OpcoesExportarVideo, PrefsExportacao} from '.
 import type {Pesquisa} from '../nucleo/pesquisa';
 import type {EstadoModeloFundo} from '../nucleo/remover-fundo';
 import type {EstadoDaFala} from '../nucleo/legendas'; // frente Fala
+import type {PedidoLevar, ResultadoConcluir, ResultadoLevar, ResultadoVolta} from '../nucleo/transicoes'; // frente Música
 
 export const CANAL = {
   abrirPasta: 'estudio:abrir-pasta',
@@ -107,6 +108,12 @@ export const CANAL = {
   removerFundoProgresso: 'estudio:remover-fundo-progresso',
   removerFundoPedido: 'estudio:remover-fundo-pedido',
   removerFundoResposta: 'estudio:remover-fundo-resposta',
+  // frente Música: ida e volta com o vídeo e o render ligado (src/main/ipc-musica.ts, docs/musica.md)
+  musicaLevar: 'estudio:musica-levar',
+  musicaConcluir: 'estudio:musica-concluir',
+  musicaCancelar: 'estudio:musica-cancelar',
+  musicaDepoisDeMudar: 'estudio:musica-depois-de-mudar',
+  musicaPorNoVideo: 'estudio:musica-por-no-video',
 } as const;
 
 /** O projeto aberto. `estado` é o último que a pessoa viu (área, documento, seleção), para reabrir onde parou; `git`
@@ -300,6 +307,15 @@ export type ApiEstudio = {
     /** Pedido da ferramenta remover_fundo do MCP: a interface calcula e devolve por responder. */
     aoPedido: (cb: (id: string, src: string) => void) => () => void;
     responder: (id: string, r: RespostaFundo) => void;
+  };
+  // frente Música (docs/musica.md): as mesmas funções das ferramentas levar_para, concluir_transicao, cancelar_transicao
+  // e por_no_video, com autor "pessoa"; depoisDeMudar leva o render aos clipes do vídeo ligados à música
+  musica: {
+    levar: (p: PedidoLevar) => Promise<ResultadoLevar>;
+    concluir: (transicao: string) => Promise<ResultadoConcluir>;
+    cancelar: (transicao: string, descartar?: boolean) => Promise<{transicao: string; revertidas: number; volta: ResultadoVolta; avisos: string[]}>;
+    depoisDeMudar: (documento: string) => Promise<{trocados: {video: string; clipe: string}[]; renderizado: boolean; aviso?: string}>;
+    porNoVideo: (o: {musica: string; video?: string; faixa?: string; em_ms?: number; substituir?: string}) => Promise<{documento: string; caminho: string}>;
   };
 };
 

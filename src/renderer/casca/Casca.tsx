@@ -8,7 +8,7 @@ import React, {Suspense, useCallback, useEffect, useRef, useState} from 'react';
 import {DockviewReact, type DockviewApi, type DockviewReadyEvent, type DockviewTheme, type IDockviewPanelHeaderProps, type IDockviewPanelProps} from 'dockview-react';
 import 'dockview-react/dist/styles/dockview.css';
 import {Blend, BookOpen, Box, Check, Copy, Download, Film, FilePlus2, FolderOpen, FolderSearch, History, Home, Image as ImageIcon, LayoutPanelLeft, ListTree,
-  MessageSquare, MessageSquarePlus, MonitorPlay, Palette, Plus, Quote, Rows3, Settings, SlidersHorizontal, Sparkle, Undo2, X} from 'lucide-react';
+  MessageSquare, MessageSquarePlus, MonitorPlay, Music, Palette, Plus, Quote, Rows3, Settings, SlidersHorizontal, Sparkle, Undo2, X} from 'lucide-react';
 import type {Preferencias, Recente} from '../../compartilhado/api';
 import type {Modulo} from '../../nucleo/documentos';
 import {FORMATOS_IMAGEM, FORMATOS_VIDEO} from '../../nucleo/formatos';
@@ -23,6 +23,9 @@ import {Comentarios} from '../paineis/Comentarios';
 import {Historico} from '../paineis/Historico';
 import {Pesquisa} from '../paineis/Pesquisa';
 import {Rodape} from './Rodape';
+import {PaineisMusica} from '../modulos/musica/paineis'; // frente Música
+import {FaixaTransicao} from '../modulos/musica/FaixaTransicao';
+import {observarMusica} from '../modulos/musica/estado';
 import {PainelMarca} from './PainelMarca';
 import './casca.css';
 
@@ -36,6 +39,7 @@ const AREAS: {id: Area; nome: string; icone: React.ReactNode; atalho: string}[] 
   {id: 'imagem', nome: 'Imagem', icone: <ImageIcon size={15} />, atalho: '2'},
   {id: '3d', nome: '3D', icone: <Box size={15} />, atalho: '3'},
   {id: 'efeitos', nome: 'Efeitos', icone: <Blend size={15} />, atalho: '4'},
+  {id: 'musica', nome: 'Música', icone: <Music size={15} />, atalho: '5'}, // frente Música
 ];
 
 const Carregando: React.FC = () => <div className="vazio">carregando…</div>;
@@ -44,6 +48,7 @@ const paineisDa = (area: Area): PaineisDoModulo | null => {
   if (area === 'video') return PaineisVideo;
   if (area === 'imagem') return PaineisImagem;
   if (area === 'efeitos') return PaineisEfeitos;
+  if (area === 'musica') return PaineisMusica; // frente Música
   return Paineis3d;
 };
 
@@ -123,7 +128,7 @@ const gravarLayout = (area: Area, faixa: Faixa, o: Orientacao, api: DockviewApi)
 
 // O terminal fica sempre na coluna da direita: embaixo é da linha do tempo, e altura é o que falta em notebook.
 const layoutPadrao = (api: DockviewApi, area: Area, faixa: Faixa, o: Orientacao) => {
-  const temLinha = area === 'video' || area === 'efeitos';
+  const temLinha = area === 'video' || area === 'efeitos' || area === 'musica';
   const W = window.innerWidth;
   const H = window.innerHeight;
   const abasDoInspector = (comLista: boolean) => {
@@ -172,6 +177,7 @@ const exportarArea = () => {
   const e = loja.get();
   const id = e.area === 'efeitos' ? e.alvoEfeitos : e.area === '3d' ? undefined : e.ativo[e.area];
   const modulo = e.info?.manifesto.documentos.find((d) => d.id === id)?.modulo;
+  if (modulo === 'musica') return avisar('A música vai para o vídeo pelo "Pôr no vídeo" (ou "Concluir e voltar"); exportar a música em arquivo vem depois.', 'info'); // frente Música
   if (!id || !modulo || modulo === '3d') return avisar(e.area === '3d' ? 'A cena 3D ainda não exporta.' : 'Nada para exportar nesta área.', 'info');
   abrirDialogoExportar(id);
 };
@@ -297,6 +303,8 @@ export const Casca: React.FC = () => {
     if (api.current && areaMontada.current === 'video' && orientacaoMontada.current !== orientacao) montar('video');
   }, [orientacao, montar]);
 
+  useEffect(() => observarMusica(), []); // frente Música: registro de transições e render ligado ao vídeo
+
   // etiqueta de fato no inspetor: o painel Pesquisa vem à frente (e volta ao grupo do inspetor se tinha sido fechado)
   useEffect(() => quandoVerFato(() => {
     const d = api.current;
@@ -331,7 +339,7 @@ export const Casca: React.FC = () => {
       if (document.querySelector('.dialogo-fundo')) return;
       const k = ev.key.toLowerCase();
       // Alt+1 a 4, Ctrl+' e os Ctrl de arquivo valem até com o terminal em foco (escuta na captura, antes do xterm)
-      if (ev.altKey && !ev.ctrlKey && /^Digit[1-4]$/.test(ev.code)) {
+      if (ev.altKey && !ev.ctrlKey && /^Digit[1-5]$/.test(ev.code)) {
         ev.preventDefault();
         ev.stopPropagation();
         loja.definir({area: AREAS[Number(ev.code.slice(5)) - 1].id});
@@ -358,7 +366,7 @@ export const Casca: React.FC = () => {
       } else if (ev.ctrlKey && k === 'z' && !digitando) {
         ev.preventDefault();
         void desfazer();
-      } else if (!digitando && !ev.ctrlKey && !ev.altKey && /^[1-4]$/.test(ev.key)) {
+      } else if (!digitando && !ev.ctrlKey && !ev.altKey && /^[1-5]$/.test(ev.key)) {
         loja.definir({area: AREAS[Number(ev.key) - 1].id});
       } else if (!digitando && !ev.ctrlKey && k === 'm') {
         loja.definir((s) => ({modoComentario: !s.modoComentario}));
@@ -411,7 +419,7 @@ export const Casca: React.FC = () => {
   const alvoEfeitos = useLoja((e) => e.alvoEfeitos);
   const idDoc = area === 'efeitos' ? alvoEfeitos : (ativo as Record<string, string | undefined>)[area];
   const docAtivo = info?.manifesto.documentos.find((d) => d.id === idDoc);
-  const podeExportar = Boolean(docAtivo && docAtivo.modulo !== '3d');
+  const podeExportar = Boolean(docAtivo && docAtivo.modulo !== '3d' && docAtivo.modulo !== 'musica');
 
   return (
     <div className="casca">
@@ -473,11 +481,12 @@ export const Casca: React.FC = () => {
           </button>
           <button className="bt fantasma" onClick={() => void desfazer()} title="Desfazer a sua última edição (Ctrl+Z)"><Undo2 size={15} /></button>
           <button className="bt exportar" disabled={!podeExportar} onClick={exportarArea}
-            title={podeExportar ? `Exportar ${docAtivo!.modulo === 'video' ? 'o vídeo' : 'a imagem'} para a pasta saidas… (Ctrl+Shift+E)` : 'A cena 3D ainda não exporta'}>
+            title={podeExportar ? `Exportar ${docAtivo!.modulo === 'video' ? 'o vídeo' : 'a imagem'} para a pasta saidas… (Ctrl+Shift+E)` : docAtivo?.modulo === 'musica' ? 'A música vai para o vídeo pelo "Pôr no vídeo"' : 'A cena 3D ainda não exporta'}>
             <Download size={15} />Exportar
           </button>
         </div>
       </header>
+      <FaixaTransicao />
       <div className="doca">
         <DockviewReact theme={TEMA} components={componentes} defaultTabComponent={AbaDoPainel} onReady={pronto} />
       </div>

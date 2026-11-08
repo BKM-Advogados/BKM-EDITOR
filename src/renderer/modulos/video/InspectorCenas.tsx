@@ -13,6 +13,7 @@ import {INTENSIDADE_PADRAO, INTENSIDADES} from '../../../nucleo/limpeza-voz';
 import {TIPOS_BLOCO_CENAS, type BlocoCenas, type CenaCenas, type DocCenas, type PropsCenas} from '../../../nucleo/cenas';
 import {FORMATOS_VIDEO, formatoDoVideo, rotuloFormato} from '../../../nucleo/formatos';
 import {avisar, mensagemDe, trocar, useLoja, valorEm, verFato} from '../../estado/loja';
+import {CriarEmMusica, MusicaDoClipe} from '../musica/NoVideo'; // frente Música
 import {CabecalhoInspector, CampoCor, CampoDeslizante, CampoInterruptor, CampoLeitura, CampoNumero, CampoSelecao, CampoTexto, Secao, copiar, numeroBr} from '../../componentes/Campos';
 import type {ItemMenu} from '../../componentes/Menu';
 import {formatarTempo} from './tocador';
@@ -288,6 +289,7 @@ const PropsFaixa: React.FC<{documento: string; caminho: string; f: FaixaAudio; f
           </Secao>
         )}
         {n > 0 && <LoudnessDaFaixa documento={documento} fp={fp} nome={f.nome} mudo={Boolean(f.mudo)} som={som} />}
+        {papel !== 'voz' && <CriarEmMusica documento={documento} faixa={f} />}
       </div>
     </div>
   );
@@ -369,6 +371,7 @@ const PropsClipe: React.FC<{documento: string; caminho: string; c: ClipeAudio; c
             )}
           </Secao>
           {(papel === 'voz' || c.original) && <SecaoLimpeza key={caminho} documento={documento} caminho={caminho} c={c} />}
+          {papel !== 'voz' && <MusicaDoClipe documento={documento} caminho={caminho} c={c} faixa={faixa} />}
           <div className="vazio">Arraste o clipe na linha do tempo para mudar onde começa; as alças aparam o começo e o fim. Faixa: {faixa.nome}.</div>
         </div>
       </div>

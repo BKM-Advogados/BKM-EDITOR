@@ -18,7 +18,12 @@ import {MODELOS} from '../../src/nucleo/modelos';
 import {codificarWav, decodificarWav, musicaSintetica, narracaoSintetica, TAXA} from '../audio-sintetico';
 import {argumentosDoRender, destinoDoFormato, nomesDosArquivos, normalizarPrefsExportacao, type OpcoesExportarVideo, type PrefsExportacao} from '../../src/nucleo/exportacao';
 import {caminhoSemFundo, MODELO_FUNDO} from '../../src/nucleo/remover-fundo';
-import {novaMusica} from '../../src/nucleo/musica'; // frente Música
+import {ehDocMusica, novaMusica, type DocMusica} from '../../src/nucleo/musica'; // frente Música
+import {renderizarMusica, TAXA_MUSICA} from '../../src/nucleo/musica-som';
+import {patchAtualizarLigados, patchClipeNovo, renderDaMusica} from '../../src/nucleo/musica-video';
+import {cancelarTransicao, concluirTransicao, levarPara, registroVazio, type BaseProjeto, type RegistroTransicoes} from '../../src/nucleo/transicoes';
+import {envelopeDeAmostras} from '../../src/nucleo/audio';
+import type {EntradaDiario, OperacaoPatch} from '../../src/nucleo/documentos';
 
 type Proj = {raiz: string; manifesto: Manifesto; docs: Record<string, unknown>; versao: number};
 const projetos = new Map<string, Proj>();
@@ -224,10 +229,14 @@ const api: ApiEstudio = {
   marcarVersao: async () => ({ok: true, mensagem: 'Ponto de restauração criado'}),
   escolherMidia: async (tipo) => (tipo === 'audio' ? proximoAudio() : null),
   aoPedirMiniatura: () => nada,
-  lerDocumento: async <T,>(id: string) => ({doc: structuredClone(aberto!.docs[id]) as T, versao: String(aberto!.versao)}),
-  lerJson: async <T,>() => [] as T,
-  aplicarPatch: async ({documento, patch}) => {
+  // frente Música: o render da música fica num blob; a tela vê a URL dele, o documento guarda o caminho (paraTela/doDisco)
+  lerDocumento: async <T,>(id: string) => ({doc: musicaPrevia.paraTela(structuredClone(aberto!.docs[id])) as T, versao: String(aberto!.versao)}),
+  lerJson: async <T,>(caminho: string) => (caminho === '.estudio/transicoes.json' ? structuredClone(musicaPrevia.registro()) : []) as T,
+  aplicarPatch: async ({documento, patch: patchDaTela, rotulo}) => {
+    const patch = musicaPrevia.doDisco(patchDaTela);
+    const antesDaTela = aberto!.docs[documento];
     const r = jsonpatch.applyPatch(structuredClone(aberto!.docs[documento]), patch as Operation[], true, false);
+    musicaPrevia.anotar(documento, antesDaTela, r.newDocument, rotulo);
     nomearClipes(r.newDocument);
     aberto!.docs[documento] = r.newDocument;
     aberto!.versao++;
@@ -237,7 +246,7 @@ const api: ApiEstudio = {
   propsVideo: async (id) => {
     const d = aberto!.docs[id] as DocCenas;
     const {props, avisos} = resolverCenas(d, {envelopes});
-    return {props: props as never, avisos};
+    return {props: musicaPrevia.paraTela(props) as never, avisos};
   },
   comentarios: async () => [],
   novoComentario: async () => {
@@ -391,6 +400,14 @@ const api: ApiEstudio = {
     },
     aoPedido: () => nada,
     responder: nada,
+  },
+  // frente Música: as mesmas funções do núcleo, sobre o projeto em memória (simulação no fim do arquivo)
+  musica: {
+    levar: async (p) => musicaPrevia.levar(p),
+    concluir: async (t) => musicaPrevia.concluir(t),
+    cancelar: async (t, descartar) => musicaPrevia.cancelar(t, descartar),
+    depoisDeMudar: (documento) => musicaPrevia.depoisDeMudar(documento),
+    porNoVideo: (o) => musicaPrevia.porNoVideo(o),
   },
 };
 
@@ -601,4 +618,133 @@ const fundoNaPrevia = (() => {
     return caminho;
   };
   return {estado, baixar, ler, gravar, ouvintes};
+})();
+
+// ---------- frente Música: ida e volta e render ligado, em memória (docs/musica.md) ----------
+// levar_para, concluir_transicao e cancelar_transicao são as do núcleo, sobre uma BaseProjeto em memória com um diário
+// (seq, inverso, transição), então o "Cancelar e desfazer" desfaz como no app. O render é o mesmo renderizarMusica do
+// app; o WAV vai para um blob, e a tela recebe a URL dele no lugar do caminho midia/musica/... (paraTela), que volta a
+// ser caminho quando a tela manda um patch (doDisco).
+const musicaPrevia = (() => {
+  let registro: RegistroTransicoes = registroVazio();
+  const diario: EntradaDiario[] = [];
+  const blobDe = new Map<string, string>(); // caminho do render → URL do blob
+  const caminhoDe = new Map<string, string>(); // URL do blob → caminho
+  const trocar = <T,>(x: T, mapa: Map<string, string>): T => {
+    if (!mapa.size) return x;
+    const andar = (v: unknown): unknown => {
+      if (typeof v === 'string') return mapa.get(v) ?? v;
+      if (Array.isArray(v)) return v.map(andar);
+      if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, w]) => [k, andar(w)]));
+      return v;
+    };
+    return andar(x) as T;
+  };
+  const entrada = (documento: string) => {
+    const e = aberto!.manifesto.documentos.find((d) => d.id === documento || d.caminho === documento);
+    if (!e) throw new Error(`documento não achado: ${documento}`);
+    return e;
+  };
+  const anotar = (caminho: string, antes: unknown, depois: unknown, quem: {autor: string; origem: string; rotulo: string; transicao?: string; patch?: OperacaoPatch[]}) => {
+    const aberta = registro.transicoes.filter((t) => t.estado === 'aberta' && t.destino.arquivo === caminho).pop()?.id;
+    const seq = (diario[diario.length - 1]?.seq ?? 0) + 1;
+    const transicao = quem.transicao ?? aberta;
+    diario.push({seq, em: new Date().toISOString(), documento: caminho, autor: quem.autor, origem: quem.origem, rotulo: quem.rotulo, versao_antes: '', versao_depois: '',
+      patch: quem.patch ?? (jsonpatch.compare(antes as object, depois as object) as OperacaoPatch[]), inverso: jsonpatch.compare(depois as object, antes as object) as OperacaoPatch[],
+      ...(transicao ? {transicao} : {})});
+    return seq;
+  };
+  const base = (autor: string): BaseProjeto => ({
+    autor,
+    manifesto: () => aberto!.manifesto,
+    ler: <T,>(documento: string) => {
+      const e = entrada(documento);
+      return {doc: structuredClone(aberto!.docs[e.id]) as T, versao: String(aberto!.versao), arquivo: e.caminho};
+    },
+    aplicar: (x) => {
+      const e = entrada(x.documento);
+      const antes = aberto!.docs[e.id];
+      const depois = jsonpatch.applyPatch(structuredClone(antes), x.patch as Operation[], true, false).newDocument;
+      aberto!.docs[e.id] = depois;
+      aberto!.versao++;
+      const seq = anotar(e.caminho, antes, depois, {autor: x.autor ?? autor, origem: 'previa', rotulo: x.rotulo, transicao: x.transicao, patch: x.patch.filter((o) => o.op !== 'test')});
+      mudou(e.caminho);
+      return {versao: String(aberto!.versao), seq};
+    },
+    adicionarDocumento: (e, c) => {
+      aberto!.manifesto.documentos.push(e);
+      aberto!.docs[e.id] = c;
+      mudou('estudio.json');
+    },
+    registro: () => structuredClone(registro),
+    gravarRegistro: (r) => {
+      registro = structuredClone(r);
+      mudou('.estudio/transicoes.json');
+    },
+    estado: () => null,
+    diario: () => diario,
+  });
+  const renderizar = async (id: string) => {
+    const doc = aberto!.docs[id] as DocMusica;
+    const r = renderDaMusica(id, doc);
+    if (blobDe.has(r.arquivo)) return r;
+    const fontes: Record<string, {canais: Float32Array[]; taxa: number} | undefined> = {};
+    for (const c of doc.arranjo.clipes) {
+      if (!c.audio || c.audio in fontes) continue;
+      try {
+        fontes[c.audio] = await amostrasDe(blobDe.get(c.audio) ?? c.audio);
+      } catch {
+        fontes[c.audio] = undefined;
+      }
+    }
+    const som = renderizarMusica(doc, fontes, {taxa: TAXA_MUSICA});
+    const url = URL.createObjectURL(new Blob([codificarWav(som.canais, TAXA_MUSICA)], {type: 'audio/wav'}));
+    blobDe.set(r.arquivo, url);
+    caminhoDe.set(url, r.arquivo);
+    audios.set(url, {url, nome: `${id}.wav`});
+    envelopes[r.arquivo] = envelopeDeAmostras(som.canais, TAXA_MUSICA);
+    return r;
+  };
+  const depoisDeMudar = async (id: string) => {
+    if (!aberto || !ehDocMusica(aberto.docs[id])) return {trocados: [], renderizado: false};
+    const r = await renderizar(id);
+    const trocados: {video: string; clipe: string}[] = [];
+    for (const d of aberto.manifesto.documentos.filter((x) => x.modulo === 'video')) {
+      const v = aberto.docs[d.id] as DocCenas;
+      const {patch, clipes} = patchAtualizarLigados(v, id, r, () => undefined);
+      if (!patch.length) continue;
+      base('sistema').aplicar({documento: d.id, patch, rotulo: `trilha atualizada (${id})`});
+      trocados.push(...clipes.map((clipe) => ({video: d.id, clipe})));
+    }
+    return {trocados, renderizado: true};
+  };
+  return {
+    paraTela: <T,>(x: T) => trocar(x, blobDe),
+    doDisco: <T,>(x: T) => trocar(x, caminhoDe),
+    registro: () => registro,
+    levar: (p: Parameters<typeof levarPara>[1]) => levarPara(base('pessoa'), p),
+    concluir: async (t: string) => {
+      const r = concluirTransicao(base('pessoa'), {transicao: t});
+      if (r.musica) await depoisDeMudar(r.musica);
+      return r;
+    },
+    cancelar: (t: string, descartar?: boolean) => cancelarTransicao(base('pessoa'), {transicao: t, descartar}),
+    depoisDeMudar,
+    porNoVideo: async (o: {musica: string; video?: string; faixa?: string; em_ms?: number}) => {
+      const doc = aberto!.docs[o.musica] as DocMusica;
+      const video = o.video ?? doc.video?.documento ?? aberto!.manifesto.documentos.find((d) => d.modulo === 'video')?.id;
+      if (!video) throw new Error('o projeto não tem vídeo');
+      const r = renderDaMusica(o.musica, doc);
+      const novo = patchClipeNovo(aberto!.docs[video] as DocCenas, {idMusica: o.musica, faixa: o.faixa, em_ms: o.em_ms ?? doc.video?.em_ms ?? 0, render: r,
+        nome: aberto!.manifesto.documentos.find((d) => d.id === o.musica)?.titulo});
+      base('pessoa').aplicar({documento: video, patch: novo.patch, rotulo: `música ${o.musica} no vídeo`});
+      await depoisDeMudar(o.musica);
+      return {documento: video, caminho: novo.caminho};
+    },
+    /** O que a tela grava (pelo aplicarPatch da ponte) também vai para o diário, com a transição aberta. */
+    anotar: (documento: string, antes: unknown, depois: unknown, rotulo?: string) => {
+      const e = aberto?.manifesto.documentos.find((d) => d.id === documento);
+      if (e) anotar(e.caminho, antes, depois, {autor: 'pessoa', origem: 'interface', rotulo: rotulo ?? 'mudança'});
+    },
+  };
 })();

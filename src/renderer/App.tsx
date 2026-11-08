@@ -4,6 +4,7 @@ import React, {Suspense, useEffect, useRef} from 'react';
 import type {DocImagem} from '../nucleo/documentos';
 import {caminhoPagina, paginasDe} from '../nucleo/carrossel';
 import {abrirProjeto, loja, observarProjeto, useLoja} from './estado/loja';
+import {estadoDaMusica, musica} from './modulos/musica/estado'; // frente Música
 import {Inicio} from './inicio/Inicio';
 import {RaizDialogo} from './componentes/Dialogo';
 import {registrarFontesDoProjeto} from './casca/fontes-do-projeto';
@@ -36,20 +37,27 @@ export const App: React.FC = () => {
   }, []);
 
   // o que a pessoa está vendo vai para .estudio/estado.json: o agente lê com estado_do_editor e o projeto reabre ali
-  useEffect(() => loja.assinar(() => {
+  useEffect(() => {
+    const gravar = () => {
     const e = loja.get();
     if (!e.info) return;
     const documento = e.area === 'efeitos' ? e.alvoEfeitos : e.area === '3d' ? e.ativo['3d'] : e.ativo[e.area];
     // imagem com várias páginas: o caminho da página ativa ("/paginas/2"), para o agente saber onde a pessoa está
     const doc = documento ? (e.docs[documento]?.doc as DocImagem | undefined) : undefined;
     const pagina = doc && Array.isArray(doc.paginas) ? caminhoPagina(doc, Math.max(0, paginasDe(doc).findIndex((p) => p.id === e.paginaAtiva[documento!]))) : undefined;
-    const estado = {area: e.area, documento, selecao: e.selecao?.caminho, tempo_ms: e.area === 'video' || e.area === 'efeitos' ? e.tempo_ms : undefined, pagina};
+    // frente Música: na Música, a seleção e a cabeça são as dela (parada; tocando, não grava a cada quadro)
+    const naMusica = e.area === 'musica' ? estadoDaMusica() : null;
+    const estado = {area: e.area, documento, selecao: naMusica ? naMusica.selecao : e.selecao?.caminho,
+      tempo_ms: naMusica ? naMusica.tempo_ms : e.area === 'video' || e.area === 'efeitos' ? e.tempo_ms : undefined, pagina};
     const chave = JSON.stringify(estado);
     if (chave !== ultimoEstado.current) {
       ultimoEstado.current = chave;
       window.estudio.gravarEstado(estado);
     }
-  }), []);
+    };
+    const largar = [loja.assinar(gravar), musica.assinar(gravar)];
+    return () => largar.forEach((f) => f());
+  }, []);
 
   return (
     <>

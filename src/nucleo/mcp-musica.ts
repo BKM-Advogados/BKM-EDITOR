@@ -8,16 +8,14 @@ import type {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {z} from 'zod';
 import type {OperacaoPatch} from './documentos';
 import {ehDocCenas, type DocCenas} from './cenas';
-import {
-  arredondarBatida, batidasPorCompasso, ehDocMusica, idLivre, NOME_PECA, novaFaixaMixer, PECAS, posicaoEmCompasso, resolverMusica, segPorBatida,
-  type ClipeMusica, type DocMusica, type NotaMusica, type PadraoMusica, type PecaBateria,
-} from './musica';
+import {ehDocMusica, NOME_PECA, PECAS, posicaoEmCompasso, resolverMusica, type DocMusica, type PecaBateria} from './musica';
+import {criarPadrao, editarArranjo, escreverNotas, trocarKit, type Edicao, type PedidoArranjo, type PedidoNotas, type PedidoPadrao} from './musica-acoes';
 import {KITS, notasDoClipe} from './musica-som';
-import {caminhoPorId, cortesDoVideo, acharClipePorId, patchClipeNovo, patchLigarClipe, renderDaMusica} from './musica-video';
-import {assinaturaDe, baseDoProjeto, depoisDeMudarMusica, ligacoesDe, servicoMusica} from './musica-projeto';
+import {cortesDoVideo, renderDaMusica} from './musica-video';
+import {assinaturaDe, baseDoProjeto, depoisDeMudarMusica, ligacoesDe, porNoVideo, servicoMusica} from './musica-projeto';
 import {cancelarTransicao, concluirTransicao, levarPara, transicaoEmCurso} from './transicoes';
 import {ErroProjeto, type Projeto} from './projeto';
-import {ESTILOS, padraoDoEstilo} from './musica-estilos';
+import {ESTILOS} from './musica-estilos';
 
 /** Classe de cada ferramenta para o portão de permissão (frente IA): todas gravam no diário com Reverter ou só leem. */
 export const CLASSES_MUSICA: Record<string, 'livre' | 'cartao'> = {
@@ -53,12 +51,6 @@ const musicaDe = (p: Projeto, documento?: string) => {
   return {id: entrada.id, rel, doc: lido.doc as DocMusica, versao: lido.versao};
 };
 
-const indiceDoClipe = (doc: DocMusica, id: string) => {
-  const i = doc.arranjo.clipes.findIndex((c) => c.id === id);
-  if (i < 0) throw new ErroProjeto(`clipe não achado: ${id} (clipes: ${doc.arranjo.clipes.map((c) => c.id).join(', ') || 'nenhum'})`, 'nao_achado');
-  return i;
-};
-
 export const registrarMusica = (servidor: McpServer, projeto: Projeto, autor: string, origem: string) => {
   /** Grava na música e leva o render aos clipes ligados do vídeo. */
   const gravar = async (m: {id: string; rel: string; versao: string}, patch: OperacaoPatch[], rotulo: string, caminho: string, extra: Record<string, unknown> = {}) => {
@@ -68,6 +60,12 @@ export const registrarMusica = (servidor: McpServer, projeto: Projeto, autor: st
     return {ok: true, seq: r.entrada.seq, documento: m.id, caminho, ...extra, duracao_s: r3(musica.duracao_s),
       ...(depois.trocados.length ? {video_atualizado: depois.trocados.map((t) => `${t.video}/${t.clipe}`)} : {}), ...('aviso' in depois && depois.aviso ? {aviso_render: depois.aviso} : {}),
       ...(avisos.length ? {avisos: avisos.slice(0, 8)} : {})};
+  };
+
+  /** Uma edição de musica-acoes.ts no diário, com o render levado ao vídeo e os avisos dela somados. */
+  const aplicarEdicao = async (m: {id: string; rel: string; versao: string}, e: Edicao) => {
+    const r = await gravar(m, e.patch, e.rotulo, e.caminho, e.extra);
+    return e.avisos?.length ? {...r, avisos: [...e.avisos, ...((r.avisos as string[] | undefined) ?? [])]} : r;
   };
 
   // ---------- ler ----------
@@ -132,85 +130,9 @@ export const registrarMusica = (servidor: McpServer, projeto: Projeto, autor: st
       fade_out: z.number().min(0).optional().describe('batidas'),
       mudo: z.boolean().optional(),
     },
-  }, seguro(async (a: {documento?: string; acao: 'por' | 'mover' | 'aparar' | 'dividir' | 'apagar' | 'ajustar'; clipe?: string; canal?: string; audio?: string; padrao?: string;
-    em?: number; dur?: number; corte_s?: number; ganho_db?: number; fade_in?: number; fade_out?: number; mudo?: boolean}) => {
+  }, seguro(async (a: PedidoArranjo & {documento?: string}) => {
     const m = musicaDe(projeto, a.documento);
-    const doc = m.doc;
-    const spb = segPorBatida(doc.bpm);
-    const bpc = batidasPorCompasso(doc.compasso);
-    if (a.acao === 'por') {
-      const canal = doc.canais.find((c) => c.id === a.canal);
-      if (!canal) throw new ErroProjeto(`diga o canal (${doc.canais.map((c) => c.id).join(', ') || 'a música não tem canais'})`, 'nao_achado');
-      const doCanal = doc.arranjo.clipes.filter((c) => c.canal === canal.id);
-      const em = arredondarBatida(a.em ?? doCanal.reduce((x, c) => Math.max(x, c.em + c.dur), 0));
-      const avisos: string[] = [];
-      let novo: ClipeMusica;
-      const id = idLivre('c', doc.arranjo.clipes.map((c) => c.id));
-      if (canal.tipo === 'audio') {
-        if (!a.audio) throw new ErroProjeto('canal de áudio: diga o "audio" (caminho no projeto)', 'patch');
-        if (!projeto.existe(a.audio)) avisos.push(`${a.audio} não está no projeto: o clipe fica calado até o arquivo chegar`);
-        if (a.dur === undefined) avisos.push('sem "dur": o clipe ficou com 4 compassos; confira com a duração do arquivo');
-        novo = {id, canal: canal.id, em, dur: arredondarBatida(a.dur ?? 4 * bpc), audio: a.audio, corte_s: a.corte_s ?? 0, ganho_db: a.ganho_db ?? 0,
-          ...(a.fade_in ? {fade_in: a.fade_in} : {}), ...(a.fade_out ? {fade_out: a.fade_out} : {})};
-      } else {
-        const padrao = a.padrao ?? doc.padroes.find((p) => p.canal === canal.id)?.id;
-        const p = doc.padroes.find((x) => x.id === padrao);
-        if (!p) throw new ErroProjeto(`canal de bateria: diga o "padrao" (${doc.padroes.filter((x) => x.canal === canal.id).map((x) => x.id).join(', ') || 'crie com criar_padrao'})`, 'patch');
-        novo = {id, canal: canal.id, em, dur: arredondarBatida(a.dur ?? p.dur ?? bpc), padrao: p.id};
-      }
-      const r = await gravar(m, [{op: 'add', path: '/arranjo/clipes/-', value: novo}], `clipe ${id} em ${posicaoEmCompasso(em, doc.compasso)}`, `/arranjo/clipes/${doc.arranjo.clipes.length}`, {clipe: id});
-      return avisos.length ? {...r, avisos: [...avisos, ...((r.avisos as string[] | undefined) ?? [])]} : r;
-    }
-    if (!a.clipe) throw new ErroProjeto('diga o "clipe"', 'patch');
-    const i = indiceDoClipe(doc, a.clipe);
-    const c = doc.arranjo.clipes[i];
-    const base = `/arranjo/clipes/${i}`;
-    const teste: OperacaoPatch = {op: 'test', path: `${base}/id`, value: c.id};
-    const campo = (k: keyof ClipeMusica, v: unknown): OperacaoPatch[] => (v === undefined ? [] : [{op: c[k] === undefined ? 'add' : 'replace', path: `${base}/${k}`, value: v}]);
-    switch (a.acao) {
-      case 'mover': {
-        if (a.em === undefined && !a.canal) throw new ErroProjeto('diga o "em" novo e/ou o "canal"', 'patch');
-        if (a.canal) {
-          const destino = doc.canais.find((k) => k.id === a.canal);
-          const atual = doc.canais.find((k) => k.id === c.canal);
-          if (!destino) throw new ErroProjeto(`canal não achado: ${a.canal}`, 'nao_achado');
-          if (atual && destino.tipo !== atual.tipo) throw new ErroProjeto(`o clipe é de ${atual.tipo} e o canal ${destino.id} é de ${destino.tipo}`, 'patch');
-        }
-        return gravar(m, [teste, ...campo('em', a.em === undefined ? undefined : arredondarBatida(a.em)), ...campo('canal', a.canal)], `move ${c.id}`, base, {clipe: c.id});
-      }
-      case 'aparar': {
-        if (a.em === undefined && a.dur === undefined) throw new ErroProjeto('diga o "em" novo (o fim fica) e/ou a "dur"', 'patch');
-        const fim = c.em + c.dur;
-        const em = a.em === undefined ? c.em : arredondarBatida(Math.min(a.em, fim - 1 / 16));
-        const desloc = em - c.em;
-        const dur = arredondarBatida(a.dur ?? fim - em);
-        const patch = [teste, ...campo('em', em !== c.em ? em : undefined), ...campo('dur', dur)];
-        if (desloc && c.audio) patch.push(...campo('corte_s', r3(Math.max(0, (c.corte_s ?? 0) + desloc * spb))));
-        if (desloc && c.padrao) patch.push(...campo('inicio', arredondarBatida(Math.max(0, (c.inicio ?? 0) + desloc))));
-        return gravar(m, patch, `apara ${c.id}`, base, {clipe: c.id});
-      }
-      case 'dividir': {
-        if (a.em === undefined || a.em <= c.em || a.em >= c.em + c.dur) throw new ErroProjeto(`diga o "em" do corte, entre ${c.em} e ${c.em + c.dur}`, 'patch');
-        const corte = arredondarBatida(a.em);
-        const id = idLivre('c', doc.arranjo.clipes.map((x) => x.id));
-        const desloc = corte - c.em;
-        const {fade_in: _fi, ...semFadeIn} = c;
-        const segundo: ClipeMusica = {...semFadeIn, id, em: corte, dur: arredondarBatida(c.dur - desloc), ...(c.audio ? {corte_s: r3((c.corte_s ?? 0) + desloc * spb)} : {}),
-          ...(c.padrao ? {inicio: arredondarBatida((c.inicio ?? 0) + desloc)} : {})};
-        delete segundo.origem;
-        const patch: OperacaoPatch[] = [teste, ...campo('dur', arredondarBatida(desloc)), ...(c.fade_out !== undefined ? [{op: 'remove' as const, path: `${base}/fade_out`}] : []),
-          {op: 'add', path: `/arranjo/clipes/${i + 1}`, value: segundo}];
-        return gravar(m, patch, `divide ${c.id} em ${posicaoEmCompasso(corte, doc.compasso)}`, `/arranjo/clipes/${i + 1}`, {clipes: [c.id, id]});
-      }
-      case 'apagar':
-        return gravar(m, [teste, {op: 'remove', path: base}], `apaga ${c.id}`, base, {clipe: c.id});
-      case 'ajustar': {
-        const patch = [teste, ...campo('ganho_db', a.ganho_db), ...campo('fade_in', a.fade_in), ...campo('fade_out', a.fade_out), ...campo('mudo', a.mudo)];
-        if (patch.length === 1) throw new ErroProjeto('diga ganho_db, fade_in, fade_out ou mudo', 'patch');
-        return gravar(m, patch, `ajusta ${c.id}`, base, {clipe: c.id});
-      }
-    }
-    throw new ErroProjeto(`ação desconhecida: ${String(a.acao)}`, 'patch');
+    return aplicarEdicao(m, editarArranjo(m.doc, a, {existe: (arq) => projeto.existe(arq)}));
   }));
 
   // ---------- medir ----------
@@ -234,31 +156,12 @@ export const registrarMusica = (servidor: McpServer, projeto: Projeto, autor: st
       em_ms: z.number().min(0).optional().describe('onde entra no vídeo (padrão: video.em_ms da música)'),
       substituir: z.string().optional().describe('id de um clipe do vídeo que passa a tocar a música'),
     },
-  }, seguro(async ({musica, video, faixa, em_ms, substituir}: {musica?: string; video?: string; faixa?: string; em_ms?: number; substituir?: string}) => {
-    const m = musicaDe(projeto, musica);
-    const idVideo = video ?? m.doc.video?.documento ?? projeto.manifesto().documentos.find((d) => d.modulo === 'video')?.id;
-    if (!idVideo) throw new ErroProjeto('o projeto não tem vídeo', 'nao_achado');
-    const relVideo = projeto.arquivoDoDocumento(idVideo);
-    const lido = projeto.lerJson<unknown>(relVideo);
-    if (!ehDocCenas(lido.doc)) throw new ErroProjeto(`${idVideo} não é um vídeo de cenas`, 'patch');
-    const v = lido.doc as DocCenas;
-    const render = renderDaMusica(m.id, m.doc, assinaturaDe(projeto));
-    let patch: OperacaoPatch[];
-    let caminho: string;
-    if (substituir) {
-      const alvo = acharClipePorId(v, substituir);
-      if (!alvo?.clipe || alvo.ci === undefined) throw new ErroProjeto(`clipe não achado no vídeo: ${substituir}`, 'nao_achado');
-      patch = patchLigarClipe({...alvo, clipe: alvo.clipe, ci: alvo.ci}, m.id, render);
-      caminho = caminhoPorId(alvo.faixa.id, alvo.clipe.id);
-    } else {
-      const titulo = projeto.manifesto().documentos.find((d) => d.id === m.id)?.titulo;
-      const novo = patchClipeNovo(v, {idMusica: m.id, nome: titulo, faixa, em_ms: em_ms ?? m.doc.video?.em_ms ?? 0, render});
-      patch = novo.patch;
-      caminho = novo.caminho;
-    }
-    const r = projeto.aplicarPatch({documento: relVideo, versao_base: lido.versao, patch, autor, origem, rotulo: `música ${m.id} no vídeo`});
+  }, seguro(async (o: {musica?: string; video?: string; faixa?: string; em_ms?: number; substituir?: string}) => {
+    const m = musicaDe(projeto, o.musica);
+    const r = porNoVideo(projeto, {...o, musica: m.id}, {autor, origem});
     const depois = await depoisDeMudarMusica(projeto, m.id);
-    return {ok: true, seq: r.entrada.seq, documento: idVideo, caminho, render: render.arquivo, duracao_ms: render.duracao_ms, ...('aviso' in depois && depois.aviso ? {aviso_render: depois.aviso} : {})};
+    return {ok: true, seq: r.seq, documento: r.documento, caminho: r.caminho, render: r.render.arquivo, duracao_ms: r.render.duracao_ms,
+      ...('aviso' in depois && depois.aviso ? {aviso_render: depois.aviso} : {})};
   }));
 
   // ---------- ida e volta entre módulos ----------
@@ -298,12 +201,7 @@ export const registrarMusica = (servidor: McpServer, projeto: Projeto, autor: st
     inputSchema: {documento: z.string().optional(), canal: z.string(), kit: z.string()},
   }, seguro(async ({documento, canal, kit}: {documento?: string; canal: string; kit: string}) => {
     const m = musicaDe(projeto, documento);
-    const i = m.doc.canais.findIndex((c) => c.id === canal);
-    if (i < 0) throw new ErroProjeto(`canal não achado: ${canal}`, 'nao_achado');
-    if (m.doc.canais[i].tipo !== 'bateria') throw new ErroProjeto(`${canal} não é um canal de bateria`, 'patch');
-    if (!KITS.some((k) => k.id === kit)) throw new ErroProjeto(`kit desconhecido: ${kit} (kits: ${KITS.map((k) => k.id).join(', ')})`, 'nao_achado');
-    return gravar(m, [{op: 'test', path: `/canais/${i}/id`, value: canal}, {op: m.doc.canais[i].kit === undefined ? 'add' : 'replace', path: `/canais/${i}/kit`, value: kit}],
-      `kit ${kit} em ${canal}`, `/canais/${i}`, {sem_som: []});
+    return aplicarEdicao(m, trocarKit(m.doc, canal, kit));
   }));
 
   servidor.registerTool('criar_padrao', {
@@ -318,43 +216,9 @@ export const registrarMusica = (servidor: McpServer, projeto: Projeto, autor: st
       estilo: z.enum(ESTILOS.map((e) => e.id) as [string, ...string[]]).optional(),
       no_arranjo: z.object({em: z.number().min(0).optional(), dur: z.number().positive().optional()}).optional().describe('batidas; o clipe repete o padrão até dur'),
     },
-  }, seguro(async (a: {documento?: string; canal: string; nome?: string; dur?: number; passos?: number; clonar?: string; estilo?: string; no_arranjo?: {em?: number; dur?: number}}) => {
+  }, seguro(async (a: PedidoPadrao & {documento?: string}) => {
     const m = musicaDe(projeto, a.documento);
-    const doc = m.doc;
-    const bpc = batidasPorCompasso(doc.compasso);
-    const patch: OperacaoPatch[] = [];
-    let canal = doc.canais.find((c) => c.id === a.canal);
-    if (!canal) {
-      canal = {id: a.canal, nome: a.canal.charAt(0).toUpperCase() + a.canal.slice(1), tipo: 'bateria', faixa_mixer: a.canal, kit: 'eletronico'};
-      patch.push({op: 'add', path: '/canais/-', value: canal});
-      if (!doc.mixer.faixas.some((f) => f.id === a.canal)) patch.push({op: 'add', path: '/mixer/faixas/-', value: novaFaixaMixer(a.canal, canal.nome)});
-    } else if (canal.tipo !== 'bateria') {
-      throw new ErroProjeto(`${a.canal} é um canal de áudio; padrões são de canais de bateria`, 'patch');
-    }
-    const id = idLivre('p', doc.padroes.map((p) => p.id));
-    let notas: NotaMusica[] = [];
-    let dur = a.dur ?? bpc;
-    if (a.clonar) {
-      const fonte = doc.padroes.find((p) => p.id === a.clonar);
-      if (!fonte) throw new ErroProjeto(`padrão não achado: ${a.clonar}`, 'nao_achado');
-      notas = structuredClone(fonte.notas);
-      dur = a.dur ?? fonte.dur ?? bpc;
-    } else if (a.estilo) {
-      const e = padraoDoEstilo(a.estilo, bpc);
-      notas = e.notas;
-      dur = a.dur ?? e.dur;
-    }
-    const novo: PadraoMusica = {id, nome: a.nome ?? (a.estilo ? ESTILOS.find((e) => e.id === a.estilo)!.nome : `Padrão ${doc.padroes.length + 1}`), canal: canal.id, dur,
-      passos: a.passos ?? Math.max(1, Math.round(dur * 4)), notas};
-    patch.push({op: 'add', path: '/padroes/-', value: novo});
-    let clipe: string | undefined;
-    if (a.no_arranjo) {
-      clipe = idLivre('c', doc.arranjo.clipes.map((c) => c.id));
-      const doCanal = doc.arranjo.clipes.filter((c) => c.canal === canal!.id);
-      const em = arredondarBatida(a.no_arranjo.em ?? doCanal.reduce((x, c) => Math.max(x, c.em + c.dur), 0));
-      patch.push({op: 'add', path: '/arranjo/clipes/-', value: {id: clipe, canal: canal.id, em, dur: arredondarBatida(a.no_arranjo.dur ?? dur), padrao: id} satisfies ClipeMusica});
-    }
-    return gravar(m, patch, `padrão ${novo.nome}`, `/padroes/${doc.padroes.length}`, {padrao: id, notas: notas.length, ...(clipe ? {clipe} : {})});
+    return aplicarEdicao(m, criarPadrao(m.doc, a));
   }));
 
   const notaSchema = z.object({
@@ -375,37 +239,9 @@ export const registrarMusica = (servidor: McpServer, projeto: Projeto, autor: st
       ate: z.number().min(0).optional().describe('trocar: batida final (padrão: fim do padrão)'),
       quantizar: z.enum(['1/4', '1/8', '1/16', '1/32']).optional().describe('fração de compasso 4/4: 1/16 = semicolcheia'),
     },
-  }, seguro(async (a: {documento?: string; padrao: string; notas: NotaMusica[]; modo?: 'somar' | 'trocar'; de?: number; ate?: number; quantizar?: '1/4' | '1/8' | '1/16' | '1/32'}) => {
+  }, seguro(async (a: PedidoNotas & {documento?: string}) => {
     const m = musicaDe(projeto, a.documento);
-    const i = m.doc.padroes.findIndex((p) => p.id === a.padrao);
-    if (i < 0) throw new ErroProjeto(`padrão não achado: ${a.padrao} (${m.doc.padroes.map((p) => p.id).join(', ') || 'crie com criar_padrao'})`, 'nao_achado');
-    const p = m.doc.padroes[i];
-    const dur = p.dur ?? batidasPorCompasso(m.doc.compasso);
-    const grade = a.quantizar ? 4 / Number(a.quantizar.split('/')[1]) : 0;
-    const avisos: string[] = [];
-    const de = a.de ?? 0;
-    const ate = a.ate ?? dur;
-    let notas = a.modo === 'trocar' ? p.notas.filter((n) => n.em < de || n.em >= ate) : [...p.notas];
-    let fora = 0;
-    for (const n0 of a.notas) {
-      if (!n0.peca && n0.nota === undefined) {
-        avisos.push('nota sem peca nem nota: ignorada');
-        continue;
-      }
-      const em = arredondarBatida(grade ? Math.round(n0.em / grade) * grade : n0.em);
-      if (em >= dur) {
-        fora++;
-        continue;
-      }
-      const n: NotaMusica = {...(n0.peca ? {peca: n0.peca} : {nota: n0.nota}), em, ...(n0.dur ? {dur: n0.dur} : {}), ...(n0.forca ? {forca: n0.forca} : {})};
-      notas = notas.filter((x) => !(x.em === n.em && (n.peca ? x.peca === n.peca : x.nota === n.nota)));
-      notas.push(n);
-    }
-    if (fora) avisos.push(`${fora} nota(s) depois do fim do padrão (${dur} batidas) ficaram de fora`);
-    notas.sort((x, y) => x.em - y.em || String(x.peca ?? x.nota).localeCompare(String(y.peca ?? y.nota)));
-    const r = await gravar(m, [{op: 'test', path: `/padroes/${i}/id`, value: p.id}, {op: 'replace', path: `/padroes/${i}/notas`, value: notas}],
-      `${a.notas.length} nota(s) em ${p.nome ?? p.id}`, `/padroes/${i}/notas`, {padrao: p.id, notas: notas.length});
-    return avisos.length ? {...r, avisos: [...avisos, ...((r.avisos as string[] | undefined) ?? [])]} : r;
+    return aplicarEdicao(m, escreverNotas(m.doc, a));
   }));
 };
 
