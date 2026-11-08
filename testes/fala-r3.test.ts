@@ -8,7 +8,7 @@ import {Legendas} from '../src/composicoes/cenas/Legendas';
 import type {ClipeAudio} from '../src/nucleo/audio';
 import {novoDocCenas, resolverCenas, type DocCenas} from '../src/nucleo/cenas';
 import {
-  areaDaLegenda, capacidadeDaLegenda, comTexto, CPS_MAX, cpsDe, fracaNoFim, legendasAoDividirClipe, legendasAoDuplicarClipe, legendasDaFala, legendasDeOutraTomada, legendasDoDocumento, lerLegendas,
+  aplicarDicionario, areaDaLegenda, capacidadeDaLegenda, DICIONARIO_CASA, termosDoDicionario, comTexto, CPS_MAX, cpsDe, fracaNoFim, legendasAoDividirClipe, legendasAoDuplicarClipe, legendasDaFala, legendasDeOutraTomada, legendasDoDocumento, lerLegendas,
   legendasNoDestino, limitesDoArrasto, linhasDaLegenda, MAX_SEGMENTO_MS, mesmaTomada, MIN_SEGMENTO_MS, nomeLivreDaLegenda, PAUSA_QUEBRA_MS, quebrarEmLinhas, quebrarEmSegmentos, resolverLegendas,
   palavrasDe, palavrasDuvidosas, palavrasValidas, realinharPalavras, substituirEmLote, textoDeLegenda, type LegendasCenas,
 } from '../src/nucleo/legendas';
@@ -389,5 +389,35 @@ describe('confiança do whisper na lista: palavra abaixo de 0,6 vai para "confir
     expect(palavrasDuvidosas(comTexto(s, 'Recebeu proposta de mudar.').palavras)).toEqual([]);
     // "25 %" juntado fica com a menor certeza dos pedaços
     expect(quebrarEmSegmentos([{w: '25', s: 0, e: 200, p: 0.9}, {w: '%', s: 200, e: 300, p: 0.5}], {max_caracteres: 42})[0].palavras).toEqual([{w: '25%', s: 0, e: 300, p: 0.5}]);
+  });
+});
+
+describe('dicionário da casa e do vídeo: volta a valer a cada geração', () => {
+  const fala = [{w: 'a', s: 0, e: 100}, {w: 'clt', s: 120, e: 500}, {w: 'garante', s: 520, e: 900}, {w: 'o', s: 950, e: 1000}, {w: 'fgts.', s: 1020, e: 1500},
+    {w: 'Recebeu', s: 2500, e: 2800}, {w: 'propósito.', s: 2820, e: 3300}];
+  const doc = (dicionario?: {de: string; para: string}[]) => ({
+    audio: {faixas: [{id: 'voz', nome: 'Narração', papel: 'voz' as const, clipes: [{id: 'n1', arquivo: 'midia/n.wav', em: 0, duracao_ms: 4000}]}]},
+    ...(dicionario ? {legendas: {segmentos: [], dicionario}} : {}),
+  });
+  const ler = () => fala;
+
+  it('as siglas da casa saem em caixa alta, com o tempo de cada palavra guardado', () => {
+    const r = legendasDoDocumento(doc(), ler, {largura: 1080, altura: 1920});
+    const textos = r.legendas.segmentos.map((s) => s.texto);
+    expect(textos.join(' ')).toContain('a CLT garante o FGTS.');
+    expect(r.dicionario).toBeGreaterThanOrEqual(1);
+    const s0 = r.legendas.segmentos[0];
+    expect(s0.palavras!.find((p) => p.w === 'CLT')).toMatchObject({s: 120, e: 500});
+  });
+
+  it('a troca guardada no vídeo vale ao gerar e ao gerar de novo; os termos vão ao whisper', () => {
+    const d = doc([{de: 'propósito', para: 'proposta'}]);
+    const r = legendasDoDocumento(d, ler, {largura: 1080, altura: 1920});
+    expect(r.legendas.segmentos.map((s) => s.texto).join(' ')).toContain('Recebeu proposta.');
+    const de = legendasDoDocumento({...d, legendas: r.legendas}, ler, {largura: 1080, altura: 1920, refazer: true});
+    expect(de.legendas.segmentos.map((s) => s.texto).join(' ')).toContain('Recebeu proposta.');
+    expect(de.legendas.dicionario).toEqual([{de: 'propósito', para: 'proposta'}]);
+    expect(termosDoDicionario(de.legendas)).toEqual(['proposta']);
+    expect(aplicarDicionario([{id: 'x', em: 0, sai: 1, texto: 'CLT já certa'}], DICIONARIO_CASA).trocas).toBe(0);
   });
 });

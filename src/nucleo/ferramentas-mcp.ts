@@ -14,7 +14,7 @@ import {FORMATOS_IMAGEM, FORMATOS_VIDEO, formatoDoVideo} from './formatos';
 import {MARCAS_INICIAIS} from './marca';
 import {PastaMarcas} from './pasta-marcas';
 import {ehDocCenas, resolverCenas, type DocCenas} from './cenas';
-import {arquivoDaFala, arquivoDasPalavras, clipesDeVoz, comTexto, CPS_MAX, cpsDe, deslocamentoDaLegenda, legendasDeArquivo, legendasDeOutraTomada, limitesDoArrasto, nomeLivreDaLegenda, palavrasDuvidosas, textoDeLegenda, type PalavraLegenda, recusaDoDestinoNoProjeto, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt, type EstadoDaFala, type IdEstiloLegenda} from './legendas';
+import {arquivoDaFala, arquivoDasPalavras, clipesDeVoz, comTexto, CPS_MAX, cpsDe, deslocamentoDaLegenda, legendasDeArquivo, legendasDeOutraTomada, limitesDoArrasto, nomeLivreDaLegenda, palavrasDuvidosas, termosDoDicionario, textoDeLegenda, type PalavraLegenda, recusaDoDestinoNoProjeto, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt, type EstadoDaFala, type IdEstiloLegenda} from './legendas';
 import {CATALOGO_FONTES} from './catalogo-fontes';
 import {
   acharTrecho, caminhoTextoFonte, conferirDigitos, decodificarComAviso, entorno, estadoDoFato, hashTexto, limparHtml, nivelDe, numerosDe, paginar, proximoId,
@@ -525,7 +525,7 @@ const registrarPesquisa = (servidor: McpServer, projeto: Projeto, autor: string,
 /** O que o MCP precisa do transcritor do processo principal (src/main/transcricao.ts): sem ele, a ferramenta avisa. */
 export type TranscritorMcp = {
   /** `sinal`: o do pedido do MCP; aborta quando a conversa é interrompida (Esc) ou a conexão cai. */
-  transcrever: (projeto: Projeto, pedido: {arquivo: string; modelo?: 'base' | 'small'; vocabulario?: string; destino?: string; pela_ia?: boolean},
+  transcrever: (projeto: Projeto, pedido: {arquivo: string; modelo?: 'base' | 'small'; vocabulario?: string; destino?: string; pela_ia?: boolean; termos?: string[]},
     andamento?: (p: unknown) => void, sinal?: AbortSignal) => Promise<{ok: boolean; palavras?: string; n?: number; duracao_s?: number; texto?: string; mensagem?: string; cancelado?: boolean}>;
   /** A transcrição do arquivo ainda é do áudio como ele está (o carimbo do palavras.json)? Sem isto, vale a existência. */
   conferir?: (projeto: Projeto, arquivo: string) => EstadoDaFala;
@@ -597,7 +597,8 @@ const registrarFala = (servidor: McpServer, projeto: Projeto, autor: string, ori
         transcritos.push({arquivo, palavras: arquivoDasPalavras(arquivo), ja_tinha: true});
         continue;
       }
-      const r = await transcritor.transcrever(projeto, pedido(arquivo), undefined, sinal);
+      const termos = termosDoDicionario(doc.legendas); // o dicionário do vídeo entra no vocabulário do whisper
+      const r = await transcritor.transcrever(projeto, {...pedido(arquivo), ...(termos.length ? {termos} : {})}, undefined, sinal);
       if (!r.ok) throw new ErroProjeto(r.mensagem ?? `a transcrição de ${arquivo} não terminou`, 'patch');
       transcritos.push({arquivo, palavras: r.palavras, n: r.n, duracao_s: r.duracao_s, ...(estado === 'velha' ? {audio_mudou: true} : {})});
     }
@@ -616,7 +617,7 @@ const registrarFala = (servidor: McpServer, projeto: Projeto, autor: string, ori
     const gravado = projeto.aplicarPatch({documento: atual.rel, versao_base: atual.versao, patch: [{op: 'add', path: '/legendas', value: r.legendas}], autor, origem,
       rotulo: `legendas da fala (${r.geradas})`});
     return {documento: alvo, versao: gravado.versao, transcritos, legendas: r.legendas.segmentos.length, geradas: r.geradas, estilo: r.legendas.estilo?.predefinicao,
-      ...(r.corrigidas ? {corrigidas_a_mao_mantidas: r.corrigidas} : {}), ...mantidos, ...(r.faltam.length ? {sem_transcricao: r.faltam} : {}),
+      ...(r.corrigidas ? {corrigidas_a_mao_mantidas: r.corrigidas} : {}), ...(r.dicionario ? {trocas_do_dicionario: r.dicionario} : {}), ...mantidos, ...(r.faltam.length ? {sem_transcricao: r.faltam} : {}),
       primeiras: r.legendas.segmentos.slice(0, 5).map((s) => ({id: s.id, em: s.em, sai: s.sai, texto: s.texto, falante: s.falante}))};
   }));
 

@@ -43,7 +43,15 @@ export type EstiloLegenda = {
  *  clipe muda de lugar ou é aparado depois, o resolvedor desloca as legendas dele junto. */
 export type OrigemLegendas = {clipe: string; arquivo: string; palavras: string; em: number; corte_ms: number;
   sha256?: string}; // do áudio transcrito (o carimbo do palavras.json): a correção à mão só passa para a mesma tomada
-export type LegendasCenas = {segmentos: SegmentoLegenda[]; estilo?: EstiloLegenda; oculto?: boolean; origens?: OrigemLegendas[]};
+export type LegendasCenas = {segmentos: SegmentoLegenda[]; estilo?: EstiloLegenda; oculto?: boolean; origens?: OrigemLegendas[];
+  dicionario?: EntradaDicionario[]}; // as trocas que a pessoa guardou: voltam a valer em toda legenda gerada
+
+/** Uma troca do dicionário: `de` vira `para`, por padrão só a palavra inteira e sem diferença de maiúsculas e acentos. */
+export type EntradaDicionario = {de: string; para: string; palavra_inteira?: boolean; caixa?: boolean};
+/** O dicionário da casa: as siglas do direito do trabalho, que o whisper às vezes escreve em minúsculas. Vale em toda
+ *  legenda gerada, antes do dicionário do vídeo. */
+export const DICIONARIO_CASA: EntradaDicionario[] = ['CLT', 'FGTS', 'INSS', 'TST', 'TRT', 'STF', 'STJ', 'CTPS', 'PIS', 'CPF', 'CNPJ', 'MTE', 'OAB', 'PLR', 'NR']
+  .map((s) => ({de: s, para: s}));
 
 // ---------- predefinições ----------
 
@@ -499,7 +507,7 @@ export const levarCorrecoes = (leg: LegendasCenas, clipe: string, palavras: Pala
  *  As legendas de outros clipes e as que não vêm de clipe (importadas, criadas à mão) ficam. */
 export const legendasDoDocumento = (doc: {audio?: AudioCenas; legendas?: LegendasCenas}, lerPalavras: (caminho: string) => unknown, o: {
   largura: number; altura: number; estilo?: EstiloLegenda; clipe?: string; faixa?: string; refazer?: boolean | string[];
-}): {legendas: LegendasCenas; faltam: string[]; clipes: number; mantidos: string[]; corrigidas: number; geradas: number} => {
+}): {legendas: LegendasCenas; faltam: string[]; clipes: number; mantidos: string[]; corrigidas: number; geradas: number; dicionario: number} => {
   const antes = doc.legendas && Array.isArray(doc.legendas.segmentos) ? doc.legendas : undefined;
   const comLegenda = new Set((antes?.segmentos ?? []).map((s) => s?.clipe).filter(Boolean));
   const refazer = (id: string) => o.refazer === true || (Array.isArray(o.refazer) && o.refazer.includes(id));
@@ -533,8 +541,11 @@ export const legendasDoDocumento = (doc: {audio?: AudioCenas; legendas?: Legenda
     }
     fontes.push({clipe: {...clipe, arquivo, em: Number(clipe.em) || 0, duracao_ms: Number(clipe.duracao_ms) || 0}, faixa, palavras, caminhoPalavras: caminho, sha256});
   }
-  const nova = legendasDaFala(fontes, {estilo: o.estilo ?? antes?.estilo, largura: o.largura, altura: o.altura, fonte: (doc as {tema?: {fonte?: string}}).tema?.fonte});
-  const resto = {faltam, clipes: fontes.length, mantidos, corrigidas, geradas: nova.segmentos.length};
+  const gerada = legendasDaFala(fontes, {estilo: o.estilo ?? antes?.estilo, largura: o.largura, altura: o.altura, fonte: (doc as {tema?: {fonte?: string}}).tema?.fonte});
+  // o dicionário da casa e o do vídeo voltam a valer nas legendas novas (a correção guardada sobrevive a gerar de novo)
+  const dic = aplicarDicionario(gerada.segmentos, [...DICIONARIO_CASA, ...(Array.isArray(antes?.dicionario) ? antes.dicionario : [])]);
+  const nova = {...gerada, segmentos: dic.segmentos};
+  const resto = {faltam, clipes: fontes.length, mantidos, corrigidas, geradas: nova.segmentos.length, dicionario: dic.trocas};
   if (!antes) return {legendas: {...doc.legendas, ...nova}, ...resto};
   const trocados = new Set(fontes.map((f) => f.clipe.id));
   const ficam = antes.segmentos.filter((s) => !s?.clipe || !trocados.has(s.clipe));
@@ -717,6 +728,23 @@ export const localizar = (segmentos: SegmentoLegenda[], procurar: string, o: Opc
     return re.test(o.caixa ? s.texto : semAcento(s.texto));
   }).map((s) => s.id);
 };
+
+/** Aplica o dicionário (a casa e o do vídeo) nas legendas, com o tempo das palavras guardado; conta só o que mudou. */
+export const aplicarDicionario = (segmentos: SegmentoLegenda[], dic: EntradaDicionario[]): {segmentos: SegmentoLegenda[]; trocas: number} => {
+  let segs = segmentos;
+  let trocas = 0;
+  for (const e of dic) {
+    if (!e?.de || typeof e.para !== 'string') continue;
+    const r = substituirEmLote(segs, e.de, e.para, {palavra_inteira: e.palavra_inteira !== false, caixa: Boolean(e.caixa)});
+    trocas += r.segmentos.filter((s, i) => s.texto !== segs[i].texto).length;
+    segs = r.segmentos;
+  }
+  return {segmentos: segs, trocas};
+};
+
+/** Os termos do dicionário, para o vocabulário do whisper (o prompt dele copia a grafia). */
+export const termosDoDicionario = (leg: LegendasCenas | undefined) =>
+  [...new Set((Array.isArray(leg?.dicionario) ? leg.dicionario : []).map((e) => e?.para).filter((x): x is string => typeof x === 'string' && Boolean(x.trim())))];
 
 /** Localiza e substitui em todas as legendas; o tempo das palavras fica (comTexto). Devolve as legendas novas e quantas
  *  trocas houve. */

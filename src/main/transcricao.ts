@@ -449,7 +449,8 @@ export class Transcritor {
       await extrairAudio({ffmpeg: pecas.ffmpeg!, entrada: projeto.caminho(rel), saida: wav, de_ms: pedido.de_ms, dur_ms: pedido.dur_ms, sinal: controle.signal});
       avisar({etapa: 'transcrevendo', mensagem: `Transcrevendo com o modelo ${modelo.arquivo}`, progresso: 0});
       const palavras = await rodarWhisper({cli: pecas.cli, modelo, arquivoModelo: pecas.modelo, wav, idioma: pedido.idioma ?? 'pt', sinal: controle.signal,
-        prompt: pedido.vocabulario ?? PROMPT_PADRAO,
+        // o dicionário do vídeo entra no fim do vocabulário: o whisper copia a grafia do que lê no prompt
+        prompt: `${pedido.vocabulario ?? PROMPT_PADRAO}${Array.isArray(pedido.termos) && pedido.termos.length ? ` ${pedido.termos.slice(0, 40).join(', ')}.` : ''}`,
         andamento: (pct) => avisar({etapa: 'transcrevendo', mensagem: `Transcrevendo com o modelo ${modelo.arquivo}`, progresso: pct})});
       // o tempo das palavras conta do começo do arquivo, mesmo quando só um trecho foi transcrito
       const desloc = pedido.de_ms ?? 0;

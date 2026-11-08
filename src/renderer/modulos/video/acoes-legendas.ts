@@ -5,7 +5,7 @@ import type {PedidoTranscricao, ProgressoTranscricao} from '../../../compartilha
 import {idLivre, type DocCenas, type PropsCenas} from '../../../nucleo/cenas';
 import {formatoDoVideo} from '../../../nucleo/formatos';
 import {
-  arquivoDaFala, arquivoDasPalavras, clipesDeVoz, comTexto, palavrasValidas, type PalavraLegenda, legendasDeOutraTomada, limitesDoArrasto, dividirSegmento, juntarSegmentos, legendasDeArquivo, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt,
+  arquivoDaFala, arquivoDasPalavras, clipesDeVoz, comTexto, palavrasValidas, termosDoDicionario, type EntradaDicionario, type PalavraLegenda, legendasDeOutraTomada, limitesDoArrasto, dividirSegmento, juntarSegmentos, legendasDeArquivo, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt,
   requebrar, substituirEmLote, type EstadoDaFala, type EstiloLegenda, type LegendasCenas, type OpcoesBusca, type SegmentoLegenda,
 } from '../../../nucleo/legendas';
 import {confirmar} from '../../componentes/Dialogo';
@@ -84,7 +84,8 @@ export const transcreverEGerar = async (documento: string, o: {clipe?: string; f
     for (const [i, arquivo] of fila.entries()) {
       andamento = {etapa: 'audio', mensagem: `Preparando ${nomeCurto(arquivo)}`, arquivo, progresso: 0};
       avisarOuvintes();
-      const r = await window.estudio.fala.transcrever({arquivo, modelo: o.modelo});
+      const termos = termosDoDicionario(docDe(documento)?.legendas);
+      const r = await window.estudio.fala.transcrever({arquivo, modelo: o.modelo, ...(termos.length ? {termos} : {})});
       if (!r.ok) {
         avisar(r.cancelado ? 'Transcrição cancelada.' : r.mensagem ?? 'A transcrição não terminou.', r.cancelado ? 'info' : 'erro');
         return;
@@ -244,14 +245,27 @@ export const novaLegenda = async (documento: string, ms: number) => {
   if (await aplicar(documento, patch, 'nova legenda')) selecionar({documento, caminho: caminhoSeg(i)});
 };
 
-export const substituirTudo = async (documento: string, procurar: string, troca: string, o: OpcoesBusca) => {
+/** Substitui em todas as legendas; com `guardar`, a troca entra no dicionário do vídeo e volta a valer quando as
+ *  legendas forem geradas de novo (e no vocabulário do whisper). */
+export const substituirTudo = async (documento: string, procurar: string, troca: string, o: OpcoesBusca & {guardar?: boolean}) => {
   const leg = legendasDe(documento);
   if (!leg || !procurar) return;
   const r = substituirEmLote(leg.segmentos, procurar, troca, o);
-  if (!r.trocas) return avisar(`"${procurar}" não aparece nas legendas.`, 'info');
-  if (await trocar(documento, '/legendas/segmentos', r.segmentos, `substituir "${procurar}" por "${troca}" (${r.trocas})`)) {
-    avisar(`${r.trocas} ${r.trocas === 1 ? 'troca' : 'trocas'}. Ctrl+Z desfaz.`, 'ok');
+  if (!r.trocas && !o.guardar) return avisar(`"${procurar}" não aparece nas legendas.`, 'info');
+  const entrada: EntradaDicionario = {de: procurar, para: troca, ...(o.palavra_inteira ? {} : {palavra_inteira: false}), ...(o.caixa ? {caixa: true} : {})};
+  const dicionario = o.guardar ? [...(leg.dicionario ?? []).filter((e) => e.de !== procurar), entrada] : leg.dicionario;
+  const novo: LegendasCenas = {...leg, segmentos: r.segmentos, ...(dicionario ? {dicionario} : {})};
+  if (await gravarLegendas(documento, novo, `substituir "${procurar}" por "${troca}" (${r.trocas})${o.guardar ? ' e guardar no dicionário' : ''}`)) {
+    avisar(`${r.trocas} ${r.trocas === 1 ? 'troca' : 'trocas'}${o.guardar ? '; guardada no dicionário do vídeo' : ''}. Ctrl+Z desfaz.`, 'ok');
   }
+};
+
+/** Tira uma troca do dicionário do vídeo. */
+export const tirarDoDicionario = async (documento: string, de: string) => {
+  const leg = legendasDe(documento);
+  if (!leg?.dicionario) return;
+  const resto = leg.dicionario.filter((e) => e.de !== de);
+  await trocar(documento, '/legendas/dicionario', resto.length ? resto : undefined, `tirar "${de}" do dicionário`);
 };
 
 // ---------- estilo ----------

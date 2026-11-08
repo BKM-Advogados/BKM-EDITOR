@@ -248,6 +248,16 @@ describe('MCP: transcrever e legendas', () => {
     expect(readFileSync(path.join(pasta, 'video', 'video.json'), 'utf-8')).toBe(antes);
   });
 
+  it('o dicionário do vídeo vai ao vocabulário do whisper', async () => {
+    const c = await conectar(transcritor);
+    const v = projeto.lerJson('video/video.json');
+    projeto.aplicarPatch({documento: 'video/video.json', versao_base: v.versao, autor: 'pessoa', origem: 'interface',
+      patch: [{op: 'add', path: '/legendas/dicionario', value: [{de: 'fgts', para: 'FGTS'}, {de: 'fundo', para: 'Fundo de Garantia'}]}]});
+    pedidos.length = 0;
+    await chamar(c, 'transcrever', {documento: 'video', refazer: true, legendas: false});
+    expect((pedidos.at(-1) as {termos?: string[]}).termos).toEqual(['FGTS', 'Fundo de Garantia']);
+  });
+
   it('exportar_legendas não grava por cima do SRT que já está em saidas/ (fala-D11)', async () => {
     const c = await conectar(transcritor);
     writeFileSync(path.join(pasta, 'saidas', 'Corrigido.srt'), 'corrigido à mão');

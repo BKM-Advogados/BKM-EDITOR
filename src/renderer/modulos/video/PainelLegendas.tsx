@@ -17,7 +17,7 @@ import {selecionar, trocar, useLoja} from '../../estado/loja';
 import {CabecalhoInspector, CampoCor, CampoDeslizante, CampoInterruptor, CampoSelecao, Secao} from '../../componentes/Campos';
 import {
   assinarAndamento, cancelarTranscricao, dividir, editarTexto, estadoDasFalas, excluirSegmento, exportarArquivo, gerarDasTranscricoes, importarArquivo, juntarComProxima,
-  aplicarCortesDoClipe, lerAndamento, mudarEstilo, ouvirAndamento, proporCortesDoClipe, voltarCortesDoClipe, novaLegenda, refazerLegendas, substituirTudo, transcreverEGerar, trocarPredefinicao,
+  aplicarCortesDoClipe, lerAndamento, tirarDoDicionario, mudarEstilo, ouvirAndamento, proporCortesDoClipe, voltarCortesDoClipe, novaLegenda, refazerLegendas, substituirTudo, transcreverEGerar, trocarPredefinicao,
 } from './acoes-legendas';
 import {aoQuadro, irPara, msAtual} from './tocador';
 import './legendas.css';
@@ -241,6 +241,7 @@ export const PainelLegendas: React.FC<{documento: string}> = ({documento}) => {
   const [troca, setTroca] = useState('');
   const [caixa, setCaixa] = useState(false);
   const [inteira, setInteira] = useState(false);
+  const [guardar, setGuardar] = useState(false);
   const [exportado, setExportado] = useState<string | null>(null);
   const leg = doc?.legendas;
   const segs = leg?.segmentos ?? [];
@@ -311,13 +312,24 @@ export const PainelLegendas: React.FC<{documento: string}> = ({documento}) => {
               <div className="opcoes">
                 <label><input type="checkbox" checked={caixa} onChange={(e) => setCaixa(e.target.checked)} /> maiúsculas e acentos</label>
                 <label><input type="checkbox" checked={inteira} onChange={(e) => setInteira(e.target.checked)} /> palavra inteira</label>
+                <label title="A troca volta a valer quando as legendas forem geradas de novo, e entra no vocabulário do whisper">
+                  <input type="checkbox" checked={guardar} onChange={(e) => setGuardar(e.target.checked)} /> guardar no dicionário</label>
               </div>
               <div className="opcoes">
                 <span>{procurar ? `${achados.size} ${achados.size === 1 ? 'legenda' : 'legendas'}` : ' '}</span>
-                <button className="bt mini" disabled={!procurar || !achados.size} onClick={() => void substituirTudo(documento, procurar, troca, {caixa, palavra_inteira: inteira})}>
+                <button className="bt mini" disabled={!procurar || (!achados.size && !guardar)} onClick={() => void substituirTudo(documento, procurar, troca, {caixa, palavra_inteira: inteira, guardar})}>
                   Substituir em todas
                 </button>
               </div>
+              {(leg?.dicionario?.length ?? 0) > 0 && (
+                <div className="dicionario">
+                  <span>Dicionário do vídeo (vale ao gerar de novo; as siglas da casa, como CLT e FGTS, já valem sempre):</span>
+                  {leg!.dicionario!.map((e) => (
+                    <span key={e.de} className="entrada">{e.de} → {e.para}
+                      <button className="bti" title="Tirar do dicionário" onClick={() => void tirarDoDicionario(documento, e.de)}><X /></button></span>
+                  ))}
+                </div>
+              )}
             </div>
           </Secao>
         )}

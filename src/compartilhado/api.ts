@@ -310,7 +310,8 @@ export type ApiEstudio = {
 /** Pedido de transcrição: um arquivo do projeto (normalmente midia/…), o trecho opcional e o modelo. */
 export type PedidoTranscricao = {arquivo: string; de_ms?: number; dur_ms?: number; modelo?: 'base' | 'small'; idioma?: string; destino?: string;
   vocabulario?: string; // vocabulario: o começo de conversa do whisper (padrão: termos do direito do trabalho)
-  pela_ia?: boolean}; // pedido pelo MCP: o andamento na tela diz que foi a IA
+  pela_ia?: boolean; // pedido pelo MCP: o andamento na tela diz que foi a IA
+  termos?: string[]}; // o dicionário do vídeo, acrescentado ao vocabulário
 export type ProgressoTranscricao = {etapa: 'baixando' | 'audio' | 'transcrevendo' | 'pronto' | 'cancelado'; mensagem: string; progresso?: number; pela_ia?: boolean};
 export type ResultadoTranscricao = {ok: boolean; arquivo: string; palavras?: string; n?: number; modelo?: string; duracao_s?: number; texto?: string; cancelado?: boolean; mensagem?: string};
 /** Cortes pela fala: a fonte (caminho no projeto), os cortes em ms do arquivo e as palavras dela (ms do arquivo). */
