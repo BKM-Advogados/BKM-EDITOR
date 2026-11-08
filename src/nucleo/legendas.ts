@@ -584,8 +584,49 @@ export const palavrasDe = (s: SegmentoLegenda): PalavraLegenda[] => {
   const ws = tokensDe(s.texto);
   const gravadas = Array.isArray(s.palavras) && s.palavras.length && s.palavras.every((p) => p && Number.isFinite(p.s) && Number.isFinite(p.e)) ? s.palavras : undefined;
   if (!gravadas || !ws.length) return estimarPalavras(s.texto, s.em, s.sai);
-  if (gravadas.length === ws.length) return gravadas.map((p, i) => ({w: ws[i], s: p.s, e: p.e}));
-  return estimarPalavras(s.texto, gravadas[0].s, gravadas[gravadas.length - 1].e);
+  return realinharPalavras(gravadas, ws);
+};
+
+/** As palavras de um texto novo no tempo das antigas. Com o mesmo número de palavras, cada uma fica com o tempo da que
+ *  estava no lugar. Com outro número, o começo e o fim iguais ficam com o tempo deles e só o trecho que mudou é
+ *  repartido, no tempo que as palavras trocadas ocupavam: trocar "FGTS" por "Fundo de Garantia" reparte só o tempo do
+ *  "FGTS" (fala-D5). Palavra inserida sem vão para ela divide o tempo da vizinha de antes. A palavra que mudou perde a
+ *  confiança `p`: quem mudou conferiu. */
+export const realinharPalavras = (antigas: PalavraLegenda[], novas: string[]): PalavraLegenda[] => {
+  const igual = (p: PalavraLegenda, w: string): PalavraLegenda => (p.w === w ? {...p} : semP({...p, w}));
+  if (!antigas.length) return [];
+  if (antigas.length === novas.length) return antigas.map((p, i) => igual(p, novas[i]));
+  let a = 0;
+  while (a < antigas.length && a < novas.length && antigas[a].w === novas[a]) a++;
+  let z = 0;
+  while (z < antigas.length - a && z < novas.length - a && antigas[antigas.length - 1 - z].w === novas[novas.length - 1 - z]) z++;
+  let meioNovo = novas.slice(a, novas.length - z);
+  let meioAntigo = antigas.slice(a, antigas.length - z);
+  // inserção sem vão: a vizinha de antes entra no trecho e divide o tempo dela
+  if (!meioAntigo.length && meioNovo.length) {
+    const antes = antigas[a - 1];
+    const depois = antigas[antigas.length - z];
+    const vao = antes && depois ? depois.s - antes.e : 0;
+    if (vao < 60 * meioNovo.length) {
+      if (antes) {
+        a -= 1;
+        meioAntigo = [antes];
+        meioNovo = [antes.w, ...meioNovo];
+      } else if (depois) {
+        z -= 1;
+        meioAntigo = [depois];
+        meioNovo = [...meioNovo, depois.w];
+      }
+    }
+  }
+  const de = meioAntigo.length ? meioAntigo[0].s : antigas[a - 1].e;
+  const ate = meioAntigo.length ? meioAntigo[meioAntigo.length - 1].e : antigas[antigas.length - z].s;
+  const meio = meioNovo.length ? estimarPalavras(meioNovo.join(' '), de, ate) : [];
+  return [...antigas.slice(0, a).map((p) => ({...p})), ...meio, ...antigas.slice(antigas.length - z).map((p) => ({...p}))];
+};
+const semP = (p: PalavraLegenda): PalavraLegenda => {
+  const {p: _p, ...resto} = p as PalavraLegenda & {p?: number};
+  return resto;
 };
 
 /** Quanto a legenda anda na tela desde que nasceu: o "zero do arquivo" do clipe de voz agora (`em − corte_ms`) menos o
@@ -598,8 +639,7 @@ export const deslocamentoDaLegenda = (s: {clipe?: string}, origens: OrigemLegend
   return ((Number(c.em) || 0) - (Number(c.corte_ms) || 0)) - ((Number(o.em) || 0) - (Number(o.corte_ms) || 0));
 };
 
-/** Troca o texto do segmento sem perder o tempo das palavras: com o mesmo número de palavras, cada uma fica com o tempo
- *  da que estava no lugar; com outro número, as palavras se espalham no tempo que as antigas ocupavam. */
+/** Troca o texto do segmento sem perder o tempo das palavras (realinharPalavras: só o trecho que mudou é repartido). */
 export const comTexto = (s: SegmentoLegenda, texto: string): SegmentoLegenda => {
   const novas = tokensDe(texto);
   const antigas = Array.isArray(s.palavras) && s.palavras.length ? s.palavras : undefined;
@@ -607,8 +647,7 @@ export const comTexto = (s: SegmentoLegenda, texto: string): SegmentoLegenda => 
     const {palavras: _p, ...resto} = s;
     return {...resto, texto};
   }
-  if (antigas.length === novas.length) return {...s, texto, palavras: antigas.map((p, i) => ({...p, w: novas[i]}))};
-  return {...s, texto, palavras: estimarPalavras(texto, antigas[0].s, antigas[antigas.length - 1].e)};
+  return {...s, texto, palavras: realinharPalavras(antigas, novas)};
 };
 
 /** Junta o segmento com o seguinte (texto, palavras e tempo). */

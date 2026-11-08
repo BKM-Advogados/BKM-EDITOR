@@ -10,7 +10,7 @@ import {novoDocCenas, resolverCenas, type DocCenas} from '../src/nucleo/cenas';
 import {
   areaDaLegenda, capacidadeDaLegenda, comTexto, CPS_MAX, cpsDe, fracaNoFim, legendasAoDividirClipe, legendasAoDuplicarClipe, legendasDaFala, legendasDeOutraTomada, legendasDoDocumento, lerLegendas,
   legendasNoDestino, limitesDoArrasto, linhasDaLegenda, MAX_SEGMENTO_MS, mesmaTomada, MIN_SEGMENTO_MS, nomeLivreDaLegenda, PAUSA_QUEBRA_MS, quebrarEmLinhas, quebrarEmSegmentos, resolverLegendas,
-  textoDeLegenda, type LegendasCenas,
+  palavrasDe, realinharPalavras, substituirEmLote, textoDeLegenda, type LegendasCenas,
 } from '../src/nucleo/legendas';
 import {avancosDaFonte, LETRAS_MEDIDAS, medidorDaFonte} from '../src/nucleo/medida-texto';
 
@@ -342,5 +342,35 @@ describe('Clássica: a palavra falada tem pista além da cor', () => {
     const k = resolverLegendas({segmentos: [{id: 'leg-1', em: 0, sai: 1500, texto: 'Recebeu proposta', palavras}], estilo: {predefinicao: 'karaoke'}},
       {largura: 1080, altura: 1920, tema: TEMA, duracao_ms: 1500})!;
     expect(renderToStaticMarkup(React.createElement(Legendas, {legendas: k}))).not.toMatch(/background:rgba\([^)]*0\.24\)/);
+  });
+});
+
+describe('trocar uma palavra por duas reparte só o tempo dela (fala-D5)', () => {
+  const seg = {id: 'leg-1', em: 0, sai: 2000, texto: 'o FGTS cai na conta',
+    palavras: [{w: 'o', s: 0, e: 100}, {w: 'FGTS', s: 120, e: 700}, {w: 'cai', s: 750, e: 950}, {w: 'na', s: 960, e: 1050}, {w: 'conta', s: 1060, e: 1500}]};
+  const tempos = (ps: {w: string; s: number; e: number}[]) => ps.map((p) => `${p.w}@${p.s}-${p.e}`);
+
+  it('na lista (comTexto) e no substituir em lote, as outras palavras ficam no tempo delas', () => {
+    const r = comTexto(seg, 'o Fundo de Garantia cai na conta');
+    expect(tempos(r.palavras!).filter((x) => /^(o|cai|na|conta)@/.test(x))).toEqual(['o@0-100', 'cai@750-950', 'na@960-1050', 'conta@1060-1500']);
+    const novas = r.palavras!.slice(1, 4);
+    expect(novas.map((p) => p.w)).toEqual(['Fundo', 'de', 'Garantia']);
+    expect(novas[0].s).toBe(120);
+    expect(novas[2].e).toBe(700);
+    const lote = substituirEmLote([seg], 'FGTS', 'Fundo de Garantia', {palavra_inteira: true}).segmentos[0];
+    expect(lote.palavras).toEqual(r.palavras);
+  });
+
+  it('no patch do texto (palavrasDe), igual; tirar uma palavra não mexe nas outras', () => {
+    expect(palavrasDe({...seg, texto: 'o Fundo de Garantia cai na conta'})).toEqual(comTexto(seg, 'o Fundo de Garantia cai na conta').palavras);
+    expect(tempos(palavrasDe({...seg, texto: 'o FGTS cai conta'}))).toEqual(['o@0-100', 'FGTS@120-700', 'cai@750-950', 'conta@1060-1500']);
+  });
+
+  it('palavra nova sem vão divide o tempo da vizinha de antes', () => {
+    const r = realinharPalavras(seg.palavras, ['o', 'FGTS', 'sempre', 'cai', 'na', 'conta']);
+    expect(r.map((p) => p.w)).toEqual(['o', 'FGTS', 'sempre', 'cai', 'na', 'conta']);
+    expect(r[1].s).toBe(120);
+    expect(r[2].e).toBe(700);
+    expect(tempos(r.slice(3))).toEqual(['cai@750-950', 'na@960-1050', 'conta@1060-1500']);
   });
 });
