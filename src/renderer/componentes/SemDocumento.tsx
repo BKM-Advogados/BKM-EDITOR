@@ -1,7 +1,7 @@
 // Estado vazio com ação: a área sem documento diz o que falta e cria com um clique, no formato escolhido pelo nome do
 // destino. Aparece no monitor de cada área (e em Efeitos, que precisa de um vídeo ou de uma imagem).
 import React from 'react';
-import {Box, Film, Image as ImageIcon, LayoutGrid} from 'lucide-react';
+import {Box, Film, Image as ImageIcon, LayoutGrid, Music} from 'lucide-react';
 import type {Modulo} from '../../nucleo/documentos';
 import {FORMATOS_IMAGEM, FORMATOS_VIDEO} from '../../nucleo/formatos';
 import {criarDocumento} from '../estado/loja';
@@ -14,6 +14,7 @@ const TEXTO: Record<Modulo, {titulo: string; icone: React.ReactNode}> = {
   video: {titulo: 'Este projeto ainda não tem vídeo', icone: <Film size={28} />},
   imagem: {titulo: 'Este projeto ainda não tem imagem', icone: <ImageIcon size={28} />},
   '3d': {titulo: 'Este projeto ainda não tem cena 3D', icone: <Box size={28} />},
+  musica: {titulo: 'Este projeto ainda não tem música', icone: <Music size={28} />}, // frente Música
 };
 
 export const SemDocumento: React.FC<{modulo: Modulo; compacto?: boolean}> = ({modulo, compacto}) => {

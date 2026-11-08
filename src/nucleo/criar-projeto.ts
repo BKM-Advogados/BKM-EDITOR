@@ -10,6 +10,7 @@ import path from 'node:path';
 import jsonpatch, {type Operation} from 'fast-json-patch';
 import type {DocCena3D, DocImagem, EntradaDocumento, Manifesto, Modulo} from './documentos';
 import {novoDocCenas} from './cenas';
+import {novaMusica} from './musica'; // frente Música
 import {EFEITOS} from './efeitos';
 import {MODELOS, type IdModelo} from './modelos';
 import {FORMATOS_IMAGEM, FORMATOS_VIDEO, type Formato} from './formatos';
@@ -77,9 +78,9 @@ export const novoDoc3d = (): DocCena3D => ({
   ],
 });
 
-const PASTA_DO_MODULO: Record<Modulo, string> = {video: 'video', imagem: 'imagem', '3d': '3d'};
-const TITULO_DO_MODULO: Record<Modulo, string> = {video: 'Vídeo', imagem: 'Imagem', '3d': 'Cena 3D'};
-const ID_DO_MODULO: Record<Modulo, string> = {video: 'video', imagem: 'imagem', '3d': 'cena3d'};
+const PASTA_DO_MODULO: Record<Modulo, string> = {video: 'video', imagem: 'imagem', '3d': '3d', musica: 'musica'};
+const TITULO_DO_MODULO: Record<Modulo, string> = {video: 'Vídeo', imagem: 'Imagem', '3d': 'Cena 3D', musica: 'Música'};
+const ID_DO_MODULO: Record<Modulo, string> = {video: 'video', imagem: 'imagem', '3d': 'cena3d', musica: 'musica'};
 
 export const conteudoNovo = (modulo: Modulo, formato?: {largura: number; altura: number; fps?: number}) => {
   if (modulo === 'video') {
@@ -90,6 +91,7 @@ export const conteudoNovo = (modulo: Modulo, formato?: {largura: number; altura:
     const f = formato ?? FORMATOS_IMAGEM[0];
     return novoDocImagem(f.largura, f.altura);
   }
+  if (modulo === 'musica') return novaMusica(); // frente Música
   return novoDoc3d();
 };
 

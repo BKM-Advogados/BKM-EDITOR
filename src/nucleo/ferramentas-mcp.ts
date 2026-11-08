@@ -21,6 +21,8 @@ import {
 import {checarTexto, REGRAS_CLIENTE, terminaComUltimaFrase, type Aviso} from './regras';
 import {acharCamada, caminhosDoId} from './carrossel';
 import {MODELO_FUNDO, patchSemFundo, patchVoltarAoOriginal, removedorDeFundo} from './remover-fundo';
+import {registrarMusica} from './mcp-musica'; // frente Música
+import {ARQUIVO_TRANSICOES, lerRegistro, transicaoEmCurso} from './transicoes'; // frente Música
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x, null, 2)}]});
 const erro = (e: unknown) => ({
@@ -129,14 +131,17 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   }));
 
   servidor.registerTool('estado_do_editor', {
-    description: 'O que a pessoa está vendo agora no app: área (video, imagem, 3d, efeitos), documento, objeto selecionado (caminho JSON Pointer) e tempo do vídeo.',
+    description: 'O que a pessoa está vendo agora no app: área (video, imagem, 3d, efeitos, musica), documento, objeto selecionado (caminho JSON Pointer), tempo do vídeo e a transição em curso (levar_para).',
     inputSchema: {},
   }, seguro(() => {
     const e = projeto.estado();
     if (!e) return 'o app ainda não gravou estado (projeto fechado ou recém-aberto)';
-    if (!e.documento || !e.selecao) return e;
+    // frente Música: a ida e volta em curso (levar_para), para a IA saber que a pessoa está dentro dela
+    const t = projeto.existe(ARQUIVO_TRANSICOES) ? transicaoEmCurso(lerRegistro(projeto.lerJson<unknown>(ARQUIVO_TRANSICOES).doc)) : undefined;
+    const transicao = t ? {transicao: {id: t.id, intencao: t.intencao, de: `${t.origem.documento}${t.origem.caminho}`, para: t.destino.documento}} : {};
+    if (!e.documento || !e.selecao) return {...e, ...transicao};
     const {doc} = projeto.lerJson(projeto.arquivoDoDocumento(e.documento));
-    return {...e, objeto_selecionado: valorEm(doc, e.selecao)};
+    return {...e, objeto_selecionado: valorEm(doc, e.selecao), ...transicao};
   }));
 
   servidor.registerTool('ler_documento', {
@@ -162,9 +167,9 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   }));
 
   servidor.registerTool('criar_documento', {
-    description: `Cria um documento novo no projeto (vídeo de cenas, imagem ou cena 3D) e o põe no manifesto; a tela abre sozinha. Formatos de vídeo: ${FORMATOS_VIDEO.map((f) => `${f.id} (${f.proporcao}, ${f.largura}x${f.altura})`).join(', ')}. De imagem: ${FORMATOS_IMAGEM.map((f) => `${f.id} (${f.largura}x${f.altura})`).join(', ')}. Ou largura e altura livres.`,
+    description: `Cria um documento novo no projeto (vídeo de cenas, imagem, cena 3D ou música) e o põe no manifesto; a tela abre sozinha. Formatos de vídeo: ${FORMATOS_VIDEO.map((f) => `${f.id} (${f.proporcao}, ${f.largura}x${f.altura})`).join(', ')}. De imagem: ${FORMATOS_IMAGEM.map((f) => `${f.id} (${f.largura}x${f.altura})`).join(', ')}. Ou largura e altura livres.`,
     inputSchema: {
-      modulo: z.enum(['video', 'imagem', '3d']),
+      modulo: z.enum(['video', 'imagem', '3d', 'musica']), // frente Música: musica
       titulo: z.string().optional(),
       formato: z.string().optional().describe('id do formato da lista'),
       largura: z.number().int().min(16).max(7680).optional(),
@@ -243,6 +248,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
 
   registrarFala(servidor, projeto, autor, origem, transcritor); // frente Fala: transcrever e legendas
   registrarAcabamento(servidor, projeto, autor, origem); // acabamento da imagem (rodada 2, B2)
+  registrarMusica(servidor, projeto, autor, origem); // frente Música: música e ida e volta entre módulos (docs/musica.md)
 };
 
 // ---------- pesquisa: fontes e fatos (src/nucleo/pesquisa.ts, docs/pesquisa.md) ----------

@@ -114,6 +114,7 @@ export class Projeto {
     autor: string;
     origem: string;
     rotulo?: string;
+    transicao?: string; // frente Música: sem ele, vale a transição aberta cujo destino é este arquivo
   }): {versao: string; entrada: EntradaDiario} {
     const rel = this.arquivoDoDocumento(entrada.documento);
     const {doc, versao} = this.lerJson<unknown>(rel);
@@ -143,8 +144,23 @@ export class Projeto {
       patch: entrada.patch.filter((o) => o.op !== 'test'),
       inverso: jsonpatch.compare(depois as object, doc as object) as OperacaoPatch[],
     };
+    const transicao = entrada.transicao ?? this.transicaoAbertaPara(rel); // frente Música
+    if (transicao) registro.transicao = transicao;
     this.registrar(registro);
     return {versao: versaoDepois, entrada: registro};
+  }
+
+  /** frente Música: a transição aberta (.estudio/transicoes.json, src/nucleo/transicoes.ts) cujo destino é este
+   *  arquivo; as mudanças feitas lá levam o id dela no diário. */
+  private transicaoAbertaPara(rel: string): string | undefined {
+    const arq = path.join(PASTA_INTERNA, 'transicoes.json');
+    if (!this.existe(arq)) return undefined;
+    try {
+      const r = JSON.parse(this.lerTexto(arq)) as {transicoes?: {id: string; estado: string; destino?: {arquivo?: string}}[]};
+      return (r.transicoes ?? []).filter((t) => t.estado === 'aberta' && t.destino?.arquivo === rel).pop()?.id;
+    } catch {
+      return undefined;
+    }
   }
 
   private arquivoDiario() {

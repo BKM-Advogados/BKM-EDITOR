@@ -22,6 +22,10 @@ export type ClipeAudio = {
   mudo?: boolean;
   original?: string; // voz limpa: o arquivo da pessoa, intacto ("Voltar ao original" põe de volta em `arquivo`)
   limpeza?: LimpezaClipe; // o que a limpeza de voz fez e mediu (limpeza-voz.ts)
+  // frente Música (src/nucleo/musica-video.ts): o clipe toca o render do documento de música `musica`, refeito quando a
+  // música muda; `musica_original` guarda o áudio de antes do "Editar em Música", para "Voltar ao original"
+  musica?: string;
+  musica_original?: {arquivo: string; corte_ms?: number; duracao_ms: number};
 };
 
 /** Limpeza de voz gravada no clipe: a intensidade usada e o ruído nas pausas e a voz antes e depois, em dB (ponderação K). */

@@ -18,6 +18,7 @@ import {MODELOS} from '../../src/nucleo/modelos';
 import {codificarWav, decodificarWav, musicaSintetica, narracaoSintetica, TAXA} from '../audio-sintetico';
 import {argumentosDoRender, destinoDoFormato, nomesDosArquivos, normalizarPrefsExportacao, type OpcoesExportarVideo, type PrefsExportacao} from '../../src/nucleo/exportacao';
 import {caminhoSemFundo, MODELO_FUNDO} from '../../src/nucleo/remover-fundo';
+import {novaMusica} from '../../src/nucleo/musica'; // frente Música
 
 type Proj = {raiz: string; manifesto: Manifesto; docs: Record<string, unknown>; versao: number};
 const projetos = new Map<string, Proj>();
@@ -148,14 +149,14 @@ const docVideo = (f?: {largura: number; altura: number; fps?: number}) => {
   return d;
 };
 const conteudo = (m: Modulo, f?: {largura: number; altura: number; fps?: number}) =>
-  m === 'video' ? docVideo(f) : m === 'imagem' ? docImagem(f?.largura ?? 1080, f?.altura ?? 1350) : doc3d();
+  m === 'video' ? docVideo(f) : m === 'imagem' ? docImagem(f?.largura ?? 1080, f?.altura ?? 1350) : m === 'musica' ? novaMusica() : doc3d();
 
 const novoDocumento = (p: Proj, modulo: Modulo, f?: {largura: number; altura: number; fps?: number}, titulo?: string): EntradaDocumento => {
   const base = modulo === '3d' ? 'cena3d' : modulo;
   let n = 1;
   while (p.manifesto.documentos.some((d) => d.id === (n === 1 ? base : `${base}-${n}`))) n++;
   const id = n === 1 ? base : `${base}-${n}`;
-  const e: EntradaDocumento = {id, modulo, caminho: `${modulo}/${id}.json`, titulo: titulo || ({video: 'Vídeo', imagem: 'Imagem', '3d': 'Cena 3D'}[modulo] + (n > 1 ? ` ${n}` : ''))};
+  const e: EntradaDocumento = {id, modulo, caminho: `${modulo}/${id}.json`, titulo: titulo || ({video: 'Vídeo', imagem: 'Imagem', '3d': 'Cena 3D', musica: 'Música'}[modulo] + (n > 1 ? ` ${n}` : ''))};
   p.manifesto.documentos.push(e);
   p.docs[id] = conteudo(modulo, f);
   return e;

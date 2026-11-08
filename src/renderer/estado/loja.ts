@@ -8,7 +8,7 @@ import type {Efeito} from '../../nucleo/efeitos';
 import type {Pesquisa} from '../../nucleo/pesquisa'; // só o tipo: pesquisa.ts usa node:crypto
 import {indicePagina, paginasDe} from '../../nucleo/carrossel';
 
-export type Area = 'video' | 'imagem' | '3d' | 'efeitos';
+export type Area = 'video' | 'imagem' | '3d' | 'efeitos' | 'musica'; // frente Música: musica
 export type Lido = {doc: any; versao: string};
 export type Selecao = {documento: string; caminho: string} | null;
 export type TipoAviso = 'ok' | 'erro' | 'info' | 'agente';
@@ -145,7 +145,7 @@ export const quandoTrocarProjeto = (f: () => void) => {
   };
 };
 
-const AREAS_VALIDAS = new Set<Area>(['video', 'imagem', '3d', 'efeitos']);
+const AREAS_VALIDAS = new Set<Area>(['video', 'imagem', '3d', 'efeitos', 'musica']);
 
 export const abrirProjeto = async (info: InfoProjeto) => {
   const mesmo = estado.info?.raiz === info.raiz;

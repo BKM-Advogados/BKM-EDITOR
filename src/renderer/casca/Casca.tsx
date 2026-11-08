@@ -156,7 +156,7 @@ const layoutPadrao = (api: DockviewApi, area: Area, faixa: Faixa, o: Orientacao)
   }
 };
 
-const TITULOS: Record<Area, string> = {video: 'Cenas e blocos', imagem: 'Camadas', '3d': 'Objetos', efeitos: 'Pilha de efeitos'};
+const TITULOS: Record<Area, string> = {video: 'Cenas e blocos', imagem: 'Camadas', '3d': 'Objetos', efeitos: 'Pilha de efeitos', musica: 'Canais'};
 
 /** Orientação do vídeo ativo, pelas props montadas (sem props ainda: vertical, o carrossel). */
 const orientacaoDe = (e: ReturnType<typeof loja.get>): Orientacao => {

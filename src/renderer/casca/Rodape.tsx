@@ -9,6 +9,7 @@ const DICAS: Record<Area, [string[], string][]> = {
   imagem: [[['V'], 'mover'], [['H'], 'mão'], [['T'], 'texto'], [['U'], 'forma'], [['M'], 'comentar']],
   '3d': [[['Q'], 'seleção'], [['W'], 'mover'], [['E'], 'girar'], [['R'], 'escala'], [['M'], 'comentar']],
   efeitos: [[['Espaço'], 'tocar'], [['M'], 'comentar'], [['Ctrl', 'Z'], 'desfazer']],
+  musica: [[['Espaço'], 'tocar'], [['L'], 'loop'], [['S'], 'dividir'], [['Del'], 'apagar'], [['Ctrl', 'Z'], 'desfazer']], // frente Música
 };
 const AVISO_MS = 4000;
 
