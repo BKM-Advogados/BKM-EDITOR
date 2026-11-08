@@ -11,6 +11,7 @@ import {envelopeDeAmostras} from '../../../nucleo/audio';
 import {audiosDaMusica, partesDoSom, resolverMusica, type AjustePeca, type DocMusica, type MacrosSintetizador, type PecaBateria, type PresetSintetizador} from '../../../nucleo/musica';
 import {codificarWav16, notaDoSintetizador, receitaDe, renderizarMusica, somDeUmaBatida, TAXA_MUSICA, type CacheSom} from '../../../nucleo/musica-som';
 import type {NiveisSom, PedidoRender, RespostaRender} from './render.worker';
+import {entregaEmBytes, type PedidoEntrega} from '../../../nucleo/musica-entrega';
 
 type SemId<T> = T extends unknown ? Omit<T, 'id'> : never;
 import {loja} from '../../estado/loja';
@@ -39,6 +40,7 @@ class MotorMusica {
   private tocando: {fontes: AudioBufferSourceNode[]; ganho: GainNode; inicioCtx: number; inicioS: number; loop: [number, number] | null} | null = null;
   avisos: string[] = [];
   niveis: NiveisSom | null = null;
+  limitador_db: number | null = null; // a maior redução do limitador do master no último render da prévia
   duracao_s = 0;
   ultimoRender_ms = 0;
 
@@ -92,9 +94,10 @@ class MotorMusica {
       return {id: p.id, ok: true};
     }
     const t0 = performance.now();
+    if (p.tipo === 'entrega') return {id: p.id, ok: true, entrega: entregaEmBytes(p.doc, Object.fromEntries(this.fontesLocais), {...p.pedido, cache: this.cacheLocal})};
     const r = renderizarMusica(p.doc, Object.fromEntries(this.fontesLocais), {taxa: p.taxa, cache: this.cacheLocal, porFaixa: p.porFaixa});
     const ms = Math.round(performance.now() - t0);
-    if (!p.paraVideo) return {id: p.id, ok: true, canais: r.canais, duracao_s: r.duracao_s, avisos: r.avisos, faltando: r.faltando, ms};
+    if (!p.paraVideo) return {id: p.id, ok: true, canais: r.canais, duracao_s: r.duracao_s, avisos: r.avisos, faltando: r.faltando, ms, limitador_db: r.limitador_db};
     const m = medirAmostras(r.canais, p.taxa);
     return {id: p.id, ok: true, duracao_s: r.duracao_s, avisos: r.avisos, faltando: r.faltando, ms, medida: {integrado_lufs: m.integrado_lufs, pico_dbtp: m.pico_dbtp},
       envelope: envelopeDeAmostras(r.canais, p.taxa), wav: codificarWav16(r.canais, p.taxa)};
@@ -175,6 +178,7 @@ class MotorMusica {
     if (minha !== this.geracao || !r.ok || !r.canais) return false;
     this.ultimoRender_ms = r.ms ?? 0;
     this.niveis = r.niveis ?? null;
+    this.limitador_db = r.limitador_db ?? null;
     this.musica = this.paraBuffer(r.canais, TAXA_MUSICA);
     this.duracao_s = r.duracao_s ?? 0;
     this.avisos = r.avisos ?? [];
@@ -188,6 +192,12 @@ class MotorMusica {
   async renderParaVideo(doc: DocMusica, porFaixa = false) {
     await Promise.all(audiosDaMusica(doc).map((a) => this.levarAoWorker(a)));
     return this.pedir({tipo: 'render', doc, taxa: TAXA_MUSICA, paraVideo: true, porFaixa});
+  }
+
+  /** A música em arquivo (pedido do processo principal): mistura no alvo e stems em WAV de 24 bits, feitos no worker. */
+  async entregaParaArquivo(doc: DocMusica, pedido: PedidoEntrega) {
+    await Promise.all(audiosDaMusica(doc).map((a) => this.levarAoWorker(a)));
+    return this.pedir({tipo: 'entrega', doc, pedido});
   }
 
   /** A voz do vídeo no tempo da música (o começo da música no vídeo é o zero daqui). Não entra no render. */

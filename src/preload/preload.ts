@@ -129,6 +129,7 @@ const api: ApiEstudio = {
     cancelar: (t, descartar) => ipcRenderer.invoke(CANAL.musicaCancelar, t, descartar),
     depoisDeMudar: (documento) => ipcRenderer.invoke(CANAL.musicaDepoisDeMudar, documento),
     porNoVideo: (o) => ipcRenderer.invoke(CANAL.musicaPorNoVideo, o),
+    exportar: (documento, pedido) => ipcRenderer.invoke(CANAL.musicaExportar, documento, pedido),
   },
   // ponte com a janela (05 §0.1)
   janela: {

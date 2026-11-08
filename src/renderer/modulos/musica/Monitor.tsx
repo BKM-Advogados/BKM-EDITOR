@@ -2,9 +2,10 @@
 // "Ouvir como no vídeo") e, embaixo, o sequenciador de passos do padrão em foco ou o mixer. Aqui também o motor fica em
 // dia com o documento: cada mudança refaz o som (só o que mudou) e a cabeça anda enquanto toca.
 import React, {useEffect, useMemo, useState} from 'react';
-import {Mic, Pause, Play, Repeat, Square, Timer, Tv} from 'lucide-react';
+import {Mic, Pause, Play, Repeat, Square, Timer, Tv, Clapperboard} from 'lucide-react';
 import {resolverMusica, NOME_PECA, PECAS, posicaoEmCompasso, type DocMusica, type PecaBateria} from '../../../nucleo/musica';
 import {PianoRoll} from './PianoRoll';
+import {VideoNaMusica} from './VideoNaMusica';
 import {ESTILOS} from '../../../nucleo/musica-estilos';
 import type {DocCenas} from '../../../nucleo/cenas';
 import type {PropsVideo} from '../../../compartilhado/api';
@@ -113,6 +114,7 @@ const Transporte: React.FC<{doc: DocMusica}> = ({doc}) => {
   const loop = useMusica((e) => e.loop);
   const metronomo = useMusica((e) => e.metronomo);
   const comoNoVideo = useMusica((e) => e.comoNoVideo);
+  const verVideo = useMusica((e) => e.verVideo);
   const renderizando = useMusica((e) => e.renderizando);
   const m = useMemo(() => resolverMusica(doc).musica, [doc]);
   const [bpm, setBpm] = useState(String(doc.bpm));
@@ -144,6 +146,8 @@ const Transporte: React.FC<{doc: DocMusica}> = ({doc}) => {
             onClick={() => void campo('/video/voz_guia', doc.video?.voz_guia === false ? true : false, 'voz guia')}><Mic size={15} /></button>
           <button className={`bti${comoNoVideo ? ' ligado' : ''}`} title="Ouvir como no vídeo: volume, fades e ducking do clipe ligado"
             onClick={() => musica.definir({comoNoVideo: !comoNoVideo})}><Tv size={15} /></button>
+          <button className={`bti${verVideo ? ' ligado' : ''}`} title="Ver o vídeo na posição da cabeça (sem som)" onClick={() => musica.definir({verVideo: !verVideo})}>
+            <Clapperboard size={15} /></button>
         </>
       )}
       <span className="estado">{renderizando ? 'atualizando a trilha no vídeo…' : motor.ultimoRender_ms ? `som em ${motor.ultimoRender_ms} ms` : ''}</span>
@@ -282,6 +286,9 @@ const Mixer: React.FC<{doc: DocMusica}> = ({doc}) => {
           <label>Reverb {Math.round(f.reverb * 100)}%
             <input type="range" min={0} max={1} step={0.05} defaultValue={f.reverb} key={`r${f.reverb}`}
               onPointerUp={(e) => void campoFaixa(f.id, 'reverb', Number((e.target as HTMLInputElement).value) || undefined, `reverb de ${f.nome}`)} /></label>
+          <label>Delay {Math.round(f.delay * 100)}%
+            <input type="range" min={0} max={1} step={0.05} defaultValue={f.delay} key={`d${f.delay}`}
+              onPointerUp={(e) => void campoFaixa(f.id, 'delay', Number((e.target as HTMLInputElement).value) || undefined, `delay de ${f.nome}`)} /></label>
           <span className="botoes">
             <button className={`bti${f.mudo ? ' ligado' : ''}`} title="Mudo" onClick={() => void campoFaixa(f.id, 'mudo', f.mudo ? undefined : true, `mudo em ${f.nome}`)}>M</button>
             <button className={`bti${f.solo ? ' ligado' : ''}`} title="Solo" onClick={() => void campoFaixa(f.id, 'solo', f.solo ? undefined : true, `solo em ${f.nome}`)}>S</button>
@@ -291,6 +298,10 @@ const Mixer: React.FC<{doc: DocMusica}> = ({doc}) => {
       <div className="tira master">
         <span className="nome">Master</span>
         <Medidor />
+        {m.master.limitador.ativo && (
+          <span className="ler" title={`Limitador em ${numeroBr(m.master.limitador.teto_db, 1)} dB: quanto ele tirou dos picos no último render`}>
+            Limitador {motor.limitador_db ? `−${numeroBr(motor.limitador_db, 1)} dB` : 'sem redução'}</span>
+        )}
         <label>Volume {numeroBr(m.master.volume_db, 1)} dB
           <input type="range" min={-40} max={12} step={0.5} defaultValue={m.master.volume_db} key={`mv${m.master.volume_db}`}
             onPointerUp={(e) => void campo('/mixer/master/volume_db', Number((e.target as HTMLInputElement).value), 'volume do master')} /></label>
@@ -307,6 +318,7 @@ export const MonitorMusica: React.FC = () => {
   const {id, doc} = useDocMusica();
   const aba = useMusica((e) => e.aba);
   const avisos = useMusica((e) => e.avisos);
+  const verVideo = useMusica((e) => e.verVideo);
   useMotorVivo(id, doc);
   if (!doc) {
     return (
@@ -327,6 +339,7 @@ export const MonitorMusica: React.FC = () => {
         {temAberta && <span style={{marginLeft: 'auto', color: 'var(--texto-2)', alignSelf: 'center', fontSize: 11}}>editando para o vídeo</span>}
       </div>
       <div className="musica-corpo">
+        {verVideo && doc.video && <VideoNaMusica doc={doc} />}
         {aba === 'passos' ? <Passos doc={doc} /> : <Mixer doc={doc} />}
         {avisos.length > 0 && <div className="vazio" style={{marginTop: 8}}>{avisos.slice(0, 4).join(' · ')}</div>}
       </div>

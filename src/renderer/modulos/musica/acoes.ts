@@ -4,7 +4,13 @@ import type {OperacaoPatch} from '../../../nucleo/documentos';
 import {alternarNota, alternarPasso, aplicarEstilo, aplicarProgressao, criarPadrao, editarArranjo, escreverNotas, gerarNotas, novoCanalDeAudio, type Edicao, type EstiloGerado,
   type PedidoArranjo, type TipoGerado} from '../../../nucleo/musica-acoes';
 import {idLivre, resolverMusica, type DocMusica, type FaixaMixer, type PecaBateria, type PresetSintetizador} from '../../../nucleo/musica';
-import {avisar, mensagemDe, patchTrocar, valorEm} from '../../estado/loja';
+import {avisar, loja, mensagemDe, patchTrocar, valorEm} from '../../estado/loja';
+import {presetDaFaixa} from '../../../nucleo/musica-acoes';
+import {encaixarNoVideo, type ModoEncaixe} from '../../../nucleo/musica-encaixe';
+import {importarMidi} from '../../../nucleo/musica-midi';
+import {ehDocCenas} from '../../../nucleo/cenas';
+import type {PresetFaixa} from '../../../nucleo/musica';
+import type {PedidoExportarMusica} from '../../../nucleo/musica-projeto';
 import {aplicarMusica, docMusica, idMusicaAtiva, musica, selecionarMusica} from './estado';
 import {motor, urlDaMidia} from './motor';
 
@@ -136,5 +142,44 @@ export const gerar = async (tipo: TipoGerado, estilo?: EstiloGerado) => {
   if (e?.extra?.padrao) {
     selecionarMusica({tipo: 'padrao', id: e.extra.padrao as string});
     musica.definir({aba: 'passos'});
+  }
+};
+
+// ---------- marco 4: presets, encaixe no vídeo, MIDI e exportar (itens 21, 23, 25 e 26) ----------
+export const presetFaixa = (faixa: string, preset: PresetFaixa) => fazer((d) => presetDaFaixa(d, faixa, preset));
+
+/** Encaixa no vídeo ligado à música (o documento aberto na loja), pela mesma conta do encaixar_no_video. */
+export const encaixar = async (modo: ModoEncaixe, viradas = false) => {
+  const e = await fazer((d) => {
+    const idVideo = d.video?.documento ?? loja.get().info?.manifesto.documentos.find((x) => x.modulo === 'video')?.id;
+    const v = idVideo ? loja.get().docs[idVideo]?.doc : undefined;
+    if (!ehDocCenas(v)) throw new Error('a música não está ligada a um vídeo de cenas: use "Pôr no vídeo" antes');
+    return encaixarNoVideo(d, v, {modo, viradas});
+  });
+  if (e) avisar(e.rotulo[0].toUpperCase() + e.rotulo.slice(1), 'ok');
+  return e;
+};
+
+/** Um .mid escolhido pela pessoa (o arquivo é lido aqui, sem passar pelo processo principal). */
+export const importarMidiDe = async (arquivo: File) => {
+  const bytes = new Uint8Array(await arquivo.arrayBuffer());
+  const e = await fazer((d) => importarMidi(d, bytes, {nome: arquivo.name.replace(/\.midi?$/i, '')}));
+  if (e) avisar(e.rotulo, 'ok');
+  return e;
+};
+
+export const exportarMusica = async (pedido: PedidoExportarMusica) => {
+  const id = idMusicaAtiva();
+  if (!id) return null;
+  try {
+    const r = await window.estudio.musica.exportar(id, pedido);
+    const m = r.medida;
+    const lufs = r.arquivo_lufs ?? m?.lufs;
+    avisar(`Exportada em ${r.arquivos[0]}${lufs !== undefined && lufs !== null ? ` (${String(lufs).replace('.', ',')} LUFS)` : ''}${r.arquivos.length > 1 ? ` e ${r.arquivos.length - 1} stems` : ''}`, 'ok');
+    for (const a of r.avisos) avisar(a, 'info');
+    return r;
+  } catch (e) {
+    avisar(mensagemDe(e), 'erro');
+    return null;
   }
 };

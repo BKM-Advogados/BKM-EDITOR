@@ -7,6 +7,7 @@
 import {useRef, useSyncExternalStore} from 'react';
 import type {OperacaoPatch} from '../../../nucleo/documentos';
 import type {DocMusica} from '../../../nucleo/musica';
+import type {PedidoEntrega} from '../../../nucleo/musica-entrega';
 import type {PedidoLevar, ResultadoVolta, Transicao} from '../../../nucleo/transicoes';
 import {abrirProjeto, aplicar, avisar, loja, mensagemDe, quandoTrocarProjeto} from '../../estado/loja';
 import {atender} from '../../ponte-janela';
@@ -22,6 +23,7 @@ export type EstadoMusica = {
   loopAte?: number;
   metronomo: boolean;
   comoNoVideo: boolean; // "Ouvir como no vídeo": volume, fades e ducking do clipe ligado
+  verVideo?: boolean; // o quadro do vídeo ligado na cabeça (item 25)
   pxPorBatida: number;
   aba: 'passos' | 'mixer';
   transicoes: Transicao[];
@@ -221,6 +223,13 @@ export const observarMusica = () => {
     if (!r.ok) throw new Error(r.mensagem);
     return {duracao_s: r.duracao_s, avisos: r.avisos, faltando: r.faltando, medida: r.medida, faixas: r.faixas, ...(sohMedir ? {} : {wav: r.wav, envelope: r.envelope})};
   });
+  // exportar a música em arquivo (item 23): a conta no worker; o processo principal grava e codifica
+  const largarEntrega = atender('musica:exportar', async (dados) => {
+    const {doc, pedido} = dados as {doc: DocMusica; pedido: PedidoEntrega};
+    const r = await (await import('./motor')).motor.entregaParaArquivo(doc, pedido);
+    if (!r.ok) throw new Error(r.mensagem);
+    return r.entrega;
+  });
   const largar = window.estudio.aoMudar(({arquivo}) => {
     if (arquivo === '.estudio/transicoes.json') return void lerTransicoes();
     const d = loja.get().info?.manifesto.documentos.find((x) => x.caminho === arquivo && x.modulo === 'musica');
@@ -230,5 +239,6 @@ export const observarMusica = () => {
     largar();
     largarTroca();
     largarRender();
+    largarEntrega();
   };
 };

@@ -1,9 +1,9 @@
 // IPC da música: a tela chama as mesmas funções das ferramentas MCP (levar_para, concluir_transicao, cancelar_transicao,
-// por_no_video), com autor "pessoa" e origem "interface", então o Ctrl+Z da pessoa desfaz o "Concluir e voltar". O
+// por_no_video, exportar_musica), com autor "pessoa" e origem "interface", então o Ctrl+Z da pessoa desfaz o "Concluir e voltar". O
 // render da música para o vídeo (src/main/musica-render.ts) fica registrado aqui também para o MCP por HTTP do app. Na
 // abertura do projeto, os renders que faltam no disco são gravados e as sobras saem. Registrado no main.ts com uma linha.
 import {CANAL} from '../compartilhado/api';
-import {baseDoProjeto, definirServicoMusica, depoisDeMudarMusica, porNoVideo, servicoMusica} from '../nucleo/musica-projeto';
+import {baseDoProjeto, definirServicoMusica, depoisDeMudarMusica, porNoVideo, servicoMusica, type PedidoExportarMusica} from '../nucleo/musica-projeto';
 import type {Projeto} from '../nucleo/projeto';
 import {cancelarTransicao, concluirTransicao, levarPara, type PedidoLevar} from '../nucleo/transicoes';
 import {acertarRenders, servicoDeRender} from './musica-render';
@@ -42,4 +42,5 @@ export const registrarIpcMusica = (lidar: Lidar, projeto: () => Projeto, janela?
     await levarAoVideo(r.musica);
     return {documento: r.documento, caminho: r.caminho};
   });
+  lidar(CANAL.musicaExportar, (documento: string, pedido: PedidoExportarMusica) => servico().exportar!(projeto(), documento, pedido));
 };

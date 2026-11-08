@@ -2,8 +2,10 @@
 // peças), a faixa do mixer (volume, pan, EQ, compressor, envio ao reverb) ou, sem seleção, o documento (BPM, compasso,
 // swing, master e a ligação com o vídeo). Tudo por patch, com diário e Ctrl+Z.
 import React, {useMemo} from 'react';
-import {AudioWaveform, Drum, Music, Piano, Plus, Repeat, Scissors, SlidersVertical, Trash2} from 'lucide-react';
-import {NOME_PECA, NOME_PRESET, PECAS, posicaoEmCompasso, PRESETS, resolverMusica, type CanalMusica, type DocMusica, type PresetSintetizador} from '../../../nucleo/musica';
+import {AudioWaveform, Download, Drum, FileMusic, Music, Piano, Plus, Repeat, Scissors, SlidersVertical, Trash2} from 'lucide-react';
+import {NOME_PECA, NOME_PRESET, PECAS, posicaoEmCompasso, PRESETS, PRESETS_FAIXA, resolverMusica, TEMPOS_DELAY, type CanalMusica, type DocMusica, type PresetFaixa,
+  type PresetSintetizador, type TempoDelay} from '../../../nucleo/musica';
+import type {FormatoMusica} from '../../../nucleo/musica-projeto';
 import {acordeDe, NOMES} from '../../../nucleo/musica-teoria';
 import {ESTILOS_GERADOS, type TipoGerado} from '../../../nucleo/musica-acoes';
 import {BotaoMenu} from '../../componentes/Menu';
@@ -11,7 +13,8 @@ import {KITS} from '../../../nucleo/musica-som';
 import {CabecalhoInspector, CampoDeslizante, CampoInterruptor, CampoLeitura, CampoNumero, CampoSelecao, CampoTexto, numeroBr, Secao} from '../../componentes/Campos';
 import {avisar, loja, mensagemDe, useLoja} from '../../estado/loja';
 import {musica, selecionarMusica, transicaoAberta, useMusica} from './estado';
-import {arranjar, campo, campoEmObjeto, campoFaixa, dividirNaCabeca, gerar, novaBateria, novoAudio, novoSintetizador, progressao} from './acoes';
+import {arranjar, campo, campoEmObjeto, campoFaixa, dividirNaCabeca, encaixar, exportarMusica, gerar, importarMidiDe, novaBateria, novoAudio, novoSintetizador, presetFaixa,
+  progressao} from './acoes';
 import {useDocMusica} from './Monitor';
 
 const InspectorClipe: React.FC<{doc: DocMusica; id: string}> = ({doc, id}) => {
@@ -122,8 +125,13 @@ const InspectorFaixa: React.FC<{doc: DocMusica; id: string}> = ({doc, id}) => {
             aoMudar={(v) => void campoFaixa(f.id, 'pan', v, `pan de ${f.nome}`)} />
           <CampoDeslizante rotulo="Reverb" min={0} max={1} passo={0.05} valor={f.reverb} padrao={0} formatar={(v) => `${Math.round(v * 100)}%`}
             aoMudar={(v) => void campoFaixa(f.id, 'reverb', v || undefined, `reverb de ${f.nome}`)} />
+          <CampoDeslizante rotulo="Delay" min={0} max={1} passo={0.05} valor={f.delay} padrao={0} formatar={(v) => `${Math.round(v * 100)}%`}
+            aoMudar={(v) => void campoFaixa(f.id, 'delay', v || undefined, `delay de ${f.nome}`)} />
           <CampoInterruptor rotulo="Mudo" valor={f.mudo} aoMudar={(v) => void campoFaixa(f.id, 'mudo', v || undefined, 'mudo')} />
           <CampoInterruptor rotulo="Solo" valor={f.solo} aoMudar={(v) => void campoFaixa(f.id, 'solo', v || undefined, 'solo')} />
+          {/* seleção nativa: o menu flutuante seria cortado na borda do painel; o preset escreve EQ, compressor e envios */}
+          <CampoSelecao rotulo="Preset" valor="" opcoes={[['', 'escolher…'], ...(Object.keys(PRESETS_FAIXA) as PresetFaixa[]).map((k) => [k, PRESETS_FAIXA[k].nome] as [string, string])]}
+            aoMudar={(v) => v && void presetFaixa(f.id, v as PresetFaixa)} />
         </Secao>
         <Secao titulo="EQ (três bandas)" chave="musica:eq">
           {eq('graves_db', 'Graves (200 Hz)')}
@@ -153,6 +161,10 @@ const InspectorDocumento: React.FC<{doc: DocMusica; id: string}> = ({doc, id}) =
     const v = e.docs[d.id]?.doc as {audio?: {faixas?: {clipes?: {id: string; musica?: string}[]}[]}} | undefined;
     return (v?.audio?.faixas ?? []).flatMap((f) => (f.clipes ?? []).filter((c) => c.musica === id).map((c) => `${d.id}/${c.id}`));
   }));
+  const [viradas, setViradas] = React.useState(true);
+  const [formato, setFormato] = React.useState<FormatoMusica>('wav');
+  const [stems, setStems] = React.useState(false);
+  const [exportando, setExportando] = React.useState(false);
   const porNoVideo = async () => {
     try {
       const r = await window.estudio.musica.porNoVideo({musica: id});
@@ -208,6 +220,26 @@ const InspectorDocumento: React.FC<{doc: DocMusica; id: string}> = ({doc, id}) =
             aoMudar={(v) => void campoEmObjeto('/mixer/master/reverb', 'tamanho', v, 'sala do reverb')} />
           <CampoDeslizante rotulo="Abafar o reverb" min={0} max={1} passo={0.05} valor={m.master.reverb.amortecimento} padrao={0.4} formatar={(v) => `${Math.round(v * 100)}%`}
             aoMudar={(v) => void campoEmObjeto('/mixer/master/reverb', 'amortecimento', v, 'amortecimento do reverb')} />
+          <CampoInterruptor rotulo="Limitador" valor={m.master.limitador.ativo} texto={`segura o pico em ${numeroBr(m.master.limitador.teto_db, 1)} dB`}
+            aoMudar={(v) => void campoEmObjeto('/mixer/master/limitador', 'ativo', v, v ? 'liga o limitador' : 'desliga o limitador')} />
+          {m.master.limitador.ativo && (
+            <CampoDeslizante rotulo="Teto" min={-12} max={0} passo={0.1} valor={m.master.limitador.teto_db} padrao={-1} formatar={(v) => `${numeroBr(v, 1)} dB`}
+              aoMudar={(v) => void campoEmObjeto('/mixer/master/limitador', 'teto_db', v, 'teto do limitador')} />
+          )}
+        </Secao>
+        <Secao titulo="Delay (retorno 2)" chave="musica:delay" fechadaDePadrao={!m.faixas.some((x) => x.delay > 0)}>
+          <CampoSelecao rotulo="Tempo" valor={m.master.delay.tempo} padrao="1/8."
+            opcoes={(Object.keys(TEMPOS_DELAY) as TempoDelay[]).map((t) => [t, `${t} (${numeroBr(TEMPOS_DELAY[t], 2)} batida)`] as [string, string])}
+            aoMudar={(v) => void campoEmObjeto('/mixer/master/delay', 'tempo', v, `delay em ${v}`)} />
+          <CampoDeslizante rotulo="Repetições" min={0} max={0.9} passo={0.05} valor={m.master.delay.realimentacao} padrao={0.35} formatar={(v) => `${Math.round(v * 100)}%`}
+            aoMudar={(v) => void campoEmObjeto('/mixer/master/delay', 'realimentacao', v, 'repetições do delay')} />
+          <CampoDeslizante rotulo="Brilho" min={0} max={1} passo={0.05} valor={m.master.delay.brilho} padrao={0.5} formatar={(v) => `${Math.round(v * 100)}%`}
+            aoMudar={(v) => void campoEmObjeto('/mixer/master/delay', 'brilho', v, 'brilho do delay')} />
+          <CampoInterruptor rotulo="Pingue-pongue" valor={m.master.delay.pingue_pongue} texto="cada repetição troca de lado"
+            aoMudar={(v) => void campoEmObjeto('/mixer/master/delay', 'pingue_pongue', v, 'pingue-pongue do delay')} />
+          <CampoDeslizante rotulo="Volume" min={-40} max={12} passo={0.5} valor={m.master.delay.volume_db} padrao={0} formatar={(v) => `${numeroBr(v, 1)} dB`}
+            aoMudar={(v) => void campoEmObjeto('/mixer/master/delay', 'volume_db', v, 'volume do delay')} />
+          {!m.faixas.some((x) => x.delay > 0) && <CampoLeitura rotulo="Envio">nenhuma faixa manda para o delay: suba o "Delay" numa faixa</CampoLeitura>}
         </Secao>
         <Secao titulo="Vídeo" chave="musica:video">
           {doc.video ? (
@@ -219,6 +251,26 @@ const InspectorDocumento: React.FC<{doc: DocMusica; id: string}> = ({doc, id}) =
           ) : <CampoLeitura rotulo="Vídeo">sem vídeo ligado</CampoLeitura>}
           <CampoLeitura rotulo="Toca em">{ligacoes.length ? ligacoes.join(', ') : 'nenhum clipe'}</CampoLeitura>
           {!aberta && <div style={{padding: '2px 8px 6px'}}><button className="bt" onClick={() => void porNoVideo()}>Pôr no vídeo</button></div>}
+          {doc.video && (
+            <>
+              <CampoInterruptor rotulo="Viradas" valor={viradas} aoMudar={setViradas} texto="uma virada de bateria antes de cada corte" />
+              <div style={{padding: '2px 8px 6px', display: 'flex', gap: 6, flexWrap: 'wrap'}}>
+                <button className="bt" title="Compassos inteiros até o último quadro (o BPM muda até 8%)" onClick={() => void encaixar('duracao')}>Fechar no fim do vídeo</button>
+                <button className="bt" title="Uma seção por cena, no compasso mais perto de cada corte" onClick={() => void encaixar('cortes', viradas)}>Seções nas cenas</button>
+                <button className="bt principal" title="Os dois" onClick={() => void encaixar('tudo', viradas)}>Encaixar tudo</button>
+              </div>
+            </>
+          )}
+        </Secao>
+        <Secao titulo="Exportar" chave="musica:exportar" fechadaDePadrao>
+          <CampoSelecao rotulo="Formato" valor={formato} opcoes={[['wav', 'WAV (24 bits)'], ['m4a', 'M4A (AAC)'], ['opus', 'Opus'], ['mid', 'MIDI (só as notas)']]}
+            aoMudar={(v) => setFormato(v as FormatoMusica)} />
+          {formato !== 'mid' && <CampoInterruptor rotulo="Stems" valor={stems} aoMudar={setStems} texto="um WAV por faixa e por retorno" />}
+          {formato !== 'mid' && <CampoLeitura rotulo="Loudness">{numeroBr(doc.alvo_lufs ?? -14, 1)} LUFS, pico até {numeroBr(doc.pico_dbtp ?? -1, 1)} dBTP</CampoLeitura>}
+          <div style={{padding: '2px 8px 6px'}}>
+            <button className="bt principal" disabled={exportando} onClick={() => (setExportando(true), void exportarMusica({formato, stems: formato !== 'mid' && stems}).finally(() => setExportando(false)))}>
+              <Download size={14} />{exportando ? 'Exportando…' : 'Exportar em saidas/'}</button>
+          </div>
         </Secao>
       </div>
     </div>
@@ -269,13 +321,21 @@ export const ListaMusica: React.FC = () => {
 
 const ListaRodape: React.FC = () => {
   const [carregando, setCarregando] = React.useState(false);
+  const midi = React.useRef<HTMLInputElement>(null);
   return (
     <div className="rodape-lista">
+      <input ref={midi} type="file" accept=".mid,.midi,audio/midi" hidden
+        onChange={(e) => {
+          const a = e.currentTarget.files?.[0];
+          e.currentTarget.value = '';
+          if (a) void importarMidiDe(a);
+        }} />
       <button className="bt" onClick={() => void novaBateria()} title="Canal de bateria com o estilo básico, já no arranjo"><Drum size={14} />+ Bateria</button>
       <BotaoMenu titulo="Canal de sintetizador, já no arranjo" className="bt" rotulo="+ Instrumento" icone={<Piano size={14} />} acima
         itens={PRESETS.map((x) => ({rotulo: NOME_PRESET[x], acao: () => void novoSintetizador(x)}))} />
       <button className="bt" disabled={carregando} onClick={() => (setCarregando(true), void novoAudio().finally(() => setCarregando(false)))} title="Um arquivo de áudio num canal novo">
         <AudioWaveform size={14} />+ Áudio…</button>
+      <button className="bt" onClick={() => midi.current?.click()} title="Um canal por trilha do .mid, com o padrão e o clipe"><FileMusic size={14} />+ MIDI…</button>
     </div>
   );
 };

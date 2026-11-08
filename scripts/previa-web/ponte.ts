@@ -21,6 +21,9 @@ import {caminhoSemFundo, MODELO_FUNDO} from '../../src/nucleo/remover-fundo';
 import {ehDocMusica, novaMusica, type DocMusica} from '../../src/nucleo/musica'; // frente Música
 import {renderizarMusica, TAXA_MUSICA} from '../../src/nucleo/musica-som';
 import {patchAtualizarLigados, patchClipeNovo, renderDaMusica} from '../../src/nucleo/musica-video';
+import {musicaParaMidi} from '../../src/nucleo/musica-midi'; // frente Música, marco 4
+import type {EntregaEmBytes} from '../../src/nucleo/musica-entrega';
+import type {PedidoExportarMusica, ResultadoExportarMusica} from '../../src/nucleo/musica-projeto';
 import {cancelarTransicao, concluirTransicao, levarPara, registroVazio, type BaseProjeto, type RegistroTransicoes} from '../../src/nucleo/transicoes';
 import {envelopeDeAmostras, type Envelope as EnvelopeMusica} from '../../src/nucleo/audio';
 import type {EntradaDiario, OperacaoPatch} from '../../src/nucleo/documentos';
@@ -416,6 +419,7 @@ const api: ApiEstudio = {
     cancelar: async (t, descartar) => musicaPrevia.cancelar(t, descartar),
     depoisDeMudar: (documento) => musicaPrevia.depoisDeMudar(documento),
     porNoVideo: (o) => musicaPrevia.porNoVideo(o),
+    exportar: (documento, pedido) => musicaPrevia.exportar(documento, pedido),
   },
 };
 
@@ -655,6 +659,9 @@ let renderFeitoPor = '';
 /** Para conferir na prévia: quem fez o último render para o vídeo ("janela" = o Web Worker). */
 (window as unknown as {renderDaMusicaFeitoPor: () => string}).renderDaMusicaFeitoPor = () => renderFeitoPor;
 
+const exportadas = new Map<string, {bytes: number; lufs?: number | null; pico_dbtp?: number | null}>();
+(window as unknown as {exportacoesDaMusica: () => unknown}).exportacoesDaMusica = () => Object.fromEntries(exportadas);
+
 const musicaPrevia = (() => {
   let registro: RegistroTransicoes = registroVazio();
   const diario: EntradaDiario[] = [];
@@ -777,12 +784,33 @@ const musicaPrevia = (() => {
       const doc = aberto!.docs[o.musica] as DocMusica;
       const video = o.video ?? doc.video?.documento ?? aberto!.manifesto.documentos.find((d) => d.modulo === 'video')?.id;
       if (!video) throw new Error('o projeto não tem vídeo');
-      const r = renderDaMusica(o.musica, doc);
+      if (!doc.video) base('pessoa').aplicar({documento: o.musica, patch: [{op: 'add', path: '/video', value: {documento: video, em_ms: Math.round(o.em_ms ?? 0), voz_guia: true}}],
+        rotulo: `música ligada ao vídeo ${video}`}); // como o porNoVideo do núcleo (marco 4)
+      const r = renderDaMusica(o.musica, aberto!.docs[o.musica] as DocMusica);
       const novo = patchClipeNovo(aberto!.docs[video] as DocCenas, {idMusica: o.musica, faixa: o.faixa, em_ms: o.em_ms ?? doc.video?.em_ms ?? 0, render: r,
         nome: aberto!.manifesto.documentos.find((d) => d.id === o.musica)?.titulo});
       base('pessoa').aplicar({documento: video, patch: novo.patch, rotulo: `música ${o.musica} no vídeo`});
       await depoisDeMudar(o.musica);
       return {documento: video, caminho: novo.caminho};
+    },
+    /** Exportar (item 23): a conta é a do worker da janela, como no app; os bytes ficam em memória (sem ffmpeg na prévia,
+     *  o M4A e o Opus ficam no WAV) e window.exportacoesDaMusica() mostra o que saiu. */
+    exportar: async (documento: string, pedido: PedidoExportarMusica): Promise<ResultadoExportarMusica> => {
+      const doc = aberto!.docs[documento] as DocMusica;
+      const titulo = (pedido.nome?.trim() || aberto!.manifesto.documentos.find((d) => d.id === documento)?.titulo || doc.titulo || documento).replace(/[\\/:*?"<>|]+/g, '-');
+      const base = `saidas/${titulo}`;
+      if (pedido.formato === 'mid') {
+        const r = musicaParaMidi(doc);
+        exportadas.set(`${base}.mid`, {bytes: r.bytes.length});
+        return {arquivos: [`${base}.mid`], avisos: r.avisos, feito_por: 'janela', trilhas: r.trilhas, notas: r.notas};
+      }
+      const daJanela = await ponteDaJanela.pedir('musica:exportar', {doc: paraTelaDoc(doc), pedido: {stems: pedido.stems, alvo_lufs: pedido.alvo_lufs, folga_db: pedido.formato === 'wav' ? 0 : 0.5}});
+      if (!daJanela.ok) throw new Error(daJanela.mensagem);
+      const e = daJanela.dados as EntregaEmBytes;
+      const arquivos = [`${base}.${pedido.formato}`, ...(e.stems ?? []).map((x) => `${base} - stems/${x.nome}.wav`)];
+      exportadas.set(arquivos[0], {bytes: e.mistura.length, lufs: e.medida.lufs, pico_dbtp: e.medida.pico_dbtp});
+      (e.stems ?? []).forEach((x, i) => exportadas.set(arquivos[i + 1], {bytes: x.wav.length}));
+      return {arquivos, avisos: [...e.avisos, ...(pedido.formato === 'wav' ? [] : ['na prévia web não há ffmpeg: o arquivo ficou em WAV'])], feito_por: 'janela', duracao_s: e.duracao_s, medida: e.medida};
     },
     /** O que a tela grava (pelo aplicarPatch da ponte) também vai para o diário, com a transição aberta. */
     anotar: (documento: string, antes: unknown, depois: unknown, rotulo?: string) => {
