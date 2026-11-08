@@ -14,8 +14,23 @@ export type PedidoRender =
 export type MedidaSom = {integrado_lufs: number | null; pico_dbtp: number | null};
 export type RespostaRender =
   | {id: number; ok: true; canais?: Float32Array[]; duracao_s?: number; avisos?: string[]; faltando?: string[]; ms?: number; medida?: MedidaSom;
-    faixas?: Record<string, MedidaSom>; envelope?: Envelope; wav?: Uint8Array}
+    faixas?: Record<string, MedidaSom>; envelope?: Envelope; wav?: Uint8Array; niveis?: NiveisSom}
   | {id: number; ok: false; mensagem: string};
+
+/** Pico em dBFS a cada 50 ms, por faixa do mixer (depois do volume e do pan) e do master: o medidor ao vivo lê na cabeça. */
+export type NiveisSom = {janela_s: number; faixas: Record<string, Float32Array>; master: Float32Array};
+const JANELA_NIVEL_S = 0.05;
+const picos = (canais: Float32Array[], taxa: number) => {
+  const passo = Math.max(1, Math.round(taxa * JANELA_NIVEL_S));
+  const n = Math.ceil((canais[0]?.length ?? 0) / passo);
+  const out = new Float32Array(n);
+  for (let j = 0; j < n; j++) {
+    let p = 0;
+    for (const c of canais) for (let i = j * passo, f = Math.min(c.length, i + passo); i < f; i++) p = Math.max(p, Math.abs(c[i]));
+    out[j] = p > 0 ? 20 * Math.log10(p) : -100;
+  }
+  return out;
+};
 
 const fontes = new Map<string, FonteAudio>();
 const cache: CacheSom = new Map();
@@ -35,7 +50,7 @@ self.addEventListener('message', (e: MessageEvent<PedidoRender>) => {
       return responder({id: p.id, ok: true});
     }
     const t0 = performance.now();
-    const r = renderizarMusica(p.doc, Object.fromEntries(fontes), {taxa: p.taxa, cache, porFaixa: p.porFaixa});
+    const r = renderizarMusica(p.doc, Object.fromEntries(fontes), {taxa: p.taxa, cache, porFaixa: p.porFaixa || !p.paraVideo});
     const ms = Math.round(performance.now() - t0);
     const medir = (c: Float32Array[]) => {
       const m = medirAmostras(c, p.taxa);
@@ -49,7 +64,9 @@ self.addEventListener('message', (e: MessageEvent<PedidoRender>) => {
     }
     // a mistura é nova a cada render (o cache guarda as camadas, não ela): vai transferida, sem cópia
     const canais = r.canais;
-    return responder({id: p.id, ok: true, canais, duracao_s: r.duracao_s, avisos: r.avisos, faltando: r.faltando, ms}, canais.map((c) => c.buffer));
+    const niveis: NiveisSom = {janela_s: JANELA_NIVEL_S, master: picos(canais, p.taxa),
+      faixas: Object.fromEntries(Object.entries(r.faixas ?? {}).map(([k, c]) => [k, picos(c, p.taxa)]))};
+    return responder({id: p.id, ok: true, canais, duracao_s: r.duracao_s, avisos: r.avisos, faltando: r.faltando, ms, niveis}, canais.map((c) => c.buffer));
   } catch (erro) {
     return responder({id: p.id, ok: false, mensagem: String((erro as Error)?.message ?? erro)});
   }

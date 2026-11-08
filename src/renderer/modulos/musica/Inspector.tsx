@@ -2,8 +2,8 @@
 // peças), a faixa do mixer (volume, pan, EQ, compressor, envio ao reverb) ou, sem seleção, o documento (BPM, compasso,
 // swing, master e a ligação com o vídeo). Tudo por patch, com diário e Ctrl+Z.
 import React, {useMemo} from 'react';
-import {AudioWaveform, Drum, Music, Piano, Scissors, SlidersVertical, Trash2} from 'lucide-react';
-import {NOME_PECA, NOME_PRESET, PECAS, PRESETS, resolverMusica, type CanalMusica, type DocMusica, type PresetSintetizador} from '../../../nucleo/musica';
+import {AudioWaveform, Drum, Music, Piano, Plus, Repeat, Scissors, SlidersVertical, Trash2} from 'lucide-react';
+import {NOME_PECA, NOME_PRESET, PECAS, posicaoEmCompasso, PRESETS, resolverMusica, type CanalMusica, type DocMusica, type PresetSintetizador} from '../../../nucleo/musica';
 import {acordeDe, NOMES} from '../../../nucleo/musica-teoria';
 import {ESTILOS_GERADOS, type TipoGerado} from '../../../nucleo/musica-acoes';
 import {BotaoMenu} from '../../componentes/Menu';
@@ -35,6 +35,10 @@ const InspectorClipe: React.FC<{doc: DocMusica; id: string}> = ({doc, id}) => {
           <div style={{padding: '2px 8px 6px', display: 'flex', gap: 6}}>
             <button className="bt" onClick={() => void dividirNaCabeca()} title="S"><Scissors size={14} />Dividir na cabeça</button>
             <button className="bt" onClick={() => void arranjar({acao: 'apagar', clipe: c.id}).then((e) => e && selecionarMusica(null))} title="Delete"><Trash2 size={14} />Apagar</button>
+          </div>
+          <div style={{padding: '0 8px 6px', display: 'flex', gap: 6}}>
+            <button className="bt" onClick={() => void arranjar({acao: 'repetir', clipe: c.id, vezes: 1})} title="Uma cópia logo depois (o padrão continua)"><Repeat size={14} />Repetir</button>
+            <button className="bt" onClick={() => void arranjar({acao: 'repetir', clipe: c.id, vezes: 3})}>Repetir 3×</button>
           </div>
         </Secao>
         <Secao titulo="Volume" chave="musica:clipe:volume">
@@ -168,6 +172,18 @@ const InspectorDocumento: React.FC<{doc: DocMusica; id: string}> = ({doc, id}) =
             aoMudar={(v) => void campo('/compasso', v.split('/').map(Number), `compasso ${v}`)} />
           <CampoDeslizante rotulo="Swing" min={0} max={1} passo={0.05} valor={m.swing} padrao={0} formatar={(v) => `${Math.round(v * 100)}%`} aoMudar={(v) => void campo('/swing', v, 'swing')} />
           <CampoNumero rotulo="Semente" valor={m.semente} padrao={1} dica="O ruído das peças sai desta semente: o mesmo número dá o mesmo som" aoMudar={(v) => void campo('/semente', Math.round(v), 'semente')} />
+        </Secao>
+        <Secao titulo="Seções" chave="musica:secoes">
+          {(doc.secoes ?? []).map((s) => (
+            <CampoTexto key={s.id} rotulo={`${posicaoEmCompasso(s.em, m.compasso)} · ${Math.round(s.dur / m.batidas_por_compasso)} comp.`} valor={s.nome}
+              dica="Arraste a seção no arranjo para mover com os clipes dela" aoMudar={(v) => void arranjar({acao: 'secao', secao: s.id, nome: v || s.id})} />
+          ))}
+          <div style={{padding: '2px 8px 6px'}}>
+            <button className="bt" title="Quatro compassos a partir do compasso da cabeça"
+              onClick={() => void arranjar({acao: 'secao', nome: `Seção ${(doc.secoes?.length ?? 0) + 1}`,
+                em: Math.floor(musica.get().cabeca_s / m.seg_por_batida / m.batidas_por_compasso) * m.batidas_por_compasso, dur: 4 * m.batidas_por_compasso})}>
+              <Plus size={14} />Seção na cabeça</button>
+          </div>
         </Secao>
         <Secao titulo="Tom e acordes" chave="musica:acordes">
           <CampoSelecao rotulo="Tom" valor={doc.tom ?? 'C'} opcoes={NOMES.map((n) => [n, n] as [string, string])} padrao="C" aoMudar={(v) => void campo('/tom', v, `tom ${v}`)} />

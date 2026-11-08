@@ -2,7 +2,9 @@
 
 Versão 1, de 08/11/2026 (rodada 3, frente Música, onda 1: marcos A e B do plano
 `tasks/estudio-musica-2026-11-07/fork/00-plano.md`). Versão 2, do mesmo dia: o som num Web Worker, a ponte com a janela,
-os sintetizadores da casa, tom, escala, acordes e o baixo, o arpejo e os acordes gerados (itens 14, 18 e 19). A música é uma vista do mesmo projeto: um documento
+os sintetizadores da casa, tom, escala, acordes e o baixo, o arpejo e os acordes gerados (itens 14, 18 e 19). Versão
+3: o piano roll com mouse, carimbo e teclado (item 17), o medidor ao vivo, a variação de padrão (16), repetir e seções
+(20). A música é uma vista do mesmo projeto: um documento
 `musica/<id>.json` que a pessoa e a IA editam pelo mesmo JSON Patch com diário, ligado a um clipe de áudio do vídeo de
 cenas. A ida e volta entre o vídeo e a Música é a primeira coisa que funciona, e o clipe do vídeo acompanha cada mudança
 da música sem exportar arquivo.
@@ -28,6 +30,23 @@ não perde nenhuma das duas.
 **Teclas na Música:** Espaço toca e pausa, S divide o clipe selecionado na cabeça, Delete apaga, L repete o clipe
 selecionado (ou a música inteira), Home volta ao começo, Ctrl+Z desfaz a última edição da pessoa. No arranjo, Ctrl +
 roda do mouse muda o zoom e Alt ao arrastar solta da grade.
+
+**Piano roll** (canal de sintetizador, aba Passos): arrastar no vazio desenha a nota (o comprimento segue o mouse; um
+clique usa o último comprimento); arrastar a nota move no tempo e na altura; a borda direita estica; duplo clique ou
+botão direito apaga. Com notas selecionadas (clique, Shift+clique, Ctrl+A): ↑↓ transpõem (Shift: oitava), ←→ andam um
+passo, Delete apaga, Ctrl+D duplica, Q quantiza, Esc tira a seleção; essas teclas são do piano roll enquanto há seleção
+(o arranjo cede). **Carimbo:** com ele ligado, o clique põe o acorde inteiro (maior, menor, 7, 7M, m7, sus4, sus2,
+dim, add9) com a fundamental na altura clicada. **Teclado:** A W S E D F T G Y H U J K tocam do Dó ao Dó, Z e X mudam a
+oitava; com **Gravar**, cada tecla escreve a nota no cursor (amarelo) e anda um passo, e um clique na grade muda o
+cursor. A grade vai do Dó1 ao Dó7, rola até as notas do padrão ao abrir e mostra apagadas as notas fora da escala.
+
+**Mixer:** cada faixa e o master têm um medidor ao vivo (o pico a cada 50 ms, depois do volume e do pan, medido pelo
+worker no mesmo render que se ouve), de −48 a 0 dBFS, em laranja acima de −3.
+
+**Arranjo:** no inspetor do clipe, Repetir e Repetir 3× põem cópias logo depois (o padrão continua de onde parou). No
+inspetor da música, Seções lista e renomeia as seções e "Seção na cabeça" cria uma de quatro compassos; no arranjo, a
+faixa de seções fica acima da de acordes, e arrastar uma seção a move com os clipes que começam nela (em compassos
+inteiros). Em Passos, "Variação" cria uma cópia do padrão com mudanças pequenas pela semente.
 
 ## O contrato da transição
 
@@ -100,6 +119,8 @@ toca como guia, fora da música.
   `V7`, `ii7`, `bVII`, `vii°`) ou por cifra (`Am7`, `F/C`, `Bb`, `Gsus4`). Uma nota de sintetizador sem `dur` dura um passo
   da grade do padrão.
 - **`semente`**: o ruído das peças sintetizadas sai dela; a mesma semente dá o mesmo som em qualquer PC.
+- **`secoes`**: marcas do arranjo, `[{id, nome, em, dur}]` em batidas (Intro, Refrão…); mover uma seção leva os clipes
+  que começam nela.
 - **`video`**: o vídeo de que a música é trilha, onde ela começa nele (`em_ms`) e se a voz dele toca como guia. Os cortes
   das cenas não ficam gravados: o arranjo e o `ler_musica` os tiram do vídeo na hora.
 - Não há `render` nem `creditos` no documento: o app calcula e grava ao lado do render.
@@ -179,15 +200,16 @@ Em `src/nucleo/mcp-musica.ts`, registradas por uma linha em `registrarFerramenta
 | Ferramenta | Parâmetros | O que faz | Classe |
 |---|---|---|---|
 | `ler_musica` | `documento?, eventos?, de?, ate?` | BPM, compasso, duração, canais, padrões, clipes (batidas e segundos), mixer, onde toca no vídeo e se o render está em dia, cortes das cenas e avisos; com `eventos`, as notas do trecho em segundos | livre |
-| `arranjar` | `documento?, acao: por\|mover\|aparar\|dividir\|apagar\|ajustar, clipe?, canal?, audio?, padrao?, em?, dur?, corte_s?, ganho_db?, fade_in?, fade_out?, mudo?` | Põe, move, apara, divide, apaga e ajusta clipes; aparar o começo anda o corte do áudio ou o início do padrão | livre |
+| `arranjar` | `documento?, acao: por\|mover\|aparar\|dividir\|apagar\|ajustar\|repetir\|secao\|mover_secao, clipe?, canal?, audio?, padrao?, em?, dur?, corte_s?, ganho_db?, fade_in?, fade_out?, mudo?, vezes?, secao?, nome?` | Põe, move, apara, divide, apaga, ajusta e repete clipes; cria, renomeia e move seções (mover leva os clipes); aparar o começo anda o corte do áudio ou o início do padrão | livre |
 | `medir_musica` | `documento?, por_faixa?` | LUFS integrado e pico da música e de cada faixa | livre |
 | `por_no_video` | `musica?, video?, faixa?, em_ms?, substituir?` | Clipe novo ligado à música, ou liga um clipe que existe | livre |
 | `levar_para` | `modulo, alvo: {documento, caminho}, intencao?, tempo?: {em_ms?, dur_ms?}` | Abre a Música com o clipe ou a faixa do vídeo e guarda de onde veio | livre |
 | `concluir_transicao` | `transicao, aplicar?, resultado?: {documento?, midia?}` | Põe a música no vídeo por patch e volta | livre |
 | `cancelar_transicao` | `transicao, descartar?` | Volta sem mudar a origem; com descartar, desfaz o que se fez no destino | livre |
 | `trocar_kit` | `documento?, canal, kit` | Troca o kit de um canal de bateria (hoje: `eletronico`) | livre |
-| `criar_padrao` | `documento?, canal, nome?, dur?, passos?, clonar?, estilo?, no_arranjo?: {em?, dur?}, instrumento?` | Padrão vazio, clonado ou de um estilo de bateria da casa (`basico`, `pop`, `eletronico`, `dembow`, `trap`, `calmo`); canal novo se não existir, de bateria ou de sintetizador (`instrumento`: `baixo`, `pad`, `pluck`, `lead`) | livre |
+| `criar_padrao` | `documento?, canal, nome?, dur?, passos?, clonar?, estilo?, no_arranjo?: {em?, dur?}, instrumento?, variar?: {de, quanto?, semente?}` | Padrão vazio, clonado ou de um estilo de bateria da casa (`basico`, `pop`, `eletronico`, `dembow`, `trap`, `calmo`); canal novo se não existir, de bateria ou de sintetizador (`instrumento`: `baixo`, `pad`, `pluck`, `lead`) | livre |
 | `escrever_notas` | `documento?, padrao, notas[], modo?: somar\|trocar, de?, ate?, quantizar?, na_escala?` | Escreve notas (peça de bateria ou nota MIDI); nota igual troca, não duplica; `na_escala` leva cada nota para a escala do tom | livre |
+| `editar_notas` | `documento?, padrao, acao: quantizar\|transpor\|duplicar\|apagar\|forca\|humanizar\|esticar, selecao?: {de?, ate?, notas?: [{em, nota?, peca?}]}, valor?, grade?, semente?` | As operações do piano roll sobre uma seleção (as notas dadas, um trecho, ou todas) | livre |
 | `aplicar_progressao` | `documento?, acordes[], em?, dur_por_acorde?` | Escreve a faixa de acordes por grau ou cifra; o trecho coberto é trocado | livre |
 | `gerar_notas` | `documento?, tipo: baixo\|arpejo\|acordes, estilo?, canal?` | Gera um padrão da faixa de acordes num canal de sintetizador e põe o clipe | livre |
 
@@ -243,8 +265,8 @@ baixado; os kits de terceiros entram na onda 2, cada pacote com o LICENSE de den
   janela por perto de 1 s numa música de 60 s.
 - Áudio que não é WAV a 48 kHz no render para o vídeo passa pelo ffmpeg do Remotion; o teste usa WAV a 48 kHz.
 - O medidor ao vivo do mixer (nível por faixa durante a reprodução) não entrou; `medir_musica` dá o LUFS e o pico.
-- A grade de notas é um piano roll em grade (uma célula por passo; a nota longa aparece seguindo). Desenhar, esticar e
-  mover notas com o mouse, o carimbo de acordes e o teclado do computador como piano (o resto do item 17) não entraram.
+- O modo "só o padrão" (tocar o padrão em loop fora do arranjo) não entrou: o L no clipe selecionado faz a mesma coisa.
+- "Pintar" clipes arrastando no vazio do arranjo não entrou; Repetir cobre o caso de encher compassos.
 - O som dos sintetizadores foi conferido por medida (altura por autocorrelação, brilho pela energia nos agudos), não de
   ouvido.
 

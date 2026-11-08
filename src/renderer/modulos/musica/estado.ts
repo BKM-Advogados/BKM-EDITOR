@@ -27,10 +27,11 @@ export type EstadoMusica = {
   transicoes: Transicao[];
   renderizando: boolean;
   avisos: string[];
+  focoNotas: boolean; // o piano roll tem notas selecionadas ou o teclado ligado: Delete, setas e letras são dele
 };
 
 let estado: EstadoMusica = {selecao: null, tocando: false, cabeca_s: 0, loop: false, metronomo: false, comoNoVideo: false, pxPorBatida: 28, aba: 'passos',
-  transicoes: [], renderizando: false, avisos: []};
+  transicoes: [], renderizando: false, avisos: [], focoNotas: false};
 const ouvintes = new Set<() => void>();
 export const musica = {
   get: () => estado,

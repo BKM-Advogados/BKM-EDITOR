@@ -101,3 +101,22 @@
 .faixa-acordes .acorde { position: absolute; top: 1px; height: 16px; border-left: 2px solid var(--trilha-efeito); padding: 0 4px; font-size: 10px; color: var(--trilha-efeito);
   white-space: nowrap; overflow: hidden; background: rgba(231, 150, 243, 0.08); }
 .arranjo .cab-acordes { height: 18px; display: flex; align-items: center; padding: 0 6px; color: var(--trilha-efeito); font-size: 10px; border-bottom: 1px solid var(--borda); }
+
+/* piano roll (item 17) */
+.piano-roll { display: flex; flex-direction: column; min-height: 0; }
+.passos-topo .sep { width: 1px; height: 18px; background: var(--borda); }
+.pr-corpo { display: grid; grid-template-columns: 64px 1fr; max-height: 380px; overflow: auto; border: 1px solid var(--borda); border-radius: var(--raio); }
+.pr-teclas { display: flex; flex-direction: column; position: sticky; left: 0; z-index: 3; background: var(--fundo-1); }
+.pr-tecla { font-size: 10px; display: flex; align-items: center; padding: 0 6px; color: var(--texto-2); border-bottom: 1px solid #222; cursor: pointer; user-select: none; }
+.pr-tecla.fora { background: #161616; color: var(--icone-inativo); }
+.pr-tecla.do { color: var(--texto); font-weight: var(--peso-forte); }
+.pr-area { overflow: visible; }
+.pr-tela { position: relative; background-color: #1f1f1f; cursor: crosshair; user-select: none; }
+.pr-linha-fora { position: absolute; left: 0; right: 0; background: rgba(0, 0, 0, 0.28); pointer-events: none; }
+.pr-nota { position: absolute; background: var(--trilha-audio); border-radius: 2px; cursor: grab; box-sizing: border-box; }
+.pr-nota.sel { outline: 2px solid var(--acento); z-index: 2; }
+.pr-nota.nova { opacity: 0.6; pointer-events: none; }
+.pr-borda { position: absolute; right: -3px; top: 0; bottom: 0; width: 9px; cursor: ew-resize; z-index: 1; }
+.pr-cursor { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--comentario); pointer-events: none; }
+.pr-agora { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--cabeca); pointer-events: none; }
+.faixa-secoes .acorde.secao { border-left-color: var(--comentario); color: var(--comentario); background: rgba(255, 202, 22, 0.08); cursor: grab; }

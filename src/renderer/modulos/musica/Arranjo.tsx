@@ -71,6 +71,7 @@ const Arranjo: React.FC<{doc: DocMusica}> = ({doc}) => {
   const loop = useMusica((e) => (e.loop ? {de: e.loopDe ?? 0, ate: e.loopAte} : null));
   const video = useLoja((e) => (doc.video ? (e.docs[doc.video.documento]?.doc as DocCenas | undefined) : undefined));
   const [arrasto, setArrasto] = useState<Arrasto | null>(null);
+  const [secaoArrastada, setSecaoArrastada] = useState<{id: string; x0: number; db: number} | null>(null);
   const rolo = useRef<HTMLDivElement>(null);
   const bpc = m.batidas_por_compasso;
   const total = Math.max(16 * bpc, Math.ceil((m.duracao_batidas + 4 * bpc) / bpc) * bpc);
@@ -80,7 +81,7 @@ const Arranjo: React.FC<{doc: DocMusica}> = ({doc}) => {
   // teclas da área Música (na captura, como as faixas de áudio do vídeo)
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => {
-      if (loja.get().area !== 'musica' || e.ctrlKey || e.altKey || e.metaKey) return;
+      if (loja.get().area !== 'musica' || e.ctrlKey || e.altKey || e.metaKey || musica.get().focoNotas) return;
       const alvo = e.target as HTMLElement;
       if (/INPUT|TEXTAREA|SELECT/.test(alvo.tagName) || alvo.isContentEditable || alvo.closest?.('.xterm') || document.querySelector('.dialogo-fundo')) return;
       const k = e.key.toLowerCase();
@@ -138,6 +139,7 @@ const Arranjo: React.FC<{doc: DocMusica}> = ({doc}) => {
     <div className="arranjo">
       <div className="cabecas">
         <div className="cab-regua">{m.bpm} BPM · {m.compasso[0]}/{m.compasso[1]}</div>
+        {doc.secoes?.length ? <div className="cab-acordes" style={{color: 'var(--comentario)'}}>Seções</div> : null}
         {doc.acordes?.length ? <div className="cab-acordes">Acordes · {doc.tom ?? 'C'} {doc.escala ?? 'maior'}</div> : null}
         {m.canais.map((c, i) => (
           <div key={c.id} className={`cab-canal${selecao?.tipo === 'canal' && selecao.id === c.id ? ' sel' : ''}`} onClick={() => selecionarMusica({tipo: 'canal', id: c.id})}>
@@ -156,6 +158,25 @@ const Arranjo: React.FC<{doc: DocMusica}> = ({doc}) => {
             {Array.from({length: Math.ceil(total / bpc)}, (_, k) => <span key={k} className="compasso" style={{left: k * bpc * px, width: bpc * px}}>{k + 1}</span>)}
             {loop && <span className="loop" style={{left: loop.de * px, width: ((loop.ate ?? m.duracao_batidas) - loop.de) * px}} />}
           </div>
+          {doc.secoes?.length ? (
+            <div className="faixa-acordes faixa-secoes" style={{position: 'relative', top: 0, height: 18, borderBottom: '1px solid var(--borda)'}}>
+              {doc.secoes.map((s) => {
+                const d = secaoArrastada?.id === s.id ? Math.round(secaoArrastada.db / bpc) * bpc : 0;
+                return (
+                  <span key={s.id} className="acorde secao" style={{left: Math.max(0, s.em + d) * px, width: Math.max(8, s.dur * px - 2)}} title={`${s.nome}: arraste para mover com os clipes`}
+                    onPointerDown={(e) => (e.stopPropagation(), (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId), setSecaoArrastada({id: s.id, x0: e.clientX, db: 0}))}
+                    onPointerMove={(e) => secaoArrastada?.id === s.id && setSecaoArrastada({...secaoArrastada, db: (e.clientX - secaoArrastada.x0) / px})}
+                    onPointerUp={() => {
+                      const a = secaoArrastada;
+                      setSecaoArrastada(null);
+                      const dd = a ? Math.round(a.db / bpc) * bpc : 0;
+                      if (a && dd) void arranjar({acao: 'mover_secao', secao: s.id, em: Math.max(0, s.em + dd)});
+                    }}
+                    onClick={(e) => e.stopPropagation()}>{s.nome}</span>
+                );
+              })}
+            </div>
+          ) : null}
           {doc.acordes?.length ? (
             <div className="faixa-acordes" style={{position: 'relative', top: 0, height: 18, borderBottom: '1px solid var(--borda)'}}>
               {doc.acordes.map((a, k) => (

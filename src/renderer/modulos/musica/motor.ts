@@ -10,7 +10,7 @@ import {medirAmostras, type FonteAudio} from '../../../nucleo/loudness';
 import {envelopeDeAmostras} from '../../../nucleo/audio';
 import {audiosDaMusica, partesDoSom, resolverMusica, type AjustePeca, type DocMusica, type MacrosSintetizador, type PecaBateria, type PresetSintetizador} from '../../../nucleo/musica';
 import {codificarWav16, notaDoSintetizador, receitaDe, renderizarMusica, somDeUmaBatida, TAXA_MUSICA, type CacheSom} from '../../../nucleo/musica-som';
-import type {PedidoRender, RespostaRender} from './render.worker';
+import type {NiveisSom, PedidoRender, RespostaRender} from './render.worker';
 
 type SemId<T> = T extends unknown ? Omit<T, 'id'> : never;
 import {loja} from '../../estado/loja';
@@ -38,6 +38,7 @@ class MotorMusica {
   private chaveMetro = '';
   private tocando: {fontes: AudioBufferSourceNode[]; ganho: GainNode; inicioCtx: number; inicioS: number; loop: [number, number] | null} | null = null;
   avisos: string[] = [];
+  niveis: NiveisSom | null = null;
   duracao_s = 0;
   ultimoRender_ms = 0;
 
@@ -173,6 +174,7 @@ class MotorMusica {
     const r = await this.pedir({tipo: 'render', doc, taxa: TAXA_MUSICA});
     if (minha !== this.geracao || !r.ok || !r.canais) return false;
     this.ultimoRender_ms = r.ms ?? 0;
+    this.niveis = r.niveis ?? null;
     this.musica = this.paraBuffer(r.canais, TAXA_MUSICA);
     this.duracao_s = r.duracao_s ?? 0;
     this.avisos = r.avisos ?? [];
@@ -249,6 +251,14 @@ class MotorMusica {
       this.curva = {valores, passo_s};
     }
     if (this.tocando) this.retomar();
+  }
+
+  /** Pico (dBFS) da faixa (ou do master, sem faixa) em `s` segundos da música; null sem medida. */
+  nivelEm(s: number, faixa?: string): number | null {
+    const n = this.niveis;
+    const serie = n ? (faixa ? n.faixas[faixa] : n.master) : undefined;
+    if (!n || !serie?.length) return null;
+    return serie[Math.min(serie.length - 1, Math.max(0, Math.floor(s / n.janela_s)))];
   }
 
   posicao(): number {

@@ -43,8 +43,8 @@ export const passo = (padrao: string, peca: PecaBateria, em: number, forca?: num
 export const forcaDaNota = (padrao: string, peca: PecaBateria, em: number, forca: number) =>
   fazer((d) => escreverNotas(d, {padrao, notas: [{peca, em, forca: Math.min(127, Math.max(1, Math.round(forca)))}]}));
 export const estilo = (padrao: string, id: string) => fazer((d) => aplicarEstilo(d, padrao, id));
-export const novoPadrao = async (canal: string, o: {clonar?: string; estilo?: string; no_arranjo?: boolean} = {}) => {
-  const e = await fazer((d) => criarPadrao(d, {canal, clonar: o.clonar, estilo: o.estilo, no_arranjo: o.no_arranjo ? {} : undefined}));
+export const novoPadrao = async (canal: string, o: {clonar?: string; estilo?: string; no_arranjo?: boolean; variar?: string} = {}) => {
+  const e = await fazer((d) => criarPadrao(d, {canal, clonar: o.clonar, estilo: o.estilo, no_arranjo: o.no_arranjo ? {} : undefined, ...(o.variar ? {variar: {de: o.variar}} : {})}));
   const id = e?.extra?.padrao as string | undefined;
   if (id) selecionarMusica({tipo: 'padrao', id});
   return e;

@@ -3,8 +3,8 @@
 // dia com o documento: cada mudança refaz o som (só o que mudou) e a cabeça anda enquanto toca.
 import React, {useEffect, useMemo, useState} from 'react';
 import {Mic, Pause, Play, Repeat, Square, Timer, Tv} from 'lucide-react';
-import {resolverMusica, NOME_PECA, NOME_PRESET, PECAS, posicaoEmCompasso, type DocMusica, type PecaBateria} from '../../../nucleo/musica';
-import {escalaDe, nomeDaNotaPt} from '../../../nucleo/musica-teoria';
+import {resolverMusica, NOME_PECA, PECAS, posicaoEmCompasso, type DocMusica, type PecaBateria} from '../../../nucleo/musica';
+import {PianoRoll} from './PianoRoll';
 import {ESTILOS} from '../../../nucleo/musica-estilos';
 import type {DocCenas} from '../../../nucleo/cenas';
 import type {PropsVideo} from '../../../compartilhado/api';
@@ -13,7 +13,7 @@ import {criarDocumento, useLoja} from '../../estado/loja';
 import {numeroBr} from '../../componentes/Campos';
 import {docMusica, musica, selecionarMusica, transicaoAberta, useMusica} from './estado';
 import {motor, vozGuiaDe} from './motor';
-import {campo, campoFaixa, estilo, forcaDaNota, nota, novaBateria, novoPadrao, passo} from './acoes';
+import {campo, campoFaixa, estilo, forcaDaNota, novaBateria, novoPadrao, passo} from './acoes';
 
 export const useDocMusica = () => {
   const id = useLoja((e) => e.ativo.musica);
@@ -200,7 +200,11 @@ const Passos: React.FC<{doc: DocMusica}> = ({doc}) => {
   const notaEm = (peca: PecaBateria, k: number) => p.notas.find((n) => n.peca === peca && Math.abs(n.em - k * passoBat) < 1e-6);
   const pecas = PECAS;
   const doCanal = doc.padroes.filter((x) => x.canal === p.canal);
-  if (canal?.tipo === 'sintetizador') return <GradeNotas doc={doc} padrao={p.id} agora={agora} />;
+  if (canal?.tipo === 'sintetizador') {
+    const b = cabeca / m.seg_por_batida;
+    const c = tocando ? m.clipes.find((x) => x.padrao === p.id && b >= x.em && b < x.em + x.dur) : undefined;
+    return <PianoRoll doc={doc} padrao={p.id} agora_bat={c ? (b - c.em + c.inicio) % pp.dur : null} />;
+  }
   return (
     <div>
       <div className="passos-topo">
@@ -213,6 +217,8 @@ const Passos: React.FC<{doc: DocMusica}> = ({doc}) => {
         </select>
         <button className="bt" onClick={() => void novoPadrao(p.canal)}>+ Padrão</button>
         <button className="bt" onClick={() => void novoPadrao(p.canal, {clonar: p.id})}>Clonar</button>
+        <button className="bt" title="Cópia com mudanças pequenas: tira e põe notas fracas, muda as forças (bumbo e caixa nos tempos ficam)"
+          onClick={() => void novoPadrao(p.canal, {variar: p.id})}>Variação</button>
         <label title="Atrasa as semicolcheias do contratempo (0 = reto, 100 = tercina)">Swing
           <input type="range" min={0} max={100} step={5} defaultValue={Math.round((doc.swing ?? 0) * 100)} key={doc.swing}
             onPointerUp={(e) => void campo('/swing', Number((e.target as HTMLInputElement).value) / 100, 'swing')} /> {Math.round((doc.swing ?? 0) * 100)}%</label>
@@ -243,69 +249,20 @@ const Passos: React.FC<{doc: DocMusica}> = ({doc}) => {
   );
 };
 
-// ---------- grade de notas (sintetizador) ----------
-// Duas oitavas em volta das notas do padrão, com as notas fora da escala do tom apagadas; cada célula é um passo. Clicar liga
-// a nota com a duração de um passo (ou desliga); a nota que dura mais aparece seguindo nas células da frente. O nome
-// da nota toca o som do canal.
-const GradeNotas: React.FC<{doc: DocMusica; padrao: string; agora: number}> = ({doc, padrao, agora}) => {
-  const m = useMemo(() => resolverMusica(doc).musica, [doc]);
-  const p = doc.padroes.find((x) => x.id === padrao)!;
-  const pp = m.padroes[padrao];
-  const canal = m.canais.find((c) => c.id === p.canal)!;
-  const passoBat = pp.dur / pp.passos;
-  const pcs = escalaDe(doc.tom, doc.escala);
-  const notas = p.notas.filter((n) => typeof n.nota === 'number');
-  const alturas = notas.map((n) => n.nota!);
-  // duas oitavas em volta das notas do padrão (sem notas: do Dó3 ao Dó5), com folga em cima e embaixo
-  const base = alturas.length ? Math.min(...alturas) - 3 : 48;
-  const topo = alturas.length ? Math.max(Math.max(...alturas) + 4, base + 24) : 72;
-  const linhas = Array.from({length: topo - base + 1}, (_, k) => topo - k);
-  const doCanal = doc.padroes.filter((x) => x.canal === p.canal);
-  const estado = (midi: number, k: number) => {
-    const t = k * passoBat;
-    const comeca = notas.find((n) => n.nota === midi && Math.abs(n.em - t) < 1e-6);
-    if (comeca) return {n: comeca, comeca: true};
-    const segue = notas.find((n) => n.nota === midi && n.em < t - 1e-6 && n.em + (n.dur ?? passoBat) > t + 1e-6);
-    return segue ? {n: segue, comeca: false} : null;
-  };
+// ---------- mixer ----------
+/** Medidor ao vivo: o pico da faixa (ou do master) na posição da cabeça, de −48 a 0 dBFS; vermelho perto do 0. */
+const Medidor: React.FC<{faixa?: string}> = ({faixa}) => {
+  const cabeca = useMusica((e) => e.cabeca_s);
+  const tocando = useMusica((e) => e.tocando);
+  const db = tocando ? motor.nivelEm(cabeca, faixa) : null;
+  const pct = db === null ? 0 : Math.max(0, Math.min(100, ((db + 48) / 48) * 100));
   return (
-    <div>
-      <div className="passos-topo">
-        <select className="campo" value={p.id} onChange={(e) => selecionarMusica({tipo: 'padrao', id: e.target.value})} title="Padrão do canal">
-          {doCanal.map((x) => <option key={x.id} value={x.id}>{x.nome ?? x.id}</option>)}
-        </select>
-        <button className="bt" onClick={() => void novoPadrao(p.canal)}>+ Padrão</button>
-        <button className="bt" onClick={() => void novoPadrao(p.canal, {clonar: p.id})}>Clonar</button>
-        <span className="ler" title="Tom e escala no inspetor da música">{doc.tom ?? 'C'} {doc.escala ?? 'maior'} · {NOME_PRESET[canal.preset]}</span>
-      </div>
-      <div className="passos notas" style={{gridTemplateColumns: `64px repeat(${pp.passos}, minmax(12px, 1fr))`}}>
-        {linhas.map((midi) => {
-          const fora = !pcs.includes(((midi % 12) + 12) % 12);
-          return (
-            <React.Fragment key={midi}>
-              <span className={`peca${fora ? ' fora' : ''}${midi % 12 === 0 ? ' do' : ''}`} title="Tocar a nota"
-                onClick={() => motor.tocarNota(midi, canal.preset, canal.macros)}>{nomeDaNotaPt(midi)}</span>
-              {Array.from({length: pp.passos}, (_, k) => {
-                const e = estado(midi, k);
-                return (
-                  <button key={k} className={`passo${e ? (e.comeca ? ' on' : ' segue') : ''}${fora ? ' fora' : ''}${(k * passoBat) % 1 < 1e-6 ? ' tempo' : ''}${agora === k ? ' agora' : ''}`}
-                    title={`${nomeDaNotaPt(midi)} · ${posicaoEmCompasso(k * passoBat, doc.compasso)}`}
-                    onClick={() => {
-                      if (e && !e.comeca) return;
-                      if (!e) motor.tocarNota(midi, canal.preset, canal.macros);
-                      void nota(p.id, midi, k * passoBat, passoBat);
-                    }} />
-                );
-              })}
-            </React.Fragment>
-          );
-        })}
-      </div>
+    <div className="medidor" title={db === null ? 'toque para ver o nível' : `pico ${numeroBr(db, 1)} dBFS`}>
+      <span className={db !== null && db > -3 ? 'alto' : ''} style={{width: `${pct}%`}} />
     </div>
   );
 };
 
-// ---------- mixer ----------
 const Mixer: React.FC<{doc: DocMusica}> = ({doc}) => {
   const selecao = useMusica((e) => e.selecao);
   const m = useMemo(() => resolverMusica(doc).musica, [doc]);
@@ -315,6 +272,7 @@ const Mixer: React.FC<{doc: DocMusica}> = ({doc}) => {
       {m.faixas.map((f) => (
         <div key={f.id} className={`tira${selecao?.tipo === 'faixa' && selecao.id === f.id ? ' sel' : ''}`} style={{opacity: f.mudo || (algumSolo && !f.solo) ? 0.55 : 1}}>
           <span className="nome" title={f.id} onClick={() => selecionarMusica({tipo: 'faixa', id: f.id})}>{f.nome}</span>
+          <Medidor faixa={f.id} />
           <label>Volume {numeroBr(f.volume_db, 1)} dB
             <input type="range" min={-40} max={12} step={0.5} defaultValue={f.volume_db} key={`v${f.volume_db}`}
               onPointerUp={(e) => void campoFaixa(f.id, 'volume_db', Number((e.target as HTMLInputElement).value), `volume de ${f.nome}`)} /></label>
@@ -332,6 +290,7 @@ const Mixer: React.FC<{doc: DocMusica}> = ({doc}) => {
       ))}
       <div className="tira master">
         <span className="nome">Master</span>
+        <Medidor />
         <label>Volume {numeroBr(m.master.volume_db, 1)} dB
           <input type="range" min={-40} max={12} step={0.5} defaultValue={m.master.volume_db} key={`mv${m.master.volume_db}`}
             onPointerUp={(e) => void campo('/mixer/master/volume_db', Number((e.target as HTMLInputElement).value), 'volume do master')} /></label>
