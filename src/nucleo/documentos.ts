@@ -48,6 +48,9 @@ export type CamadaImagem = {
   degrade?: Degrade; // texto e forma: no lugar de `cor` e `preenchimento`
   mascara?: string; // imagem: id da forma ou do texto logo acima, que a recorta
   src_original?: string; // imagem: o arquivo de antes do "remover fundo", para voltar
+  // seleção e layout (rodada 3, B2: src/nucleo/layout-imagem.ts e travas-imagem.ts)
+  grupo?: string; // id do grupo: as camadas com o mesmo grupo são escolhidas e andam juntas (Ctrl+G)
+  travada?: boolean; // não anda nem muda de tamanho na tela; patch da IA nela é recusado
 };
 
 /** Sombra projetada, na direção da página (não gira com a camada). Desfoque e deslocamento em px do documento. */
@@ -120,6 +123,7 @@ export type AlvoComentario = {
   tempo_ms?: number; // vídeo: ms de saída
   ponto?: {x: number; y: number}; // 0 a 1, relativo ao quadro
   contexto?: string; // texto do objeto ou palavras da narração em volta, para reancorar
+  pagina_id?: string; // imagem com várias páginas: id da página do objeto (o caminho muda quando as páginas mudam; B2, rodada 3)
 };
 
 export type Comentario = {

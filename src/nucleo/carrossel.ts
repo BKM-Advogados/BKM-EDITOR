@@ -3,7 +3,7 @@
 // só, em memória; o arquivo da pessoa só ganha `paginas` quando ela cria a segunda página (ou renomeia a primeira).
 // Cada operação devolve o patch e a lista de páginas que resulta dele, para a interface escolher a página ativa sem
 // reler o disco. Ver docs/carrossel.md.
-import type {CamadaImagem, DocImagem, OperacaoPatch, PaginaImagem} from './documentos';
+import type {AlvoComentario, CamadaImagem, DocImagem, OperacaoPatch, PaginaImagem} from './documentos';
 
 export const NOME_PAGINA = (n: number) => `Página ${n}`;
 
@@ -246,3 +246,25 @@ export const acharCamada = (doc: DocImagem, ref: string): {caminho: string; c: C
 /** Caminhos de todas as camadas com este id (duplicar página repete os ids das camadas). */
 export const caminhosDoId = (doc: DocImagem, id: string): string[] =>
   paginasDe(doc).flatMap((pg, p) => (Array.isArray(pg?.camadas) ? pg.camadas : []).flatMap((c, i) => (c?.id === id ? [`${baseCamadas(doc, p)}/${i}`] : [])));
+
+/** Página de um comentário (imagem-D5): pelo id da página quando ele tem (o caminho muda quando as páginas mudam), senão
+ *  pelo caminho; -1 se não é de camada desta imagem ou a página não existe mais. */
+export const paginaDoAlvo = (doc: DocImagem, alvo: Pick<AlvoComentario, 'objeto' | 'pagina_id'>): number => {
+  if (alvo.pagina_id && temPaginas(doc)) return paginasDe(doc).findIndex((p) => p.id === alvo.pagina_id);
+  return paginaDoCaminho(doc, alvo.objeto);
+};
+
+/** Caminho de agora da camada comentada: na página dela, pelo id da camada (se a pilha mudou) ou pelo índice do caminho
+ *  gravado; undefined se a camada não está mais lá. */
+export const caminhoDoAlvo = (doc: DocImagem, alvo: Pick<AlvoComentario, 'objeto' | 'objeto_id' | 'pagina_id'>): string | undefined => {
+  const p = paginaDoAlvo(doc, alvo);
+  if (p < 0) return undefined;
+  const base = baseCamadas(doc, p);
+  const camadas = paginasDe(doc)[p]?.camadas ?? [];
+  if (alvo.objeto_id) {
+    const i = camadas.findIndex((c) => c?.id === alvo.objeto_id);
+    if (i >= 0) return `${base}/${i}`;
+  }
+  const m = /\/camadas\/(\d+)$/.exec(alvo.objeto ?? '');
+  return m && camadas[Number(m[1])] && !alvo.objeto_id ? `${base}/${m[1]}` : undefined;
+};
