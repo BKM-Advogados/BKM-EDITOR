@@ -10,13 +10,14 @@ import {TEMA_NEUTRO, type DocCenas, type PropsCenas} from '../../../nucleo/cenas
 import {formatoDoVideo} from '../../../nucleo/formatos';
 import {
   arquivoDaFala, arquivoDasPalavras, clipesDeVoz, CPS_MAX, cpsDe, legendasDeOutraTomada, localizar, POSICOES_LEGENDA, PREDEFINICOES_LEGENDA, resolverEstilo, segmentosEm, type EstiloLegenda, type IdEstiloLegenda, type PosicaoLegenda,
-  type EstadoDaFala, type SegmentoLegenda,
+  type EstadoDaFala, type PalavraLegenda, type SegmentoLegenda,
 } from '../../../nucleo/legendas';
+import type {CorteFala} from '../../../nucleo/cortes-fala';
 import {selecionar, trocar, useLoja} from '../../estado/loja';
 import {CabecalhoInspector, CampoCor, CampoDeslizante, CampoInterruptor, CampoSelecao, Secao} from '../../componentes/Campos';
 import {
   assinarAndamento, cancelarTranscricao, dividir, editarTexto, estadoDasFalas, excluirSegmento, exportarArquivo, gerarDasTranscricoes, importarArquivo, juntarComProxima,
-  lerAndamento, mudarEstilo, ouvirAndamento, novaLegenda, refazerLegendas, substituirTudo, transcreverEGerar, trocarPredefinicao,
+  aplicarCortesDoClipe, lerAndamento, mudarEstilo, ouvirAndamento, proporCortesDoClipe, voltarCortesDoClipe, novaLegenda, refazerLegendas, substituirTudo, transcreverEGerar, trocarPredefinicao,
 } from './acoes-legendas';
 import {aoQuadro, irPara, msAtual} from './tocador';
 import './legendas.css';
@@ -88,6 +89,59 @@ const ItemLegenda: React.FC<{documento: string; s: SegmentoLegenda; em: number; 
       </div>
     );
   };
+
+/** Cortes pela fala: por clipe de voz transcrito, os cortes sugeridos (pausa longa, "ãh", pontas), para marcar e
+ *  aplicar; o clipe cortado mostra "Voltar ao áudio sem cortes". */
+const CortesFala: React.FC<{documento: string; doc: DocCenas}> = ({documento, doc}) => {
+  const clipes = clipesDeVoz(doc);
+  const [propostas, setPropostas] = useState<Record<string, {cortes: CorteFala[]; palavras: PalavraLegenda[]; marcados: boolean[]} | null>>({});
+  const [ocupado, setOcupado] = useState(false);
+  if (!clipes.length) return null;
+  const tela = (c: (typeof clipes)[number]['clipe'], ms: number) => (Number(c.em) || 0) + ms - (Number(c.corte_ms) || 0);
+  return (
+    <Secao titulo="Cortes pela fala" chave="legendas:cortes" fechadaDePadrao>
+      <div className="nota-fala">Tira as pausas longas (ficam 0,3 s) e o "ãh" e o "hum" da narração, pela transcrição: nenhum corte encosta numa palavra, e cada emenda tem
+        um crossfade de 8 ms. O clipe passa a tocar o áudio emendado e as legendas vão junto.</div>
+      {clipes.map(({clipe}) => {
+        const p = propostas[clipe.id];
+        const marcados = p ? p.cortes.filter((_, i) => p.marcados[i]) : [];
+        const economia = marcados.reduce((s, c) => s + c.ate_ms - c.de_ms, 0);
+        return (
+          <div key={clipe.id} className="cortes-clipe">
+            <div className="linha-botoes">
+              <b>{clipe.nome || clipe.arquivo.split('/').pop()}</b>
+              {clipe.cortes_fala ? <button className="bt fantasma mini" disabled={ocupado} onClick={() => void voltarCortesDoClipe(documento, clipe.id)}>Voltar ao áudio sem cortes</button> : null}
+              <button className="bt fantasma mini" disabled={ocupado} onClick={() => void proporCortesDoClipe(documento, clipe.id).then((r) =>
+                setPropostas((x) => ({...x, [clipe.id]: r ? {...r, marcados: r.cortes.map(() => true)} : null})))}><Scissors /> Propor cortes</button>
+            </div>
+            {p === null && <div className="nota-fala">Transcreva a fala deste clipe antes.</div>}
+            {p && !p.cortes.length && <div className="nota-fala">Nada a cortar: nenhuma pausa acima de 0,7 s nem "ãh".</div>}
+            {p && p.cortes.length > 0 && (
+              <>
+                <div className="lista-cortes">
+                  {p.cortes.map((c, i) => (
+                    <label key={i} className="corte">
+                      <input type="checkbox" checked={p.marcados[i]} onChange={(e) => setPropostas((x) => ({...x, [clipe.id]: {...p, marcados: p.marcados.map((m, k) => (k === i ? e.target.checked : m))}}))} />
+                      <span className="tempo" onClick={() => irPara(tela(clipe, c.de_ms))}>{tempoCurto(tela(clipe, c.de_ms))}</span>
+                      <span>{c.motivo === 'preenchimento' ? `"${c.texto}"` : 'pausa'} · −{((c.ate_ms - c.de_ms) / 1000).toFixed(1).replace('.', ',')} s</span>
+                    </label>
+                  ))}
+                </div>
+                <button className="bt principal mini" disabled={ocupado || !marcados.length} onClick={() => {
+                  setOcupado(true);
+                  void aplicarCortesDoClipe(documento, clipe.id, marcados, p.palavras).then((ok) => {
+                    setOcupado(false);
+                    if (ok) setPropostas((x) => ({...x, [clipe.id]: undefined as never}));
+                  });
+                }}>Aplicar {marcados.length} {marcados.length === 1 ? 'corte' : 'cortes'} (−{(economia / 1000).toFixed(1).replace('.', ',')} s)</button>
+              </>
+            )}
+          </div>
+        );
+      })}
+    </Secao>
+  );
+};
 
 const Transcricao: React.FC<{documento: string; doc: DocCenas}> = ({documento, doc}) => {
   const andamento = useSyncExternalStore(assinarAndamento, lerAndamento);
@@ -205,6 +259,7 @@ export const PainelLegendas: React.FC<{documento: string}> = ({documento}) => {
         sub={segs.length ? `${segs.length} ${segs.length === 1 ? 'legenda' : 'legendas'} · ${pre.nome}${leg?.oculto ? ' · escondidas' : ''}` : 'Vídeo de cenas'} dica="/legendas" />
       <div className="insp-corpo">
         <Transcricao documento={documento} doc={doc} />
+        <CortesFala documento={documento} doc={doc} />
         {leg && (
           <Secao titulo="Estilo" chave="legendas:estilo">
             <div className="predefs">

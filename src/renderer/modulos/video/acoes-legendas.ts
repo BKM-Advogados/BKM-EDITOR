@@ -5,10 +5,11 @@ import type {PedidoTranscricao, ProgressoTranscricao} from '../../../compartilha
 import {idLivre, type DocCenas, type PropsCenas} from '../../../nucleo/cenas';
 import {formatoDoVideo} from '../../../nucleo/formatos';
 import {
-  arquivoDaFala, arquivoDasPalavras, clipesDeVoz, comTexto, legendasDeOutraTomada, limitesDoArrasto, dividirSegmento, juntarSegmentos, legendasDeArquivo, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt,
+  arquivoDaFala, arquivoDasPalavras, clipesDeVoz, comTexto, palavrasValidas, type PalavraLegenda, legendasDeOutraTomada, limitesDoArrasto, dividirSegmento, juntarSegmentos, legendasDeArquivo, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt,
   requebrar, substituirEmLote, type EstadoDaFala, type EstiloLegenda, type LegendasCenas, type OpcoesBusca, type SegmentoLegenda,
 } from '../../../nucleo/legendas';
 import {confirmar} from '../../componentes/Dialogo';
+import {acharClipe, patchDosCortes, patchSemCortes, proporCortes, trechoDoClipe, type CorteFala} from '../../../nucleo/cortes-fala';
 import {aplicar, avisar, loja, mensagemDe, selecionar, trocar} from '../../estado/loja';
 
 export const docDe = (documento: string) => loja.get().docs[documento]?.doc as DocCenas | undefined;
@@ -301,4 +302,47 @@ export const exportarArquivo = async (documento: string, ext: 'srt' | 'vtt') => 
   } catch (e) {
     avisar(mensagemDe(e), 'erro');
   }
+};
+
+// ---------- cortes pela fala (src/nucleo/cortes-fala.ts) ----------
+
+const seg = (ms: number) => (ms / 1000).toFixed(1).replace('.', ',');
+
+/** Os cortes que a fala do clipe sugere (pausas longas, "ãh", pontas), com as palavras dele; null sem transcrição. */
+export const proporCortesDoClipe = async (documento: string, clipeId: string): Promise<{cortes: CorteFala[]; palavras: PalavraLegenda[]} | null> => {
+  const achado = acharClipe(docDe(documento)?.audio, clipeId);
+  if (!achado) return null;
+  try {
+    const palavras = palavrasValidas(await window.estudio.lerJson(arquivoDasPalavras(arquivoDaFala(achado.clipe))));
+    return palavras.length ? {palavras, cortes: proporCortes(palavras, trechoDoClipe(achado.clipe))} : null;
+  } catch {
+    return null;
+  }
+};
+
+/** Grava a narração emendada (processo principal) e troca o clipe por ela, com as legendas no tempo novo. */
+export const aplicarCortesDoClipe = async (documento: string, clipeId: string, cortes: CorteFala[], palavras: PalavraLegenda[]) => {
+  const achado = acharClipe(docDe(documento)?.audio, clipeId);
+  if (!achado || !cortes.length) return false;
+  try {
+    avisar(`Emendando a narração (${cortes.length} ${cortes.length === 1 ? 'corte' : 'cortes'})…`, 'info');
+    const r = await window.estudio.fala.emendar({fonte: achado.clipe.arquivo, cortes: cortes.map((c) => ({de_ms: c.de_ms, ate_ms: c.ate_ms})), palavras});
+    const d = docDe(documento);
+    if (!d) return false;
+    const tirado = r.antes_ms - r.duracao_ms;
+    if (await aplicar(documento, patchDosCortes(d, clipeId, cortes, r), `cortes pela fala (−${seg(tirado)} s)`)) {
+      avisar(`Narração ${seg(tirado)} s mais curta${r.removidas.length ? `, sem ${r.removidas.join(' ')}` : ''}. Ctrl+Z desfaz.`, 'ok');
+      return true;
+    }
+  } catch (e) {
+    avisar(mensagemDe(e), 'erro');
+  }
+  return false;
+};
+
+/** O clipe volta ao áudio de antes dos cortes (as legendas dele também). */
+export const voltarCortesDoClipe = async (documento: string, clipeId: string) => {
+  const d = docDe(documento);
+  const patch = d ? patchSemCortes(d, clipeId) : null;
+  if (patch && (await aplicar(documento, patch, 'voltar ao áudio sem cortes'))) avisar('A narração voltou ao áudio sem cortes. Ctrl+Z desfaz.', 'ok');
 };
