@@ -323,3 +323,21 @@ describe('legenda no corte 1:1 do 4:5 e acima das legendas do YouTube (fala-D8)'
     expect(areaDaLegenda(1080, 1920)).toEqual(areaDaLegenda(1080, 1920, {no_quadrado: false, legendas_youtube: true}));
   });
 });
+
+describe('Clássica: a palavra falada tem pista além da cor', () => {
+  it('fundo leve na cor de destaque só na palavra da hora, sem mexer no lugar do texto', () => {
+    const palavras = [{w: 'Recebeu', s: 0, e: 400}, {w: 'proposta', s: 400, e: 900}];
+    const legendas = resolverLegendas({segmentos: [{id: 'leg-1', em: 0, sai: 1500, texto: 'Recebeu proposta', palavras}], estilo: {predefinicao: 'classica'}},
+      {largura: 1080, altura: 1920, tema: TEMA, duracao_ms: 1500})!;
+    expect(legendas.estilo.pista).toBe('fundo');
+    tela.quadro = 15; // 500 ms: "proposta"
+    const html = renderToStaticMarkup(React.createElement(Legendas, {legendas}));
+    const spans = [...html.matchAll(/<span style="([^"]*)">(Recebeu|proposta)<\/span>/g)].map((m) => [m[2], m[1]]);
+    expect(spans.find(([w]) => w === 'proposta')![1]).toMatch(/background:rgba\(.*0\.24\).*margin:0 -/);
+    expect(spans.find(([w]) => w === 'Recebeu')![1]).not.toContain('background');
+    // o Karaokê segue só com a cor e as apagadas
+    const k = resolverLegendas({segmentos: [{id: 'leg-1', em: 0, sai: 1500, texto: 'Recebeu proposta', palavras}], estilo: {predefinicao: 'karaoke'}},
+      {largura: 1080, altura: 1920, tema: TEMA, duracao_ms: 1500})!;
+    expect(renderToStaticMarkup(React.createElement(Legendas, {legendas: k}))).not.toMatch(/background:rgba\([^)]*0\.24\)/);
+  });
+});

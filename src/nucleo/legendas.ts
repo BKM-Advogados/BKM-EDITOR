@@ -57,11 +57,12 @@ export type Predefinicao = {
   sombra: boolean;
   linhas: 1 | 2;
   max_palavras?: number;
+  pista?: 'fundo'; // além da cor, a palavra falada ganha um fundo translúcido (quem não distingue cores também segue)
 };
 
 export const PREDEFINICOES_LEGENDA: Record<IdEstiloLegenda, Predefinicao> = {
-  classica: {id: 'classica', nome: 'Clássica', descricao: 'Embaixo, caixa escura atrás da linha, palavra falada na cor de destaque', posicao: 'baixo', tam: 0.042,
-    peso: 600, maiusculas: false, caixa: 'linha', destaque: 'cor', apagadas: false, sombra: false, linhas: 2},
+  classica: {id: 'classica', nome: 'Clássica', descricao: 'Embaixo, caixa escura atrás da linha, palavra falada na cor de destaque e com um fundo leve', posicao: 'baixo',
+    tam: 0.042, peso: 600, maiusculas: false, caixa: 'linha', destaque: 'cor', apagadas: false, sombra: false, linhas: 2, pista: 'fundo'},
   caixa: {id: 'caixa', nome: 'Palavra em caixa', descricao: 'Grande, em maiúsculas, poucas palavras por vez e a palavra falada dentro de uma caixa', posicao: 'meio',
     tam: 0.068, peso: 800, maiusculas: true, caixa: 'nenhuma', destaque: 'caixa', apagadas: false, sombra: true, linhas: 2, max_palavras: 3},
   karaoke: {id: 'karaoke', nome: 'Karaokê', descricao: 'As palavras acendem conforme são ditas, como no carrossel da Cliente', posicao: 'baixo', tam: 0.056, peso: 700,
