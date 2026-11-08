@@ -22,6 +22,8 @@ import {checarTexto, REGRAS_CLIENTE, terminaComUltimaFrase, type Aviso} from './
 import {acharCamada, caminhosDoId} from './carrossel';
 import {MODELO_FUNDO, patchSemFundo, patchVoltarAoOriginal, removedorDeFundo} from './remover-fundo';
 import {registrarMusica} from './mcp-musica'; // frente Música
+import {musicaDoModelo, type ModeloMusica} from './musica-modelos'; // frente Música (item 27)
+import type {DocMusica} from './musica'; // frente Música (item 27)
 import {ARQUIVO_TRANSICOES, lerRegistro, transicaoEmCurso} from './transicoes'; // frente Música
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x, null, 2)}]});
@@ -175,13 +177,15 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
       largura: z.number().int().min(16).max(7680).optional(),
       altura: z.number().int().min(16).max(7680).optional(),
       fps: z.number().min(1).max(120).optional(),
+      modelo: z.enum(['vazio', 'batida', 'trilha_video', 'efeito_sonoro']).optional().describe('música: modelo com som gerado'), // frente Música (item 27)
     },
-  }, seguro(({modulo, titulo, formato, largura, altura, fps}: {modulo: Modulo; titulo?: string; formato?: string; largura?: number; altura?: number; fps?: number}) => {
+  }, seguro(({modulo, titulo, formato, largura, altura, fps, modelo}: {modulo: Modulo; titulo?: string; formato?: string; largura?: number; altura?: number; fps?: number;
+    modelo?: ModeloMusica}) => {
     const preset = (modulo === 'imagem' ? FORMATOS_IMAGEM : FORMATOS_VIDEO).find((f) => f.id === formato);
     if (formato && !preset) throw new ErroProjeto(`formato desconhecido: ${formato}`, 'nao_achado');
     const tam = largura && altura ? {largura, altura} : preset ? {largura: preset.largura, altura: preset.altura} : undefined;
     const {entrada, conteudo} = documentoNovo(projeto.manifesto(), modulo, {titulo, formato: tam ? {...tam, fps: fps ?? 30} : undefined});
-    projeto.adicionarDocumento(entrada, conteudo);
+    projeto.adicionarDocumento(entrada, modulo === 'musica' && modelo ? musicaDoModelo(modelo, conteudo as DocMusica) : conteudo); // frente Música: modelo
     return {ok: true, ...entrada};
   }));
 

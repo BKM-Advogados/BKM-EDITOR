@@ -87,7 +87,22 @@ export type CompressorFaixa = {ativo?: boolean; limiar_db?: number; razao?: numb
 /** Faixa do mixer: volume em dB, pan, mudo, solo, EQ, compressor e quanto vai para cada retorno (0 a 1, depois do
  *  volume): `reverb` (retorno 1) e `delay` (retorno 2). Os presets (PRESETS_FAIXA) só escrevem estes campos. */
 export type FaixaMixer = {id: string; nome?: string; volume_db?: number; pan?: number; mudo?: boolean; solo?: boolean; eq?: EqFaixa; compressor?: CompressorFaixa; reverb?: number;
-  delay?: number};
+  delay?: number; sidechain?: SidechainFaixa};
+/** Sidechain (item 22): a faixa abaixa `quanto_db` a cada nota da peça `peca` do canal `de` (o bumbo, por padrão), e volta
+ *  em `soltura_ms`. Dispara pelas notas, não pelo som: o bumbo mudo também dispara. */
+export type SidechainFaixa = {de: string; peca?: PecaBateria; quanto_db?: number; ataque_ms?: number; soltura_ms?: number};
+/** Automação de volume por pontos (item 22): `alvo` é o id de uma faixa do mixer ou "master"; cada ponto é `{em, db}` (em
+ *  batidas e dB). Entre os pontos, uma reta em dB; antes do primeiro e depois do último, o valor deles. A curva toma o lugar
+ *  do volume do fader. */
+export type AutomacaoMusica = {alvo: string; parametro?: 'volume'; pontos: {em: number; db: number}[]};
+
+// ---------- licenças e créditos (item 24) ----------
+/** "proprio": feito pelo Estúdio ou pela pessoa; "uso_proprio": de fora, mas a pessoa declarou ter o direito; "nao_sei":
+ *  sem licença informada (impede publicar até alguém dizer). */
+export type IdLicenca = 'proprio' | 'CC0-1.0' | 'MIT' | 'CC-BY-4.0' | 'uso_proprio' | 'nao_sei';
+/** De onde vem um som de fora (um áudio do projeto, por `arquivo`, ou um kit, por `kit`) e sob que licença. `credito` é o
+ *  texto que a licença pede, literal; sem ele, o crédito sai de titulo, autor, link e licença. */
+export type LicencaSom = {arquivo?: string; kit?: string; licenca: IdLicenca; titulo?: string; autor?: string; link?: string; credito?: string};
 export type ReverbMaster = {tamanho?: number; amortecimento?: number; volume_db?: number};
 /** Retorno 2, delay preso ao BPM (item 21): `tempo` em figura ("1/8." = colcheia pontuada), realimentação de 0 a 0,9,
  *  brilho de 0 (escuro) a 1, pingue-pongue alterna os lados. */
@@ -126,6 +141,8 @@ export type DocMusica = {
   video?: VideoMusica;
   acordes?: AcordeNoTempo[];
   secoes?: {id: string; nome: string; em: number; dur: number}[]; // marcas do arranjo (item 20); mover leva os clipes
+  automacoes?: AutomacaoMusica[]; // volume por pontos, por faixa ou no master (item 22)
+  licencas?: LicencaSom[]; // de onde vêm os áudios de fora e os kits importados (item 24)
 };
 
 export const ehDocMusica = (d: unknown): d is DocMusica => Boolean(d && typeof d === 'object' && (d as {tipo?: unknown}).tipo === 'musica');
@@ -251,7 +268,7 @@ export type ClipeMusicaP = {
 };
 
 export type FaixaMixerP = {id: string; nome: string; volume_db: number; pan: number; mudo: boolean; solo: boolean; eq: Required<EqFaixa>; compressor: Required<CompressorFaixa>; reverb: number;
-  delay: number};
+  delay: number; sidechain: Required<SidechainFaixa> | null};
 export type CanalMusicaP = {id: string; nome: string; tipo: 'audio' | 'bateria' | 'sintetizador'; faixa_mixer: string; kit: string; pecas: Partial<Record<PecaBateria, AjustePeca>>;
   preset: PresetSintetizador; macros: Required<MacrosSintetizador>; mudo: boolean; solo: boolean};
 
@@ -269,6 +286,8 @@ export type MusicaP = {
   padroes: Record<string, PadraoMusica & {dur: number; passos: number}>;
   faixas: FaixaMixerP[];
   master: {volume_db: number; reverb: Required<ReverbMaster>; delay: Required<DelayMaster> & {batidas: number}; limitador: Required<LimitadorMaster>};
+  /** Por faixa (ou "master"): os pontos em segundos, em ordem. */
+  automacoes: Record<string, {s: number; db: number}[]>;
   video?: {documento: string; em_ms: number; voz_guia: boolean};
 };
 
@@ -310,11 +329,26 @@ export const resolverMusica = (doc: DocMusica): {musica: MusicaP; avisos: string
       soltura_ms: limitar(numero(f.compressor?.soltura_ms, COMPRESSOR_PADRAO.soltura_ms), 5, 2000), ganho_db: limitar(numero(f.compressor?.ganho_db, 0), 0, 24)},
     reverb: limitar(numero(f.reverb, 0), 0, 1),
     delay: limitar(numero(f.delay, 0), 0, 1),
+    sidechain: null,
   }));
   for (const c of canais) {
     if (!faixas.some((f) => f.id === c.faixa_mixer)) {
-      faixas.push({id: c.faixa_mixer, nome: c.nome, volume_db: 0, pan: 0, mudo: false, solo: false, eq: {graves_db: 0, medios_db: 0, agudos_db: 0}, compressor: {...COMPRESSOR_PADRAO}, reverb: 0, delay: 0});
+      faixas.push({id: c.faixa_mixer, nome: c.nome, volume_db: 0, pan: 0, mudo: false, solo: false, eq: {graves_db: 0, medios_db: 0, agudos_db: 0}, compressor: {...COMPRESSOR_PADRAO}, reverb: 0, delay: 0, sidechain: null});
     }
+  }
+
+  // sidechain: o canal que dispara precisa existir; o resto volta para dentro da faixa
+  for (const f of faixasDoc) {
+    const sc = f.sidechain;
+    if (!sc) continue;
+    const alvo = faixas.find((x) => x.id === f.id)!;
+    const fonte = canais.find((c) => c.id === sc.de);
+    if (!fonte) {
+      avisos.push(`o sidechain da faixa "${f.nome || f.id}" vem do canal "${String(sc.de)}", que não existe; fica desligado`);
+      continue;
+    }
+    alvo.sidechain = {de: fonte.id, peca: PECAS.includes(sc.peca as PecaBateria) ? sc.peca! : 'bumbo', quanto_db: limitar(numero(sc.quanto_db, 6), 0, 24),
+      ataque_ms: limitar(numero(sc.ataque_ms, 5), 0, 50), soltura_ms: limitar(numero(sc.soltura_ms, 180), 20, 2000)};
   }
 
   const padroes: MusicaP['padroes'] = {};
@@ -358,6 +392,21 @@ export const resolverMusica = (doc: DocMusica): {musica: MusicaP; avisos: string
     });
   });
   const duracao_batidas = clipes.reduce((m, c) => Math.max(m, c.em + c.dur), 0);
+  const automacoes: MusicaP['automacoes'] = {};
+  for (const a of Array.isArray(doc.automacoes) ? doc.automacoes : []) {
+    if (!a || typeof a.alvo !== 'string') continue;
+    if (a.alvo !== 'master' && !faixas.some((f) => f.id === a.alvo)) {
+      avisos.push(`a automação é da faixa "${a.alvo}", que não existe no mixer; fica de fora`);
+      continue;
+    }
+    if (a.parametro !== undefined && a.parametro !== 'volume') {
+      avisos.push(`automação de "${String(a.parametro)}" ainda não existe (só volume); fica de fora`);
+      continue;
+    }
+    const pontos = (Array.isArray(a.pontos) ? a.pontos : []).filter((x) => x && typeof x.em === 'number' && typeof x.db === 'number')
+      .map((x) => ({s: Math.max(0, x.em) * spb, db: limitar(x.db, VOLUME_DB_MIN, VOLUME_DB_MAX)})).sort((x, y) => x.s - y.s);
+    if (pontos.length) automacoes[a.alvo] = pontos;
+  }
   const master = doc.mixer?.master ?? {};
   const r = master.reverb ?? {};
   const dl = master.delay ?? {};
@@ -368,7 +417,7 @@ export const resolverMusica = (doc: DocMusica): {musica: MusicaP; avisos: string
   return {
     musica: {
       bpm, compasso, seg_por_batida: spb, batidas_por_compasso: bpc, swing, semente: Math.trunc(numero(doc.semente, 1)),
-      duracao_batidas, duracao_s: duracao_batidas * spb, canais, clipes, padroes, faixas,
+      duracao_batidas, duracao_s: duracao_batidas * spb, canais, clipes, padroes, faixas, automacoes,
       master: {volume_db: db(master.volume_db), reverb: {tamanho: limitar(numero(r.tamanho, REVERB_PADRAO.tamanho), 0, 1),
         amortecimento: limitar(numero(r.amortecimento, REVERB_PADRAO.amortecimento), 0, 1), volume_db: db(r.volume_db)},
         delay: {tempo: tempoDelay, batidas: TEMPOS_DELAY[tempoDelay], realimentacao: limitar(numero(dl.realimentacao, DELAY_PADRAO.realimentacao), 0, 0.9),

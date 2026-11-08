@@ -4,7 +4,7 @@
 // (src/main/musica-render.ts) e no MCP por stdio, então a prévia e o render saem iguais amostra por amostra. Nada de
 // Math.random: o ruído vem da semente do documento. Ver docs/musica.md.
 import type {FonteAudio} from './loudness';
-import {resolverMusica, type CanalMusicaP, type ClipeMusicaP, type DocMusica, type FaixaMixerP, type MacrosSintetizador, type MusicaP, type NotaMusica, type PecaBateria,
+import {resolverMusica, type IdLicenca, type CanalMusicaP, type ClipeMusicaP, type DocMusica, type FaixaMixerP, type MacrosSintetizador, type MusicaP, type NotaMusica, type PecaBateria,
   type PresetSintetizador} from './musica';
 
 export const TAXA_MUSICA = 48000; // a do render do vídeo
@@ -193,7 +193,10 @@ export const sintetizarPeca = (peca: PecaBateria, taxa: number, afinacao = 0, se
 
 /** Kits que o motor sabe tocar. Só o sintetizado por enquanto; os de amostra (CC0 e MIT, conferidos dentro do pacote)
  *  entram na onda 2 com o mesmo formato (peça → som). */
-export const KITS: {id: string; nome: string; licenca: string}[] = [{id: 'eletronico', nome: 'Eletrônico (sintetizado)', licenca: 'feito pelo Estúdio, sem arquivo'}];
+/** Kits que a bateria toca. `spdx` e os campos de crédito vêm do kit.json de cada kit (onda 2); o sintetizado é próprio. */
+export const KITS: {id: string; nome: string; licenca: string; spdx: IdLicenca; titulo?: string; autor?: string; link?: string; credito?: string}[] = [
+  {id: 'eletronico', nome: 'Eletrônico (sintetizado)', licenca: 'feito pelo Estúdio, sem arquivo', spdx: 'proprio'},
+];
 
 // ---------- notas no tempo ----------
 /** Ganho da força (1 a 127): curva suave, 100 fica perto de −3 dB e 127 em 0 dB. */
@@ -434,6 +437,58 @@ export const atrasar = (entrada: Float32Array[], atraso_s: number, realimentacao
   return out;
 };
 
+// ---------- sidechain e automação de volume (item 22) ----------
+/** Os tempos (s) em que o sidechain dispara: as notas da peça no canal de bateria de origem, ou todas as notas de um
+ *  canal de sintetizador. Clipe mudo não dispara; canal mudo dispara (o bumbo "fantasma" dos produtores). */
+export const disparosDoSidechain = (m: MusicaP, sc: NonNullable<FaixaMixerP['sidechain']>): number[] => {
+  const canal = m.canais.find((c) => c.id === sc.de);
+  if (!canal || canal.tipo === 'audio') return [];
+  const out: number[] = [];
+  for (const c of m.clipes) {
+    if (c.canal !== canal.id) continue;
+    for (const ev of notasDoClipe(m, c)) if (canal.tipo !== 'bateria' || ev.nota.peca === sc.peca) out.push(ev.s);
+  }
+  return out.sort((a, b) => a - b);
+};
+
+/** Ganho do sidechain por amostra: desce até −quanto_db numa rampa de ataque_ms que acaba na nota e volta numa curva
+ *  (quadrática) em soltura_ms; notas perto umas das outras valem pela maior redução. */
+export const ganhoDoSidechain = (disparos: number[], sc: {quanto_db: number; ataque_ms: number; soltura_ms: number}, n: number, taxa: number): Float32Array => {
+  const red = new Float32Array(n);
+  const at = Math.round((sc.ataque_ms / 1000) * taxa);
+  const so = Math.max(1, Math.round((sc.soltura_ms / 1000) * taxa));
+  for (const t of disparos) {
+    const i0 = Math.round(t * taxa);
+    for (let i = Math.max(0, i0 - at); i < Math.min(n, i0); i++) {
+      const v = (i - (i0 - at)) / at;
+      if (v > red[i]) red[i] = v;
+    }
+    for (let i = Math.max(0, i0); i < Math.min(n, i0 + so); i++) {
+      const x = 1 - (i - i0) / so;
+      if (x * x > red[i]) red[i] = x * x;
+    }
+  }
+  const g = new Float32Array(n);
+  for (let i = 0; i < n; i++) g[i] = red[i] > 0 ? Math.pow(10, (-sc.quanto_db * red[i]) / 20) : 1;
+  return g;
+};
+
+/** A curva de volume por pontos em ganho linear, amostra a amostra: reta em dB entre os pontos, o valor do primeiro
+ *  antes dele e o do último depois. */
+export const ganhoDaAutomacao = (pontos: {s: number; db: number}[], n: number, taxa: number): Float32Array => {
+  const g = new Float32Array(n);
+  if (!pontos.length) return g.fill(1);
+  let k = 0;
+  for (let i = 0; i < n; i++) {
+    const s = i / taxa;
+    while (k < pontos.length - 1 && pontos[k + 1].s <= s) k++;
+    const a = pontos[k], b = pontos[k + 1];
+    const db = s <= pontos[0].s ? pontos[0].db : !b ? a.db : a.db + ((b.db - a.db) * (s - a.s)) / Math.max(1e-9, b.s - a.s);
+    g[i] = Math.pow(10, db / 20);
+  }
+  return g;
+};
+
 // ---------- limitador do master (item 21) ----------
 /** Segura o pico de amostra em `teto_db`, no lugar. O ganho desce 1,5 ms antes do pico, numa rampa (média do mínimo
  *  pedido na janela), e volta em `soltura_ms`; como cada ponto da rampa já é menor ou igual ao que o pico pede, nada
@@ -668,11 +723,16 @@ export const renderizarMusica = (doc: DocMusica, fontes: Record<string, FonteAud
   for (const f of m.faixas) {
     const entram = secos.get(f.id);
     if (!entram || f.mudo || (algumSoloFaixa && !f.solo)) continue;
-    const chave = `faixa:${JSON.stringify({f: {...f, mudo: false, solo: false, reverb: 0, delay: 0}, de: entram.map((e) => e.chave)})}`;
+    // a automação toma o lugar do fader; o sidechain dispara pelas notas do canal de origem (item 22)
+    const auto = m.automacoes[f.id];
+    const disparos = f.sidechain ? disparosDoSidechain(m, f.sidechain) : [];
+    const chave = `faixa:${JSON.stringify({f: {...f, mudo: false, solo: false, reverb: 0, delay: 0}, de: entram.map((e) => e.chave), auto, disparos})}`;
     const bus = doCache(chave, () => {
       const b = [Float32Array.from(entram[0].som[0]), Float32Array.from(entram[0].som[1])];
       for (const e of entram.slice(1)) for (let k = 0; k < 2; k++) for (let i = 0; i < n; i++) b[k][i] += e.som[k][i];
-      processarFaixa(b, f, taxa);
+      processarFaixa(b, auto ? {...f, volume_db: 0} : f, taxa);
+      const curvas = [f.sidechain && disparos.length ? ganhoDoSidechain(disparos, f.sidechain, n, taxa) : null, auto ? ganhoDaAutomacao(auto, n, taxa) : null];
+      for (const g of curvas) if (g) for (let k = 0; k < 2; k++) for (let i = 0; i < n; i++) b[k][i] *= g[i];
       return b;
     });
     for (let i = 0; i < n; i++) {
@@ -714,10 +774,19 @@ export const renderizarMusica = (doc: DocMusica, fontes: Record<string, FonteAud
     if (o.porFaixa) retornos.reverb = g === 1 ? volta : volta.map((x) => x.map((v) => v * g));
   }
   for (const k of [...cache.keys()]) if (!usadas.has(k) && !k.startsWith('peca:')) cache.delete(k);
-  const gm = ganhoDeDb(m.master.volume_db);
-  if (gm !== 1) for (let i = 0; i < n; i++) {
-    L[i] *= gm;
-    R[i] *= gm;
+  const autoMaster = m.automacoes.master;
+  if (autoMaster) {
+    const g = ganhoDaAutomacao(autoMaster, n, taxa);
+    for (let i = 0; i < n; i++) {
+      L[i] *= g[i];
+      R[i] *= g[i];
+    }
+  } else {
+    const gm = ganhoDeDb(m.master.volume_db);
+    if (gm !== 1) for (let i = 0; i < n; i++) {
+      L[i] *= gm;
+      R[i] *= gm;
+    }
   }
   const lim = m.master.limitador;
   const limitador_db = lim.ativo ? limitarNoLugar([L, R], lim.teto_db, lim.soltura_ms, taxa) : undefined;

@@ -259,7 +259,8 @@ describe('música em arquivo, MIDI e encaixe pelo MCP', () => {
   it('exporta WAV de 24 bits em −14 LUFS e os stems, com nome de arquivo limpo', async () => {
     const r = await chamar('exportar_musica', {documento: id, formato: 'wav', stems: true});
     expect(r.erro).toBe(false);
-    expect(r.dado.arquivos).toEqual(['saidas/Batida- entrega-final.wav', 'saidas/Batida- entrega-final - stems/Bateria.wav', 'saidas/Batida- entrega-final - stems/Baixo.wav']);
+    expect(r.dado.arquivos).toEqual(['saidas/Batida- entrega-final.wav', 'saidas/Batida- entrega-final - stems/Bateria.wav', 'saidas/Batida- entrega-final - stems/Baixo.wav',
+      'saidas/Batida- entrega-final.licencas.json']); // o comprovante de licenças (marco 5); créditos só quando algum som pede
     expect(Math.abs(r.dado.lufs + 14)).toBeLessThanOrEqual(0.3);
     expect(r.dado.pico_dbtp).toBeLessThanOrEqual(-0.95);
     for (const a of r.dado.arquivos) expect(existsSync(path.join(pasta, a))).toBe(true);
@@ -303,5 +304,53 @@ describe('música em arquivo, MIDI e encaixe pelo MCP', () => {
     expect(lida.duracao).toEqual({batidas: 16, compassos: 4, s: 8});
     expect(lida.secoes.map((s: {nome: string; onde: string}) => [s.nome, s.onde])).toEqual([['Cena 1', '1.1'], ['Cena 2', '3.1']]);
     expect(r.dado.avisos?.join(' ')).toMatch(/cortes longe do compasso/);
+  });
+});
+
+// ---------- marco 5: modelos, licenças e créditos (itens 24 e 27) ----------
+describe('modelos e licenças pelo MCP', () => {
+  it('criar_documento com modelo nasce com som gerado e pode ser publicado', async () => {
+    const c = await chamar('criar_documento', {modulo: 'musica', titulo: 'Batida do modelo', modelo: 'batida'});
+    expect(c.erro, JSON.stringify(c.dado)).toBe(false);
+    const lida = (await chamar('ler_musica', {documento: c.dado.id})).dado;
+    expect(lida.canais.map((x: {tipo: string}) => x.tipo)).toEqual(['bateria', 'sintetizador', 'sintetizador']);
+    expect(lida.licencas.pode_publicar).toBe(true);
+    expect(lida.mixer.some((f: {sidechain?: unknown}) => f.sidechain)).toBe(true);
+  });
+
+  it('levar_para "criar" com o modelo da trilha liga a música nova ao vídeo e fecha com fade', async () => {
+    const ida = await chamar('levar_para', {modulo: 'musica', alvo: {documento: 'video', caminho: '/audio/faixas/@musica'}, intencao: 'criar', tempo: {em_ms: 0, dur_ms: 8000},
+      modelo: 'trilha_video'});
+    expect(ida.erro, JSON.stringify(ida.dado)).toBe(false);
+    const lida = (await chamar('ler_musica', {documento: ida.dado.destino.documento})).dado;
+    expect(lida.video.documento).toBe('video');
+    expect(lida.automacoes[0].alvo).toBe('master');
+    expect(lida.duracao.compassos).toBe(3); // 8 s a 90 BPM = 2,25 compassos → 3
+    await chamar('cancelar_transicao', {transicao: ida.dado.transicao, descartar: true});
+  });
+
+  it('licencas_do_projeto diz a licença de cada som, com o SHA-256 do áudio, e a exportação grava créditos e comprovante', async () => {
+    // a música do Marco A toca midia/cama.wav, sem licença informada
+    const antes = (await chamar('licencas_do_projeto', {documento: 'musica'})).dado.musicas[0];
+    const cama = antes.sons.find((x: {tipo: string}) => x.tipo === 'audio');
+    expect(cama).toMatchObject({id: 'midia/cama.wav', licenca: 'nao_sei', classe: 'sem_licenca'});
+    expect(cama.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(antes.pode_publicar).toBe(false);
+    const doc = projeto.lerJson<DocMusica>('musica/musica.json');
+    const patch = await chamar('aplicar_patch', {documento: 'musica', versao_base: doc.versao,
+      patch: [{op: 'add', path: '/licencas', value: [{arquivo: 'midia/cama.wav', licenca: 'CC-BY-4.0', titulo: 'Cama', autor: 'Beltrano', link: 'https://exemplo.org/cama'}]}]});
+    expect(patch.erro, JSON.stringify(patch.dado)).toBe(false);
+    const depois = (await chamar('licencas_do_projeto')).dado;
+    const m = depois.musicas.find((x: {documento: string}) => x.documento === 'musica');
+    expect(m.pode_publicar).toBe(true);
+    expect(m.creditos).toEqual(['"Cama" por Beltrano (https://exemplo.org/cama), licença CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)']);
+    expect(depois.videos[0]).toMatchObject({video: 'video', creditos: m.creditos});
+    const e = await chamar('exportar_musica', {documento: 'musica', formato: 'wav', nome: 'com-credito'});
+    expect(e.dado.arquivos).toEqual(['saidas/com-credito.wav', 'saidas/com-credito.licencas.json', 'saidas/com-credito - créditos.txt']);
+    expect(projeto.lerTexto('saidas/com-credito - créditos.txt')).toMatch(/- "Cama" por Beltrano/);
+    const comprovante = JSON.parse(projeto.lerTexto('saidas/com-credito.licencas.json'));
+    expect(comprovante).toMatchObject({formato: 1, musica: 'musica', arquivo: 'saidas/com-credito.wav', pode_publicar: true});
+    expect(comprovante.sons.find((x: {tipo: string}) => x.tipo === 'audio').sha256).toBe(cama.sha256);
+    expect(CLASSES_MUSICA.licencas_do_projeto).toBe('livre');
   });
 });

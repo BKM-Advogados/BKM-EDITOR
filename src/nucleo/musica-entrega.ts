@@ -5,7 +5,7 @@
 // ganho, sem limitador: somados, dão a mistura antes dele. Ver docs/musica.md, "Exportar".
 import {medirAmostras, type FonteAudio} from './loudness';
 import {resolverMusica, type DocMusica} from './musica';
-import {limitarNoLugar, renderizarMusica, TAXA_MUSICA, type CacheSom} from './musica-som';
+import {ganhoDaAutomacao, limitarNoLugar, renderizarMusica, TAXA_MUSICA, type CacheSom} from './musica-som';
 
 export const ALVO_LUFS_MUSICA = -14;
 export const PICO_DBTP_MUSICA = -1;
@@ -29,7 +29,8 @@ export const masterizar = (canais: Float32Array[], taxa: number, o: {alvo_lufs?:
   let ganho_db = alvo - antes.integrado_lufs;
   let teto = pico - 0.3; // o pico entre amostras passa um pouco do de amostra
   let melhor: {canais: Float32Array[]; medida: MedidaEntrega; ganho: number} | null = null;
-  for (let k = 0; k < 5; k++) {
+  let antes_: {ganho_db: number; lufs: number} | null = null;
+  for (let k = 0; k < 8; k++) {
     const g = Math.pow(10, ganho_db / 20);
     const out = canais.map((c) => c.map((v) => v * g));
     const limitador_db = limitarNoLugar(out, teto, 60, taxa);
@@ -42,7 +43,11 @@ export const masterizar = (canais: Float32Array[], taxa: number, o: {alvo_lufs?:
     if (!melhor || erro < Math.abs((melhor.medida.lufs ?? alvo) - alvo) + Math.max(0, (melhor.medida.pico_dbtp ?? -120) - pico) * 2) melhor = {canais: out, medida, ganho: g};
     if (no_alvo) break;
     if (tp > pico) teto -= tp - pico + 0.1;
-    ganho_db += alvo - lufs; // o limitador tira um pouco do integrado: compensa
+    // o limitador tira parte do integrado: com duas voltas, o passo segue a inclinação medida (secante), que com o
+    // limitador trabalhando é menor que 1 LU por dB
+    const inclinacao = antes_ && Math.abs(ganho_db - antes_.ganho_db) > 1e-3 ? (lufs - antes_.lufs) / (ganho_db - antes_.ganho_db) : 1;
+    antes_ = {ganho_db, lufs};
+    ganho_db += Math.max(-6, Math.min(6, (alvo - lufs) / Math.max(0.2, Math.min(1.2, inclinacao))));
   }
   return melhor!;
 };
@@ -104,7 +109,8 @@ export const entregaDaMusica = (doc: DocMusica, fontes: Record<string, FonteAudi
   let stems: ResultadoEntrega['stems'];
   if (o.stems && som.faixas) {
     const {musica: m} = resolverMusica(doc);
-    const g = ganho * Math.pow(10, m.master.volume_db / 20);
+    const g = ganho * (m.automacoes.master ? 1 : Math.pow(10, m.master.volume_db / 20));
+    const curva = m.automacoes.master ? ganhoDaAutomacao(m.automacoes.master, som.canais[0].length, taxa) : null; // a automação do master vale para os stems
     const usados = new Set<string>();
     const nomeLivre = (nome: string) => {
       let x = nome.replace(/[\\/:*?"<>|]+/g, '-').trim() || 'faixa';
@@ -112,7 +118,7 @@ export const entregaDaMusica = (doc: DocMusica, fontes: Record<string, FonteAudi
       usados.add(x.toLowerCase());
       return x;
     };
-    const comGanho = (c: Float32Array[]) => c.map((x) => x.map((v) => v * g));
+    const comGanho = (c: Float32Array[]) => c.map((x) => x.map((v, i) => v * g * (curva ? curva[i] : 1)));
     stems = [
       ...m.faixas.filter((f) => som.faixas![f.id]).map((f) => ({nome: nomeLivre(f.nome), canais: comGanho(som.faixas![f.id])})),
       ...(som.retornos?.reverb ? [{nome: nomeLivre('Retorno reverb'), canais: comGanho(som.retornos.reverb)}] : []),

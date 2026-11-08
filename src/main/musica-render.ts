@@ -20,6 +20,8 @@ import {medirArquivo} from './loudness';
 import {entregaEmBytes, type EntregaEmBytes} from '../nucleo/musica-entrega';
 import {musicaParaMidi} from '../nucleo/musica-midi';
 import type {PedidoExportarMusica, ResultadoExportarMusica} from '../nucleo/musica-projeto';
+import {hashesDaMusica} from '../nucleo/musica-projeto';
+import {comprovanteDeLicencas, licencasDaMusica, textoDosCreditos} from '../nucleo/musica-licencas';
 import {gravarEnvelope} from './ipc-audio';
 
 const lerMusica = (p: Projeto, id: string) => {
@@ -178,7 +180,20 @@ export const exportarMusica = async (p: Projeto, id: string, pedido: PedidoExpor
     arquivos.push(rel);
   }
   if (e.stems?.length) avisos.push('os stems saem em WAV, com o mesmo ganho da mistura e sem o limitador: somados, dão a mistura');
-  return {arquivos, avisos, feito_por: daJanela?.ok ? 'janela' : 'processo', duracao_s: Math.round(e.duracao_s * 1000) / 1000, medida: e.medida, ...medidaArquivo};
+  // créditos e comprovante (item 24): o comprovante sempre; o texto dos créditos quando algum som pede crédito
+  const lic = licencasDaMusica(doc, {hashes: hashesDaMusica(p, doc)});
+  const comprovante = `${base}.licencas.json`;
+  p.gravarTexto(comprovante, serializar(comprovanteDeLicencas({musica: id, titulo, arquivo: arquivos[0], licencas: lic, gerado_em: new Date().toISOString()})));
+  arquivos.push(comprovante);
+  if (lic.creditos.length) {
+    const rel = `${base} - créditos.txt`;
+    p.gravarTexto(rel, textoDosCreditos(titulo, lic));
+    arquivos.push(rel);
+    avisos.push(`${lic.creditos.length} ${lic.creditos.length === 1 ? 'som pede' : 'sons pedem'} crédito: o texto está em ${rel}`);
+  }
+  for (const x of lic.impede) avisos.push(`antes de publicar: ${x}`);
+  return {arquivos, avisos, feito_por: daJanela?.ok ? 'janela' : 'processo', duracao_s: Math.round(e.duracao_s * 1000) / 1000, medida: e.medida, ...medidaArquivo,
+    pode_publicar: lic.pode_publicar, creditos: lic.creditos};
 };
 
 /** Renders em midia/musica/ que nenhum vídeo toca agora. O render se refaz pelo documento (o mesmo documento dá o mesmo

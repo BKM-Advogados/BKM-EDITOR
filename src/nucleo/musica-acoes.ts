@@ -566,3 +566,20 @@ export const moverSecao = (doc: DocMusica, id: string, em: number): Edicao => {
   patch.push({op: 'replace', path: '/secoes', value: secoes});
   return {patch, rotulo: `move a seção ${s.nome} para ${posicaoEmCompasso(s.em + d, doc.compasso)}`, caminho: '/secoes', extra: {secao: id}};
 };
+
+// ---------- automação de volume (item 22) ----------
+/** Troca os pontos da automação de volume de uma faixa (ou do "master"); sem pontos, tira a automação. */
+export const editarAutomacao = (doc: DocMusica, alvo: string, pontos: {em: number; db: number}[] | null): Edicao => {
+  const lista = Array.isArray(doc.automacoes) ? doc.automacoes : [];
+  const i = lista.findIndex((a) => a.alvo === alvo);
+  const limpos = (pontos ?? []).map((p) => ({em: arredondarBatida(Math.max(0, p.em)), db: Math.round(p.db * 10) / 10})).sort((a, b) => a.em - b.em);
+  const nome = alvo === 'master' ? 'master' : doc.mixer.faixas.find((f) => f.id === alvo)?.nome ?? alvo;
+  if (!limpos.length) {
+    if (i < 0) throw new Error(`a faixa ${nome} não tem automação`);
+    return {patch: [{op: 'remove', path: `/automacoes/${i}`}], rotulo: `tira a automação de ${nome}`, caminho: '/automacoes'};
+  }
+  const valor = {alvo, parametro: 'volume' as const, pontos: limpos};
+  const patch: OperacaoPatch[] = doc.automacoes === undefined ? [{op: 'add', path: '/automacoes', value: [valor]}]
+    : i >= 0 ? [{op: 'replace', path: `/automacoes/${i}`, value: valor}] : [{op: 'add', path: '/automacoes/-', value: valor}];
+  return {patch, rotulo: `automação de volume de ${nome}`, caminho: `/automacoes/${i >= 0 ? i : lista.length}`};
+};

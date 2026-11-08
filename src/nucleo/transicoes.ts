@@ -11,6 +11,7 @@ import type {EntradaDiario, EntradaDocumento, EstadoEditor, Manifesto, Modulo, O
 import {ehDocCenas, resolverCenas, type DocCenas} from './cenas';
 import {papelDe} from './audio';
 import {entradaDeMusica, ehDocMusica, musicaDeClipe, musicaParaCriar, type DocMusica} from './musica';
+import {musicaDoModelo, type ModeloMusica} from './musica-modelos';
 import {acharAlvoAudio, acharClipePorId, caminhoPorId, patchClipeNovo, patchLigarClipe, renderDaMusica} from './musica-video';
 
 export const ARQUIVO_TRANSICOES = '.estudio/transicoes.json';
@@ -87,6 +88,8 @@ export type PedidoLevar = {
   alvo: {documento: string; caminho: string};
   intencao?: IntencaoTransicao;
   tempo?: {em_ms?: number; dur_ms?: number};
+  /** "criar" na Música: o modelo da música nova (item 27); sem ele, uma bateria vazia. */
+  modelo?: ModeloMusica;
   /** A tela diz onde a pessoa estava; sem isto, vale o estado.json (o que a IA vê). */
   de?: {area?: AreaTransicao; selecao?: string; tempo_ms?: number};
 };
@@ -134,6 +137,11 @@ export const levarPara = (b: BaseProjeto, p: PedidoLevar): ResultadoLevar => {
       const em = Math.max(0, Math.round(p.tempo?.em_ms ?? (b.estado()?.documento === entradaOrigem.id ? b.estado()?.tempo_ms ?? 0 : 0)));
       const papel = papelDe(alvo.faixa) === 'efeitos' ? 'efeitos' : 'musica';
       conteudo = musicaParaCriar({video: entradaOrigem.id, papel, em_ms: em, dur_ms: p.tempo?.dur_ms ?? (papel === 'musica' ? Math.max(1000, total - em) : 2000)});
+      if (p.modelo && p.modelo !== 'vazio') {
+        // o modelo enche a mesma duração em compassos inteiros, com o título e a ligação ao vídeo
+        const dur_ms = p.tempo?.dur_ms ?? (papel === 'musica' ? Math.max(1000, total - em) : 2000);
+        conteudo = musicaDoModelo(p.modelo, conteudo, {dur_s: dur_ms / 1000});
+      }
     }
     destino = entradaDeMusica(manifesto, conteudo.titulo);
     b.adicionarDocumento(destino, conteudo);

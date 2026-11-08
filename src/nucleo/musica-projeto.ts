@@ -3,11 +3,14 @@
 // quando ela muda (autor "sistema": não entra no Ctrl+Z da pessoa). Quem renderiza o WAV é o processo principal ou o MCP
 // por stdio (src/main/musica-render.ts), registrado por definirServicoMusica; sem ele, a ligação e o caminho do render
 // ficam certos e o arquivo sai quando o app abrir o projeto. Ver docs/musica.md.
-import {rmSync, statSync} from 'node:fs';
+import {readFileSync, rmSync, statSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 import type {DocCenas} from './cenas';
 import {ehDocCenas} from './cenas';
 import {ehDocMusica, type DocMusica} from './musica';
 import type {MedidaEntrega} from './musica-entrega';
+import {audiosDaMusica} from './musica';
+import {licencasDaMusica, type LicencasDaMusica} from './musica-licencas';
 import {acharClipePorId, caminhoPorId, ehRenderDeMusica, medidaDoRender, patchAtualizarLigados, patchClipeNovo, patchLigarClipe, renderDaMusica} from './musica-video';
 import type {OperacaoPatch} from './documentos';
 import {ErroProjeto, serializar, type Projeto} from './projeto';
@@ -77,7 +80,7 @@ export type FormatoMusica = 'wav' | 'm4a' | 'opus' | 'mid';
 export type PedidoExportarMusica = {formato: FormatoMusica; stems?: boolean; alvo_lufs?: number; nome?: string};
 /** `medida` é a da mistura no alvo (antes do codificador); `arquivo_lufs` e `arquivo_dbtp`, as do arquivo codificado. */
 export type ResultadoExportarMusica = {arquivos: string[]; avisos: string[]; feito_por: 'janela' | 'processo'; duracao_s?: number; medida?: MedidaEntrega;
-  arquivo_lufs?: number; arquivo_dbtp?: number; trilhas?: number; notas?: number};
+  arquivo_lufs?: number; arquivo_dbtp?: number; trilhas?: number; notas?: number; pode_publicar?: boolean; creditos?: string[]};
 let servico: ServicoMusica | null = null;
 export const definirServicoMusica = (s: ServicoMusica | null) => {
   servico = s;
@@ -165,6 +168,35 @@ export const ligacoesDe = (p: Projeto, idMusica: string) => {
     }
   }
   return out;
+};
+
+// ---------- licenças e créditos (item 24) ----------
+/** SHA-256 de cada áudio que a música usa (o que não está no disco fica sem). */
+export const hashesDaMusica = (p: Projeto, doc: DocMusica) => {
+  const out: Record<string, string> = {};
+  for (const a of audiosDaMusica(doc)) {
+    try {
+      out[a] = createHash('sha256').update(readFileSync(p.caminho(a))).digest('hex');
+    } catch {
+      /* o áudio que falta já é aviso do render */
+    }
+  }
+  return out;
+};
+
+/** As licenças de uma música, com o SHA-256 dos áudios. */
+export const licencasDoDocumento = (p: Projeto, id: string): LicencasDaMusica => {
+  const doc = lerMusica(p, id);
+  return licencasDaMusica(doc, {hashes: hashesDaMusica(p, doc)});
+};
+
+/** Os créditos de um vídeo: os das músicas ligadas a clipes dele, juntos e sem repetir (para a exportação do vídeo pôr
+ *  ao lado do MP4 ou na descrição; frente Vídeo, na integração). */
+export const creditosDoVideo = (p: Projeto, idVideo: string) => {
+  const musicas = p.manifesto().documentos.filter((d) => d.modulo === 'musica' && ligacoesDe(p, d.id).some((l) => l.video === idVideo)).map((d) => d.id);
+  const porMusica = musicas.map((id) => ({musica: id, ...licencasDoDocumento(p, id)}));
+  return {musicas, creditos: [...new Set(porMusica.flatMap((x) => x.creditos))], impede: porMusica.flatMap((x) => x.impede.map((i) => `${x.musica}: ${i}`)),
+    pode_publicar: porMusica.every((x) => x.pode_publicar)};
 };
 
 /** Depois de mudar uma música: troca os clipes ligados e, com o serviço, grava o render. Nunca lança por causa do

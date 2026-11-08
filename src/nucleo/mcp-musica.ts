@@ -19,6 +19,9 @@ import {cancelarTransicao, concluirTransicao, levarPara, transicaoEmCurso} from 
 import {ErroProjeto, type Projeto} from './projeto';
 import {ESTILOS} from './musica-estilos';
 import {encaixarNoVideo, type ModoEncaixe} from './musica-encaixe';
+import type {ModeloMusica} from './musica-modelos';
+import {licencasDaMusica} from './musica-licencas';
+import {creditosDoVideo, licencasDoDocumento} from './musica-projeto';
 import {importarMidi} from './musica-midi';
 import {readFileSync} from 'node:fs';
 import path from 'node:path';
@@ -28,7 +31,7 @@ import path from 'node:path';
 export const CLASSES_MUSICA: Record<string, 'livre' | 'cartao'> = {
   ler_musica: 'livre', arranjar: 'livre', medir_musica: 'livre', por_no_video: 'livre', levar_para: 'livre', concluir_transicao: 'livre',
   cancelar_transicao: 'livre', trocar_kit: 'livre', escrever_notas: 'livre', criar_padrao: 'livre', aplicar_progressao: 'livre', gerar_notas: 'livre', editar_notas: 'livre',
-  encaixar_no_video: 'livre', exportar_musica: 'cartao', importar_midi: 'cartao',
+  encaixar_no_video: 'livre', exportar_musica: 'cartao', importar_midi: 'cartao', licencas_do_projeto: 'livre',
 };
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x)}]});
@@ -57,6 +60,13 @@ const musicaDe = (p: Projeto, documento?: string) => {
   if (!ehDocMusica(lido.doc)) throw new ErroProjeto(`${id} não é um documento de música`, 'patch');
   const entrada = p.manifesto().documentos.find((d) => d.caminho === rel)!;
   return {id: entrada.id, rel, doc: lido.doc as DocMusica, versao: lido.versao};
+};
+
+/** O aviso de quando a música entra no vídeo (D3): som que pede crédito. O áudio sem licença informada fica para o
+ *  licencas_do_projeto e o comprovante (se avisa aqui também é pergunta ao responsável, na nota da frente). */
+const avisosDeLicenca = (doc: DocMusica) => {
+  const l = licencasDaMusica(doc);
+  return l.creditos.length ? [`a música tem ${l.creditos.length === 1 ? 'um som que pede' : `${l.creditos.length} sons que pedem`} crédito (CC BY): o texto sai na exportação e em licencas_do_projeto`] : [];
 };
 
 export const registrarMusica = (servidor: McpServer, projeto: Projeto, autor: string, origem: string) => {
@@ -114,8 +124,14 @@ export const registrarMusica = (servidor: McpServer, projeto: Projeto, autor: st
         ...(c.audio ? {audio: c.audio, corte_s: c.corte_s} : {}), ...(c.padrao ? {padrao: c.padrao, ...(c.inicio ? {inicio: c.inicio} : {})} : {}),
         ...(c.ganho_db ? {ganho_db: c.ganho_db} : {}), ...(c.mudo ? {mudo: true} : {})})),
       mixer: r.faixas.map((f) => ({id: f.id, volume_db: f.volume_db, pan: f.pan, ...(f.mudo ? {mudo: true} : {}), ...(f.solo ? {solo: true} : {}),
-        ...(f.eq.graves_db || f.eq.medios_db || f.eq.agudos_db ? {eq: f.eq} : {}), ...(f.compressor.ativo ? {compressor: f.compressor} : {}), ...(f.reverb ? {reverb: f.reverb} : {})})),
+        ...(f.eq.graves_db || f.eq.medios_db || f.eq.agudos_db ? {eq: f.eq} : {}), ...(f.compressor.ativo ? {compressor: f.compressor} : {}), ...(f.reverb ? {reverb: f.reverb} : {}),
+        ...(f.delay ? {delay: f.delay} : {}), ...(f.sidechain ? {sidechain: f.sidechain} : {})})),
       master: r.master,
+      ...(m.doc.automacoes?.length ? {automacoes: m.doc.automacoes} : {}),
+      licencas: (() => {
+        const l = licencasDaMusica(m.doc);
+        return {pode_publicar: l.pode_publicar, sons: l.sons.map((x) => `${x.nome}: ${x.licenca}`), ...(l.creditos.length ? {creditos: l.creditos.length} : {})};
+      })(),
       ...(video ? {video} : {}),
       ...(ligacoes.length ? {no_video: ligacoes} : {}),
       ...(eventos ? {notas: notas.slice(0, 300).map((e) => ({s: r3(e.s), ...(e.nota.peca ? {peca: e.nota.peca} : {nota: e.nota.nota}), forca: e.nota.forca ?? 100, clipe: e.clipe})),
@@ -175,8 +191,9 @@ export const registrarMusica = (servidor: McpServer, projeto: Projeto, autor: st
     const m = musicaDe(projeto, o.musica);
     const r = porNoVideo(projeto, {...o, musica: m.id}, {autor, origem});
     const depois = await depoisDeMudarMusica(projeto, m.id);
+    const lic = avisosDeLicenca(m.doc);
     return {ok: true, seq: r.seq, documento: r.documento, caminho: r.caminho, render: r.render.arquivo, duracao_ms: r.render.duracao_ms,
-      ...('aviso' in depois && depois.aviso ? {aviso_render: depois.aviso} : {})};
+      ...('aviso' in depois && depois.aviso ? {aviso_render: depois.aviso} : {}), ...(lic.length ? {avisos: lic} : {})};
   }));
 
   // ---------- ida e volta entre módulos ----------
@@ -187,8 +204,10 @@ export const registrarMusica = (servidor: McpServer, projeto: Projeto, autor: st
       alvo: z.object({documento: z.string().describe('id do vídeo'), caminho: z.string().describe('/audio/faixas/@<faixa>/clipes/@<clipe>, ou só a faixa para criar')}),
       intencao: z.enum(['editar', 'criar', 'substituir']).optional().describe('padrão: editar num clipe, criar numa faixa'),
       tempo: z.object({em_ms: z.number().min(0).optional(), dur_ms: z.number().positive().optional()}).optional().describe('criar: onde entra no vídeo e quanto dura'),
+      modelo: z.enum(['vazio', 'batida', 'trilha_video', 'efeito_sonoro']).optional().describe('criar: modelo da música nova (padrão: bateria vazia)'),
     },
-  }, seguro((p: {modulo: 'musica' | 'video' | 'imagem' | '3d' | 'efeitos'; alvo: {documento: string; caminho: string}; intencao?: 'editar' | 'criar' | 'substituir'; tempo?: {em_ms?: number; dur_ms?: number}}) =>
+  }, seguro((p: {modulo: 'musica' | 'video' | 'imagem' | '3d' | 'efeitos'; alvo: {documento: string; caminho: string}; intencao?: 'editar' | 'criar' | 'substituir'; tempo?: {em_ms?: number; dur_ms?: number};
+    modelo?: ModeloMusica}) =>
     levarPara(baseDoProjeto(projeto, autor, origem), p)));
 
   servidor.registerTool('concluir_transicao', {
@@ -202,7 +221,8 @@ export const registrarMusica = (servidor: McpServer, projeto: Projeto, autor: st
     const r = concluirTransicao(baseDoProjeto(projeto, autor, origem), p);
     if (!r.musica) return r;
     const depois = await depoisDeMudarMusica(projeto, r.musica);
-    return {...r, ...('aviso' in depois && depois.aviso ? {aviso_render: depois.aviso} : {})};
+    const lic = avisosDeLicenca(musicaDe(projeto, r.musica).doc);
+    return {...r, ...('aviso' in depois && depois.aviso ? {aviso_render: depois.aviso} : {}), ...(lic.length ? {avisos: [...r.avisos, ...lic]} : {})};
   }));
 
   servidor.registerTool('cancelar_transicao', {
@@ -345,6 +365,7 @@ export const registrarMusica = (servidor: McpServer, projeto: Projeto, autor: st
     const md = r.medida;
     return {ok: true, documento: m.id, arquivos: r.arquivos, ...(md ? {lufs: md.lufs, pico_dbtp: md.pico_dbtp, ganho_db: md.ganho_db, limitador_db: md.limitador_db} : {}),
       ...(r.arquivo_lufs !== undefined ? {arquivo_lufs: r.arquivo_lufs, arquivo_dbtp: r.arquivo_dbtp} : {}), ...(r.notas !== undefined ? {trilhas: r.trilhas, notas: r.notas} : {}),
+      ...(r.pode_publicar !== undefined ? {pode_publicar: r.pode_publicar} : {}), ...(r.creditos?.length ? {creditos: r.creditos} : {}),
       ...(r.avisos.length ? {avisos: r.avisos} : {})};
   }));
 
@@ -367,6 +388,23 @@ export const registrarMusica = (servidor: McpServer, projeto: Projeto, autor: st
       throw new ErroProjeto(`não achei o arquivo: ${a.arquivo}`, 'nao_achado');
     }
     return aplicarEdicao(m, importarMidi(m.doc, bytes, {em: a.em, usar_bpm: a.usar_bpm, nome: a.nome}));
+  }));
+
+  // ---------- licenças e créditos (item 24) ----------
+  servidor.registerTool('licencas_do_projeto', {
+    description: 'Cada som que a música toca (kit, sintetizador ou áudio), com licença, classe (livre, credito, declarado, sem_licenca), SHA-256 do áudio e o que impede publicar, e o texto dos créditos. Sem documento: todas as músicas e os créditos de cada vídeo. A licença de um áudio se diz por patch em /licencas.',
+    inputSchema: {documento: z.string().optional().describe('id da música')},
+  }, seguro(({documento}: {documento?: string}) => {
+    const ids = documento ? [musicaDe(projeto, documento).id] : projeto.manifesto().documentos.filter((d) => d.modulo === 'musica').map((d) => d.id);
+    const musicas = ids.map((id) => {
+      const l = licencasDoDocumento(projeto, id);
+      return {documento: id, pode_publicar: l.pode_publicar, creditos: l.creditos, ...(l.impede.length ? {impede: l.impede} : {}),
+        sons: l.sons.map((x) => ({tipo: x.tipo, id: x.id, licenca: x.licenca, classe: x.classe, canais: x.canais, ...(x.credito ? {credito: x.credito} : {}),
+          ...(x.autor ? {autor: x.autor} : {}), ...(x.link ? {link: x.link} : {}), ...(x.sha256 ? {sha256: x.sha256} : {})}))};
+    });
+    const videos = documento ? [] : projeto.manifesto().documentos.filter((d) => d.modulo === 'video').map((d) => ({video: d.id, ...creditosDoVideo(projeto, d.id)}))
+      .filter((v) => v.musicas.length);
+    return {musicas, ...(videos.length ? {videos} : {})};
   }));
 };
 
