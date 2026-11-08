@@ -87,6 +87,8 @@ arquivo de fora do projeto, exporta, apaga ou reverte mudança de outro autor.
 | `ler_legendas` | `livre` (só lê) | `documento?`, `de?`, `ate?` | as legendas nos tempos da tela (id, em, sai, texto, falante), já com o clipe de voz no lugar em que está |
 | `editar_legenda` | `livre` | `documento?`, `id`, `texto?`, `em?`, `sai?` | corrige o texto (cada palavra guarda o tempo da que estava no lugar, como na lista do app) e o tempo, dado como na tela: o app desconta o quanto o clipe andou desde que a legenda nasceu. Entrar e sair o mesmo tanto leva as palavras junto (sem sair do trecho do clipe: recusa e diz quanto dá); mudar uma ponta apara |
 | `exportar_legendas` | `cartao` (exporta) | `documento?`, `formatos?`, `nome?`, `falantes_no_srt?`, `sobrescrever?` | `saidas/<título>.srt` e `.vtt`, nos tempos de saída; com o nome tomado, `<título> (2).srt` (só grava por cima com `sobrescrever`) |
+| `propor_cortes_fala` | `livre` (só lê) | `documento?`, `clipe?`, `silencio_min_ms?`, `pausa_ms?`, `preenchimento?`, `pontas?` | os cortes que a fala do clipe sugere (ms do arquivo), com o motivo, o "ãh" tirado, o contexto (três palavras antes e depois) e quanto encurta |
+| `aplicar_cortes_fala` | `livre` (grava um WAV novo em `midia/` e o patch no diário; Reverter desfaz) | `documento?`, `clipe?`, `cortes?`, `voltar?` | emenda a narração sem os cortes (os pedidos ou os sugeridos), troca o arquivo do clipe e leva as legendas; recusa corte a menos de 80 ms de palavra; `voltar: true` volta ao arquivo de antes |
 | `importar_legendas` | `livre` | `arquivo`, `documento?`, `estilo?` | lê um SRT ou VTT do projeto (UTF-8, UTF-16 ou Windows-1252, pelos bytes) e troca as legendas |
 
 O `transcrever` pedido pela IA mostra o andamento e o Cancelar no painel das legendas ("A IA pediu: …"), como o do
@@ -223,6 +225,51 @@ leva o falante na marca de voz (`<v Nome>`) e escapa `&`, `<` e `>`. A leitura a
 `MM:SS.mmm`, vírgula ou ponto nos milésimos, ajustes de cue, `NOTE`, `STYLE`, `REGION`, etiquetas (`<i>`, `<c.x>`,
 `<font>`, `{\an8}`) e carimbos de palavra do VTT; o que não entende vira aviso. Ida e volta sem perder um milissegundo
 (teste). Ao importar, o tempo de cada palavra é estimado.
+
+## Cortes pela fala
+
+`src/nucleo/cortes-fala.ts` (a conta, pura), `src/main/cortes-fala.ts` (o WAV), `src/nucleo/mcp-fala.ts` (as duas
+ferramentas) e a seção "Cortes pela fala" do painel das legendas.
+
+- **O que sai.** Cada pausa acima de 700 ms fica com 300 ms (a mesma pausa que abre legenda nova); as palavras de
+  preenchimento que o whisper escreve ("ãh", "hum", "éé", "ahn") saem com a pausa em volta; o silêncio antes da primeira
+  palavra e depois da última do trecho que o clipe toca fica com meia pausa. "é", "né", "tipo" e "então" ficam: têm
+  sentido na fala jurídica.
+- **As regras.** Nenhuma borda de corte a menos de 80 ms de uma palavra que fica, então o corte nunca pega um pedaço de
+  palavra (`conferirCortes` recusa o pedido que pega); o "ãh" colado numa palavra fica. Cada emenda tem crossfade de
+  potência igual de 8 ms, centrado nela e tirado do silêncio dos dois lados; a ponta cortada do arquivo ganha uma rampa
+  curta. O render do Remotion muda o volume por pacote e não emenda áudio, então a emenda é um WAV novo.
+- **O arquivo.** `midia/<fonte>.cortes-<código>.wav` (o código vem dos cortes: os mesmos cortes dão o mesmo arquivo), em
+  PCM de 16 bits na taxa e nos canais da fonte, ao lado do `palavras.json` dele (as palavras que ficam, no tempo novo,
+  com o carimbo do WAV novo: a transcrição continua em dia sem rodar o whisper). A fonte é o que o clipe toca: a voz
+  limpa, se houver. O arquivo entra no git (é o que o clipe toca).
+- **O documento.** O clipe passa a tocar o WAV emendado, com `corte_ms` e `duracao_ms` no tempo novo, e guarda em
+  `cortes_fala` {`fonte`, `cortes`, `corte_ms`, `duracao_ms`, `original`, `limpeza`} o que era antes; o `original` e a
+  `limpeza` da voz limpa vão para dentro dele, porque a fala do clipe passa a ser a do arquivo emendado. As legendas do
+  clipe andam para o tempo novo e a palavra cortada sai delas; a origem passa a ser o arquivo emendado. Tudo num patch
+  só: Ctrl+Z e Reverter desfazem, e "Voltar ao áudio sem cortes" (ou `aplicar_cortes_fala` com `voltar`) volta ao
+  arquivo de antes mesmo depois de outras mudanças.
+- **Medido** (`testes/cortes-fala.test.ts` e `testes/cortes-fala-mcp.test.ts`): zumbido de 47 Hz contínuo com rajadas
+  de 440 Hz nas palavras; com o crossfade, o maior passo entre amostras perto de cada emenda fica na ordem do próprio
+  zumbido, e o controle sem crossfade estala (passo mais de 20 vezes maior); o WAV sai com o tamanho de antes menos os
+  cortes, amostra a amostra; cada palavra começa no tempo remapeado. De ponta a ponta com o ffmpeg do Remotion, num
+  projeto temporário: WAV, `palavras.json` em dia, legendas no tempo novo sem o "ãh", recusa e volta.
+- **Caminho.** Vídeo → faixa "Legendas" → painel → "Cortes pela fala" → "Propor cortes" → marcar → "Aplicar". Pela IA:
+  `propor_cortes_fala` e `aplicar_cortes_fala`. A cena não encurta junto: se a narração ficou mais curta que as cenas, a
+  pessoa ajusta as cenas.
+
+## Para o guia da IA
+
+Texto para a coordenação juntar no `claudeMd` (seção do vídeo de cenas):
+
+> **Legendas, régua.** `ler_legendas` devolve `cps` (caracteres por segundo) de cada legenda e `rapidas_para_ler` (acima
+> de 17); a correção é esticar o `sai` no vão (`editar_legenda`), dividir ou encurtar o texto. A quebra é pela largura
+> medida da fonte, até 42 caracteres por linha, em duas linhas, e não deixa artigo, preposição, auxiliar ou "não" no fim
+> da linha. No 4:5 a legenda fica no corte 1:1 (`estilo.no_quadrado: false` usa a altura toda).
+> **Cortes pela fala.** `propor_cortes_fala` {clipe?} sugere tirar pausas longas (ficam 300 ms) e "ãh"/"hum", em ms do
+> arquivo, com o contexto de cada corte; mostre à pessoa e aplique com `aplicar_cortes_fala` {clipe?, cortes?} (todos ou
+> os escolhidos; nunca a menos de 80 ms de uma palavra). O clipe passa a tocar um WAV novo e guarda o de antes em
+> `cortes_fala`: não escreva `cortes_fala` à mão; para desfazer, `aplicar_cortes_fala` com `voltar: true`.
 
 ## Rodada 3 (08/11/2026)
 
