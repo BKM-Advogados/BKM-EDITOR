@@ -47,7 +47,9 @@ export type IntensidadeLimpeza = 'leve' | 'media' | 'forte';
 export type FaixaAudio = {id: string; nome: string; papel?: PapelFaixa; volume?: number; mudo?: boolean; ducking?: Ducking; clipes: ClipeAudio[]};
 
 /** `alvo_lufs` e `pico_dbtp`: o loudness integrado e o pico verdadeiro máximo do arquivo exportado (padrão −14 e −1). */
-export type AudioCenas = {faixas: FaixaAudio[]; alvo_lufs?: number; pico_dbtp?: number};
+export type AudioCenas = {faixas: FaixaAudio[]; alvo_lufs?: number; pico_dbtp?: number;
+  acompanha_cenas?: boolean; // frente Som (rodada 3): false desliga o som que anda com as cenas (som-com-cenas.ts); padrão: acompanha
+};
 
 /** Loudness por janela do arquivo, em dB com ponderação K (o mesmo número do LUFS, por janela). `db` tem uma entrada
  *  por `janela_ms`; SILENCIO_DB é "nada". Gravado em midia/<arquivo>.envelope.json pelo processo principal, com `fonte`:

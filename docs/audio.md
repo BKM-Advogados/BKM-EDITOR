@@ -364,6 +364,28 @@ e 9 CC0; Scott Buckley, Audionautix, Lee Rosevere, HoliznaCC0, Open Goldberg Var
 baixada**: a escolha é do responsável. Depois do ok, baixar só as escolhidas para a pasta de trilhas, gravar a ficha ao lado com o
 `sha256` e conferir. O validador roda o arquivo da proposta inteiro nos testes.
 
+## A narração presa às cenas (video-D3)
+
+Inserir, duplicar, excluir ou mudar a duração de uma cena **empurra o som que vem depois**, e as legendas que seguem esses clipes vão
+junto (`src/nucleo/som-com-cenas.ts`). É um ajuste que o `Projeto` soma ao patch na **mesma gravação** (`projeto.adicionarAjuste`,
+registrado no `main.ts` e em `registrarSom`): o diário tem uma entrada só, e Ctrl+Z, "Ver" e "Reverter" desfazem o conjunto. Vale
+igual para a pessoa (inspetor, linha do tempo, Ctrl+K…) e para a IA (`aplicar_patch` em `/cenas`).
+
+- **Cena mais longa, nova ou duplicada** (em N ms): abre um vazio de N ms no fim dela. O clipe que atravessa esse ponto é dividido ali
+  (`dividirClipe`, com as legendas e a grade de quadros) e tudo o que começa depois anda N ms para a frente.
+- **Cena mais curta ou excluída**: tira esse trecho do som. Os clipes inteiros dentro dele saem (com as legendas e os efeitos), os que o
+  atravessam são cortados, e o que vem depois anda para trás.
+- **Dividir a cena** (Ctrl+K): a metade de baixo é uma cena nova logo depois da antiga, o total é o mesmo e o som não muda.
+- **Não age:** quando o patch já mexe em `/audio` ou `/legendas` (quem o fez cuida do som, e é o que faz o Ctrl+Z não somar duas
+  vezes); quando a ordem das cenas muda; quando nenhuma cena de antes sobra (todas trocadas por ids novos: não há como saber para onde
+  o som vai); e com `audio.acompanha_cenas: false` (campo opcional, padrão: acompanha).
+- **Limites:** o corte cai na grade de quadros do clipe (até meio quadro de diferença); um clipe com menos de 100 ms de um dos lados do
+  ponto conta como inteiro do lado onde está a maior parte; cena de duração fora de 300 ms a 10 min é lida com o limite, como no
+  resolvedor. **Medido** nos testes (`testes/som-com-cenas.test.ts`): alongar a cena 2 em 1 s move 1 s as legendas e o efeito da cena 3 e
+  deixa as das cenas 1 e 2; excluir a cena 2 tira 4 s do som, das legendas e dos efeitos e a cena 3 sobe; a legenda atravessada pelo corte
+  é partida na palavra do corte; o inverso do diário devolve o documento de antes. **Não verificado** na interface (arrastar a duração
+  na linha do tempo).
+
 ## Pasta de trilhas
 
 Preferência `pasta_trilhas` (padrão `%USERPROFILE%\Estudio\trilhas`). "Música da biblioteca…" lista os mp3, wav,
@@ -377,6 +399,7 @@ está na seção acima; a pasta continua sendo da pessoa.
   `volumeDoClipe`. Puro, sem disco.
 - `src/nucleo/cenas.ts`: `audio` no documento e nas props; `resolverCenas(doc, {envelopes})`.
 - `src/nucleo/gravacao.ts`: WAV PCM, medidor e teleprompter. `src/main/ipc-gravacao.ts`: salva a tomada. `src/renderer/modulos/video/gravador.ts` e `GravadorNarracao.tsx`: a captura e o painel.
+- `src/nucleo/som-com-cenas.ts`: o som que acompanha as cenas (`somAcompanhaCenas`, o ajuste do `Projeto`).
 - `src/nucleo/clipes-audio.ts`: `dividirClipe`, `copiarClipe`, `crossfadeEntre`, `volumeDoEfeito` (puros, em JSON Patch).
   `src/nucleo/mcp-som.ts`: as ferramentas MCP do som (`registrarSom`, uma linha em `ferramentas-mcp.ts`).
 - `src/composicoes/cenas/VideoCenas.tsx`: `<Som>` com um `<Html5Audio>` por clipe.
@@ -391,7 +414,7 @@ está na seção acima; a pasta continua sendo da pessoa.
 - `src/renderer/modulos/video/`: `envelope.ts` (mede com Web Audio), `acoes-audio.ts` (patches, limpar e voltar ao
   original), `FaixasAudio.tsx` (linha do tempo), `BibliotecaTrilhas.tsx`, `MedidorLoudness.tsx`, e as partes de áudio em
   `LinhaDoTempo.tsx` e `InspectorCenas.tsx`.
-- `testes/audio.test.ts`, `testes/loudness.test.ts`, `testes/limpeza-voz.test.ts`, `testes/clipes-audio.test.ts`, `testes/mcp-som.test.ts`, `testes/gravacao.test.ts`; `scripts/audio-sintetico.ts` (WAV de
+- `testes/audio.test.ts`, `testes/loudness.test.ts`, `testes/limpeza-voz.test.ts`, `testes/clipes-audio.test.ts`, `testes/mcp-som.test.ts`, `testes/gravacao.test.ts`, `testes/biblioteca-musicas.test.ts`, `testes/som-com-cenas.test.ts`; `scripts/audio-sintetico.ts` (WAV de
   teste da prévia web e do script de exportação), `scripts/limpeza-teste.mjs` e `scripts/exportar-teste-som.mjs`.
 - Prévia web: a ponte limpa e mede de verdade (o mesmo núcleo) sobre os WAV sintéticos.
 
@@ -413,3 +436,6 @@ que tocam juntas.
 Para a pessoa gravar a narração: `preparar_teleprompter` (ou o campo `teleprompter` por patch) deixa o texto pronto; peça a ela para abrir
 "+ Áudio" › "Gravar narração…" (o microfone é dela). Depois da gravação, o clipe já está na faixa de narração; `adicionar_clipe_audio`
 serve para pôr outro arquivo de `midia/` (a tomada de outra pessoa, uma música, um efeito).
+
+Ao mudar a duração ou a ordem das cenas por `aplicar_patch`, o som e as legendas dos clipes acompanham sozinhos (o `audio.acompanha_cenas: false` desliga). Se o seu
+patch já mexe em `/audio`, o som é por sua conta: o ajuste não soma nada por cima.

@@ -11,6 +11,7 @@ import {clipeNovoNaFaixa, copiarClipe, crossfadeEntre, dividirClipe, recusou, ty
 import {arquivoDaFicha, creditosDas, validarFicha, type FichaFaixa} from './biblioteca-musicas';
 import {duracaoDoTeleprompter, PPM_PADRAO, textoDasCenas} from './gravacao';
 import {importarTrilha, listarTrilhas, pastaTrilhas} from './pasta-trilhas';
+import {somAcompanhaCenas} from './som-com-cenas';
 import {ErroProjeto, type Projeto} from './projeto';
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x, null, 2)}]});
@@ -68,6 +69,7 @@ export const medidasDoVideo = (projeto: Projeto, doc: unknown): Record<string, u
 const seg = (ms: number) => (ms / 1000).toLocaleString('pt-BR', {maximumFractionDigits: 2});
 
 export const registrarSom = (servidor: McpServer, projeto: Projeto, autor: string, origem: string) => {
+  projeto.adicionarAjuste(somAcompanhaCenas); // o som anda com as cenas também no MCP fora do app (video-D3)
   servidor.registerTool('dividir_clipe', {
     description: 'Divide um clipe de áudio do vídeo de cenas em dois, no tempo do vídeo (ms). O corte vai para a grade de quadros e as duas metades tocam juntas o mesmo som do clipe inteiro. Volume, mudo, voz limpa e legendas vão junto; o fade de entrada fica na primeira metade e o de saída na segunda. Cada metade tem pelo menos 100 ms.',
     inputSchema: {

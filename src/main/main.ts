@@ -25,6 +25,7 @@ import {Terminais} from './terminais';
 import {registrarIpcAudio} from './ipc-audio';
 import {registrarIpcGravacao} from './ipc-gravacao'; // frente Som (rodada 3)
 import {definirPastaTrilhas} from '../nucleo/pasta-trilhas';
+import {somAcompanhaCenas} from '../nucleo/som-com-cenas';
 import {registrarIpcFala} from './ipc-fala'; // frente Fala
 import {legendasNoDestino, type LegendasP} from '../nucleo/legendas'; // frente Fala: legendas no tamanho de cada destino
 import {registrarPrefsExportacao} from './ipc-exportacao';
@@ -149,6 +150,7 @@ const abrirProjeto = async (raiz: string) => {
   });
   midia.servir(raiz);
   regerarClaudeMd(raiz); // o Claude conhece os campos desta versão também nos projetos criados antes dela
+  sessao.projeto.adicionarAjuste(somAcompanhaCenas); // frente Som: a narração presa às cenas (som-com-cenas.ts)
   apagarLimposSemUso(sessao.projeto); // frente Som: as versões limpas da voz que nem documento nem diário citam (limpeza-voz.ts)
   await sessao.abrir();
   memoria.lembrar(raiz, manifesto.nome);

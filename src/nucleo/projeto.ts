@@ -107,6 +107,12 @@ export class Projeto {
   }
 
   // ---------- patches e diário ----------
+  private readonly ajustes = new Set<(doc: unknown, patch: OperacaoPatch[]) => OperacaoPatch[]>();
+  /** Registra um ajuste que soma operações ao patch na mesma gravação (idempotente: a mesma função entra uma vez). */
+  adicionarAjuste(f: (doc: unknown, patch: OperacaoPatch[]) => OperacaoPatch[]) {
+    this.ajustes.add(f);
+  }
+
   aplicarPatch(entrada: {
     documento: string;
     patch: OperacaoPatch[];
@@ -122,9 +128,19 @@ export class Projeto {
     }
     const erro = jsonpatch.validate(entrada.patch as Operation[], doc);
     if (erro) throw new ErroProjeto(`patch inválido: ${erro.name} em ${erro.operation?.path ?? '?'}: ${erro.message.split('\n')[0]}`);
+    // ajustes de módulos (frente Som: o som acompanha as cenas) somam operações ao patch na mesma gravação: o diário fica com uma entrada só
+    let patch = entrada.patch;
+    for (const ajuste of this.ajustes) {
+      try {
+        patch = [...patch, ...ajuste(doc, patch)];
+      } catch {
+        /* um ajuste com defeito não derruba a gravação da pessoa */
+      }
+    }
+    if (patch !== entrada.patch && jsonpatch.validate(patch as Operation[], doc)) patch = entrada.patch; // ajuste que gerou patch inválido: fica só o da pessoa
     let depois: unknown;
     try {
-      depois = jsonpatch.applyPatch(doc, entrada.patch as Operation[], true, false).newDocument;
+      depois = jsonpatch.applyPatch(doc, patch as Operation[], true, false).newDocument;
     } catch (e) {
       throw new ErroProjeto(`patch recusado: ${(e as Error).message.split('\n')[0]}`);
     }
@@ -140,7 +156,7 @@ export class Projeto {
       rotulo: entrada.rotulo ?? resumirPatch(entrada.patch),
       versao_antes: versao,
       versao_depois: versaoDepois,
-      patch: entrada.patch.filter((o) => o.op !== 'test'),
+      patch: patch.filter((o) => o.op !== 'test'),
       inverso: jsonpatch.compare(depois as object, doc as object) as OperacaoPatch[],
     };
     this.registrar(registro);
