@@ -30,15 +30,24 @@ export const NOME_PECA: Record<PecaBateria, string> = {
  *  umas às outras, como o chimbal fechado que corta o aberto). */
 export type AjustePeca = {volume_db?: number; pan?: number; afinacao?: number; grupo?: number};
 
-/** Canal do arranjo: de áudio (clipes de arquivo) ou de bateria (clipes de padrão tocados por um kit). Cada canal sai
- *  numa faixa do mixer (`faixa_mixer`, padrão o próprio id). */
+/** Sintetizador da casa (item 14): quatro sons de partida e quatro macros de 0 a 1. */
+export type PresetSintetizador = 'baixo' | 'pad' | 'pluck' | 'lead';
+export const PRESETS: PresetSintetizador[] = ['baixo', 'pad', 'pluck', 'lead'];
+export const NOME_PRESET: Record<PresetSintetizador, string> = {baixo: 'Baixo', pad: 'Pad', pluck: 'Pluck', lead: 'Lead'};
+/** brilho: abre o filtro; ataque: entrada mais lenta; soltura: cauda mais longa; cor: mistura e desafina os osciladores. */
+export type MacrosSintetizador = {brilho?: number; ataque?: number; soltura?: number; cor?: number};
+
+/** Canal do arranjo: de áudio (clipes de arquivo), de bateria (clipes de padrão tocados por um kit) ou de sintetizador
+ *  (clipes de padrão com notas MIDI). Cada canal sai numa faixa do mixer (`faixa_mixer`, padrão o próprio id). */
 export type CanalMusica = {
   id: string;
   nome: string;
-  tipo: 'audio' | 'bateria';
+  tipo: 'audio' | 'bateria' | 'sintetizador';
   faixa_mixer?: string;
   kit?: string; // bateria: id do kit (padrão: 'eletronico', o sintetizado pelo motor)
   pecas?: Partial<Record<PecaBateria, AjustePeca>>;
+  preset?: PresetSintetizador; // sintetizador (padrão: pluck)
+  macros?: MacrosSintetizador;
   mudo?: boolean;
   solo?: boolean;
 };
@@ -83,6 +92,9 @@ export type MixerMusica = {faixas: FaixaMixer[]; master?: {volume_db?: number; r
 
 export type MarcadorMusica = {id: string; em: number; nome: string};
 
+/** Faixa de acordes (item 18): cada acorde por cifra ("Am7") ou grau no tom ("vi"), em batidas. */
+export type AcordeNoTempo = {em: number; dur: number; acorde: string};
+
 /** Ligação com o vídeo: de que documento a música é a trilha, onde ela começa nele e se a voz do vídeo toca como guia
  *  na Música (não entra no render). Os cortes das cenas não ficam gravados: saem do vídeo na hora. */
 export type VideoMusica = {documento: string; em_ms?: number; voz_guia?: boolean};
@@ -105,6 +117,7 @@ export type DocMusica = {
   mixer: MixerMusica;
   marcadores?: MarcadorMusica[];
   video?: VideoMusica;
+  acordes?: AcordeNoTempo[];
 };
 
 export const ehDocMusica = (d: unknown): d is DocMusica => Boolean(d && typeof d === 'object' && (d as {tipo?: unknown}).tipo === 'musica');
@@ -211,7 +224,8 @@ export type ClipeMusicaP = {
 };
 
 export type FaixaMixerP = {id: string; nome: string; volume_db: number; pan: number; mudo: boolean; solo: boolean; eq: Required<EqFaixa>; compressor: Required<CompressorFaixa>; reverb: number};
-export type CanalMusicaP = {id: string; nome: string; tipo: 'audio' | 'bateria'; faixa_mixer: string; kit: string; pecas: Partial<Record<PecaBateria, AjustePeca>>; mudo: boolean; solo: boolean};
+export type CanalMusicaP = {id: string; nome: string; tipo: 'audio' | 'bateria' | 'sintetizador'; faixa_mixer: string; kit: string; pecas: Partial<Record<PecaBateria, AjustePeca>>;
+  preset: PresetSintetizador; macros: Required<MacrosSintetizador>; mudo: boolean; solo: boolean};
 
 export type MusicaP = {
   bpm: number;
@@ -249,9 +263,12 @@ export const resolverMusica = (doc: DocMusica): {musica: MusicaP; avisos: string
   const swing = limitar(numero(doc.swing, 0), 0, 1);
 
   const faixasDoc = Array.isArray(doc.mixer?.faixas) ? doc.mixer.faixas : [];
+  const macro = (v: unknown, padrao: number) => limitar(numero(v, padrao), 0, 1);
   const canais: CanalMusicaP[] = (Array.isArray(doc.canais) ? doc.canais : []).map((c) => ({
-    id: c.id, nome: c.nome || c.id, tipo: c.tipo === 'bateria' ? 'bateria' : 'audio', faixa_mixer: c.faixa_mixer || c.id, kit: c.kit || 'eletronico',
-    pecas: c.pecas ?? {}, mudo: Boolean(c.mudo), solo: Boolean(c.solo),
+    id: c.id, nome: c.nome || c.id, tipo: c.tipo === 'bateria' || c.tipo === 'sintetizador' ? c.tipo : 'audio', faixa_mixer: c.faixa_mixer || c.id, kit: c.kit || 'eletronico',
+    pecas: c.pecas ?? {}, preset: PRESETS.includes(c.preset as PresetSintetizador) ? c.preset! : 'pluck',
+    macros: {brilho: macro(c.macros?.brilho, 0.5), ataque: macro(c.macros?.ataque, 0), soltura: macro(c.macros?.soltura, 0.3), cor: macro(c.macros?.cor, 0.3)},
+    mudo: Boolean(c.mudo), solo: Boolean(c.solo),
   }));
   const idsCanais = new Set(canais.map((c) => c.id));
 
@@ -297,10 +314,10 @@ export const resolverMusica = (doc: DocMusica): {musica: MusicaP; avisos: string
     } else if (canal.tipo === 'audio' && !c.audio) {
       avisos.push(`o clipe "${nome}" está num canal de áudio sem "audio"; fica calado`);
       mudo = true;
-    } else if (canal.tipo === 'bateria' && (!c.padrao || !padroes[c.padrao])) {
-      avisos.push(c.padrao ? `o clipe "${nome}" toca o padrão "${c.padrao}", que não existe; fica calado` : `o clipe "${nome}" está num canal de bateria sem "padrao"; fica calado`);
+    } else if (canal.tipo !== 'audio' && (!c.padrao || !padroes[c.padrao])) {
+      avisos.push(c.padrao ? `o clipe "${nome}" toca o padrão "${c.padrao}", que não existe; fica calado` : `o clipe "${nome}" está num canal de ${canal.tipo} sem "padrao"; fica calado`);
       mudo = true;
-    } else if (canal.tipo === 'bateria' && padroes[c.padrao!].canal !== canal.id) {
+    } else if (canal.tipo !== 'audio' && padroes[c.padrao!].canal !== canal.id) {
       avisos.push(`o clipe "${nome}" toca no canal "${canal.id}" o padrão "${c.padrao}", que é do canal "${padroes[c.padrao!].canal}"`);
     }
     const fadeIn = limitar(numero(c.fade_in, 0), 0, dur);
@@ -308,7 +325,7 @@ export const resolverMusica = (doc: DocMusica): {musica: MusicaP; avisos: string
     clipes.push({
       id: c.id, canal: c.canal, indice, em, dur, em_s: em * spb, dur_s: dur * spb, audio: canal?.tipo === 'audio' ? c.audio : undefined,
       corte_s: Math.max(0, numero(c.corte_s, 0)), ganho_db: db(c.ganho_db), fade_in_s: fadeIn * spb, fade_out_s: fadeOut * spb,
-      padrao: canal?.tipo === 'bateria' ? c.padrao : undefined, inicio: Math.max(0, numero(c.inicio, 0)), mudo,
+      padrao: canal && canal.tipo !== 'audio' ? c.padrao : undefined, inicio: Math.max(0, numero(c.inicio, 0)), mudo,
     });
   });
   const duracao_batidas = clipes.reduce((m, c) => Math.max(m, c.em + c.dur), 0);

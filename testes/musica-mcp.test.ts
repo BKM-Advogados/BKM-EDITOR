@@ -202,4 +202,25 @@ describe('música pelo MCP', () => {
     await fora.callTool({name: 'concluir_transicao', arguments: {transicao: t.transicao}});
     await fora.close();
   });
+
+  it('acordes, baixo gerado e melodia num sintetizador, pelo MCP; o vídeo recebe a versão nova', async () => {
+    const antes = clipe('clipe-2').arquivo;
+    const p = await chamar('aplicar_progressao', {documento: 'musica', acordes: ['I', 'vi', 'IV', 'V'], dur_por_acorde: 2});
+    expect(p.dado.ok).toBe(true);
+    const g = await chamar('gerar_notas', {documento: 'musica', tipo: 'baixo', estilo: 'oitavas'});
+    expect(g.dado).toMatchObject({ok: true, canal: 'baixo', notas: 16});
+    const lead = await chamar('criar_padrao', {documento: 'musica', canal: 'melodia', instrumento: 'lead', no_arranjo: {em: 0, dur: 8}});
+    expect(lead.dado.ok).toBe(true);
+    const e = await chamar('escrever_notas', {documento: 'musica', padrao: lead.dado.padrao, notas: [{nota: 61, em: 0, dur: 1}, {nota: 64, em: 1}], na_escala: true});
+    expect(e.dado.ok).toBe(true);
+    const m = projeto.lerJson<DocMusica>('musica/musica.json').doc;
+    expect(m.padroes.find((x) => x.id === lead.dado.padrao)!.notas.map((n) => n.nota)).toEqual([62, 64]); // Dó♯ vai para Ré em Dó maior
+    const lida = await chamar('ler_musica', {documento: 'musica'});
+    expect(lida.dado.acordes.map((a: {nome: string}) => a.nome)).toEqual(['C', 'Am', 'F', 'G']);
+    expect(lida.dado.canais.find((c: {id: string}) => c.id === 'melodia')).toMatchObject({tipo: 'sintetizador', preset: 'lead'});
+    expect(clipe('clipe-2').arquivo).not.toBe(antes);
+    const recusa = await chamar('criar_padrao', {documento: 'musica', canal: 'melodia', estilo: 'pop'});
+    expect(recusa.erro).toBe(true);
+    expect(recusa.dado).toMatch(/estilos da casa são de bateria/);
+  });
 });

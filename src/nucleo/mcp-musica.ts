@@ -8,8 +8,10 @@ import type {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {z} from 'zod';
 import type {OperacaoPatch} from './documentos';
 import {ehDocCenas, type DocCenas} from './cenas';
-import {ehDocMusica, NOME_PECA, PECAS, posicaoEmCompasso, resolverMusica, type DocMusica, type PecaBateria} from './musica';
-import {criarPadrao, editarArranjo, escreverNotas, trocarKit, type Edicao, type PedidoArranjo, type PedidoNotas, type PedidoPadrao} from './musica-acoes';
+import {ehDocMusica, NOME_PECA, PECAS, posicaoEmCompasso, PRESETS, resolverMusica, type DocMusica, type PecaBateria, type PresetSintetizador} from './musica';
+import {aplicarProgressao, criarPadrao, editarArranjo, escreverNotas, ESTILOS_GERADOS, gerarNotas, trocarKit, type Edicao, type EstiloGerado, type PedidoArranjo, type PedidoGerar,
+  type PedidoNotas, type PedidoPadrao, type PedidoProgressao} from './musica-acoes';
+import {acordeDe, escalaDe, NOMES} from './musica-teoria';
 import {KITS, notasDoClipe} from './musica-som';
 import {cortesDoVideo, renderDaMusica} from './musica-video';
 import {assinaturaDe, baseDoProjeto, depoisDeMudarMusica, ligacoesDe, porNoVideo, servicoMusica} from './musica-projeto';
@@ -20,7 +22,7 @@ import {ESTILOS} from './musica-estilos';
 /** Classe de cada ferramenta para o portão de permissão (frente IA): todas gravam no diário com Reverter ou só leem. */
 export const CLASSES_MUSICA: Record<string, 'livre' | 'cartao'> = {
   ler_musica: 'livre', arranjar: 'livre', medir_musica: 'livre', por_no_video: 'livre', levar_para: 'livre', concluir_transicao: 'livre',
-  cancelar_transicao: 'livre', trocar_kit: 'livre', escrever_notas: 'livre', criar_padrao: 'livre',
+  cancelar_transicao: 'livre', trocar_kit: 'livre', escrever_notas: 'livre', criar_padrao: 'livre', aplicar_progressao: 'livre', gerar_notas: 'livre',
 };
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x)}]});
@@ -96,7 +98,10 @@ export const registrarMusica = (servidor: McpServer, projeto: Projeto, autor: st
     return {
       documento: m.id, versao: m.versao, titulo: m.doc.titulo, bpm: r.bpm, compasso: r.compasso, tom: m.doc.tom, escala: m.doc.escala, swing: r.swing,
       duracao: {batidas: r3(r.duracao_batidas), compassos: r3(r.duracao_batidas / r.batidas_por_compasso), s: r3(r.duracao_s)},
-      canais: r.canais.map((c) => ({id: c.id, nome: c.nome, tipo: c.tipo, ...(c.tipo === 'bateria' ? {kit: c.kit} : {}), faixa_mixer: c.faixa_mixer, ...(c.mudo ? {mudo: true} : {}), ...(c.solo ? {solo: true} : {})})),
+      canais: r.canais.map((c) => ({id: c.id, nome: c.nome, tipo: c.tipo, ...(c.tipo === 'bateria' ? {kit: c.kit} : {}), ...(c.tipo === 'sintetizador' ? {preset: c.preset, macros: c.macros} : {}),
+        faixa_mixer: c.faixa_mixer, ...(c.mudo ? {mudo: true} : {}), ...(c.solo ? {solo: true} : {})})),
+      escala_notas: escalaDe(m.doc.tom, m.doc.escala).map((pc) => NOMES[pc]),
+      ...(m.doc.acordes?.length ? {acordes: m.doc.acordes.map((x) => ({...x, nome: acordeDe(x.acorde, m.doc.tom, m.doc.escala)?.nome ?? '?'}))} : {}),
       padroes: Object.values(r.padroes).map((p) => ({id: p.id, nome: p.nome, canal: p.canal, dur: p.dur, passos: p.passos, notas: p.notas.length})),
       clipes: r.clipes.map((c) => ({id: c.id, canal: c.canal, em: c.em, dur: c.dur, onde: posicaoEmCompasso(c.em, r.compasso), em_s: r3(c.em_s), dur_s: r3(c.dur_s),
         ...(c.audio ? {audio: c.audio, corte_s: c.corte_s} : {}), ...(c.padrao ? {padrao: c.padrao, ...(c.inicio ? {inicio: c.inicio} : {})} : {}),
@@ -205,10 +210,11 @@ export const registrarMusica = (servidor: McpServer, projeto: Projeto, autor: st
   }));
 
   servidor.registerTool('criar_padrao', {
-    description: `Cria um padrão num canal (e um canal de bateria novo, se ele não existir): vazio, clonado de outro, ou de um estilo da casa (${ESTILOS.map((e) => e.id).join(', ')}). Com no_arranjo, já põe um clipe dele.`,
+    description: `Cria um padrão num canal (e o canal, se não existir: de bateria, ou de sintetizador com instrumento): vazio, clonado, ou de um estilo de bateria da casa (${ESTILOS.map((e) => e.id).join(', ')}). Com no_arranjo, já põe um clipe dele.`,
     inputSchema: {
       documento: z.string().optional(),
-      canal: z.string().describe('id do canal; se não existir, nasce um canal de bateria com ele'),
+      canal: z.string().describe('id do canal; se não existir, nasce com ele'),
+      instrumento: z.enum(['bateria', ...PRESETS] as ['bateria', ...PresetSintetizador[]]).optional().describe('canal novo: bateria (padrão) ou um sintetizador (baixo, pad, pluck, lead)'),
       nome: z.string().optional(),
       dur: z.number().positive().optional().describe('batidas (padrão: um compasso)'),
       passos: z.number().int().min(1).max(64).optional().describe('grade do sequenciador (padrão: 16 por compasso)'),
@@ -223,13 +229,13 @@ export const registrarMusica = (servidor: McpServer, projeto: Projeto, autor: st
 
   const notaSchema = z.object({
     peca: z.enum(PECAS as [PecaBateria, ...PecaBateria[]]).optional(),
-    nota: z.number().int().min(0).max(127).optional().describe('MIDI, 60 = Dó central (instrumentos, depois)'),
+    nota: z.number().int().min(0).max(127).optional().describe('MIDI, 60 = Dó central (canal de sintetizador)'),
     em: z.number().min(0).describe('batida dentro do padrão'),
-    dur: z.number().positive().optional().describe('batidas (padrão 0,25)'),
+    dur: z.number().positive().optional().describe('batidas (padrão: um passo da grade)'),
     forca: z.number().int().min(1).max(127).optional().describe('padrão 100'),
   });
   servidor.registerTool('escrever_notas', {
-    description: `Escreve notas num padrão (bateria: peça ${PECAS.join(', ')}). modo somar (padrão) ou trocar (apaga as do trecho de..ate antes). quantizar encaixa na grade. Nota igual (mesma peça e tempo) não duplica: troca a força.`,
+    description: `Escreve notas num padrão (bateria: peca ${PECAS.join(', ')}; sintetizador: nota MIDI). modo somar (padrão) ou trocar (apaga as do trecho de..ate antes). quantizar encaixa na grade; na_escala leva cada nota para a escala do tom. Nota igual (mesma peça ou altura e tempo) não duplica.`,
     inputSchema: {
       documento: z.string().optional(),
       padrao: z.string(),
@@ -238,10 +244,39 @@ export const registrarMusica = (servidor: McpServer, projeto: Projeto, autor: st
       de: z.number().min(0).optional().describe('trocar: batida inicial do trecho (padrão 0)'),
       ate: z.number().min(0).optional().describe('trocar: batida final (padrão: fim do padrão)'),
       quantizar: z.enum(['1/4', '1/8', '1/16', '1/32']).optional().describe('fração de compasso 4/4: 1/16 = semicolcheia'),
+      na_escala: z.boolean().optional().describe('leva cada nota MIDI para a nota mais perto da escala (tom e escala da música)'),
     },
   }, seguro(async (a: PedidoNotas & {documento?: string}) => {
     const m = musicaDe(projeto, a.documento);
     return aplicarEdicao(m, escreverNotas(m.doc, a));
+  }));
+
+  // ---------- tom, acordes e notas geradas (itens 18 e 19) ----------
+  servidor.registerTool('aplicar_progressao', {
+    description: 'Escreve a faixa de acordes no tom da música (tom e escala por patch em /tom e /escala): graus como I vi IV V, V7, ii7, bVII, ou cifras como Am7, F/C. Um depois do outro, a partir de em. Depois, gerar_notas faz baixo, arpejo ou acordes deles.',
+    inputSchema: {
+      documento: z.string().optional(),
+      acordes: z.array(z.string()).min(1).max(64),
+      em: z.number().min(0).optional().describe('batida do primeiro (padrão 0)'),
+      dur_por_acorde: z.number().positive().optional().describe('batidas (padrão: um compasso)'),
+    },
+  }, seguro(async (a: PedidoProgressao & {documento?: string}) => {
+    const m = musicaDe(projeto, a.documento);
+    return aplicarEdicao(m, aplicarProgressao(m.doc, a));
+  }));
+
+  const estilos = [...new Set(Object.values(ESTILOS_GERADOS).flat())] as [EstiloGerado, ...EstiloGerado[]];
+  servidor.registerTool('gerar_notas', {
+    description: `Gera notas da faixa de acordes num canal de sintetizador (nasce com o som do tipo se faltar) e põe o clipe cobrindo os acordes. baixo: ${ESTILOS_GERADOS.baixo.join(', ')}; arpejo: ${ESTILOS_GERADOS.arpejo.join(', ')}; acordes: ${ESTILOS_GERADOS.acordes.join(', ')}. As notas ficam escritas.`,
+    inputSchema: {
+      documento: z.string().optional(),
+      tipo: z.enum(['baixo', 'arpejo', 'acordes']),
+      estilo: z.enum(estilos).optional(),
+      canal: z.string().optional().describe('id do canal de sintetizador (padrão: o do som do tipo, ou um novo)'),
+    },
+  }, seguro(async (a: PedidoGerar & {documento?: string}) => {
+    const m = musicaDe(projeto, a.documento);
+    return aplicarEdicao(m, gerarNotas(m.doc, a));
   }));
 };
 

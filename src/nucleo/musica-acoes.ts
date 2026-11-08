@@ -2,8 +2,9 @@
 // do MCP (mcp-musica.ts). Cada função lê o documento como está e devolve o patch (com "test" no que ela confere), o
 // rótulo do diário e o caminho do que mudou; nada aqui grava. Erro é Error com a frase para a pessoa ou para a IA.
 import type {OperacaoPatch} from './documentos';
-import {arredondarBatida, batidasPorCompasso, idLivre, novaFaixaMixer, posicaoEmCompasso, segPorBatida,
-  type CanalMusica, type ClipeMusica, type DocMusica, type NotaMusica, type PadraoMusica, type PecaBateria} from './musica';
+import {arredondarBatida, batidasPorCompasso, idLivre, NOME_PRESET, novaFaixaMixer, posicaoEmCompasso, PRESETS, segPorBatida,
+  type AcordeNoTempo, type CanalMusica, type ClipeMusica, type DocMusica, type NotaMusica, type PadraoMusica, type PecaBateria, type PresetSintetizador} from './musica';
+import {acordeDe, baixoDoAcorde, encaixarNaEscala, nomeDaNota, vozesDoAcorde} from './musica-teoria';
 import {KITS} from './musica-som';
 import {ESTILOS, padraoDoEstilo} from './musica-estilos';
 
@@ -106,7 +107,7 @@ export const editarArranjo = (doc: DocMusica, a: PedidoArranjo, o: {existe?: (ar
 
 // ---------- notas ----------
 export type Quantizar = '1/4' | '1/8' | '1/16' | '1/32';
-export type PedidoNotas = {padrao: string; notas: NotaMusica[]; modo?: 'somar' | 'trocar'; de?: number; ate?: number; quantizar?: Quantizar};
+export type PedidoNotas = {padrao: string; notas: NotaMusica[]; modo?: 'somar' | 'trocar'; de?: number; ate?: number; quantizar?: Quantizar; na_escala?: boolean};
 
 /** Escreve notas num padrão: nota igual (mesma peça ou altura, mesmo tempo) troca, não duplica; com "trocar", o trecho
  *  de..ate é apagado antes. As notas ficam em ordem de tempo. */
@@ -131,7 +132,8 @@ export const escreverNotas = (doc: DocMusica, a: PedidoNotas): Edicao => {
       fora++;
       continue;
     }
-    const n: NotaMusica = {...(n0.peca ? {peca: n0.peca} : {nota: n0.nota}), em, ...(n0.dur ? {dur: n0.dur} : {}), ...(n0.forca ? {forca: n0.forca} : {})};
+    const altura = n0.nota !== undefined && a.na_escala ? encaixarNaEscala(n0.nota, doc.tom, doc.escala) : n0.nota;
+    const n: NotaMusica = {...(n0.peca ? {peca: n0.peca} : {nota: altura}), em, ...(n0.dur ? {dur: n0.dur} : {}), ...(n0.forca ? {forca: n0.forca} : {})};
     notas = notas.filter((x) => !(Math.abs(x.em - n.em) < 1e-6 && (n.peca ? x.peca === n.peca : x.nota === n.nota)));
     notas.push(n);
   }
@@ -155,7 +157,8 @@ export const alternarPasso = (doc: DocMusica, padrao: string, peca: PecaBateria,
 };
 
 // ---------- padrões, canais e kits ----------
-export type PedidoPadrao = {canal: string; nome?: string; dur?: number; passos?: number; clonar?: string; estilo?: string; no_arranjo?: {em?: number; dur?: number}};
+export type PedidoPadrao = {canal: string; nome?: string; dur?: number; passos?: number; clonar?: string; estilo?: string; no_arranjo?: {em?: number; dur?: number};
+  instrumento?: 'bateria' | PresetSintetizador};
 
 /** Padrão novo num canal (o canal de bateria nasce, com a faixa do mixer, se não existir): vazio, clonado ou de um
  *  estilo da casa; com no_arranjo, também o clipe que o toca. */
@@ -164,13 +167,16 @@ export const criarPadrao = (doc: DocMusica, a: PedidoPadrao): Edicao => {
   const patch: OperacaoPatch[] = [];
   let canal = doc.canais.find((c) => c.id === a.canal);
   if (!canal) {
-    if (!/^[a-z0-9_-]{1,40}$/i.test(a.canal)) throw new Error('o id do canal novo é curto, sem espaço (ex.: bateria, bateria-2)');
-    canal = {id: a.canal, nome: a.canal.charAt(0).toUpperCase() + a.canal.slice(1).replace(/[-_]/g, ' '), tipo: 'bateria', faixa_mixer: a.canal, kit: 'eletronico'};
+    if (!/^[a-z0-9_-]{1,40}$/i.test(a.canal)) throw new Error('o id do canal novo é curto, sem espaço (ex.: bateria, baixo-2)');
+    const sint = a.instrumento && a.instrumento !== 'bateria' && PRESETS.includes(a.instrumento) ? a.instrumento : null;
+    const nome = a.canal.charAt(0).toUpperCase() + a.canal.slice(1).replace(/[-_]/g, ' ');
+    canal = sint ? {id: a.canal, nome, tipo: 'sintetizador', faixa_mixer: a.canal, preset: sint} : {id: a.canal, nome, tipo: 'bateria', faixa_mixer: a.canal, kit: 'eletronico'};
     patch.push({op: 'add', path: '/canais/-', value: canal});
     if (!doc.mixer.faixas.some((f) => f.id === a.canal)) patch.push({op: 'add', path: '/mixer/faixas/-', value: novaFaixaMixer(a.canal, canal.nome)});
-  } else if (canal.tipo !== 'bateria') {
-    throw new Error(`${a.canal} é um canal de áudio; padrões são de canais de bateria`);
+  } else if (canal.tipo === 'audio') {
+    throw new Error(`${a.canal} é um canal de áudio; padrões são de canais de bateria ou de sintetizador`);
   }
+  if (a.estilo && canal.tipo !== 'bateria') throw new Error('os estilos da casa são de bateria; num sintetizador, escreva as notas ou gere dos acordes (gerar_notas)');
   const id = idLivre('p', doc.padroes.map((p) => p.id));
   let notas: NotaMusica[] = [];
   let dur = a.dur ?? bpc;
@@ -230,3 +236,101 @@ export const novoCanalDeAudio = (doc: DocMusica, audio: string, duracao_s: numbe
     rotulo: `canal de áudio ${canal.nome}`, caminho: `/canais/${doc.canais.length}`, extra: {canal: id, clipe},
   };
 };
+
+// ---------- notas por altura, tom e acordes (itens 14, 18 e 19) ----------
+/** A célula da grade de notas: liga a nota MIDI no tempo `em` (com a duração de um passo) ou, se já toca ali, desliga. */
+export const alternarNota = (doc: DocMusica, padrao: string, nota: number, em: number, dur?: number): Edicao => {
+  const i = doc.padroes.findIndex((p) => p.id === padrao);
+  if (i < 0) throw new Error(`padrão não achado: ${padrao}`);
+  const p = doc.padroes[i];
+  const t = arredondarBatida(em);
+  const tem = p.notas.some((n) => n.nota === nota && Math.abs(n.em - t) < 1e-6);
+  const notas = tem ? p.notas.filter((n) => !(n.nota === nota && Math.abs(n.em - t) < 1e-6))
+    : [...p.notas, {nota, em: t, ...(dur ? {dur: arredondarBatida(dur)} : {})}].sort((x, y) => x.em - y.em || (x.nota ?? 0) - (y.nota ?? 0));
+  return {patch: [{op: 'test', path: `/padroes/${i}/id`, value: p.id}, {op: 'replace', path: `/padroes/${i}/notas`, value: notas}],
+    rotulo: `${tem ? 'tira' : 'põe'} ${nomeDaNota(nota)} em ${posicaoEmCompasso(t, doc.compasso)}`, caminho: `/padroes/${i}/notas`};
+};
+
+export type PedidoProgressao = {acordes: string[]; em?: number; dur_por_acorde?: number};
+
+/** Escreve a faixa de acordes no tom do projeto: cada acorde por grau ("vi", "V7") ou cifra ("Am7"), um depois do outro,
+ *  a partir de `em` (padrão 0), com `dur_por_acorde` batidas (padrão: um compasso). O trecho coberto é trocado; o resto
+ *  da faixa fica. Acorde que não se entende vira aviso e fica de fora. */
+export const aplicarProgressao = (doc: DocMusica, a: PedidoProgressao): Edicao => {
+  const bpc = batidasPorCompasso(doc.compasso);
+  const dur = arredondarBatida(a.dur_por_acorde ?? bpc);
+  const em0 = arredondarBatida(a.em ?? 0);
+  const avisos: string[] = [];
+  const novos: AcordeNoTempo[] = [];
+  a.acordes.forEach((s, k) => {
+    if (!acordeDe(s, doc.tom, doc.escala)) avisos.push(`acorde não entendido: "${s}" (use grau como vi, V7, ou cifra como Am7, F/C)`);
+    else novos.push({em: arredondarBatida(em0 + k * dur), dur, acorde: s.trim()});
+  });
+  if (!novos.length) throw new Error(avisos.join('; ') || 'diga os acordes');
+  const fim = em0 + a.acordes.length * dur;
+  const ficam = (doc.acordes ?? []).filter((x) => x.em + x.dur <= em0 + 1e-9 || x.em >= fim - 1e-9);
+  const acordes = [...ficam, ...novos].sort((x, y) => x.em - y.em);
+  return {patch: [{op: doc.acordes ? 'replace' : 'add', path: '/acordes', value: acordes}], rotulo: `acordes ${a.acordes.join(' ')}`, caminho: '/acordes',
+    extra: {acordes: novos.map((x) => ({...x, nome: acordeDe(x.acorde, doc.tom, doc.escala)!.nome}))}, avisos};
+};
+
+export type TipoGerado = 'baixo' | 'arpejo' | 'acordes';
+export type EstiloGerado = 'longo' | 'batidas' | 'oitavas' | 'sobe' | 'desce' | 'sobe_desce';
+export const ESTILOS_GERADOS: Record<TipoGerado, EstiloGerado[]> = {baixo: ['longo', 'batidas', 'oitavas'], arpejo: ['sobe', 'desce', 'sobe_desce'], acordes: ['longo', 'batidas']};
+const PRESET_DO_TIPO: Record<TipoGerado, PresetSintetizador> = {baixo: 'baixo', arpejo: 'pluck', acordes: 'pad'};
+
+/** As notas que a faixa de acordes pede, em batidas desde o começo do primeiro acorde. */
+export const notasGeradas = (doc: DocMusica, tipo: TipoGerado, estilo?: EstiloGerado): {notas: NotaMusica[]; em: number; dur: number} => {
+  const lista = [...(doc.acordes ?? [])].sort((x, y) => x.em - y.em);
+  if (!lista.length) throw new Error('a música não tem faixa de acordes: escreva com aplicar_progressao (ex.: I vi IV V)');
+  const em = lista[0].em;
+  const fim = lista.reduce((m, x) => Math.max(m, x.em + x.dur), 0);
+  const e = estilo && ESTILOS_GERADOS[tipo].includes(estilo) ? estilo : ESTILOS_GERADOS[tipo][0];
+  const notas: NotaMusica[] = [];
+  for (const x of lista) {
+    const a = acordeDe(x.acorde, doc.tom, doc.escala);
+    if (!a) continue;
+    const ini = x.em - em;
+    if (tipo === 'baixo') {
+      const raiz = baixoDoAcorde(a);
+      if (e === 'longo') notas.push({nota: raiz, em: ini, dur: x.dur, forca: 105});
+      else if (e === 'batidas') for (let b = 0; b < x.dur - 1e-9; b += 1) notas.push({nota: raiz, em: ini + b, dur: 0.9, forca: b === 0 ? 110 : 95});
+      else for (let b = 0; b < x.dur - 1e-9; b += 0.5) notas.push({nota: raiz + (Math.round(b * 2) % 2 ? 12 : 0), em: ini + b, dur: 0.45, forca: Math.round(b * 2) % 2 ? 85 : 105});
+    } else if (tipo === 'acordes') {
+      const vozes = vozesDoAcorde(a, 62);
+      if (e === 'longo') for (const v of vozes) notas.push({nota: v, em: ini, dur: x.dur, forca: 80});
+      else for (let b = 0; b < x.dur - 1e-9; b += 1) for (const v of vozes) notas.push({nota: v, em: ini + b, dur: 0.9, forca: b === 0 ? 90 : 75});
+    } else {
+      const vozes = [...vozesDoAcorde(a, 64), ...vozesDoAcorde(a, 64).map((v) => v + 12)];
+      const ordem = e === 'desce' ? [...vozes].reverse() : e === 'sobe_desce' ? [...vozes, ...vozes.slice(1, -1).reverse()] : vozes;
+      for (let b = 0, k = 0; b < x.dur - 1e-9; b += 0.5, k++) notas.push({nota: ordem[k % ordem.length], em: ini + b, dur: 0.45, forca: k % 2 ? 80 : 95});
+    }
+  }
+  return {notas: notas.map((n) => ({...n, em: arredondarBatida(n.em), dur: arredondarBatida(n.dur ?? 0.25)})), em, dur: arredondarBatida(fim - em)};
+};
+
+export type PedidoGerar = {canal?: string; tipo: TipoGerado; estilo?: EstiloGerado};
+
+/** Gera um padrão a partir da faixa de acordes, num canal de sintetizador (que nasce com o som do tipo, se faltar), e
+ *  põe o clipe dele cobrindo os acordes. As notas ficam escritas: mexer nos acordes depois não muda este padrão. */
+export const gerarNotas = (doc: DocMusica, a: PedidoGerar): Edicao => {
+  const {notas, em, dur} = notasGeradas(doc, a.tipo, a.estilo);
+  const patch: OperacaoPatch[] = [];
+  const idCanal = a.canal ?? (doc.canais.find((c) => c.tipo === 'sintetizador' && c.preset === PRESET_DO_TIPO[a.tipo])?.id ?? idLivreCanal(doc, a.tipo));
+  let canal = doc.canais.find((c) => c.id === idCanal);
+  if (!canal) {
+    canal = {id: idCanal, nome: NOME_PRESET[PRESET_DO_TIPO[a.tipo]], tipo: 'sintetizador', faixa_mixer: idCanal, preset: PRESET_DO_TIPO[a.tipo]};
+    patch.push({op: 'add', path: '/canais/-', value: canal});
+    if (!doc.mixer.faixas.some((f) => f.id === idCanal)) patch.push({op: 'add', path: '/mixer/faixas/-', value: novaFaixaMixer(idCanal, canal.nome)});
+  } else if (canal.tipo !== 'sintetizador') {
+    throw new Error(`${canal.id} é um canal de ${canal.tipo}; o ${a.tipo} vai num canal de sintetizador`);
+  }
+  const id = idLivre('p', doc.padroes.map((p) => p.id));
+  const estilo = a.estilo && ESTILOS_GERADOS[a.tipo].includes(a.estilo) ? a.estilo : ESTILOS_GERADOS[a.tipo][0];
+  const nome = `${a.tipo === 'baixo' ? 'Baixo' : a.tipo === 'arpejo' ? 'Arpejo' : 'Acordes'} (${estilo.replace('_', ' e ')})`;
+  patch.push({op: 'add', path: '/padroes/-', value: {id, nome, canal: canal.id, dur, passos: Math.max(1, Math.round(dur * 4)), notas} satisfies PadraoMusica});
+  const clipe = idLivre('c', doc.arranjo.clipes.map((c) => c.id));
+  patch.push({op: 'add', path: '/arranjo/clipes/-', value: {id: clipe, canal: canal.id, em, dur, padrao: id} satisfies ClipeMusica});
+  return {patch, rotulo: `${nome} gerado dos acordes`, caminho: `/padroes/${doc.padroes.length}`, extra: {canal: canal.id, padrao: id, clipe, notas: notas.length}};
+};
+const idLivreCanal = (doc: DocMusica, base: string) => (doc.canais.some((c) => c.id === base) ? idLivre(`${base}-`, doc.canais.map((c) => c.id)) : base);

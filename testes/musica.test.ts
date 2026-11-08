@@ -245,3 +245,71 @@ describe('música no vídeo', () => {
     expect(cortesDoVideo(v)).toEqual([4000]);
   });
 });
+
+describe('teoria, sintetizadores e acordes', () => {
+  it('lê acordes por grau no tom e por cifra, e a escala', async () => {
+    const {acordeDe, escalaDe, encaixarNaEscala, nomeDaNota, vozesDoAcorde, baixoDoAcorde} = await import('../src/nucleo/musica-teoria');
+    expect(acordeDe('vi', 'C')).toMatchObject({raiz: 9, intervalos: [0, 3, 7], nome: 'Am'});
+    expect(acordeDe('V7', 'C')).toMatchObject({raiz: 7, intervalos: [0, 4, 7, 10], nome: 'G7'});
+    expect(acordeDe('bVII', 'C')).toMatchObject({raiz: 10, nome: 'A#'});
+    expect(acordeDe('ii7', 'D')).toMatchObject({raiz: 4, nome: 'Em7'});
+    expect(acordeDe('Am7')).toMatchObject({raiz: 9, nome: 'Am7'});
+    expect(acordeDe('F/C')).toMatchObject({raiz: 5, baixo: 0, nome: 'F/C'});
+    expect(acordeDe('Xyz')).toBeNull();
+    expect(escalaDe('A', 'menor')).toEqual([9, 11, 0, 2, 4, 5, 7]);
+    expect(encaixarNaEscala(61, 'C', 'maior')).toBe(62);
+    expect(nomeDaNota(60)).toBe('C4');
+    expect(vozesDoAcorde(acordeDe('C')!, 60)).toEqual([60, 64, 67]);
+    expect(vozesDoAcorde(acordeDe('Am')!, 60)).toEqual([57, 60, 64]);
+    expect(baixoDoAcorde(acordeDe('C')!)).toBe(36);
+  });
+
+  it('o sintetizador toca a altura pedida, com os quatro sons e as macros', async () => {
+    const {notaDoSintetizador, receitaDe} = await import('../src/nucleo/musica-som');
+    const macros = {brilho: 0.2, ataque: 0, soltura: 0.2, cor: 0};
+    // o lead antes do vibrato (0,3 s): o período do Lá 440 a 48 kHz é de 109,1 amostras (pico da autocorrelação)
+    const x = notaDoSintetizador(69, 0.4, receitaDe('lead', macros), TAXA);
+    const ini = Math.round(0.1 * TAXA), n = Math.round(0.15 * TAXA);
+    let melhor = 0, periodo = 0;
+    for (let lag = 60; lag < 200; lag++) {
+      let soma = 0;
+      for (let i = ini; i < ini + n; i++) soma += x[i] * x[i + lag];
+      if (soma > melhor) [melhor, periodo] = [soma, lag];
+    }
+    expect(Math.abs(periodo - TAXA / 440)).toBeLessThanOrEqual(1);
+    // a soltura entra depois da nota; o pad demora a entrar
+    for (const p of ['baixo', 'pad', 'pluck', 'lead'] as const) {
+      const s = notaDoSintetizador(48, 0.5, receitaDe(p, macros), TAXA);
+      expect(s.length).toBeGreaterThan(0.5 * TAXA);
+      expect(Math.max(...s.map(Math.abs))).toBeGreaterThan(0.01);
+    }
+    const pad = notaDoSintetizador(60, 1, receitaDe('pad', macros), TAXA);
+    expect(rms(pad, 0, Math.round(0.05 * TAXA))).toBeLessThan(rms(pad, Math.round(0.5 * TAXA), Math.round(0.6 * TAXA)) / 3);
+    // brilho abre o filtro: mais energia nos agudos
+    const escuro = notaDoSintetizador(48, 0.5, receitaDe('pluck', {...macros, brilho: 0}), TAXA);
+    const claro = notaDoSintetizador(48, 0.5, receitaDe('pluck', {...macros, brilho: 1}), TAXA);
+    const agudos = (s: Float32Array) => rms(Float32Array.from(s.subarray(1).map((v, i) => v - s[i])));
+    expect(agudos(claro)).toBeGreaterThan(agudos(escuro) * 1.5);
+  });
+
+  it('a progressão vira faixa de acordes, e o baixo, o arpejo e os acordes saem dela', async () => {
+    const {aplicarProgressao, gerarNotas, notasGeradas} = await import('../src/nucleo/musica-acoes');
+    const d = novaMusica();
+    const e = aplicarProgressao(d, {acordes: ['I', 'vi', 'IV', 'V', 'Zz']});
+    expect(e.avisos?.[0]).toMatch(/"Zz"/);
+    const comAcordes = jsonpatch.applyPatch(structuredClone(d), e.patch as Operation[]).newDocument;
+    expect(comAcordes.acordes!.map((a) => [a.em, a.acorde])).toEqual([[0, 'I'], [4, 'vi'], [8, 'IV'], [12, 'V']]);
+    const baixo = notasGeradas(comAcordes, 'baixo', 'batidas');
+    expect(baixo.dur).toBe(16);
+    expect(baixo.notas).toHaveLength(16);
+    expect(baixo.notas.slice(0, 5).map((n) => n.nota)).toEqual([36, 36, 36, 36, 33]); // Dó2 e Lá1
+    expect(notasGeradas(comAcordes, 'acordes', 'longo').notas.slice(0, 3).map((n) => n.nota)).toEqual([60, 64, 67]);
+    expect(notasGeradas(comAcordes, 'arpejo', 'sobe').notas).toHaveLength(32);
+    const g = gerarNotas(comAcordes, {tipo: 'baixo'});
+    const final = jsonpatch.applyPatch(structuredClone(comAcordes), g.patch as Operation[]).newDocument;
+    expect(final.canais.find((c) => c.id === 'baixo')).toMatchObject({tipo: 'sintetizador', preset: 'baixo'});
+    expect(final.arranjo.clipes[0]).toMatchObject({canal: 'baixo', em: 0, dur: 16});
+    const som = renderizarMusica(final, {}).canais[0];
+    expect(rms(som)).toBeGreaterThan(0.01);
+  });
+});

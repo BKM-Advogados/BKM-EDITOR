@@ -4,7 +4,8 @@
 // (src/main/musica-render.ts) e no MCP por stdio, então a prévia e o render saem iguais amostra por amostra. Nada de
 // Math.random: o ruído vem da semente do documento. Ver docs/musica.md.
 import type {FonteAudio} from './loudness';
-import {resolverMusica, type CanalMusicaP, type ClipeMusicaP, type DocMusica, type FaixaMixerP, type MusicaP, type NotaMusica, type PecaBateria} from './musica';
+import {resolverMusica, type CanalMusicaP, type ClipeMusicaP, type DocMusica, type FaixaMixerP, type MacrosSintetizador, type MusicaP, type NotaMusica, type PecaBateria,
+  type PresetSintetizador} from './musica';
 
 export const TAXA_MUSICA = 48000; // a do render do vídeo
 const MONO_EM_ESTEREO = Math.SQRT1_2; // como o ffmpeg abre o mono em estéreo (−3 dB por lado)
@@ -403,13 +404,126 @@ export const reverberar = (entrada: Float32Array[], tamanho: number, amortecimen
   });
 };
 
+// ---------- sintetizadores da casa (item 14) ----------
+// Quatro sons de partida, todos da mesma receita: dois osciladores com PolyBLEP (serra e quadrada sem o serrilhado do
+// ingênuo), um sub em seno no baixo, filtro passa-baixas de dois polos com envelope próprio e o envelope de volume
+// (ataque, queda, sustentação, soltura). As macros mexem nos números da receita; nada é aleatório.
+type ReceitaSint = {onda: 'serra' | 'quadrada'; mistura: number; desafina_cents: number; sub: number; corte_hz: number; corte_brilho_hz: number; env_filtro_oitavas: number;
+  queda_filtro_s: number; ataque_s: number; queda_s: number; sustenta: number; soltura_s: number; ganho: number; vibrato: boolean};
+
+export const receitaDe = (preset: PresetSintetizador, m: Required<MacrosSintetizador>): ReceitaSint => {
+  const ataque = (base: number, max: number) => base + m.ataque * max;
+  const soltura = (base: number, max: number) => base + m.soltura * max;
+  switch (preset) {
+    case 'baixo':
+      return {onda: 'serra', mistura: 0.3 * m.cor, desafina_cents: 4 * m.cor, sub: 0.6, corte_hz: 160, corte_brilho_hz: 2400 * m.brilho, env_filtro_oitavas: 1.4,
+        queda_filtro_s: 0.18, ataque_s: ataque(0.003, 0.2), queda_s: 0.3, sustenta: 0.65, soltura_s: soltura(0.04, 0.5), ganho: 0.55, vibrato: false};
+    case 'pad':
+      return {onda: 'serra', mistura: 0.5, desafina_cents: 5 + 16 * m.cor, sub: 0, corte_hz: 500, corte_brilho_hz: 5000 * m.brilho, env_filtro_oitavas: 0.5,
+        queda_filtro_s: 1.2, ataque_s: ataque(0.35, 1.8), queda_s: 1, sustenta: 0.8, soltura_s: soltura(0.5, 2.8), ganho: 0.22, vibrato: false};
+    case 'lead':
+      return {onda: 'quadrada', mistura: 0.2 + 0.6 * m.cor, desafina_cents: 6 * m.cor, sub: 0, corte_hz: 900, corte_brilho_hz: 7000 * m.brilho, env_filtro_oitavas: 1,
+        queda_filtro_s: 0.3, ataque_s: ataque(0.005, 0.4), queda_s: 0.25, sustenta: 0.75, soltura_s: soltura(0.06, 0.9), ganho: 0.28, vibrato: true};
+    case 'pluck':
+    default:
+      return {onda: 'serra', mistura: 0.4 * m.cor, desafina_cents: 7 * m.cor, sub: 0, corte_hz: 250, corte_brilho_hz: 6000 * m.brilho, env_filtro_oitavas: 3,
+        queda_filtro_s: 0.14, ataque_s: ataque(0.001, 0.15), queda_s: 0.4, sustenta: 0, soltura_s: soltura(0.08, 0.7), ganho: 0.4, vibrato: false};
+  }
+};
+
+/** Correção PolyBLEP de uma descontinuidade em `t` (fase de 0 a 1, `dt` = passo de fase). */
+const polyBlep = (t: number, dt: number) => {
+  if (t < dt) {
+    const x = t / dt;
+    return x + x - x * x - 1;
+  }
+  if (t > 1 - dt) {
+    const x = (t - 1) / dt;
+    return x * x + x + x + 1;
+  }
+  return 0;
+};
+const serra = (fase: number, dt: number) => 2 * fase - 1 - polyBlep(fase, dt);
+const quadrada = (fase: number, dt: number) => (fase < 0.5 ? 1 : -1) + polyBlep(fase, dt) - polyBlep((fase + 0.5) % 1, dt);
+
+/** Uma nota do sintetizador, mono, com a soltura depois de `dur_s`. */
+export const notaDoSintetizador = (midi: number, dur_s: number, r: ReceitaSint, taxa: number, forca = 100): Float32Array => {
+  const n = Math.max(1, Math.round((dur_s + r.soltura_s) * taxa));
+  const out = new Float32Array(n);
+  const f0 = 440 * Math.pow(2, (midi - 69) / 12);
+  const fatores = [Math.pow(2, -r.desafina_cents / 1200), Math.pow(2, r.desafina_cents / 1200)];
+  const fases = [0, 0.25];
+  let faseSub = 0;
+  let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+  let filtro: Biquad = passaBaixas(1000, 0.9, taxa);
+  const g = ganhoDaForca(forca) * r.ganho;
+  const fimNota = dur_s * taxa;
+  let nivelNaSoltura = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / taxa;
+    // envelope de volume: ataque linear, queda exponencial até a sustentação, soltura exponencial a partir do nível
+    let amp: number;
+    if (i < fimNota) {
+      amp = t < r.ataque_s ? t / r.ataque_s : r.sustenta + (1 - r.sustenta) * Math.exp(-(t - r.ataque_s) / Math.max(0.001, r.queda_s / 3));
+      nivelNaSoltura = amp;
+    } else {
+      amp = nivelNaSoltura * Math.exp(-((i - fimNota) / taxa) / Math.max(0.001, r.soltura_s / 4));
+    }
+    if (i % 32 === 0) {
+      const env = Math.exp(-t / Math.max(0.001, r.queda_filtro_s));
+      const corte = Math.min(taxa * 0.45, (r.corte_hz + r.corte_brilho_hz) * Math.pow(2, r.env_filtro_oitavas * env));
+      filtro = passaBaixas(corte, 0.9, taxa);
+    }
+    const vib = r.vibrato && t > 0.3 ? Math.pow(2, (15 * Math.sin(2 * Math.PI * 5.5 * t)) / 1200) : 1;
+    let x = 0;
+    for (let k = 0; k < 2; k++) {
+      const dt = (f0 * fatores[k] * vib) / taxa;
+      const principal = r.onda === 'serra' ? serra(fases[k], dt) : quadrada(fases[k], dt);
+      const outra = r.onda === 'serra' ? quadrada(fases[k], dt) : serra(fases[k], dt);
+      x += (principal * (1 - r.mistura) + outra * r.mistura) * 0.5;
+      fases[k] = (fases[k] + dt) % 1;
+    }
+    if (r.sub) {
+      x += Math.sin(2 * Math.PI * faseSub) * r.sub;
+      faseSub = (faseSub + f0 / 2 / taxa) % 1;
+    }
+    const y = filtro.b0 * x + filtro.b1 * x1 + filtro.b2 * x2 - filtro.a1 * y1 - filtro.a2 * y2;
+    x2 = x1; x1 = x; y2 = y1; y1 = y;
+    out[i] = y * amp * g;
+  }
+  return out;
+};
+
+/** Canal de sintetizador: cada nota do padrão (MIDI), com a duração dela (padrão: um passo da grade), até o fim do clipe. */
+const renderSintetizador = (m: MusicaP, canal: CanalMusicaP, n: number, taxa: number): Float32Array[] => {
+  const L = new Float32Array(n), R = new Float32Array(n);
+  const r = receitaDe(canal.preset, canal.macros);
+  for (const c of m.clipes) {
+    if (c.canal !== canal.id || c.mudo || !c.padrao) continue;
+    const p = m.padroes[c.padrao];
+    if (!p) continue;
+    const fimClipe = (c.em + c.dur) * m.seg_por_batida;
+    for (const e of notasDoClipe(m, c)) {
+      if (typeof e.nota.nota !== 'number') continue;
+      const dur_s = Math.max(0.01, Math.min((e.nota.dur ?? p.dur / p.passos) * m.seg_por_batida, fimClipe - e.s));
+      const som = notaDoSintetizador(e.nota.nota, dur_s, r, taxa, e.nota.forca);
+      const ini = Math.round(e.s * taxa);
+      for (let i = Math.max(0, ini), k = i - ini; i < n && k < som.length; i++, k++) {
+        L[i] += som[k] * MONO_EM_ESTEREO;
+        R[i] += som[k] * MONO_EM_ESTEREO;
+      }
+    }
+  }
+  return [L, R];
+};
+
 // ---------- a música inteira ----------
 export type ResultadoSom = {canais: Float32Array[]; taxa: number; duracao_s: number; avisos: string[]; faltando: string[]; faixas?: Record<string, Float32Array[]>};
 
 /** Chave do som seco de um canal: o que muda o que ele toca (não o mixer). */
 const chaveDoCanal = (m: MusicaP, canal: CanalMusicaP, n: number, taxa: number, fontes: Record<string, FonteAudio | undefined>) => {
   const clipes = m.clipes.filter((c) => c.canal === canal.id);
-  const padroes = canal.tipo === 'bateria' ? [...new Set(clipes.map((c) => c.padrao))].map((p) => (p ? m.padroes[p] : null)) : [];
+  const padroes = canal.tipo !== 'audio' ? [...new Set(clipes.map((c) => c.padrao))].map((p) => (p ? m.padroes[p] : null)) : [];
   const audios = canal.tipo === 'audio' ? clipes.map((c) => (c.audio ? `${c.audio}:${fontes[c.audio]?.canais[0]?.length ?? 'falta'}:${fontes[c.audio]?.taxa ?? 0}` : '')) : [];
   return `canal:${JSON.stringify({c: {...canal, mudo: false, solo: false}, clipes, padroes, audios, bpm: m.bpm, swing: m.swing, semente: m.semente, n, taxa})}`;
 };
@@ -447,6 +561,7 @@ export const renderizarMusica = (doc: DocMusica, fontes: Record<string, FonteAud
     const faltavam = faltando.size;
     let som: Float32Array[];
     if (canal.tipo === 'bateria') som = doCache(chave, () => renderBateria(m, canal, n, taxa, cache));
+    else if (canal.tipo === 'sintetizador') som = doCache(chave, () => renderSintetizador(m, canal, n, taxa));
     else {
       const antes = cache.get(chave) as Float32Array[] | undefined;
       som = antes ?? renderAudio(m, canal, n, taxa, fontes, faltando);
