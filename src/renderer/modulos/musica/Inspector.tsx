@@ -2,13 +2,16 @@
 // peças), a faixa do mixer (volume, pan, EQ, compressor, envio ao reverb) ou, sem seleção, o documento (BPM, compasso,
 // swing, master e a ligação com o vídeo). Tudo por patch, com diário e Ctrl+Z.
 import React, {useMemo} from 'react';
-import {AudioWaveform, Drum, Music, Scissors, SlidersVertical, Trash2} from 'lucide-react';
-import {NOME_PECA, PECAS, resolverMusica, type DocMusica} from '../../../nucleo/musica';
+import {AudioWaveform, Drum, Music, Piano, Scissors, SlidersVertical, Trash2} from 'lucide-react';
+import {NOME_PECA, NOME_PRESET, PECAS, PRESETS, resolverMusica, type CanalMusica, type DocMusica, type PresetSintetizador} from '../../../nucleo/musica';
+import {acordeDe, NOMES} from '../../../nucleo/musica-teoria';
+import {ESTILOS_GERADOS, type TipoGerado} from '../../../nucleo/musica-acoes';
+import {BotaoMenu} from '../../componentes/Menu';
 import {KITS} from '../../../nucleo/musica-som';
 import {CabecalhoInspector, CampoDeslizante, CampoInterruptor, CampoLeitura, CampoNumero, CampoSelecao, CampoTexto, numeroBr, Secao} from '../../componentes/Campos';
 import {avisar, loja, mensagemDe, useLoja} from '../../estado/loja';
 import {musica, selecionarMusica, transicaoAberta, useMusica} from './estado';
-import {arranjar, campo, campoEmObjeto, campoFaixa, dividirNaCabeca, novaBateria, novoAudio} from './acoes';
+import {arranjar, campo, campoEmObjeto, campoFaixa, dividirNaCabeca, gerar, novaBateria, novoAudio, novoSintetizador, progressao} from './acoes';
 import {useDocMusica} from './Monitor';
 
 const InspectorClipe: React.FC<{doc: DocMusica; id: string}> = ({doc, id}) => {
@@ -54,17 +57,28 @@ const InspectorCanal: React.FC<{doc: DocMusica; id: string}> = ({doc, id}) => {
   const base = `/canais/${i}`;
   return (
     <div className="painel">
-      <CabecalhoInspector icone={c.tipo === 'bateria' ? <Drum /> : <AudioWaveform />} familia="midia" nome={c.nome} sub={`Canal de ${c.tipo === 'bateria' ? 'bateria' : 'áudio'} · faixa ${c.faixa_mixer ?? c.id}`} dica={base} />
+      <CabecalhoInspector icone={iconeDoCanal(c, 18)} familia="midia" nome={c.nome} sub={`Canal de ${c.tipo === 'bateria' ? 'bateria' : c.tipo === 'sintetizador' ? 'sintetizador' : 'áudio'} · faixa ${c.faixa_mixer ?? c.id}`} dica={base} />
       <div className="insp-corpo">
         <Secao titulo="Canal" chave="musica:canal">
           <CampoTexto rotulo="Nome" valor={c.nome} aoMudar={(v) => void campo(`${base}/nome`, v || c.id, 'nome do canal')} />
           {c.tipo === 'bateria' && <CampoSelecao rotulo="Kit" valor={c.kit ?? 'eletronico'} opcoes={KITS.map((k) => [k.id, k.nome] as [string, string])}
             aoMudar={(v) => void campo(`${base}/kit`, v, `kit ${v}`)} />}
+          {c.tipo === 'sintetizador' && <CampoSelecao rotulo="Som" valor={c.preset ?? 'pluck'} opcoes={PRESETS.map((x) => [x, NOME_PRESET[x]] as [PresetSintetizador, string])}
+            aoMudar={(v) => void campo(`${base}/preset`, v, `som ${NOME_PRESET[v]}`)} />}
           <CampoInterruptor rotulo="Mudo" valor={Boolean(c.mudo)} aoMudar={(v) => void campo(`${base}/mudo`, v || undefined, 'mudo')} />
           <CampoInterruptor rotulo="Solo" valor={Boolean(c.solo)} aoMudar={(v) => void campo(`${base}/solo`, v || undefined, 'solo')} />
           <div style={{padding: '2px 8px 6px'}}><button className="bt" onClick={() => (selecionarMusica({tipo: 'faixa', id: c.faixa_mixer ?? c.id}), musica.definir({aba: 'mixer'}))}>
             <SlidersVertical size={14} />Faixa do mixer</button></div>
         </Secao>
+        {c.tipo === 'sintetizador' && (
+          <Secao titulo="Macros" chave="musica:macros">
+            {([['brilho', 'Brilho', 0.5, 'abre o filtro'], ['ataque', 'Ataque', 0, 'entrada mais lenta'], ['soltura', 'Soltura', 0.3, 'cauda mais longa'],
+              ['cor', 'Cor', 0.3, 'mistura e desafina os osciladores']] as const).map(([k, rotulo, padrao, dica]) => (
+              <CampoDeslizante key={k} rotulo={rotulo} min={0} max={1} passo={0.05} valor={c.macros?.[k] ?? padrao} padrao={padrao} formatar={(v) => `${Math.round(v * 100)}%`}
+                aoMudar={(v) => void campoEmObjeto(`${base}/macros`, k, v, `${rotulo.toLowerCase()} de ${c.nome} (${dica})`)} />
+            ))}
+          </Secao>
+        )}
         {c.tipo === 'bateria' && (
           <Secao titulo="Peças" chave="musica:pecas" fechadaDePadrao>
             {PECAS.map((p) => {
@@ -155,6 +169,22 @@ const InspectorDocumento: React.FC<{doc: DocMusica; id: string}> = ({doc, id}) =
           <CampoDeslizante rotulo="Swing" min={0} max={1} passo={0.05} valor={m.swing} padrao={0} formatar={(v) => `${Math.round(v * 100)}%`} aoMudar={(v) => void campo('/swing', v, 'swing')} />
           <CampoNumero rotulo="Semente" valor={m.semente} padrao={1} dica="O ruído das peças sai desta semente: o mesmo número dá o mesmo som" aoMudar={(v) => void campo('/semente', Math.round(v), 'semente')} />
         </Secao>
+        <Secao titulo="Tom e acordes" chave="musica:acordes">
+          <CampoSelecao rotulo="Tom" valor={doc.tom ?? 'C'} opcoes={NOMES.map((n) => [n, n] as [string, string])} padrao="C" aoMudar={(v) => void campo('/tom', v, `tom ${v}`)} />
+          <CampoSelecao rotulo="Escala" valor={doc.escala ?? 'maior'} opcoes={[['maior', 'maior'], ['menor', 'menor']]} padrao="maior"
+            aoMudar={(v) => void campo('/escala', v, `escala ${v}`)} />
+          <CampoTexto rotulo="Acordes" valor={(doc.acordes ?? []).map((a) => a.acorde).join(' ')}
+            dica="Um por compasso, a partir do começo: graus (I vi IV V, V7, ii7) ou cifras (C Am F G, F/C)"
+            invalido={(v) => v.split(/[\s,|]+/).filter(Boolean).find((s) => !acordeDe(s, doc.tom, doc.escala)) ? 'há acorde que não entendo' : null}
+            aoMudar={(v) => void (v.trim() ? progressao(v) : campo('/acordes', undefined, 'tira os acordes'))} />
+          {doc.acordes?.length ? <CampoLeitura rotulo="Soam">{doc.acordes.map((a) => acordeDe(a.acorde, doc.tom, doc.escala)?.nome ?? '?').join(' · ')}</CampoLeitura> : null}
+          <div style={{padding: '2px 8px 6px', display: 'flex', gap: 6, flexWrap: 'wrap'}}>
+            {(['baixo', 'arpejo', 'acordes'] as TipoGerado[]).map((t) => (
+              <BotaoMenu key={t} titulo={`Gerar ${t} dos acordes`} className="bt" rotulo={`Gerar ${t}`} icone={<Piano size={14} />} acima
+                itens={ESTILOS_GERADOS[t].map((e) => ({rotulo: e.replace('_', ' e '), acao: () => void gerar(t, e)}))} />
+            ))}
+          </div>
+        </Secao>
         <Secao titulo="Master" chave="musica:master">
           <CampoDeslizante rotulo="Volume" min={-40} max={12} passo={0.5} valor={m.master.volume_db} padrao={0} formatar={(v) => `${numeroBr(v, 1)} dB`}
             aoMudar={(v) => void campo('/mixer/master/volume_db', v, 'volume do master')} />
@@ -204,7 +234,7 @@ export const ListaMusica: React.FC = () => {
         {doc.canais.map((c) => (
           <React.Fragment key={c.id}>
             <div className={`item${s?.tipo === 'canal' && s.id === c.id ? ' sel' : ''}`} onClick={() => selecionarMusica({tipo: 'canal', id: c.id})}>
-              {c.tipo === 'bateria' ? <Drum size={14} /> : <AudioWaveform size={14} />}<span className="nome">{c.nome}</span>
+              {iconeDoCanal(c, 14)}<span className="nome">{c.nome}</span>
               <span className="ler" style={{fontSize: 10}}>{doc.arranjo.clipes.filter((x) => x.canal === c.id).length}</span>
             </div>
             {doc.padroes.filter((p) => p.canal === c.id).map((p) => (
@@ -226,8 +256,13 @@ const ListaRodape: React.FC = () => {
   return (
     <div className="rodape-lista">
       <button className="bt" onClick={() => void novaBateria()} title="Canal de bateria com o estilo básico, já no arranjo"><Drum size={14} />+ Bateria</button>
+      <BotaoMenu titulo="Canal de sintetizador, já no arranjo" className="bt" rotulo="+ Instrumento" icone={<Piano size={14} />} acima
+        itens={PRESETS.map((x) => ({rotulo: NOME_PRESET[x], acao: () => void novoSintetizador(x)}))} />
       <button className="bt" disabled={carregando} onClick={() => (setCarregando(true), void novoAudio().finally(() => setCarregando(false)))} title="Um arquivo de áudio num canal novo">
         <AudioWaveform size={14} />+ Áudio…</button>
     </div>
   );
 };
+
+export const iconeDoCanal = (c: Pick<CanalMusica, 'tipo'>, tamanho: number) =>
+  c.tipo === 'bateria' ? <Drum size={tamanho} /> : c.tipo === 'sintetizador' ? <Piano size={tamanho} /> : <AudioWaveform size={tamanho} />;

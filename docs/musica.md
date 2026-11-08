@@ -1,7 +1,8 @@
 # Música
 
 Versão 1, de 08/11/2026 (rodada 3, frente Música, onda 1: marcos A e B do plano
-`tasks/estudio-musica-2026-11-07/fork/00-plano.md`). A música é uma vista do mesmo projeto: um documento
+`tasks/estudio-musica-2026-11-07/fork/00-plano.md`). Versão 2, do mesmo dia: o som num Web Worker, a ponte com a janela,
+os sintetizadores da casa, tom, escala, acordes e o baixo, o arpejo e os acordes gerados (itens 14, 18 e 19). A música é uma vista do mesmo projeto: um documento
 `musica/<id>.json` que a pessoa e a IA editam pelo mesmo JSON Patch com diário, ligado a um clipe de áudio do vídeo de
 cenas. A ida e volta entre o vídeo e a Música é a primeira coisa que funciona, e o clipe do vídeo acompanha cada mudança
 da música sem exportar arquivo.
@@ -79,8 +80,11 @@ toca como guia, fora da música.
 
 - **Tempo em batidas** (a semínima), decimais, a partir do começo; por dentro, arredondado a 1/960. `em_s` e `dur_s` saem
   do BPM. O corte de um áudio (`corte_s`) é em segundos do arquivo. Fades de clipe em batidas.
-- **Canal** `audio` (clipes com `audio`) ou `bateria` (clipes com `padrao`, tocados pelo `kit`). Cada canal sai na faixa
-  do mixer `faixa_mixer` (padrão: o próprio id); faixa que falta no mixer vale 0 dB no centro.
+- **Canal** `audio` (clipes com `audio`), `bateria` (clipes com `padrao`, tocados pelo `kit`) ou `sintetizador` (clipes
+  com `padrao` de notas MIDI, tocados pelo `preset`: `baixo`, `pad`, `pluck` ou `lead`, com `macros` de 0 a 1: `brilho`
+  abre o filtro, `ataque` deixa a entrada mais lenta, `soltura` alonga a cauda, `cor` mistura e desafina os
+  osciladores). Cada canal sai na faixa do mixer `faixa_mixer` (padrão: o próprio id); faixa que falta no mixer vale 0
+  dB no centro.
 - **Padrão**: notas com `peca` (bateria: `bumbo`, `caixa`, `palma`, `aro`, `chimbal_fechado`, `chimbal_aberto`, `prato`,
   `tom_grave`, `tom_agudo`, `shaker`) ou `nota` (MIDI, para os instrumentos da onda 2), `em` dentro do padrão, `dur` e
   `forca` (1 a 127, padrão 100). Notas não têm id: acham-se pelo padrão, pelo tempo e pela peça. O clipe repete o padrão
@@ -91,6 +95,10 @@ toca como guia, fora da música.
   de −18 a +18 dB), `compressor` e `reverb` (quanto vai ao reverb do master, de 0 a 1). Havendo solo, só toca o que tem
   solo (por canal e por faixa).
 - **`swing`** de 0 (reto) a 1 (tercina): atrasa as semicolcheias do contratempo até 1/12 de batida.
+- **`tom`** (`C`, `F#`, `Bb`…) e **`escala`** (`maior` ou `menor`) dão a escala que a grade de notas destaca e que o
+  `na_escala` usa. **`acordes`**: a faixa de acordes, `[{em, dur, acorde}]` em batidas, cada um por grau no tom (`I`, `vi`,
+  `V7`, `ii7`, `bVII`, `vii°`) ou por cifra (`Am7`, `F/C`, `Bb`, `Gsus4`). Uma nota de sintetizador sem `dur` dura um passo
+  da grade do padrão.
 - **`semente`**: o ruído das peças sintetizadas sai dela; a mesma semente dá o mesmo som em qualquer PC.
 - **`video`**: o vídeo de que a música é trilha, onde ela começa nele (`em_ms`) e se a voz dele toca como guia. Os cortes
   das cenas não ficam gravados: o arranjo e o `ler_musica` os tiram do vídeo na hora.
@@ -129,6 +137,18 @@ voltam. Como a prévia já fez a mesma conta, o render para o vídeo costuma sai
 janela fechada) ou sem resposta em 2 minutos, a conta é feita no processo, como antes. A medida ao lado do render diz quem
 fez (`feito_por`: `janela` ou `processo`).
 
+**Sintetizadores da casa** (item 14): dois osciladores com PolyBLEP (serra e quadrada sem o serrilhado do ingênuo), um
+sub em seno no baixo, filtro passa-baixas com envelope próprio e o envelope de volume (ataque, queda, sustentação,
+soltura); vibrato só no lead. As quatro predefinições são receitas desses números, e as macros mexem neles. Sem amostra
+e sem aleatório: a mesma nota soa igual em qualquer PC.
+
+**Tom e acordes** (itens 18 e 19, `src/nucleo/musica-teoria.ts`): a faixa de acordes vem de uma progressão
+(`aplicar_progressao`, ou o campo "Acordes" do inspetor da música, um acorde por compasso), e dela saem padrões prontos:
+o **baixo** (`longo`, um por acorde; `batidas`, a fundamental em cada tempo; `oitavas`, fundamental e oitava em
+colcheias), o **arpejo** (`sobe`, `desce`, `sobe_desce`, em colcheias) e os **acordes** (`longo` ou `batidas`, vozes em
+volta do Ré4). As notas ficam escritas no padrão ("fixar como notas" é o padrão): mudar os acordes depois não mexe nelas.
+O baixo nasce num canal de sintetizador com o som "baixo", o arpejo no "pluck" e os acordes no "pad".
+
 O cache guarda três camadas (o som seco de cada canal, cada faixa processada e o retorno do reverb) e, a cada render,
 só o que aquele render usou. **Medido** (este PC, com as oito frentes rodando; 60 s, dois canais de bateria e um de
 áudio, EQ, compressor e reverb): 1,1 s a frio; volume de uma faixa sem reverb, 0,16 s; de uma faixa com reverb, 0,8 s;
@@ -166,15 +186,17 @@ Em `src/nucleo/mcp-musica.ts`, registradas por uma linha em `registrarFerramenta
 | `concluir_transicao` | `transicao, aplicar?, resultado?: {documento?, midia?}` | Põe a música no vídeo por patch e volta | livre |
 | `cancelar_transicao` | `transicao, descartar?` | Volta sem mudar a origem; com descartar, desfaz o que se fez no destino | livre |
 | `trocar_kit` | `documento?, canal, kit` | Troca o kit de um canal de bateria (hoje: `eletronico`) | livre |
-| `criar_padrao` | `documento?, canal, nome?, dur?, passos?, clonar?, estilo?, no_arranjo?: {em?, dur?}` | Padrão vazio, clonado ou de um estilo da casa (`basico`, `pop`, `eletronico`, `dembow`, `trap`, `calmo`); canal novo se não existir | livre |
-| `escrever_notas` | `documento?, padrao, notas[], modo?: somar\|trocar, de?, ate?, quantizar?` | Escreve notas; nota igual troca, não duplica | livre |
+| `criar_padrao` | `documento?, canal, nome?, dur?, passos?, clonar?, estilo?, no_arranjo?: {em?, dur?}, instrumento?` | Padrão vazio, clonado ou de um estilo de bateria da casa (`basico`, `pop`, `eletronico`, `dembow`, `trap`, `calmo`); canal novo se não existir, de bateria ou de sintetizador (`instrumento`: `baixo`, `pad`, `pluck`, `lead`) | livre |
+| `escrever_notas` | `documento?, padrao, notas[], modo?: somar\|trocar, de?, ate?, quantizar?, na_escala?` | Escreve notas (peça de bateria ou nota MIDI); nota igual troca, não duplica; `na_escala` leva cada nota para a escala do tom | livre |
+| `aplicar_progressao` | `documento?, acordes[], em?, dur_por_acorde?` | Escreve a faixa de acordes por grau ou cifra; o trecho coberto é trocado | livre |
+| `gerar_notas` | `documento?, tipo: baixo\|arpejo\|acordes, estilo?, canal?` | Gera um padrão da faixa de acordes num canal de sintetizador e põe o clipe | livre |
 
 Estendidas: `criar_documento` aceita `modulo: "musica"`; `estado_do_editor` mostra a transição em curso e, na Música, a
 seleção como caminho no documento (`/arranjo/clipes/2`) e a cabeça em ms. Todas são "livre" (gravam no diário e têm
 Reverter, ou só leem): nenhuma baixa, lê fora do projeto ou apaga.
 
-**Patch descrito** (sem ferramenta, pelo `aplicar_patch`): BPM, compasso, swing, semente; nome, kit, peças, mudo e solo
-dos canais; volume, pan, mudo, solo, EQ, compressor e reverb das faixas do mixer; volume e reverb do master; `video`.
+**Patch descrito** (sem ferramenta, pelo `aplicar_patch`): BPM, compasso, swing, semente, tom e escala; nome, kit,
+peças, `preset`, `macros`, mudo e solo dos canais; volume, pan, mudo, solo, EQ, compressor e reverb das faixas do mixer; volume e reverb do master; `video`.
 Depois de um patch numa música, os clipes ligados recebem o render novo sozinhos (com o app aberto).
 
 ## Para o guia da IA
@@ -190,6 +212,10 @@ Texto para a seção do CLAUDE.md do projeto (a coordenação junta no `claudeMd
   `canal`, `em`, `dur` e `audio` (+ `corte_s` em segundos do arquivo) ou `padrao`; `mixer.faixas` com `volume_db`,
   `pan`, `eq`, `compressor` e `reverb` (0 a 1). Leia com `ler_musica`; mexa com `arranjar`, `criar_padrao`,
   `escrever_notas` e `trocar_kit`; o resto (BPM, mixer) por `aplicar_patch`.
+- Melodia e harmonia: `tom` e `escala` por patch; `aplicar_progressao {acordes: ["I","vi","IV","V"]}` escreve a faixa de
+  acordes; `gerar_notas {tipo: "baixo"|"arpejo"|"acordes", estilo?}` faz o padrão num canal de sintetizador (`preset`
+  baixo, pad, pluck ou lead; `macros` brilho, ataque, soltura e cor, de 0 a 1). Notas MIDI (60 = Dó central) com
+  `escrever_notas` (`na_escala: true` encaixa na escala); `criar_padrao {canal, instrumento: "lead"}` cria o canal.
 - Ida e volta com o vídeo: `levar_para {modulo: "musica", alvo: {documento: "video", caminho:
   "/audio/faixas/@musica/clipes/@<id>"}}` abre a música daquele áudio (ou, com só a faixa e `intencao: "criar"`, uma
   nova); `concluir_transicao {transicao}` põe no vídeo e volta; `cancelar_transicao {transicao, descartar?}` volta sem
@@ -217,6 +243,10 @@ baixado; os kits de terceiros entram na onda 2, cada pacote com o LICENSE de den
   janela por perto de 1 s numa música de 60 s.
 - Áudio que não é WAV a 48 kHz no render para o vídeo passa pelo ffmpeg do Remotion; o teste usa WAV a 48 kHz.
 - O medidor ao vivo do mixer (nível por faixa durante a reprodução) não entrou; `medir_musica` dá o LUFS e o pico.
+- A grade de notas é um piano roll em grade (uma célula por passo; a nota longa aparece seguindo). Desenhar, esticar e
+  mover notas com o mouse, o carimbo de acordes e o teclado do computador como piano (o resto do item 17) não entraram.
+- O som dos sintetizadores foi conferido por medida (altura por autocorrelação, brilho pela energia nos agudos), não de
+  ouvido.
 
 ## Roteiro para o responsável no app (10 minutos)
 
@@ -234,8 +264,11 @@ baixado; os kits de terceiros entram na onda 2, cada pacote com o LICENSE de den
 8. No inspetor do clipe, **Voltar ao original**: o clipe toca de novo o áudio de antes (a música fica no projeto).
    Logo depois do passo 6, antes de mexer de novo na música, o Ctrl+Z também tira a música do clipe; depois, as trocas
    de render mudam o vídeo e o Ctrl+Z desfaz primeiro as suas edições na música.
-9. No painel do Claude, peça "abra a música do clipe da trilha, ponha um prato no começo e volte ao vídeo". A área
+9. Sem seleção, no inspetor da música, **Tom e acordes**: escreva `I vi IV V` no campo Acordes e use **Gerar baixo ›
+   batidas** e **Gerar arpejo › sobe**. A faixa de acordes aparece no arranjo, os canais Baixo e Pluck nascem, e a grade
+   de notas mostra as notas (as fora da escala apagadas). Clique no nome de uma nota para ouvi-la; mexa nas macros.
+10. No painel do Claude, peça "abra a música do clipe da trilha, ponha um prato no começo e volte ao vídeo". A área
    deve trocar sozinha na ida e na volta.
-10. Feche e reabra o projeto: a música, a ligação e o render continuam lá.
+11. Feche e reabra o projeto: a música, a ligação e o render continuam lá.
 
 Anote o que travar ou demorar: o tempo do render na sua máquina é o que falta medir.

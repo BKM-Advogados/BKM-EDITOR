@@ -4,8 +4,10 @@
 // "inicio" do padrão, então o que toca fica no lugar), clicar seleciona, clicar na régua leva a cabeça. Teclas na área
 // Música: Espaço toca, S divide o clipe na cabeça, Delete apaga, L repete o clipe, Home volta ao começo.
 import React, {useEffect, useMemo, useRef, useState} from 'react';
-import {AudioWaveform, Drum, Volume2, VolumeX} from 'lucide-react';
-import {resolverMusica, type ClipeMusicaP, type DocMusica} from '../../../nucleo/musica';
+import {Volume2, VolumeX} from 'lucide-react';
+import {iconeDoCanal} from './Inspector';
+import {acordeDe} from '../../../nucleo/musica-teoria';
+import {posicaoEmCompasso, resolverMusica, type ClipeMusicaP, type DocMusica} from '../../../nucleo/musica';
 import {notasDoClipe} from '../../../nucleo/musica-som';
 import {cortesDoVideo} from '../../../nucleo/musica-video';
 import type {DocCenas} from '../../../nucleo/cenas';
@@ -136,9 +138,10 @@ const Arranjo: React.FC<{doc: DocMusica}> = ({doc}) => {
     <div className="arranjo">
       <div className="cabecas">
         <div className="cab-regua">{m.bpm} BPM · {m.compasso[0]}/{m.compasso[1]}</div>
+        {doc.acordes?.length ? <div className="cab-acordes">Acordes · {doc.tom ?? 'C'} {doc.escala ?? 'maior'}</div> : null}
         {m.canais.map((c, i) => (
           <div key={c.id} className={`cab-canal${selecao?.tipo === 'canal' && selecao.id === c.id ? ' sel' : ''}`} onClick={() => selecionarMusica({tipo: 'canal', id: c.id})}>
-            {c.tipo === 'bateria' ? <Drum size={14} /> : <AudioWaveform size={14} />}
+            {iconeDoCanal(c, 14)}
             <span className="nome" title={c.id}>{c.nome}</span>
             <button className={`bti${c.mudo ? ' ligado' : ''}`} title="Mudo" onClick={(e) => (e.stopPropagation(), void campo(`/canais/${i}/mudo`, c.mudo ? undefined : true, `mudo em ${c.nome}`))}>
               {c.mudo ? <VolumeX size={12} /> : <Volume2 size={12} />}
@@ -153,6 +156,15 @@ const Arranjo: React.FC<{doc: DocMusica}> = ({doc}) => {
             {Array.from({length: Math.ceil(total / bpc)}, (_, k) => <span key={k} className="compasso" style={{left: k * bpc * px, width: bpc * px}}>{k + 1}</span>)}
             {loop && <span className="loop" style={{left: loop.de * px, width: ((loop.ate ?? m.duracao_batidas) - loop.de) * px}} />}
           </div>
+          {doc.acordes?.length ? (
+            <div className="faixa-acordes" style={{position: 'relative', top: 0, height: 18, borderBottom: '1px solid var(--borda)'}}>
+              {doc.acordes.map((a, k) => (
+                <span key={k} className="acorde" style={{left: a.em * px, width: Math.max(8, a.dur * px - 2)}} title={`${a.acorde} · ${posicaoEmCompasso(a.em, m.compasso)}`}>
+                  {acordeDe(a.acorde, doc.tom, doc.escala)?.nome ?? a.acorde}
+                </span>
+              ))}
+            </div>
+          ) : null}
           {Array.from({length: Math.ceil(total / bpc) + 1}, (_, k) => <span key={`g${k}`} className="grade compasso" style={{left: k * bpc * px}} />)}
           {px >= 14 && Array.from({length: total}, (_, b) => (b % bpc ? <span key={`b${b}`} className="grade" style={{left: b * px}} /> : null))}
           {cortes.map((c) => <span key={c.ms} className="corte" style={{left: c.b * px}}><span>corte {(c.ms / 1000).toFixed(1)} s</span></span>)}

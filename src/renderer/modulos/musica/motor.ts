@@ -8,8 +8,8 @@ import type {AudioP, ClipeAudioP, FaixaAudioP} from '../../../nucleo/audio';
 import {volumeDoClipe} from '../../../nucleo/audio';
 import {medirAmostras, type FonteAudio} from '../../../nucleo/loudness';
 import {envelopeDeAmostras} from '../../../nucleo/audio';
-import {audiosDaMusica, partesDoSom, resolverMusica, type AjustePeca, type DocMusica, type PecaBateria} from '../../../nucleo/musica';
-import {codificarWav16, renderizarMusica, somDeUmaBatida, TAXA_MUSICA, type CacheSom} from '../../../nucleo/musica-som';
+import {audiosDaMusica, partesDoSom, resolverMusica, type AjustePeca, type DocMusica, type MacrosSintetizador, type PecaBateria, type PresetSintetizador} from '../../../nucleo/musica';
+import {codificarWav16, notaDoSintetizador, receitaDe, renderizarMusica, somDeUmaBatida, TAXA_MUSICA, type CacheSom} from '../../../nucleo/musica-som';
 import type {PedidoRender, RespostaRender} from './render.worker';
 
 type SemId<T> = T extends unknown ? Omit<T, 'id'> : never;
@@ -327,6 +327,18 @@ class MotorMusica {
       }
     }
     t.ganho.disconnect();
+  }
+
+  /** Uma nota agora (célula da grade, nome da nota): o sintetizador do canal. */
+  tocarNota(midi: number, preset: PresetSintetizador, macros: MacrosSintetizador = {}, dur_s = 0.4) {
+    const ctx = this.contexto();
+    void ctx.resume();
+    const m = {brilho: macros.brilho ?? 0.5, ataque: macros.ataque ?? 0, soltura: macros.soltura ?? 0.3, cor: macros.cor ?? 0.3};
+    const s = notaDoSintetizador(midi, dur_s, receitaDe(preset, m), TAXA_MUSICA);
+    const b = ctx.createBufferSource();
+    b.buffer = this.paraBuffer([s, s], TAXA_MUSICA);
+    b.connect(ctx.destination);
+    b.start();
   }
 
   /** Uma batida agora (pad, passo clicado): a peça com o ajuste do canal. */

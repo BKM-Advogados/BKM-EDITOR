@@ -88,3 +88,16 @@
 .lista-musica .rodape-lista { display: flex; gap: 4px; padding: 6px; border-top: 1px solid var(--borda); flex-wrap: wrap; }
 /* a casca é uma grade de três linhas (barra, doca, rodapé): com a faixa da transição, ganha uma linha só para ela */
 .casca:has(> .faixa-transicao) { grid-template-rows: 36px auto 1fr var(--rodape, 22px); }
+
+/* grade de notas (sintetizador): linhas fora da escala apagadas, o Dó marcado, notas longas seguindo */
+.passos.notas .peca { height: 16px; font-size: 10px; }
+.passos.notas .peca.fora { color: var(--texto-3, #6e6e6e); }
+.passos.notas .peca.do { color: var(--texto); font-weight: var(--peso-forte); }
+.passos.notas .passo { height: 16px; }
+.passos.notas .passo.fora { background: #1c1c1c; }
+.passos.notas .passo.fora.tempo { background: #242424; }
+.passos .passo.segue { background: #2d6b4c; }
+.faixa-acordes { position: absolute; left: 0; height: 18px; top: 24px; z-index: 2; }
+.faixa-acordes .acorde { position: absolute; top: 1px; height: 16px; border-left: 2px solid var(--trilha-efeito); padding: 0 4px; font-size: 10px; color: var(--trilha-efeito);
+  white-space: nowrap; overflow: hidden; background: rgba(231, 150, 243, 0.08); }
+.arranjo .cab-acordes { height: 18px; display: flex; align-items: center; padding: 0 6px; color: var(--trilha-efeito); font-size: 10px; border-bottom: 1px solid var(--borda); }

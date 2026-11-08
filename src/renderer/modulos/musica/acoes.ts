@@ -1,8 +1,9 @@
 // Ações da área Música: as edições de src/nucleo/musica-acoes.ts (as mesmas das ferramentas MCP) aplicadas no documento
 // ativo, e os campos do mixer e do documento por patch. Tudo vai para o diário e o Ctrl+Z da pessoa desfaz.
 import type {OperacaoPatch} from '../../../nucleo/documentos';
-import {alternarPasso, aplicarEstilo, criarPadrao, editarArranjo, escreverNotas, novoCanalDeAudio, type Edicao, type PedidoArranjo} from '../../../nucleo/musica-acoes';
-import {idLivre, resolverMusica, type DocMusica, type FaixaMixer, type PecaBateria} from '../../../nucleo/musica';
+import {alternarNota, alternarPasso, aplicarEstilo, aplicarProgressao, criarPadrao, editarArranjo, escreverNotas, gerarNotas, novoCanalDeAudio, type Edicao, type EstiloGerado,
+  type PedidoArranjo, type TipoGerado} from '../../../nucleo/musica-acoes';
+import {idLivre, resolverMusica, type DocMusica, type FaixaMixer, type PecaBateria, type PresetSintetizador} from '../../../nucleo/musica';
 import {avisar, mensagemDe, patchTrocar, valorEm} from '../../estado/loja';
 import {aplicarMusica, docMusica, idMusicaAtiva, musica, selecionarMusica} from './estado';
 import {motor, urlDaMidia} from './motor';
@@ -109,3 +110,31 @@ export const campoEmObjeto = (base: string, chave: string, valor: unknown, rotul
   return campo(`${base}/${chave}`, valor, rotulo);
 };
 
+
+// ---------- sintetizadores, tom e acordes ----------
+export const nota = (padrao: string, midi: number, em: number, dur: number) => fazer((d) => alternarNota(d, padrao, midi, em, dur));
+
+/** "+ Instrumento": canal de sintetizador com um padrão vazio, já no arranjo do começo ao fim da música. */
+export const novoSintetizador = async (preset: PresetSintetizador) => {
+  const doc = docMusica();
+  if (!doc) return;
+  const canal = doc.canais.some((c) => c.id === preset) ? idLivre(`${preset}-`, doc.canais.map((c) => c.id)) : preset;
+  const m = resolverMusica(doc).musica;
+  const dur = Math.max(4, Math.ceil(m.duracao_batidas / m.batidas_por_compasso - 1e-9)) * m.batidas_por_compasso;
+  const e = await fazer((d) => criarPadrao(d, {canal, instrumento: preset, no_arranjo: {em: 0, dur}}));
+  if (e?.extra?.padrao) {
+    selecionarMusica({tipo: 'padrao', id: e.extra.padrao as string});
+    musica.definir({aba: 'passos'});
+  }
+};
+
+/** Acordes digitados ("I vi IV V" ou "C Am F G"), um por compasso, a partir do começo. */
+export const progressao = (texto: string) => fazer((d) => aplicarProgressao(d, {acordes: texto.split(/[\s,|]+/).filter(Boolean)}));
+
+export const gerar = async (tipo: TipoGerado, estilo?: EstiloGerado) => {
+  const e = await fazer((d) => gerarNotas(d, {tipo, estilo}));
+  if (e?.extra?.padrao) {
+    selecionarMusica({tipo: 'padrao', id: e.extra.padrao as string});
+    musica.definir({aba: 'passos'});
+  }
+};
