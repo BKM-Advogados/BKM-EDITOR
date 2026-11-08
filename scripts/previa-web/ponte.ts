@@ -260,7 +260,7 @@ const api: ApiEstudio = {
   terminal: {criar: async () => ({id: 99}), escrever: nada, tamanho: nada, fechar: nada, aoReceber: () => nada, aoSair: () => nada},
   conversa: {
     conta: async () => ({instalado: true, logado: true, metodo: 'claude.ai', email: 'pessoa@exemplo.com.br', chave_api: false}),
-    abrir: async () => ({id: Math.floor(Math.random() * 1000), sessao: 'previa'}),
+    abrir: async (o) => ({id: Math.floor(Math.random() * 1000), sessao: 'previa', provedor: o?.provedor ?? 'claude', rotulo: o?.provedor === 'deepseek' ? 'DeepSeek 1' : 'Claude 1'}),
     enviar: async () => undefined,
     permitir: nada,
     parar: nada,
@@ -390,6 +390,15 @@ const api: ApiEstudio = {
     },
     aoPedido: () => nada,
     responder: nada,
+  },
+  // frente IA: catálogo simulado (Claude pronto, DeepSeek com chave do cofre, Gemini sem chave, Ollama neste PC)
+  ia: {
+    provedores: async () => [
+      {id: 'claude', nome: 'Claude (sua conta)', via: 'claude-cli', servidor: 'EUA (Anthropic)', chave: 'nenhuma', pronto: true},
+      {id: 'deepseek', nome: 'DeepSeek', via: 'openai', servidor: 'China', chave: 'exigida', modelo: 'deepseek-flash', pronto: true, chave_origem: 'cofre', chave_final: 'a1f9'},
+      {id: 'gemini', nome: 'Gemini (chave)', via: 'openai', servidor: 'EUA (Google)', chave: 'exigida', modelo: 'gemini-3.6-flash', pronto: false, falta: 'chave'},
+      {id: 'ollama', nome: 'Ollama (neste PC)', via: 'openai', servidor: 'neste PC', chave: 'nenhuma', pronto: false, falta: 'modelo'},
+    ],
   },
 };
 

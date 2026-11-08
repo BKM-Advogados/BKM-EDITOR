@@ -122,6 +122,10 @@ const api: ApiEstudio = {
     aoPedido: (cb) => ouvir<[string, string]>(CANAL.removerFundoPedido, cb),
     responder: (id, r) => ipcRenderer.send(CANAL.removerFundoResposta, id, r),
   },
+  // frente IA
+  ia: {
+    provedores: () => ipcRenderer.invoke(CANAL.iaProvedores),
+  },
 };
 
 contextBridge.exposeInMainWorld('estudio', api);

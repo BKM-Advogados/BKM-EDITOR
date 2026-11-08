@@ -27,6 +27,8 @@ export type Conversa = {
   itens: Item[];
   rascunho: string;
   semLogin?: boolean;
+  provedor: string; // id do catálogo (src/main/ia/provedores.ts): claude, deepseek, ollama, gemini-cli…
+  uso?: {entrada: number; cache: number; saida: number; custo_usd?: number}; // somado na conversa
 };
 
 let conversas: Conversa[] = [];
@@ -120,7 +122,7 @@ const aoEvento = (id: number, e: EventoConversa) => {
       const i = ultimoClaude(c);
       fecharTextoAoVivo(i);
       i.fim = {erro: e.erro, duracao_ms: e.duracao_ms};
-      if (e.erro && /authenticat|log ?in|oauth/i.test(e.texto ?? '')) {
+      if (e.erro && c.provedor === 'claude' && /authenticat|log ?in|oauth/i.test(e.texto ?? '')) {
         c.semLogin = true;
         i.blocos = i.blocos.filter((b) => b.tipo !== 'texto');
         c.itens.push({tipo: 'aviso', erro: true, texto: 'O Claude Code deste PC não está logado. Abra um terminal (botão abaixo) e digite /login: o login é feito pela Anthropic, no navegador.'});
@@ -130,12 +132,20 @@ const aoEvento = (id: number, e: EventoConversa) => {
       c.desde = undefined;
       break;
     }
+    case 'uso': {
+      const u = (c.uso ??= {entrada: 0, cache: 0, saida: 0});
+      u.entrada += e.entrada;
+      u.cache += e.entrada_cache;
+      u.saida += e.saida;
+      if (e.custo_usd !== undefined) u.custo_usd = (u.custo_usd ?? 0) + e.custo_usd;
+      break;
+    }
     case 'hibernou':
       c.estado = 'hibernada';
       break;
     case 'saiu':
       if (c.estado === 'trabalhando' || c.estado === 'precisa') {
-        c.itens.push({tipo: 'aviso', erro: true, texto: `O processo do Claude parou${e.detalhe ? `: ${e.detalhe}` : ''}. A próxima mensagem continua a mesma conversa.`});
+        c.itens.push({tipo: 'aviso', erro: true, texto: `O processo de ${c.titulo.split(' · ')[0]} parou${e.detalhe ? `: ${e.detalhe}` : ''}. A próxima mensagem continua a mesma conversa.`});
       }
       c.estado = 'hibernada';
       c.detalhe = undefined;
@@ -163,12 +173,13 @@ export const lerConta = async (forcar = false) => {
   return conta;
 };
 
-export const novaConversa = async (sessao?: string) => {
+export const novaConversa = async (sessao?: string, provedor = 'claude') => {
   ligar();
   try {
-    const r = await window.estudio.conversa.abrir({sessao});
+    const r = await window.estudio.conversa.abrir({sessao, provedor});
     contagem += 1;
-    const c: Conversa = {id: r.id, sessao: r.sessao, titulo: `Claude ${contagem}`, estado: sessao ? 'hibernada' : 'nova', itens: [], rascunho: ''};
+    const c: Conversa = {id: r.id, sessao: r.sessao, titulo: r.rotulo ?? `Claude ${contagem}`, estado: sessao ? 'hibernada' : 'nova', itens: [], rascunho: '',
+      provedor: r.provedor ?? provedor};
     conversas.push(c);
     ativa = c.id;
     foco = 'conversa';
@@ -260,9 +271,9 @@ export const avisarNaConversa = (id: number, texto: string) => {
 
 /** Conversa nova que já começa com um pedido (o campo "Descreva o vídeo para o Claude" da tela inicial): a fala mostra
  *  o pedido da pessoa; o que o Claude precisa saber do projeto novo vai como anexo. */
-export const conversarCom = async (texto: string, anexos: Anexo[] = []) => {
-  await lerConta().catch(() => null);
-  const c = await novaConversa();
+export const conversarCom = async (texto: string, anexos: Anexo[] = [], provedor = 'claude') => {
+  if (provedor === 'claude') await lerConta().catch(() => null);
+  const c = await novaConversa(undefined, provedor);
   if (c) await enviar(c.id, texto, anexos);
   return c;
 };

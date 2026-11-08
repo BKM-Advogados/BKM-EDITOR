@@ -107,6 +107,7 @@ export const CANAL = {
   removerFundoProgresso: 'estudio:remover-fundo-progresso',
   removerFundoPedido: 'estudio:remover-fundo-pedido',
   removerFundoResposta: 'estudio:remover-fundo-resposta',
+  iaProvedores: 'estudio:ia-provedores', // frente IA
 } as const;
 
 /** O projeto aberto. `estado` é o último que a pessoa viu (área, documento, seleção), para reabrir onde parou; `git`
@@ -217,7 +218,7 @@ export type ApiEstudio = {
   // o Claude como conversa: o mesmo claude da pessoa no modo sem tela; `sessao` retoma uma conversa existente
   conversa: {
     conta: () => Promise<ContaClaude>;
-    abrir: (o?: {sessao?: string}) => Promise<{id: number; sessao: string}>;
+    abrir: (o?: {sessao?: string; provedor?: string; modelo?: string}) => Promise<{id: number; sessao: string; provedor: string; rotulo: string}>;
     enviar: (id: number, texto: string) => Promise<void>;
     permitir: (id: number, pedido: string, decisao: 'permitir' | 'negar', sempre?: boolean) => void;
     parar: (id: number) => void;
@@ -303,6 +304,10 @@ export type ApiEstudio = {
     aoPedido: (cb: (id: string, src: string) => void) => () => void;
     responder: (id: string, r: RespostaFundo) => void;
   };
+  // frente IA: o catálogo de provedores com o que falta para usar cada um
+  ia: {
+    provedores: () => Promise<EstadoProvedor[]>;
+  };
 };
 
 // ---------- frente Fala ----------
@@ -326,6 +331,12 @@ export type ResultadoExportarPaginas = {ok: boolean; pasta?: string; pdf?: strin
 
 /** O PNG sem fundo (data URL) que a interface devolve a um pedido do MCP, com o tempo do modelo. */
 export type RespostaFundo = {ok: boolean; png?: string; ms?: number; mensagem?: string};
+
+// ---------- frente IA ----------
+/** Um provedor do catálogo e o que falta para usar (a chave nunca vem: só a origem e os 4 últimos caracteres). */
+export type EstadoProvedor = {id: string; nome: string; via: 'claude-cli' | 'openai' | 'acp'; servidor: string; experimental?: boolean; modelo?: string;
+  base?: string; paginaChave?: string; chave: 'exigida' | 'opcional' | 'nenhuma'; pronto: boolean; falta?: string;
+  chave_origem?: 'cofre' | 'ambiente' | 'nenhuma'; chave_final?: string};
 
 declare global {
   interface Window {

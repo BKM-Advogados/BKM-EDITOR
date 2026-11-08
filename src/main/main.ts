@@ -5,7 +5,7 @@ import {copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, write
 import path from 'node:path';
 import os from 'node:os';
 import {CANAL, type InfoProjeto, type Metricas, type NovoProjeto, type Perfil, type Preferencias, type Progresso, type ResultadoExportacao, type Retangulo} from '../compartilhado/api';
-import {Conversas, contaClaude} from './conversa';
+import {contaClaude} from './conversa';
 import type {Comentario, EstadoEditor, Manifesto, Modulo, OperacaoPatch} from '../nucleo/documentos';
 import {aplicarMarcaAoPlano, dentroDoOneDrive, documentoNovo, gravarPlano, nomeDePasta, nomePadrao, pastaLivre, planoDoProjeto, regerarClaudeMd} from '../nucleo/criar-projeto';
 import {MODELOS} from '../nucleo/modelos';
@@ -29,6 +29,7 @@ import {registrarPrefsExportacao} from './ipc-exportacao';
 import {apagarLimposSemUso, registrarIpcLimpeza} from './limpeza-voz';
 import {registrarIpcLoudness} from './loudness';
 import {registrarRemoverFundo} from './remover-fundo';
+import {criarSessoesIA, registrarIpcIa} from './ipc-ia'; // frente IA
 
 // o mesmo id do instalador (electron-builder.yml): a barra de tarefas agrupa a janela com o atalho
 app.setAppUserModelId('br.com.bkmadvogados.estudio');
@@ -53,15 +54,16 @@ const midia = new ServidorMidia();
 // dos JSON e sobe o .git do projeto
 const memoria = new Memoria(app.getPath('userData'), path.join(app.getPath('home'), 'Estudio'));
 let mcpHttp: McpHttp | null = null;
-let abasClaude = 0;
 const enviar = (canal: string, ...a: unknown[]) => janela?.webContents.send(canal, ...a);
 const terminais = new Terminais({dados: (id, d) => enviar(CANAL.terminalDados, id, d), saiu: (id, c) => enviar(CANAL.terminalSaiu, id, c)});
 // teste da conversa sem login: ESTUDIO_CLAUDE_FALSO aponta para um claude falso (testes/fixtures/claude-falso.mjs),
 // rodado pelo próprio Electron em modo Node
 const claudeFalso = process.env.ESTUDIO_CLAUDE_FALSO;
-const conversas = new Conversas({evento: (id, e) => enviar(CANAL.conversaEvento, id, e), vivas: () => terminais.vivas(),
-  claude: () => (claudeFalso ? process.execPath : terminais.caminhoClaude),
-  ...(claudeFalso ? {prefixo: [claudeFalso], ambienteExtra: {ELECTRON_RUN_AS_NODE: '1'}} : {})});
+// frente IA (rodada 3): conversas de qualquer provedor (src/main/ia/sessoes.ts); o Claude segue pelo conversa.ts
+const conversas = criarSessoesIA({evento: (id, e) => enviar(CANAL.conversaEvento, id, e), vivasTerminal: () => terminais.vivas(),
+  conexao: (origem) => mcpHttp!.novaConexao(midia.origem, origem),
+  claude: {claude: () => (claudeFalso ? process.execPath : terminais.caminhoClaude),
+    ...(claudeFalso ? {prefixo: [claudeFalso], ambienteExtra: {ELECTRON_RUN_AS_NODE: '1'}} : {})}});
 
 const recursos = (rel: string) => (app.isPackaged ? path.join(process.resourcesPath, rel) : path.join(app.getAppPath(), rel));
 const pastaDoExemplo = () => recursos(path.join('exemplos', 'exemplo'));
@@ -347,10 +349,10 @@ lidar(CANAL.abrirFonte, async (url: string) => {
 });
 lidar(CANAL.terminalCriar, (o: {tipo: 'claude' | 'shell'; colunas: number; linhas: number; sessao?: string}) =>
   terminais.criar({...o, cwd: exigirProjeto().raiz, limiteClaude: PERFIL.sessoes_claude, outrasVivas: conversas.vivas(),
-    arquivoMcp: o.tipo === 'claude' ? mcpHttp!.novaAba(midia.origem, `Claude ${++abasClaude}`) : undefined}));
+    arquivoMcp: o.tipo === 'claude' ? mcpHttp!.novaAba(midia.origem, conversas.novoRotulo('claude')) : undefined}));
 lidar(CANAL.conversaConta, () => contaClaude(terminais.caminhoClaude));
-lidar(CANAL.conversaAbrir, (o: {sessao?: string}) =>
-  conversas.abrir({cwd: exigirProjeto().raiz, sessao: o.sessao, arquivoMcp: mcpHttp!.novaAba(midia.origem, `Claude ${++abasClaude}`)}));
+lidar(CANAL.conversaAbrir, (o: {sessao?: string; provedor?: string; modelo?: string}) =>
+  conversas.abrir({cwd: exigirProjeto().raiz, sessao: o.sessao, provedor: o.provedor, modelo: o.modelo}));
 lidar(CANAL.conversaEnviar, (id: number, texto: string) => conversas.enviar(id, texto, PERFIL.sessoes_claude));
 lidar(CANAL.conversaHibernar, (id: number) => conversas.hibernar(id));
 // ---------- exportação: um ou mais arquivos em saidas/, com andamento na interface e na barra de tarefas, e Cancelar ----------
@@ -466,6 +468,7 @@ registrarPrefsExportacao(lidar, exigirProjeto); // marca d'água por destino, le
 // frente Som (rodada 2): limpeza de voz (limpeza-voz.ts) e medidor de loudness da mistura (loudness.ts)
 registrarIpcLimpeza(lidar, exigirProjeto, enviar);
 registrarIpcLoudness(lidar, exigirProjeto, (documento) => (exigirProjeto(), sessao!.propsVideo(documento, midia.base)));
+registrarIpcIa(lidar, CANAL.iaProvedores, () => claude); // frente IA: lista de provedores
 
 app.on('ready', async () => {
   await midia.iniciar();

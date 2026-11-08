@@ -4,6 +4,7 @@
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore} from 'react';
 import {ArrowUp, CircleAlert, CircleCheck, CircleX, LoaderCircle, ShieldQuestion, Sparkle, SquareTerminal, X} from 'lucide-react';
 import type {OperacaoPatch} from '../../nucleo/documentos';
+import {FERRAMENTAS_ESTUDIO, normalizarFerramenta} from '../../compartilhado/ferramentas';
 import {aplicar, avisar, loja, selecionar, useLoja, valorEm} from '../estado/loja';
 import {enviar, estadoConversas, guardarRascunho, lerConta, parar, responderPermissao, type Anexo, type Bloco, type Conversa as TConversa} from './conversas';
 import './conversa.css';
@@ -49,8 +50,13 @@ const tentarJson = (s?: string): any => {
   }
 };
 
-const descrever = (nome: string, e: Record<string, any>, resultado?: string): Desc => {
-  const mcp = /^mcp__estudio__(.+)$/.exec(nome)?.[1];
+const arquivoDe = (e: Record<string, any>) => nomeArquivo(e.file_path ?? e.absolute_path ?? e.path ?? e.notebook_path);
+
+const descrever = (bruto: string, e: Record<string, any>, resultado?: string): Desc => {
+  // o mesmo cartão para qualquer provedor: o nome chega sem o prefixo de cada agente (compartilhado/ferramentas.ts)
+  const f = normalizarFerramenta(bruto, FERRAMENTAS_ESTUDIO);
+  const mcp = f.servidor === 'estudio' ? f.nome : undefined;
+  const nome = f.nome;
   if (mcp === 'aplicar_patch') {
     const ops = (Array.isArray(e.patch) ? e.patch : []) as OperacaoPatch[];
     const testes = new Map(ops.filter((o) => o.op === 'test').map((o) => [o.path, (o as {value?: unknown}).value]));
@@ -80,29 +86,31 @@ const descrever = (nome: string, e: Record<string, any>, resultado?: string): De
   if (mcp === 'projeto_info') return {verbo: 'Viu o projeto'};
   if (mcp === 'listar_mudancas') return {verbo: 'Viu as últimas mudanças'};
   if (mcp) return {verbo: mcp.replace(/_/g, ' ')};
-  switch (nome) {
-    case 'Read': return {verbo: 'Leu', alvo: nomeArquivo(e.file_path)};
-    case 'Edit': case 'MultiEdit': case 'NotebookEdit': return {verbo: 'Editou', alvo: nomeArquivo(e.file_path ?? e.notebook_path)};
-    case 'Write': return {verbo: 'Escreveu', alvo: nomeArquivo(e.file_path)};
-    case 'Bash': case 'PowerShell': return {verbo: 'Rodou', codigo: String(e.command ?? '')};
-    case 'Glob': case 'Grep': return {verbo: 'Procurou', codigo: String(e.pattern ?? '')};
-    case 'WebFetch': return {verbo: 'Abriu', alvo: String(e.url ?? '')};
-    case 'WebSearch': return {verbo: 'Pesquisou', alvo: String(e.query ?? '')};
-    case 'TodoWrite': return {verbo: 'Atualizou a lista de tarefas'};
-    case 'Task': case 'Agent': return {verbo: 'Pediu a um subagente', alvo: e.description};
-    case 'Skill': return {verbo: 'Usou a skill', alvo: e.skill ?? e.name};
-    default: return {verbo: nome.replace(/^mcp__[^_]+__/, '').replace(/_/g, ' ')};
+  switch (f.servidor === 'interno' ? nome : '') {
+    case 'ler_arquivo': return {verbo: 'Leu', alvo: arquivoDe(e)};
+    case 'editar_arquivo': return {verbo: 'Editou', alvo: arquivoDe(e)};
+    case 'escrever_arquivo': return {verbo: 'Escreveu', alvo: arquivoDe(e)};
+    case 'shell': return {verbo: 'Rodou', codigo: String(e.command ?? '')};
+    case 'procurar': return {verbo: 'Procurou', codigo: String(e.pattern ?? '')};
+    case 'abrir_pagina': return {verbo: 'Abriu', alvo: String(e.url ?? e.prompt ?? '')};
+    case 'buscar_web': return {verbo: 'Pesquisou', alvo: String(e.query ?? '')};
+    case 'lista_de_tarefas': return {verbo: 'Atualizou a lista de tarefas'};
+    case 'subagente': return {verbo: 'Pediu a um subagente', alvo: e.description};
+    case 'skill': return {verbo: 'Usou a skill', alvo: e.skill ?? e.name};
+    default: return {verbo: nome.replace(/_/g, ' ')};
   }
 };
 
-const pedidoEmTexto = (ferramenta: string, e: Record<string, any>): {acao: string; codigo?: string} => {
-  switch (ferramenta) {
-    case 'Bash': case 'PowerShell': return {acao: 'rodar um comando', codigo: String(e.command ?? '')};
-    case 'Edit': case 'MultiEdit': case 'Write': case 'NotebookEdit': return {acao: `editar ${nomeArquivo(e.file_path ?? e.notebook_path) ?? 'um arquivo'}`, codigo: e.file_path};
-    case 'Read': return {acao: `ler ${nomeArquivo(e.file_path) ?? 'um arquivo'}`, codigo: e.file_path};
-    case 'WebFetch': return {acao: 'abrir uma página', codigo: e.url};
-    case 'WebSearch': return {acao: 'pesquisar na web', codigo: e.query};
-    default: return {acao: `usar ${ferramenta.replace(/^mcp__[^_]+__/, '').replace(/_/g, ' ')}`};
+const pedidoEmTexto = (bruto: string, e: Record<string, any>): {acao: string; codigo?: string} => {
+  const f = normalizarFerramenta(bruto, FERRAMENTAS_ESTUDIO);
+  const caminho = e.file_path ?? e.absolute_path ?? e.path ?? e.notebook_path;
+  switch (f.servidor === 'interno' ? f.nome : '') {
+    case 'shell': return {acao: 'rodar um comando', codigo: String(e.command ?? '')};
+    case 'editar_arquivo': case 'escrever_arquivo': return {acao: `editar ${nomeArquivo(caminho) ?? 'um arquivo'}`, codigo: caminho};
+    case 'ler_arquivo': return {acao: `ler ${nomeArquivo(caminho) ?? 'um arquivo'}`, codigo: caminho};
+    case 'abrir_pagina': return {acao: 'abrir uma página', codigo: e.url};
+    case 'buscar_web': return {acao: 'pesquisar na web', codigo: e.query};
+    default: return {acao: `usar ${f.nome.replace(/_/g, ' ')}`};
   }
 };
 
@@ -113,6 +121,18 @@ const irPara = (documento: string, caminho: string) => {
     loja.definir((s) => ({area: area as typeof s.area, ativo: {...s.ativo, [d.modulo]: d.id}}));
     selecionar({documento: d.id, caminho});
   }
+};
+
+/** O nome da IA da conversa sem o número: "DeepSeek 1" vira "DeepSeek". */
+const nomeIA = (c: TConversa) => c.titulo.split(' · ')[0].replace(/\s+\d+$/, '');
+const milhares = (n: number) => (n >= 1000 ? `${(n / 1000).toLocaleString('pt-BR', {maximumFractionDigits: 1})} mil` : String(n));
+/** Tokens e custo da conversa, com a composição: entrada (parte do cache) e saída. */
+const rodapeUso = (c: TConversa) => {
+  const u = c.uso;
+  if (!u || (!u.entrada && !u.saida && !u.custo_usd)) return nomeIA(c);
+  const tokens = u.entrada || u.saida ? `${milhares(u.entrada)} tokens de entrada${u.cache ? ` (${milhares(u.cache)} do cache)` : ''} · ${milhares(u.saida)} de saída` : '';
+  const custo = u.custo_usd !== undefined ? `≈ US$ ${u.custo_usd.toLocaleString('pt-BR', {maximumFractionDigits: 4})}` : '';
+  return [nomeIA(c), custo, tokens].filter(Boolean).join(' · ');
 };
 
 const CartaoAcao: React.FC<{b: Extract<Bloco, {tipo: 'acao'}>}> = ({b}) => {
@@ -143,7 +163,7 @@ const CartaoPermissao: React.FC<{c: TConversa; b: Extract<Bloco, {tipo: 'permiss
   const p = pedidoEmTexto(b.ferramenta, b.entrada);
   return (
     <div className={`permissao${b.decisao ? ' decidida' : ''}`}>
-      <div className="perm-topo"><ShieldQuestion size={15} />O Claude quer {p.acao}</div>
+      <div className="perm-topo"><ShieldQuestion size={15} />{nomeIA(c)} quer {p.acao}</div>
       {p.codigo && <pre className="perm-cmd">{p.codigo}</pre>}
       {b.decisao ? (
         <div className="perm-decisao">{b.decisao === 'permitida' ? 'Permitido' : b.decisao === 'negada' ? 'Negado' : 'Cancelado pelo Claude'}</div>
@@ -217,6 +237,7 @@ export const Conversa: React.FC<{c: TConversa; abrirTerminal: () => void; libera
   const [tirados, setTirados] = useState<Set<string>>(new Set());
   const [, tique] = useState(0);
   const conta = useConta();
+  const eClaude = c.provedor === 'claude';
   const sugeridos = useAnexos();
   const anexos = sugeridos.filter((a) => !tirados.has(a.chave));
   const trabalhando = c.estado === 'trabalhando' || c.estado === 'precisa';
@@ -254,7 +275,7 @@ export const Conversa: React.FC<{c: TConversa; abrirTerminal: () => void; libera
         const el = e.currentTarget;
         colado.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
       }}>
-        {conta && (!conta.instalado || !conta.logado) && (
+        {eClaude && conta && (!conta.instalado || !conta.logado) && (
           <div className="faixa-conta">
             <CircleAlert size={15} />
             <div>
@@ -264,11 +285,11 @@ export const Conversa: React.FC<{c: TConversa; abrirTerminal: () => void; libera
             </div>
           </div>
         )}
-        {conta?.chave_api && <div className="faixa-conta aviso"><CircleAlert size={15} /><div>Há uma ANTHROPIC_API_KEY neste PC: nesta conversa o Claude cobra pela API, não pela assinatura.</div></div>}
+        {eClaude && conta?.chave_api && <div className="faixa-conta aviso"><CircleAlert size={15} /><div>Há uma ANTHROPIC_API_KEY neste PC: nesta conversa o Claude cobra pela API, não pela assinatura.</div></div>}
         {!c.itens.length && (
           <div className="vazio-conversa">
             <Sparkle size={22} />
-            <p>Converse com o Claude sobre este projeto. Ele vê o que você seleciona, lê os comentários e muda os documentos; cada mudança aparece aqui e no Histórico, e dá para reverter.</p>
+            <p>Converse com {eClaude ? 'o Claude' : nomeIA(c)} sobre este projeto. A IA vê o que você seleciona, lê os comentários e muda os documentos; cada mudança aparece aqui e no Histórico, e dá para reverter.</p>
             <div className="sugestoes">{SUGESTOES.map((s) => <button key={s} className="anexo" onClick={() => (setTexto(s), caixa.current?.focus())}>{s}</button>)}</div>
           </div>
         )}
@@ -309,7 +330,7 @@ export const Conversa: React.FC<{c: TConversa; abrirTerminal: () => void; libera
       <div className="compositor">
         <div className="caixa-pedido">
           {anexos.length > 0 && <div className="anexos">{anexos.map((a) => <ChipAnexo key={a.chave} a={a} tirar={() => setTirados((s) => new Set(s).add(a.chave))} />)}</div>}
-          <textarea ref={caixa} rows={1} value={texto} placeholder={trabalhando ? 'O Claude está trabalhando… (Esc para parar)' : 'Peça ao Claude…'}
+          <textarea ref={caixa} rows={1} value={texto} placeholder={trabalhando ? `${nomeIA(c)} está trabalhando… (Esc para parar)` : `Peça a ${nomeIA(c)}…`}
             onChange={(e) => (setTexto(e.target.value), guardarRascunho(c.id, e.target.value))}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -321,12 +342,12 @@ export const Conversa: React.FC<{c: TConversa; abrirTerminal: () => void; libera
               }
             }} />
           <div className="baixo">
-            <span className="modelo">{c.modelo ?? 'Claude'}{c.estado === 'hibernada' && ' · hibernada (volta na próxima mensagem)'}</span>
+            <span className="modelo">{c.modelo ?? nomeIA(c)}{c.estado === 'hibernada' && ' · hibernada (volta na próxima mensagem)'}</span>
             <button className="enviar" disabled={!texto.trim() || trabalhando} onClick={() => void mandar()} title="Enviar · Enter"><ArrowUp size={15} /></button>
           </div>
         </div>
         <div className="rodape-pedido">
-          <span>{conta?.logado ? `Sua conta Claude${conta.plano ? ` · ${conta.plano}` : conta.email ? ` · ${conta.email}` : ''}` : 'Sua conta Claude'}</span>
+          <span>{eClaude ? (conta?.logado ? `Sua conta Claude${conta.plano ? ` · ${conta.plano}` : conta.email ? ` · ${conta.email}` : ''}` : 'Sua conta Claude') : rodapeUso(c)}</span>
           <span>Enter envia · Shift+Enter quebra a linha</span>
         </div>
       </div>

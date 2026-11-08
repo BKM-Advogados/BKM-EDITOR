@@ -26,13 +26,20 @@ export class McpHttp {
 
   /** Token e arquivo de configuração (--mcp-config) para uma aba nova do Claude. */
   novaAba(base: string, origem: string): string {
+    return this.novaConexao(base, origem).arquivo;
+  }
+
+  /** O mesmo, com o endereço e o cabeçalho à mão: o laço próprio e os agentes ACP recebem assim, sem ler o arquivo. */
+  novaConexao(base: string, origem: string) {
     const token = randomBytes(18).toString('hex');
     mkdirSync(this.pastaConfig, {recursive: true});
     const arquivo = path.join(this.pastaConfig, `aba-${token.slice(0, 8)}.json`);
-    const config = {mcpServers: {estudio: {type: 'http', url: `${base}/mcp`, headers: {Authorization: `Bearer ${token}`}}}};
+    const url = `${base}/mcp`;
+    const headers = {Authorization: `Bearer ${token}`};
+    const config = {mcpServers: {estudio: {type: 'http', url, headers}}};
     writeFileSync(arquivo, JSON.stringify(config, null, 2), {encoding: 'utf-8', mode: 0o600});
     this.abas.set(token, {origem, arquivo});
-    return arquivo;
+    return {arquivo, url, headers};
   }
 
   esquecerTudo() {
