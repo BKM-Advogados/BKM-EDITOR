@@ -17,7 +17,8 @@ O processo principal (`src/main/transcricao.ts`) faz quatro coisas:
    um trecho (`de_ms`, `dur_ms`).
 3. **Roda o `whisper-cli`** em português, decodificação gulosa, com o JSON completo (`-ojf`: tempo de cada token) e um
    começo de conversa com o vocabulário do direito do trabalho (`PROMPT_PADRAO`; a pessoa ou o Claude troca pelo
-   `vocabulario`). Threads: núcleos − 1, até 8.
+   `vocabulario`). Threads: núcleos − 1, até 8. Antes, o detector de voz acha os trechos com voz, e o que o whisper
+   escrever fora deles sai (ver "Detector de voz").
 4. **Junta os tokens em palavras** (token que começa com espaço abre palavra; pedaço e pontuação grudam na anterior; a
    pontuação solta não estica a palavra por cima da pausa) e grava `midia/<arquivo>.palavras.json`.
 
@@ -31,6 +32,7 @@ o que falta. Fora do Windows x64 a função fica indisponível com aviso (não h
 | `whisper-bin-x64.zip` (whisper-cli, whisper.dll, ggml*.dll, SDL2.dll) | github.com/ggml-org/whisper.cpp/releases/download/b5454 | 8.928.640 | `6ba69e34…816ccb` | MIT (whisper.cpp e ggml); SDL2 é zlib |
 | `ggml-small-q5_1.bin` (padrão) | huggingface.co/ggerganov/whisper.cpp, commit 5359861 | 190.085.487 | `ae85e4a9…0411bb` | MIT (pesos do Whisper da OpenAI) |
 | `ggml-base-q5_1.bin` (opcional, mais rápido) | idem | 59.707.625 | `422f1ae4…1f01a8898` | MIT |
+| `ggml-silero-v6.2.0.bin` (detector de voz, rodada 3) | huggingface.co/ggml-org/whisper-vad, commit 9ffd54a | 885.098 | `2aa269b7…7fb6987` | MIT (Silero VAD; a conversão é do whisper.cpp) |
 
 Os SHA-256 inteiros estão em `transcricao.ts`. O do zip é o que o próprio GitHub publica no lançamento, conferido no
 arquivo baixado; os dos modelos são o oid do LFS no Hugging Face. Nada disso entra no instalador.
@@ -52,6 +54,118 @@ erros que sobram são de ouvido ("exceções" → "sessões") e de registro ("pa
 DTW (tempos por token alinhados à atenção) desliga a flash attention, dobra o tempo e piorou o começo das palavras:
 fica desligado. Numa máquina de 8 GB o pico de 465 MB cabe; o tempo deve ficar entre 0,4 e 0,8 da duração da fala,
 conforme o processador (não medido em outra máquina).
+
+### Detector de voz (VAD, rodada 3)
+
+Onde não há fala, o whisper inventa texto. No silêncio, na música e nos efeitos ele escreveu "[Som de fio]",
+"[música]" e "[Som de futebol]". O detector de voz Silero VAD v6.2.0 (MIT, 0,9 MB, `MODELO_VAD`) diz onde há voz e
+baixa junto com o modelo. Quem já tem o whisper baixa o detector na próxima transcrição.
+
+**Como o app usa: o VAD é um filtro** (`ouvirWav`, `trechosDeVoz`, `soNaVoz` em `transcricao.ts`):
+
+1. Uma passada do `whisper-cli` só com o VAD (`--vad -d 1`, que não decodifica nada; 2 a 3 s, quase tudo para
+   carregar o modelo) dá os trechos de voz no relógio do arquivo.
+2. O whisper ouve o arquivo inteiro, como antes.
+3. Só fica a palavra que encosta num trecho de voz, com 300 ms de folga nas pontas.
+
+Sem voz nenhuma, sai lista vazia. Se o registro do `whisper-cli` não disser os trechos (outra versão), nada é filtrado.
+
+As anotações que o whisper escreve no lugar do que não é fala saem sempre: "[…]" de até seis palavras, "(risos)",
+"(música)", "(aplausos)" e "♪". Um "(CLT)" dito na fala fica (`semAnotacoes`).
+
+**Por que não o `--vad` numa passada só:** ele emenda os trechos de voz e o whisper ouve só eles. Dois problemas,
+medidos:
+
+- O tempo de cada token sai no relógio do áudio encurtado. A narração que começa em 14 s saiu começando em 0 s. O
+  `whisper-cli` escreve no stderr a tabela de cada trecho (`vad_segment_info`), e `tempoNoArquivo` leva o tempo de
+  volta ao arquivo. Essa parte ficou pronta e testada.
+- Mesmo com o relógio certo, o começo das palavras piora. O whisper encosta o começo na borda do trecho que recebe.
+
+A passada única é 1,5 vez mais rápida (47 a 50 s contra 73 a 75 s na mistura abaixo), mas a régua pede o começo da
+palavra a até 100 ms.
+
+Medido em 08/11 com `npx tsx scripts/vad-teste.mjs` (small, vocabulário da casa, 7 threads, com as oito frentes rodando
+neste PC; os tempos variam com a carga). Os áudios:
+
+- **silêncio**: 20 s de silêncio de sala, perto de −47 dB;
+- **música**: 20 s de música sintética (acordes, baixo, batida e chimbal, sem voz cantada);
+- **efeitos**: os seis efeitos do C2 em sequência;
+- **antes da fala**: o começo da mistura, 6 s de silêncio e 8 s de música, antes da narração do C2 (72 s).
+
+A coluna "antes da fala" conta as palavras escritas nesses 14 s. As últimas colunas medem a narração da mistura
+contra o `palavras.json` do exemplo, que também é de máquina.
+
+| Configuração | Silêncio | Música | Efeitos | Antes da fala | Palavras erradas | Começo até 100 ms | Mediana / p90 do começo |
+|---|---|---|---|---|---|---|---|
+| Sem VAD e sem tirar anotações (como era) | 3 | 1 | 3 | 1 | 4,1% | 52% | 100 / 240 ms |
+| **VAD como filtro (o app)** | 0 | 0 | 0 | 0 | 4,1% | 52% | 100 / 240 ms |
+| `--vad` numa passada, sem a tabela | 0 | 0 | 0 | 40 (a narração inteira foi para trás) | 26,3% | 0% | 16,7 s |
+| `--vad` numa passada, ajustes do whisper | 0 | 0 | 0 | 0 | 6,2% | 35% | 170 / 360 ms |
+| `--vad` numa passada, pausa de 1 s, folga de 300 ms | 0 | 0 | 0 | 0 | 4,6% | 40% | 140 / 440 ms |
+
+Com o filtro, a narração ficou idêntica à sem VAD: as mesmas 187 palavras com os mesmos tempos. No silêncio e na
+música, o detector achou zero trechos de voz, então qualquer palavra ali sairia.
+
+Pelo caminho do app (`Transcritor.transcrever` na mistura), saíram 193 palavras, nenhuma antes dos 14 s, com o
+`palavras.json` versão 2 e as etapas "Procurando a voz" e "Transcrevendo" na tela.
+
+Não medido:
+
+- voz cantada (a música do teste é sintética);
+- fala baixa sob música alta (o filtro pode tirar palavra dita baixo no meio de um trecho que o detector não pegou);
+- o detector no app instalado.
+
+### Conjunto da casa (rodada 3)
+
+Para medir a régua da transcrição com fala da casa, conferida à mão: WER abaixo de 10%, glossário certo em 95% das
+ocorrências e começo da palavra a até 100 ms em 90% das palavras. O conjunto está em `scripts/conjunto-casa.json`:
+oito itens, 636 s (10,6 min).
+
+| Item | O que é | Duração |
+|---|---|---|
+| `igor-reel` | voz humana: o Reel do Igor, gravado no celular, com música | 76 s |
+| `whatsapp` | voz humana: o advogado no vídeo do WhatsApp (480p) | 106 s |
+| `c3` a `c8` | narrações dos Curtas da Cliente (Notebook): saúde e PPP, o que a Justiça reconheceu, adicional noturno, feriado, banco de horas, portaria até o ponto | 454 s |
+
+O C2 fica de fora, porque o vocabulário do whisper (`PROMPT_PADRAO`) foi afinado nele. As mídias ficam na pasta dos
+shorts da Cliente (`tasks/shorts-2026-11-04`, fora do repositório). A conferência fica em
+`tasks/estudio-acompanhamento/rodada-3/conjunto-casa/`. O glossário (siglas, nomes da casa e termos do direito do
+trabalho) está no mesmo JSON.
+
+**Roteiro de conferência** (a conferência à mão é do responsável):
+
+1. `npx tsx scripts/conjunto-casa.mjs preparar` transcreve cada item com os ajustes do app (small, vocabulário e
+   detector de voz) e grava na pasta da conferência:
+   - `<id>.wav`, o áudio;
+   - `<id>.texto.txt`, o texto da máquina, uma frase por linha;
+   - `<id>.inicios.txt`, doze palavras espaçadas, em rótulos do Audacity;
+   - `<id>.maquina.json`, as palavras com tempo.
+
+   Não grava por cima de um texto ou de rótulos que já estão lá. Já rodado em 08/11.
+2. **Texto.** Abra `<id>.texto.txt` e ouça `<id>.wav`. Corrija o texto para o que foi dito, palavra por palavra:
+   - siglas em caixa alta;
+   - números como a legenda escreveria (13º, 40%);
+   - nomes como se escrevem (Empresa, Escritório Exemplo);
+   - o que não dá para entender vira `[?]`, que sai da conta.
+
+   Pontuação e quebra de linha não contam. No fim, troque `conferido: não` por `conferido: sim`. Conta uns 3 a 5 min
+   por minuto de áudio.
+3. **Começos.** No Audacity (grátis):
+   1. Arquivo › Importar › Áudio, `<id>.wav`.
+   2. Arquivo › Importar › Rótulos, `<id>.inicios.txt`.
+   3. Em cada um dos doze rótulos, aproxime a onda e arraste a borda esquerda até o começo do som da palavra. Não mexa
+      no texto do rótulo.
+   4. Arquivo › Exportar › Exportar rótulos, por cima do mesmo `<id>.inicios.txt`.
+
+   São 96 palavras no conjunto, cerca de meia hora.
+4. `npx tsx scripts/conjunto-casa.mjs medir` mede o que já foi conferido e diz o que falta. Grava `resultado.json` na
+   pasta, com o total, a régua e as ocorrências erradas do glossário. As medidas:
+   - **WER**: sem acento, caixa e pontuação, como a medida do C2, e também com acento.
+   - **Glossário**: o que o whisper escreveu e o que fica depois do dicionário da casa, como na legenda.
+   - **Começo**: o rótulo movido contra a palavra igual mais perto (até 1 s).
+
+   Com `--refazer`, transcreve de novo com o código de agora (para comparar modelo, vocabulário ou VAD) sem mexer na
+   conferência. Também aceita `--modelo base` e `--sem-vad`.
 
 ### Formato do palavras.json
 
@@ -349,6 +463,10 @@ Cliente), `VideoCenas.tsx` (uma linha), `LinhaDoTempo.tsx` (uma linha), `Inspect
   referência (palavras erradas, erro do começo, tempo e pico de memória).
 - `npx tsx scripts/exportar-teste-legendas.mjs [estilo]`: 15 s da narração real → whisper → legendas → MP4 com som e
   legenda, uma foto de cada estilo, SRT e VTT, em `testes/saida/exportar-legendas/`.
+- `npx tsx scripts/vad-teste.mjs`: silêncio, música sintética, os efeitos do C2 e a narração depois de 14 s sem fala,
+  sem VAD, com o VAD como filtro e com o `--vad` numa passada (ver "Detector de voz").
+- `npx tsx scripts/conjunto-casa.mjs preparar|medir`: o conjunto da casa e a medida contra a conferência à mão (ver
+  "Conjunto da casa").
   Medido em 07/11: os 15,5 s viraram 46 palavras em 9 a 12 s; o MP4 de 16 s (720×1280, H.264 com AAC) saiu com 12
   legendas no karaokê, e as cinco fotos mostram a palavra falada em destaque em cada estilo.
 - Prévia web (`npx vite --config vite.renderer.config.ts --port 5205`): a ponte simula a transcrição (andamento de
@@ -367,6 +485,9 @@ Cliente), `VideoCenas.tsx` (uma linha), `LinhaDoTempo.tsx` (uma linha), `Inspect
 
 ## Para depois
 
-- Diarização por modelo (falantes num clipe só); o `checar_texto` olhar também o texto das legendas; cortar silêncios
-  e editar pelo texto (rodada 3, já com o `palavras.json`); transcrever clipe de vídeo do vídeo de cenas quando ele
-  existir; legenda em mais de um idioma.
+- Diarização por modelo (falantes num clipe só); o `checar_texto` olhar também o texto das legendas; editar pelo texto
+  (rodada 4); transcrever clipe de vídeo do vídeo de cenas quando ele existir; legenda em mais de um idioma.
+- Transcrição desligável por projeto: pede um campo no `estudio.json` (da Casca), lido pelo `transcrever` e pelo painel.
+- O começo das palavras: contra a referência de máquina, 52% ficam a até 100 ms (a régua pede 90%). O DTW piorou
+  (medido em 07/11); o próximo passo é medir no conjunto da casa conferido e, se não cumprir, alinhar as palavras ao
+  áudio depois do whisper (alinhamento forçado com um modelo de fonemas de licença comercial).

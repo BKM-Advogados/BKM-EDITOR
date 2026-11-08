@@ -405,7 +405,7 @@ lidar(CANAL.exportar, async (documento: string, opcoes?: OpcoesExportarVideo): P
       }, avisoDe(i, path.basename(destino)));
       arquivos.push(destino);
       parcial = undefined;
-      // o SRT ao lado do vídeo, com o mesmo nome (e o .pt_BR.srt do Facebook), sem gravar por cima (frente Fala)
+      // o SRT ao lado do vídeo, com o mesmo nome (e o .pt_BR.srt do Facebook e o .vtt), sem gravar por cima (frente Fala)
       if (planoLeg.srt && legendas && !legendas.oculto) {
         for (const a of arquivosDeLegendaDoVideo(path.basename(destino, `.${args.ext}`), legendas.segmentos, args.frameRange ? o.trecho : null, (n) => existsSync(path.join(pasta, n)))) {
           writeFileSync(path.join(pasta, a.nome), a.texto, 'utf-8');
