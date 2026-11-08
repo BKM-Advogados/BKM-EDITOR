@@ -142,7 +142,7 @@ export const VideoCenas: React.FC<PropsCenas> = (p) => {
   const q = (ms: number) => Math.round((ms / 1000) * fps);
   return (
     <AbsoluteFill style={{backgroundColor: p.tema.fundo}}>
-      <CamadaEfeitos efeitos={p.efeitos} quadro={frame}>
+      <CamadaEfeitos efeitos={p.efeitos} quadro={frame} largura={p.largura} altura={p.altura}>
         {/* o fundo do tema também dentro da camada: os efeitos valem nele (tres-efeitos-D4) */}
         <AbsoluteFill style={{backgroundColor: p.tema.fundo}} />
         {p.cenas.map((c, i) => {
