@@ -1,7 +1,7 @@
 // Rodada 3, frente C: a cena 3D é lida com validação (tres-efeitos-D12). Um campo com o tipo errado, escrito à mão ou pela IA,
 // não derruba a janela: a tela desenha a cena corrigida e o inspetor avisa o que estava fora do lugar.
 import {describe, expect, it} from 'vitest';
-import {lerCena3d} from '../src/nucleo/cena3d';
+import {INTENSIDADE_PADRAO_LUZ, lerCena3d, novoDoc3d} from '../src/nucleo/cena3d';
 
 describe('cena 3D lida com validação', () => {
   const boa = {
@@ -46,5 +46,38 @@ describe('cena 3D lida com validação', () => {
 
   it('uma cena sem câmera continua sem câmera (a vista padrão é do motor)', () => {
     expect(lerCena3d({...boa, camera: undefined}).doc.camera).toBeUndefined();
+  });
+});
+
+describe('rodada 3: id repetido, intensidade por tipo de luz e cena nova', () => {
+  it('objeto com id repetido ganha id novo, aparece na cena e o aviso leva o id para o Corrigir (tres-efeitos-D11)', () => {
+    const r = lerCena3d({objetos: [
+      {id: 'caixa', nome: 'Caixa', tipo: 'caixa', posicao: [0, 0, 0], rotacao: [0, 0, 0], escala: [1, 1, 1], cor: '#fff'},
+      {id: 'caixa', nome: 'Caixa', tipo: 'caixa', posicao: [2, 0, 0], rotacao: [0, 0, 0], escala: [1, 1, 1], cor: '#fff'},
+      {id: 'caixa', nome: 'Caixa', tipo: 'caixa', posicao: [4, 0, 0], rotacao: [0, 0, 0], escala: [1, 1, 1], cor: '#fff'},
+    ], luzes: [{id: 'sol', tipo: 'direcional', cor: '#fff', intensidade: 1, posicao: [1, 1, 1]}, {id: 'sol', tipo: 'ponto', cor: '#fff', intensidade: 5, posicao: [2, 2, 2]}]});
+    expect(r.doc.objetos.map((o) => o.id)).toEqual(['caixa', 'caixa-2', 'caixa-3']);
+    expect(r.doc.luzes.map((l) => l.id)).toEqual(['sol', 'sol-2']);
+    expect(r.problemas.filter((p) => p.caminho.endsWith('/id')).map((p) => [p.caminho, p.valor])).toEqual([
+      ['/objetos/1/id', 'caixa-2'], ['/objetos/2/id', 'caixa-3'], ['/luzes/1/id', 'sol-2'],
+    ]);
+    // um id que sobra para o objeto seguinte não colide com o gerado
+    expect(lerCena3d({objetos: [{id: 'a'}, {id: 'a'}, {id: 'a-2'}]}).doc.objetos.map((o) => o.id)).toEqual(['a', 'a-2', 'a-2-2']);
+  });
+
+  it('cada tipo de luz tem a sua intensidade de partida; a de ponto não é a do sol (tres-efeitos-D9)', () => {
+    expect(INTENSIDADE_PADRAO_LUZ).toEqual({ambiente: 0.5, direcional: 1.6, ponto: 60});
+    // cabe na faixa que a leitura aceita
+    for (const v of Object.values(INTENSIDADE_PADRAO_LUZ)) {
+      expect(lerCena3d({luzes: [{id: 'x', tipo: 'ponto', cor: '#fff', intensidade: v, posicao: [1, 1, 1]}]}).doc.luzes[0].intensidade).toBe(v);
+    }
+  });
+
+  it('a cena nova do app é lida sem nenhum aviso (a prévia web usa a mesma)', () => {
+    const nova = novoDoc3d();
+    const r = lerCena3d(nova);
+    expect(r.problemas).toEqual([]);
+    expect(r.doc.objetos.map((o) => o.id)).toEqual(['chao', 'caixa']);
+    expect(r.doc.luzes.map((l) => l.id)).toEqual(['ambiente', 'sol']);
   });
 });

@@ -3,13 +3,13 @@
 import React from 'react';
 import {Camera} from 'lucide-react';
 import type {DocCena3D, Luz3D, Objeto3D, OperacaoPatch, Vetor3} from '../../../nucleo/documentos';
-import {aplicar, patchTrocar, trocar, useLoja} from '../../estado/loja';
+import {aplicar, avisar, patchTrocar, trocar, useLoja} from '../../estado/loja';
 import {CampoDeslizante, CampoNumero, CampoTexto, Secao} from '../../componentes/Campos';
 import {indiceEm, luzesDe, objetosDe, PADRAO_METALICO, PADRAO_RUGOSIDADE, TIPOS, type TipoObjeto} from './comum';
 import {CampoCorAoSoltar, CampoEscolha, CampoVetor} from './CamposTres';
-import {ajustarAoVivo, usarVistaComoCamera} from './vista';
+import {ajustarAoVivo, lerVista, usarVistaComoCamera} from './vista';
 import {corrigirCena3d, useCena3d} from './lida';
-import type {CenaLida, ProblemaCena3D} from '../../../nucleo/cena3d';
+import {INTENSIDADE_PADRAO_LUZ, type CenaLida, type ProblemaCena3D} from '../../../nucleo/cena3d';
 
 const TIPOS_LUZ: {valor: Luz3D['tipo']; nome: string}[] = [
   {valor: 'ambiente', nome: 'Ambiente'},
@@ -17,6 +17,7 @@ const TIPOS_LUZ: {valor: Luz3D['tipo']; nome: string}[] = [
   {valor: 'ponto', nome: 'Ponto'},
 ];
 const OPCOES_TIPO = TIPOS.map((t) => ({valor: t.tipo, nome: t.nome}));
+
 
 const Id: React.FC<{id: string}> = ({id}) => <span className="etiqueta" title="id estável (o agente e os comentários usam este)">{id}</span>;
 
@@ -51,8 +52,12 @@ const InspectorObjeto: React.FC<{documento: string; caminho: string; o: Objeto3D
 const InspectorLuz: React.FC<{documento: string; doc: DocCena3D; caminho: string; l: Luz3D}> = ({documento, doc, caminho, l}) => {
   const gravar = (campo: string, valor: unknown) => void trocar(documento, `${caminho}/${campo}`, valor, `${campo} da luz ${l.id}`);
   const trocarTipo = (tipo: Luz3D['tipo']) => {
-    // direcional e ponto precisam de posição; quem vem da ambiente ganha uma
-    const patch: OperacaoPatch[] = [...patchTrocar(doc, `${caminho}/tipo`, tipo), ...(tipo !== 'ambiente' && !l.posicao ? patchTrocar(doc, `${caminho}/posicao`, [3, 5, 3]) : [])];
+    // direcional e ponto precisam de posição; quem vem da ambiente ganha uma. A intensidade que ainda é a padrão do tipo antigo passa
+    // a ser a do novo (a de ponto cai com o quadrado da distância: 1,6 deixava a cena quase escura; tres-efeitos-D9)
+    const padraoAntigo = INTENSIDADE_PADRAO_LUZ[l.tipo];
+    const intensidade = Math.abs(l.intensidade - padraoAntigo) < 0.01 ? INTENSIDADE_PADRAO_LUZ[tipo] : undefined;
+    const patch: OperacaoPatch[] = [...patchTrocar(doc, `${caminho}/tipo`, tipo), ...(tipo !== 'ambiente' && !l.posicao ? patchTrocar(doc, `${caminho}/posicao`, [3, 5, 3]) : []),
+      ...(intensidade !== undefined ? patchTrocar(doc, `${caminho}/intensidade`, intensidade) : [])];
     void aplicar(documento, patch, `tipo da luz ${l.id}`);
   };
   return (
@@ -67,8 +72,11 @@ const InspectorLuz: React.FC<{documento: string; doc: DocCena3D; caminho: string
 
 const InspectorCena: React.FC<{documento: string; doc: DocCena3D}> = ({documento, doc}) => {
   const camera = doc.camera as Partial<DocCena3D['camera']> | undefined;
+  const [chaveFov, setChaveFov] = React.useState(0);
+  // cena sem câmera: a nova parte da vista que está no monitor (e não de um alvo fixo), para a vista não saltar (tres-efeitos-D13)
   const gravarCamera = (campo: 'fov' | 'posicao' | 'alvo', valor: number | Vetor3) =>
-    void (camera ? trocar(documento, `/camera/${campo}`, valor, `${campo} da câmera`) : trocar(documento, '/camera', {posicao: [4, 3, 6], alvo: [0, 0, 0], fov: 40, [campo]: valor}, 'câmera'));
+    void (camera ? trocar(documento, `/camera/${campo}`, valor, `${campo} da câmera`)
+      : trocar(documento, '/camera', {...(lerVista() ?? {posicao: [4, 3, 6], alvo: [0, 0.5, 0], fov: 40}), [campo]: valor}, 'câmera'));
   return (
     <>
       <Secao titulo="Cena">
@@ -77,7 +85,11 @@ const InspectorCena: React.FC<{documento: string; doc: DocCena3D}> = ({documento
         <div className="linha-campo"><span>luzes</span><span>{luzesDe(doc).length}</span></div>
       </Secao>
       <Secao titulo="Câmera">
-        <CampoNumero rotulo="fov (°)" valor={camera?.fov} passo={1} aoMudar={(n) => n > 1 && n < 179 && gravarCamera('fov', n)} />
+        <CampoNumero key={chaveFov} rotulo="fov (°)" valor={camera?.fov} passo={1} aoMudar={(n) => {
+          if (n > 1 && n < 179) return gravarCamera('fov', n);
+          avisar('O campo de visão vai de 1° a 179°: o valor não foi gravado.', 'erro');
+          setChaveFov((k) => k + 1); // o campo volta ao valor que está no documento
+        }} />
         <CampoVetor rotulo="posição" valor={camera?.posicao} aoMudar={(v) => gravarCamera('posicao', v)} />
         <CampoVetor rotulo="alvo" valor={camera?.alvo} aoMudar={(v) => gravarCamera('alvo', v)} />
         <button className="bt principal" style={{width: '100%', justifyContent: 'center', marginTop: 4}} onClick={() => void usarVistaComoCamera(documento)}>

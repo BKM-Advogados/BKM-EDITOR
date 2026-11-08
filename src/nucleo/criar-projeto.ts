@@ -8,7 +8,8 @@
 import {copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import jsonpatch, {type Operation} from 'fast-json-patch';
-import type {DocCena3D, DocImagem, EntradaDocumento, Manifesto, Modulo} from './documentos';
+import type {DocImagem, EntradaDocumento, Manifesto, Modulo} from './documentos';
+import {novoDoc3d} from './cena3d';
 import {novoDocCenas} from './cenas';
 import {EFEITOS} from './efeitos';
 import {MODELOS, type IdModelo} from './modelos';
@@ -63,19 +64,7 @@ export const novoDocImagem = (largura: number, altura: number): DocImagem => {
   };
 };
 
-export const novoDoc3d = (): DocCena3D => ({
-  formato: 1,
-  fundo: '#111418',
-  camera: {posicao: [4, 3, 6], alvo: [0, 0.5, 0], fov: 40},
-  luzes: [
-    {id: 'ambiente', tipo: 'ambiente', cor: '#ffffff', intensidade: 0.5},
-    {id: 'sol', tipo: 'direcional', cor: '#ffffff', intensidade: 1.6, posicao: [5, 8, 4]},
-  ],
-  objetos: [
-    {id: 'chao', nome: 'Chão', tipo: 'plano', posicao: [0, 0, 0], rotacao: [-90, 0, 0], escala: [8, 8, 1], cor: '#2a2f36'},
-    {id: 'caixa', nome: 'Caixa', tipo: 'caixa', posicao: [0, 0.75, 0], rotacao: [0, 25, 0], escala: [1.5, 1.5, 1.5], cor: '#70B8FF', gira: [0, 20, 0]},
-  ],
-});
+export {novoDoc3d} from './cena3d'; // a cena 3D nova mora em cena3d.ts (pura), para a prévia web usar a mesma (frente C)
 
 const PASTA_DO_MODULO: Record<Modulo, string> = {video: 'video', imagem: 'imagem', '3d': '3d'};
 const TITULO_DO_MODULO: Record<Modulo, string> = {video: 'Vídeo', imagem: 'Imagem', '3d': 'Cena 3D'};

@@ -70,11 +70,27 @@ export const lerCena3d = (x: unknown): CenaLida => {
     return padrao;
   };
 
+  // id repetido (a IA duplica a caixa sem trocar o id): o segundo vira `id-2`, `id-3`…, para o objeto aparecer na cena e dar para
+  // editar; o aviso leva o caminho e o id novo, e Corrigir grava (tres-efeitos-D11)
+  const unico = (usados: Set<string>, id: string, caminho: string, rotulo: string) => {
+    if (!usados.has(id)) {
+      usados.add(id);
+      return id;
+    }
+    let n = 2;
+    while (usados.has(`${id}-${n}`)) n++;
+    const novo = `${id}-${n}`;
+    usados.add(novo);
+    avisar(`${caminho}/id`, `${rotulo} ${id} repetido: este passa a ${novo}`, novo);
+    return novo;
+  };
+  const idsObjetos = new Set<string>();
+  const idsLuzes = new Set<string>();
   const objetos = (Array.isArray(raiz.objetos) ? raiz.objetos : []).map((bruto, i): Objeto3D => {
     const c = `/objetos/${i}`;
     const o = ehObjeto(bruto) ? bruto : {};
     if (!ehObjeto(bruto)) avisar(c, `objeto ${i + 1}: não é um objeto`, undefined);
-    const id = typeof o.id === 'string' && o.id ? o.id : `objeto-${i + 1}`;
+    const id = unico(idsObjetos, typeof o.id === 'string' && o.id ? o.id : `objeto-${i + 1}`, c, 'objeto');
     const tipo = TIPOS_OBJETO.includes(o.tipo as Objeto3D['tipo']) ? (o.tipo as Objeto3D['tipo']) : 'caixa';
     if (ehObjeto(bruto) && o.tipo !== tipo) avisar(`${c}/tipo`, `${id}: tipo ${mostrar(o.tipo)} não existe (${TIPOS_OBJETO.join(', ')}); usando "caixa"`, 'caixa');
     const metalico = num(`${c}/metalico`, `${id} metálico`, o.metalico, undefined, [0, 1]);
@@ -99,7 +115,7 @@ export const lerCena3d = (x: unknown): CenaLida => {
     const c = `/luzes/${i}`;
     const l = ehObjeto(bruto) ? bruto : {};
     if (!ehObjeto(bruto)) avisar(c, `luz ${i + 1}: não é um objeto`, undefined);
-    const id = typeof l.id === 'string' && l.id ? l.id : `luz-${i + 1}`;
+    const id = unico(idsLuzes, typeof l.id === 'string' && l.id ? l.id : `luz-${i + 1}`, c, 'luz');
     const tipo = TIPOS_LUZ.includes(l.tipo as Luz3D['tipo']) ? (l.tipo as Luz3D['tipo']) : 'ambiente';
     if (ehObjeto(bruto) && l.tipo !== tipo) avisar(`${c}/tipo`, `${id}: tipo ${mostrar(l.tipo)} não existe (${TIPOS_LUZ.join(', ')}); usando "ambiente"`, 'ambiente');
     const posicao = tipo === 'ambiente' ? undefined : vet(`${c}/posicao`, `${id} posição`, l.posicao, POSICAO_LUZ_PADRAO);
@@ -131,3 +147,23 @@ export const lerCena3d = (x: unknown): CenaLida => {
   } as DocCena3D;
   return {doc, problemas};
 };
+
+/** A cena 3D que o app cria num documento novo: câmera, ambiente e sol, um chão e a caixa que gira na prévia. */
+export const novoDoc3d = (): DocCena3D => ({
+  formato: 1,
+  fundo: '#111418',
+  camera: {posicao: [4, 3, 6], alvo: [0, 0.5, 0], fov: 40},
+  luzes: [
+    {id: 'ambiente', tipo: 'ambiente', cor: '#ffffff', intensidade: 0.5},
+    {id: 'sol', tipo: 'direcional', cor: '#ffffff', intensidade: 1.6, posicao: [5, 8, 4]},
+  ],
+  objetos: [
+    {id: 'chao', nome: 'Chão', tipo: 'plano', posicao: [0, 0, 0], rotacao: [-90, 0, 0], escala: [8, 8, 1], cor: '#2a2f36'},
+    {id: 'caixa', nome: 'Caixa', tipo: 'caixa', posicao: [0, 0.75, 0], rotacao: [0, 25, 0], escala: [1.5, 1.5, 1.5], cor: '#70B8FF', gira: [0, 20, 0]},
+  ],
+});
+
+/** Intensidade de partida de cada tipo de luz: a ambiente e a direcional em unidades do Three.js; a de ponto em candelas (cai com o
+ *  quadrado da distância, então 60 a uns 8 de distância dá a claridade de um sol de 1,6). Ao trocar o tipo de uma luz que ainda tem
+ *  a intensidade padrão do tipo antigo, o inspetor põe a do novo (tres-efeitos-D9). */
+export const INTENSIDADE_PADRAO_LUZ: Record<Luz3D['tipo'], number> = {ambiente: 0.5, direcional: 1.6, ponto: 60};
