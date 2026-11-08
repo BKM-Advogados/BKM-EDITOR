@@ -78,6 +78,34 @@ Camada nova (`textoNovo` e `formaNova`, em `camadas-novas.ts`) e o modelo de car
 - **Reaplicar o kit** (imagem-D13): o logo e as fontes que mudaram no kit trocam os do projeto (mesmo nome) e voltam
   em `atualizados`; o painel Marca avisa quais.
 
+## Ícones do Lucide
+
+2020 ícones (Lucide 1.68.0, licença ISC), recoloríveis e vetoriais. Um ícone é uma camada de `tipo: "forma"` com
+`forma: "icone"`, o nome em `icone` (inglês, com hífen: `scale`, `file-text`) e a cor em `preenchimento` (ou `degrade`):
+
+```json
+{"id": "icone-1", "nome": "Ícone · scale", "tipo": "forma", "forma": "icone", "icone": "scale", "preenchimento": "@destaque",
+ "x": 454, "y": 588, "largura": 173, "altura": 173, "icone_espessura": 2}
+```
+
+- **Pintura** (`src/renderer/modulos/imagem/icone.ts`): cada elemento do Lucide vira um `Path2D` na grade de 24, com traço
+  arredondado de `icone_espessura` (padrão 2, na grade: cresce e encolhe com a caixa). O ícone é um quadrado do menor
+  lado da caixa, centrado. Vai sempre pelo caminho do acabamento (canvas), então sombra, contorno (pelo alfa, como numa
+  foto), degradê e máscara valem. Medido na prévia (`minus` numa caixa de 96 px): o traço sai com 8, 16 e 32 px em 1x,
+  2x e 4x, sem nenhum pixel intermediário na borda.
+- **Dados**: `scripts/gerar-icones.mjs` lê o pacote `lucide-static` (`icon-nodes.json` e `tags.json`) e gera
+  `icones-geometria.json` (só a interface pinta; um caminho por elemento, porque o `m` minúsculo de um caminho colado ao
+  anterior viraria relativo) e `src/nucleo/icones-indice.json` (nome e etiquetas, para o MCP e a busca). A licença do
+  Lucide está em `LICENSE-Lucide.txt`, ao lado da geometria. Nenhuma dependência nova: o `lucide-react` já era usado na
+  interface e o `lucide-static` só serve ao script.
+- **Busca em português** (`src/nucleo/icones.ts`): o léxico liga cerca de 300 palavras do direito, do trabalho e do dia a
+  dia (balança, justiça, contrato, assinatura, prazo, vencimento, férias, rescisão, FGTS, atenção…) a nomes do Lucide; o
+  resto da busca lê o nome e as etiquetas em inglês. Sem acento, em maiúsculas ou no plural funciona. `balança` acha
+  `scale`; `contrato`, `file-text`, `handshake` e `file-pen`; `prazo`, `clock`, `calendar-clock` e `hourglass`.
+- **Interface**: botão "Inserir ícone" no trilho do monitor (busca, grade de resultados, Enter insere o primeiro) e a
+  seção "Ícone" do inspector (nome com sugestão se não existe, cor com as amostras do kit, traço).
+- **MCP**: `buscar_icone` e `inserir_icone` (tabela abaixo).
+
 ## Campo de cor
 
 `CampoCor` (`componentes/Campos.tsx`) mostra as cores do kit do documento aberto como amostras com nome (tooltip e
@@ -95,6 +123,10 @@ Texto para o `claudeMd` do projeto (a coordenação junta em `criar-projeto.ts`)
 > campo (`"preenchimento": "@destaque"`). `@destaque+35` clareia, `@texto-20` escurece, `@fundo:destaque:25` mistura.
 > `aplicar_marca` troca o kit de um documento: a peça acompanha, e o que a pessoa escolheu à mão fica. Texto sobre o
 > fundo precisa de 4,5:1: `cor_da_marca` avisa quando falta.
+>
+> **Ícones.** `buscar_icone` ("balança", "prazo") acha o nome; `inserir_icone` põe o ícone na página. Ele é uma
+> forma com `forma: "icone"` e `icone: "scale"`: mude `x`, `y`, `largura`, `altura`, `rotacao` e `sombra` por
+> `aplicar_patch` como numa forma, a cor por `cor_da_marca` (campo `preenchimento`) e o traço em `icone_espessura`.
 
 ## Ferramentas MCP e classe de permissão
 
@@ -103,6 +135,8 @@ Texto para o `claudeMd` do projeto (a coordenação junta em `criar-projeto.ts`)
 | `ver_marca` | O kit do documento: cores com o nome que se usa, fontes. | `livre` (só lê) |
 | `cor_da_marca` | Põe `@nome` num campo de cor de uma camada ou no fundo; avisa o contraste. | `livre` |
 | `fonte_da_marca` | Põe `@titulo`, `@texto` ou `@mono` num texto. | `livre` |
+| `buscar_icone` | Procura ícones do Lucide por palavra em português ou inglês; devolve os nomes. | `livre` (só lê) |
+| `inserir_icone` | Insere um ícone como forma na página, na cor do kit (`@destaque`), com posição, tamanho, cor e traço opcionais. | `livre` |
 | `aplicar_marca` (rodada 1) | Aplica um kit ao documento; na imagem, por papel. | `livre` |
 
 Todas gravam no diário com o autor e têm Reverter; nenhuma lê a web nem traz arquivo de fora do projeto.
@@ -120,7 +154,10 @@ com o `documento` do vídeo. Volta: Ctrl+Z desfaz o patch do kit (a troca é um 
   `@fontsource/ibm-plex-sans` 5.3.0 e `@fontsource/ibm-plex-mono` 5.3.0 (só o woff2 latin copiado; o texto da licença
   de cada uma está ao lado, `LICENSE-*.txt`). Inter: The Inter Project Authors; Archivo: The Archivo Project Authors;
   IBM Plex: IBM Corp. Nenhuma dependência nova no `package.json`.
-- Lucide (ISC) e `@remotion/fonts` (já no `package.json`; não é mais importado).
+- Lucide 1.68.0 (**ISC**): a geometria e as etiquetas dos ícones vêm do pacote `lucide-static` 1.68.0 (a mesma versão do
+  `lucide-react` do `package.json`); o texto da licença está em `src/renderer/modulos/imagem/LICENSE-Lucide.txt`.
+  Nenhuma dependência nova: o `lucide-static` só serve ao script que gera os dados.
+- `@remotion/fonts` (já no `package.json`; não é mais importado).
 
 ## O que não foi verificado
 
