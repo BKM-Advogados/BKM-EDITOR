@@ -7,7 +7,7 @@ import jsonpatch from 'fast-json-patch';
 import type {OperacaoPatch} from './documentos';
 import {
   ARQUIVO_MARCAS_MIDIA, classificarDerivado, comMarca, lerMarcasDeMidia, marcasVazias, montarIndice, pastasDaMidia, tipoDaMidia,
-  type ArquivoBruto, type EntradaMidia, type EstadoDaTomada, type MarcaDeMidia, type MarcasDeMidia,
+  type ArquivoBruto, type EstadoDaTomada, type IndiceDaMidia, type MarcaDeMidia, type MarcasDeMidia,
 } from './midia';
 import {dimensoesDaImagem, duracaoDeMp4, duracaoDeWav} from './midia-cabecalho';
 import {ErroProjeto, serializar, versaoDe, type Projeto} from './projeto';
@@ -111,8 +111,6 @@ export const lerMarcasDoProjeto = (p: Projeto): MarcasDeMidia => {
     return marcasVazias(); // marcas.json quebrado não esconde a mídia
   }
 };
-
-export type IndiceDaMidia = {entradas: EntradaMidia[]; pastas: {pasta: string; quantidade: number}[]; total: number; tamanho_total: number};
 
 export const indiceDaMidia = (p: Projeto): IndiceDaMidia => {
   const entradas = montarIndice(listarMidiaBruta(p.raiz), lerMarcasDoProjeto(p));

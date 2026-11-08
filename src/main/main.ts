@@ -30,6 +30,7 @@ import {apagarLimposSemUso, registrarIpcLimpeza} from './limpeza-voz';
 import {registrarIpcLoudness} from './loudness';
 import {registrarRemoverFundo} from './remover-fundo';
 import {avisoDeQuedaEmLaco, decidirRecarga, garantirInstanciaUnica, trazerParaFrente} from './janela-segura'; // frente Casca
+import {registrarIpcMidia} from './ipc-midia'; // frente Casca: painel de mídia
 
 // o mesmo id do instalador (electron-builder.yml): a barra de tarefas agrupa a janela com o atalho
 app.setAppUserModelId('br.com.bkmadvogados.estudio');
@@ -481,6 +482,7 @@ registrarPrefsExportacao(lidar, exigirProjeto); // marca d'água por destino, le
 // frente Som (rodada 2): limpeza de voz (limpeza-voz.ts) e medidor de loudness da mistura (loudness.ts)
 registrarIpcLimpeza(lidar, exigirProjeto, enviar);
 registrarIpcLoudness(lidar, exigirProjeto, (documento) => (exigirProjeto(), sessao!.propsVideo(documento, midia.base)));
+registrarIpcMidia(lidar, exigirProjeto); // frente Casca: painel de mídia (lista de midia/ e marcas das tomadas)
 
 app.on('ready', async () => {
   if (!primeiraInstancia) return; // a segunda instância já pediu para sair (garantirInstanciaUnica)

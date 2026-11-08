@@ -18,6 +18,7 @@ import {MODELOS} from '../../src/nucleo/modelos';
 import {codificarWav, decodificarWav, musicaSintetica, narracaoSintetica, TAXA} from '../audio-sintetico';
 import {argumentosDoRender, destinoDoFormato, nomesDosArquivos, normalizarPrefsExportacao, type OpcoesExportarVideo, type PrefsExportacao} from '../../src/nucleo/exportacao';
 import {caminhoSemFundo, MODELO_FUNDO} from '../../src/nucleo/remover-fundo';
+import {comMarca, marcasVazias, montarIndice, pastasDaMidia, type ArquivoBruto, type MarcasDeMidia} from '../../src/nucleo/midia'; // frente Casca
 
 type Proj = {raiz: string; manifesto: Manifesto; docs: Record<string, unknown>; versao: number};
 const projetos = new Map<string, Proj>();
@@ -133,7 +134,7 @@ const progresso = (p: Progresso) => ouvintesProgresso.forEach((f) => f(p));
 const esperar = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
 const pastaSaidas = () => `${aberto!.raiz}\\saidas`;
 
-const info = (): InfoProjeto | null => aberto && {raiz: aberto.raiz, manifesto: structuredClone(aberto.manifesto), base_midia: '', claude: true, git: true,
+const info = (): InfoProjeto | null => aberto && {raiz: aberto.raiz, manifesto: structuredClone(aberto.manifesto), base_midia: `${location.origin}/exemplos/exemplo`, claude: true, git: true,
   perfil: {nome: 'padrao', sessoes_claude: 4, escala_previa: 0.75, pixel_ratio: 1.5}, estado: null};
 
 const docImagem = (l: number, a: number) => ({formato: 1, largura: l, altura: a, fundo: '#111418', camadas: [{id: 'titulo', nome: 'Título', tipo: 'texto',
@@ -391,6 +392,11 @@ const api: ApiEstudio = {
     aoPedido: () => nada,
     responder: nada,
   },
+  // frente Casca (rodada 3): painel de mídia, simulação no fim do arquivo
+  midia: {
+    indice: async () => midiaNaPrevia.indice(),
+    marcar: async (caminho, mudanca) => midiaNaPrevia.marcar(caminho, mudanca),
+  },
 };
 
 (window as unknown as {estudio: ApiEstudio}).estudio = api;
@@ -600,4 +606,47 @@ const fundoNaPrevia = (() => {
     return caminho;
   };
   return {estado, baixar, ler, gravar, ouvintes};
+})();
+
+// ---------- frente Casca: painel de mídia (docs/casca.md) ----------
+// Os seis arquivos reais do exemplo da Cliente (o Vite os serve em /exemplos/exemplo/midia, e a base de mídia da prévia aponta para lá,
+// então as miniaturas e a prévia tocam de verdade) e alguns de mentira com derivados e subpasta, para ver o agrupamento, as
+// pastas, a busca e a marcação das tomadas. As marcas ficam em memória, como no resto da ponte.
+const MB = 1024 * 1024;
+const midiaNaPrevia = (() => {
+  const hoje = Date.now();
+  const arquivos: ArquivoBruto[] = [
+    {rel: 'midia/video-exemplo.mp4', tamanho: 9_316_651, modificado_ms: hoje - 3 * 3600e3, duracao_ms: 38_000},
+    {rel: 'midia/Cidade Exemplo.jpg', tamanho: 709_144, modificado_ms: hoje - 26 * 3600e3},
+    {rel: 'midia/logo-exemplo.png', tamanho: 49_252, modificado_ms: hoje - 48 * 3600e3, largura: 512, altura: 512},
+    {rel: 'midia/sfx/carimbo_0.wav', tamanho: 42_284, modificado_ms: hoje - 72 * 3600e3, duracao_ms: 960},
+    {rel: 'midia/sfx/impacto_grave.wav', tamanho: 211_244, modificado_ms: hoje - 72 * 3600e3, duracao_ms: 2400},
+    {rel: 'midia/sfx/papel_desliza_0.wav', tamanho: 53_804, modificado_ms: hoje - 72 * 3600e3, duracao_ms: 1220},
+    {rel: 'midia/sfx/pop.wav', tamanho: 34_604, modificado_ms: hoje - 72 * 3600e3, duracao_ms: 780},
+    {rel: 'midia/sfx/swell.wav', tamanho: 163_244, modificado_ms: hoje - 72 * 3600e3, duracao_ms: 3700},
+    {rel: 'midia/sfx/whoosh.wav', tamanho: 105_644, modificado_ms: hoje - 72 * 3600e3, duracao_ms: 2400},
+    // de mentira: sem o arquivo por trás, só para o agrupamento
+    {rel: 'midia/narracao.wav', tamanho: 5 * MB, modificado_ms: hoje - 600e3, duracao_ms: 61_000},
+    {rel: 'midia/narracao.wav.palavras.json', tamanho: 18_000, modificado_ms: hoje - 590e3},
+    {rel: 'midia/narracao.wav.envelope.json', tamanho: 9_000, modificado_ms: hoje - 590e3},
+    {rel: 'midia/narracao.wav.limpo.wav', tamanho: 5 * MB, modificado_ms: hoje - 300e3},
+    {rel: 'midia/narracao.wav.limpo.wav.envelope.json', tamanho: 9_000, modificado_ms: hoje - 300e3},
+    {rel: 'midia/tomadas/gancho-1.mp4', tamanho: 120 * MB, modificado_ms: hoje - 5 * 3600e3, duracao_ms: 42_000},
+    {rel: 'midia/tomadas/gancho-2.mp4', tamanho: 118 * MB, modificado_ms: hoje - 5 * 3600e3, duracao_ms: 39_500},
+    {rel: 'midia/tomadas/gancho-2.mp4.palavras.json', tamanho: 14_000, modificado_ms: hoje - 4 * 3600e3},
+    {rel: 'midia/foto-ana.jpg', tamanho: 2 * MB, modificado_ms: hoje - 9 * 3600e3, largura: 3000, altura: 2000},
+    {rel: caminhoSemFundo('midia/foto-ana.jpg'), tamanho: 1 * MB, modificado_ms: hoje - 8 * 3600e3, largura: 3000, altura: 2000},
+  ];
+  let marcas: MarcasDeMidia = comMarca(comMarca(marcasVazias(), 'midia/tomadas/gancho-2.mp4', {estado: 'boa', nota: 'Tomada com o gancho firme'}), 'midia/tomadas/gancho-1.mp4', {estado: 'descartada'});
+  let seq = 100;
+  const indice = () => {
+    const entradas = montarIndice(arquivos, marcas);
+    return {entradas, pastas: pastasDaMidia(entradas), total: entradas.length, tamanho_total: arquivos.reduce((s, a) => s + a.tamanho, 0)};
+  };
+  const marcar = (caminho: string, mudanca: {estado?: 'boa' | 'descartada' | null; nota?: string}) => {
+    if (!indice().entradas.some((e) => e.caminho === caminho)) throw new Error(`arquivo não achado em midia/: ${caminho}`);
+    marcas = comMarca(marcas, caminho, mudanca);
+    return {seq: ++seq, documento: 'midia/marcas.json', caminho, marca: marcas.marcas[caminho] ?? null};
+  };
+  return {indice, marcar};
 })();

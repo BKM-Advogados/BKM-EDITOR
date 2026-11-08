@@ -62,6 +62,9 @@ export type ArquivoBruto = {rel: string; tamanho: number; modificado_ms: number;
 
 export type DerivadoDeMidia = {caminho: string; tipo: TipoDerivado; detalhe?: string; tamanho: number};
 
+/** Tudo que o painel precisa: as entradas (derivados dentro), as pastas com contagem e os totais. */
+export type IndiceDaMidia = {entradas: EntradaMidia[]; pastas: {pasta: string; quantidade: number}[]; total: number; tamanho_total: number};
+
 export type EstadoDaTomada = 'boa' | 'descartada';
 export type MarcaDeMidia = {estado?: EstadoDaTomada; nota?: string};
 export type MarcasDeMidia = {versao: 1; marcas: Record<string, MarcaDeMidia>};

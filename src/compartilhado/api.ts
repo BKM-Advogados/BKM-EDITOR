@@ -8,6 +8,7 @@ import type {MedidasLoudness} from '../nucleo/loudness';
 import type {FonteArquivo, Marca} from '../nucleo/marca';
 import type {OpcoesExportarImagem, OpcoesExportarVideo, PrefsExportacao} from '../nucleo/exportacao';
 import type {Pesquisa} from '../nucleo/pesquisa';
+import type {EstadoDaTomada, IndiceDaMidia, MarcaDeMidia} from '../nucleo/midia'; // frente Casca
 import type {EstadoModeloFundo} from '../nucleo/remover-fundo';
 import type {EstadoDaFala} from '../nucleo/legendas'; // frente Fala
 
@@ -107,6 +108,9 @@ export const CANAL = {
   removerFundoProgresso: 'estudio:remover-fundo-progresso',
   removerFundoPedido: 'estudio:remover-fundo-pedido',
   removerFundoResposta: 'estudio:remover-fundo-resposta',
+  // frente Casca (rodada 3): painel de mídia (src/main/ipc-midia.ts, docs/casca.md)
+  midia: 'estudio:midia',
+  midiaMarcar: 'estudio:midia-marcar',
 } as const;
 
 /** O projeto aberto. `estado` é o último que a pessoa viu (área, documento, seleção), para reabrir onde parou; `git`
@@ -300,6 +304,14 @@ export type ApiEstudio = {
     /** Pedido da ferramenta remover_fundo do MCP: a interface calcula e devolve por responder. */
     aoPedido: (cb: (id: string, src: string) => void) => () => void;
     responder: (id: string, r: RespostaFundo) => void;
+  };
+  // frente Casca (rodada 3): painel de mídia (docs/casca.md)
+  midia: {
+    /** A lista de midia/ com os derivados sob o original, as pastas e as marcas das tomadas. */
+    indice: () => Promise<IndiceDaMidia>;
+    /** Marca a tomada (boa, descartada, ou null para tirar a marca) e/ou a nota; grava midia/marcas.json e entra no diário como da pessoa. */
+    marcar: (caminho: string, mudanca: {estado?: EstadoDaTomada | null; nota?: string}) =>
+      Promise<{seq: number; documento: string; caminho: string; marca: MarcaDeMidia | null}>;
   };
 };
 
