@@ -86,7 +86,7 @@ arquivo de fora do projeto, exporta, apaga ou reverte mudança de outro autor.
 | `transcrever` | `cartao` (na primeira vez baixa o whisper.cpp e o modelo, 200 MB) | `arquivo?`, `destino?`, `documento?`, `clipe?`, `faixa?`, `legendas?`, `estilo?`, `refazer?`, `refazer_legendas?`, `modelo?`, `vocabulario?` | Uma ferramenta para os dois usos do plano. Com `arquivo` (qualquer áudio ou vídeo do projeto: a narração de um roteiro da Cliente, uma gravação para a pesquisa), grava as palavras ao lado ou em `destino` (ex.: `video/palavras.json`; nunca o manifesto, um documento, `comentarios.json`, a pesquisa, `.estudio/` ou um .json que não seja lista de palavras, porque grava por cima e fora do diário) e devolve o texto (até 4.000 caracteres). No vídeo de cenas, transcreve a fala que ainda não tem transcrição ou cuja tomada mudou (ou toda, com `refazer`) e gera as legendas **dos clipes que ainda não têm** (padrão), pelo `aplicar_patch` de sempre (diário e versão). Clipe com legendas fica como está e volta em `ja_tinham_legendas` (e em `legendas_de_audio_antigo`, se a tomada mudou); `refazer_legendas` refaz, levando as palavras corrigidas à mão |
 | `ler_legendas` | `livre` (só lê) | `documento?`, `de?`, `ate?` | as legendas nos tempos da tela (id, em, sai, texto, falante), já com o clipe de voz no lugar em que está |
 | `editar_legenda` | `livre` | `documento?`, `id`, `texto?`, `em?`, `sai?` | corrige o texto (cada palavra guarda o tempo da que estava no lugar, como na lista do app) e o tempo, dado como na tela: o app desconta o quanto o clipe andou desde que a legenda nasceu. Entrar e sair o mesmo tanto leva as palavras junto (sem sair do trecho do clipe: recusa e diz quanto dá); mudar uma ponta apara |
-| `exportar_legendas` | `cartao` (exporta) | `documento?`, `formatos?`, `nome?`, `falantes_no_srt?`, `sobrescrever?` | `saidas/<título>.srt` e `.vtt`, nos tempos de saída; com o nome tomado, `<título> (2).srt` (só grava por cima com `sobrescrever`) |
+| `exportar_legendas` | `cartao` (exporta) | `documento?`, `formatos?` (`srt`, `vtt`, `srt_pt_br`), `nome?`, `falantes_no_srt?`, `sobrescrever?`, `trecho?` | `saidas/<título>.srt` e `.vtt` (padrão), ou `.pt_BR.srt` (o nome que o Facebook pede), nos tempos de saída; com `trecho` {de_ms, ate_ms}, só as legendas dele, cortadas nas pontas e contadas do zero (para o vídeo exportado com o mesmo trecho); trecho sem legenda é erro claro; com o nome tomado, `<título> (2).srt` (só grava por cima com `sobrescrever`) |
 | `propor_cortes_fala` | `livre` (só lê) | `documento?`, `clipe?`, `silencio_min_ms?`, `pausa_ms?`, `preenchimento?`, `pontas?` | os cortes que a fala do clipe sugere (ms do arquivo), com o motivo, o "ãh" tirado, o contexto (três palavras antes e depois) e quanto encurta |
 | `aplicar_cortes_fala` | `livre` (grava um WAV novo em `midia/` e o patch no diário; Reverter desfaz) | `documento?`, `clipe?`, `cortes?`, `voltar?` | emenda a narração sem os cortes (os pedidos ou os sugeridos), troca o arquivo do clipe e leva as legendas; recusa corte a menos de 80 ms de palavra; `voltar: true` volta ao arquivo de antes |
 | `importar_legendas` | `livre` | `arquivo`, `documento?`, `estilo?` | lê um SRT ou VTT do projeto (UTF-8, UTF-16 ou Windows-1252, pelos bytes) e troca as legendas |
@@ -224,7 +224,24 @@ Exporta nos tempos de saída (o clipe no lugar em que está), com até duas linh
 leva o falante na marca de voz (`<v Nome>`) e escapa `&`, `<` e `>`. A leitura aceita BOM, CRLF, bloco sem número,
 `MM:SS.mmm`, vírgula ou ponto nos milésimos, ajustes de cue, `NOTE`, `STYLE`, `REGION`, etiquetas (`<i>`, `<c.x>`,
 `<font>`, `{\an8}`) e carimbos de palavra do VTT; o que não entende vira aviso. Ida e volta sem perder um milissegundo
-(teste). Ao importar, o tempo de cada palavra é estimado.
+(teste). Ao importar, o tempo de cada palavra é estimado pelo tamanho dentro da legenda e fica marcado
+(`palavras_estimadas: true` no segmento), para a lista e a IA saberem que não veio da fala.
+
+### Na exportação (rodada 3)
+
+O diálogo Exportar ganha a linha **Legendas** quando o vídeo tem legenda, com uma escolha por destino
+(`src/nucleo/legendas-exportacao.ts`):
+
+| Escolha | Vídeo | Ao lado |
+|---|---|---|
+| No vídeo (padrão) | legenda queimada | nada |
+| Só o SRT | sem legenda (a miniatura e a marca d'água também a ignoram) | `<nome do vídeo>.srt` e `.pt_BR.srt` |
+| Os dois | legenda queimada; no 16:9, acima da faixa onde o YouTube mostra as legendas automáticas | `<nome do vídeo>.srt` e `.pt_BR.srt` |
+
+O SRT leva o mesmo nome do arquivo de vídeo (com o sufixo do destino, como "Mudar - 9x16.srt"), sai nos tempos do
+arquivo (com trecho, contado do zero do trecho) e não grava por cima: se o nome existe, "(2)". O `.pt_BR.srt` é o
+nome que o Facebook usa para reconhecer o idioma; o YouTube e o LinkedIn aceitam qualquer um dos dois. A escolha vai
+em `OpcoesExportarVideo.legendas` (id do destino → `video` | `srt` | `ambos`); sem ela, tudo sai como antes.
 
 ## Lista e dicionário (rodada 3)
 
@@ -288,6 +305,8 @@ Texto para a coordenação juntar no `claudeMd` (seção do vídeo de cenas):
 > arquivo, com o contexto de cada corte; mostre à pessoa e aplique com `aplicar_cortes_fala` {clipe?, cortes?} (todos ou
 > os escolhidos; nunca a menos de 80 ms de uma palavra). O clipe passa a tocar um WAV novo e guarda o de antes em
 > `cortes_fala`: não escreva `cortes_fala` à mão; para desfazer, `aplicar_cortes_fala` com `voltar: true`.
+> **SRT para as redes.** `exportar_legendas` {formatos: ['srt', 'srt_pt_br']} grava também o nome que o Facebook pede;
+> com `trecho` {de_ms, ate_ms}, o SRT acompanha o vídeo exportado com o mesmo trecho (conta do zero).
 
 ## Rodada 3 (08/11/2026)
 
