@@ -163,6 +163,8 @@ export type EventoConversa =
   | {tipo: 'permissao'; pedido: string; ferramenta: string; entrada: Record<string, unknown>; titulo?: string; motivo?: string; pode_sempre: boolean}
   | {tipo: 'permissao-cancelada'; pedido: string}
   | {tipo: 'fim'; erro: boolean; texto?: string; custo_usd?: number; duracao_ms?: number}
+  // tokens do turno (entrada inclui a parte que veio do cache); custo_usd quando o próprio provedor informa
+  | {tipo: 'uso'; entrada: number; entrada_cache: number; saida: number; custo_usd?: number}
   | {tipo: 'hibernou'}
   | {tipo: 'saiu'; codigo: number | null; detalhe?: string}
   | {tipo: 'erro'; mensagem: string};
