@@ -7,7 +7,7 @@
 import React, {Suspense, useCallback, useEffect, useRef, useState} from 'react';
 import {DockviewReact, type DockviewApi, type DockviewReadyEvent, type DockviewTheme, type IDockviewPanelHeaderProps, type IDockviewPanelProps} from 'dockview-react';
 import 'dockview-react/dist/styles/dockview.css';
-import {Blend, BookOpen, Box, Check, Copy, Download, Film, FilePlus2, FolderOpen, FolderSearch, History, Home, Image as ImageIcon, LayoutPanelLeft, ListTree,
+import {Blend, BookOpen, Box, Check, Copy, Download, Film, FilePlus2, FolderOpen, FolderSearch, History, Home, Image as ImageIcon, Images, LayoutPanelLeft, ListTree,
   MessageSquare, MessageSquarePlus, MonitorPlay, Palette, Plus, Quote, Rows3, Settings, SlidersHorizontal, Sparkle, Undo2, X} from 'lucide-react';
 import type {Preferencias, Recente} from '../../compartilhado/api';
 import type {Modulo} from '../../nucleo/documentos';
@@ -16,6 +16,7 @@ import {abrirProjeto, avisar, criarDocumento, desfazer, fecharProjeto, loja, men
 import {pedirTexto} from '../componentes/Dialogo';
 import {acaoDeArquivo} from './atalhos';
 import {SeloSalvo} from './SeloSalvo';
+import {Midia} from '../paineis/Midia'; // frente Casca (rodada 3): painel de mídia
 import type {PaineisDoModulo} from './contrato';
 import {PaineisVideo} from '../modulos/video/paineis';
 import {PaineisImagem} from '../modulos/imagem/paineis';
@@ -66,7 +67,7 @@ const PorArea: React.FC<{parte: 'Lista' | 'Monitor' | 'Inspector' | 'Linha'}> = 
 // sustentam a área não têm ×; os outros mostram o × ao passar o mouse.
 const ICONES_ABA: Record<string, React.ReactNode> = {
   monitor: <MonitorPlay size={14} />, linha: <Rows3 size={14} />, lista: <ListTree size={14} />, inspector: <SlidersHorizontal size={14} />,
-  comentarios: <MessageSquare size={14} />, historico: <History size={14} />, pesquisa: <Quote size={14} />, terminal: <Sparkle size={14} />,
+  comentarios: <MessageSquare size={14} />, historico: <History size={14} />, pesquisa: <Quote size={14} />, midia: <Images size={14} />, terminal: <Sparkle size={14} />,
 };
 const ESSENCIAIS = new Set(['monitor', 'linha', 'lista', 'inspector', 'terminal']);
 const AbaDoPainel: React.FC<IDockviewPanelHeaderProps> = ({api}) => {
@@ -97,16 +98,17 @@ const componentes: Record<string, React.FC<IDockviewPanelProps>> = {
   comentarios: () => <Comentarios />,
   historico: () => <Historico />,
   pesquisa: () => <Pesquisa />,
+  midia: () => <Midia />,
   terminal: () => <Suspense fallback={<Carregando />}><Terminal /></Suspense>,
 };
 
 // faixas de layout de docs/tela.md: C (compacta) abaixo de 1600x800, P (padrão) acima; cada área x faixa guarda o seu.
 // No Vídeo, o arranjo depende também do formato: vertical (V) quer o monitor em coluna, horizontal (H) quer largura.
-// A versão na chave sobe quando entra painel novo no arranjo padrão (v6: Pesquisa), para os layouts gravados o verem.
+// A versão na chave sobe quando entra painel novo no arranjo padrão (v6: Pesquisa, v7: Mídia), para os layouts gravados o verem.
 type Faixa = 'C' | 'P';
 type Orientacao = 'V' | 'H';
 const faixaAtual = (): Faixa => (window.innerWidth < 1600 || window.innerHeight < 800 ? 'C' : 'P');
-const CHAVE = (area: Area, faixa: Faixa, o: Orientacao) => `estudio:layout:v6:${area}:${faixa}${area === 'video' ? `:${o}` : ''}`;
+const CHAVE = (area: Area, faixa: Faixa, o: Orientacao) => `estudio:layout:v7:${area}:${faixa}${area === 'video' ? `:${o}` : ''}`;
 const lerLayout = (area: Area, faixa: Faixa, o: Orientacao) => {
   try {
     const t = localStorage.getItem(CHAVE(area, faixa, o));
@@ -156,6 +158,11 @@ const layoutPadrao = (api: DockviewApi, area: Area, faixa: Faixa, o: Orientacao)
     api.addPanel({id: 'inspector', component: 'inspector', title: 'Propriedades', position: {referencePanel: 'lista', direction: 'right'}});
     abasDoInspector(false);
   }
+  // frente Casca (rodada 3): o painel de mídia é uma aba ao lado da Lista (nas três disposições a Lista existe); a aba que estava
+  // à frente continua à frente
+  api.addPanel({id: 'midia', component: 'midia', title: 'Mídia', position: {referencePanel: 'lista', direction: 'within'}});
+  api.getPanel('lista')?.api.setActive();
+  api.getPanel('inspector')?.api.setActive();
 };
 
 const TITULOS: Record<Area, string> = {video: 'Cenas e blocos', imagem: 'Camadas', '3d': 'Objetos', efeitos: 'Pilha de efeitos'};
@@ -308,6 +315,15 @@ export const Casca: React.FC = () => {
     p.api.setActive();
   }), []);
 
+  // o painel de mídia fechado volta pelo menu do projeto, ao lado da Lista (ou do inspetor, se a Lista não estiver)
+  const abrirMidia = () => {
+    const d = api.current;
+    if (!d) return;
+    const ref = d.getPanel('lista') ? 'lista' : 'inspector';
+    const p = d.getPanel('midia') ?? d.addPanel({id: 'midia', component: 'midia', title: 'Mídia', ...(d.getPanel(ref) ? {position: {referencePanel: ref, direction: 'within' as const}} : {})});
+    p.api.setActive();
+  };
+
   const marcarVersao = async () => {
     const r = await window.estudio.marcarVersao();
     avisar(r.mensagem, r.ok ? 'ok' : 'info');
@@ -449,6 +465,7 @@ export const Casca: React.FC = () => {
             <button onClick={item(() => void marcarVersao())}><Check size={14} />Marcar ponto de restauração<kbd>Ctrl+S</kbd></button>
             <button onClick={item(() => void window.estudio.abrirExemplo().then(abrirProjeto).catch((e: Error) => avisar(mensagemDe(e), 'erro')))}><BookOpen size={14} />Ver um pronto (exemplo Cliente)</button>
             <hr />
+            <button onClick={item(abrirMidia)}><Images size={14} />Mídia do projeto</button>
             <button onClick={item(() => setMarca(true))}><Palette size={14} />Marca…</button>
             <button onClick={item(() => setPreferencias(true))}><Settings size={14} />Preferências…</button>
             <button onClick={item(() => montar(area, true))}><LayoutPanelLeft size={14} />Redefinir os painéis desta área</button>
