@@ -122,6 +122,12 @@ const api: ApiEstudio = {
     aoPedido: (cb) => ouvir<[string, string]>(CANAL.removerFundoPedido, cb),
     responder: (id, r) => ipcRenderer.send(CANAL.removerFundoResposta, id, r),
   },
+  // carrossel em partes (rodada 3, B2)
+  exportarPaginasEmPartes: {
+    abrir: (o) => ipcRenderer.invoke(CANAL.exportarPaginasAbrir, o),
+    parte: (sessao, pagina) => ipcRenderer.invoke(CANAL.exportarPaginasParte, sessao, pagina),
+    fechar: (sessao) => ipcRenderer.invoke(CANAL.exportarPaginasFechar, sessao),
+  },
 };
 
 contextBridge.exposeInMainWorld('estudio', api);

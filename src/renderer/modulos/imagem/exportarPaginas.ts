@@ -1,7 +1,8 @@
 // Exportação do carrossel pela interface: cada página vira um documento de uma prancheta só (vistaDaPagina) e passa
 // pelo mesmo canvas do PNG simples (desenharDocumento, em exportarPng.ts), com fundo, camadas e a pilha de efeitos; os
 // PNG vão ao processo principal, que grava saidas/<nome>/01.png… e o PDF (exportar-paginas.ts). Uma página de cada
-// vez: o canvas é solto antes da próxima, para o carrossel de 20 páginas não segurar 20 imagens em resolução cheia.
+// vez, em partes (imagem-D19): desenha, manda e solta antes da próxima, para o carrossel de 20 páginas não segurar 20
+// imagens em resolução cheia (nem 20 PNG em base64 num pedido só).
 import type {DocImagem} from '../../../nucleo/documentos';
 import {paginasDe, vistaDaPagina} from '../../../nucleo/carrossel';
 import {avisar, loja} from '../../estado/loja';
@@ -27,14 +28,15 @@ export const exportarCarrossel = async (documento: string) => {
   const paginas = paginasDe(doc);
   avisar(`Exportando ${paginas.length} ${paginas.length === 1 ? 'página' : 'páginas'} em ${doc.largura}×${doc.altura} e o PDF…`);
   try {
-    const prontas: {png: string; numero: number}[] = [];
+    const partes = window.estudio.exportarPaginasEmPartes;
+    const {sessao} = await partes.abrir({documento, pdf: true});
     const faltaram: string[] = [];
     for (let p = 0; p < paginas.length; p++) {
-      const r = await desenharPagina(doc, p);
-      prontas.push({png: r.png, numero: p + 1});
-      faltaram.push(...r.faltaram.map((f) => `${f} (${paginas[p].nome})`));
+      const pagina = await desenharPagina(doc, p);
+      await partes.parte(sessao, {png: pagina.png, numero: p + 1});
+      faltaram.push(...pagina.faltaram.map((f) => `${f} (${paginas[p].nome})`));
     }
-    const r = await window.estudio.exportarPaginas({documento, paginas: prontas, pdf: true});
+    const r = await partes.fechar(sessao);
     const falta = faltaram.length ? ` (sem imagem: ${faltaram.join(', ')})` : '';
     if (r.ok) avisar(`Carrossel exportado: ${r.pdf ?? r.pasta}${falta}`, faltaram.length ? 'erro' : 'ok');
     else avisar(r.mensagem ? `Exportação: ${r.mensagem}` : 'Exportação cancelada.', r.mensagem ? 'erro' : 'info');

@@ -107,6 +107,10 @@ export const CANAL = {
   removerFundoProgresso: 'estudio:remover-fundo-progresso',
   removerFundoPedido: 'estudio:remover-fundo-pedido',
   removerFundoResposta: 'estudio:remover-fundo-resposta',
+  // carrossel exportado em partes (rodada 3, B2, imagem-D19): src/main/exportar-paginas.ts
+  exportarPaginasAbrir: 'estudio:exportar-paginas-abrir',
+  exportarPaginasParte: 'estudio:exportar-paginas-parte',
+  exportarPaginasFechar: 'estudio:exportar-paginas-fechar',
 } as const;
 
 /** O projeto aberto. `estado` é o último que a pessoa viu (área, documento, seleção), para reabrir onde parou; `git`
@@ -300,6 +304,12 @@ export type ApiEstudio = {
     /** Pedido da ferramenta remover_fundo do MCP: a interface calcula e devolve por responder. */
     aoPedido: (cb: (id: string, src: string) => void) => () => void;
     responder: (id: string, r: RespostaFundo) => void;
+  };
+  // carrossel em partes (rodada 3, B2, imagem-D19): uma página por vez, cada PNG vai ao disco ao chegar e o PDF sai no fechar
+  exportarPaginasEmPartes: {
+    abrir: (o: {documento: string; pdf: boolean}) => Promise<{sessao: string}>;
+    parte: (sessao: string, pagina: {png: string; numero: number}) => Promise<boolean>;
+    fechar: (sessao: string) => Promise<ResultadoExportarPaginas>;
   };
 };
 

@@ -4,6 +4,7 @@
 // Cada operação devolve o patch e a lista de páginas que resulta dele, para a interface escolher a página ativa sem
 // reler o disco. Ver docs/carrossel.md.
 import type {AlvoComentario, CamadaImagem, DocImagem, OperacaoPatch, PaginaImagem} from './documentos';
+import {FORMATOS_IMAGEM} from './formatos';
 
 export const NOME_PAGINA = (n: number) => `Página ${n}`;
 
@@ -267,4 +268,12 @@ export const caminhoDoAlvo = (doc: DocImagem, alvo: Pick<AlvoComentario, 'objeto
   }
   const m = /\/camadas\/(\d+)$/.exec(alvo.objeto ?? '');
   return m && camadas[Number(m[1])] && !alvo.objeto_id ? `${base}/${m[1]}` : undefined;
+};
+
+/** Pontos de PDF por pixel (imagem-D12): a imagem de impressão (A4 a 300 dpi, em pé ou deitada) vira página do tamanho
+ *  do papel (2480 px × 72/300 = 595 pt, 21 cm); as de rede ficam com 1 px = 1 pt, o que o LinkedIn espera. */
+export const pontosPorPixel = (largura: number, altura: number) => {
+  const a4 = FORMATOS_IMAGEM.find((f) => f.id === 'a4');
+  const ehA4 = a4 && ((largura === a4.largura && altura === a4.altura) || (largura === a4.altura && altura === a4.largura));
+  return ehA4 ? 72 / 300 : 1;
 };
