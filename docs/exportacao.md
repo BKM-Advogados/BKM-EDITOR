@@ -103,3 +103,26 @@ lista.
   vez sem, e tira quadros de cada MP4 com o ffmpeg do compositor do Remotion (testes/saida/kenburns/, fora do git).
   Neste PC, com escala 0,5: cinco MP4 em 57 s.
 - Não conferido: o app Electron de verdade (o antivírus bloqueia o de desenvolvimento).
+
+## Rodada 3: correções do vídeo que vai ao ar
+
+Para o guia da IA (texto para o `claudeMd`), no vídeo de cenas e no carrossel da Cliente:
+
+- **Número com decimais** (video-D8): o bloco `numero` mostra as casas decimais que `de` e `ate` têm (7,5 → "7,5"; 2824,68 →
+  "2.824,68"); em dinheiro (`prefixo` ou `sufixo` com "R$" ou "reais") com centavos, sempre duas ("R$ 1.412,50"). Para forçar,
+  o campo opcional `casas` (0 a 4) no bloco. Vale também nos blocos `numero` do carrossel da Cliente.
+- **Lâmina sem corte visível** (video-D1): quando a lâmina (Ctrl+K) corta no meio de um bloco, ela põe `segue_ms` na primeira
+  metade e `desde_ms` na segunda. **Não edite esses dois campos**: dizem à composição que o bloco continua dos dois lados do
+  corte (não some, não entra de novo, a contagem e o Ken Burns seguem). O vídeo dividido sai igual ao inteiro. Se a cena
+  seguinte for apagada, o bloco com `segue_ms` só termina no fim da cena, sem o fade de saída.
+- **Corte entre cenas** (video-D2, tres-efeitos-D4): o fundo da cena fica sólido até o último quadro; quem some antes do corte
+  são os blocos. O fundo do tema entra na camada de efeitos, então os efeitos valem nele.
+- **Carrossel: dúvida e foto** (video-D6, video-D7): a cena de dúvida acompanha "ficou" e "procure" na narração mas monta sem
+  elas (aviso por palavra). O bloco `foto` aceita `src` e `credito` próprios; sem `src`, vale a foto e o crédito da campanha.
+- **Carrossel: legenda** (video-D17): a legenda palavra a palavra termina 16 px acima da faixa que a rede cobre embaixo no
+  9:16 (y 1420 de 1920) e cresce para cima; a área livre dos blocos acaba em ~1270.
+
+Conferido: `testes/numero.test.ts`, `testes/corte-limpo.test.ts`, `testes/carrossel-duvida-foto.test.ts` e
+`testes/zonas-seguras.test.ts`; e um render fora do Electron comparando, quadro a quadro, o vídeo dividido com o inteiro
+(diferença 0 em nove instantes; sem as marcas, média acima de 8) e duas cenas claras sobre tema escuro com Brilho 0,5
+(128 em todos os quadros do corte).
