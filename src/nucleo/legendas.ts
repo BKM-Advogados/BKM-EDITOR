@@ -35,7 +35,8 @@ export type EstiloLegenda = {
 };
 /** De onde as legendas vieram: o clipe, o arquivo de áudio, a transcrição e onde o clipe estava naquela hora. Se o
  *  clipe muda de lugar ou é aparado depois, o resolvedor desloca as legendas dele junto. */
-export type OrigemLegendas = {clipe: string; arquivo: string; palavras: string; em: number; corte_ms: number};
+export type OrigemLegendas = {clipe: string; arquivo: string; palavras: string; em: number; corte_ms: number;
+  sha256?: string}; // do áudio transcrito (o carimbo do palavras.json): a correção à mão só passa para a mesma tomada
 export type LegendasCenas = {segmentos: SegmentoLegenda[]; estilo?: EstiloLegenda; oculto?: boolean; origens?: OrigemLegendas[]};
 
 // ---------- predefinições ----------
@@ -235,7 +236,7 @@ export const nomeDoFalante = (c: {nome?: string; arquivo: string}) => {
 
 /** Legendas de um ou mais clipes de voz, cada um com as palavras transcritas dele (ms do arquivo). O falante é o nome do
  *  clipe, se a pessoa deu um, ou o da faixa. Os ids saem `leg-1`, `leg-2`… na ordem do tempo. */
-export const legendasDaFala = (fontes: {clipe: ClipeFala; faixa: {nome?: string}; palavras: PalavraLegenda[]; caminhoPalavras: string}[], o: {
+export const legendasDaFala = (fontes: {clipe: ClipeFala; faixa: {nome?: string}; palavras: PalavraLegenda[]; caminhoPalavras: string; sha256?: string}[], o: {
   estilo?: EstiloLegenda; largura: number; altura: number; quebra?: Partial<OpcoesQuebra>;
 }): LegendasCenas => {
   const estilo = o.estilo ?? ESTILO_PADRAO;
@@ -248,12 +249,99 @@ export const legendasDaFala = (fontes: {clipe: ClipeFala; faixa: {nome?: string}
   return {
     segmentos: segs.map((s, i) => ({id: `leg-${i + 1}`, ...s})),
     estilo,
-    origens: fontes.map((f) => ({clipe: f.clipe.id, arquivo: f.clipe.arquivo, palavras: f.caminhoPalavras, em: f.clipe.em, corte_ms: f.clipe.corte_ms ?? 0})),
+    origens: fontes.map((f) => ({clipe: f.clipe.id, arquivo: f.clipe.arquivo, palavras: f.caminhoPalavras, em: f.clipe.em, corte_ms: f.clipe.corte_ms ?? 0,
+      ...(f.sha256 ? {sha256: f.sha256} : {})})),
   };
 };
 
 /** O palavras.json que a transcrição grava ao lado do arquivo de áudio (midia/narracao.wav → midia/narracao.wav.palavras.json). */
 export const arquivoDasPalavras = (arquivo: string) => `${arquivo}.palavras.json`;
+
+/** O arquivo de onde sai a fala do clipe: o da pessoa (`original`) quando o clipe toca a versão de voz limpa, que tem os
+ *  mesmos tempos; senão o próprio `arquivo`. Limpar a voz, ou voltar ao original, não pede outra transcrição. */
+export const arquivoDaFala = (c: {arquivo: string; original?: string}) => (typeof c.original === 'string' && c.original ? c.original : c.arquivo);
+
+/** O palavras.json ao lado do áudio, na versão 2: as palavras com o carimbo do áudio transcrito (tamanho, data e sha256,
+ *  como o envelope do som), para transcrever de novo quando a tomada é regravada com o mesmo nome. A versão 1 era só a
+ *  lista de palavras (é o que o `destino` do roteiro da Cliente continua recebendo) e conta como sem carimbo. */
+export const VERSAO_PALAVRAS = 2;
+export type FonteDaFala = {tamanho: number; modificado_ms?: number; sha256?: string};
+export type PalavrasGravadas = {versao: typeof VERSAO_PALAVRAS; fonte: FonteDaFala; modelo?: string; trecho?: {de_ms?: number; dur_ms?: number};
+  palavras: (PalavraLegenda & {p?: number})[]};
+/** 'em_dia': a transcrição é do áudio como ele está; 'velha': o áudio mudou (ou o arquivo não tem carimbo); 'falta': não
+ *  há transcrição. */
+export type EstadoDaFala = 'em_dia' | 'velha' | 'falta';
+
+/** Caminho no projeto comparável: barras para a frente, sem "." e "..", sem diferença de caixa (o Windows não tem). */
+const chaveDoCaminho = (c: string) => {
+  const out: string[] = [];
+  for (const p of c.replace(/\\/g, '/').split('/')) {
+    if (!p || p === '.') continue;
+    if (p === '..') out.pop();
+    else out.push(p);
+  }
+  return out.join('/').toLowerCase();
+};
+
+/** Por que o `destino` das palavras (o transcrever de um arquivo, para o roteiro da Cliente) não serve, ou null se serve. A
+ *  transcrição grava por cima, fora do diário: o destino é um .json que não é do app (manifesto, documento, comentários,
+ *  pesquisa, .estudio/) e, se já existe, uma lista de palavras. `atual`: o que está no destino, se ele existe (doc
+ *  undefined quando não deu para ler). */
+export const recusaDoDestino = (destino: string, documentos: string[], atual?: {doc: unknown}): string | null => {
+  const outro = ': escolha outro caminho, como video/palavras.json';
+  const k = chaveDoCaminho(destino);
+  if (!k.endsWith('.json')) return 'o destino das palavras termina em .json';
+  if (k === 'estudio.json') return `${destino} é o manifesto do projeto${outro}`;
+  if (documentos.some((d) => chaveDoCaminho(d) === k)) return `${destino} é um documento do projeto${outro}`;
+  if (k === 'comentarios.json') return `${destino} guarda os comentários da pessoa${outro}`;
+  if (k === 'pesquisa/pesquisa.json') return `${destino} é a pesquisa do projeto${outro}`;
+  if (k.startsWith('.estudio/')) return `${destino} é do app${outro}`;
+  if (atual && !palavrasValidas(atual.doc).length && !(Array.isArray(atual.doc) && !atual.doc.length)) {
+    return `${destino} já existe e não é uma lista de palavras${outro}`;
+  }
+  return null;
+};
+
+/** recusaDoDestino com o que o projeto tem: os documentos do manifesto e o que já está no destino. */
+export const recusaDoDestinoNoProjeto = (projeto: {manifesto(): {documentos: {caminho: string}[]}; existe(c: string): boolean; lerJson<T>(c: string): {doc: T}},
+  destino: string): string | null => {
+  let documentos: string[] = [];
+  try {
+    documentos = projeto.manifesto().documentos.map((d) => d.caminho);
+  } catch {
+    /* manifesto ilegível: o resto da regra vale */
+  }
+  let atual: {doc: unknown} | undefined;
+  try {
+    if (projeto.existe(destino)) {
+      try {
+        atual = {doc: projeto.lerJson<unknown>(destino).doc};
+      } catch {
+        atual = {doc: undefined};
+      }
+    }
+  } catch {
+    /* fora do projeto: quem grava recusa */
+  }
+  return recusaDoDestino(destino, documentos, atual);
+};
+
+/** O carimbo do palavras.json lido, se for da versão 2. */
+export const fonteDaFala = (x: unknown): FonteDaFala | undefined => {
+  const o = x as Partial<PalavrasGravadas> | null;
+  const f = o && !Array.isArray(o) && o.versao === VERSAO_PALAVRAS ? o.fonte : undefined;
+  return f && typeof f === 'object' && typeof f.tamanho === 'number' ? f : undefined;
+};
+
+/** A transcrição lida ainda é do áudio como ele está? Mesmo tamanho e mesma data: 'em_dia'. Mesmo tamanho e outra data
+ *  (cópia, git clone): 'conferir', e só o sha256 decide (quem chama lê o arquivo). Outro tamanho ou sem carimbo: 'velha'. */
+export const conferirFala = (lido: unknown, atual: {tamanho: number; modificado_ms: number}): EstadoDaFala | 'conferir' => {
+  if (!palavrasValidas(lido).length) return 'falta';
+  const f = fonteDaFala(lido);
+  if (!f || f.tamanho !== atual.tamanho) return 'velha';
+  if (typeof f.modificado_ms === 'number' && Math.floor(f.modificado_ms) === Math.floor(atual.modificado_ms)) return 'em_dia';
+  return f.sha256 ? 'conferir' : 'velha';
+};
 
 /** Os clipes das faixas de voz do documento (não mudos), com a faixa de cada um. `clipe` ou `faixa` (ids) escolhem um
  *  só; o clipe pedido entra mesmo que esteja numa faixa de música ou de efeitos. */
@@ -269,38 +357,83 @@ export const clipesDeVoz = (doc: {audio?: AudioCenas}, filtro: {clipe?: string; 
   return out;
 };
 
-/** Palavras de um palavras.json qualquer (o da transcrição tem {w, s, e, p}); o que não for palavra fica de fora. */
+/** Palavras de um palavras.json qualquer (a lista da versão 1 ou o `palavras` da versão 2, com {w, s, e, p}); o que não
+ *  for palavra fica de fora. */
 export const palavrasValidas = (x: unknown): PalavraLegenda[] =>
-  (Array.isArray(x) ? x : []).filter((p): p is PalavraLegenda => Boolean(p) && typeof p.w === 'string' && Number.isFinite(p.s) && Number.isFinite(p.e))
+  (Array.isArray(x) ? x : Array.isArray((x as {palavras?: unknown} | null)?.palavras) ? (x as {palavras: unknown[]}).palavras : []).filter((p): p is PalavraLegenda => Boolean(p) && typeof p.w === 'string' && Number.isFinite(p.s) && Number.isFinite(p.e))
     .map((p) => ({w: p.w, s: p.s, e: p.e}));
 
-/** As legendas do documento a partir das transcrições já gravadas. Clipes cujo arquivo ainda não foi transcrito vão em
- *  `faltam`; as legendas de clipes que não estão no pedido (outro clipe, outra faixa) ficam como estavam. */
+/** As palavras que a pessoa corrigiu nas legendas de um clipe, passadas para a transcrição (ms do arquivo): a palavra da
+ *  legenda que está no tempo de uma palavra transcrita (até 40 ms no começo e no fim) e tem outro texto. Só entre legendas
+ *  e transcrição da mesma tomada: com o sha256 da origem diferente do da transcrição, nada passa. O que perdeu o tempo
+ *  (outro número de palavras, legenda arrastada) não passa. */
+export const levarCorrecoes = (leg: LegendasCenas, clipe: string, palavras: PalavraLegenda[], sha256?: string): {palavras: PalavraLegenda[]; n: number} => {
+  const o = (Array.isArray(leg.origens) ? leg.origens : []).find((x) => x.clipe === clipe);
+  if (!o || (o.sha256 && sha256 && o.sha256 !== sha256)) return {palavras, n: 0};
+  const desloc = (o.corte_ms ?? 0) - o.em; // ms do vídeo de quando a legenda nasceu → ms do arquivo
+  const novas = palavras.map((p) => ({...p}));
+  let n = 0;
+  for (const s of Array.isArray(leg.segmentos) ? leg.segmentos : []) {
+    if (s?.clipe !== clipe || !Array.isArray(s.palavras) || typeof s.texto !== 'string') continue;
+    for (const p of palavrasDe(s)) {
+      const alvo = novas.find((q) => Math.abs(q.s - (p.s + desloc)) <= 40 && Math.abs(q.e - (p.e + desloc)) <= 40);
+      if (alvo && alvo.w !== p.w) {
+        alvo.w = p.w;
+        n++;
+      }
+    }
+  }
+  return {palavras: novas, n};
+};
+
+/** As legendas do documento a partir das transcrições já gravadas. Gera só o que falta: o clipe que já tem legendas fica
+ *  como está (vai em `mantidos`), a não ser que esteja em `refazer` (true: todos os pedidos); aí as palavras corrigidas à
+ *  mão que ainda caem no tempo da transcrição passam para as novas (`corrigidas`). Clipe sem transcrição vai em `faltam`.
+ *  As legendas de outros clipes e as que não vêm de clipe (importadas, criadas à mão) ficam. */
 export const legendasDoDocumento = (doc: {audio?: AudioCenas; legendas?: LegendasCenas}, lerPalavras: (caminho: string) => unknown, o: {
-  largura: number; altura: number; estilo?: EstiloLegenda; clipe?: string; faixa?: string;
-}): {legendas: LegendasCenas; faltam: string[]; clipes: number} => {
+  largura: number; altura: number; estilo?: EstiloLegenda; clipe?: string; faixa?: string; refazer?: boolean | string[];
+}): {legendas: LegendasCenas; faltam: string[]; clipes: number; mantidos: string[]; corrigidas: number; geradas: number} => {
+  const antes = doc.legendas && Array.isArray(doc.legendas.segmentos) ? doc.legendas : undefined;
+  const comLegenda = new Set((antes?.segmentos ?? []).map((s) => s?.clipe).filter(Boolean));
+  const refazer = (id: string) => o.refazer === true || (Array.isArray(o.refazer) && o.refazer.includes(id));
   const fontes: Parameters<typeof legendasDaFala>[0] = [];
   const faltam: string[] = [];
-  const escolhidos = clipesDeVoz(doc, o);
-  for (const {clipe, faixa} of escolhidos) {
-    const caminho = arquivoDasPalavras(clipe.arquivo);
-    let palavras: PalavraLegenda[] = [];
-    try {
-      palavras = palavrasValidas(lerPalavras(caminho));
-    } catch {
-      palavras = [];
+  const mantidos: string[] = [];
+  let corrigidas = 0;
+  for (const {clipe, faixa} of clipesDeVoz(doc, o)) {
+    if (comLegenda.has(clipe.id) && !refazer(clipe.id)) {
+      mantidos.push(clipe.id);
+      continue;
     }
-    if (!palavras.length) faltam.push(clipe.arquivo);
-    else fontes.push({clipe: {...clipe, em: Number(clipe.em) || 0, duracao_ms: Number(clipe.duracao_ms) || 0}, faixa, palavras, caminhoPalavras: caminho});
+    const arquivo = arquivoDaFala(clipe);
+    const caminho = arquivoDasPalavras(arquivo);
+    let lido: unknown;
+    try {
+      lido = lerPalavras(caminho);
+    } catch {
+      lido = undefined;
+    }
+    let palavras = palavrasValidas(lido);
+    if (!palavras.length) {
+      faltam.push(arquivo);
+      continue;
+    }
+    const sha256 = fonteDaFala(lido)?.sha256;
+    if (antes && comLegenda.has(clipe.id)) {
+      const c = levarCorrecoes(antes, clipe.id, palavras, sha256);
+      palavras = c.palavras;
+      corrigidas += c.n;
+    }
+    fontes.push({clipe: {...clipe, arquivo, em: Number(clipe.em) || 0, duracao_ms: Number(clipe.duracao_ms) || 0}, faixa, palavras, caminhoPalavras: caminho, sha256});
   }
-  const nova = legendasDaFala(fontes, {estilo: o.estilo ?? doc.legendas?.estilo, largura: o.largura, altura: o.altura});
-  if (!o.clipe && !o.faixa || !doc.legendas) return {legendas: {...doc.legendas, ...nova}, faltam, clipes: fontes.length};
-  // pedido de um clipe ou de uma faixa: troca só as legendas desses clipes
-  const trocados = new Set(escolhidos.map((e) => e.clipe.id));
-  const ficam = (doc.legendas.segmentos ?? []).filter((s) => !s.clipe || !trocados.has(s.clipe));
+  const nova = legendasDaFala(fontes, {estilo: o.estilo ?? antes?.estilo, largura: o.largura, altura: o.altura});
+  const resto = {faltam, clipes: fontes.length, mantidos, corrigidas, geradas: nova.segmentos.length};
+  if (!antes) return {legendas: {...doc.legendas, ...nova}, ...resto};
+  const trocados = new Set(fontes.map((f) => f.clipe.id));
+  const ficam = antes.segmentos.filter((s) => !s?.clipe || !trocados.has(s.clipe));
   const segmentos = [...ficam, ...nova.segmentos].sort((a, b) => a.em - b.em).map((s, i) => ({...s, id: `leg-${i + 1}`}));
-  const origens = [...(doc.legendas.origens ?? []).filter((x) => !trocados.has(x.clipe)), ...(nova.origens ?? [])];
-  return {legendas: {...doc.legendas, estilo: nova.estilo, segmentos, origens}, faltam, clipes: fontes.length};
+  const origens = [...(antes.origens ?? []).filter((x) => !trocados.has(x.clipe)), ...(nova.origens ?? [])];
+  return {legendas: {...antes, estilo: nova.estilo, segmentos, origens}, ...resto};
 };
 
 /** Quebra de novo as legendas de um estilo para outro (largura e palavras por vez mudam), mantendo falante e clipe. */
@@ -338,13 +471,26 @@ export const estimarPalavras = (texto: string, em: number, sai: number): Palavra
   });
 };
 
-/** As palavras do segmento: as gravadas, se ainda batem com o texto; senão, estimadas no tempo do segmento. */
+/** As palavras do segmento, sempre com o texto dele. Com as palavras gravadas e o mesmo número de palavras no texto,
+ *  cada uma fica com o tempo da que estava no lugar (o texto corrigido por patch, sem mexer em `palavras`, não perde o
+ *  compasso da fala); com outro número, espalham no tempo que as gravadas ocupavam. Sem palavras gravadas (SRT
+ *  importado), o tempo é estimado pelo tamanho dentro do segmento. É a regra do comTexto, que a lista do app usa. */
 export const palavrasDe = (s: SegmentoLegenda): PalavraLegenda[] => {
   const ws = tokensDe(s.texto);
-  if (Array.isArray(s.palavras) && s.palavras.length === ws.length && s.palavras.every((p, i) => p.w === ws[i] && Number.isFinite(p.s) && Number.isFinite(p.e))) {
-    return s.palavras.map((p) => ({...p}));
-  }
-  return estimarPalavras(s.texto, s.em, s.sai);
+  const gravadas = Array.isArray(s.palavras) && s.palavras.length && s.palavras.every((p) => p && Number.isFinite(p.s) && Number.isFinite(p.e)) ? s.palavras : undefined;
+  if (!gravadas || !ws.length) return estimarPalavras(s.texto, s.em, s.sai);
+  if (gravadas.length === ws.length) return gravadas.map((p, i) => ({w: ws[i], s: p.s, e: p.e}));
+  return estimarPalavras(s.texto, gravadas[0].s, gravadas[gravadas.length - 1].e);
+};
+
+/** Quanto a legenda anda na tela desde que nasceu: o "zero do arquivo" do clipe de voz agora (`em − corte_ms`) menos o
+ *  de quando ela foi gerada (`origens`). Tempo na tela = tempo guardado + deslocamento; 0 sem clipe ou sem origem. */
+export const deslocamentoDaLegenda = (s: {clipe?: string}, origens: OrigemLegendas[] | undefined, clipes: {id: string; em: number; corte_ms?: number}[]): number => {
+  if (!s.clipe) return 0;
+  const c = clipes.find((x) => x.id === s.clipe);
+  const o = (Array.isArray(origens) ? origens : []).find((x) => x.clipe === s.clipe);
+  if (!c || !o) return 0;
+  return ((Number(c.em) || 0) - (Number(c.corte_ms) || 0)) - ((Number(o.em) || 0) - (Number(o.corte_ms) || 0));
 };
 
 /** Troca o texto do segmento sem perder o tempo das palavras: com o mesmo número de palavras, cada uma fica com o tempo
@@ -516,8 +662,61 @@ export const resolverLegendas = (leg: LegendasCenas | undefined, ctx: {audio?: A
   return {segmentos, estilo: resolverEstilo(leg.estilo, ctx.tema), area: areaDaLegenda(ctx.largura, ctx.altura), oculto: Boolean(leg.oculto)};
 };
 
+/** As legendas para outro tamanho de quadro (um destino da exportação, como o Reels de um vídeo 16:9): a área segura do
+ *  destino e, onde a legenda não cabe nas linhas do estilo nesse tamanho, ela dividida em pedaços que cabem, pela mesma
+ *  regra da quebra e dentro dela. Nada se junta com a vizinha: o que a pessoa dividiu, juntou ou corrigiu fica. Na mesma
+ *  proporção do documento (`doc`), só a área é refeita, para o arquivo sair igual à prévia. */
+export const legendasNoDestino = (leg: LegendasP, largura: number, altura: number, doc?: {largura: number; altura: number}): LegendasP => {
+  const area = areaDaLegenda(largura, altura);
+  if (doc && Math.abs(largura / altura - doc.largura / doc.altura) < 0.01) return {...leg, area};
+  const e = leg.estilo;
+  const quebra: OpcoesQuebra = {max_caracteres: caracteresPorLinha({predefinicao: e.id, tam: e.tam, maiusculas: e.maiusculas}, largura, altura) * e.linhas,
+    max_palavras: e.max_palavras};
+  const cabe = (ps: PalavraLegenda[]) => ps.reduce((n, p, i) => n + p.w.length + (i ? 1 : 0), 0) <= quebra.max_caracteres && (!quebra.max_palavras || ps.length <= quebra.max_palavras);
+  const segmentos = leg.segmentos.flatMap((s): SegmentoLegendaP[] => {
+    if (s.palavras.length < 2 || cabe(s.palavras)) return [s];
+    const pedacos = quebrarEmSegmentos(s.palavras, quebra);
+    return pedacos.map((x, k) => ({...s, id: k ? `${s.id}.${k + 1}` : s.id, texto: x.texto, palavras: x.palavras ?? [],
+      em: k ? Math.max(s.em, x.em) : s.em, sai: k === pedacos.length - 1 ? s.sai : Math.min(s.sai, x.sai)}));
+  });
+  return {...leg, segmentos, area};
+};
+
 /** Os segmentos que aparecem em `ms` (pode haver mais de um quando duas vozes se sobrepõem). */
 export const segmentosEm = (segmentos: SegmentoLegendaP[], ms: number) => segmentos.filter((s) => ms >= s.em && ms < s.sai);
+
+export const ENTRA_LEGENDA_MS = 120; // a legenda acende em 120 ms antes de `em`
+export const SAI_LEGENDA_MS = 120; // e apaga em 120 ms depois de `sai`
+
+/** A legenda da tela em `ms`, uma só: a que está no ar (com duas vozes ao mesmo tempo, a que começou por último). Na fala
+ *  contínua, em que uma sai quando a outra entra, a troca é no quadro, sem as duas juntas. No silêncio entre duas, a que
+ *  sai apaga na primeira metade do vão e a que entra acende na segunda, cada uma em até 120 ms. `entrada` (0 a 1) é o
+ *  quanto a legenda já entrou, para a subida dela; `opacidade` junta entrada e saída. */
+export const legendaNoAr = (segmentos: SegmentoLegendaP[], ms: number): {s: SegmentoLegendaP; opacidade: number; entrada: number} | null => {
+  let atual: SegmentoLegendaP | undefined;
+  let antes: SegmentoLegendaP | undefined;
+  let depois: SegmentoLegendaP | undefined;
+  for (const s of segmentos) {
+    if (s.em <= ms && ms < s.sai) {
+      if (!atual || s.em >= atual.em) atual = s;
+    } else if (s.sai <= ms) {
+      if (!antes || s.sai > antes.sai) antes = s;
+    } else if (!depois || s.em < depois.em) depois = s;
+  }
+  if (atual) return {s: atual, opacidade: 1, entrada: 1};
+  const fim = antes?.sai ?? -Infinity;
+  const ini = depois?.em ?? Infinity;
+  const metade = (ini - fim) / 2;
+  if (antes && ms - fim < metade) {
+    const o = 1 - (ms - fim) / Math.min(SAI_LEGENDA_MS, metade);
+    return o > 0 ? {s: antes, opacidade: o, entrada: 1} : null;
+  }
+  if (depois) {
+    const e = 1 - (ini - ms) / Math.min(ENTRA_LEGENDA_MS, metade);
+    return e > 0 ? {s: depois, opacidade: e, entrada: e} : null;
+  }
+  return null;
+};
 
 // ---------- SRT e VTT ----------
 

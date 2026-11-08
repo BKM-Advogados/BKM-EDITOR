@@ -91,12 +91,103 @@ describe('MCP: transcrever e legendas', () => {
     expect(doc.legendas?.origens?.[0]).toMatchObject({clipe: 'clipe-1', palavras: 'midia/narracao.wav.palavras.json', em: 500});
     expect(Math.max(...doc.legendas!.segmentos.map((s) => s.palavras!.length))).toBeLessThanOrEqual(4);
     expect(projeto.diario().at(-1)).toMatchObject({autor: 'agente', rotulo: expect.stringContaining('legendas da fala')});
-    // de novo: a transcrição já existe e não roda outra vez
+    // de novo: a transcrição já existe e não roda outra vez, e o clipe que já tem legendas fica como está
     pedidos.length = 0;
+    const antes = lerVideo().legendas;
     const r2 = await chamar(c, 'transcrever', {documento: 'video', faixa: 'narracao', estilo: 'classica'});
     expect(pedidos).toEqual([]);
     expect(r2.json.transcritos[0]).toMatchObject({ja_tinha: true});
-    expect(lerVideo().legendas?.estilo?.predefinicao).toBe('classica');
+    expect(r2.json).toMatchObject({geradas: 0, ja_tinham_legendas: ['clipe-1']});
+    expect(r2.json.nota).toContain('refazer_legendas');
+    expect(lerVideo().legendas).toEqual(antes);
+    // refazer_legendas refaz, no estilo pedido, e a palavra corrigida à mão fica
+    const atual = lerVideo();
+    const i = atual.legendas!.segmentos.findIndex((s) => s.texto.includes('cidade?'));
+    const seg = atual.legendas!.segmentos[i];
+    const j = seg.palavras!.findIndex((w) => w.w === 'cidade?');
+    projeto.aplicarPatch({documento: 'video/video.json', versao_base: projeto.lerJson('video/video.json').versao, autor: 'pessoa', origem: 'interface',
+      patch: [{op: 'replace', path: `/legendas/segmentos/${i}/texto`, value: seg.texto.replace('cidade?', 'Cidade?')},
+        {op: 'replace', path: `/legendas/segmentos/${i}/palavras/${j}/w`, value: 'Cidade?'}]});
+    const r3 = await chamar(c, 'transcrever', {documento: 'video', estilo: 'classica', refazer_legendas: true});
+    expect(r3.json).toMatchObject({corrigidas_a_mao_mantidas: 1});
+    expect(r3.json.geradas).toBeGreaterThan(10);
+    const refeitas = lerVideo().legendas!;
+    expect(refeitas.estilo?.predefinicao).toBe('classica');
+    expect(refeitas.segmentos.some((s) => s.texto.includes('Cidade?'))).toBe(true);
+    expect(refeitas.segmentos.some((s) => s.texto.includes('cidade?'))).toBe(false);
+  });
+
+  it('clipe de voz limpa: a fala é a do original, que já tem transcrição; tomada regravada transcreve de novo sem mexer nas legendas', async () => {
+    const estados: Record<string, 'em_dia' | 'velha' | 'falta'> = {};
+    const comConferir: TranscritorMcp = {...transcritor, conferir: (_p, arquivo) => estados[arquivo] ?? 'falta'};
+    const c = await conectar(comConferir);
+    const v = projeto.lerJson<DocCenas>('video/video.json');
+    projeto.aplicarPatch({documento: 'video/video.json', versao_base: v.versao, autor: 'pessoa', origem: 'interface', patch: [
+      {op: 'replace', path: '/audio/faixas/0/clipes/0/arquivo', value: 'midia/narracao.wav.media.limpo.wav'},
+      {op: 'add', path: '/audio/faixas/0/clipes/0/original', value: 'midia/narracao.wav'}]});
+    const antes = lerVideo().legendas;
+    estados['midia/narracao.wav'] = 'em_dia';
+    pedidos.length = 0;
+    const r = await chamar(c, 'transcrever', {documento: 'video'});
+    expect(pedidos).toEqual([]);
+    expect(r.json.transcritos).toEqual([{arquivo: 'midia/narracao.wav', palavras: 'midia/narracao.wav.palavras.json', ja_tinha: true}]);
+    expect(lerVideo().legendas).toEqual(antes);
+    // a pessoa regravou a narração com o mesmo nome: transcreve de novo, e as legendas esperam a decisão dela
+    estados['midia/narracao.wav'] = 'velha';
+    const r2 = await chamar(c, 'transcrever', {documento: 'video'});
+    expect(pedidos.map((x) => x.arquivo)).toEqual(['midia/narracao.wav']);
+    expect(r2.json.transcritos[0]).toMatchObject({audio_mudou: true});
+    expect(r2.json).toMatchObject({geradas: 0, legendas_de_audio_antigo: ['clipe-1']});
+    expect(lerVideo().legendas).toEqual(antes);
+  });
+
+  it('o destino nunca é o manifesto, um documento ou outro arquivo do app (transversal-N6)', async () => {
+    const c = await conectar(transcritor);
+    writeFileSync(path.join(pasta, 'midia', 'config.json'), '{"a": 1}');
+    const antes = {manifesto: readFileSync(path.join(pasta, 'estudio.json'), 'utf-8'), video: readFileSync(path.join(pasta, 'video', 'video.json'), 'utf-8')};
+    pedidos.length = 0;
+    for (const [destino, motivo] of [['estudio.json', 'manifesto'], ['video/video.json', 'documento'], ['Video/../ESTUDIO.json', 'manifesto'],
+      ['video\\video.json', 'documento'], ['comentarios.json', 'comentários'], ['pesquisa/pesquisa.json', 'pesquisa'], ['.estudio/estado.json', 'do app'],
+      ['midia/config.json', 'não é uma lista de palavras'], ['video/palavras.txt', 'termina em .json']]) {
+      const r = await chamar(c, 'transcrever', {arquivo: 'midia/fonte.mp4', destino});
+      expect(r.erro, destino).toBe(true);
+      expect(r.texto, destino).toContain(motivo);
+    }
+    expect(pedidos).toEqual([]);
+    expect(readFileSync(path.join(pasta, 'estudio.json'), 'utf-8')).toBe(antes.manifesto);
+    expect(readFileSync(path.join(pasta, 'video', 'video.json'), 'utf-8')).toBe(antes.video);
+    // a lista de palavras que já existe pode ser regravada
+    expect((await chamar(c, 'transcrever', {arquivo: 'midia/fonte.mp4', destino: 'video/palavras.json'})).erro).toBe(false);
+  });
+
+  it('ler_legendas dá os tempos da tela; editar_legenda corrige texto e tempo sem perder o compasso (som-N7, video-N5)', async () => {
+    const c = await conectar(transcritor);
+    const mover = (em: number) => projeto.aplicarPatch({documento: 'video/video.json', versao_base: projeto.lerJson('video/video.json').versao, autor: 'pessoa',
+      origem: 'interface', patch: [{op: 'replace', path: '/audio/faixas/0/clipes/0/em', value: em}]});
+    mover(2500); // a pessoa arrastou a narração 2 s para a frente depois de gerar
+    const guardada = lerVideo().legendas!.segmentos[0];
+    const lidas = (await chamar(c, 'ler_legendas', {documento: 'video'})).json;
+    expect(lidas.legendas[0]).toMatchObject({id: guardada.id, em: guardada.em + 2000, sai: guardada.sai + 2000});
+    expect((await chamar(c, 'ler_legendas', {documento: 'video', de: guardada.sai + 2000, ate: guardada.sai + 2001})).json.legendas.map((s: {id: string}) => s.id)).not.toContain(guardada.id);
+    // texto: a palavra corrigida guarda o tempo dela
+    const ws = guardada.texto.split(' ');
+    const texto = [ws[0].toUpperCase(), ...ws.slice(1)].join(' ');
+    const r = await chamar(c, 'editar_legenda', {documento: 'video', id: guardada.id, texto});
+    expect(r.json.legenda).toMatchObject({texto, em: guardada.em + 2000});
+    const depois = lerVideo().legendas!.segmentos[0];
+    expect(depois.palavras!.map((p) => [p.w, p.s, p.e])).toEqual(guardada.palavras!.map((p, i) => [i ? p.w : ws[0].toUpperCase(), p.s, p.e]));
+    // tempo: o da tela vira o guardado; entrar e sair 300 ms depois leva as palavras junto
+    const tela = lidas.legendas[0];
+    const r2 = await chamar(c, 'editar_legenda', {documento: 'video', id: guardada.id, em: tela.em + 300, sai: tela.sai + 300});
+    expect(r2.json.legenda).toMatchObject({em: tela.em + 300, sai: tela.sai + 300});
+    const movida = lerVideo().legendas!.segmentos[0];
+    expect([movida.em, movida.sai]).toEqual([guardada.em + 300, guardada.sai + 300]);
+    expect(movida.palavras![0].s).toBe(guardada.palavras![0].s + 300);
+    expect((await chamar(c, 'editar_legenda', {documento: 'video', id: 'nao-ha', texto: 'x'})).texto).toContain('legenda não achada');
+    expect((await chamar(c, 'editar_legenda', {documento: 'video', id: guardada.id, em: tela.sai, sai: tela.sai + 50})).erro).toBe(true);
+    // volta ao lugar de antes, para os testes seguintes
+    await chamar(c, 'editar_legenda', {documento: 'video', id: guardada.id, texto: guardada.texto, em: tela.em, sai: tela.sai});
+    mover(500);
   });
 
   it('clipe que não existe vira erro claro', async () => {

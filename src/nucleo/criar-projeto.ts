@@ -10,6 +10,7 @@ import path from 'node:path';
 import jsonpatch, {type Operation} from 'fast-json-patch';
 import type {DocCena3D, DocImagem, EntradaDocumento, Manifesto, Modulo} from './documentos';
 import {novoDocCenas} from './cenas';
+import {EFEITOS} from './efeitos';
 import {MODELOS, type IdModelo} from './modelos';
 import {FORMATOS_IMAGEM, FORMATOS_VIDEO, type Formato} from './formatos';
 import {arquivosDaMarca, patchDaMarca, temaDaMarca} from './marca';
@@ -154,6 +155,30 @@ const secaoPesquisa = () => [
   '   regra da fala tem de estar num fato. O que não estiver sai ou vira pergunta para a pessoa.',
 ];
 
+/** Os efeitos que existem, com a faixa de cada valor, tirados da lista do app (efeitos.ts): o Claude que inventa um
+ *  tipo derruba a área Efeitos. Quebra as linhas em 118 colunas, como o resto do texto. */
+const secaoEfeitos = () => {
+  const num = (n: number) => String(n).replace('-', '−');
+  const tipos = EFEITOS.map((d) => `\`${d.tipo}\` ${num(d.min)} a ${num(d.max)}${d.unidade === 'px' ? ' px' : d.unidade}`);
+  const linhas: string[] = [];
+  let atual = '  Tipos e faixa do `valor`:';
+  for (const [i, t] of tipos.entries()) {
+    const pedaco = ` ${t}${i === tipos.length - 1 ? '.' : ';'}`;
+    if ((atual + pedaco).length > 118) {
+      linhas.push(atual);
+      atual = ` ${pedaco}`;
+    } else atual += pedaco;
+  }
+  linhas.push(atual);
+  return [
+    '- Efeitos (vídeo de cenas e imagem): `efeitos`, na raiz do documento, é a pilha aplicada em ordem no quadro inteiro:',
+    '  cada item é {`id` (único), `tipo`, `valor`, `ativo` (padrão sim), `cor` (só no `tom`)}. Só estes tipos existem.',
+    ...linhas,
+    '  Brilho, contraste e saturação valem 1 quando não mudam nada; preto e branco é `saturacao` 0; sépia, vinheta,',
+    '  granulado e tom vão de 0 (nada) a 1. Tipo ou campo fora disto quebra a área Efeitos do app: não invente.',
+  ];
+};
+
 export const claudeMd = (modulos: Modulo[]) => {
   const tem = (m: Modulo) => modulos.includes(m);
   const linhas = [
@@ -185,17 +210,20 @@ export const claudeMd = (modulos: Modulo[]) => {
       '  limpo, guarda o da pessoa em `original` e as medidas em `limpeza`. Não escreva `original` nem `limpeza` à mão.',
       '  Movimento no bloco `imagem` (zoom dinâmico): `movimento` {`tipo` (`aproximar`, `afastar`, `esquerda`, `direita`,',
       '  `cima`, `baixo`), `intensidade` (0,05 a 0,4; padrão 0,15), `suave` (padrão sim)}. Fica limpo com `ajuste: "cobrir"`.',
-      '  Legendas (opcional): `legendas` {`segmentos`, `estilo`, `oculto`}. Cada segmento tem `id`, `em` e `sai` em ms na linha',
-      '  do tempo do vídeo, `texto` ("\\n" quebra a linha), `palavras` [{w, s, e} em ms] e `falante`. O `estilo` tem',
-      '  `predefinicao` (`classica`, `caixa`, `karaoke`, `faixa`, `discreta`), `posicao` (`baixo`, `meio`, `cima`), `tam`,',
-      '  `maiusculas`, `falante`, `cor`, `cor_destaque`, `fundo` e `fonte` (padrão: os do `tema`). `origens` e o `clipe` de',
-      '  cada segmento são do app, para as legendas andarem com o clipe de voz: não mexa. Gere com `transcrever`; corrija o',
-      '  texto por patch nos segmentos.',
+      '  Legendas (opcional): `legendas` {`segmentos`, `estilo`, `oculto`}. Cada segmento tem `id`, `em` e `sai` (ms do vídeo),',
+      '  `texto` ("\\n" quebra a linha), `palavras` [{w, s, e}, ms do vídeo] e `falante`. `em`, `sai` e `palavras` são os',
+      '  tempos do vídeo **de quando a legenda nasceu**: a legenda de um clipe de voz (`clipe`) anda com ele, e se o clipe foi',
+      '  arrastado ou aparado depois, a tela mostra o tempo guardado mais o quanto ele andou (`origens`, do app: não mexa).',
+      '  Por isso leia as legendas com `ler_legendas` (os tempos da tela) e corrija com `editar_legenda` {id, texto?, em?,',
+      '  sai?}, que troca o texto e as palavras juntos (cada palavra guarda o tempo dela) e converte o tempo da tela. Não',
+      '  escreva `texto`, `palavras`, `em` ou `sai` de legenda por `aplicar_patch`. O `estilo` muda por patch: `predefinicao`',
+      '  (`classica`, `caixa`, `karaoke`, `faixa`, `discreta`), `posicao` (`baixo`, `meio`, `cima`), `tam`, `maiusculas`,',
+      '  `falante`, `cor`, `cor_destaque`, `fundo` e `fonte` (padrão: os do `tema`). Gere com `transcrever`.',
     );
   }
   if (tem('imagem')) {
     linhas.push(
-      '- Imagem: `largura`, `altura`, `fundo` e `camadas` (`imagem`, `texto`, `forma`) de baixo para cima, com `efeitos`. Um',
+      '- Imagem: `largura`, `altura`, `fundo`, `camadas` (`imagem`, `texto`, `forma`) de baixo para cima e `efeitos`. Um',
       '  carrossel tem `paginas[]` (cada uma com `id`, `nome` e as suas `camadas`; a raiz fica com `camadas: []`) e as camadas',
       '  se endereçam por `/paginas/P/camadas/N`; `estado_do_editor` diz a página ativa.',
       '  Acabamento por camada: `sombra` {cor, opacidade, desfoque, x, y}; `contorno` {cor, espessura, posicao: `fora`,',
@@ -206,7 +234,18 @@ export const claudeMd = (modulos: Modulo[]) => {
       '  `src_original`. A pessoa exporta PNG por página e PDF pelo app; o MCP não exporta.',
     );
   }
-  if (tem('3d')) linhas.push('- Cena 3D: objetos com `posicao`, `rotacao` em graus, `escala` e `cor`; luzes; câmera.');
+  if (tem('3d')) {
+    linhas.push(
+      '- Cena 3D: `fundo` (cor), `camera`, `luzes` e `objetos`. Vetores são listas `[x, y, z]`, com y para cima e o chão em',
+      '  y = 0. Cada objeto tem `id` (único), `nome`, `tipo` (`caixa`, `esfera`, `cilindro`, `cone`, `toro` ou `plano`),',
+      '  `posicao` [x, y, z], `rotacao` [x, y, z] em graus, `escala` [x, y, z] (1 = tamanho normal), `cor` ("#rrggbb") e,',
+      '  opcionais, `metalico` e `rugosidade` (0 a 1), `visivel` e `gira` [x, y, z] em graus por segundo (só na prévia). O',
+      '  chão é um `plano` com `rotacao` [-90, 0, 0]. Cada luz tem `id`, `tipo` (`ambiente`, `direcional` ou `ponto`), `cor`,',
+      '  `intensidade` (ambiente perto de 0,5; direcional perto de 1,6) e `posicao` [x, y, z] (menos na ambiente). `camera`',
+      '  {`posicao` [x, y, z], `alvo` [x, y, z], `fov` em graus, padrão 40}. Outro tipo ou campo não aparece: não invente.',
+    );
+  }
+  if (tem('video') || tem('imagem')) linhas.push(...secaoEfeitos());
   if (tem('video') || tem('imagem')) {
     linhas.push(
       '- Kit de marca: `aplicar_marca` põe num documento as cores, a fonte, o logo (`midia/logo-<id>.*`) e as fontes próprias',
@@ -236,7 +275,7 @@ export const claudeMd = (modulos: Modulo[]) => {
   ];
   if (tem('video') || tem('imagem')) passos.push('`aplicar_marca` troca o kit de marca (cores, fonte, logo e fontes próprias) de um documento.');
   if (tem('video')) {
-    passos.push('`transcrever` transcreve a fala no próprio PC: grava `<arquivo>.palavras.json` e, no vídeo de cenas, gera as\n   legendas. `exportar_legendas` grava SRT e VTT em `saidas/`; `importar_legendas` lê um SRT ou VTT do projeto.');
+    passos.push('`transcrever` transcreve a fala no próprio PC: grava `<arquivo>.palavras.json` e, no vídeo de cenas, gera as\n   legendas que faltam. `ler_legendas` mostra as legendas nos tempos da tela e `editar_legenda` corrige texto e tempo.\n   `exportar_legendas` grava SRT e VTT em `saidas/`; `importar_legendas` lê um SRT ou VTT do projeto.');
   }
   if (tem('imagem')) passos.push('`remover_fundo` tira o fundo de uma foto de pessoa com o modelo local; com `voltar: true`, volta ao original.');
   linhas.push('', '## Como trabalhar', '', ...passos.map((t, i) => `${i + 1}. ${t}`));

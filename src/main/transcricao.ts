@@ -2,19 +2,21 @@
 // modelo não vêm no instalador: baixam no primeiro uso para %USERPROFILE%\Estudio\modelos\whisper\, com o SHA-256
 // conferido antes de usar. O áudio do clipe sai em WAV 16 kHz mono pelo ffmpeg do compositor do Remotion (o mesmo da
 // exportação), o whisper-cli devolve JSON com o tempo de cada pedaço de palavra, e o resultado vira
-// midia/<arquivo>.palavras.json: [{w, s, e, p}] em ms, o formato que o resolvedor do roteiro da Cliente já lê.
+// midia/<arquivo>.palavras.json: {versao: 2, fonte, palavras: [{w, s, e, p}] em ms}, com o carimbo do áudio (tamanho, data
+// e sha256) para transcrever de novo quando a tomada é regravada. Com `destino` (o roteiro da Cliente) grava só a lista, o
+// formato que o resolvedor do roteiro lê.
 //
 // Este arquivo não importa o Electron: o MCP por stdio (mcp/nucleo.ts) e os testes usam o mesmo Transcritor. O IPC
 // (registrarIpcTranscricao) recebe o `lidar` e o `enviar` do main.ts.
 import {spawn, type ChildProcess} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync} from 'node:fs';
+import {closeSync, createWriteStream, existsSync, mkdirSync, openSync, readFileSync, readSync, renameSync, rmSync, statSync, writeFileSync, type Stats} from 'node:fs';
 import {createRequire} from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import {inflateRawSync} from 'node:zlib';
 import {CANAL, type EstadoTranscricao, type PedidoTranscricao, type ProgressoTranscricao, type ResultadoTranscricao} from '../compartilhado/api';
-import {arquivoDasPalavras} from '../nucleo/legendas';
+import {arquivoDasPalavras, conferirFala, fonteDaFala, palavrasValidas, recusaDoDestinoNoProjeto, VERSAO_PALAVRAS, type EstadoDaFala, type FonteDaFala, type PalavrasGravadas} from '../nucleo/legendas';
 import type {Palavra} from '../nucleo/roteiro/resolver';
 import {ErroProjeto, type Projeto} from '../nucleo/projeto';
 import {getCompositorPackage} from './compositor-package';
@@ -64,7 +66,21 @@ export class Cancelado extends Error {
   }
 }
 
-const sha256DoArquivo = (arquivo: string) => createHash('sha256').update(readFileSync(arquivo)).digest('hex');
+/** sha256 de um arquivo, lido em pedaços de 1 MB (uma narração longa não precisa caber na memória). */
+const sha256DoArquivo = (arquivo: string) => {
+  const h = createHash('sha256');
+  const fd = openSync(arquivo, 'r');
+  try {
+    const buf = Buffer.allocUnsafe(1 << 20);
+    for (let n = readSync(fd, buf, 0, buf.length, null); n > 0; n = readSync(fd, buf, 0, buf.length, null)) h.update(buf.subarray(0, n));
+  } finally {
+    closeSync(fd);
+  }
+  return h.digest('hex');
+};
+
+/** O carimbo do áudio como ele está agora: tamanho, data e sha256 (o mesmo do envelope do som). */
+export const fonteDoAudio = (abs: string, st: Stats = statSync(abs)): FonteDaFala => ({tamanho: st.size, modificado_ms: st.mtimeMs, sha256: sha256DoArquivo(abs)});
 
 /** Baixa `url` para `destino` passando por um .parcial; só renomeia se o tamanho e o SHA-256 baterem. */
 export const baixarConferido = async (o: {url: string; destino: string; bytes: number; sha256: string; buscar?: Buscar; sinal?: AbortSignal;
@@ -317,7 +333,38 @@ export type OpcoesTranscritor = {pasta?: string; raizApp?: string; empacotado?: 
 
 export class Transcritor {
   private atual: {controle: AbortController; arquivo: string} | null = null;
+  // sha256 por caminho + tamanho + data: o áudio de mesmo tamanho e outra data (cópia, git clone) é lido uma vez
+  private readonly shas = new Map<string, string>();
   constructor(private readonly o: OpcoesTranscritor = {}) {}
+
+  private shaGuardado(abs: string, st: Stats) {
+    const chave = `${abs}|${st.size}|${st.mtimeMs}`;
+    let s = this.shas.get(chave);
+    if (!s) {
+      s = sha256DoArquivo(abs);
+      if (this.shas.size >= 256) this.shas.delete(this.shas.keys().next().value!);
+      this.shas.set(chave, s);
+    }
+    return s;
+  }
+
+  /** A transcrição de `arquivo` (o palavras.json ao lado dele) ainda é do áudio como ele está? 'velha' quando a tomada
+   *  foi regravada com o mesmo nome (ou o arquivo é da versão 1, sem carimbo). Sem o áudio no projeto, vale o que há. */
+  conferir(projeto: Projeto, arquivo: string): EstadoDaFala {
+    try {
+      const rel = arquivoDasPalavras(arquivo);
+      if (!projeto.existe(rel)) return 'falta';
+      const lido = projeto.lerJson<unknown>(rel).doc;
+      if (!projeto.existe(arquivo)) return palavrasValidas(lido).length ? 'em_dia' : 'falta';
+      const abs = projeto.caminho(arquivo);
+      const st = statSync(abs);
+      const e = conferirFala(lido, {tamanho: st.size, modificado_ms: st.mtimeMs});
+      if (e !== 'conferir') return e;
+      return fonteDaFala(lido)?.sha256 === this.shaGuardado(abs, st) ? 'em_dia' : 'velha';
+    } catch {
+      return 'falta';
+    }
+  }
 
   get pasta() {
     return this.o.pasta ?? pastaWhisper();
@@ -367,11 +414,15 @@ export class Transcritor {
     return {pasta: this.pasta, cli, modelo: arqModelo, ffmpeg};
   }
 
-  /** Transcreve um arquivo do projeto (ou o trecho `de_ms`+`dur_ms` dele) e grava midia/<arquivo>.palavras.json. */
+  /** Transcreve um arquivo do projeto (ou o trecho `de_ms`+`dur_ms` dele) e grava midia/<arquivo>.palavras.json com o
+   *  carimbo do áudio; com `destino`, grava só a lista de palavras nele. */
   async transcrever(projeto: Projeto, pedido: PedidoTranscricao, andamento: Andamento = () => undefined): Promise<ResultadoTranscricao> {
     if (this.atual) throw new ErroProjeto(`já há uma transcrição em andamento (${this.atual.arquivo}); espere ou cancele`, 'patch');
     const rel = pedido.arquivo;
     if (typeof rel !== 'string' || !projeto.existe(rel)) throw new ErroProjeto(`o arquivo não está no projeto: ${String(rel)}`, 'nao_achado');
+    // a lista de palavras grava por cima, fora do diário: nunca no manifesto, num documento ou noutro arquivo do app
+    const recusa = pedido.destino === undefined ? null : recusaDoDestinoNoProjeto(projeto, String(pedido.destino));
+    if (recusa) throw new ErroProjeto(recusa, 'caminho');
     const controle = new AbortController();
     this.atual = {controle, arquivo: rel};
     const t0 = Date.now();
@@ -380,6 +431,8 @@ export class Transcritor {
       const modelo = MODELOS_WHISPER[pedido.modelo ?? this.o.modelo ?? MODELO_PADRAO] ?? MODELOS_WHISPER[MODELO_PADRAO];
       const pecas = await this.preparar(modelo.id, andamento, controle.signal);
       mkdirSync(temp, {recursive: true});
+      // o carimbo é do áudio que o ffmpeg vai ler agora: se a tomada mudar no meio, a próxima conferência pede de novo
+      const fonte = fonteDoAudio(projeto.caminho(rel));
       const wav = path.join(temp, 'fala.wav');
       andamento({etapa: 'audio', mensagem: `Tirando o áudio de ${path.basename(rel)}`, progresso: 0});
       await extrairAudio({ffmpeg: pecas.ffmpeg!, entrada: projeto.caminho(rel), saida: wav, de_ms: pedido.de_ms, dur_ms: pedido.dur_ms, sinal: controle.signal});
@@ -391,7 +444,9 @@ export class Transcritor {
       const desloc = pedido.de_ms ?? 0;
       const finais = palavras.map((p) => ({...p, s: p.s + desloc, e: p.e + desloc}));
       const destino = pedido.destino ?? arquivoDasPalavras(rel);
-      projeto.gravarTexto(destino, `${JSON.stringify(finais)}\n`);
+      const trecho = pedido.de_ms !== undefined || pedido.dur_ms !== undefined ? {de_ms: pedido.de_ms, dur_ms: pedido.dur_ms} : undefined;
+      const gravado: PalavrasGravadas = {versao: VERSAO_PALAVRAS, fonte, modelo: modelo.id, ...(trecho ? {trecho} : {}), palavras: finais};
+      projeto.gravarTexto(destino, `${JSON.stringify(pedido.destino ? finais : gravado)}\n`);
       const r: ResultadoTranscricao = {ok: true, arquivo: rel, palavras: destino, n: finais.length, modelo: modelo.id, duracao_s: Math.round((Date.now() - t0) / 100) / 10,
         texto: finais.map((p) => p.w).join(' ')};
       andamento({etapa: 'pronto', mensagem: `${finais.length} palavras em ${r.duracao_s} s`, progresso: 100});
@@ -420,6 +475,8 @@ type Lidar = <A extends unknown[], R>(canal: string, f: (...a: A) => R | Promise
 export const registrarIpcTranscricao = (lidar: Lidar, o: {projeto: () => Projeto; enviar: (canal: string, ...a: unknown[]) => void; aoCancelar: (f: () => void) => void} & OpcoesTranscritor) => {
   const transcritor = new Transcritor(o);
   lidar(CANAL.falaEstado, (modelo?: IdModeloWhisper) => transcritor.estado(modelo));
+  lidar(CANAL.falaConferir, (arquivos: string[]) => Object.fromEntries((Array.isArray(arquivos) ? arquivos : []).filter((a) => typeof a === 'string').slice(0, 200)
+    .map((a) => [a, transcritor.conferir(o.projeto(), a)])));
   lidar(CANAL.falaTranscrever, (pedido: PedidoTranscricao) =>
     transcritor.transcrever(o.projeto(), pedido, (p) => o.enviar(CANAL.falaProgresso, {...p, arquivo: pedido.arquivo})));
   o.aoCancelar(() => transcritor.cancelar());

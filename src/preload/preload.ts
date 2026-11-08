@@ -107,6 +107,7 @@ const api: ApiEstudio = {
     aoProgresso: (cb) => ouvir<[ProgressoTranscricao & {arquivo: string}]>(CANAL.falaProgresso, cb),
     gravarSaida: (nome, texto) => ipcRenderer.invoke(CANAL.falaGravarSaida, nome, texto),
     escolherLegenda: () => ipcRenderer.invoke(CANAL.falaEscolherLegenda),
+    conferir: (arquivos) => ipcRenderer.invoke(CANAL.falaConferir, arquivos),
   },
   // exportação (frente C)
   prefsExportacao: () => ipcRenderer.invoke(CANAL.prefsExportacao),
