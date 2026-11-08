@@ -312,6 +312,9 @@ describe('legenda no corte 1:1 do 4:5 e acima das legendas do YouTube (fala-D8)'
     const toda = resolverLegendas({segmentos: [{id: 'leg-1', em: 0, sai: 1000, texto: 'oi'}], estilo: {predefinicao: 'classica', no_quadrado: false}},
       {largura: 1080, altura: 1350, tema: TEMA, duracao_ms: 1000})!;
     expect(toda.area.base).toBeCloseTo(0.94);
+    // o vídeo quadrado já é 1:1: nada muda nele
+    expect(areaDaLegenda(1080, 1080)).toEqual(areaDaLegenda(1080, 1080, {no_quadrado: false}));
+    expect(areaDaLegenda(1080, 1080).base).toBeCloseTo(0.94);
   });
 
   it('16:9 com o SRT junto: acima da faixa das legendas automáticas; sem, embaixo como antes', () => {

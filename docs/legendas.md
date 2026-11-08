@@ -127,13 +127,27 @@ que as gravadas ocupavam (`palavrasDe`, a mesma regra do `comTexto` da lista). `
 ### Gerar a partir da fala (`src/nucleo/legendas.ts`)
 
 As palavras do arquivo vão para o tempo do vídeo pelo clipe (`em + s − corte_ms`); entra a palavra cujo meio cai no
-trecho que o clipe toca. A quebra fecha a legenda na pausa de 600 ms ou mais, no fim de frase, na vírgula quando já há
-meia legenda, quando passaria da largura (caracteres por linha × linhas, calculados pelo tamanho da letra e pela área
-segura do formato) ou das palavras por vez do estilo, e aos 6 s. O fim fica 250 ms depois da última palavra, sem
-invadir a próxima, e nenhuma dura menos de 0,7 s se houver espaço. "25 %" e "seguro -desemprego" voltam a ser uma
-palavra. Duas regras de acabamento: no corte por largura ou por número de palavras, a legenda não termina em artigo,
-preposição ou conjunção ("Com o fim | da produção"); e a legenda curta que sobra no meio de uma frase ("concordância."
-sozinha) divide o texto com a anterior, no corte mais equilibrado que caiba nas duas, de preferência depois de vírgula.
+trecho que o clipe toca. A quebra segue a régua (Netflix pt-BR e o `@remotion/captions`): fecha a legenda no silêncio de
+**300 ms**, no fim de frase, na vírgula quando já há meia legenda, quando não caberia nas linhas do estilo ou passaria
+das palavras por vez, e aos **7 s**. O fim fica 250 ms depois da última palavra e avança no vão até a próxima para dar
+tempo de ler: pelo menos **833 ms** e no máximo **17 caracteres por segundo** (`cpsDe`, que conta letras, espaços e
+pontuação), sem invadir a próxima. A legenda que mesmo assim passa de 17 car/s ganha "N car/s" na lista e sai em
+`rapidas_para_ler` no `ler_legendas`. "25 %" e "seguro -desemprego" voltam a ser uma palavra. A legenda não termina em
+artigo, preposição, conjunção, verbo auxiliar nem "não" (`fracaNoFim`: "Com o fim | da produção", "vai | pagar"); e a
+legenda curta que sobra no meio de uma frase ("concordância." sozinha) divide o texto com a anterior, no corte mais
+equilibrado que caiba nas duas, de preferência depois de vírgula.
+
+**O que cabe é medido na fonte** (fala-D6). `capacidadeDaLegenda` dá a largura útil da linha (a área segura menos o
+respiro da caixa), o medidor da fonte do tema e o teto de **42 caracteres por linha**; `quebrarEmLinhas` corta o texto
+em uma ou duas linhas pela largura medida, no corte mais equilibrado, preferindo depois de pontuação e sem palavra fraca
+no fim da primeira. A mesma regra decide se uma legenda cabe (na geração, na troca de estilo e no destino da exportação),
+desenha as linhas na composição e quebra o SRT e o VTT (aí contando caracteres). A medida vem de
+`src/nucleo/medida-texto.ts`: o avanço de cada letra das quatro fontes das composições (Inter, Archivo, IBM Plex Sans e
+Mono), por peso, medido em 08/11/2026 no Chromium com os mesmos `.woff2` do subconjunto latino que o
+`@remotion/google-fonts` usa (carregados por `FontFace`, medidos letra a letra pelo canvas). A soma letra a letra fica a
+menos de 0,7% da medida da frase inteira (o kerning, que a tabela não tem); letra acentuada vale a base (conferido nas
+quatro). Fonte própria de um kit mede como a Inter. No navegador (prévia e render), a composição mede com o canvas e a
+fonte carregada, então a linha desenhada é a medida.
 
 **As legendas andam com o clipe:** `origens` guarda onde o clipe estava quando elas nasceram. Se a pessoa arrasta o
 clipe ou apara o começo, o resolvedor desloca as legendas dele pela diferença do "zero do arquivo" (`em − corte_ms`) e
@@ -143,7 +157,7 @@ tira as palavras que o clipe não toca mais. Clipe apagado: as legendas ficam on
 
 | Predefinição | Posição | Letra (lado menor) | Caixa | Palavra falada | Por vez |
 |---|---|---|---|---|---|
-| Clássica | embaixo | 4,2% | caixa escura translúcida por linha | cor de destaque | 2 linhas |
+| Clássica | embaixo | 4,2% | caixa escura translúcida por linha | cor de destaque e um fundo leve (pista além da cor) | 2 linhas |
 | Palavra em caixa | no meio | 6,8%, maiúsculas, 800 | nenhuma, com contorno | dentro de uma caixa na cor de destaque | 3 palavras |
 | Karaokê | embaixo | 5,6%, 700 | nenhuma, com sombra | cor de destaque; as que vêm depois apagadas (como o carrossel da Cliente) | 4 palavras |
 | Faixa da marca | embaixo | 4% | faixa de lado a lado na cor de destaque, texto na cor do fundo | sublinhada | 2 linhas |
@@ -155,7 +169,10 @@ ponto ao lado diz quando difere do padrão do estilo).
 
 **Área segura:** a legenda fica entre o que a interface das redes cobre em cima e embaixo e longe da coluna de botões
 (`src/nucleo/zonas-seguras.ts`): no 9:16, entre 250 px de cima e 484 px de baixo e a 140 px dos lados; no 16:9, fora
-do décimo de baixo dos controles do YouTube; no 4:5, dentro da área de título de 90%.
+do décimo de baixo dos controles do YouTube; no 4:5, dentro do corte 1:1 da prévia quadrada (WhatsApp, LinkedIn, a
+grade antiga), ou na área de título de 90% com `estilo.no_quadrado: false` ("No quadrado" no painel do vídeo 4:5)
+(fala-D8). Com `legendas_youtube`, a área do 16:9 fica acima da faixa das legendas automáticas do YouTube, para quando o
+SRT sobe junto (a exportação liga isso por destino).
 
 **Em cada destino da exportação** (`legendasNoDestino`, no laço do `main.ts`): o vídeo 16:9 exportado também em 9:16
 leva a legenda para a área do 9:16, e a legenda que não cabe nas linhas do estilo nesse tamanho é dividida em pedaços

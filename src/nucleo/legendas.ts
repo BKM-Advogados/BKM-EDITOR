@@ -95,7 +95,7 @@ export const areaDaLegenda = (largura: number, altura: number, o: {no_quadrado?:
     if (z.tipo === 'contorno') {
       // o corte 1:1 do 4:5 é o contorno de largura inteira do conjunto do feed; a faixa das legendas do YouTube é o
       // contorno que não é miolo
-      if (conjunto?.id === 'feed' && z.miolo && inteira && o.no_quadrado !== false) {
+      if (conjunto?.id === 'feed' && z.miolo && inteira && o.no_quadrado !== false && altura > largura * 1.05) { // o quadrado já é 1:1
         topo = Math.max(topo, z.y);
         base = Math.min(base, z.y + z.altura);
       } else if (conjunto?.id === 'youtube' && !z.miolo && o.legendas_youtube) base = Math.min(base, z.y);
