@@ -4,27 +4,15 @@ import {mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {afterAll, describe, expect, it} from 'vitest';
-import {MARCA_CLAUDE_FIM, MARCA_CLAUDE_INICIO, claudeMd, claudeMdAtualizado, gravarPlano, planoDoProjeto, regerarClaudeMd} from '../src/nucleo/criar-projeto';
+import {MARCA_CLAUDE_FIM, MARCA_CLAUDE_INICIO, MARCA_IMAGEM_INICIO, claudeMd, claudeMdAtualizado, gravarPlano, planoDoProjeto, regerarClaudeMd} from '../src/nucleo/criar-projeto';
 import {EFEITOS} from '../src/nucleo/efeitos';
 
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'estudio-claude-md-'));
 afterAll(() => rmSync(tmp, {recursive: true, force: true}));
 const EXEMPLO = path.join(__dirname, '..', 'exemplos', 'exemplo');
 
-// o texto que a 0.3.0 gravava: o de hoje sem as marcas e sem os campos da rodada 2
-const TEXTO_DA_030 = [
-  '# Projeto do Estúdio',
-  '',
-  'Esta pasta é um projeto do Estúdio, aberto no app. A pessoa edita na interface; você edita pelas ferramentas do MCP',
-  '`estudio`. Os dois mexem nos mesmos arquivos JSON, e o app recarrega a tela sozinho quando um arquivo muda.',
-  '',
-  '## Arquivos',
-  '',
-  '- Imagem: `largura`, `altura`, `fundo` e `camadas`. Exporta PNG por página e PDF.',
-  '',
-  'Tudo o que você faz cai nos documentos, e a pessoa edita depois. Não grave fora da pasta do projeto.',
-  '',
-].join('\n');
+// o texto que a 0.3.0 gravava, tal como o `claudeMd` do commit 580050c o gerava (sem as marcas), por módulo
+const texto030 = (modulo: 'video' | 'imagem') => readFileSync(path.join(__dirname, 'fixtures', `claude-md-030-${modulo}.md`), 'utf-8');
 
 describe('CLAUDE.md do projeto', () => {
   it('a parte do app vem entre as marcas', () => {
@@ -104,11 +92,13 @@ describe('CLAUDE.md do projeto', () => {
   });
 
   it('o texto antigo do app, sem marcas, vira o novo e guarda o que a pessoa acrescentou', () => {
-    const atual = `${TEXTO_DA_030}\n## Combinados\n\nTítulos sempre em caixa alta.\n`;
+    const atual = `${texto030('imagem')}\n## Combinados\n\nTítulos sempre em caixa alta.\n`;
+    expect(atual).not.toContain('`mascara`'); // o texto da 0.3.0 é mesmo o antigo
     const novo = claudeMdAtualizado(atual, ['imagem'])!;
     expect(novo.startsWith(MARCA_CLAUDE_INICIO)).toBe(true);
     expect(novo).toContain('`mascara`');
-    expect(novo).not.toContain('Exporta PNG por página e PDF.');
+    expect(novo.split('# Projeto do Estúdio').length).toBe(2); // o texto antigo do app não fica duplicado
+    expect(novo).not.toContain('## Anotações do texto anterior'); // o texto do app puro não gera anotação nenhuma
     expect(novo.trimEnd().endsWith('## Combinados\n\nTítulos sempre em caixa alta.')).toBe(true);
     // e na abertura seguinte já não muda nada
     expect(claudeMdAtualizado(novo, ['imagem'])).toBeNull();
@@ -122,12 +112,57 @@ describe('CLAUDE.md do projeto', () => {
 
   it('ao abrir, um projeto criado na 0.3.0 ganha o texto novo, e o manifesto decide as seções', () => {
     const destino = gravarPlano(path.join(tmp, 'antigo'), planoDoProjeto({nome: 'Antigo', modelo: 'video-branco'}));
-    writeFileSync(path.join(destino, 'CLAUDE.md'), TEXTO_DA_030, 'utf-8');
+    writeFileSync(path.join(destino, 'CLAUDE.md'), texto030('video'), 'utf-8');
     expect(regerarClaudeMd(destino)).toBe(true);
     const md = readFileSync(path.join(destino, 'CLAUDE.md'), 'utf-8');
     expect(md).toContain('`legendas`');
     expect(md).not.toContain('`mascara`'); // o projeto só tem vídeo
     expect(regerarClaudeMd(destino)).toBe(false);
+  });
+
+  it('o que a pessoa escreveu dentro do texto da 0.3.0 não some ao abrir com a versão nova (imagem-N5)', () => {
+    const acrescimo = '- `midia/ana.jpg`: use sempre a foto da Ana nas capas.';
+    const antigo = texto030('imagem').replace('## Arquivos\n', `## Arquivos\n\n${acrescimo}\n`);
+    expect(antigo).toContain(acrescimo);
+    const novo = claudeMdAtualizado(antigo, ['imagem'])!;
+    expect(novo).toContain(acrescimo);
+    const secao = novo.split('## Anotações do texto anterior')[1];
+    expect(secao).toBeDefined();
+    // só a linha dela entra na seção: nenhuma linha do texto do app se repete ali
+    const linhas = secao.split('\n').filter((l) => l.trim() && !l.startsWith('O Estúdio refez'));
+    expect(linhas).toEqual([acrescimo]);
+    // e na abertura seguinte já não muda nada
+    expect(claudeMdAtualizado(novo, ['imagem'])).toBeNull();
+  });
+
+  it('o CLAUDE.md do modelo da Cliente também lê a parte da imagem (imagem-N3)', () => {
+    const doExemplo = readFileSync(path.join(EXEMPLO, 'CLAUDE.md'), 'utf-8');
+    for (const campo of ['`mascara`', '`sombra`', '`degrade`', '`paginas[]`']) expect(doExemplo).toContain(campo);
+    expect(claudeMdAtualizado(doExemplo, ['video', 'imagem', '3d'])).toBeNull(); // o exemplo já vem em dia
+    // projeto da Cliente criado antes, sem o bloco: ganha no fim, e o texto à mão fica como está
+    const semBloco = `${doExemplo.slice(0, doExemplo.indexOf(MARCA_IMAGEM_INICIO)).trimEnd()}\n`;
+    expect(semBloco).not.toContain('`mascara`');
+    const novo = claudeMdAtualizado(semBloco, ['video', 'imagem'])!;
+    expect(novo.startsWith(semBloco.trimEnd())).toBe(true);
+    expect(novo).toContain('`mascara`');
+    expect(claudeMdAtualizado(novo, ['video', 'imagem'])).toBeNull();
+    // bloco de uma versão velha é refeito; o que está fora dele, não
+    const velho = `${novo.replace('`degrade`', '`degrade_velho`')}\nNota da Ana depois do bloco.\n`;
+    const refeito = claudeMdAtualizado(velho, ['video', 'imagem'])!;
+    expect(refeito).toContain('`degrade`');
+    expect(refeito).not.toContain('`degrade_velho`');
+    expect(refeito.endsWith('\nNota da Ana depois do bloco.\n')).toBe(true);
+    // projeto sem imagem não recebe o bloco; CLAUDE.md da pessoa (sem as marcas nem a frase do exemplo) fica como está
+    expect(claudeMdAtualizado(semBloco, ['video'])).toBeNull();
+    expect(claudeMdAtualizado('# Meu projeto\n\nRegras minhas.\n', ['imagem'])).toBeNull();
+  });
+
+  it('o modelo "Carrossel narrado Cliente" nasce com a parte da imagem no CLAUDE.md', () => {
+    const destino = gravarPlano(path.join(tmp, 'cliente'), planoDoProjeto({nome: 'Cliente', modelo: 'modelo-carrossel'}), EXEMPLO);
+    const md = readFileSync(path.join(destino, 'CLAUDE.md'), 'utf-8');
+    expect(md).toContain(MARCA_IMAGEM_INICIO);
+    expect(md).toContain('`mascara`');
+    expect(regerarClaudeMd(destino)).toBe(false); // ao abrir, nada muda
   });
 
   it('projeto sem CLAUDE.md ganha um; pasta sem manifesto não quebra', () => {
