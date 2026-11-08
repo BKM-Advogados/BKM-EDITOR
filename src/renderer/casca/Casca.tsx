@@ -15,6 +15,7 @@ import {FORMATOS_IMAGEM, FORMATOS_VIDEO} from '../../nucleo/formatos';
 import {abrirProjeto, avisar, criarDocumento, desfazer, fecharProjeto, loja, mensagemDe, quandoVerFato, useLoja, type Area} from '../estado/loja';
 import {pedirTexto} from '../componentes/Dialogo';
 import {acaoDeArquivo} from './atalhos';
+import {SeloSalvo} from './SeloSalvo';
 import type {PaineisDoModulo} from './contrato';
 import {PaineisVideo} from '../modulos/video/paineis';
 import {PaineisImagem} from '../modulos/imagem/paineis';
@@ -459,9 +460,7 @@ export const Casca: React.FC = () => {
           <span className="sep">/</span>
           <NomeProjeto nome={info?.manifesto.nome ?? 'Sem nome'} raiz={info?.raiz} />
           {docAtivo && <><span className="sep">›</span><span className="doc">{docAtivo.titulo}</span></>}
-          <span className="salvo" title={info?.git ? 'Cada edição grava na hora. Ctrl+S marca um ponto de restauração.' : 'Cada edição grava na hora. Sem o Git, não há pontos de restauração.'}>
-            <Check size={12} />Salvo
-          </span>
+          <SeloSalvo git={Boolean(info?.git)} />
         </span>
         <nav className="areas">
           {AREAS.map((a) => (
