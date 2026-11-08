@@ -53,6 +53,24 @@ export const FEIXE_PADRAO = 1;
  *  narração do C2 levou o small de 4,6% para 3,6% de palavras erradas ("Exija" e "exceção" passaram a sair certas). */
 export const PROMPT_PADRAO = 'Vídeo sobre direito do trabalho, com regras, exceções e prazos da CLT: rescisão, aviso prévio, FGTS, férias, 13º salário, horas extras, justa causa, transferência.';
 
+// Detector de voz (VAD): o Silero VAD v6.2.0 (MIT), convertido para ggml pelo projeto whisper.cpp, preso no commit
+// 9ffd54a do repositório ggml-org/whisper-vad no Hugging Face (licença MIT; o SHA-256 é o oid do LFS). No app ele é um
+// filtro: uma passada rápida acha os trechos de voz e só fica a palavra que encosta num deles; silêncio, música e efeito
+// não viram palavras inventadas. O whisper continua ouvindo o arquivo inteiro, porque com --vad (só os trechos de voz,
+// emendados) o começo das palavras piorou: medido, a mediana do erro foi de 100 para 140 a 170 ms. docs/legendas.md, "VAD".
+export const MODELO_VAD = {
+  arquivo: 'ggml-silero-v6.2.0.bin',
+  url: 'https://huggingface.co/ggml-org/whisper-vad/resolve/9ffd54a1e1ee413ddf265af9913beaf518d1639b/ggml-silero-v6.2.0.bin',
+  bytes: 885_098,
+  sha256: '2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987',
+};
+/** Os ajustes do VAD (os nomes do whisper-cli): limiar da voz, fala mínima, silêncio que separa trechos e a folga
+ *  que cada trecho ganha nas pontas (para não comer o começo de uma palavra dita baixo). */
+export type AjustesVad = {limiar: number; fala_min_ms: number; silencio_min_ms: number; folga_ms: number};
+export const VAD_PADRAO: AjustesVad = {limiar: 0.5, fala_min_ms: 250, silencio_min_ms: 100, folga_ms: 30};
+export const argumentosVad = (modelo: string, a: AjustesVad = VAD_PADRAO) => ['--vad', '-vm', modelo, '-vt', String(a.limiar),
+  '-vspd', String(a.fala_min_ms), '-vsd', String(a.silencio_min_ms), '-vp', String(a.folga_ms)];
+
 export const pastaWhisper = (home = os.homedir()) => path.join(home, 'Estudio', 'modelos', 'whisper');
 
 // ---------- baixar com SHA-256 ----------
@@ -190,7 +208,7 @@ export const extrairZip = (zip: Buffer, destino: string, quero: (nome: string) =
 
 export const EXE_WHISPER = process.platform === 'win32' ? 'whisper-cli.exe' : 'whisper-cli';
 
-export type Pecas = {pasta: string; cli: string; modelo: string; ffmpeg: string | null};
+export type Pecas = {pasta: string; cli: string; modelo: string; ffmpeg: string | null; vad?: string};
 
 /** ffmpeg do compositor do Remotion: no app empacotado fica em app.asar.unpacked; no desenvolvimento, no node_modules. */
 export const caminhoFfmpeg = (o: {raizApp?: string; empacotado?: boolean} = {}): string | null => {
@@ -266,17 +284,75 @@ const especial = (t: string) => /^\[_?[A-Z_]+[^\]]*\]$/.test(t.trim()) || /^<\|.
 
 const SO_PONTUACAO = /^[.,;:!?…)"'”»\]-]+$/;
 
+// ---------- o relógio do VAD ----------
+// Com --vad, o whisper-cli junta os trechos de voz num áudio só e devolve o tempo de cada token nesse áudio encurtado
+// (só o tempo do segmento volta ao relógio do arquivo). Medido: a narração do C2 depois de 14 s de silêncio e música saiu
+// começando em 0 s. O whisper-cli escreve no stderr, para cada trecho, onde ele está no arquivo e no áudio encurtado
+// (vad_segment_info); com essa tabela o tempo de cada token volta ao arquivo.
+
+/** Um trecho de voz: onde está no arquivo e no áudio só de voz que o whisper ouviu (ms). */
+export type TrechoVad = {orig_ms: number; orig_fim_ms: number; vad_ms: number; vad_fim_ms: number};
+const LINHA_VAD = /vad_segment_info:\s*orig_start:\s*([\d.]+),\s*orig_end:\s*([\d.]+),\s*vad_start:\s*([\d.]+),\s*vad_end:\s*([\d.]+)/;
+/** A linha "vad_segment_info: orig_start: 14.27, orig_end: 16.22, vad_start: 0.00, vad_end: 1.95" do stderr, em ms. */
+export const trechoDoLogVad = (linha: string): TrechoVad | null => {
+  const m = LINHA_VAD.exec(linha);
+  if (!m) return null;
+  const [orig_ms, orig_fim_ms, vad_ms, vad_fim_ms] = m.slice(1, 5).map((x) => Math.round(Number(x) * 1000));
+  return {orig_ms, orig_fim_ms, vad_ms, vad_fim_ms};
+};
+/** Leva um tempo do áudio só de voz ao relógio do arquivo, pelo trecho em que ele cai. Depois do fim de um trecho
+ *  vem a folga que o whisper põe antes do próximo; ali o whisper costuma marcar o começo da primeira palavra do trecho
+ *  seguinte (medido: a mediana do começo andava 60 ms para trás e o p10, 400 ms). Então o começo que cai na folga vai
+ *  ao início do próximo trecho, e o fim fica no fim do trecho em que estava. Sem tabela, fica como está. */
+export const tempoNoArquivo = (mapa: TrechoVad[], t: number, lado: 'inicio' | 'fim' = 'inicio') => {
+  if (!mapa.length) return t;
+  let i = 0;
+  while (i + 1 < mapa.length && mapa[i + 1].vad_ms <= t) i++;
+  const m = mapa[i];
+  const prox = mapa[i + 1];
+  if (prox && t > m.vad_fim_ms) return lado === 'inicio' ? prox.orig_ms : Math.min(m.orig_fim_ms + (t - m.vad_fim_ms), prox.orig_ms);
+  return m.orig_ms + Math.max(0, t - m.vad_ms);
+};
+
+// entre parênteses, só as anotações conhecidas: um "(CLT)" dito na fala fica
+const ANOTACAO_ENTRE_PARENTESES = /^\((risos|música|musica|aplausos|silêncio|silencio|tosse|suspiro|ruído|ruido|inaudível|inaudivel)\)[.,!?…]*$/i;
+/** Tira as anotações que o whisper escreve no lugar do que não é fala: "[música]", "[Som de fio]", "(risos)", "♪". */
+export const semAnotacoes = <P extends {w: string}>(ps: P[]): P[] => {
+  const out: P[] = [];
+  for (let i = 0; i < ps.length; i++) {
+    const w = ps[i].w;
+    if (/^[♪♫*]+$/.test(w.replace(/[.,!?…]+$/, ''))) continue;
+    if (ANOTACAO_ENTRE_PARENTESES.test(w)) continue;
+    if (w.startsWith('[')) {
+      const fecha = ']';
+      // a anotação vai até a palavra que fecha o colchete (no máximo seis palavras); sem fechar, é texto e fica
+      let j = i;
+      while (j < ps.length && j - i < 6 && !ps[j].w.replace(/[.,!?…]+$/, '').endsWith(fecha)) j++;
+      if (j < ps.length && j - i < 6) {
+        i = j;
+        continue;
+      }
+    }
+    out.push(ps[i]);
+  }
+  return out;
+};
+
 /** Junta os tokens do whisper em palavras: um token que começa com espaço abre palavra nova; o resto (pedaço de palavra,
  *  pontuação) gruda na anterior. O começo da palavra é o do primeiro token e o fim, o do último pedaço que não é só
  *  pontuação: o "?" que o whisper põe no fim da pausa não estica a palavra por cima do silêncio. */
-export const palavrasDoWhisper = (json: SaidaWhisper, desloc_ms = 0): (Palavra & {p: number})[] => {
+export const palavrasDoWhisper = (json: SaidaWhisper, desloc_ms = 0, vad?: {mapa: TrechoVad[]}): (Palavra & {p: number})[] => {
   const out: (Palavra & {p: number; _n: number})[] = [];
   for (const seg of json.transcription ?? []) {
+    // com o VAD e sem a tabela (outra versão do whisper-cli), o segmento dá a diferença: o tempo dele já é o do arquivo
+    const toks = (seg.tokens ?? []).filter((t) => t.text && !especial(t.text));
+    const passo = vad && !vad.mapa.length && seg.offsets && toks[0]?.offsets ? seg.offsets.from - toks[0].offsets.from : 0;
+    const relogio = (x: number, lado: 'inicio' | 'fim') => (vad?.mapa.length ? tempoNoArquivo(vad.mapa, x, lado) : x + passo);
     for (const t of seg.tokens ?? []) {
       const texto = t.text ?? '';
       if (!texto || especial(texto)) continue;
-      const de = t.offsets?.from ?? 0;
-      const ate = Math.max(de, t.offsets?.to ?? de);
+      const de = relogio(t.offsets?.from ?? 0, 'inicio');
+      const ate = Math.max(de, relogio(t.offsets?.to ?? t.offsets?.from ?? 0, 'fim'));
       const novo = /^\s/.test(texto) || !out.length;
       const limpo = texto.trim();
       if (!limpo) continue;
@@ -300,36 +376,83 @@ export const palavrasDoWhisper = (json: SaidaWhisper, desloc_ms = 0): (Palavra &
     if (prox && w.e > prox.s) w.e = Math.max(w.s, prox.s);
     if (w.e - w.s < 40) w.e = w.s + 40;
   }
-  return out.map(({w, s, e, p}) => ({w, s: Math.round(s + desloc_ms), e: Math.round(e + desloc_ms), p: Math.round(p * 1000) / 1000}));
+  return semAnotacoes(out).map(({w, s, e, p}) => ({w, s: Math.round(s + desloc_ms), e: Math.round(e + desloc_ms), p: Math.round(p * 1000) / 1000}));
 };
+
+/** Onde há voz no WAV (ms), pelo detector: uma passada do whisper-cli que só roda o VAD (`-d 1`: não decodifica
+ *  nada; 2 a 3 s, quase tudo para carregar o modelo). Sem voz nenhuma, lista vazia. null quando o registro não diz
+ *  (outra versão do whisper-cli): aí nada é filtrado. */
+export const trechosDeVoz = async (o: {cli: string; arquivoModelo: string; wav: string; vad: string; ajustesVad?: AjustesVad; threads?: number; sinal?: AbortSignal}):
+  Promise<{de: number; ate: number}[] | null> => {
+  const threads = o.threads ?? Math.max(1, Math.min(8, os.cpus().length - 1));
+  let achados: number | null = null;
+  const trechos: {de: number; ate: number}[] = [];
+  const r = await rodar(o.cli, ['-m', o.arquivoModelo, '-f', o.wav, '-t', String(threads), '-d', '1', '-bs', '1', '-bo', '1', ...argumentosVad(o.vad, o.ajustesVad)], {
+    sinal: o.sinal,
+    aoErro: (l) => {
+      const n = /Final speech segments after filtering:\s*(\d+)/.exec(l);
+      if (n) achados = Number(n[1]);
+      const v = trechoDoLogVad(l);
+      if (v) trechos.push({de: v.orig_ms, ate: v.orig_fim_ms});
+    },
+  });
+  if (r.codigo !== 0) throw new Error(`o detector de voz parou (código ${r.codigo}): ${r.erro.trim().split('\n').slice(-3).join(' ')}`);
+  if (achados === 0) return [];
+  return trechos.length ? trechos : null;
+};
+
+/** Fica só a palavra que encosta num trecho de voz, com uma folga (o detector às vezes começa um pouco depois). */
+export const soNaVoz = <P extends {s: number; e: number}>(palavras: P[], trechos: {de: number; ate: number}[], folga_ms = 300): P[] =>
+  palavras.filter((p) => trechos.some((t) => p.e > t.de - folga_ms && p.s < t.ate + folga_ms));
 
 /** Roda o whisper-cli no WAV e devolve as palavras em ms desde o começo do WAV. */
 export const rodarWhisper = async (o: {cli: string; modelo: ModeloWhisper; arquivoModelo: string; wav: string; idioma?: string; threads?: number; sinal?: AbortSignal;
-  andamento?: (pct: number) => void; filho?: (c: ChildProcess) => void; feixe?: number; dtw?: boolean; prompt?: string; extra?: string[]}) => {
+  andamento?: (pct: number) => void; filho?: (c: ChildProcess) => void; feixe?: number; dtw?: boolean; prompt?: string; extra?: string[];
+  /** caminho do modelo do VAD: com ele, o whisper só ouve os trechos com voz */
+  vad?: string; ajustesVad?: AjustesVad}) => {
   const base = o.wav.replace(/\.wav$/i, '');
   const threads = o.threads ?? Math.max(1, Math.min(8, os.cpus().length - 1));
   const feixe = o.feixe ?? FEIXE_PADRAO;
-  const args = ['-m', o.arquivoModelo, '-f', o.wav, '-l', o.idioma ?? 'pt', '-t', String(threads), '-ojf', '-of', base, '-np', '-pp',
+  // com o VAD, sem o -np: a tabela dos trechos de voz sai no stderr junto com o resto do registro do whisper-cli
+  const args = ['-m', o.arquivoModelo, '-f', o.wav, '-l', o.idioma ?? 'pt', '-t', String(threads), '-ojf', '-of', base, ...(o.vad ? [] : ['-np']), '-pp',
     ...(feixe > 1 ? ['-bs', String(feixe)] : ['-bs', '1', '-bo', '1']), ...(o.dtw ? ['-nfa', '--dtw', o.modelo.dtw] : []),
-    ...(o.prompt?.trim() ? ['--prompt', o.prompt.trim().slice(0, 600)] : []), ...(o.extra ?? [])];
+    ...(o.prompt?.trim() ? ['--prompt', o.prompt.trim().slice(0, 600)] : []), ...(o.vad ? argumentosVad(o.vad, o.ajustesVad) : []), ...(o.extra ?? [])];
+  const mapa: TrechoVad[] = [];
   const r = await rodar(o.cli, args, {
     sinal: o.sinal,
     filho: o.filho,
     aoErro: (l) => {
       const m = /progress\s*=\s*(\d+)%/.exec(l);
       if (m) o.andamento?.(Number(m[1]));
+      const v = o.vad ? trechoDoLogVad(l) : null;
+      if (v) mapa.push(v);
     },
   });
   const json = `${base}.json`;
   if (r.codigo !== 0 || !existsSync(json)) throw new Error(`o whisper parou (código ${r.codigo}): ${r.erro.trim().split('\n').slice(-4).join(' ')}`);
   const lido = JSON.parse(readFileSync(json, 'utf-8')) as SaidaWhisper;
   rmSync(json, {force: true});
-  return palavrasDoWhisper(lido);
+  return palavrasDoWhisper(lido, 0, o.vad ? {mapa: mapa.sort((a, b) => a.vad_ms - b.vad_ms)} : undefined);
+};
+
+/** O que o app faz com um WAV: o detector acha a voz, o whisper ouve o arquivo inteiro (os tempos ficam os de sempre)
+ *  e só fica a palavra que encosta num trecho de voz. Os scripts de medida usam a mesma função. */
+export const ouvirWav = async (o: {pecas: Pecas; modelo: ModeloWhisper; wav: string; idioma?: string; prompt?: string; sinal?: AbortSignal;
+  andamento?: (etapa: 'voz' | 'whisper', pct: number) => void; filho?: (c: ChildProcess) => void}) => {
+  o.andamento?.('voz', 0);
+  const voz = o.pecas.vad ? await trechosDeVoz({cli: o.pecas.cli, arquivoModelo: o.pecas.modelo, wav: o.wav, vad: o.pecas.vad, sinal: o.sinal}) : null;
+  o.andamento?.('whisper', 0);
+  const ouvidas = await rodarWhisper({cli: o.pecas.cli, modelo: o.modelo, arquivoModelo: o.pecas.modelo, wav: o.wav, idioma: o.idioma ?? 'pt', sinal: o.sinal,
+    prompt: o.prompt, filho: o.filho, andamento: (pct) => o.andamento?.('whisper', pct)});
+  const palavras = voz ? soNaVoz(ouvidas, voz) : ouvidas;
+  return {palavras, trechos_de_voz: voz?.length ?? null, fora_da_voz: ouvidas.length - palavras.length};
 };
 
 // ---------- o transcritor: um de cada vez, com andamento e cancelar ----------
 
 export type OpcoesTranscritor = {pasta?: string; raizApp?: string; empacotado?: boolean; buscar?: Buscar; modelo?: IdModeloWhisper;
+  /** false desliga o detector de voz (padrão: ligado; o modelo de 0,9 MB baixa com o resto) */
+  vad?: boolean;
   /** Recebe o andamento de toda transcrição, a do botão e a que a IA pede pelo MCP: o IPC manda à tela. (transversal-N4) */
   aoAndamento?: (p: ProgressoTranscricao & {arquivo: string}) => void};
 
@@ -382,6 +505,7 @@ export class Transcritor {
     const falta: string[] = [];
     if (!tem(cli)) falta.push(`whisper.cpp ${WHISPER_VERSAO} (${Math.round(BINARIO_WHISPER.bytes / 1e6)} MB)`);
     if (!tem(arqModelo, m.bytes)) falta.push(`modelo ${m.arquivo} (${Math.round(m.bytes / 1e6)} MB)`);
+    if (this.o.vad !== false && !tem(path.join(this.pasta, MODELO_VAD.arquivo), MODELO_VAD.bytes)) falta.push(`detector de voz ${MODELO_VAD.arquivo} (0,9 MB)`);
     return {
       pasta: this.pasta, modelo, modelos: Object.values(MODELOS_WHISPER).map((x) => ({id: x.id, nome: x.nome, mb: Math.round(x.bytes / 1e6), instalado: tem(path.join(this.pasta, x.arquivo), x.bytes)})),
       pronto: !falta.length && Boolean(ffmpeg), falta, ffmpeg: Boolean(ffmpeg), ocupado: this.atual?.arquivo,
@@ -413,7 +537,16 @@ export class Transcritor {
       await baixarConferido({url: m.url, bytes: m.bytes, sha256: m.sha256, destino: arqModelo, buscar: this.o.buscar, sinal,
         andamento: (r, t) => andamento({etapa: 'baixando', mensagem: `Baixando o modelo ${m.arquivo} (${Math.round(t / 1e6)} MB)`, progresso: (r / t) * 100})});
     }
-    return {pasta: this.pasta, cli, modelo: arqModelo, ffmpeg};
+    // o detector de voz: 0,9 MB, baixa junto na primeira vez (e em quem já tinha o whisper, na próxima transcrição)
+    let vad: string | undefined;
+    if (this.o.vad !== false) {
+      vad = path.join(this.pasta, MODELO_VAD.arquivo);
+      if (!existsSync(vad) || statSync(vad).size !== MODELO_VAD.bytes) {
+        await baixarConferido({...MODELO_VAD, destino: vad, buscar: this.o.buscar, sinal,
+          andamento: (r, t) => andamento({etapa: 'baixando', mensagem: 'Baixando o detector de voz (Silero VAD, 0,9 MB)', progresso: (r / t) * 100})});
+      }
+    }
+    return {pasta: this.pasta, cli, modelo: arqModelo, ffmpeg, ...(vad ? {vad} : {})};
   }
 
   /** Transcreve um arquivo do projeto (ou o trecho `de_ms`+`dur_ms` dele) e grava midia/<arquivo>.palavras.json com o
@@ -447,11 +580,11 @@ export class Transcritor {
       const wav = path.join(temp, 'fala.wav');
       avisar({etapa: 'audio', mensagem: `Tirando o áudio de ${path.basename(rel)}`, progresso: 0});
       await extrairAudio({ffmpeg: pecas.ffmpeg!, entrada: projeto.caminho(rel), saida: wav, de_ms: pedido.de_ms, dur_ms: pedido.dur_ms, sinal: controle.signal});
-      avisar({etapa: 'transcrevendo', mensagem: `Transcrevendo com o modelo ${modelo.arquivo}`, progresso: 0});
-      const palavras = await rodarWhisper({cli: pecas.cli, modelo, arquivoModelo: pecas.modelo, wav, idioma: pedido.idioma ?? 'pt', sinal: controle.signal,
+      // o detector de voz primeiro: o que o whisper escrever fora dos trechos de voz sai (silêncio, música, efeito)
+      const {palavras} = await ouvirWav({pecas, modelo, wav, idioma: pedido.idioma ?? 'pt', sinal: controle.signal,
         // o dicionário do vídeo entra no fim do vocabulário: o whisper copia a grafia do que lê no prompt
         prompt: `${pedido.vocabulario ?? PROMPT_PADRAO}${Array.isArray(pedido.termos) && pedido.termos.length ? ` ${pedido.termos.slice(0, 40).join(', ')}.` : ''}`,
-        andamento: (pct) => avisar({etapa: 'transcrevendo', mensagem: `Transcrevendo com o modelo ${modelo.arquivo}`, progresso: pct})});
+        andamento: (etapa, pct) => avisar({etapa: 'transcrevendo', mensagem: etapa === 'voz' ? 'Procurando a voz' : `Transcrevendo com o modelo ${modelo.arquivo}`, progresso: pct})});
       // o tempo das palavras conta do começo do arquivo, mesmo quando só um trecho foi transcrito
       const desloc = pedido.de_ms ?? 0;
       const finais = palavras.map((p) => ({...p, s: p.s + desloc, e: p.e + desloc}));

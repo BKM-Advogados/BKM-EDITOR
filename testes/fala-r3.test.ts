@@ -1,5 +1,6 @@
 // Rodada 3 da frente Fala (docs/legendas.md): os defeitos da área e a régua das legendas. Cada describe cita o id.
-import {readFileSync} from 'node:fs';
+import {mkdtempSync, readFileSync, rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
 import path from 'node:path';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
@@ -14,6 +15,7 @@ import {
 } from '../src/nucleo/legendas';
 import {avancosDaFonte, LETRAS_MEDIDAS, medidorDaFonte} from '../src/nucleo/medida-texto';
 import {arquivosDeLegendaDoVideo, legendasNoTrecho, planoDasLegendas} from '../src/nucleo/legendas-exportacao';
+import {argumentosVad, MODELO_VAD, palavrasDoWhisper, semAnotacoes, soNaVoz, tempoNoArquivo, trechoDoLogVad, Transcritor, type TrechoVad} from '../src/main/transcricao';
 
 const tela = vi.hoisted(() => ({quadro: 0}));
 vi.mock('remotion', async (original) => ({
@@ -454,9 +456,9 @@ describe('legendas na exportação: queimar, só o SRT ou os dois, por destino',
     const r = arquivosDeLegendaDoVideo('Mudar - 9x16', segs, null, (n) => ha.has(n));
     expect(r.map((a) => a.nome)).toEqual(['Mudar - 9x16 (2).srt', 'Mudar - 9x16.pt_BR.srt', 'Mudar - 9x16.vtt']);
     expect(r[0].texto).toBe(paraSrt(segs));
+    expect(r[2].texto.startsWith('WEBVTT')).toBe(true);
     expect(arquivosDeLegendaDoVideo('x', segs, {de_ms: 5000, ate_ms: 6000}, () => false)).toEqual([]);
   });
-    expect(r[2].texto.startsWith('WEBVTT')).toBe(true);
 
   it('o SRT de fora guarda as palavras repartidas pelo tamanho, marcadas como estimadas', () => {
     const {legendas} = legendasDeArquivo('1\n00:00:01,000 --> 00:00:02,000\nRecebeu proposta\n', 'x.srt');
@@ -464,5 +466,65 @@ describe('legendas na exportação: queimar, só o SRT ou os dois, por destino',
     expect(legendas.segmentos[0].palavras!.map((p) => p.w)).toEqual(['Recebeu', 'proposta']);
     expect(legendas.segmentos[0].palavras![0].s).toBe(1000);
     expect(legendas.segmentos[0].palavras![1].e).toBe(2000);
+  });
+});
+
+describe('VAD: o tempo das palavras volta ao relógio do arquivo e o que não é fala não vira palavra', () => {
+  // o que o whisper-cli escreve no stderr com --vad (medido na narração do C2 depois de 14 s de silêncio e música)
+  const LOG = [
+    'whisper_vad: vad_segment_info: orig_start: 14.27, orig_end: 16.22, vad_start: 0.00, vad_end: 1.95',
+    'whisper_vad: vad_segment_info: orig_start: 16.74, orig_end: 19.58, vad_start: 2.15, vad_end: 4.99',
+  ];
+  const mapa = LOG.map(trechoDoLogVad) as TrechoVad[];
+
+  it('lê a tabela dos trechos de voz e leva cada tempo ao arquivo', () => {
+    expect(mapa[0]).toEqual({orig_ms: 14270, orig_fim_ms: 16220, vad_ms: 0, vad_fim_ms: 1950});
+    expect(trechoDoLogVad('whisper_full_with_state: progress =  50%')).toBeNull();
+    expect(tempoNoArquivo(mapa, 10)).toBe(14280);
+    // na folga entre os trechos: o começo vai ao próximo trecho e o fim fica no fim do trecho em que estava
+    expect(tempoNoArquivo(mapa, 2100)).toBe(16740);
+    expect(tempoNoArquivo(mapa, 2100, 'fim')).toBe(16370);
+    expect(tempoNoArquivo(mapa, 1900, 'fim')).toBe(16170);
+    expect(tempoNoArquivo(mapa, 2150)).toBe(16740);
+    expect(tempoNoArquivo(mapa, 3000)).toBe(17590);
+    expect(tempoNoArquivo([], 500)).toBe(500);
+  });
+
+  it('as palavras saem no relógio do arquivo; sem a tabela, pela diferença do segmento', () => {
+    const json = {transcription: [{offsets: {from: 14270, to: 19580}, tokens: [
+      {text: '[_BEG_]', offsets: {from: 0, to: 0}},
+      {text: ' Recebeu', offsets: {from: 10, to: 240}, p: 0.9},
+      {text: ' proposta', offsets: {from: 2200, to: 2600}, p: 0.8},
+    ]}]};
+    expect(palavrasDoWhisper(json, 0, {mapa}).map((w) => [w.w, w.s, w.e])).toEqual([['Recebeu', 14280, 14510], ['proposta', 16790, 17190]]);
+    expect(palavrasDoWhisper(json, 0, {mapa: []}).map((w) => [w.w, w.s])).toEqual([['Recebeu', 14270], ['proposta', 16460]]);
+    // sem VAD, como sempre
+    expect(palavrasDoWhisper(json).map((w) => w.s)).toEqual([10, 2200]);
+  });
+
+  it('tira "[Som de fio]", "[música]", "(risos)" e "♪", e deixa o "(CLT)" e o colchete que não fecha', () => {
+    const ws = ['[Som', 'de', 'fio]', 'Recebeu', '(risos)', '(CLT)', '♪', '[música].'].map((w) => ({w}));
+    expect(semAnotacoes(ws).map((x) => x.w)).toEqual(['Recebeu', '(CLT)']);
+    expect(semAnotacoes(['[nota', 'sem', 'fim'].map((w) => ({w}))).map((x) => x.w)).toEqual(['[nota', 'sem', 'fim']);
+  });
+
+  it('como filtro: só fica a palavra que encosta num trecho de voz (com 300 ms de folga)', () => {
+    const ps = [{w: 'Obrigado.', s: 2000, e: 2400}, {w: 'Recebeu', s: 14100, e: 14500}, {w: 'proposta', s: 14600, e: 15000}, {w: 'fim', s: 16400, e: 16600}];
+    expect(soNaVoz(ps, [{de: 14270, ate: 16220}]).map((p) => p.w)).toEqual(['Recebeu', 'proposta', 'fim']);
+    expect(soNaVoz(ps, [])).toEqual([]);
+  });
+
+  it('o detector de voz entra nos argumentos e na lista do que falta baixar (0,9 MB, com SHA-256)', () => {
+    const a = argumentosVad('C:/m/ggml-silero.bin');
+    expect(a.slice(0, 3)).toEqual(['--vad', '-vm', 'C:/m/ggml-silero.bin']);
+    expect(MODELO_VAD.url).toContain('/resolve/9ffd54a1e1ee413ddf265af9913beaf518d1639b/');
+    expect(MODELO_VAD.sha256).toMatch(/^[0-9a-f]{64}$/);
+    const pasta = mkdtempSync(path.join(tmpdir(), 'estudio-vad-'));
+    try {
+      expect(new Transcritor({pasta}).estado().falta.some((f) => f.includes(MODELO_VAD.arquivo))).toBe(true);
+      expect(new Transcritor({pasta, vad: false}).estado().falta.some((f) => f.includes(MODELO_VAD.arquivo))).toBe(false);
+    } finally {
+      rmSync(pasta, {recursive: true, force: true});
+    }
   });
 });
