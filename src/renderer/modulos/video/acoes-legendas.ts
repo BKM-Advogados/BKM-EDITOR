@@ -170,11 +170,11 @@ export const DURACAO_MIN_LEGENDA = 200;
 
 /** Muda o tempo de um segmento em `dms` (passos de 10 ms): "mover" leva tudo junto, as palavras também; "ini" e "fim"
  *  aparam as pontas. Relativo, então vale também para a legenda que anda com o clipe de voz. */
-export const moverSegmento = async (documento: string, id: string, modo: 'mover' | 'ini' | 'fim', dms: number) => {
+export const moverSegmento = async (documento: string, id: string, modo: 'mover' | 'ini' | 'fim', dms: number, o: {exato?: boolean} = {}) => {
   const i = indiceDe(documento, id);
   const s = legendasDe(documento)?.segmentos[i];
   if (!s) return;
-  const d = Math.round(dms / 10) * 10;
+  const d = o.exato ? Math.round(dms) : Math.round(dms / 10) * 10;
   if (!d) return;
   let novo: SegmentoLegenda;
   if (modo === 'mover') {

@@ -982,6 +982,15 @@ export const legendasNoDestino = (leg: LegendasP, largura: number, altura: numbe
   return {...leg, segmentos, area};
 };
 
+/** Quanto andar uma ponta da legenda (ms da tela) para ela cair no quadro vizinho: `passo` −1 ou +1 quadro, encaixando
+ *  na grade de quadros do vídeo (o teclado da lista e da faixa: [ e ] no começo, { e } no fim). */
+export const passoDeQuadro = (ms: number, fps: number, passo: -1 | 1) => {
+  const q = 1000 / (fps > 0 ? fps : 30);
+  const atual = ms / q;
+  const alvo = passo > 0 ? Math.floor(atual + 1e-6) + 1 : Math.ceil(atual - 1e-6) - 1;
+  return Math.round(Math.max(0, alvo) * q - ms);
+};
+
 /** Os segmentos que aparecem em `ms` (pode haver mais de um quando duas vozes se sobrepõem). */
 export const segmentosEm = (segmentos: SegmentoLegendaP[], ms: number) => segmentos.filter((s) => ms >= s.em && ms < s.sai);
 

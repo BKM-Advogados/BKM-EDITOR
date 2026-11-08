@@ -56,7 +56,7 @@ const ItemLegenda: React.FC<{documento: string; s: SegmentoLegenda; em: number; 
     const cabeca = msAtual();
     return (
       <div ref={raiz} className={`item-legenda${agora ? ' agora' : ''}${sel ? ' sel' : ''}${achado ? ' achado' : ''}`}>
-        <button className="tempo" title="Levar a cabeça ao começo desta legenda" onClick={() => {
+        <button className="tempo" title="Levar a cabeça ao começo desta legenda. Selecionada: [ e ] mudam o começo, { e } o fim, um quadro por vez" onClick={() => {
           irPara(em);
           selecionar({documento, caminho: `/legendas/segmentos/${i}`});
         }}>

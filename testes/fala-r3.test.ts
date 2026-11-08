@@ -10,7 +10,7 @@ import {novoDocCenas, resolverCenas, type DocCenas} from '../src/nucleo/cenas';
 import {
   aplicarDicionario, areaDaLegenda, capacidadeDaLegenda, DICIONARIO_CASA, termosDoDicionario, comTexto, CPS_MAX, cpsDe, fracaNoFim, legendasAoDividirClipe, legendasAoDuplicarClipe, legendasDaFala, legendasDeOutraTomada, legendasDoDocumento, lerLegendas,
   legendasNoDestino, limitesDoArrasto, linhasDaLegenda, MAX_SEGMENTO_MS, mesmaTomada, MIN_SEGMENTO_MS, nomeLivreDaLegenda, PAUSA_QUEBRA_MS, quebrarEmLinhas, quebrarEmSegmentos, resolverLegendas,
-  palavrasDe, palavrasDuvidosas, palavrasValidas, realinharPalavras, substituirEmLote, textoDeLegenda, type LegendasCenas,
+  palavrasDe, palavrasDuvidosas, passoDeQuadro, palavrasValidas, realinharPalavras, substituirEmLote, textoDeLegenda, type LegendasCenas,
 } from '../src/nucleo/legendas';
 import {avancosDaFonte, LETRAS_MEDIDAS, medidorDaFonte} from '../src/nucleo/medida-texto';
 
@@ -419,5 +419,16 @@ describe('dicionário da casa e do vídeo: volta a valer a cada geração', () =
     expect(de.legendas.dicionario).toEqual([{de: 'propósito', para: 'proposta'}]);
     expect(termosDoDicionario(de.legendas)).toEqual(['proposta']);
     expect(aplicarDicionario([{id: 'x', em: 0, sai: 1, texto: 'CLT já certa'}], DICIONARIO_CASA).trocas).toBe(0);
+  });
+});
+
+describe('início e fim pelo teclado, um quadro por vez', () => {
+  it('passoDeQuadro encaixa na grade de quadros do vídeo', () => {
+    expect(passoDeQuadro(1000, 30, 1)).toBe(33); // do quadro 30 ao 31
+    expect(passoDeQuadro(1000, 30, -1)).toBe(-33);
+    expect(passoDeQuadro(1010, 30, 1)).toBe(23); // fora da grade: o próximo quadro inteiro
+    expect(passoDeQuadro(1010, 30, -1)).toBe(-10);
+    expect(passoDeQuadro(0, 30, -1)).toBe(0);
+    expect(passoDeQuadro(1000, 25, 1)).toBe(40);
   });
 });
