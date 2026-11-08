@@ -238,3 +238,60 @@ vindo de qualquer área.
 - Para mostrar à pessoa do que você fala: `selecionar_camadas` com ids ou caminhos.
 - Para alinhar ou distribuir, prefira `alinhar_camadas` e `distribuir_camadas` a calcular x e y à mão: elas usam a
   caixa da camada girada e levam a foto recortada com a máscara.
+
+## Grupos e camadas travadas (rodada 3)
+
+Código: `src/nucleo/layout-imagem.ts` (grupo, alinhar por unidade), `src/nucleo/travas-imagem.ts` (a trava no núcleo),
+`acoesSelecao.ts` (as ações da tela) e `src/nucleo/mcp-imagem.ts`. Testes em `testes/grupos-travas.test.ts`.
+
+**Formato.** Dois campos opcionais no fim da camada: `grupo` (id do grupo, ex.: `grupo-1`) e `travada` (`true`).
+
+**Grupo.** Ctrl+G (ou o botão da barra) dá o mesmo `grupo` às camadas escolhidas e as deixa vizinhas na pilha, onde
+estava a de cima, na mesma ordem entre elas: um patch só, desfazível. No monitor, o clique numa camada do grupo escolhe
+o grupo inteiro (a apertada fica como principal) e o arrasto leva todas; o duplo clique escolhe só aquela camada; o
+laço traz o grupo inteiro; Shift+clique põe ou tira o grupo todo. Alinhar e distribuir contam cada grupo como uma
+unidade (anda inteiro, pela caixa dele); um grupo sozinho alinha à prancheta. Ctrl+Shift+G desagrupa (tira o grupo de
+todas as camadas dele). Na lista, a camada de grupo mostra o ícone do grupo.
+
+**Trava.** Ctrl+Shift+L, o botão da barra ou o cadeado da lista travam e destravam. Camada travada se escolhe (para ver e
+destravar), mas não anda, não muda de tamanho (sem alça; a caixa fica tracejada e a etiqueta mostra o cadeado), fica
+fora do laço e não anda no alinhar (grupo com camada travada fica parado). Num arrasto de várias, as travadas ficam e
+as outras andam.
+
+**A trava vale para a IA no núcleo.** `Projeto.aplicarPatch` pergunta a `motivoDaTrava` antes de gravar um patch que
+não é da pessoa: o patch é aplicado numa cópia e cada camada travada tem de sair igual (mesma página, mesmo id, mesmo
+conteúdo). Mexer, apagar ou trocar a lista que a contém é recusado, com o motivo ("a camada logo está travada pela
+pessoa: nada foi gravado…"); mudar a ordem da pilha passa (a camada não muda); travar passa. Destravar pela IA só pela
+ferramenta `destravar_camadas`, de classe cartão. Vale para toda ferramenta que grava documento (`aplicar_patch`,
+`alinhar_camadas`, `remover_fundo`, `aplicar_marca`…), dentro e fora do app. A pessoa (autor `pessoa`: a tela, o
+desfazer) não passa por essa trava.
+
+**Comentário no carrossel (imagem-D5 e imagem-N1).** O comentário criado numa página do carrossel guarda
+`pagina_id` (o id da página, campo novo do alvo). A página do pino, a camada que ele abre e o ponto da lista e da
+miniatura saem de `paginaDoAlvo` e `caminhoDoAlvo` (`carrossel.ts`): a página pelo id dela e a camada pelo id dentro
+dela. Página inserida antes, ou a pilha que mudou, não levam mais o comentário para outra página, e o ponto da lista
+acende só na camada da página do comentário (antes acendia na camada de mesmo id em todas). Comentário antigo, sem
+`pagina_id`, continua pelo caminho gravado. O painel de comentários escolhe o caminho gravado; o monitor corrige para
+o de agora pela página e pelo id.
+
+**remover_fundo na página gêmea (imagem-N6).** Depois do modelo, a camada é procurada de novo na página de antes pelo id
+da página (não pelo caminho), no mesmo lugar da pilha, com o mesmo id; página duplicada e reordenada no meio não leva
+mais o recorte para a gêmea.
+
+**Ferramentas do MCP** (em `src/nucleo/mcp-imagem.ts`):
+
+| Ferramenta | Entrada | O que faz | Classe |
+|---|---|---|---|
+| `agrupar_camadas` | `documento`, `camadas` (2 ou mais) | Mesmo grupo e vizinhas na pilha; devolve o grupo e os caminhos novos. | livre |
+| `desagrupar_camadas` | `documento`, `camadas` | Tira o grupo de todas as camadas dos grupos pedidos. | livre |
+| `travar_camadas` | `documento`, `camadas` | Trava. | livre |
+| `destravar_camadas` | `documento`, `camadas` | Destrava o que a pessoa travou. | cartão |
+
+### Para o guia da IA
+
+- Camada com `travada: true` foi travada pela pessoa: o patch que mexe nela é recusado. Não tente contornar; para
+  destravar, peça o ok dela e use `destravar_camadas`.
+- Camadas com o mesmo `grupo` andam juntas: para mover ou alinhar o grupo, passe todas (ou use `alinhar_camadas`, que
+  trata o grupo como um). `agrupar_camadas` e `desagrupar_camadas` fazem e desfazem.
+- Comentário de carrossel traz `pagina_id`: ache a camada pela página com esse id e pelo `objeto_id` dentro dela; o
+  caminho gravado pode estar velho.
