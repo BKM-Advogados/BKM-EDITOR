@@ -9,7 +9,7 @@ import {ArrowUp, BookOpen, Box, Check, ChevronDown, ChevronRight, Copy, Film, Fo
 import type {Ambiente, ContaClaude, MarcaInfo, NovoProjeto, Preferencias, Recente} from '../../compartilhado/api';
 import type {Modulo} from '../../nucleo/documentos';
 import {MODELOS, type IdModelo} from '../../nucleo/modelos';
-import {FORMATOS_IMAGEM, FORMATOS_VIDEO, type PresetFormato} from '../../nucleo/formatos';
+import {FORMATOS_IMAGEM, FORMATOS_VIDEO, TAMANHO_MAX, TAMANHO_MIN, limitarTamanho, type PresetFormato} from '../../nucleo/formatos';
 import {abrirProjeto, avisar, loja, mensagemDe, useLoja} from '../estado/loja';
 import {BotaoMenu} from '../componentes/Menu';
 import {pedirTexto} from '../componentes/Dialogo';
@@ -24,6 +24,32 @@ const ABAS: {id: Modulo; nome: string; icone: React.ReactNode}[] = [
 ];
 const ICONE_MODULO: Record<Modulo, React.ReactNode> = {video: <Film size={18} />, imagem: <ImageIcon size={18} />, '3d': <Box size={18} />};
 const PERSONALIZADO = 'personalizado';
+
+/** Largura e altura do tamanho livre (transversal-D17): digitar 9000 não vira 1080×1920 em silêncio. O campo guarda o texto
+ *  como a pessoa digita; só um valor de 16 a 7680 sobe para o formulário, fora disso o campo fica vermelho com o limite e,
+ *  ao sair dele (ou Enter), o número volta ao limite mais perto. */
+const CampoTamanho: React.FC<{rotulo: string; valor: number; aoMudar: (n: number) => void; aoInvalidar: (invalido: boolean) => void}> = ({rotulo, valor, aoMudar, aoInvalidar}) => {
+  const [texto, setTexto] = useState(String(valor));
+  useEffect(() => setTexto(String(valor)), [valor]);
+  const n = Number(texto);
+  const fora = texto.trim() !== '' && (!Number.isFinite(n) || n < TAMANHO_MIN || n > TAMANHO_MAX);
+  useEffect(() => aoInvalidar(fora), [fora]); // eslint-disable-line react-hooks/exhaustive-deps
+  const confirmar = () => {
+    const v = limitarTamanho(texto.trim() === '' ? valor : n, valor);
+    setTexto(String(v));
+    aoMudar(v);
+  };
+  return (
+    <input className={`campo${fora ? ' invalido' : ''}`} type="number" aria-label={rotulo} aria-invalid={fora} min={TAMANHO_MIN} max={TAMANHO_MAX} value={texto}
+      onChange={(e) => {
+        setTexto(e.target.value);
+        const v = Number(e.target.value);
+        if (e.target.value.trim() !== '' && Number.isFinite(v) && v >= TAMANHO_MIN && v <= TAMANHO_MAX) aoMudar(Math.round(v));
+      }}
+      onBlur={confirmar}
+      onKeyDown={(e) => e.key === 'Enter' && confirmar()} />
+  );
+};
 
 const quando = (iso: string) => {
   const d = new Date(iso);
@@ -94,6 +120,8 @@ export const Inicio: React.FC = () => {
   const [recentes, setRecentes] = useState<Recente[] | null>(null);
   const [formato, setFormato] = useState<Record<'video' | 'imagem', string>>({video: 'reels', imagem: 'feed'});
   const [livre, setLivre] = useState({largura: 1080, altura: 1080, fps: 30});
+  const [larguraInvalida, setLarguraInvalida] = useState(false);
+  const [alturaInvalida, setAlturaInvalida] = useState(false);
   const [maisOpcoes, setMaisOpcoes] = useState(false);
   const [nome, setNome] = useState('');
   const [pasta, setPasta] = useState('');
@@ -304,10 +332,11 @@ export const Inicio: React.FC = () => {
                 {aba !== '3d' && idFormato === PERSONALIZADO && (
                   <label><span>Tamanho</span>
                     <span className="linha-pasta">
-                      <input className="campo" type="number" min={16} max={7680} value={livre.largura} onChange={(e) => setLivre((x) => ({...x, largura: Number(e.target.value) || 1080}))} />
+                      <CampoTamanho rotulo="Largura" valor={livre.largura} aoMudar={(n) => setLivre((x) => ({...x, largura: n}))} aoInvalidar={setLarguraInvalida} />
                       <span className="vezes">×</span>
-                      <input className="campo" type="number" min={16} max={7680} value={livre.altura} onChange={(e) => setLivre((x) => ({...x, altura: Number(e.target.value) || 1080}))} />
+                      <CampoTamanho rotulo="Altura" valor={livre.altura} aoMudar={(n) => setLivre((x) => ({...x, altura: n}))} aoInvalidar={setAlturaInvalida} />
                     </span>
+                    {(larguraInvalida || alturaInvalida) && <span className="erro-campo">Largura e altura vão de {TAMANHO_MIN} a {TAMANHO_MAX} px.</span>}
                   </label>
                 )}
                 {aba === 'video' && (

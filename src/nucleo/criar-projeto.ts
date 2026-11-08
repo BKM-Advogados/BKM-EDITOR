@@ -12,7 +12,7 @@ import type {DocCena3D, DocImagem, EntradaDocumento, Manifesto, Modulo} from './
 import {novoDocCenas} from './cenas';
 import {EFEITOS} from './efeitos';
 import {MODELOS, type IdModelo} from './modelos';
-import {FORMATOS_IMAGEM, FORMATOS_VIDEO, type Formato} from './formatos';
+import {FORMATOS_IMAGEM, FORMATOS_VIDEO, limitarTamanho, type Formato} from './formatos';
 import {arquivosDaMarca, patchDaMarca, temaDaMarca} from './marca';
 import {REGRAS_MIDIA_PESADA} from './midia-git';
 import type {MarcaLida} from './pasta-marcas';
@@ -87,11 +87,11 @@ const ID_DO_MODULO: Record<Modulo, string> = {video: 'video', imagem: 'imagem', 
 export const conteudoNovo = (modulo: Modulo, formato?: {largura: number; altura: number; fps?: number}) => {
   if (modulo === 'video') {
     const f = formato ?? FORMATOS_VIDEO[0];
-    return novoDocCenas({largura: f.largura, altura: f.altura, fps: formato?.fps ?? 30});
+    return novoDocCenas({largura: limitarTamanho(f.largura), altura: limitarTamanho(f.altura), fps: formato?.fps ?? 30});
   }
   if (modulo === 'imagem') {
     const f = formato ?? FORMATOS_IMAGEM[0];
-    return novoDocImagem(f.largura, f.altura);
+    return novoDocImagem(limitarTamanho(f.largura), limitarTamanho(f.altura));
   }
   return novoDoc3d();
 };

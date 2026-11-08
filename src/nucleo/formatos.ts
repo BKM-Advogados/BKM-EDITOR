@@ -37,6 +37,18 @@ export const proporcaoDe = (largura: number, altura: number): string => {
 
 export const presetDe = (lista: PresetFormato[], id?: string) => lista.find((f) => f.id === id);
 
+/** O que o resolvedor e a exportação aceitam de largura e altura (px). Fora disso a prévia e o MP4 trocavam, em silêncio, para
+ *  1080×1920 (transversal-D17): quem cria o documento já limita aqui. */
+export const TAMANHO_MIN = 16;
+export const TAMANHO_MAX = 7680;
+
+/** Largura ou altura dentro de 16 a 7680 px, arredondada; vazio, zero ou texto que não é número volta ao `padrao`. */
+export const limitarTamanho = (n: unknown, padrao = 1080): number => {
+  const v = typeof n === 'number' ? n : Number(n);
+  if (!Number.isFinite(v) || v <= 0) return padrao;
+  return Math.min(TAMANHO_MAX, Math.max(TAMANHO_MIN, Math.round(v)));
+};
+
 /** Formato do documento de vídeo, com o padrão do carrossel para documento antigo. */
 export const formatoDoVideo = (doc: unknown): Formato => {
   const f = (doc as {formato?: unknown} | null)?.formato;
@@ -44,8 +56,8 @@ export const formatoDoVideo = (doc: unknown): Formato => {
   const {largura, altura, fps} = f as Partial<Formato>;
   const ok = (n: unknown, min: number, max: number) => typeof n === 'number' && Number.isFinite(n) && n >= min && n <= max;
   return {
-    largura: ok(largura, 16, 7680) ? Math.round(largura!) : FORMATO_PADRAO.largura,
-    altura: ok(altura, 16, 7680) ? Math.round(altura!) : FORMATO_PADRAO.altura,
+    largura: ok(largura, TAMANHO_MIN, TAMANHO_MAX) ? Math.round(largura!) : FORMATO_PADRAO.largura,
+    altura: ok(altura, TAMANHO_MIN, TAMANHO_MAX) ? Math.round(altura!) : FORMATO_PADRAO.altura,
     fps: ok(fps, 1, 120) ? fps! : FPS_PADRAO,
   };
 };
