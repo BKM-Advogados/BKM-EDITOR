@@ -72,3 +72,22 @@ describe('legenda do carrossel da Cliente (video-D17)', () => {
     expect(baseDaLegendaCarrossel(40)).toBe(1396);
   });
 });
+
+describe('zona segura por tipo de quadro (video-D13)', () => {
+  it('o 1:1 tem a própria classe, só com a margem de título, e não as medidas do 4:5', async () => {
+    const {classeDoQuadro, conjuntoDaClasse, CONJUNTO_QUADRADO} = await import('../src/nucleo/zonas-seguras');
+    expect(classeDoQuadro(1080, 1080)).toBe('quadrado');
+    expect(classeDoQuadro(1080, 1050)).toBe('quadrado'); // quase quadrado (até 5%)
+    expect(classeDoQuadro(1080, 1350)).toBe('feed');
+    expect(classeDoQuadro(1080, 1920)).toBe('vertical');
+    expect(classeDoQuadro(1920, 1080)).toBe('youtube');
+    expect(conjuntoDaClasse('quadrado')).toBe(CONJUNTO_QUADRADO);
+    expect(conjuntoDaClasse('feed')).toBe(conjuntoDe('feed'));
+    expect(conjuntoDaClasse(null)).toBeUndefined();
+    // só uma margem de 5% de cada lado, e nada coberto
+    expect(CONJUNTO_QUADRADO.zonas).toHaveLength(1);
+    expect(CONJUNTO_QUADRADO.zonas[0]).toMatchObject({tipo: 'contorno', x: 0.05, y: 0.05, largura: 0.9, altura: 0.9});
+    // a lista das redes não ganhou o quadrado (ele é um conjunto à parte)
+    expect(ZONAS_SEGURAS.map((c) => c.id)).toEqual(['vertical', 'feed', 'youtube']);
+  });
+});

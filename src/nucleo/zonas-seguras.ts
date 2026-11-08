@@ -83,6 +83,26 @@ export const baseDaLegendaCarrossel = (respiro = 16): number => {
   return Math.round(faixa.y * 1920) - respiro;
 };
 
+// ---------- o quadrado e a escolha por tipo de quadro (video-D13) ----------
+
+/** O quadrado (1:1) não tem zona de rede: o que vale é a margem de título de 5% (SMPTE RP 218). Antes o monitor mostrava ali as
+ *  medidas do 4:5. */
+export const CONJUNTO_QUADRADO: {nome: string; proporcao: string; zonas: ZonaSegura[]} = {
+  nome: 'Quadrado',
+  proporcao: '1:1',
+  zonas: [{tipo: 'contorno', x: 0.05, y: 0.05, largura: 0.9, altura: 0.9, rotulo: 'Margem de título (5%)', fonte: 'SMPTE RP 218: 5% de margem'}],
+};
+
+export type ClasseDoQuadro = IdZonaSegura | 'quadrado';
+
+/** A classe do quadro: vertical, feed, YouTube ou quadrado. A escolha de zona do monitor é lembrada por classe, para um vídeo
+ *  16:9 não religar a zona do 9:16 que a pessoa usou em outro. */
+export const classeDoQuadro = (largura: number, altura: number): ClasseDoQuadro =>
+  largura > 0 && altura > 0 && Math.abs(largura / altura - 1) < 0.05 ? 'quadrado' : zonaSugerida(largura, altura);
+
+/** O conjunto de zonas de uma escolha do monitor (uma rede, ou o quadrado). */
+export const conjuntoDaClasse = (id?: ClasseDoQuadro | null) => (id === 'quadrado' ? CONJUNTO_QUADRADO : conjuntoDe(id));
+
 // ---------- onde a marca d'água pode ficar ----------
 export type CantoMarca = 'sup-esq' | 'sup-dir' | 'inf-esq' | 'inf-dir';
 
