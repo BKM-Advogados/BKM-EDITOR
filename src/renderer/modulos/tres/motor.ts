@@ -5,6 +5,7 @@ import {RoomEnvironment} from 'three/examples/jsm/environments/RoomEnvironment.j
 import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
 import {TransformControls, type TransformControlsMode} from 'three/examples/jsm/controls/TransformControls.js';
 import type {DocCena3D, Vetor3} from '../../../nucleo/documentos';
+import {rotacaoMaisPerto} from '../../../nucleo/cena3d';
 import {arred3, arredV, GRAU, vetor, type Transformacao} from './comum';
 import {CenaDoc} from './cena';
 import type {CameraDoc} from './vista';
@@ -237,7 +238,11 @@ export class Motor {
   private transformacao(): Transformacao | null {
     const m = this.gizmo.object;
     if (!m) return null;
-    return {posicao: arredV(m.position.toArray()), rotacao: arredV([m.rotation.x / GRAU, m.rotation.y / GRAU, m.rotation.z / GRAU]), escala: arredV(m.scale.toArray())};
+    // o Euler do Three vem com Y entre −90° e 90°: no arrasto fica a forma da mesma pose que está mais perto da rotação de antes
+    // (125° em Y é gravado 0, 125, 0 e não 180, 55, 180; tres-efeitos-D10)
+    const euler: Vetor3 = [m.rotation.x / GRAU, m.rotation.y / GRAU, m.rotation.z / GRAU];
+    const rotacao = this.antes ? rotacaoMaisPerto(euler, this.antes.rotacao) : euler;
+    return {posicao: arredV(m.position.toArray()), rotacao: arredV(rotacao), escala: arredV(m.scale.toArray())};
   }
 
   private arrastando = (e: {value: unknown}) => {

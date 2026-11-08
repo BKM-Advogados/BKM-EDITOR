@@ -167,3 +167,24 @@ export const novoDoc3d = (): DocCena3D => ({
  *  quadrado da distância, então 60 a uns 8 de distância dá a claridade de um sol de 1,6). Ao trocar o tipo de uma luz que ainda tem
  *  a intensidade padrão do tipo antigo, o inspetor põe a do novo (tres-efeitos-D9). */
 export const INTENSIDADE_PADRAO_LUZ: Record<Luz3D['tipo'], number> = {ambiente: 0.5, direcional: 1.6, ponto: 60};
+
+/** Rotação em graus (Euler XYZ) mais perto de `referencia` que dá a mesma orientação que `nova`. O gizmo gira o objeto pelo
+ *  quaternion, e o Three devolve o Euler com o ângulo Y preso entre −90° e 90°: um giro de 125° em Y volta como [180, 55, 180], que é
+ *  a mesma pose mas é lida como outra coisa (o inspetor mostra 180, 55, 180; o rótulo do arrasto mostra o delta errado; e a prévia
+ *  animada soma o giro ao Y desse Euler, que equivale a girar ao contrário). Toda orientação tem duas formas, (x, y, z) e
+ *  (x+180, 180−y, z+180), cada uma com voltas de 360° em cada eixo: fica a que está mais perto da rotação que o objeto tinha
+ *  (tres-efeitos-D10). */
+export const rotacaoMaisPerto = (nova: Vetor3, referencia: Vetor3): Vetor3 => {
+  const formas: Vetor3[] = [nova, [nova[0] + 180, 180 - nova[1], nova[2] + 180]];
+  let melhor = nova;
+  let menor = Infinity;
+  for (const f of formas) {
+    const v = f.map((a, i) => a + 360 * Math.round((referencia[i] - a) / 360)) as Vetor3;
+    const custo = v.reduce((s, a, i) => s + Math.abs(a - referencia[i]), 0);
+    if (custo < menor - 1e-9) {
+      menor = custo;
+      melhor = v;
+    }
+  }
+  return melhor;
+};
