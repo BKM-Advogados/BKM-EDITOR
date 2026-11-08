@@ -30,7 +30,9 @@ readline.createInterface({input: process.stdin}).on('line', (l) => {
   const m = JSON.parse(l);
   if (m.type === 'control_request' && m.request.subtype === 'initialize') {
     sair({type: 'control_response', response: {subtype: 'success', request_id: m.request_id, response: {commands: []}}});
-    sair({type: 'system', subtype: 'init', session_id: sessao, model: args.includes('--resume') ? 'falso-retomado' : 'falso-novo'});
+    // --model (seletor de modelo da conversa) aparece como o modelo da sessão; sem ele, diz se é nova ou retomada
+    sair({type: 'system', subtype: 'init', session_id: sessao,
+      model: args.includes('--model') ? args[args.indexOf('--model') + 1] : args.includes('--resume') ? 'falso-retomado' : 'falso-novo'});
   } else if (m.type === 'control_request' && m.request.subtype === 'interrupt') {
     sair({type: 'control_response', response: {subtype: 'success', request_id: m.request_id, response: {still_queued: []}}});
   } else if (m.type === 'control_response' && esperando) {

@@ -125,6 +125,13 @@ const api: ApiEstudio = {
   // frente IA
   ia: {
     provedores: () => ipcRenderer.invoke(CANAL.iaProvedores),
+    gravarChave: (p, c) => ipcRenderer.invoke(CANAL.iaGravarChave, p, c),
+    apagarChave: (p) => ipcRenderer.invoke(CANAL.iaApagarChave, p),
+    modelos: (p) => ipcRenderer.invoke(CANAL.iaModelos, p),
+    configurar: (p, c) => ipcRenderer.invoke(CANAL.iaConfigurar, p, c),
+    padrao: (p) => ipcRenderer.invoke(CANAL.iaPadrao, p),
+    usoDoMes: () => ipcRenderer.invoke(CANAL.iaUsoDoMes),
+    modeloDaConversa: (id, m) => ipcRenderer.invoke(CANAL.conversaModelo, id, m),
   },
 };
 

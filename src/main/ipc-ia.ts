@@ -1,46 +1,112 @@
-// Frente IA (rodada 3, docs/ia.md): monta as conversas de todos os provedores e o IPC da lista de provedores.
-// Registrado no main.ts com uma linha. A chave nunca sai daqui para a tela: só "tem chave", a origem e o final.
-import type {EstadoProvedor} from '../compartilhado/api';
+// Frente IA (rodada 3, docs/ia.md): monta as conversas de todos os provedores e o IPC de Configurações › IA (lista de
+// provedores, chaves, modelos, endereço, padrão e uso do mês). Registrado no main.ts com uma linha. A chave nunca sai
+// daqui para a tela: só "tem chave", a origem e os 4 últimos caracteres.
+import path from 'node:path';
+import type {EstadoProvedor, ResultadoChave} from '../compartilhado/api';
 import {acharChave, CofreMemoria, finalDaChave, type Cofre} from './ia/chaves';
+import {CofreArquivo, type Cifra} from './ia/cofre-arquivo';
+import {ConfiguracaoIA} from './ia/config';
 import {textoDeSistema} from './ia/guia';
-import {PROVEDORES} from './ia/provedores';
+import {listarModelos} from './ia/modelos';
+import {PROVEDORES, provedor as acharProvedor} from './ia/provedores';
 import {acharExecutavel, SessoesIA, type OpcoesSessoes} from './ia/sessoes';
 import {ambienteLimpo, PATH_COM_LOCAL} from './terminais';
 
 type Lidar = <A extends unknown[], R>(canal: string, f: (...a: A) => R | Promise<R>) => void;
 
-// o cofre do Electron (safeStorage) entra com a tela de chaves; até lá, só as variáveis de ambiente do PC
 let cofre: Cofre = new CofreMemoria();
-export const definirCofre = (c: Cofre) => {
+let configuracao: ConfiguracaoIA | null = null;
+/** Para os testes e para o registro: troca o cofre e a pasta da configuração. */
+export const definirCofre = (c: Cofre, config?: ConfiguracaoIA) => {
   cofre = c;
+  if (config) configuracao = config;
 };
 
 const ambienteAgente = () => ({...ambienteLimpo(), PATH: PATH_COM_LOCAL()});
 
 export const criarSessoesIA = (o: Pick<OpcoesSessoes, 'evento' | 'vivasTerminal' | 'conexao' | 'claude'>) =>
   new SessoesIA({...o, cofre: {ler: (p) => cofre.ler(p), gravar: (p, c) => cofre.gravar(p, c), apagar: (p) => cofre.apagar(p)},
-    sistema: textoDeSistema, ambiente: ambienteAgente});
+    sistema: textoDeSistema, ambiente: ambienteAgente,
+    config: (p) => configuracao?.provedor(p) ?? {},
+    aoUso: (p, _m, u, custo) => {
+      try {
+        configuracao?.registrarUso(p, u, custo ?? 0);
+      } catch {
+        /* a soma do mês nunca derruba a conversa */
+      }
+    }});
 
 /** Cada provedor do catálogo com o que falta para usar. Agentes ACP só entram quando o executável é achado. */
 export const estadoDosProvedores = async (o: {claudeInstalado: boolean; acharExe?: (n: string) => Promise<unknown>}): Promise<EstadoProvedor[]> => {
   const achar = o.acharExe ?? ((n: string) => acharExecutavel(n, ambienteAgente()));
+  const cfg = configuracao?.ler() ?? {provedores: {}};
+  const persistente = cofre instanceof CofreArquivo ? cofre.persistente() : false;
   const r: EstadoProvedor[] = [];
   for (const p of PROVEDORES) {
-    const base = {id: p.id, nome: p.nome, via: p.via, servidor: p.servidor, experimental: p.experimental, modelo: p.modelo, base: p.base,
-      paginaChave: p.paginaChave, chave: p.chave};
+    const c = cfg.provedores[p.id] ?? {};
+    const modelo = c.modelo ?? p.modelo;
+    const base = c.base ?? p.base;
+    const comum = {id: p.id, nome: p.nome, via: p.via, servidor: p.servidor, experimental: p.experimental, local: p.local, modelo, base,
+      paginaChave: p.paginaChave, chave: p.chave, padrao: (cfg.padrao ?? 'claude') === p.id, cofre_persistente: persistente};
     if (p.via === 'claude-cli') {
-      r.push({...base, pronto: o.claudeInstalado, falta: o.claudeInstalado ? undefined : 'não instalado'});
+      r.push({...comum, pronto: o.claudeInstalado, falta: o.claudeInstalado ? undefined : 'instalar o Claude Code'});
     } else if (p.via === 'acp') {
-      if (await achar(p.exe!)) r.push({...base, pronto: true});
+      if (await achar(p.exe!)) r.push({...comum, pronto: true});
     } else {
-      const c = acharChave(cofre, p.id);
-      const falta = !p.base ? 'endereço' : p.chave === 'exigida' && !c.chave ? 'chave' : !p.modelo ? 'modelo' : undefined;
-      r.push({...base, pronto: !falta, falta, chave_origem: c.origem, chave_final: finalDaChave(c.chave)});
+      const k = acharChave(cofre, p.id);
+      const falta = !base ? 'endereço' : p.chave === 'exigida' && !k.chave ? 'chave' : !modelo ? 'modelo' : undefined;
+      r.push({...comum, pronto: !falta, falta, chave_origem: k.origem, chave_final: finalDaChave(k.chave), chave_variavel: k.variavel});
     }
   }
   return r;
 };
 
-export const registrarIpcIa = (lidar: Lidar, canal: string, claudeInstalado: () => boolean) => {
-  lidar(canal, () => estadoDosProvedores({claudeInstalado: claudeInstalado()}));
+const conexaoDe = (id: string) => {
+  const p = acharProvedor(id);
+  if (!p || p.via !== 'openai') throw new Error('este provedor não usa chave nem endereço do app');
+  const base = configuracao?.provedor(id).base ?? p.base;
+  if (!base) throw new Error('falta o endereço deste provedor');
+  return {p, base};
+};
+
+/** Testa a chave na lista de modelos (não gasta token). Recusada (401/403): não grava. Sem rede: grava e avisa. */
+export const gravarChave = async (id: string, chave: string, f?: typeof fetch): Promise<ResultadoChave> => {
+  const limpa = String(chave ?? '').trim();
+  if (limpa.length < 8 || /\s/.test(limpa)) return {ok: false, mensagem: 'essa não parece uma chave de API (curta demais ou com espaço)'};
+  const {p, base} = conexaoDe(id);
+  const r = await listarModelos({base, chave: limpa, provedor: p.id, cabecalhos: p.cabecalhos, fetch: f});
+  if (!r.ok && (r.status === 401 || r.status === 403)) return {ok: false, mensagem: r.mensagem};
+  cofre.gravar(id, limpa);
+  const persistente = cofre instanceof CofreArquivo ? cofre.persistente() : false;
+  const onde = persistente ? 'guardada cifrada neste PC' : 'válida só enquanto o app estiver aberto (o Windows não ofereceu a cifra)';
+  if (!r.ok) return {ok: true, persistente, mensagem: `chave ${onde}, mas não deu para testar agora: ${r.mensagem}`};
+  return {ok: true, persistente, mensagem: `chave aceita e ${onde}`, modelos: r.modelos};
+};
+
+export const modelosDe = async (id: string, f?: typeof fetch) => {
+  const {p, base} = conexaoDe(id);
+  return listarModelos({base, chave: acharChave(cofre, id).chave, provedor: p.id, cabecalhos: p.cabecalhos, fetch: f});
+};
+
+export type CanaisIa = {provedores: string; gravarChave: string; apagarChave: string; modelos: string; configurar: string; padrao: string;
+  usoDoMes: string; conversaModelo: string};
+
+export const registrarIpcIa = (o: {lidar: Lidar; canais: CanaisIa; claudeInstalado: () => boolean; pasta: string; cifra: Cifra;
+  conversas: () => Pick<SessoesIA, 'definirModelo'>}) => {
+  definirCofre(new CofreArquivo(path.join(o.pasta, 'chaves.json'), o.cifra), new ConfiguracaoIA(o.pasta));
+  const {lidar, canais} = o;
+  lidar(canais.provedores, () => estadoDosProvedores({claudeInstalado: o.claudeInstalado()}));
+  lidar(canais.gravarChave, (id: string, chave: string) => gravarChave(id, chave));
+  lidar(canais.apagarChave, (id: string) => cofre.apagar(id));
+  lidar(canais.modelos, (id: string) => modelosDe(id));
+  lidar(canais.configurar, (id: string, c: {modelo?: string; base?: string}) => {
+    const p = acharProvedor(id);
+    if (!p) throw new Error('provedor desconhecido');
+    // endereço só se edita no compatível e nos locais: os outros são os oficiais do catálogo
+    if (c.base !== undefined && p.id !== 'compativel' && !p.local) throw new Error('o endereço deste provedor é fixo');
+    return configuracao!.configurar(id, c);
+  });
+  lidar(canais.padrao, (id: string) => configuracao!.definirPadrao(id));
+  lidar(canais.usoDoMes, () => configuracao!.usoDoMes());
+  lidar(canais.conversaModelo, (id: number, modelo?: string) => o.conversas().definirModelo(id, modelo));
 };

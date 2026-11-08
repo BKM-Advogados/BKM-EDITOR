@@ -8,6 +8,7 @@ import {Conversas} from '../conversa';
 import {acharChave, type Cofre} from './chaves';
 import {LacoOpenAI} from './laco';
 import {SessaoAcp} from './motor-acp';
+import {custoEstimado, type UsoTokens} from './precos';
 import {provedor as acharProvedor, type Provedor} from './provedores';
 
 type Conexao = {arquivo: string; url: string; headers: Record<string, string>};
@@ -27,6 +28,8 @@ export type OpcoesSessoes = {
   ambiente: () => Record<string, string>; // ambiente limpo para os agentes
   acharExe?: (nome: string) => Promise<{arquivo: string; shell: boolean; prefixo?: string[]} | null>; // prefixo: o teste roda um agente falso com o node
   fetch?: typeof fetch;
+  config?: (provedor: string) => {modelo?: string; base?: string}; // o que a pessoa escolheu em Configurações › IA
+  aoUso?: (provedor: string, modelo: string, u: UsoTokens, custo_usd?: number) => void; // soma do mês
 };
 
 /** Executável no PATH, aceitando o .cmd que o npm cria no Windows. */
@@ -90,25 +93,29 @@ export class SessoesIA {
       return {id, sessao: r.sessao, provedor: p.id, rotulo};
     }
     if (p.via === 'openai') {
-      const base = o.base ?? p.base;
-      const modelo = o.modelo ?? p.modelo;
+      const cfg = this.o.config?.(p.id) ?? {};
+      const base = o.base ?? cfg.base ?? p.base;
+      const modelo = o.modelo ?? cfg.modelo ?? p.modelo;
       if (!base) throw new Error('falta o endereço deste provedor (Configurações › IA)');
       if (!modelo) throw new Error('falta escolher o modelo deste provedor (Configurações › IA)');
       const {chave} = acharChave(this.o.cofre, p.id);
       if (p.chave === 'exigida' && !chave) throw new Error(`falta a chave do ${p.nome} (Configurações › IA)`);
       const laco = new LacoOpenAI({conexao: {base, chave, modelo, cabecalhos: p.cabecalhos}, mcp: {url: conexao.url, headers: conexao.headers},
-        sistema: this.o.sistema(o.cwd), evento: (e) => this.o.evento(id, e), fetch: this.o.fetch});
+        sistema: this.o.sistema(o.cwd), evento: (e) => this.doLaco(id, e), fetch: this.o.fetch});
       const sessao = o.sessao ?? `${p.id}-${Date.now().toString(36)}-${id}`;
       this.itens.set(id, {via: 'openai', provedor: p, laco, sessao, modelo, pronto: false});
       return {id, sessao, provedor: p.id, rotulo};
     }
     const acharExe: NonNullable<OpcoesSessoes['acharExe']> = this.o.acharExe ?? ((n: string) => acharExecutavel(n, this.o.ambiente()));
-    const {chave} = acharChave(this.o.cofre, p.id === 'gemini-cli' || p.id === 'antigravity' ? 'gemini' : p.id);
+    // o agente é o da pessoa, com o login e a configuração dela: o app não injeta chave nem troca o modelo dele
     const acp = new SessaoAcp({
       cwd: o.cwd,
       mcp: {url: conexao.url, headers: conexao.headers},
-      ambiente: {...this.o.ambiente(), ...(chave && (p.id === 'gemini-cli' || p.id === 'antigravity') ? {GEMINI_API_KEY: chave} : {})},
-      evento: (e) => this.o.evento(id, e),
+      ambiente: this.o.ambiente(),
+      evento: (e) => {
+        if (e.tipo === 'uso' && e.custo_usd) this.o.aoUso?.(p.id, '', {entrada: 0, entrada_cache: 0, saida: 0}, e.custo_usd);
+        this.o.evento(id, e);
+      },
       comando: async () => {
         const exe = await acharExe(p.exe!);
         return exe ? {arquivo: exe.arquivo, args: [...(exe.prefixo ?? []), ...(p.args ?? [])], shell: exe.shell} : null;
@@ -116,6 +123,29 @@ export class SessoesIA {
     });
     this.itens.set(id, {via: 'acp', provedor: p, acp, sessao: acp.sessao});
     return {id, sessao: acp.sessao, provedor: p.id, rotulo};
+  }
+
+  /** Eventos do laço próprio: o uso de tokens ganha o custo estimado pela tabela e vai para a soma do mês. */
+  private doLaco(id: number, e: EventoConversa) {
+    const i = this.itens.get(id);
+    if (e.tipo === 'uso' && i?.via === 'openai') {
+      const c = custoEstimado(i.provedor.id, i.laco.modelo, e);
+      this.o.aoUso?.(i.provedor.id, i.laco.modelo, e, c?.usd);
+      this.o.evento(id, c ? {...e, custo_usd: c.usd} : e);
+      return;
+    }
+    this.o.evento(id, e);
+  }
+
+  /** Seletor de modelo da conversa: vale na próxima mensagem. Agente ACP usa o modelo da configuração dele. */
+  definirModelo(id: number, modelo?: string) {
+    const i = this.item(id);
+    if (i.via === 'claude-cli') return this.claude.definirModelo(i.interno, modelo);
+    if (i.via === 'acp') throw new Error('este agente usa o modelo da configuração dele');
+    if (!modelo) return;
+    i.laco.definirModelo(modelo);
+    i.modelo = modelo;
+    if (i.pronto) this.o.evento(id, {tipo: 'pronto', sessao: i.sessao, modelo});
   }
 
   private item(id: number) {

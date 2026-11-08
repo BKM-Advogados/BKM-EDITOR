@@ -6,7 +6,7 @@ import {ArrowUp, CircleAlert, CircleCheck, CircleX, LoaderCircle, ShieldQuestion
 import type {OperacaoPatch} from '../../nucleo/documentos';
 import {FERRAMENTAS_ESTUDIO, normalizarFerramenta} from '../../compartilhado/ferramentas';
 import {aplicar, avisar, loja, selecionar, useLoja, valorEm} from '../estado/loja';
-import {enviar, estadoConversas, guardarRascunho, lerConta, parar, responderPermissao, type Anexo, type Bloco, type Conversa as TConversa} from './conversas';
+import {enviar, estadoConversas, guardarRascunho, lerConta, parar, responderPermissao, trocarModelo, type Anexo, type Bloco, type Conversa as TConversa} from './conversas';
 import './conversa.css';
 
 // ── texto do Claude: markdown pequeno (parágrafos, listas, negrito, itálico, código), sempre escapado ──
@@ -133,6 +133,27 @@ const rodapeUso = (c: TConversa) => {
   const tokens = u.entrada || u.saida ? `${milhares(u.entrada)} tokens de entrada${u.cache ? ` (${milhares(u.cache)} do cache)` : ''} · ${milhares(u.saida)} de saída` : '';
   const custo = u.custo_usd !== undefined ? `≈ US$ ${u.custo_usd.toLocaleString('pt-BR', {maximumFractionDigits: 4})}` : '';
   return [nomeIA(c), custo, tokens].filter(Boolean).join(' · ');
+};
+
+// ── seletor de modelo (rodada 3, "Seletor de modelo e painel de conexões"): grava o modelo da conversa e vale na próxima
+// mensagem; o rótulo mostra o modelo que a abertura da sessão devolveu. No Claude, os apelidos que o Claude Code aceita;
+// no laço próprio, a lista do próprio endereço; agente ACP usa o modelo da configuração dele.
+const APELIDOS_CLAUDE: [string, string][] = [['', 'padrão da conta'], ['sonnet', 'Sonnet'], ['opus', 'Opus'], ['haiku', 'Haiku']];
+const SeletorModelo: React.FC<{c: TConversa; desligado: boolean}> = ({c, desligado}) => {
+  const [lista, setLista] = useState<string[] | null>(null);
+  const provedor = useSyncExternalStore(estadoConversas.assinar, () => estadoConversas.provedores().find((p) => p.id === c.provedor));
+  if (provedor?.via === 'acp') return <>{c.modelo ?? nomeIA(c)}</>;
+  const opcoes: [string, string][] = c.provedor === 'claude' ? APELIDOS_CLAUDE : (lista ?? []).map((m) => [m, m]);
+  const atual = c.modelo ?? '';
+  if (atual && !opcoes.some(([v]) => v === atual)) opcoes.unshift([atual, atual]);
+  return (
+    <select className="seletor-modelo" value={atual} disabled={desligado} title="Modelo desta conversa: vale a partir da próxima mensagem"
+      onFocus={() => c.provedor !== 'claude' && lista === null && void window.estudio.ia.modelos(c.provedor).then((r) => setLista(r.ok ? r.modelos : []))}
+      onChange={(e) => void trocarModelo(c.id, e.target.value)}>
+      {!opcoes.length && <option value="">{nomeIA(c)}</option>}
+      {opcoes.map(([v, r]) => <option key={v} value={v}>{r}</option>)}
+    </select>
+  );
 };
 
 const CartaoAcao: React.FC<{b: Extract<Bloco, {tipo: 'acao'}>}> = ({b}) => {
@@ -342,7 +363,7 @@ export const Conversa: React.FC<{c: TConversa; abrirTerminal: () => void; libera
               }
             }} />
           <div className="baixo">
-            <span className="modelo">{c.modelo ?? nomeIA(c)}{c.estado === 'hibernada' && ' · hibernada (volta na próxima mensagem)'}</span>
+            <span className="modelo"><SeletorModelo c={c} desligado={trabalhando} />{c.estado === 'hibernada' && ' · hibernada (volta na próxima mensagem)'}</span>
             <button className="enviar" disabled={!texto.trim() || trabalhando} onClick={() => void mandar()} title="Enviar · Enter"><ArrowUp size={15} /></button>
           </div>
         </div>

@@ -88,6 +88,15 @@ export class LacoOpenAI {
     return this.parada !== null;
   }
 
+  get modelo() {
+    return this.o.conexao.modelo;
+  }
+
+  /** O seletor de modelo da conversa: vale a partir da próxima chamada ao provedor. */
+  definirModelo(modelo: string) {
+    this.o.conexao.modelo = modelo;
+  }
+
   parar() {
     this.parada?.abort();
   }

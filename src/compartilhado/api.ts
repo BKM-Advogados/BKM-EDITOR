@@ -108,6 +108,13 @@ export const CANAL = {
   removerFundoPedido: 'estudio:remover-fundo-pedido',
   removerFundoResposta: 'estudio:remover-fundo-resposta',
   iaProvedores: 'estudio:ia-provedores', // frente IA
+  iaGravarChave: 'estudio:ia-gravar-chave',
+  iaApagarChave: 'estudio:ia-apagar-chave',
+  iaModelos: 'estudio:ia-modelos',
+  iaConfigurar: 'estudio:ia-configurar',
+  iaPadrao: 'estudio:ia-padrao',
+  iaUsoDoMes: 'estudio:ia-uso-do-mes',
+  conversaModelo: 'estudio:conversa-modelo',
 } as const;
 
 /** O projeto aberto. `estado` é o último que a pessoa viu (área, documento, seleção), para reabrir onde parou; `git`
@@ -307,6 +314,14 @@ export type ApiEstudio = {
   // frente IA: o catálogo de provedores com o que falta para usar cada um
   ia: {
     provedores: () => Promise<EstadoProvedor[]>;
+    gravarChave: (provedor: string, chave: string) => Promise<ResultadoChave>;
+    apagarChave: (provedor: string) => Promise<void>;
+    modelos: (provedor: string) => Promise<ResultadoModelos>;
+    configurar: (provedor: string, c: {modelo?: string; base?: string}) => Promise<{modelo?: string; base?: string}>;
+    padrao: (provedor: string) => Promise<void>;
+    usoDoMes: () => Promise<UsoDoMes>;
+    /** Seletor de modelo da conversa aberta: vale na próxima mensagem. */
+    modeloDaConversa: (id: number, modelo?: string) => Promise<void>;
   };
 };
 
@@ -336,7 +351,13 @@ export type RespostaFundo = {ok: boolean; png?: string; ms?: number; mensagem?: 
 /** Um provedor do catálogo e o que falta para usar (a chave nunca vem: só a origem e os 4 últimos caracteres). */
 export type EstadoProvedor = {id: string; nome: string; via: 'claude-cli' | 'openai' | 'acp'; servidor: string; experimental?: boolean; modelo?: string;
   base?: string; paginaChave?: string; chave: 'exigida' | 'opcional' | 'nenhuma'; pronto: boolean; falta?: string;
-  chave_origem?: 'cofre' | 'ambiente' | 'nenhuma'; chave_final?: string};
+  chave_origem?: 'cofre' | 'ambiente' | 'nenhuma'; chave_final?: string; chave_variavel?: string; local?: boolean; padrao?: boolean;
+  cofre_persistente?: boolean};
+/** Resultado de gravar uma chave: testada na lista de modelos do provedor (não gasta token). */
+export type ResultadoChave = {ok: boolean; mensagem: string; persistente?: boolean; modelos?: string[]};
+export type ResultadoModelos = {ok: true; modelos: string[]} | {ok: false; status?: number; rede?: boolean; mensagem: string};
+/** Soma do mês por provedor, no PC: tokens e custo estimado pela tabela de preços. */
+export type UsoDoMes = Record<string, {entrada: number; cache: number; saida: number; custo_usd: number; turnos: number}>;
 
 declare global {
   interface Window {

@@ -1,5 +1,5 @@
 // Processo principal do Estúdio: uma janela, o projeto aberto, os terminais, o servidor de mídia e a exportação.
-import {app, BrowserWindow, dialog, ipcMain, net, shell, type IpcMainInvokeEvent} from 'electron';
+import {app, BrowserWindow, dialog, ipcMain, net, safeStorage, shell, type IpcMainInvokeEvent} from 'electron';
 import {execFile} from 'node:child_process';
 import {copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
@@ -468,7 +468,11 @@ registrarPrefsExportacao(lidar, exigirProjeto); // marca d'água por destino, le
 // frente Som (rodada 2): limpeza de voz (limpeza-voz.ts) e medidor de loudness da mistura (loudness.ts)
 registrarIpcLimpeza(lidar, exigirProjeto, enviar);
 registrarIpcLoudness(lidar, exigirProjeto, (documento) => (exigirProjeto(), sessao!.propsVideo(documento, midia.base)));
-registrarIpcIa(lidar, CANAL.iaProvedores, () => claude); // frente IA: lista de provedores
+// frente IA: Configurações › IA (provedores, chaves cifradas pelo safeStorage em userData/ia, modelos, uso do mês)
+registrarIpcIa({lidar, claudeInstalado: () => claude, pasta: path.join(app.getPath('userData'), 'ia'), conversas: () => conversas,
+  cifra: {disponivel: () => safeStorage.isEncryptionAvailable(), cifrar: (t) => safeStorage.encryptString(t), decifrar: (b) => safeStorage.decryptString(b)},
+  canais: {provedores: CANAL.iaProvedores, gravarChave: CANAL.iaGravarChave, apagarChave: CANAL.iaApagarChave, modelos: CANAL.iaModelos,
+    configurar: CANAL.iaConfigurar, padrao: CANAL.iaPadrao, usoDoMes: CANAL.iaUsoDoMes, conversaModelo: CANAL.conversaModelo}});
 
 app.on('ready', async () => {
   await midia.iniciar();

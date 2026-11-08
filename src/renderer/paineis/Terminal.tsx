@@ -2,13 +2,12 @@
 // PowerShell), várias abas em paralelo. "Ver no terminal" hiberna a conversa e abre a mesma sessão no modo texto
 // (claude --resume); ao voltar, a conversa fecha o terminal daquela sessão antes de mandar, para as duas não
 // escreverem juntas no mesmo histórico. Carregado sob demanda.
-import React, {useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore} from 'react';
-import type {EstadoProvedor} from '../../compartilhado/api';
+import React, {useEffect, useLayoutEffect, useRef, useSyncExternalStore} from 'react';
 import {BotaoMenu, type ItemMenu} from '../componentes/Menu';
 import {Moon, Play, Plus, Sparkle, SquareTerminal, Terminal as IconeTerminal, X} from 'lucide-react';
-import {avisar, loja, quandoTrocarProjeto, useLoja} from '../estado/loja';
+import {loja, quandoTrocarProjeto, useLoja} from '../estado/loja';
 import {abrirAba, abrirClaudeNaSessao, ajustar, ativar, fecharAba, fecharClaudeDaSessao, hibernar, retomar, terminais} from './terminais';
-import {ativarConversa, avisarNaConversa, conversarCom, estadoConversas, fecharConversa, focarTerminal, hibernarConversa, novaConversa} from './conversas';
+import {abrirConfigIA, ativarConversa, avisarNaConversa, conversarCom, estadoConversas, fecharConversa, focarTerminal, hibernarConversa, lerProvedores, novaConversa} from './conversas';
 import {Conversa} from './Conversa';
 
 let primeiraVez = true;
@@ -75,18 +74,21 @@ export const Terminal: React.FC = () => {
     if (a) avisarNaConversa(conversa.id, 'Esta conversa continuou no terminal. Ao mandar a próxima mensagem aqui, o terminal dela fecha e a conversa segue deste ponto.');
   };
 
-  // frente IA: o menu "+ Conversa" lista os provedores do catálogo; o que falta (chave, modelo) aparece no rótulo
-  const [provedores, setProvedores] = useState<EstadoProvedor[]>([]);
+  // frente IA: o menu "+ Conversa" lista os provedores do catálogo; o que falta abre Configurações › IA naquele provedor
+  const provedores = useSyncExternalStore(estadoConversas.assinar, estadoConversas.provedores);
   useEffect(() => {
-    void window.estudio.ia?.provedores().then(setProvedores).catch(() => setProvedores([]));
+    void lerProvedores();
   }, [conversas.length]);
-  const itensProvedores: ItemMenu[] = provedores.length
-    ? provedores.map((p) => ({
-        rotulo: `${p.nome}${p.pronto ? '' : ` · falta ${p.falta ?? 'configurar'}`}${p.experimental ? ' · experimental' : ''}`,
-        acao: () => (p.pronto ? void novaConversa(undefined, p.id)
-          : avisar(`${p.nome}: falta ${p.falta ?? 'configurar'}. Configure em Configurações › IA.`, 'erro')),
-      }))
-    : [{rotulo: temClaude ? 'Claude (sua conta)' : 'Claude Code não instalado', acao: () => temClaude && void novaConversa()}];
+  const itensProvedores: ItemMenu[] = [
+    ...(provedores.length
+      ? provedores.map((p) => ({
+          rotulo: `${p.nome}${p.pronto ? '' : ` · falta ${p.falta ?? 'configurar'}`}${p.experimental ? ' · experimental' : ''}${p.padrao ? ' · padrão' : ''}`,
+          acao: () => (p.pronto ? void novaConversa(undefined, p.id) : abrirConfigIA(p.id)),
+        }))
+      : [{rotulo: temClaude ? 'Claude (sua conta)' : 'Claude Code não instalado', acao: () => temClaude && void novaConversa()}]),
+    'sep',
+    {rotulo: 'Provedores e chaves…', acao: () => abrirConfigIA()},
+  ];
   const entrar = () => {
     focarTerminal();
     void abrirAba('claude');

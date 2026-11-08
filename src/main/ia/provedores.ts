@@ -20,6 +20,7 @@ export type Provedor = {
   exe?: string;
   args?: string[];
   experimental?: boolean;
+  local?: boolean; // roda neste PC: sem chave, endereço editável
 };
 
 export const PROVEDORES: Provedor[] = [
@@ -29,15 +30,17 @@ export const PROVEDORES: Provedor[] = [
   {id: 'gemini', nome: 'Gemini (chave)', via: 'openai', base: 'https://generativelanguage.googleapis.com/v1beta/openai', chave: 'exigida',
     modelo: 'gemini-3.6-flash', servidor: 'EUA (Google)', paginaChave: 'https://aistudio.google.com/apikey'},
   {id: 'openai', nome: 'OpenAI', via: 'openai', base: 'https://api.openai.com/v1', chave: 'exigida', servidor: 'EUA', paginaChave: 'https://platform.openai.com/api-keys'},
+  // pela camada compatível com OpenAI da Anthropic ("stable", sem cache de prompt; a doc diz que não é para produção de
+  // longo prazo). Modelos conferidos na lista da doc em 08/11/2026; a chave é testada no /v1/models nativo
   {id: 'anthropic', nome: 'Anthropic (chave)', via: 'openai', base: 'https://api.anthropic.com/v1', chave: 'exigida', servidor: 'EUA',
-    paginaChave: 'https://console.anthropic.com/settings/keys'},
+    modelo: 'claude-sonnet-5-5', paginaChave: 'https://platform.claude.com/settings/keys'},
   {id: 'openrouter', nome: 'OpenRouter', via: 'openai', base: 'https://openrouter.ai/api/v1', chave: 'exigida', servidor: 'EUA (repassa ao provedor do modelo)',
     paginaChave: 'https://openrouter.ai/keys', cabecalhos: {'HTTP-Referer': 'https://estudio.local', 'X-Title': 'Estudio'}},
   {id: 'mistral', nome: 'Mistral', via: 'openai', base: 'https://api.mistral.ai/v1', chave: 'exigida', servidor: 'França (UE)', paginaChave: 'https://console.mistral.ai/api-keys'},
   {id: 'xai', nome: 'xAI (Grok)', via: 'openai', base: 'https://api.x.ai/v1', chave: 'exigida', servidor: 'EUA', paginaChave: 'https://console.x.ai'},
   {id: 'groq', nome: 'Groq', via: 'openai', base: 'https://api.groq.com/openai/v1', chave: 'exigida', servidor: 'EUA', paginaChave: 'https://console.groq.com/keys'},
-  {id: 'ollama', nome: 'Ollama (neste PC)', via: 'openai', base: 'http://127.0.0.1:11434/v1', chave: 'nenhuma', servidor: 'neste PC'},
-  {id: 'lmstudio', nome: 'LM Studio (neste PC)', via: 'openai', base: 'http://127.0.0.1:1234/v1', chave: 'nenhuma', servidor: 'neste PC'},
+  {id: 'ollama', nome: 'Ollama (neste PC)', via: 'openai', base: 'http://127.0.0.1:11434/v1', chave: 'nenhuma', servidor: 'neste PC', local: true},
+  {id: 'lmstudio', nome: 'LM Studio (neste PC)', via: 'openai', base: 'http://127.0.0.1:1234/v1', chave: 'nenhuma', servidor: 'neste PC', local: true},
   {id: 'compativel', nome: 'Outro endereço compatível com OpenAI', via: 'openai', chave: 'opcional', servidor: 'o do endereço'},
   // agentes que a pessoa já tem instalados: aparecem só quando o executável é achado
   {id: 'gemini-cli', nome: 'Gemini CLI', via: 'acp', exe: 'gemini', args: ['--experimental-acp'], chave: 'opcional', servidor: 'EUA (Google)'},

@@ -2,7 +2,7 @@
 // dito continua. Cada conversa é um `claude -p` no processo principal (src/main/conversa.ts); aqui os eventos que
 // chegam viram itens para desenhar: a fala da pessoa, o texto do Claude, as ações como cartões e os pedidos de
 // permissão.
-import type {ContaClaude, EventoConversa} from '../../compartilhado/api';
+import type {ContaClaude, EstadoProvedor, EventoConversa} from '../../compartilhado/api';
 import {avisar, quandoTrocarProjeto} from '../estado/loja';
 
 export type Anexo = {chave: string; tipo: 'selecao' | 'comentario' | 'tempo' | 'projeto'; rotulo: string; contexto: string};
@@ -35,6 +35,9 @@ let conversas: Conversa[] = [];
 let ativa: number | null = null;
 let foco: 'conversa' | 'terminal' = 'conversa';
 let conta: ContaClaude | null = null;
+// frente IA: o catálogo de provedores e o diálogo Configurações › IA (aberto com o provedor em foco, ou fechado)
+let provedores: EstadoProvedor[] = [];
+let configIA: {foco?: string} | null = null;
 let contagem = 0;
 const ouvintes = new Set<() => void>();
 // os objetos das conversas são mutáveis e de identidade estável (as funções abaixo guardam referência a eles); cada
@@ -49,6 +52,8 @@ export const estadoConversas = {
   ativa: () => ativa,
   foco: () => foco,
   conta: () => conta,
+  provedores: () => provedores,
+  configIA: () => configIA,
   assinar(f: () => void) {
     ouvintes.add(f);
     return () => {
@@ -295,4 +300,40 @@ export const preencher = (texto: string) => {
   mudou();
   requestAnimationFrame(() => (document.querySelector('.conversa .caixa-pedido textarea') as HTMLTextAreaElement | null)?.focus());
   return true;
+};
+
+// ---------- frente IA: provedores, Configurações › IA e seletor de modelo ----------
+export const lerProvedores = async () => {
+  try {
+    provedores = (await window.estudio.ia?.provedores()) ?? [];
+  } catch {
+    provedores = [];
+  }
+  mudou();
+  return provedores;
+};
+
+export const abrirConfigIA = (foco?: string) => {
+  configIA = {foco};
+  mudou();
+  void lerProvedores();
+};
+
+export const fecharConfigIA = () => {
+  configIA = null;
+  mudou();
+};
+
+/** O seletor de modelo da conversa: grava no processo principal e vale na próxima mensagem. */
+export const trocarModelo = async (id: number, modelo: string) => {
+  const c = conversas.find((x) => x.id === id);
+  if (!c) return;
+  try {
+    await window.estudio.ia.modeloDaConversa(id, modelo || undefined);
+    c.modelo = modelo || undefined;
+    c.itens.push({tipo: 'aviso', texto: `Modelo trocado para ${modelo || 'o padrão da conta'}: vale a partir da próxima mensagem.`});
+    mudou();
+  } catch (e) {
+    avisar(limpar((e as Error).message), 'erro');
+  }
 };

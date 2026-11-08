@@ -24,6 +24,7 @@ type Conversa = {
   ocioso: NodeJS.Timeout | null;
   pedidos: Map<string, Record<string, unknown>>; // pedidos de permissão esperando a pessoa
   modelo?: string;
+  modeloAtivo?: string; // o --model com que o processo vivo subiu
 };
 
 type Opcoes = {
@@ -56,6 +57,8 @@ export class Conversas {
   enviar(id: number, texto: string, limite: number) {
     const c = this.conversas.get(id);
     if (!c) throw new Error('conversa encerrada');
+    // seletor de modelo (rodada 3): o modelo novo vale na próxima mensagem; o processo volta com --resume e --model
+    if (c.proc && c.modeloAtivo !== c.modelo) this.matar(c);
     if (!c.proc) {
       if (this.vivas() + this.o.vivas() >= limite) throw new Error(`limite de ${limite} sessões do Claude abertas neste PC; hiberne uma para continuar`);
       this.iniciar(c);
@@ -75,6 +78,12 @@ export class Conversas {
       ? {behavior: 'allow', updatedInput: req.input ?? {}, ...(sempre && Array.isArray(req.permission_suggestions) ? {updatedPermissions: req.permission_suggestions} : {})}
       : {behavior: 'deny', message: 'A pessoa negou esta ação no Estúdio.'};
     this.escrever(c, {type: 'control_response', response: {subtype: 'success', request_id: pedido, response: resposta}});
+  }
+
+  /** O seletor de modelo da conversa; vazio volta ao padrão da conta. */
+  definirModelo(id: number, modelo?: string) {
+    const c = this.conversas.get(id);
+    if (c) c.modelo = modelo || undefined;
   }
 
   parar(id: number) {
@@ -115,6 +124,7 @@ export class Conversas {
     const proc = spawn(exe, args, {cwd: c.cwd, windowsHide: true, env: {...ambienteLimpo(), PATH: PATH_COM_LOCAL(), ESTUDIO_PROJETO: c.cwd, ...this.o.ambienteExtra}});
     c.proc = proc;
     c.iniciada = true;
+    c.modeloAtivo = c.modelo;
     readline.createInterface({input: proc.stdout}).on('line', (l) => this.linha(c, l));
     let erro = '';
     proc.stderr.on('data', (d: Buffer) => {
