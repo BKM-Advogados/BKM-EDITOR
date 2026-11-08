@@ -13,7 +13,7 @@ import {FORMATOS_IMAGEM, FORMATOS_VIDEO, formatoDoVideo} from './formatos';
 import {MARCAS_INICIAIS} from './marca';
 import {PastaMarcas} from './pasta-marcas';
 import {ehDocCenas, resolverCenas, type DocCenas} from './cenas';
-import {arquivoDaFala, arquivoDasPalavras, clipesDeVoz, comTexto, deslocamentoDaLegenda, legendasDeArquivo, legendasDeOutraTomada, limitesDoArrasto, textoDeLegenda, recusaDoDestinoNoProjeto, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt, type EstadoDaFala, type IdEstiloLegenda} from './legendas';
+import {arquivoDaFala, arquivoDasPalavras, clipesDeVoz, comTexto, deslocamentoDaLegenda, legendasDeArquivo, legendasDeOutraTomada, limitesDoArrasto, nomeLivreDaLegenda, textoDeLegenda, recusaDoDestinoNoProjeto, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt, type EstadoDaFala, type IdEstiloLegenda} from './legendas';
 import {CATALOGO_FONTES} from './catalogo-fontes';
 import {
   acharTrecho, caminhoTextoFonte, conferirDigitos, decodificarComAviso, entorno, estadoDoFato, hashTexto, limparHtml, nivelDe, numerosDe, paginar, proximoId,
@@ -661,21 +661,24 @@ const registrarFala = (servidor: McpServer, projeto: Projeto, autor: string, ori
   }));
 
   servidor.registerTool('exportar_legendas', {
-    description: 'Grava as legendas do vídeo de cenas em saidas/<nome>.srt e/ou .vtt, nos tempos de saída (já com o clipe de voz no lugar em que está). O VTT leva o falante na marca de voz (<v Nome>).',
+    description: 'Grava as legendas do vídeo de cenas em saidas/<nome>.srt e/ou .vtt, nos tempos de saída (já com o clipe de voz no lugar em que está). O VTT leva o falante na marca de voz (<v Nome>). Não grava por cima: se o nome existe, sai "<nome> (2).srt", a menos que sobrescrever seja true.',
     inputSchema: {
       documento: z.string().optional(),
       formatos: z.array(z.enum(['srt', 'vtt'])).optional().describe('padrão: os dois'),
       nome: z.string().optional().describe('nome do arquivo sem extensão (padrão: o título do vídeo)'),
       falantes_no_srt: z.boolean().optional().describe('"Nome: " antes do texto no SRT'),
+      sobrescrever: z.boolean().optional().describe('true: grava por cima do arquivo de mesmo nome (pergunte à pessoa antes)'),
     },
-  }, seguro(({documento, formatos, nome, falantes_no_srt}: {documento?: string; formatos?: ('srt' | 'vtt')[]; nome?: string; falantes_no_srt?: boolean}) => {
+  }, seguro(({documento, formatos, nome, falantes_no_srt, sobrescrever}: {documento?: string; formatos?: ('srt' | 'vtt')[]; nome?: string; falantes_no_srt?: boolean;
+    sobrescrever?: boolean}) => {
     const {alvo, doc} = docCenasDe(projeto, documento);
     const segs = resolverCenas(doc).props.legendas_cenas?.segmentos ?? [];
     if (!segs.length) throw new ErroProjeto('o vídeo não tem legendas: gere com transcrever ou importe com importar_legendas', 'nao_achado');
     const titulo = nome?.trim() || projeto.manifesto().documentos.find((d) => d.id === alvo)?.titulo || alvo;
     const lista: ('srt' | 'vtt')[] = formatos?.length ? formatos : ['srt', 'vtt'];
     const arquivos = lista.map((ext) => {
-      const rel = `saidas/${nomeDoArquivoDeLegenda(titulo, ext)}`;
+      const base = nomeDoArquivoDeLegenda(titulo, ext);
+      const rel = `saidas/${sobrescrever ? base : nomeLivreDaLegenda(base, (n) => projeto.existe(`saidas/${n}`))}`;
       projeto.gravarTexto(rel, ext === 'srt' ? paraSrt(segs, {falantes: falantes_no_srt}) : paraVtt(segs));
       return rel;
     });

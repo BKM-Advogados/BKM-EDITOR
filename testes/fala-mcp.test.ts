@@ -224,4 +224,15 @@ describe('MCP: transcrever e legendas', () => {
     expect(r.json).toMatchObject({ok: true, legendas: 1, codificacao: 'windows-1252'});
     expect(lerVideo().legendas!.segmentos[0].texto).toBe('rescisão e aviso prévio');
   });
+
+  it('exportar_legendas não grava por cima do SRT que já está em saidas/ (fala-D11)', async () => {
+    const c = await conectar(transcritor);
+    writeFileSync(path.join(pasta, 'saidas', 'Corrigido.srt'), 'corrigido à mão');
+    const r = await chamar(c, 'exportar_legendas', {documento: 'video', nome: 'Corrigido', formatos: ['srt']});
+    expect(r.json.arquivos).toEqual(['saidas/Corrigido (2).srt']);
+    expect(readFileSync(path.join(pasta, 'saidas', 'Corrigido.srt'), 'utf-8')).toBe('corrigido à mão');
+    const r2 = await chamar(c, 'exportar_legendas', {documento: 'video', nome: 'Corrigido', formatos: ['srt'], sobrescrever: true});
+    expect(r2.json.arquivos).toEqual(['saidas/Corrigido.srt']);
+    expect(readFileSync(path.join(pasta, 'saidas', 'Corrigido.srt'), 'utf-8')).toContain('-->');
+  });
 });

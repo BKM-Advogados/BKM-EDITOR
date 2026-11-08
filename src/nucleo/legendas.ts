@@ -900,5 +900,18 @@ export const legendasDeArquivo = (texto: string, nome: string, estilo: EstiloLeg
   return {legendas: {estilo, segmentos: segmentos.map((s, i) => ({id: `leg-${i + 1}`, ...s}))}, avisos};
 };
 
+/** O primeiro nome livre: "Título.srt", senão "Título (2).srt", "Título (3).srt"… (o ".pt_BR" fica junto da extensão).
+ *  Exportar de novo não grava por cima do SRT que a pessoa corrigiu fora do app. (fala-D11) */
+export const nomeLivreDaLegenda = (nome: string, existe: (nome: string) => boolean) => {
+  if (!existe(nome)) return nome;
+  const m = /^(.*?)((?:\.[a-z]{2}_[A-Z]{2})?\.(?:srt|vtt))$/i.exec(nome) ?? /^(.*?)(\.[^.]*)?$/.exec(nome)!;
+  const [base, ext = ''] = [m[1], m[2]];
+  for (let n = 2; n < 1000; n++) {
+    const outro = `${base} (${n})${ext}`;
+    if (!existe(outro)) return outro;
+  }
+  return `${base} (${Date.now()})${ext}`;
+};
+
 /** Nome do arquivo de legenda em saidas/: o título do vídeo sem o que o Windows não aceita. */
 export const nomeDoArquivoDeLegenda = (titulo: string, ext: 'srt' | 'vtt') => `${(titulo.replace(/[<>:"/\\|?*\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim() || 'legendas')}.${ext}`;

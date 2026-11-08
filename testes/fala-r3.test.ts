@@ -6,7 +6,7 @@ import {Legendas} from '../src/composicoes/cenas/Legendas';
 import type {ClipeAudio} from '../src/nucleo/audio';
 import {novoDocCenas, resolverCenas, type DocCenas} from '../src/nucleo/cenas';
 import {
-  comTexto, lerLegendas, legendasDeOutraTomada, legendasDoDocumento, limitesDoArrasto, mesmaTomada, resolverLegendas, textoDeLegenda, type LegendasCenas,
+  comTexto, lerLegendas, nomeLivreDaLegenda, legendasDeOutraTomada, legendasDoDocumento, limitesDoArrasto, mesmaTomada, resolverLegendas, textoDeLegenda, type LegendasCenas,
 } from '../src/nucleo/legendas';
 
 const tela = vi.hoisted(() => ({quadro: 0}));
@@ -128,5 +128,15 @@ describe('a legenda arrastada para fora do clipe não some calada (som-N6)', () 
     expect(limitesDoArrasto(doc, {id: 'x', em: 0, sai: 500, texto: 'à mão'})).toBeNull();
     // o clipe andou 2 s depois de gerar: o limite é o da tela
     expect(limitesDoArrasto(comClipe({em: 3000}, LEG), LEG.segmentos[0])).toEqual({min: -150, max: 11_000 - 1 - 3150});
+  });
+});
+
+describe('SRT da tela não grava por cima (fala-D11)', () => {
+  it('nomeLivreDaLegenda: o primeiro nome livre, com o .pt_BR junto da extensão', () => {
+    const ha = new Set(['Mudar.srt', 'Mudar (2).srt', 'Mudar.pt_BR.srt']);
+    const existe = (n: string) => ha.has(n);
+    expect(nomeLivreDaLegenda('Outro.srt', existe)).toBe('Outro.srt');
+    expect(nomeLivreDaLegenda('Mudar.srt', existe)).toBe('Mudar (3).srt');
+    expect(nomeLivreDaLegenda('Mudar.pt_BR.srt', existe)).toBe('Mudar (2).pt_BR.srt');
   });
 });
