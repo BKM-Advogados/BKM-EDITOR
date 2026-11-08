@@ -108,6 +108,7 @@ const api: ApiEstudio = {
     gravarSaida: (nome, texto) => ipcRenderer.invoke(CANAL.falaGravarSaida, nome, texto),
     escolherLegenda: () => ipcRenderer.invoke(CANAL.falaEscolherLegenda),
     conferir: (arquivos) => ipcRenderer.invoke(CANAL.falaConferir, arquivos),
+    emendar: (p) => ipcRenderer.invoke(CANAL.falaEmendar, p),
   },
   // exportação (frente C)
   prefsExportacao: () => ipcRenderer.invoke(CANAL.prefsExportacao),

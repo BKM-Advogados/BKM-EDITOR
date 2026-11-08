@@ -19,6 +19,7 @@ import {codificarWav, decodificarWav, musicaSintetica, narracaoSintetica, TAXA} 
 import {argumentosDoRender, destinoDoFormato, nomesDosArquivos, normalizarPrefsExportacao, type OpcoesExportarVideo, type PrefsExportacao} from '../../src/nucleo/exportacao';
 import {caminhoSemFundo, MODELO_FUNDO} from '../../src/nucleo/remover-fundo';
 import {textoDeLegenda} from '../../src/nucleo/legendas'; // frente Fala: legenda em ANSI
+import {arquivoCortado, palavrasDepoisDosCortes} from '../../src/nucleo/cortes-fala'; // frente Fala: cortes pela fala
 
 type Proj = {raiz: string; manifesto: Manifesto; docs: Record<string, unknown>; versao: number};
 const projetos = new Map<string, Proj>();
@@ -465,6 +466,15 @@ function falaSimulada(): ApiEstudio['fala'] {
       };
       entrada.click();
     }),
+    // cortes pela fala: a prévia não grava áudio; devolve o nome e as palavras do arquivo emendado, para a tela seguir
+    emendar: async ({fonte, cortes, palavras}) => {
+      const arquivo = arquivoCortado(fonte, cortes);
+      const ficam = palavrasDepoisDosCortes(palavras, cortes);
+      palavrasSimuladas.set(`${arquivo}.palavras.json`, ficam.map((p) => ({...p, p: 1})));
+      const tirado = cortes.reduce((s, c) => s + c.ate_ms - c.de_ms, 0);
+      return {arquivo, palavras: `${arquivo}.palavras.json`, duracao_ms: 12_000 - tirado, antes_ms: 12_000,
+        removidas: palavras.filter((p) => cortes.some((c) => p.s >= c.de_ms && p.e <= c.ate_ms)).map((p) => p.w)};
+    },
     // a transcrição simulada é sempre do áudio como ele está
     conferir: async (arquivos) => Object.fromEntries(arquivos.map((a) => [a, palavrasSimuladas.has(`${a}.palavras.json`) ? 'em_dia' : 'falta'] as const)),
   };

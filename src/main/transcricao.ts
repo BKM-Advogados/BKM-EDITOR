@@ -15,7 +15,7 @@ import {createRequire} from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import {inflateRawSync} from 'node:zlib';
-import {CANAL, type EstadoTranscricao, type PedidoTranscricao, type ProgressoTranscricao, type ResultadoTranscricao} from '../compartilhado/api';
+import {CANAL, type EstadoTranscricao, type PedidoEmenda, type PedidoTranscricao, type ProgressoTranscricao, type ResultadoEmenda, type ResultadoTranscricao} from '../compartilhado/api';
 import {arquivoDasPalavras, conferirFala, fonteDaFala, palavrasValidas, recusaDoDestinoNoProjeto, VERSAO_PALAVRAS, type EstadoDaFala, type FonteDaFala, type PalavrasGravadas} from '../nucleo/legendas';
 import type {Palavra} from '../nucleo/roteiro/resolver';
 import {ErroProjeto, type Projeto} from '../nucleo/projeto';
@@ -478,6 +478,12 @@ export class Transcritor {
   cancelar() {
     this.atual?.controle.abort();
   }
+
+  /** Cortes pela fala: grava a narração emendada e o palavras.json dela (src/main/cortes-fala.ts). */
+  async emendar(projeto: Projeto, pedido: PedidoEmenda): Promise<ResultadoEmenda> {
+    const {emendarArquivo} = await import('./cortes-fala');
+    return emendarArquivo(projeto, pedido);
+  }
 }
 
 // ---------- IPC (registrado no main.ts com uma linha) ----------
@@ -488,6 +494,7 @@ export const registrarIpcTranscricao = (lidar: Lidar, o: {projeto: () => Projeto
   // o andamento de toda transcrição vai à tela, também quando a IA pede pelo MCP
   const transcritor = new Transcritor({...o, aoAndamento: (p) => o.enviar(CANAL.falaProgresso, p)});
   lidar(CANAL.falaEstado, (modelo?: IdModeloWhisper) => transcritor.estado(modelo));
+  lidar(CANAL.falaEmendar, (pedido: PedidoEmenda) => transcritor.emendar(o.projeto(), pedido));
   lidar(CANAL.falaConferir, (arquivos: string[]) => Object.fromEntries((Array.isArray(arquivos) ? arquivos : []).filter((a) => typeof a === 'string').slice(0, 200)
     .map((a) => [a, transcritor.conferir(o.projeto(), a)])));
   lidar(CANAL.falaTranscrever, (pedido: PedidoTranscricao) => transcritor.transcrever(o.projeto(), {...pedido, pela_ia: undefined}));

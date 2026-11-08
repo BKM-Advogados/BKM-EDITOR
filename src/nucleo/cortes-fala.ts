@@ -6,7 +6,8 @@
 // emendado e guarda em `cortes_fala` de onde veio, para voltar; as legendas do clipe andam junto, e a palavra cortada
 // sai delas.
 import type {AudioCenas, ClipeAudio} from './audio';
-import {palavrasDe, type LegendasCenas, type OrigemLegendas, type PalavraLegenda, type SegmentoLegenda} from './legendas';
+import type {OperacaoPatch} from './documentos';
+import {arquivoDaFala, arquivoDasPalavras, palavrasDe, type LegendasCenas, type OrigemLegendas, type PalavraLegenda, type SegmentoLegenda} from './legendas';
 
 export type MotivoCorte = 'silencio' | 'preenchimento' | 'pedido';
 /** Um corte em ms do arquivo de áudio: tira [de_ms, ate_ms). */
@@ -310,3 +311,36 @@ export const acharClipe = (audio: AudioCenas | undefined, id: string) => {
   }
   return null;
 };
+
+// ---------- o patch (a tela e o MCP usam igual) ----------
+
+/** O patch que aplica os cortes já gravados (`r`, do emendarArquivo): o clipe passa a tocar o arquivo emendado e as
+ *  legendas dele andam junto. Vai para o diário: Ctrl+Z e Reverter desfazem. */
+export const patchDosCortes = (doc: {audio?: AudioCenas; legendas?: LegendasCenas}, clipeId: string, cortes: {de_ms: number; ate_ms: number}[],
+  r: {arquivo: string; palavras: string; sha256?: string}): OperacaoPatch[] => {
+  const achado = acharClipe(doc.audio, clipeId);
+  if (!achado) throw new Error(`clipe não achado: ${clipeId}`);
+  const {clipe, caminho} = achado;
+  const novo = clipeDepoisDosCortes(clipe, cortes, r.arquivo);
+  const ops: OperacaoPatch[] = [{op: 'test', path: `${caminho}/id`, value: clipeId}, {op: 'replace', path: caminho, value: novo}];
+  if (doc.legendas) {
+    ops.push({op: 'replace', path: '/legendas', value: legendasDepoisDosCortes(doc.legendas, clipe, cortes, {arquivo: r.arquivo, palavras: r.palavras,
+      corte_ms: Number(novo.corte_ms) || 0, sha256: r.sha256})});
+  }
+  return ops;
+};
+
+/** O patch que volta o clipe ao arquivo de antes dos cortes (e as legendas dele ao tempo de antes); null se o clipe não
+ *  tem cortes. */
+export const patchSemCortes = (doc: {audio?: AudioCenas; legendas?: LegendasCenas}, clipeId: string): OperacaoPatch[] | null => {
+  const achado = acharClipe(doc.audio, clipeId);
+  if (!achado) throw new Error(`clipe não achado: ${clipeId}`);
+  const sem = clipeSemCortes(achado.clipe);
+  if (!sem) return null;
+  const ops: OperacaoPatch[] = [{op: 'test', path: `${achado.caminho}/id`, value: clipeId}, {op: 'replace', path: achado.caminho, value: sem}];
+  if (doc.legendas) ops.push({op: 'replace', path: '/legendas', value: legendasSemCortes(doc.legendas, achado.clipe, sem, arquivoDasPalavras(arquivoDaFala(sem)))});
+  return ops;
+};
+
+/** O que o clipe toca do arquivo (ms do arquivo): para propor os cortes só no trecho que se ouve. */
+export const trechoDoClipe = (c: ClipeAudio) => ({inicio_ms: Number(c.corte_ms) || 0, fim_ms: (Number(c.corte_ms) || 0) + (Number(c.duracao_ms) || 0)});

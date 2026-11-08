@@ -5,6 +5,7 @@
 // fetch do Node no MCP por stdio e nos testes, as duas montadas por criarRede.
 import type {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {readFileSync} from 'node:fs';
+import {registrarCortesFala, type EmendadorMcp} from './mcp-fala'; // frente Fala: cortes pela fala
 import {z} from 'zod';
 import {ErroProjeto, valorEm, type Projeto} from './projeto';
 import type {DocImagem, Modulo, OperacaoPatch} from './documentos';
@@ -243,6 +244,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   }));
 
   registrarFala(servidor, projeto, autor, origem, transcritor); // frente Fala: transcrever e legendas
+  registrarCortesFala(servidor, projeto, autor, origem, transcritor?.emendar && ((p, x) => transcritor.emendar!(p, x))); // frente Fala: cortes pela fala
   registrarAcabamento(servidor, projeto, autor, origem); // acabamento da imagem (rodada 2, B2)
 };
 
@@ -527,6 +529,8 @@ export type TranscritorMcp = {
     andamento?: (p: unknown) => void, sinal?: AbortSignal) => Promise<{ok: boolean; palavras?: string; n?: number; duracao_s?: number; texto?: string; mensagem?: string; cancelado?: boolean}>;
   /** A transcrição do arquivo ainda é do áudio como ele está (o carimbo do palavras.json)? Sem isto, vale a existência. */
   conferir?: (projeto: Projeto, arquivo: string) => EstadoDaFala;
+  /** Cortes pela fala: grava a narração emendada (src/main/cortes-fala.ts). */
+  emendar?: EmendadorMcp;
 };
 
 const LIMITE_TEXTO_TRANSCRITO = 4000;
