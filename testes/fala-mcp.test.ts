@@ -248,6 +248,20 @@ describe('MCP: transcrever e legendas', () => {
     expect(readFileSync(path.join(pasta, 'video', 'video.json'), 'utf-8')).toBe(antes);
   });
 
+  it('exportar_legendas com trecho conta do zero e grava o .pt_BR.srt', async () => {
+    const c = await conectar(transcritor);
+    // o teste anterior deixou uma legenda só, de 1 s a 2 s; o trecho de 5 s a 9 s fica vazio e o de 1,5 s a 9 s a pega pela metade
+    const vazio = await chamar(c, 'exportar_legendas', {documento: 'video', nome: 'Trecho', formatos: ['srt_pt_br'], trecho: {de_ms: 5000, ate_ms: 9000}});
+    expect(vazio.erro).toBe(true);
+    expect(vazio.texto).toContain('nenhuma legenda cai no trecho');
+    const r = await chamar(c, 'exportar_legendas', {documento: 'video', nome: 'Trecho', formatos: ['srt_pt_br'], trecho: {de_ms: 1500, ate_ms: 9000}});
+    expect(r.json.arquivos).toEqual(['saidas/Trecho.pt_BR.srt']);
+    const srt = projeto.lerTexto('saidas/Trecho.pt_BR.srt');
+    // contada do começo do trecho: entra no zero e sai em 0,5 s
+    expect(srt).toContain('00:00:00,000 --> 00:00:00,500');
+    expect(srt).toContain('rescisão e aviso prévio');
+  });
+
   it('o dicionário do vídeo vai ao vocabulário do whisper', async () => {
     const c = await conectar(transcritor);
     const v = projeto.lerJson('video/video.json');

@@ -24,6 +24,7 @@ export type SegmentoLegenda = {
   palavras?: PalavraLegenda[]; // sem elas (SRT importado), o tempo de cada palavra é estimado pelo tamanho
   falante?: string;
   clipe?: string; // id do clipe de voz de onde a fala veio
+  palavras_estimadas?: boolean; // as palavras foram repartidas pelo tamanho (SRT de fora), não vieram da fala
 };
 export type IdEstiloLegenda = 'classica' | 'caixa' | 'karaoke' | 'faixa' | 'discreta';
 export type PosicaoLegenda = 'baixo' | 'meio' | 'cima';
@@ -1130,7 +1131,8 @@ export const lerLegendas = (texto: string, nome = ''): {segmentos: LegendaLida[]
 /** Legendas lidas de um arquivo, prontas para o documento (ids novos, sem palavras: o tempo de cada uma é estimado). */
 export const legendasDeArquivo = (texto: string, nome: string, estilo: EstiloLegenda = ESTILO_PADRAO): {legendas: LegendasCenas; avisos: string[]} => {
   const {segmentos, avisos} = lerLegendas(texto, nome);
-  return {legendas: {estilo, segmentos: segmentos.map((s, i) => ({id: `leg-${i + 1}`, ...s}))}, avisos};
+  // o SRT de fora não traz o tempo de cada palavra: ele é repartido pelo tamanho dentro da legenda e marcado como estimado
+  return {legendas: {estilo, segmentos: segmentos.map((s, i) => ({id: `leg-${i + 1}`, ...s, palavras: estimarPalavras(s.texto, s.em, s.sai), palavras_estimadas: true}))}, avisos};
 };
 
 /** O primeiro nome livre: "Título.srt", senão "Título (2).srt", "Título (3).srt"… (o ".pt_BR" fica junto da extensão).

@@ -6,6 +6,7 @@
 import type {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {readFileSync} from 'node:fs';
 import {registrarCortesFala, type EmendadorMcp} from './mcp-fala'; // frente Fala: cortes pela fala
+import {legendasNoTrecho} from './legendas-exportacao'; // frente Fala
 import {z} from 'zod';
 import {ErroProjeto, valorEm, type Projeto} from './projeto';
 import type {DocImagem, Modulo, OperacaoPatch} from './documentos';
@@ -682,25 +683,29 @@ const registrarFala = (servidor: McpServer, projeto: Projeto, autor: string, ori
   }));
 
   servidor.registerTool('exportar_legendas', {
-    description: 'Grava as legendas do vídeo de cenas em saidas/<nome>.srt e/ou .vtt, nos tempos de saída (já com o clipe de voz no lugar em que está). O VTT leva o falante na marca de voz (<v Nome>). Não grava por cima: se o nome existe, sai "<nome> (2).srt", a menos que sobrescrever seja true.',
+    description: 'Grava as legendas do vídeo de cenas em saidas/<nome>.srt, .vtt e/ou .pt_BR.srt (srt_pt_br: o nome que o Facebook pede), nos tempos de saída (já com o clipe de voz no lugar em que está). Com trecho, só as legendas dele, contadas do zero (para acompanhar o vídeo exportado com o mesmo trecho). O VTT leva o falante na marca de voz (<v Nome>). Não grava por cima: se o nome existe, sai "<nome> (2).srt", a menos que sobrescrever seja true.',
     inputSchema: {
       documento: z.string().optional(),
-      formatos: z.array(z.enum(['srt', 'vtt'])).optional().describe('padrão: os dois'),
+      formatos: z.array(z.enum(['srt', 'vtt', 'srt_pt_br'])).optional().describe('padrão: srt e vtt'),
+      trecho: z.object({de_ms: z.number(), ate_ms: z.number()}).optional().describe('ms do vídeo; as legendas saem contadas do começo do trecho'),
       nome: z.string().optional().describe('nome do arquivo sem extensão (padrão: o título do vídeo)'),
       falantes_no_srt: z.boolean().optional().describe('"Nome: " antes do texto no SRT'),
       sobrescrever: z.boolean().optional().describe('true: grava por cima do arquivo de mesmo nome (pergunte à pessoa antes)'),
     },
-  }, seguro(({documento, formatos, nome, falantes_no_srt, sobrescrever}: {documento?: string; formatos?: ('srt' | 'vtt')[]; nome?: string; falantes_no_srt?: boolean;
-    sobrescrever?: boolean}) => {
+  }, seguro(({documento, formatos, nome, falantes_no_srt, sobrescrever, trecho}: {documento?: string; formatos?: ('srt' | 'vtt' | 'srt_pt_br')[]; nome?: string;
+    falantes_no_srt?: boolean; sobrescrever?: boolean; trecho?: {de_ms: number; ate_ms: number}}) => {
     const {alvo, doc} = docCenasDe(projeto, documento);
-    const segs = resolverCenas(doc).props.legendas_cenas?.segmentos ?? [];
-    if (!segs.length) throw new ErroProjeto('o vídeo não tem legendas: gere com transcrever ou importe com importar_legendas', 'nao_achado');
+    if (trecho && !(trecho.ate_ms > trecho.de_ms && trecho.de_ms >= 0)) throw new ErroProjeto('o trecho vai de de_ms até ate_ms, maior', 'patch');
+    const todas = resolverCenas(doc).props.legendas_cenas?.segmentos ?? [];
+    if (!todas.length) throw new ErroProjeto('o vídeo não tem legendas: gere com transcrever ou importe com importar_legendas', 'nao_achado');
+    const segs = legendasNoTrecho(todas, trecho);
+    if (!segs.length) throw new ErroProjeto(`nenhuma legenda cai no trecho de ${trecho!.de_ms} a ${trecho!.ate_ms} ms`, 'nao_achado');
     const titulo = nome?.trim() || projeto.manifesto().documentos.find((d) => d.id === alvo)?.titulo || alvo;
-    const lista: ('srt' | 'vtt')[] = formatos?.length ? formatos : ['srt', 'vtt'];
-    const arquivos = lista.map((ext) => {
-      const base = nomeDoArquivoDeLegenda(titulo, ext);
+    const lista: ('srt' | 'vtt' | 'srt_pt_br')[] = formatos?.length ? formatos : ['srt', 'vtt'];
+    const arquivos = lista.map((f) => {
+      const base = f === 'srt_pt_br' ? nomeDoArquivoDeLegenda(titulo, 'srt').replace(/\.srt$/, '.pt_BR.srt') : nomeDoArquivoDeLegenda(titulo, f);
       const rel = `saidas/${sobrescrever ? base : nomeLivreDaLegenda(base, (n) => projeto.existe(`saidas/${n}`))}`;
-      projeto.gravarTexto(rel, ext === 'srt' ? paraSrt(segs, {falantes: falantes_no_srt}) : paraVtt(segs));
+      projeto.gravarTexto(rel, f === 'vtt' ? paraVtt(segs) : paraSrt(segs, {falantes: falantes_no_srt}));
       return rel;
     });
     return {ok: true, documento: alvo, legendas: segs.length, arquivos};
