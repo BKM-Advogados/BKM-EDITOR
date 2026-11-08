@@ -440,7 +440,12 @@ export const rodarWhisper = async (o: {cli: string; modelo: ModeloWhisper; arqui
 export const ouvirWav = async (o: {pecas: Pecas; modelo: ModeloWhisper; wav: string; idioma?: string; prompt?: string; sinal?: AbortSignal;
   andamento?: (etapa: 'voz' | 'whisper', pct: number) => void; filho?: (c: ChildProcess) => void}) => {
   o.andamento?.('voz', 0);
-  const voz = o.pecas.vad ? await trechosDeVoz({cli: o.pecas.cli, arquivoModelo: o.pecas.modelo, wav: o.wav, vad: o.pecas.vad, sinal: o.sinal}) : null;
+  // o detector que falha não impede a transcrição: sai sem o filtro (o Cancelar continua parando tudo)
+  const voz = o.pecas.vad ? await trechosDeVoz({cli: o.pecas.cli, arquivoModelo: o.pecas.modelo, wav: o.wav, vad: o.pecas.vad, sinal: o.sinal})
+    .catch((e: unknown) => {
+      if (e instanceof Cancelado || o.sinal?.aborted) throw e;
+      return null;
+    }) : null;
   o.andamento?.('whisper', 0);
   const ouvidas = await rodarWhisper({cli: o.pecas.cli, modelo: o.modelo, arquivoModelo: o.pecas.modelo, wav: o.wav, idioma: o.idioma ?? 'pt', sinal: o.sinal,
     prompt: o.prompt, filho: o.filho, andamento: (pct) => o.andamento?.('whisper', pct)});
