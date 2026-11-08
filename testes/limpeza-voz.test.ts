@@ -233,6 +233,39 @@ describe('versões limpas fora do git (som-D13)', () => {
     expect(existsSync(p.caminho(arquivoLimpo('midia/narracao.wav')))).toBe(true);
   });
 
+  it('som-N1: a faxina poupa a versão que o diário ainda cita, e o Ctrl+Z depois de reabrir acha o arquivo', () => {
+    const p = projetoNovo('Diario');
+    const doc = p.manifesto().documentos.find((d) => d.modulo === 'video')!;
+    const media = arquivoLimpo('midia/narracao.wav');
+    const forte = arquivoLimpo('midia/narracao.wav', 'forte');
+    const orfa = arquivoLimpo('midia/narracao.wav', 'leve'); // limpeza que não chegou ao documento
+    for (const f of ['midia/narracao.wav', media, forte, orfa]) p.gravarTexto(f, 'x');
+    for (const f of [media, forte, orfa]) p.gravarTexto(arquivoDoEnvelope(f), '{}');
+    const pela = (patch: Parameters<Projeto['aplicarPatch']>[0]['patch'], rotulo: string) =>
+      p.aplicarPatch({documento: doc.id, patch, autor: 'pessoa', origem: 'interface', rotulo});
+    // sessão 1: Limpar voz (Média), depois Limpar de novo (Forte)
+    pela([{op: 'add', path: '/audio', value: {faixas: [{id: 'f', nome: 'Narração', papel: 'voz', clipes: [
+      {id: 'a', arquivo: media, original: 'midia/narracao.wav', limpeza: {intensidade: 'media'}, em: 0, duracao_ms: 1000}]}]}}], 'limpar voz');
+    pela([{op: 'replace', path: '/audio/faixas/0/clipes/0/arquivo', value: forte},
+      {op: 'replace', path: '/audio/faixas/0/clipes/0/limpeza', value: {intensidade: 'forte'}}], 'limpar de novo');
+    // sessão 2: a abertura apaga só a órfã; a Média, que o documento não cita mais, fica porque o inverso a cita
+    expect(apagarLimposSemUso(p)).toEqual([orfa]);
+    expect(existsSync(p.caminho(orfa))).toBe(false);
+    expect(existsSync(p.caminho(arquivoDoEnvelope(orfa)))).toBe(false);
+    for (const f of [media, arquivoDoEnvelope(media), forte]) expect(existsSync(p.caminho(f))).toBe(true);
+    // Ctrl+Z como o main.ts faz: a última entrada da pessoa pela interface, com o inverso dela
+    const ultima = p.diario().filter((e) => e.autor === 'pessoa' && e.origem === 'interface').at(-1)!;
+    p.aplicarPatch({documento: ultima.documento, versao_base: ultima.versao_depois, patch: ultima.inverso, autor: 'pessoa', origem: 'desfazer'});
+    const clipe = p.lerJson<{audio: {faixas: {clipes: {arquivo: string}[]}[]}}>(doc.caminho).doc.audio.faixas[0].clipes[0];
+    expect(clipe.arquivo).toBe(media);
+    expect(existsSync(p.caminho(clipe.arquivo))).toBe(true);
+    // diário com uma linha quebrada: na dúvida, não apaga nada
+    p.gravarTexto(orfa, 'x');
+    writeFileSync(p.caminho('.estudio/diario.jsonl'), `${readFileSync(p.caminho('.estudio/diario.jsonl'), 'utf-8')}{"seq": \n`);
+    expect(apagarLimposSemUso(p)).toEqual([]);
+    expect(existsSync(p.caminho(orfa))).toBe(true);
+  });
+
   it.skipIf(!temGit || !existsSync(FFMPEG))('limpar de verdade (ffmpeg do Remotion): .gitignore antes do WAV, que fica fora do git, e envelope carimbado', async () => {
     const p = projetoNovo('Limpar');
     git(p.raiz, 'init', '-q');

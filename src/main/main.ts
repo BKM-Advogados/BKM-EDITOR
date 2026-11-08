@@ -147,7 +147,7 @@ const abrirProjeto = async (raiz: string) => {
   });
   midia.servir(raiz);
   regerarClaudeMd(raiz); // o Claude conhece os campos desta versão também nos projetos criados antes dela
-  apagarLimposSemUso(sessao.projeto); // frente Som: as versões limpas da voz que nenhum documento cita (limpeza-voz.ts)
+  apagarLimposSemUso(sessao.projeto); // frente Som: as versões limpas da voz que nem documento nem diário citam (limpeza-voz.ts)
   await sessao.abrir();
   memoria.lembrar(raiz, manifesto.nome);
   tituloDaJanela(manifesto.nome);

@@ -118,9 +118,12 @@ automático do projeto faz `git add -A`. A primeira limpeza acrescenta ao `.giti
 as linhas `*.limpo.wav`, `*.limpo-leve.wav`, `*.limpo-forte.wav` e o envelope de cada uma (`*.limpo.wav.envelope.json`…),
 com um comentário; vale para projeto novo e antigo, e o `GITIGNORE` de `criar-projeto.ts` não muda. A versão limpa se
 refaz a partir do original ("Limpar de novo", que é determinístico). **Sobras:** na abertura do projeto, a versão limpa
-(nome `<arquivo>.<ext>.limpo[-leve|-forte].wav`) que nenhum documento cita é apagada com o envelope; só na abertura, para
-o desfazer da sessão nunca procurar um arquivo apagado, e só se todos os documentos abrirem. Um documento antigo tirado do
-git que aponte para uma versão apagada faz o render parar com o nome do arquivo; "Limpar de novo" a refaz.
+(nome `<arquivo>.<ext>.limpo[-leve|-forte].wav`) que nem os documentos nem o diário (`.estudio/diario.jsonl`, nos patches
+e nos inversos) citam é apagada com o envelope. O diário conta porque o Ctrl+Z o lê do disco e atravessa sessões: depois
+de reabrir, desfazer "Limpar de novo" volta o clipe para a versão de antes, que tem de estar lá. Na prática, só some a
+versão que nunca chegou a um documento (limpeza cuja troca no clipe falhou); as intensidades testadas ficam no disco,
+fora do git. Só na abertura, nunca no meio da sessão, e só se todos os documentos e o diário abrirem. Um documento antigo
+tirado do git que aponte para uma versão apagada faz o render parar com o nome do arquivo; "Limpar de novo" a refaz.
 
 O ffmpeg do Remotion vem enxuto (só `aformat`, `atrim`, `adelay`, `apad`, `amix`, `aresample`, `loudnorm`, `volume`,
 `silencedetect` e poucos outros de áudio; sem `afftdn`, `highpass`, `lowpass`, `deesser`, `arnndn` nem `ebur128`). Por isso
