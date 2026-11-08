@@ -212,7 +212,7 @@ export const PainelLegendas: React.FC<{documento: string}> = ({documento}) => {
                 <button key={p.id} className={`predef${p.id === estilo.predefinicao ? ' ligado' : ''}`} title={p.descricao}
                   onClick={() => p.id !== estilo.predefinicao && void trocarPredefinicao(documento, {predefinicao: p.id as IdEstiloLegenda,
                     ...(estilo.falante ? {falante: true} : {}), ...(estilo.cor ? {cor: estilo.cor} : {}), ...(estilo.cor_destaque ? {cor_destaque: estilo.cor_destaque} : {}),
-                    ...(estilo.fundo ? {fundo: estilo.fundo} : {})})}>
+                    ...(estilo.fundo ? {fundo: estilo.fundo} : {}), ...(estilo.no_quadrado === false ? {no_quadrado: false} : {})})}>
                   <b>{p.nome}</b>{p.descricao}
                 </button>
               ))}
@@ -224,6 +224,11 @@ export const PainelLegendas: React.FC<{documento: string}> = ({documento}) => {
               aoMudar={(v) => void mudarEstilo(documento, 'tam', v === Math.round(pre.tam * menor) ? undefined : Math.round((v / menor) * 10000) / 10000, 'tamanho das legendas')} />
             <CampoInterruptor rotulo="Maiúsculas" valor={estilo.maiusculas ?? pre.maiusculas}
               aoMudar={(v) => void mudarEstilo(documento, 'maiusculas', v === pre.maiusculas ? undefined : v, v ? 'legendas em maiúsculas' : 'legendas sem maiúsculas')} />
+            {Math.abs(formatoDoVideo(doc).largura / formatoDoVideo(doc).altura - 0.8) < 0.01 && (
+              <CampoInterruptor rotulo="No quadrado" valor={estilo.no_quadrado !== false} texto="dentro do corte 1:1 do 4:5"
+                dica="A prévia quadrada do WhatsApp, do LinkedIn e da grade corta o 4:5 em cima e embaixo: ligado, a legenda fica dentro do quadrado"
+                aoMudar={(v) => void mudarEstilo(documento, 'no_quadrado', v ? undefined : false, v ? 'legendas dentro do quadrado' : 'legendas na altura toda do 4:5')} />
+            )}
             <CampoInterruptor rotulo="Falante" valor={Boolean(estilo.falante)} texto="nome acima do texto"
               aoMudar={(v) => void mudarEstilo(documento, 'falante', v || undefined, v ? 'mostrar o falante' : 'esconder o falante')} />
             <CampoInterruptor rotulo="No vídeo" valor={!leg.oculto} texto="mostrar no vídeo e na exportação"

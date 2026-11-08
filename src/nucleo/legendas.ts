@@ -33,6 +33,7 @@ export type EstiloLegenda = {
   cor_destaque?: string; // palavra falada (padrão: tema.destaque)
   fundo?: string; // caixa e faixa (padrão: tema.fundo)
   fonte?: string; // padrão: tema.fonte
+  no_quadrado?: boolean; // no 4:5, dentro do corte 1:1 da prévia quadrada (padrão: sim; false usa a altura toda) (fala-D8)
 };
 /** De onde as legendas vieram: o clipe, o arquivo de áudio, a transcrição e onde o clipe estava naquela hora. Se o
  *  clipe muda de lugar ou é aparado depois, o resolvedor desloca as legendas dele junto. */
@@ -80,14 +81,25 @@ const MARGEM = 0.05; // área segura de título (SMPTE RP 218), a mesma da sobre
 
 /** A área livre da interface das redes no formato (zonas-seguras.ts): abaixo do que cobre o topo, acima do que cobre a
  *  base e, de cada lado, longe da coluna de botões. As margens dos lados são iguais, para o texto centrado ficar no
- *  centro do quadro. */
-export const areaDaLegenda = (largura: number, altura: number): AreaLegenda => {
+ *  centro do quadro. `no_quadrado` (padrão sim): no 4:5, dentro do corte 1:1 que a prévia quadrada (WhatsApp, LinkedIn,
+ *  a grade antiga) mostra. `legendas_youtube`: no 16:9, acima da faixa das legendas automáticas do YouTube, para quando
+ *  o SRT sobe junto e o espectador liga as legendas (fala-D8). */
+export const areaDaLegenda = (largura: number, altura: number, o: {no_quadrado?: boolean; legendas_youtube?: boolean} = {}): AreaLegenda => {
   let topo = MARGEM;
   let base = 1 - MARGEM;
   let lado = MARGEM;
-  for (const z of conjuntoDe(zonaSugerida(largura, altura))?.zonas ?? []) {
-    if (z.tipo !== 'coberta') continue;
+  const conjunto = conjuntoDe(zonaSugerida(largura, altura));
+  for (const z of conjunto?.zonas ?? []) {
     const inteira = z.largura >= 0.99;
+    if (z.tipo === 'contorno') {
+      // o corte 1:1 do 4:5 é o contorno de largura inteira do conjunto do feed; a faixa das legendas do YouTube é o
+      // contorno que não é miolo
+      if (conjunto?.id === 'feed' && z.miolo && inteira && o.no_quadrado !== false) {
+        topo = Math.max(topo, z.y);
+        base = Math.min(base, z.y + z.altura);
+      } else if (conjunto?.id === 'youtube' && !z.miolo && o.legendas_youtube) base = Math.min(base, z.y);
+      continue;
+    }
     if (inteira && z.y <= 0.01) topo = Math.max(topo, z.altura);
     else if (inteira && z.y + z.altura >= 0.99) base = Math.min(base, z.y);
     else if (z.x >= 0.5) lado = Math.max(lado, 1 - z.x);
@@ -678,7 +690,7 @@ export const substituirEmLote = (segmentos: SegmentoLegenda[], procurar: string,
 
 // ---------- resolver para a composição ----------
 
-export type EstiloLegendaP = Predefinicao & {cor: string; cor_destaque: string; cor_suave: string; fundo: string; fonte: string; falante: boolean};
+export type EstiloLegendaP = Predefinicao & {cor: string; cor_destaque: string; cor_suave: string; fundo: string; fonte: string; falante: boolean; no_quadrado: boolean};
 export type SegmentoLegendaP = {id: string; em: number; sai: number; texto: string; palavras: PalavraLegenda[]; falante?: string; origem: string};
 export type LegendasP = {segmentos: SegmentoLegendaP[]; estilo: EstiloLegendaP; area: AreaLegenda; oculto: boolean};
 
@@ -702,6 +714,7 @@ export const resolverEstilo = (e: EstiloLegenda | undefined, tema: TemaCenas): E
     fundo: e?.fundo || (faixa ? tema.destaque : tema.fundo),
     fonte: e?.fonte || tema.fonte,
     falante: Boolean(e?.falante),
+    no_quadrado: e?.no_quadrado !== false,
   };
 };
 
@@ -870,15 +883,17 @@ export const resolverLegendas = (leg: LegendasCenas | undefined, ctx: {audio?: A
       + `${fora.length === 1 ? 'aparece' : 'aparecem'}: traga de volta para dentro do clipe ou gere de novo`);
   }
   segmentos.sort((a, b) => a.em - b.em);
-  return {segmentos, estilo: resolverEstilo(leg.estilo, ctx.tema), area: areaDaLegenda(ctx.largura, ctx.altura), oculto: Boolean(leg.oculto)};
+  return {segmentos, estilo: resolverEstilo(leg.estilo, ctx.tema), area: areaDaLegenda(ctx.largura, ctx.altura, {no_quadrado: leg.estilo?.no_quadrado}),
+    oculto: Boolean(leg.oculto)};
 };
 
 /** As legendas para outro tamanho de quadro (um destino da exportação, como o Reels de um vídeo 16:9): a área segura do
  *  destino e, onde a legenda não cabe nas linhas do estilo nesse tamanho, ela dividida em pedaços que cabem, pela mesma
  *  regra da quebra e dentro dela. Nada se junta com a vizinha: o que a pessoa dividiu, juntou ou corrigiu fica. Na mesma
  *  proporção do documento (`doc`), só a área é refeita, para o arquivo sair igual à prévia. */
-export const legendasNoDestino = (leg: LegendasP, largura: number, altura: number, doc?: {largura: number; altura: number}): LegendasP => {
-  const area = areaDaLegenda(largura, altura);
+export const legendasNoDestino = (leg: LegendasP, largura: number, altura: number, doc?: {largura: number; altura: number},
+  o: {legendas_youtube?: boolean} = {}): LegendasP => {
+  const area = areaDaLegenda(largura, altura, {no_quadrado: leg.estilo.no_quadrado, legendas_youtube: o.legendas_youtube});
   if (doc && Math.abs(largura / altura - doc.largura / doc.altura) < 0.01) return {...leg, area};
   const e = leg.estilo;
   const cap = capacidadeDaLegenda({predefinicao: e.id, tam: e.tam, maiusculas: e.maiusculas, fonte: e.fonte}, largura, altura, {area});

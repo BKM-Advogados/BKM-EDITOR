@@ -8,8 +8,8 @@ import {Legendas} from '../src/composicoes/cenas/Legendas';
 import type {ClipeAudio} from '../src/nucleo/audio';
 import {novoDocCenas, resolverCenas, type DocCenas} from '../src/nucleo/cenas';
 import {
-  capacidadeDaLegenda, comTexto, CPS_MAX, cpsDe, fracaNoFim, legendasAoDividirClipe, legendasAoDuplicarClipe, legendasDaFala, legendasDeOutraTomada, legendasDoDocumento, lerLegendas,
-  limitesDoArrasto, linhasDaLegenda, MAX_SEGMENTO_MS, mesmaTomada, MIN_SEGMENTO_MS, nomeLivreDaLegenda, PAUSA_QUEBRA_MS, quebrarEmLinhas, quebrarEmSegmentos, resolverLegendas,
+  areaDaLegenda, capacidadeDaLegenda, comTexto, CPS_MAX, cpsDe, fracaNoFim, legendasAoDividirClipe, legendasAoDuplicarClipe, legendasDaFala, legendasDeOutraTomada, legendasDoDocumento, lerLegendas,
+  legendasNoDestino, limitesDoArrasto, linhasDaLegenda, MAX_SEGMENTO_MS, mesmaTomada, MIN_SEGMENTO_MS, nomeLivreDaLegenda, PAUSA_QUEBRA_MS, quebrarEmLinhas, quebrarEmSegmentos, resolverLegendas,
   textoDeLegenda, type LegendasCenas,
 } from '../src/nucleo/legendas';
 import {avancosDaFonte, LETRAS_MEDIDAS, medidorDaFonte} from '../src/nucleo/medida-texto';
@@ -298,5 +298,28 @@ describe('linhas: 42 caracteres, corte equilibrado sem palavra fraca no fim e la
     expect(linhas.join(' ')).toBe(texto);
     for (const l of linhas) expect(l.length).toBeLessThanOrEqual(42);
     expect(fracaNoFim(linhas[0].split(' ').pop()!)).toBe(false);
+  });
+});
+
+describe('legenda no corte 1:1 do 4:5 e acima das legendas do YouTube (fala-D8)', () => {
+  it('4:5: dentro do quadrado por padrão; com no_quadrado false, a altura toda', () => {
+    const a = areaDaLegenda(1080, 1350);
+    expect(a.topo).toBeGreaterThanOrEqual(135 / 1350);
+    expect(a.base).toBeLessThanOrEqual(1 - 135 / 1350);
+    expect(areaDaLegenda(1080, 1350, {no_quadrado: false}).base).toBeCloseTo(0.94);
+    const doc = resolverLegendas({segmentos: [{id: 'leg-1', em: 0, sai: 1000, texto: 'oi'}]}, {largura: 1080, altura: 1350, tema: TEMA, duracao_ms: 1000})!;
+    expect(doc.area).toEqual(a);
+    const toda = resolverLegendas({segmentos: [{id: 'leg-1', em: 0, sai: 1000, texto: 'oi'}], estilo: {predefinicao: 'classica', no_quadrado: false}},
+      {largura: 1080, altura: 1350, tema: TEMA, duracao_ms: 1000})!;
+    expect(toda.area.base).toBeCloseTo(0.94);
+  });
+
+  it('16:9 com o SRT junto: acima da faixa das legendas automáticas; sem, embaixo como antes', () => {
+    expect(areaDaLegenda(1920, 1080).base).toBeCloseTo(0.89);
+    expect(areaDaLegenda(1920, 1080, {legendas_youtube: true}).base).toBeLessThanOrEqual(0.76);
+    const leg = resolverLegendas({segmentos: [{id: 'leg-1', em: 0, sai: 1000, texto: 'oi'}]}, {largura: 1920, altura: 1080, tema: TEMA, duracao_ms: 1000})!;
+    expect(legendasNoDestino(leg, 1920, 1080, {largura: 1920, altura: 1080}, {legendas_youtube: true}).area.base).toBeLessThanOrEqual(0.76);
+    // o 9:16 não muda: a base já fica acima dos 484 px de baixo e dentro do corte 3:4
+    expect(areaDaLegenda(1080, 1920)).toEqual(areaDaLegenda(1080, 1920, {no_quadrado: false, legendas_youtube: true}));
   });
 });

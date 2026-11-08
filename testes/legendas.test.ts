@@ -252,9 +252,10 @@ describe('área segura e largura', () => {
     expect(a.dir).toBe(a.esq);
   });
 
-  it('16:9 sai dos controles do YouTube; 4:5 fica na área de título de 90%', () => {
+  it('16:9 sai dos controles do YouTube; 4:5 fica no corte 1:1 (ou na área de título de 90%, fora do quadrado)', () => {
     expect(areaDaLegenda(1920, 1080)).toEqual({topo: 0.11, base: 0.89, esq: 0.05, dir: 0.05});
-    expect(areaDaLegenda(1080, 1350)).toEqual({topo: 0.060000000000000005, base: 0.94, esq: 0.05, dir: 0.05});
+    expect(areaDaLegenda(1080, 1350)).toEqual({topo: 0.11, base: 0.89, esq: 0.05, dir: 0.05});
+    expect(areaDaLegenda(1080, 1350, {no_quadrado: false})).toEqual({topo: 0.060000000000000005, base: 0.94, esq: 0.05, dir: 0.05});
   });
 
   it('caracteres por linha crescem no 16:9 até o teto de 42 e caem na letra grande', () => {
