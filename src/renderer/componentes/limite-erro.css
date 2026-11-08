@@ -1,0 +1,7 @@
+/* Limite de erro por painel (componentes/LimiteDeErro.tsx): o motivo, a dica e as ações, no lugar do painel que falhou */
+.limite-erro { display: flex; flex-direction: column; gap: var(--esp-2); padding: var(--esp-3); margin: var(--esp-2); border: 1px solid var(--erro); border-radius: var(--raio);
+  background: var(--fundo-3); font-size: var(--tam-2); color: var(--texto-2); }
+.limite-erro-titulo { display: flex; align-items: center; gap: 6px; color: var(--erro); font-weight: var(--peso-forte); }
+.limite-erro-motivo { color: var(--texto); font-family: var(--fonte-mono, monospace); word-break: break-word; }
+.limite-erro-dica { color: var(--texto-3); line-height: 1.45; }
+.limite-erro-acoes { display: flex; gap: var(--esp-2); }
