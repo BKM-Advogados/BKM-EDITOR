@@ -183,3 +183,58 @@ medir: o modelo em `testes/saida/modelos/modnet/model.onnx` e `npx tsx scripts/c
 - Canvas da prévia até 4096 px por lado: num zoom muito alto, a camada com acabamento perde nitidez antes do resto.
 - Fundo em degradê só no documento inteiro (todas as páginas).
 - Na área Efeitos, a pilha de efeitos vale por cima do acabamento, como de qualquer camada.
+
+## Seleção múltipla, alinhar e distribuir (rodada 3)
+
+Versão de 08/11/2026, frente B2 da rodada 3. Código: `src/nucleo/layout-imagem.ts` (contas, puro),
+`src/renderer/estado/loja.ts` (a seleção), `MonitorImagem.tsx` (os gestos), `BarraSelecao.tsx` (alinhar e distribuir),
+`CamadasImagem.tsx` (a lista) e `src/nucleo/mcp-imagem.ts` (ferramentas). Testes em `testes/layout-imagem.test.ts`.
+
+**A seleção na loja (contrato para as outras frentes).** `selecao` continua `{documento, caminho}`: quem lê uma seleção
+só lê `caminho`, que é a camada principal (a última escolhida). A seleção múltipla soma `outros?: string[]`, os demais
+caminhos do mesmo documento. Para ler todas: `caminhosDaSelecao(selecao, documento?)` (o principal primeiro). Para
+escrever: `selecionar(...)` como sempre (solta as outras), `selecionarVarias(documento, caminhos)` (o principal é o
+último) e `alternarNaSelecao(documento, caminho)` (Shift+clique). O `.estudio/estado.json` ganhou `selecao_varias`
+(todos os caminhos, só quando há mais de um), que o `estado_do_editor` do MCP devolve.
+
+**Gestos no monitor (V, mover).** Apertar numa camada já a escolhe e arrastar a move, mesmo sem estar selecionada
+(imagem-D2, o gesto do Canva). Apertar dentro da seleção arrasta todas juntas (um patch só; a foto recortada vai com a
+máscara). Shift+clique põe ou tira da seleção. Arrastar no vazio desenha o laço: entram as camadas tocadas por ele
+(sem as ocultas e sem a foto recortada, que aparece pela máscara); com Shift, somam à seleção. Ctrl+A escolhe todas as
+camadas visíveis da página; Esc solta. Clique sem arrasto dentro da seleção escolhe a camada de cima naquele ponto. Na
+lista de camadas, Shift ou Ctrl+clique põe ou tira; as selecionadas ficam acesas e os botões de subir, descer e excluir
+ficam na principal.
+
+**Alinhar e distribuir.** Com seleção, a barra aparece em cima do monitor: seis alinhamentos (esquerda, centro e direita
+na horizontal; topo, meio e base na vertical) e dois distribuir (horizontal e vertical, com três ou mais). Com uma
+camada, o alvo é a prancheta; com várias, a caixa delas. Passar o mouse num botão mostra o alvo (tracejado do acento) e
+onde cada camada vai cair (caixas fantasmas), antes do clique; o clique é um patch só, desfazível. As contas usam a
+caixa da camada girada (a que contém os quatro cantos), sem sombra nem contorno. Distribuir deixa a primeira e a última
+no lugar e o mesmo espaço entre as caixas.
+
+**Redimensionar camada girada (imagem-D15).** A alça fica no canto de baixo à direita; numa camada girada, o canto de
+cima à esquerda agora fica parado na página enquanto o tamanho muda (`redimensionarGirada`). Antes, o centro ficava e o
+canto escorregava.
+
+**Ferramentas do MCP** (`src/nucleo/mcp-imagem.ts`, chamada por uma linha no fim de `registrarFerramentas`):
+
+| Ferramenta | Entrada | O que faz | Classe |
+|---|---|---|---|
+| `selecionar_camadas` | `documento`, `camadas` (ids ou caminhos; vazia limpa) | Grava `.estudio/selecao.json`; a tela lê, traz a área, o documento e a página para a frente e seleciona. Não muda o documento. | livre |
+| `alinhar_camadas` | `documento`, `camadas`, `como` (esquerda, centro, direita, topo, meio, base), `alvo?` (selecao, prancheta) | Um patch com test dos ids, no diário. | livre |
+| `distribuir_camadas` | `documento`, `camadas` (3 ou mais), `eixo` (horizontal, vertical) | Um patch com test dos ids, no diário. | livre |
+
+As camadas vêm por id (único no documento: página duplicada repete ids, e aí a ferramenta recusa e lista os caminhos)
+ou por caminho, todas da mesma página. Esquemas só com texto, listas e enumerações, sem união solta: valem para qualquer
+provedor.
+
+**Ida e volta entre módulos.** A seleção mora na loja, comum a todas as áreas: ao ir para Efeitos e voltar, ou ao
+chegar pela conversa, ela continua. `selecionar_camadas` traz a área Imagem, o documento e a página para a frente
+vindo de qualquer área.
+
+### Para o guia da IA
+
+- A imagem tem seleção múltipla: `estado_do_editor` traz `selecao` (a principal) e, com mais de uma, `selecao_varias`.
+- Para mostrar à pessoa do que você fala: `selecionar_camadas` com ids ou caminhos.
+- Para alinhar ou distribuir, prefira `alinhar_camadas` e `distribuir_camadas` a calcular x e y à mão: elas usam a
+  caixa da camada girada e levam a foto recortada com a máscara.
