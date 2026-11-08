@@ -1,14 +1,15 @@
 // Aplica a pilha de efeitos a um conteúdo: filtro CSS no conteúdo e camadas (vinheta, granulado, tom) por cima.
 // Serve à composição do Remotion e à prévia da imagem; `quadro` dá a semente do granulado.
 import React from 'react';
-import {efeitosValidos, filtroCss, type Efeito} from '../../nucleo/efeitos';
+import {efeitosValidos, filtroCss, GRANULADO, sementeDoGranulado, type Efeito} from '../../nucleo/efeitos';
 
 const Granulado: React.FC<{forca: number; quadro: number}> = ({forca, quadro}) => {
-  const id = `grao-${quadro % 997}`;
+  const semente = sementeDoGranulado(quadro);
+  const id = `grao-${semente}`;
   return (
     <svg width="100%" height="100%" style={{position: 'absolute', inset: 0, opacity: forca, mixBlendMode: 'overlay', pointerEvents: 'none'}}>
       <filter id={id}>
-        <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves={2} seed={quadro % 997} stitchTiles="stitch" />
+        <feTurbulence type="fractalNoise" baseFrequency={GRANULADO.frequencia} numOctaves={GRANULADO.oitavas} seed={semente} stitchTiles="stitch" />
         <feColorMatrix type="saturate" values="0" />
       </filter>
       <rect width="100%" height="100%" filter={`url(#${id})`} />

@@ -114,3 +114,21 @@ export const novoEfeito = (tipo: TipoEfeito, existentes: {id: string}[] = []): E
   while (existentes.some((e) => e.id === `${tipo}-${n}`)) n++;
   return {id: `${tipo}-${n}`, tipo, valor: definicao(tipo).padrao, ...(tipo === 'tom' ? {cor: '#C88155'} : {})};
 };
+
+// ---------- granulado (tres-efeitos-D6) ----------
+// O granulado tem um só gerador, o feTurbulence do SVG, e a prévia, o render do vídeo e o PNG o usam com os mesmos números. Antes o PNG
+// preenchia um ruído por pixel (mais fino e mais regular que o da tela, e ainda mais fino na escala 2); agora ele desenha o mesmo SVG
+// na resolução do arquivo, com o grão em unidades do documento: exportar em escala 2 dobra o grão junto com a imagem.
+
+/** Frequência e oitavas do ruído do granulado, as mesmas na prévia (CamadaEfeitos) e no PNG (exportarPng). */
+export const GRANULADO = {frequencia: 0.9, oitavas: 2};
+
+/** Semente do ruído em cada quadro do vídeo; a imagem usa a do quadro 0. */
+export const sementeDoGranulado = (quadro: number) => Math.abs(Math.round(quadro)) % 997;
+
+/** O SVG do granulado: o ruído cinza em torno do meio, meio transparente, que se mistura por cima com `overlay`. `largura` e `altura`
+ *  são as do documento (onde vale a frequência do ruído); `pxLargura` e `pxAltura`, as do arquivo (o ruído acompanha a escala). */
+export const svgDoGranulado = (largura: number, altura: number, pxLargura: number, pxAltura: number, semente: number) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" width="${pxLargura}" height="${pxAltura}" viewBox="0 0 ${largura} ${altura}">` +
+  `<filter id="grao"><feTurbulence type="fractalNoise" baseFrequency="${GRANULADO.frequencia}" numOctaves="${GRANULADO.oitavas}" seed="${semente}" stitchTiles="stitch"/>` +
+  `<feColorMatrix type="saturate" values="0"/></filter><rect width="${largura}" height="${altura}" filter="url(#grao)"/></svg>`;
