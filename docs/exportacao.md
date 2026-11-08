@@ -126,3 +126,30 @@ Conferido: `testes/numero.test.ts`, `testes/corte-limpo.test.ts`, `testes/carros
 `testes/zonas-seguras.test.ts`; e um render fora do Electron comparando, quadro a quadro, o vídeo dividido com o inteiro
 (diferença 0 em nove instantes; sem as marcas, média acima de 8) e duas cenas claras sobre tema escuro com Brilho 0,5
 (128 em todos os quadros do corte).
+
+### Rodada 3: diálogo de exportar e marca d'água (fechamento)
+
+- **Tamanho personalizado** (video-D5): o campo guarda o que se digita (só dígitos, até 4) e só passa o número ao destino de 16 a
+  7680; fora disso o campo fica marcado e o Exportar espera; ao sair do campo, prende à faixa. Digitar 1920 não passa por 16 e 7680.
+- **Trecho** (video-D11): as pontas a menos de 50 ms do começo e do fim encostam neles (47,4 s num vídeo de 47,383 s é o vídeo
+  inteiro). **Props tardias** (video-D18): se o vídeo termina de montar depois de o diálogo abrir, ele assume o formato, o destino e
+  a duração do vídeo, se a pessoa ainda não mexeu em nada.
+- **Prévia por destino** (video-D4): linha "Prévia" com uma miniatura por destino marcado, no tamanho dele. Os blocos que a composição
+  desenhou e se sobrepõem naquele quadro (a medida é a do DOM, no quadro em que a cabeça parou) ficam destacados e listados antes do
+  render; bloco ainda invisível no quadro não conta.
+- **Contraste de 3:1 da marca d'água**: o botão **Conferir** (linha "Contraste") renderiza três quadros do destino (25%, 50% e 75% do
+  trecho), sem a marca e com ela, e mede na caixa dela o fundo (média do quadro sem a marca) e a cor da marca na tela (os pixels que
+  mudaram, já com a opacidade). O pior quadro manda; o mínimo é 3:1 (WCAG para gráficos e texto grande). Abaixo disso, o diálogo
+  avisa e oferece **Usar placa escura/clara**, a que mais contrasta com a marca: a placa é a caixa da marca (grafite `#171A19` ou osso
+  `#F4F0EA`), com respiro de um quarto da altura, e continua fora das zonas da rede e da legenda; com ela aplicada, o diálogo mede de
+  novo (a medida passa a ser da marca contra a placa). A escolha vai em `.estudio/exportacao.json` (`"placa": "escura"`).
+  Código: `src/nucleo/contraste.ts` (a conta), `src/main/contraste-marca.ts` (o render e a leitura dos pixels, canal
+  `medirContrasteMarca`), `scripts/medir-contraste-teste.mjs` (o mesmo caminho fora do Electron).
+- **Largura da assinatura medida** (não estimada): o diálogo mede o texto na fonte do kit (canvas) e passa `proporcao_texto`
+  (largura ÷ altura da caixa); sem ela, vale a estimativa antiga de 0,6 da letra por caractere. Na prévia web e no vídeo, a caixa tem
+  a largura exata do texto.
+
+Conferido: `testes/dialogo-exportar.test.ts`, `testes/contraste.test.ts`, `testes/marca-contraste.test.ts`; na prévia web (digitar 1920,
+Trecho num vídeo de 47,383 s, miniaturas por formato com a sobreposição destacada, o fluxo Conferir → Usar placa); e, fora do
+Electron, a medida num render de verdade (logo claro em fundo claro quase invisível; com placa escura 8,4:1; assinatura branca em
+fundo claro 1,4:1). Na prévia web o "Conferir" devolve uma medida de exemplo (não há render lá).
