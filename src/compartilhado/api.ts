@@ -279,7 +279,7 @@ export type ApiEstudio = {
     /** Grava texto em saidas/<nome> (SRT, VTT); devolve o caminho absoluto. */
     gravarSaida: (nome: string, texto: string) => Promise<string>;
     /** Diálogo para escolher um .srt ou .vtt; devolve nome e texto (null se cancelou). */
-    escolherLegenda: () => Promise<{nome: string; texto: string} | null>;
+    escolherLegenda: () => Promise<{nome: string; texto: string; codificacao?: string} | null>;
     /** Por arquivo de áudio: 'em_dia' (a transcrição é do áudio como ele está), 'velha' (a tomada mudou) ou 'falta'. */
     conferir: (arquivos: string[]) => Promise<Record<string, EstadoDaFala>>;
   };

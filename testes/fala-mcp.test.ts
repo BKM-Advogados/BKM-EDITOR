@@ -213,4 +213,13 @@ describe('MCP: transcrever e legendas', () => {
     expect(depois.origens).toBeUndefined();
     expect(depois.estilo?.predefinicao).toBe('classica');
   });
+
+  it('importar_legendas lê o SRT em ANSI (Windows-1252) com os acentos certos (video-N6)', async () => {
+    const c = await conectar(transcritor);
+    const srt = ['1', '00:00:01,000 --> 00:00:02,000', 'rescisão e aviso prévio', ''].join(String.fromCharCode(13, 10));
+    writeFileSync(path.join(pasta, 'midia', 'ansi.srt'), Buffer.from(srt, 'latin1'));
+    const r = await chamar(c, 'importar_legendas', {documento: 'video', arquivo: 'midia/ansi.srt'});
+    expect(r.json).toMatchObject({ok: true, legendas: 1, codificacao: 'windows-1252'});
+    expect(lerVideo().legendas!.segmentos[0].texto).toBe('rescisão e aviso prévio');
+  });
 });

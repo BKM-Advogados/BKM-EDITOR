@@ -269,7 +269,8 @@ export const importarArquivo = async (documento: string) => {
     if (!legendas.segmentos.length) return avisar(`Nenhuma legenda lida de ${a.nome}${avisos.length ? `: ${avisos[0]}` : ''}.`, 'erro');
     const {origens: _o, ...antes} = d?.legendas ?? {segmentos: []};
     if (await gravarLegendas(documento, {...antes, ...legendas}, `legendas importadas de ${a.nome}`)) {
-      avisar(`${legendas.segmentos.length} legendas de ${a.nome}${avisos.length ? ` (${avisos.length} ${avisos.length === 1 ? 'trecho ignorado' : 'trechos ignorados'})` : ''}. Ctrl+Z desfaz.`, 'ok');
+      const ansi = a.codificacao === 'windows-1252' ? ' (lido como Windows-1252, o "ANSI": confira os acentos)' : '';
+      avisar(`${legendas.segmentos.length} legendas de ${a.nome}${ansi}${avisos.length ? ` (${avisos.length} ${avisos.length === 1 ? 'trecho ignorado' : 'trechos ignorados'})` : ''}. Ctrl+Z desfaz.`, 'ok');
     }
   } catch (e) {
     avisar(mensagemDe(e), 'erro');

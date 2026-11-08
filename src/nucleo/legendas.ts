@@ -784,6 +784,21 @@ const limparTexto = (t: string) => t
 export type LegendaLida = {em: number; sai: number; texto: string; falante?: string};
 
 /** Lê SRT ou WebVTT (pelo nome do arquivo ou pelo "WEBVTT" do começo). Bloco que não se entende vira aviso. */
+export type CodificacaoLegenda = 'utf-8' | 'utf-16le' | 'utf-16be' | 'windows-1252';
+
+/** O texto de um arquivo de legenda pelos bytes: UTF-8 (com ou sem BOM) quando os bytes são UTF-8 válido, UTF-16 com
+ *  BOM, e senão Windows-1252, o "ANSI" do Bloco de Notas antigo e do Subtitle Edit, para "rescisão" não virar
+ *  "rescis�o". (video-N6) */
+export const textoDeLegenda = (bytes: Uint8Array): {texto: string; codificacao: CodificacaoLegenda} => {
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) return {texto: new TextDecoder('utf-16le').decode(bytes.subarray(2)), codificacao: 'utf-16le'};
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) return {texto: new TextDecoder('utf-16be').decode(bytes.subarray(2)), codificacao: 'utf-16be'};
+  try {
+    return {texto: new TextDecoder('utf-8', {fatal: true}).decode(bytes), codificacao: 'utf-8'};
+  } catch {
+    return {texto: new TextDecoder('windows-1252').decode(bytes), codificacao: 'windows-1252'};
+  }
+};
+
 export const lerLegendas = (texto: string, nome = ''): {segmentos: LegendaLida[]; avisos: string[]; formato: 'srt' | 'vtt'} => {
   const limpo = texto.replace(/^﻿/, '').replace(/\r\n?/g, '\n');
   const formato: 'srt' | 'vtt' = /\.vtt$/i.test(nome) || /^WEBVTT/.test(limpo) ? 'vtt' : 'srt';

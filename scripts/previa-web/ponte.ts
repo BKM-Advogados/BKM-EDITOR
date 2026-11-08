@@ -18,6 +18,7 @@ import {MODELOS} from '../../src/nucleo/modelos';
 import {codificarWav, decodificarWav, musicaSintetica, narracaoSintetica, TAXA} from '../audio-sintetico';
 import {argumentosDoRender, destinoDoFormato, nomesDosArquivos, normalizarPrefsExportacao, type OpcoesExportarVideo, type PrefsExportacao} from '../../src/nucleo/exportacao';
 import {caminhoSemFundo, MODELO_FUNDO} from '../../src/nucleo/remover-fundo';
+import {textoDeLegenda} from '../../src/nucleo/legendas'; // frente Fala: legenda em ANSI
 
 type Proj = {raiz: string; manifesto: Manifesto; docs: Record<string, unknown>; versao: number};
 const projetos = new Map<string, Proj>();
@@ -460,7 +461,7 @@ function falaSimulada(): ApiEstudio['fala'] {
       entrada.onchange = () => {
         const f = entrada.files?.[0];
         if (!f) return ok(null);
-        void f.text().then((texto) => ok({nome: f.name, texto}));
+        void f.arrayBuffer().then((b) => ok({nome: f.name, ...textoDeLegenda(new Uint8Array(b))}));
       };
       entrada.click();
     }),

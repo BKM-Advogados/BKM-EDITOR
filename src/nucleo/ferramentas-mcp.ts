@@ -4,6 +4,7 @@
 // fonte é apagado. A rede do ler_fonte vem de quem registra: net.fetch do Electron no app (src/main/mcp-http.ts),
 // fetch do Node no MCP por stdio e nos testes, as duas montadas por criarRede.
 import type {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
+import {readFileSync} from 'node:fs';
 import {z} from 'zod';
 import {ErroProjeto, valorEm, type Projeto} from './projeto';
 import type {DocImagem, Modulo, OperacaoPatch} from './documentos';
@@ -12,7 +13,7 @@ import {FORMATOS_IMAGEM, FORMATOS_VIDEO, formatoDoVideo} from './formatos';
 import {MARCAS_INICIAIS} from './marca';
 import {PastaMarcas} from './pasta-marcas';
 import {ehDocCenas, resolverCenas, type DocCenas} from './cenas';
-import {arquivoDaFala, arquivoDasPalavras, clipesDeVoz, comTexto, deslocamentoDaLegenda, legendasDeArquivo, recusaDoDestinoNoProjeto, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt, type EstadoDaFala, type IdEstiloLegenda} from './legendas';
+import {arquivoDaFala, arquivoDasPalavras, clipesDeVoz, comTexto, deslocamentoDaLegenda, legendasDeArquivo, textoDeLegenda, recusaDoDestinoNoProjeto, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt, type EstadoDaFala, type IdEstiloLegenda} from './legendas';
 import {CATALOGO_FONTES} from './catalogo-fontes';
 import {
   acharTrecho, caminhoTextoFonte, conferirDigitos, decodificarComAviso, entorno, estadoDoFato, hashTexto, limparHtml, nivelDe, numerosDe, paginar, proximoId,
@@ -683,12 +684,15 @@ const registrarFala = (servidor: McpServer, projeto: Projeto, autor: string, ori
   }, seguro(({arquivo, documento, estilo}: {arquivo: string; documento?: string; estilo?: IdEstiloLegenda}) => {
     if (!projeto.existe(arquivo)) throw new ErroProjeto(`o arquivo não está no projeto: ${arquivo}`, 'nao_achado');
     const {alvo, rel, doc, versao} = docCenasDe(projeto, documento);
-    const {legendas, avisos} = legendasDeArquivo(projeto.lerTexto(arquivo), arquivo, estilo ? {...(doc.legendas?.estilo ?? {}), predefinicao: estilo} : doc.legendas?.estilo);
+    // pelos bytes: o SRT em ANSI (Windows-1252) chega com os acentos certos (video-N6)
+    const {texto, codificacao} = textoDeLegenda(readFileSync(projeto.caminho(arquivo)));
+    const {legendas, avisos} = legendasDeArquivo(texto, arquivo, estilo ? {...(doc.legendas?.estilo ?? {}), predefinicao: estilo} : doc.legendas?.estilo);
     if (!legendas.segmentos.length) throw new ErroProjeto(`nenhuma legenda lida de ${arquivo}: ${avisos.join('; ')}`, 'patch');
     const {origens: _o, ...antes} = doc.legendas ?? {segmentos: []};
     const gravado = projeto.aplicarPatch({documento: rel, versao_base: versao, patch: [{op: 'add', path: '/legendas', value: {...antes, ...legendas}}],
       autor, origem, rotulo: `legendas importadas de ${arquivo.split('/').pop()}`});
-    return {ok: true, documento: alvo, versao: gravado.versao, legendas: legendas.segmentos.length, ...(avisos.length ? {avisos} : {})};
+    return {ok: true, documento: alvo, versao: gravado.versao, legendas: legendas.segmentos.length, ...(codificacao !== 'utf-8' ? {codificacao} : {}),
+      ...(avisos.length ? {avisos} : {})};
   }));
 };
 

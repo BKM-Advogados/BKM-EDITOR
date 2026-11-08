@@ -5,6 +5,7 @@ import {dialog, ipcMain, type BrowserWindow, type IpcMainEvent} from 'electron';
 import {readFileSync, statSync} from 'node:fs';
 import path from 'node:path';
 import {CANAL} from '../compartilhado/api';
+import {textoDeLegenda} from '../nucleo/legendas';
 import {ErroProjeto, type Projeto} from '../nucleo/projeto';
 import {definirTranscritorMcp} from './mcp-http';
 import {registrarIpcTranscricao, type Buscar} from './transcricao';
@@ -36,7 +37,9 @@ export const registrarIpcFala = (o: {lidar: Lidar; confiavel: (e: IpcMainEvent) 
     const arquivo = r.filePaths[0];
     if (r.canceled || !arquivo) return null;
     if (statSync(arquivo).size > LIMITE_LEGENDA) throw new ErroProjeto('o arquivo de legenda passa de 5 MB', 'caminho');
-    return {nome: path.basename(arquivo), texto: readFileSync(arquivo, 'utf-8')};
+    // pelos bytes: o SRT em ANSI (Windows-1252) chega com os acentos certos
+    const {texto, codificacao} = textoDeLegenda(readFileSync(arquivo));
+    return {nome: path.basename(arquivo), texto, codificacao};
   });
   definirTranscritorMcp(transcritor);
   return transcritor;
