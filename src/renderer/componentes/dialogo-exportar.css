@@ -60,3 +60,10 @@
 .miniatura-exp { position: relative; flex: none; border-radius: 4px; overflow: hidden; background: var(--fundo-1); box-shadow: 0 0 0 1px var(--borda); }
 .miniatura-exp .zonas-seguras .zona.coberta { background: rgba(255, 77, 77, 0.16); border: none; }
 .miniatura-exp .zonas-seguras .zona.contorno { border-width: 1px; border-color: rgba(112, 184, 255, 0.55); }
+
+/* prévia por destino: uma miniatura de cada destino marcado, com os blocos que se sobrepõem no quadro destacados (video-D4) */
+.previa-destinos { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; }
+.previa-destino { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; max-width: 160px; }
+.previa-destino .nota { color: var(--texto-3); font-size: 11px; }
+.previa-destino .erro-exp { font-size: 11px; line-height: 1.35; }
+.miniatura-exp .sobre { position: absolute; border: 1.5px solid var(--erro); background: rgba(255, 77, 77, 0.22); pointer-events: none; }

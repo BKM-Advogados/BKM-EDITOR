@@ -108,6 +108,51 @@ export type ArgumentosRender = {
 export const trechoValido = (t: Trecho | null | undefined, duracaoMs: number) =>
   Boolean(t && Number.isFinite(t.de_ms) && Number.isFinite(t.ate_ms) && t.de_ms >= 0 && t.ate_ms <= duracaoMs && t.ate_ms - t.de_ms >= 100);
 
+/** Trecho com as pontas encostadas: o "de" a menos de 50 ms do começo vira 0 e o "até" a menos de 50 ms do fim vira a duração
+ *  (o campo mostra um décimo de segundo, e 47,383 s aparece como 47,4: sem isto o Trecho nascia inválido, video-D11). */
+export const encostarTrecho = (t: Trecho, duracaoMs: number): Trecho => ({
+  de_ms: t.de_ms <= 50 && t.de_ms >= 0 ? 0 : t.de_ms,
+  ate_ms: Math.abs(t.ate_ms - duracaoMs) <= 50 ? duracaoMs : t.ate_ms,
+});
+
+// ---------- tamanho personalizado (video-D5) ----------
+export const LIMITE_PERSONALIZADO = {min: 16, max: 7680};
+
+/** O que a pessoa digitou numa medida do Personalizado: só dígitos, até 4; `valor` é o número se já está na faixa e null
+ *  enquanto ainda digita ("1" a caminho de 1920). A tela guarda o texto e só prende na faixa ao sair do campo. */
+export const lerMedidaPersonalizada = (texto: string): {texto: string; valor: number | null} => {
+  const t = texto.replace(/\D/g, '').replace(/^0+(?=\d)/, '').slice(0, 4);
+  const n = Number(t);
+  return {texto: t, valor: t !== '' && n >= LIMITE_PERSONALIZADO.min && n <= LIMITE_PERSONALIZADO.max ? n : null};
+};
+
+/** Ao sair do campo: o número preso à faixa; vazio ou zero volta ao valor de antes. */
+export const fecharMedidaPersonalizada = (texto: string, anterior: number): number => {
+  const n = Number(texto.replace(/\D/g, ''));
+  return n > 0 ? Math.min(LIMITE_PERSONALIZADO.max, Math.max(LIMITE_PERSONALIZADO.min, n)) : anterior;
+};
+
+// ---------- sobreposição de blocos num destino (video-D4) ----------
+export type CaixaMedida = {id: string; x: number; y: number; largura: number; altura: number}; // qualquer unidade, a mesma nas quatro
+
+/** Os pares de caixas que se sobrepõem mais que `minimo` (fração da menor das duas; padrão 8%): blocos medidos no quadro do
+ *  destino pelo diálogo. Encostar não conta. */
+export const sobreposicoes = (caixas: CaixaMedida[], minimo = 0.08): [string, string][] => {
+  const pares: [string, string][] = [];
+  for (let i = 0; i < caixas.length; i++) {
+    for (let j = i + 1; j < caixas.length; j++) {
+      const a = caixas[i];
+      const b = caixas[j];
+      const w = Math.min(a.x + a.largura, b.x + b.largura) - Math.max(a.x, b.x);
+      const h = Math.min(a.y + a.altura, b.y + b.altura) - Math.max(a.y, b.y);
+      if (w <= 0 || h <= 0) continue;
+      const menor = Math.min(a.largura * a.altura, b.largura * b.altura);
+      if (menor > 0 && (w * h) / menor > minimo) pares.push([a.id, b.id]);
+    }
+  }
+  return pares;
+};
+
 /** O que o renderMedia recebe para um destino. O trecho vira quadros: do quadro em que começa ao último antes do fim. */
 export const argumentosDoRender = (o: OpcoesExportarVideo, destino: Destino, formato: Formato, duracaoMs: number): ArgumentosRender => {
   const codec = CODECS.find((c) => c.id === o.codec) ?? CODECS[0];

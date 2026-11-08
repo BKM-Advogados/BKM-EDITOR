@@ -14,7 +14,7 @@ import type {DocImagem} from '../../nucleo/documentos';
 import {paginasDe, temPaginas} from '../../nucleo/carrossel';
 import {
   CANTOS_MARCA, CODECS, configPadraoMarca, destinoDoFormato, ESCALAS_IMAGEM, ESCALAS_VIDEO, estimarExportacao, fontesDaMarcaDagua, formatarBytes, FORMATOS_IMAGEM_SAIDA,
-  legendasDasProps, legendasNoDestino, marcaDaguaDoDestino, nomesDosArquivos, normalizarConfigMarca, OPACIDADE_MARCA, QUALIDADES, TAMANHO_MARCA, trechoValido,
+  encostarTrecho, fecharMedidaPersonalizada, legendasDasProps, legendasNoDestino, lerMedidaPersonalizada, marcaDaguaDoDestino, nomesDosArquivos, sobreposicoes, normalizarConfigMarca, OPACIDADE_MARCA, QUALIDADES, TAMANHO_MARCA, trechoValido,
   type CodecVideo, type ConfigMarcaDagua, type Destino, type FontesMarcaDagua, type FormatoImagem, type MarcaDaguaP, type OpcoesExportarVideo, type QualidadeVideo,
 } from '../../nucleo/exportacao';
 import {FORMATO_PADRAO, FORMATOS_VIDEO, proporcaoDe, type Formato} from '../../nucleo/formatos';
@@ -131,8 +131,12 @@ const urlDaMidia = (base: unknown, src: string) =>
 /** Um quadro do vídeo no tamanho do destino, com a marca d'água e as zonas da rede apagadas por cima: a composição de
  *  verdade (Thumbnail do Remotion), como a exportação vai desenhar. A legenda vai na área do destino, a mesma de que a
  *  marca se afasta. */
+type Sobreposto = {a: string; b: string; caixa: {x: number; y: number; largura: number; altura: number}[]};
+
 const Miniatura: React.FC<{props: Record<string, unknown>; largura: number; altura: number; fixo: boolean; fps: number; duracaoMs: number; marca: MarcaDaguaP | null;
-  legendas: LegendasP | null}> = ({props, largura, altura, fixo, fps, duracaoMs, marca, legendas}) => {
+  legendas: LegendasP | null; aoSobrepor?: (pares: string[]) => void}> = ({props, largura, altura, fixo, fps, duracaoMs, marca, legendas, aoSobrepor}) => {
+    const raiz = React.useRef<HTMLDivElement>(null);
+    const [sobre, setSobre] = useState<Sobreposto[]>([]);
     const tempo = useLoja((e) => e.tempo_ms);
     const total = Math.max(1, Math.ceil((duracaoMs / 1000) * fps));
     // o quadro em que a cabeça parou; no começo do vídeo, 1,5 s adiante (o primeiro bloco ainda está entrando)
@@ -141,16 +145,78 @@ const Miniatura: React.FC<{props: Record<string, unknown>; largura: number; altu
       [props, fixo, largura, altura, legendas, marca]);
     const escala = Math.min(150 / largura, 150 / altura);
     const zonas = conjuntoDe(zonasDaMarca(largura, altura))?.zonas ?? [];
+    // video-D4: mede os blocos que a composição desenhou neste quadro, no tamanho do destino, e marca os que se sobrepõem.
+    // Bloco ainda invisível (opacidade ~0: entra depois ou já saiu) não conta; a medida é a do DOM de verdade.
+    useEffect(() => {
+      const el = raiz.current;
+      if (!el) return;
+      let anim = 0;
+      let ultimo = '';
+      const medir = () => {
+        const R = el.getBoundingClientRect();
+        if (!R.width || !R.height) return;
+        const caixas = [...el.querySelectorAll<HTMLElement>('[data-bloco-id]')].filter((b) => Number(getComputedStyle(b).opacity) > 0.05).map((b) => {
+          const r = b.getBoundingClientRect();
+          const rot = (b.innerText ?? '').replace(/\s+/g, ' ').trim().slice(0, 22) || b.dataset.blocoId || '?';
+          return {id: rot, x: (r.left - R.left) / R.width, y: (r.top - R.top) / R.height, largura: r.width / R.width, altura: r.height / R.height};
+        });
+        const pares: Sobreposto[] = sobreposicoes(caixas).map(([a, b]) => ({a, b, caixa: caixas.filter((c) => c.id === a || c.id === b)}));
+        const chave = JSON.stringify(pares.map((p) => [p.a, p.b, p.caixa.map((c) => [c.x.toFixed(3), c.y.toFixed(3), c.largura.toFixed(3), c.altura.toFixed(3)])]));
+        if (chave === ultimo) return;
+        ultimo = chave;
+        setSobre(pares);
+        aoSobrepor?.(pares.map((p) => `"${p.a}" e "${p.b}"`));
+      };
+      const agendar = () => {
+        cancelAnimationFrame(anim);
+        anim = requestAnimationFrame(medir);
+      };
+      const mo = new MutationObserver(agendar);
+      mo.observe(el, {subtree: true, childList: true, attributes: true, attributeFilter: ['style']});
+      agendar();
+      const t = window.setTimeout(agendar, 700); // a fonte do tema pode chegar depois do primeiro desenho
+      return () => {
+        mo.disconnect();
+        cancelAnimationFrame(anim);
+        window.clearTimeout(t);
+      };
+    }, [quadro, largura, altura, entrada]); // eslint-disable-line react-hooks/exhaustive-deps
     return (
-      <div className="miniatura-exp" style={{width: Math.round(largura * escala), height: Math.round(altura * escala)}} title={`${largura}×${altura} · quadro em ${numeroBr(quadro / fps, 1)} s`}>
+      <div ref={raiz} className="miniatura-exp" style={{width: Math.round(largura * escala), height: Math.round(altura * escala)}} title={`${largura}×${altura} · quadro em ${numeroBr(quadro / fps, 1)} s${sobre.length ? ' · blocos sobrepostos' : ''}`}>
         <Thumbnail component={COMPOSICOES[composicaoDe(props)]} inputProps={entrada} compositionWidth={largura} compositionHeight={altura} durationInFrames={total} fps={fps}
           frameToDisplay={quadro} style={{width: '100%', height: '100%'}} />
         <div className="zonas-seguras" aria-hidden="true">
           {zonas.map((z, i) => <div key={i} className={`zona ${z.tipo}`} style={{left: `${z.x * 100}%`, top: `${z.y * 100}%`, width: `${z.largura * 100}%`, height: `${z.altura * 100}%`}} />)}
         </div>
+        {sobre.flatMap((p, i) => p.caixa.map((c, k) => (
+          <div key={`${i}-${k}`} className="sobre" data-sobreposicao style={{left: `${c.x * 100}%`, top: `${c.y * 100}%`, width: `${c.largura * 100}%`, height: `${c.altura * 100}%`}} />
+        )))}
       </div>
     );
   };
+
+/** Uma miniatura por destino marcado, no tamanho dele, com o aviso dos blocos que se sobrepõem nesse quadro: o layout feito num
+ *  formato pode não caber em outro, e o diálogo avisa antes do render (video-D4). */
+const PreviaDosDestinos: React.FC<{destinos: Destino[]; props: Record<string, unknown>; medidaDe: (d: Destino) => {largura: number; altura: number}; fixo: boolean; fps: number;
+  duracaoMs: number; marcaDe: (d: Destino) => MarcaDaguaP | null; legendasDe: (d: Destino) => LegendasP | null}> = ({destinos, props, medidaDe, fixo, fps, duracaoMs, marcaDe, legendasDe}) => {
+  const [avisos, setAvisos] = useState<Record<string, string[]>>({});
+  return (
+    <div className="previa-destinos">
+      {destinos.map((d) => {
+        const m = medidaDe(d);
+        const lista = avisos[d.id] ?? [];
+        return (
+          <div key={d.id} className="previa-destino">
+            <Miniatura props={props} {...m} fixo={fixo} fps={fps} duracaoMs={duracaoMs} marca={marcaDe(d)} legendas={legendasDe(d)}
+              aoSobrepor={(pares) => setAvisos((a) => (JSON.stringify(a[d.id] ?? []) === JSON.stringify(pares) ? a : {...a, [d.id]: pares}))} />
+            <div className="nota">{d.id === 'personalizado' ? `${m.largura}×${m.altura}` : proporcaoDe(m.largura, m.altura)}</div>
+            {lista.length > 0 && <div className="erro-exp" data-aviso-sobreposicao title={lista.join('; ')}>Sobrepõe: {lista.slice(0, 2).join('; ')}{lista.length > 2 ? '…' : ''}</div>}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 /** A marca d'água do destino em edição: ligar, logo ou assinatura, canto, tamanho e opacidade, com a miniatura ao lado.
  *  Com vários destinos marcados, os botões de cima escolhem qual se edita (cada um guarda a sua escolha). */
@@ -218,12 +284,26 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
 
   const [destinos, setDestinos] = useState<Destino[]>([doDocumento]);
   const [personalizado, setPersonalizado] = useState({largura: formato.largura, altura: formato.altura});
+  const [textoPers, setTextoPers] = useState({largura: String(formato.largura), altura: String(formato.altura)}); // o que está nos campos (video-D5)
+  const mexeu = React.useRef(false); // a pessoa já mexeu nos destinos: as props que chegam depois não os trocam (video-D18)
   const [codec, setCodec] = useState<CodecVideo>('h264');
   const [qualidade, setQualidade] = useState<QualidadeVideo>('alta');
   const [escala, setEscala] = useState(1);
   const [trechoLigado, setTrechoLigado] = useState(false);
   const [de, setDe] = useState('0');
   const [ate, setAte] = useState(numeroBr(duracaoMs / 1000, 1));
+  // as props do vídeo podem chegar depois de o diálogo abrir (video-D18): até lá o formato é o padrão e a duração é 0. Quando
+  // chegam, o diálogo assume o formato e a duração do vídeo, se a pessoa ainda não mexeu em nada
+  const prontas = Boolean(props);
+  useEffect(() => {
+    if (!prontas || mexeu.current) return;
+    const d = destinoDoFormato(formato);
+    setDestinos([d]);
+    setEditando(d.id);
+    setPersonalizado({largura: formato.largura, altura: formato.altura});
+    setTextoPers({largura: String(formato.largura), altura: String(formato.altura)});
+    setAte(numeroBr(duracaoMs / 1000, 1));
+  }, [prontas]); // eslint-disable-line react-hooks/exhaustive-deps
   const [nome, setNome] = useState(titulo);
   const [fase, setFase] = useState<FaseVideo>({tipo: 'opcoes'});
   // marca d'água: a escolha de cada destino (a guardada no projeto por baixo do que se mexeu aqui) e o destino em edição
@@ -248,14 +328,31 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
   }, [fase.tipo]);
 
   const marcado = (id: string) => destinos.some((d) => d.id === id);
-  const alternar = (d: Destino) => setDestinos((ds) => (ds.some((x) => x.id === d.id) ? ds.filter((x) => x.id !== d.id) : [...ds, d]));
-  const mudarPersonalizado = (campo: 'largura' | 'altura', v: string) => {
-    const n = Math.max(16, Math.min(7680, Math.round(Number(v) || 0)));
-    const novo = {...personalizado, [campo]: n};
+  const alternar = (d: Destino) => {
+    mexeu.current = true;
+    setDestinos((ds) => (ds.some((x) => x.id === d.id) ? ds.filter((x) => x.id !== d.id) : [...ds, d]));
+  };
+  const aplicarPersonalizado = (novo: {largura: number; altura: number}) => {
     setPersonalizado(novo);
     setDestinos((ds) => ds.map((d) => (d.id === 'personalizado' ? {id: 'personalizado', ...novo} : d)));
   };
-  const trecho = trechoLigado ? {de_ms: Math.round(lerSegundos(de) * 1000), ate_ms: Math.round(lerSegundos(ate) * 1000)} : null;
+  // o campo guarda o que a pessoa digita (só dígitos): "1" a caminho de 1920 não vira 16. O destino só muda quando o número
+  // está na faixa (16 a 7680); fora dela o campo fica marcado e o Exportar espera; ao sair do campo, prende à faixa
+  const mudarPersonalizado = (campo: 'largura' | 'altura', v: string) => {
+    mexeu.current = true;
+    const l = lerMedidaPersonalizada(v);
+    setTextoPers((t) => ({...t, [campo]: l.texto}));
+    if (l.valor !== null) aplicarPersonalizado({...personalizado, [campo]: l.valor});
+  };
+  const sairPersonalizado = (campo: 'largura' | 'altura') => {
+    const n = fecharMedidaPersonalizada(textoPers[campo], personalizado[campo]);
+    setTextoPers((t) => ({...t, [campo]: String(n)}));
+    if (n !== personalizado[campo]) aplicarPersonalizado({...personalizado, [campo]: n});
+  };
+  const persValido = (campo: 'largura' | 'altura') => lerMedidaPersonalizada(textoPers[campo]).valor !== null;
+  const persOk = !marcado('personalizado') || (persValido('largura') && persValido('altura'));
+  // o campo mostra um décimo de segundo (47,383 s aparece como 47,4): as pontas a menos de 50 ms encostam no começo e no fim (video-D11)
+  const trecho = trechoLigado ? encostarTrecho({de_ms: Math.round(lerSegundos(de) * 1000), ate_ms: Math.round(lerSegundos(ate) * 1000)}, duracaoMs) : null;
   const trechoOk = !trechoLigado || trechoValido(trecho, duracaoMs);
   const configMarca = (d: Destino) => normalizarConfigMarca(marcas[d.id], configPadraoMarca(d, fontesMarca));
   const mudarMarca = (d: Destino, m: Partial<ConfigMarcaDagua>) => setMarcas((ms) => ({...ms, [d.id]: {...configMarca(d), ...m}}));
@@ -276,10 +373,12 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
     const e = estimativa.porDestino.find((x) => x.destino.id === id);
     return e ? `~${formatarBytes(e.bytes)}` : '';
   };
-  const podeExportar = Boolean(props) && destinos.length > 0 && trechoOk;
+  const podeExportar = Boolean(props) && destinos.length > 0 && trechoOk && persOk;
 
   const exportar = async () => {
-    if (!podeExportar) return avisar(!destinos.length ? 'Marque pelo menos um destino.' : 'O trecho precisa ficar dentro do vídeo e ter pelo menos 0,1 s.', 'info');
+    if (!podeExportar) {
+      return avisar(!destinos.length ? 'Marque pelo menos um destino.' : !persOk ? `O tamanho personalizado vai de ${16} a ${7680} px.` : 'O trecho precisa ficar dentro do vídeo e ter pelo menos 0,1 s.', 'info');
+    }
     setFase({tipo: 'exportando', a: {mensagem: 'Começando…'}});
     // a escolha da marca d'água fica no projeto para a próxima vez (sem ela, a exportação segue igual)
     if (Object.keys(marcas).length) window.estudio.gravarPrefsExportacao({marca_dagua: marcas}).catch(() => undefined);
@@ -324,8 +423,10 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
             <input type="checkbox" checked={marcado('personalizado')} disabled={fixo} onChange={() => alternar({id: 'personalizado', ...personalizado})} />
             <span>Personalizado{doDocumento.id === 'personalizado' ? <span className="medida"> · o formato deste vídeo</span> : null}</span>
             <span className="pers" onClick={(e) => e.preventDefault()}>
-              <input className="campo" type="text" inputMode="numeric" value={personalizado.largura} disabled={fixo} aria-label="Largura" onChange={(e) => mudarPersonalizado('largura', e.target.value)} />×
-              <input className="campo" type="text" inputMode="numeric" value={personalizado.altura} disabled={fixo} aria-label="Altura" onChange={(e) => mudarPersonalizado('altura', e.target.value)} />
+              <input className={`campo${persValido('largura') ? '' : ' invalido'}`} type="text" inputMode="numeric" value={textoPers.largura} disabled={fixo} aria-label="Largura"
+                title="de 16 a 7680 px" onChange={(e) => mudarPersonalizado('largura', e.target.value)} onBlur={() => sairPersonalizado('largura')} />×
+              <input className={`campo${persValido('altura') ? '' : ' invalido'}`} type="text" inputMode="numeric" value={textoPers.altura} disabled={fixo} aria-label="Altura"
+                title="de 16 a 7680 px" onChange={(e) => mudarPersonalizado('altura', e.target.value)} onBlur={() => sairPersonalizado('altura')} />
             </span>
             <span className="tam">{marcado('personalizado') ? tamanhoDe('personalizado') : ''}</span>
           </label>
@@ -340,6 +441,11 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
                 legendas={legendasDe(emEdicao)} />} />
           )}
       </Linha>
+      {props && destinos.length > 0 && (
+        <Linha rotulo="Prévia">
+          <PreviaDosDestinos destinos={destinos} props={props} medidaDe={medidaDe} fixo={fixo} fps={formato.fps} duracaoMs={duracaoMs} marcaDe={marcaDe} legendasDe={legendasDe} />
+        </Linha>
+      )}
       <Linha rotulo="Formato">
         <select className="campo" value={codec} onChange={(e) => setCodec(e.target.value as CodecVideo)}>
           {CODECS.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
