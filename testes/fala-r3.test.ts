@@ -10,9 +10,10 @@ import {novoDocCenas, resolverCenas, type DocCenas} from '../src/nucleo/cenas';
 import {
   aplicarDicionario, areaDaLegenda, capacidadeDaLegenda, DICIONARIO_CASA, termosDoDicionario, comTexto, CPS_MAX, cpsDe, fracaNoFim, legendasAoDividirClipe, legendasAoDuplicarClipe, legendasDaFala, legendasDeOutraTomada, legendasDoDocumento, lerLegendas,
   legendasNoDestino, limitesDoArrasto, linhasDaLegenda, MAX_SEGMENTO_MS, mesmaTomada, MIN_SEGMENTO_MS, nomeLivreDaLegenda, PAUSA_QUEBRA_MS, quebrarEmLinhas, quebrarEmSegmentos, resolverLegendas,
-  palavrasDe, palavrasDuvidosas, passoDeQuadro, palavrasValidas, realinharPalavras, substituirEmLote, textoDeLegenda, type LegendasCenas,
+  palavrasDe, palavrasDuvidosas, passoDeQuadro, palavrasValidas, realinharPalavras, substituirEmLote, legendasDeArquivo, paraSrt, textoDeLegenda, type LegendasCenas,
 } from '../src/nucleo/legendas';
 import {avancosDaFonte, LETRAS_MEDIDAS, medidorDaFonte} from '../src/nucleo/medida-texto';
+import {arquivosDeLegendaDoVideo, legendasNoTrecho, planoDasLegendas} from '../src/nucleo/legendas-exportacao';
 
 const tela = vi.hoisted(() => ({quadro: 0}));
 vi.mock('remotion', async (original) => ({
@@ -430,5 +431,37 @@ describe('início e fim pelo teclado, um quadro por vez', () => {
     expect(passoDeQuadro(1010, 30, -1)).toBe(-10);
     expect(passoDeQuadro(0, 30, -1)).toBe(0);
     expect(passoDeQuadro(1000, 25, 1)).toBe(40);
+  });
+});
+
+describe('legendas na exportação: queimar, só o SRT ou os dois, por destino', () => {
+  it('o plano de cada destino; no 16:9 com o SRT junto, a legenda sobe acima das do YouTube', () => {
+    expect(planoDasLegendas(undefined, {largura: 1080, altura: 1920})).toEqual({queimar: true, srt: false, legendas_youtube: false});
+    expect(planoDasLegendas('srt', {largura: 1920, altura: 1080})).toEqual({queimar: false, srt: true, legendas_youtube: false});
+    expect(planoDasLegendas('ambos', {largura: 1920, altura: 1080})).toEqual({queimar: true, srt: true, legendas_youtube: true});
+    expect(planoDasLegendas('ambos', {largura: 1080, altura: 1920}).legendas_youtube).toBe(false);
+  });
+
+  it('com trecho, as legendas saem contadas do zero e cortadas nas pontas', () => {
+    const segs = [{em: 0, sai: 1000, texto: 'a'}, {em: 1500, sai: 3000, texto: 'b'}, {em: 4000, sai: 5000, texto: 'c'}];
+    expect(legendasNoTrecho(segs, {de_ms: 2000, ate_ms: 4500})).toEqual([{em: 0, sai: 1000, texto: 'b'}, {em: 2000, sai: 2500, texto: 'c'}]);
+    expect(legendasNoTrecho(segs, null)).toBe(segs);
+  });
+
+  it('o SRT ao lado do vídeo tem o nome dele, o .pt_BR.srt do Facebook, e não grava por cima', () => {
+    const segs = [{em: 0, sai: 1000, texto: 'Recebeu proposta'}];
+    const ha = new Set(['Mudar - 9x16.srt']);
+    const r = arquivosDeLegendaDoVideo('Mudar - 9x16', segs, null, (n) => ha.has(n));
+    expect(r.map((a) => a.nome)).toEqual(['Mudar - 9x16 (2).srt', 'Mudar - 9x16.pt_BR.srt']);
+    expect(r[0].texto).toBe(paraSrt(segs));
+    expect(arquivosDeLegendaDoVideo('x', segs, {de_ms: 5000, ate_ms: 6000}, () => false)).toEqual([]);
+  });
+
+  it('o SRT de fora guarda as palavras repartidas pelo tamanho, marcadas como estimadas', () => {
+    const {legendas} = legendasDeArquivo('1\n00:00:01,000 --> 00:00:02,000\nRecebeu proposta\n', 'x.srt');
+    expect(legendas.segmentos[0]).toMatchObject({palavras_estimadas: true});
+    expect(legendas.segmentos[0].palavras!.map((p) => p.w)).toEqual(['Recebeu', 'proposta']);
+    expect(legendas.segmentos[0].palavras![0].s).toBe(1000);
+    expect(legendas.segmentos[0].palavras![1].e).toBe(2000);
   });
 });

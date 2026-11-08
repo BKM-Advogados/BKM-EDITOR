@@ -60,3 +60,6 @@
 .miniatura-exp { position: relative; flex: none; border-radius: 4px; overflow: hidden; background: var(--fundo-1); box-shadow: 0 0 0 1px var(--borda); }
 .miniatura-exp .zonas-seguras .zona.coberta { background: rgba(255, 77, 77, 0.16); border: none; }
 .miniatura-exp .zonas-seguras .zona.contorno { border-width: 1px; border-color: rgba(112, 184, 255, 0.55); }
+/* frente Fala: a escolha das legendas por destino */
+.legendas-exp { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.legendas-exp label { display: inline-flex; gap: 6px; align-items: center; }
