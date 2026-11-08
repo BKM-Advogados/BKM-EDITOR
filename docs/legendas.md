@@ -71,7 +71,7 @@ baixa junto com o modelo. Quem já tem o whisper baixa o detector na próxima tr
 
 Palavra a palavra, o filtro tirava fala de verdade no conjunto da casa. Tirou "Amigo, você perdeu seu" do começo do
 vídeo do WhatsApp: com música por baixo, o detector só achou voz em 2,9 s, e o whisper deixou 410 ms entre "seu" e
-"emprego". Também tirou um "O" do C7. Pela frase, tira 0 das 1.673 palavras do conjunto. O que o whisper inventa no
+"emprego". Também tirou um "O" do C7. Pela frase, tira 0 das 1.678 palavras do conjunto. O que o whisper inventa no
 silêncio fica isolado, segundos longe da fala.
 
 Sem voz nenhuma, sai lista vazia. Se o registro do `whisper-cli` não disser os trechos (outra versão), nada é filtrado.
