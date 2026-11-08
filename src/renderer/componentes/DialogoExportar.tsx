@@ -14,10 +14,11 @@ import type {DocImagem} from '../../nucleo/documentos';
 import {paginasDe, temPaginas} from '../../nucleo/carrossel';
 import {
   CANTOS_MARCA, CODECS, configPadraoMarca, destinoDoFormato, ESCALAS_IMAGEM, ESCALAS_VIDEO, estimarExportacao, fontesDaMarcaDagua, formatarBytes, FORMATOS_IMAGEM_SAIDA,
-  marcaDaguaDoDestino, nomesDosArquivos, normalizarConfigMarca, OPACIDADE_MARCA, QUALIDADES, TAMANHO_MARCA, trechoValido,
+  legendasDasProps, legendasNoDestino, marcaDaguaDoDestino, nomesDosArquivos, normalizarConfigMarca, OPACIDADE_MARCA, QUALIDADES, TAMANHO_MARCA, trechoValido,
   type CodecVideo, type ConfigMarcaDagua, type Destino, type FontesMarcaDagua, type FormatoImagem, type MarcaDaguaP, type OpcoesExportarVideo, type QualidadeVideo,
 } from '../../nucleo/exportacao';
 import {FORMATO_PADRAO, FORMATOS_VIDEO, proporcaoDe, type Formato} from '../../nucleo/formatos';
+import type {LegendasP} from '../../nucleo/legendas';
 import {conjuntoDe, zonasDaMarca, type CantoMarca} from '../../nucleo/zonas-seguras';
 import {avisar, useLoja} from '../estado/loja';
 import {exportarPng, type SaidaPng} from '../modulos/imagem/exportarPng';
@@ -128,14 +129,16 @@ const urlDaMidia = (base: unknown, src: string) =>
   /^[a-z][a-z0-9+.-]*:/i.test(src) ? src : `${String(base ?? '').replace(/\/+$/, '')}/${src.split('/').map(encodeURIComponent).join('/')}`;
 
 /** Um quadro do vídeo no tamanho do destino, com a marca d'água e as zonas da rede apagadas por cima: a composição de
- *  verdade (Thumbnail do Remotion), como a exportação vai desenhar. */
-const Miniatura: React.FC<{props: Record<string, unknown>; largura: number; altura: number; fixo: boolean; fps: number; duracaoMs: number; marca: MarcaDaguaP | null}> =
-  ({props, largura, altura, fixo, fps, duracaoMs, marca}) => {
+ *  verdade (Thumbnail do Remotion), como a exportação vai desenhar. A legenda vai na área do destino, a mesma de que a
+ *  marca se afasta. */
+const Miniatura: React.FC<{props: Record<string, unknown>; largura: number; altura: number; fixo: boolean; fps: number; duracaoMs: number; marca: MarcaDaguaP | null;
+  legendas: LegendasP | null}> = ({props, largura, altura, fixo, fps, duracaoMs, marca, legendas}) => {
     const tempo = useLoja((e) => e.tempo_ms);
     const total = Math.max(1, Math.ceil((duracaoMs / 1000) * fps));
     // o quadro em que a cabeça parou; no começo do vídeo, 1,5 s adiante (o primeiro bloco ainda está entrando)
     const quadro = Math.min(total - 1, Math.round(((tempo > 500 ? tempo : 1500) / 1000) * fps));
-    const entrada = useMemo(() => ({...props, ...(fixo ? {} : {largura, altura}), ...(marca ? {marca_dagua: marca} : {})}), [props, fixo, largura, altura, marca]);
+    const entrada = useMemo(() => ({...props, ...(fixo ? {} : {largura, altura}), ...(legendas ? {legendas_cenas: legendas} : {}), ...(marca ? {marca_dagua: marca} : {})}),
+      [props, fixo, largura, altura, legendas, marca]);
     const escala = Math.min(150 / largura, 150 / altura);
     const zonas = conjuntoDe(zonasDaMarca(largura, altura))?.zonas ?? [];
     return (
@@ -191,7 +194,7 @@ const OpcoesMarca: React.FC<{destinos: Destino[]; atual: Destino; editar: (id: s
                   onChange={(e) => mudar(atual, {opacidade: Number(e.target.value) / 100})} />
                 <span className="nota">{pct(c.opacidade)}</span>
               </div>
-              {marca && !marca.segura && <div className="erro-exp">Grande demais para ficar fora das zonas da rede neste canto: diminua o tamanho.</div>}
+              {marca && !marca.segura && <div className="erro-exp">Grande demais para ficar fora das zonas da rede e da legenda neste canto: diminua o tamanho ou troque o canto.</div>}
             </>
           )}
         </div>
@@ -259,7 +262,10 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
   const emEdicao = destinos.find((d) => d.id === editando) ?? destinos[0];
   // o carrossel da Cliente só sai no tamanho dele; o vídeo de cenas, no do destino
   const medidaDe = (d: Destino) => (fixo ? {largura: formato.largura, altura: formato.altura} : d);
-  const marcaDe = (d: Destino) => marcaDaguaDoDestino(configMarca(d), medidaDe(d), fontesMarca, proporcaoLogo);
+  // a legenda de cada destino na área livre dele: a marca se afasta dela, e a miniatura a desenha ali
+  const legendas = useMemo(() => legendasDasProps(props), [props]);
+  const legendasDe = (d: Destino) => (fixo ? legendas : legendasNoDestino(legendas, medidaDe(d)));
+  const marcaDe = (d: Destino) => marcaDaguaDoDestino(configMarca(d), medidaDe(d), fontesMarca, proporcaoLogo, legendasDe(d));
   const temMarca = Boolean(fontesMarca.logo || fontesMarca.assinatura);
   const opcoes: OpcoesExportarVideo = {destinos, codec, qualidade, escala, trecho, nome: nome.trim() || undefined,
     ...(temMarca ? {marca_dagua: Object.fromEntries(destinos.map((d) => [d.id, configMarca(d)])), ...(proporcaoLogo ? {proporcao_logo: proporcaoLogo} : {})} : {})};
@@ -330,7 +336,8 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
           : !emEdicao ? <span className="nota">Marque um destino.</span>
           : (
             <OpcoesMarca destinos={destinos} atual={emEdicao} editar={setEditando} config={configMarca} mudar={mudarMarca} fontes={fontesMarca} marca={marcaDe(emEdicao)}
-              miniatura={props && <Miniatura props={props} {...medidaDe(emEdicao)} fixo={fixo} fps={formato.fps} duracaoMs={duracaoMs} marca={marcaDe(emEdicao)} />} />
+              miniatura={props && <Miniatura props={props} {...medidaDe(emEdicao)} fixo={fixo} fps={formato.fps} duracaoMs={duracaoMs} marca={marcaDe(emEdicao)}
+                legendas={legendasDe(emEdicao)} />} />
           )}
       </Linha>
       <Linha rotulo="Formato">

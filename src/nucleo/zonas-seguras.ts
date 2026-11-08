@@ -88,7 +88,8 @@ export const CANTO_PADRAO: Record<IdZonaSegura, CantoMarca> = {vertical: 'sup-di
 export const zonasDaMarca = (largura: number, altura: number): IdZonaSegura | null =>
   largura > 0 && altura > 0 && Math.abs(largura / altura - 1) < 0.05 ? null : zonaSugerida(largura, altura);
 
-type Ret = {x: number; y: number; largura: number; altura: number};
+/** Retângulo em frações do quadro (canto de cima à esquerda). */
+export type Ret = {x: number; y: number; largura: number; altura: number};
 const FOLGA = 1e-9;
 const cruza = (a: Ret, b: Ret) => a.x < b.x + b.largura - FOLGA && b.x < a.x + a.largura - FOLGA && a.y < b.y + b.altura - FOLGA && b.y < a.y + a.altura - FOLGA;
 const dentro = (a: Ret, b: Ret) => a.x >= b.x - FOLGA && a.y >= b.y - FOLGA && a.x + a.largura <= b.x + b.largura + FOLGA && a.y + a.altura <= b.y + b.altura + FOLGA;
@@ -99,13 +100,15 @@ export const livreDasZonas = (zonas: ZonaSegura[], ret: Ret) =>
   dentro(ret, {x: 0, y: 0, largura: 1, altura: 1}) && zonas.every((z) => (z.miolo ? dentro(ret, z) : !cruza(ret, z)));
 
 /** Posição (frações do quadro, canto de cima à esquerda) de uma caixa de `caixa` px num quadro de `quadro` px, o mais
- *  perto possível do `canto` pedido, a `margem` px da borda e das zonas. Os candidatos são as bordas das próprias zonas
- *  (encostar logo abaixo da faixa de cima, logo à esquerda da coluna de ícones, dentro do corte); fica o mais perto do
- *  canto entre os que não pisam em nada. Sem nenhum livre (caixa grande demais), volta o canto com a margem e
- *  `segura: false`. */
+ *  perto possível do `canto` pedido, a `margem` px da borda e das zonas. `evitar` são áreas a mais, tratadas como as
+ *  cobertas da rede: a da legenda do vídeo (caixaDaLegenda, em exportacao.ts), para a marca não cobrir a fala. Os
+ *  candidatos são as bordas das próprias zonas (encostar logo abaixo da faixa de cima, logo à esquerda da coluna de
+ *  ícones, dentro do corte, logo acima da legenda); fica o mais perto do canto entre os que não pisam em nada. Sem
+ *  nenhum livre (caixa grande demais), volta o canto com a margem e `segura: false`. */
 export const posicaoSegura = (id: IdZonaSegura | null | undefined, canto: CantoMarca, quadro: {largura: number; altura: number},
-  caixa: {largura: number; altura: number}, margem: number): {x: number; y: number; segura: boolean} => {
-  const zonas = conjuntoDe(id)?.zonas ?? [];
+  caixa: {largura: number; altura: number}, margem: number, evitar: Ret[] = []): {x: number; y: number; segura: boolean} => {
+  const zonas: ZonaSegura[] = [...(conjuntoDe(id)?.zonas ?? []),
+    ...evitar.map((r): ZonaSegura => ({tipo: 'coberta', x: r.x, y: r.y, largura: r.largura, altura: r.altura, rotulo: 'Evitar', fonte: 'exportação'}))];
   const w = caixa.largura / quadro.largura;
   const h = caixa.altura / quadro.altura;
   const mx = margem / quadro.largura;

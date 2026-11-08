@@ -4,7 +4,8 @@
 // destino: o que o diálogo guarda (ConfigMarcaDagua) e o que a composição desenha (MarcaDaguaP, já posicionada).
 import {FORMATOS_VIDEO, proporcaoDe, type Formato} from './formatos';
 import {MARCA_CLIENTE} from './marca';
-import {CANTO_PADRAO, posicaoSegura, zonasDaMarca, zonaSugerida, type CantoMarca} from './zonas-seguras';
+import {areaDaLegenda, type LegendasP} from './legendas';
+import {CANTO_PADRAO, posicaoSegura, zonasDaMarca, zonaSugerida, type CantoMarca, type Ret} from './zonas-seguras';
 
 export type CodecVideo = 'h264' | 'h265' | 'webm';
 export type QualidadeVideo = 'alta' | 'media' | 'leve';
@@ -205,11 +206,56 @@ export const normalizarPrefsExportacao = (x: unknown): PrefsExportacao => {
 /** Largura aproximada de uma linha de texto (px): 0,6 da letra por caractere, a média larga de uma sem serifa. */
 const larguraDoTexto = (texto: string, letra: number) => Math.ceil(texto.length * letra * 0.6);
 
+// ---------- a marca d'água não cobre a legenda (video-N2, som-N5, imagem-N4, transversal-N3) ----------
+
+const finito = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+
+/** As legendas que vão ao render (`legendas_cenas` das props), se tiverem a área e o estilo no formato do resolvedor
+ *  (legendas.ts). Sem legenda, oculta ou sem segmentos: null. */
+export const legendasDasProps = (props: Record<string, unknown> | null | undefined): LegendasP | null => {
+  const l = props?.legendas_cenas as Partial<LegendasP> | undefined;
+  const a = l?.area;
+  if (!l || l.oculto || !Array.isArray(l.segmentos) || !l.segmentos.length || !l.estilo || typeof l.estilo !== 'object') return null;
+  if (!a || ![a.topo, a.base, a.esq, a.dir].every(finito)) return null;
+  return l as LegendasP;
+};
+
+/** As legendas com a área livre de outro tamanho de quadro: a mesma conta que o resolvedor faz (areaDaLegenda), para a
+ *  miniatura do diálogo mostrar a legenda e a marca de cada destino onde a exportação vai pôr. */
+export const legendasNoDestino = (l: LegendasP | null, quadro: {largura: number; altura: number}): LegendasP | null =>
+  l ? {...l, area: areaDaLegenda(quadro.largura, quadro.altura)} : null;
+
+/** Onde a legenda pode aparecer (frações do quadro), pelo pior caso, com a mesma geometria do Legendas.tsx: da margem
+ *  esquerda à direita da área (a faixa da marca vai de borda a borda), na posição do estilo (embaixo encostada na base
+ *  da área, em cima no topo, no meio a 62% entre os dois), com todas as linhas do estilo na letra dele, o nome do
+ *  falante quando ligado e a faixa com o respiro dela. Uma folga de 0,3 da letra cobre a entrada (o texto sobe 0,25 da
+ *  letra) e a caixa atrás da linha, que passa um pouco do texto. */
+export const caixaDaLegenda = (l: LegendasP | null | undefined, quadro: {largura: number; altura: number}): Ret | null => {
+  if (!l || !(quadro.largura > 0 && quadro.altura > 0)) return null;
+  const {area: a, estilo: e} = l;
+  const W = quadro.largura;
+  const H = quadro.altura;
+  const tam = (finito(e.tam) && e.tam > 0 ? e.tam : 0.042) * Math.min(W, H);
+  const entrelinha = e.caixa === 'linha' ? 1.42 : 1.18;
+  let h = (e.linhas === 1 ? 1 : 2) * entrelinha * tam;
+  if (e.falante) h += tam * 0.62 * entrelinha + tam * 0.12;
+  const faixa = e.caixa === 'faixa';
+  if (faixa) h += tam * 0.8;
+  const topo = e.posicao === 'cima' ? a.topo * H : e.posicao === 'meio' ? (a.topo + (a.base - a.topo) * 0.62) * H - h / 2 : a.base * H - h;
+  const folga = tam * 0.3;
+  const x0 = faixa ? 0 : Math.max(0, a.esq * W - folga);
+  const x1 = faixa ? W : Math.min(W, (1 - a.dir) * W + folga);
+  const y0 = Math.max(0, topo - folga);
+  const y1 = Math.min(H, topo + h + folga);
+  return {x: x0 / W, y: y0 / H, largura: (x1 - x0) / W, altura: (y1 - y0) / H};
+};
+
 /** A marca de um destino, pronta para a composição, ou null (desligada ou sem logo nem assinatura no kit). Se o conteúdo
  *  pedido faltar, vai o outro. A caixa tem a altura do `tamanho` e a largura do logo (pela proporção) ou do texto, até
- *  60% do quadro; a posição é a livre mais perto do canto. */
+ *  60% do quadro; a posição é a livre mais perto do canto, fora das zonas da rede e da legenda (`legendas`: as que vão
+ *  ao render deste destino, legendasDasProps). */
 export const marcaDaguaDoDestino = (c: ConfigMarcaDagua | null | undefined, destino: {largura: number; altura: number}, fontes: FontesMarcaDagua,
-  proporcaoLogo?: number): MarcaDaguaP | null => {
+  proporcaoLogo?: number, legendas?: LegendasP | null): MarcaDaguaP | null => {
   if (!c?.ligada || !(destino.largura > 0 && destino.altura > 0)) return null;
   const logo = (c.conteudo === 'logo' || !fontes.assinatura) && fontes.logo ? fontes.logo : undefined;
   const texto = logo ? undefined : fontes.assinatura;
@@ -219,7 +265,8 @@ export const marcaDaguaDoDestino = (c: ConfigMarcaDagua | null | undefined, dest
   const proporcao = proporcaoLogo && Number.isFinite(proporcaoLogo) && proporcaoLogo > 0 ? Math.min(8, Math.max(0.2, proporcaoLogo)) : PROPORCAO_LOGO_PADRAO;
   const largura = Math.min(0.6 * destino.largura, logo ? altura * proporcao : larguraDoTexto(texto!, altura * 0.8));
   const canto = CANTOS_MARCA.some((x) => x.id === c.canto) ? c.canto : CANTO_PADRAO[zonaSugerida(destino.largura, destino.altura)];
-  const pos = posicaoSegura(zonasDaMarca(destino.largura, destino.altura), canto, destino, {largura, altura}, MARGEM_MARCA * menor);
+  const legenda = caixaDaLegenda(legendas, destino);
+  const pos = posicaoSegura(zonasDaMarca(destino.largura, destino.altura), canto, destino, {largura, altura}, MARGEM_MARCA * menor, legenda ? [legenda] : []);
   const n = (v: number) => Math.round(v * 1e5) / 1e5;
   return {...(logo ? {logo} : {texto}), ...(texto && fontes.fonte ? {fonte: fontes.fonte} : {}), x: n(pos.x), y: n(pos.y), largura: n(largura / destino.largura),
     altura: n(altura / destino.altura), alinhar: canto.endsWith('dir') ? 'direita' : 'esquerda', opacidade: limitar(c.opacidade, OPACIDADE_MARCA), segura: pos.segura};
