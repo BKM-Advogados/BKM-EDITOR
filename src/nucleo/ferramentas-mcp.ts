@@ -13,7 +13,7 @@ import {FORMATOS_IMAGEM, FORMATOS_VIDEO, formatoDoVideo} from './formatos';
 import {MARCAS_INICIAIS} from './marca';
 import {PastaMarcas} from './pasta-marcas';
 import {ehDocCenas, resolverCenas, type DocCenas} from './cenas';
-import {arquivoDaFala, arquivoDasPalavras, clipesDeVoz, comTexto, deslocamentoDaLegenda, legendasDeArquivo, textoDeLegenda, recusaDoDestinoNoProjeto, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt, type EstadoDaFala, type IdEstiloLegenda} from './legendas';
+import {arquivoDaFala, arquivoDasPalavras, clipesDeVoz, comTexto, deslocamentoDaLegenda, legendasDeArquivo, legendasDeOutraTomada, limitesDoArrasto, textoDeLegenda, recusaDoDestinoNoProjeto, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt, type EstadoDaFala, type IdEstiloLegenda} from './legendas';
 import {CATALOGO_FONTES} from './catalogo-fontes';
 import {
   acharTrecho, caminhoTextoFonte, conferirDigitos, decodificarComAviso, entorno, estadoDoFato, hashTexto, limparHtml, nivelDe, numerosDe, paginar, proximoId,
@@ -593,7 +593,8 @@ const registrarFala = (servidor: McpServer, projeto: Projeto, autor: string, ori
     const r = legendasDoDocumento(atual.doc, (c) => projeto.lerJson<unknown>(c).doc, {largura: f.largura, altura: f.altura, clipe: a.clipe, faixa: a.faixa,
       estilo: a.estilo ? {...(atual.doc.legendas?.estilo ?? {}), predefinicao: a.estilo} : undefined, refazer: a.refazer_legendas === true});
     // clipe com legendas da tomada antiga: não refaz sem a pessoa decidir
-    const desatualizadas = r.mantidos.filter((id) => clipes.some((c) => c.clipe.id === id && estados[arquivoDaFala(c.clipe)] === 'velha'));
+    const outra = new Set(legendasDeOutraTomada(atual.doc));
+    const desatualizadas = r.mantidos.filter((id) => outra.has(id) || clipes.some((c) => c.clipe.id === id && estados[arquivoDaFala(c.clipe)] === 'velha'));
     const mantidos = r.mantidos.length ? {ja_tinham_legendas: r.mantidos, ...(desatualizadas.length ? {legendas_de_audio_antigo: desatualizadas} : {}),
       nota: 'clipes que já tinham legendas ficaram como estavam; para refazer, pergunte à pessoa e chame de novo com refazer_legendas: true (as palavras corrigidas à mão no mesmo tempo ficam)'} : {};
     if (!r.clipes) return {documento: alvo, transcritos, legendas: atual.doc.legendas?.segmentos?.length ?? 0, geradas: 0, ...mantidos, ...(r.faltam.length ? {sem_transcricao: r.faltam} : {})};
@@ -647,6 +648,10 @@ const registrarFala = (servidor: McpServer, projeto: Projeto, autor: string, ori
       // entrar e sair o mesmo tanto mais cedo ou mais tarde leva as palavras junto; mudar só uma ponta apara
       const d = novoEm - s.em;
       const junto = d !== 0 && novoSai - s.sai === d && Array.isArray(s.palavras);
+      const lim = junto ? limitesDoArrasto(doc, s) : null;
+      if (lim && (d < lim.min || d > lim.max)) {
+        throw new ErroProjeto(`a legenda sairia do trecho que o clipe de voz toca e sumiria: dá para andar de ${lim.min} a ${lim.max} ms; para o texto aparecer antes ou depois da voz, mude só o em ou só o sai`, 'patch');
+      }
       s = {...s, em: novoEm, sai: novoSai, ...(junto ? {palavras: s.palavras!.map((p) => ({...p, s: p.s + d, e: p.e + d}))} : {})};
     }
     const gravado = projeto.aplicarPatch({documento: rel, versao_base: versao, autor, origem, rotulo: `legenda ${id}`,

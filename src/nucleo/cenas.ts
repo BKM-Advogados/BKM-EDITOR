@@ -170,7 +170,7 @@ export const resolverCenas = (doc: DocCenas, opcoes: OpcoesResolver = {}): {prop
   const duracao_ms = Math.max(1000, t);
   const som = resolverAudio(doc.audio, duracao_ms, opcoes.envelopes);
   avisos.push(...som.avisos);
-  const legendas = resolverLegendas(doc.legendas, {audio: som.audio, largura: formato.largura, altura: formato.altura, tema, duracao_ms}, avisos); // frente Fala
+  const legendas = resolverLegendas(doc.legendas, {audio: som.audio, largura: formato.largura, altura: formato.altura, tema, duracao_ms, fala: doc.audio}, avisos); // frente Fala
   return {
     props: {composicao: 'VideoCenas', duracao_ms, largura: formato.largura, altura: formato.altura, fps: formato.fps, tema, cenas,
       efeitos: doc.efeitos ?? [], ...(som.audio ? {audio: som.audio} : {}), ...(legendas ? {legendas_cenas: legendas} : {})},

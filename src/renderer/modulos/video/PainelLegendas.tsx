@@ -9,7 +9,7 @@ import type {EstadoTranscricao} from '../../../compartilhado/api';
 import {TEMA_NEUTRO, type DocCenas, type PropsCenas} from '../../../nucleo/cenas';
 import {formatoDoVideo} from '../../../nucleo/formatos';
 import {
-  arquivoDaFala, arquivoDasPalavras, clipesDeVoz, localizar, POSICOES_LEGENDA, PREDEFINICOES_LEGENDA, resolverEstilo, segmentosEm, type EstiloLegenda, type IdEstiloLegenda, type PosicaoLegenda,
+  arquivoDaFala, arquivoDasPalavras, clipesDeVoz, legendasDeOutraTomada, localizar, POSICOES_LEGENDA, PREDEFINICOES_LEGENDA, resolverEstilo, segmentosEm, type EstiloLegenda, type IdEstiloLegenda, type PosicaoLegenda,
   type EstadoDaFala, type SegmentoLegenda,
 } from '../../../nucleo/legendas';
 import {selecionar, trocar, useLoja} from '../../estado/loja';
@@ -106,6 +106,8 @@ const Transcricao: React.FC<{documento: string; doc: DocCenas}> = ({documento, d
   const algum = arquivos.some(emDia);
   const faltaTranscrever = arquivos.some((a) => !emDia(a));
   const faltaLegenda = clipes.some(({clipe}) => !comLegenda.has(clipe.id));
+  // o clipe trocou de arquivo depois das legendas (som-N2): elas são da tomada de antes
+  const outra = new Set(legendasDeOutraTomada(doc));
   return (
     <Secao titulo="Transcrever a fala" chave="legendas:transcrever">
       {!arquivos.length ? (
@@ -118,7 +120,7 @@ const Transcricao: React.FC<{documento: string; doc: DocCenas}> = ({documento, d
             return (
               <div key={clipe.id} title={e === 'velha' ? `O áudio mudou depois da transcrição: ${fala}` : arquivoDasPalavras(fala)}>
                 {e === 'em_dia' ? <span className="ok">✓ </span> : e === 'velha' ? <span className="velha">↻ </span> : '· '}
-                {clipe.nome || clipe.arquivo.split('/').pop()} <span style={{color: 'var(--texto-3)'}}>({faixa.nome}{comLegenda.has(clipe.id) ? '' : ', sem legendas'})</span>
+                {clipe.nome || clipe.arquivo.split('/').pop()} <span style={{color: 'var(--texto-3)'}}>({faixa.nome}{!comLegenda.has(clipe.id) ? ', sem legendas' : outra.has(clipe.id) ? ', legendas de outro arquivo' : ''})</span>
               </div>
             );
           })}
@@ -132,10 +134,10 @@ const Transcricao: React.FC<{documento: string; doc: DocCenas}> = ({documento, d
         </div>
       ) : (
         <div className="linha-botoes">
-          {faltaTranscrever ? (
+          {faltaTranscrever || outra.size ? (
             <button className="bt principal mini" disabled={!arquivos.length || estado?.plataforma === false} onClick={() => void transcreverEGerar(documento, {modelo})}
               title="Roda o whisper.cpp neste PC: nada sai da máquina. Os clipes que já têm legendas ficam como estão">
-              <Mic /> {algum ? 'Transcrever o que falta' : 'Transcrever e gerar legendas'}
+              <Mic /> {!faltaTranscrever ? 'Atualizar as legendas…' : algum ? 'Transcrever o que falta' : 'Transcrever e gerar legendas'}
             </button>
           ) : faltaLegenda ? (
             <button className="bt principal mini" onClick={() => void gerarDasTranscricoes(documento)} title="Gera as legendas dos clipes que ainda não têm; as outras ficam como estão">

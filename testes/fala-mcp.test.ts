@@ -184,6 +184,8 @@ describe('MCP: transcrever e legendas', () => {
     expect([movida.em, movida.sai]).toEqual([guardada.em + 300, guardada.sai + 300]);
     expect(movida.palavras![0].s).toBe(guardada.palavras![0].s + 300);
     expect((await chamar(c, 'editar_legenda', {documento: 'video', id: 'nao-ha', texto: 'x'})).texto).toContain('legenda não achada');
+    // andar com as palavras para antes do clipe esconderia a legenda: recusa e diz quanto dá (som-N6)
+    expect((await chamar(c, 'editar_legenda', {documento: 'video', id: guardada.id, em: tela.em - 2000, sai: tela.sai - 2000})).texto).toContain('sairia do trecho');
     expect((await chamar(c, 'editar_legenda', {documento: 'video', id: guardada.id, em: tela.sai, sai: tela.sai + 50})).erro).toBe(true);
     // volta ao lugar de antes, para os testes seguintes
     await chamar(c, 'editar_legenda', {documento: 'video', id: guardada.id, texto: guardada.texto, em: tela.em, sai: tela.sai});

@@ -5,7 +5,7 @@ import type {PedidoTranscricao, ProgressoTranscricao} from '../../../compartilha
 import {idLivre, type DocCenas, type PropsCenas} from '../../../nucleo/cenas';
 import {formatoDoVideo} from '../../../nucleo/formatos';
 import {
-  arquivoDaFala, arquivoDasPalavras, clipesDeVoz, comTexto, dividirSegmento, juntarSegmentos, legendasDeArquivo, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt,
+  arquivoDaFala, arquivoDasPalavras, clipesDeVoz, comTexto, legendasDeOutraTomada, limitesDoArrasto, dividirSegmento, juntarSegmentos, legendasDeArquivo, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt,
   requebrar, substituirEmLote, type EstadoDaFala, type EstiloLegenda, type LegendasCenas, type OpcoesBusca, type SegmentoLegenda,
 } from '../../../nucleo/legendas';
 import {confirmar} from '../../componentes/Dialogo';
@@ -96,7 +96,9 @@ export const transcreverEGerar = async (documento: string, o: {clipe?: string; f
   }
   let refazer: true | string[] = o.refazer ? true : [];
   // a tomada mudou depois das legendas: as de agora são da fala antiga, mas podem ter correções; a pessoa decide
-  const mudaram = o.refazer ? [] : pedidos.filter(({clipe}) => comLegenda.has(clipe.id) && estados[arquivoDaFala(clipe)] === 'velha');
+  // ou o clipe trocou de arquivo depois das legendas ("Trocar arquivo…"): som-N2
+  const outra = new Set(legendasDeOutraTomada(docDe(documento) ?? d));
+  const mudaram = o.refazer ? [] : pedidos.filter(({clipe}) => comLegenda.has(clipe.id) && (estados[arquivoDaFala(clipe)] === 'velha' || outra.has(clipe.id)));
   if (mudaram.length) {
     const nomes = [...new Set(mudaram.map(({clipe}) => clipe.nome || nomeCurto(arquivoDaFala(clipe))))].join(', ');
     const sim = await confirmar({titulo: 'O áudio mudou depois das legendas', botao: 'Refazer as legendas',
@@ -171,7 +173,14 @@ export const moverSegmento = async (documento: string, id: string, modo: 'mover'
   if (!d) return;
   let novo: SegmentoLegenda;
   if (modo === 'mover') {
-    const dd = Math.max(-s.em, d);
+    let dd = Math.max(-s.em, d);
+    // a legenda de um clipe de voz não sai do trecho que ele toca: o resolvedor a esconderia (som-N6)
+    const lim = limitesDoArrasto(docDe(documento) ?? {}, s);
+    if (lim && (dd < lim.min || dd > lim.max)) {
+      dd = Math.min(lim.max, Math.max(lim.min, dd));
+      avisar('A legenda fica dentro do trecho que o clipe de voz toca. Para o texto aparecer antes ou depois da voz, puxe só o começo ou o fim.', 'info');
+      if (!dd) return;
+    }
     novo = {...s, em: s.em + dd, sai: s.sai + dd, ...(s.palavras ? {palavras: s.palavras.map((p) => ({...p, s: p.s + dd, e: p.e + dd}))} : {})};
   } else if (modo === 'ini') novo = {...s, em: Math.max(0, Math.min(s.sai - DURACAO_MIN_LEGENDA, s.em + d))};
   else novo = {...s, sai: Math.max(s.em + DURACAO_MIN_LEGENDA, s.sai + d)};

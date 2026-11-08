@@ -367,9 +367,9 @@ export const palavrasValidas = (x: unknown): PalavraLegenda[] =>
  *  legenda que está no tempo de uma palavra transcrita (até 40 ms no começo e no fim) e tem outro texto. Só entre legendas
  *  e transcrição da mesma tomada: com o sha256 da origem diferente do da transcrição, nada passa. O que perdeu o tempo
  *  (outro número de palavras, legenda arrastada) não passa. */
-export const levarCorrecoes = (leg: LegendasCenas, clipe: string, palavras: PalavraLegenda[], sha256?: string): {palavras: PalavraLegenda[]; n: number} => {
+export const levarCorrecoes = (leg: LegendasCenas, clipe: string, palavras: PalavraLegenda[], sha256?: string, outraTomada = false): {palavras: PalavraLegenda[]; n: number} => {
   const o = (Array.isArray(leg.origens) ? leg.origens : []).find((x) => x.clipe === clipe);
-  if (!o || (o.sha256 && sha256 && o.sha256 !== sha256)) return {palavras, n: 0};
+  if (!o || (o.sha256 && sha256 && o.sha256 !== sha256) || outraTomada) return {palavras, n: 0};
   const desloc = (o.corte_ms ?? 0) - o.em; // ms do vídeo de quando a legenda nasceu → ms do arquivo
   const novas = palavras.map((p) => ({...p}));
   let n = 0;
@@ -420,7 +420,7 @@ export const legendasDoDocumento = (doc: {audio?: AudioCenas; legendas?: Legenda
     }
     const sha256 = fonteDaFala(lido)?.sha256;
     if (antes && comLegenda.has(clipe.id)) {
-      const c = levarCorrecoes(antes, clipe.id, palavras, sha256);
+      const c = levarCorrecoes(antes, clipe.id, palavras, sha256, !mesmaTomada(antes.origens?.find((x) => x.clipe === clipe.id) ?? {}, clipe));
       palavras = c.palavras;
       corrigidas += c.n;
     }
@@ -613,14 +613,59 @@ export const resolverEstilo = (e: EstiloLegenda | undefined, tema: TemaCenas): E
   };
 };
 
+/** A legenda nasceu desta tomada do clipe? A origem guarda o arquivo transcrito; vale o arquivo do clipe ou, na voz
+ *  limpa, o original (as legendas geradas antes da rodada 3 guardavam o .limpo.wav). Sem arquivo na origem, vale. */
+export const mesmaTomada = (o: {arquivo?: string}, c: {arquivo: string; original?: string}) => !o.arquivo || o.arquivo === c.arquivo || o.arquivo === c.original;
+
+/** Os clipes cujas legendas são de outra tomada: o arquivo do clipe foi trocado ("Trocar arquivo…") depois de gerar.
+ *  (som-N2) */
+export const legendasDeOutraTomada = (doc: {audio?: AudioCenas; legendas?: LegendasCenas}): string[] => {
+  const comLegenda = new Set((Array.isArray(doc.legendas?.segmentos) ? doc.legendas.segmentos : []).map((s) => s?.clipe).filter(Boolean));
+  const origens = Array.isArray(doc.legendas?.origens) ? doc.legendas.origens : [];
+  const out: string[] = [];
+  for (const f of Array.isArray(doc.audio?.faixas) ? doc.audio.faixas : []) {
+    for (const c of Array.isArray(f.clipes) ? f.clipes : []) {
+      const o = origens.find((x) => x.clipe === c?.id);
+      if (c && typeof c.arquivo === 'string' && comLegenda.has(c.id) && o && !mesmaTomada(o, c)) out.push(c.id);
+    }
+  }
+  return out;
+};
+
+/** Quanto a legenda de um clipe pode andar (ms, para trás e para a frente) com as palavras junto sem sair do trecho que
+ *  o clipe toca, onde o resolvedor a esconderia. null quando ela não depende de clipe (importada, criada à mão, de outra
+ *  tomada). (som-N6) */
+export const limitesDoArrasto = (doc: {audio?: AudioCenas; legendas?: LegendasCenas}, s: SegmentoLegenda): {min: number; max: number} | null => {
+  if (!s.clipe) return null;
+  const clipes = (Array.isArray(doc.audio?.faixas) ? doc.audio.faixas : []).flatMap((f) => (Array.isArray(f.clipes) ? f.clipes : []));
+  const c = clipes.find((x) => x?.id === s.clipe);
+  const o = (Array.isArray(doc.legendas?.origens) ? doc.legendas.origens : []).find((x) => x.clipe === s.clipe);
+  if (!c || !o || !mesmaTomada(o, c)) return null;
+  const desloc = deslocamentoDaLegenda(s, doc.legendas?.origens, clipes);
+  const ps = palavrasDe(s);
+  if (!ps.length) return null;
+  const meio = (p: PalavraLegenda) => (p.s + Math.max(p.s, p.e)) / 2 + desloc;
+  const ini = Number(c.em) || 0;
+  const fim = ini + (Number(c.duracao_ms) || 0);
+  const min = Math.ceil(ini - meio(ps[0]));
+  const max = Math.floor(fim - 1 - meio(ps[ps.length - 1]));
+  return min <= max ? {min, max} : {min: 0, max: 0};
+};
+
 /** Props das legendas, em ms de saída. Segmento que veio de um clipe anda com ele (o clipe mudou de lugar ou foi aparado
- *  depois de gerar) e some no que o clipe não toca mais. O que estiver fora do lugar vira aviso, não erro. */
-export const resolverLegendas = (leg: LegendasCenas | undefined, ctx: {audio?: AudioP; largura: number; altura: number; tema: TemaCenas; duracao_ms: number},
-  avisos: string[] = []): LegendasP | undefined => {
+ *  depois de gerar) e perde as palavras que o clipe aparado não toca mais; só então a ponta dele é cortada. O que estiver
+ *  fora do lugar vira aviso, não erro: o clipe que sumiu, a tomada trocada (a legenda fica no tempo em que nasceu) e a
+ *  legenda arrastada para fora do trecho que o clipe toca. `fala`: o áudio do documento, para saber o original da voz
+ *  limpa e comparar a tomada. */
+export const resolverLegendas = (leg: LegendasCenas | undefined, ctx: {audio?: AudioP; largura: number; altura: number; tema: TemaCenas; duracao_ms: number;
+  fala?: AudioCenas}, avisos: string[] = []): LegendasP | undefined => {
   if (!leg || typeof leg !== 'object') return undefined;
   const clipes = new Map((ctx.audio?.faixas ?? []).flatMap((f) => f.clipes.map((c) => [c.id, c] as const)));
   const origens = new Map((Array.isArray(leg.origens) ? leg.origens : []).map((o) => [o.clipe, o]));
+  const doDoc = new Map((Array.isArray(ctx.fala?.faixas) ? ctx.fala.faixas : []).flatMap((f) => (Array.isArray(f.clipes) ? f.clipes : []).map((c) => [c?.id, c] as const)));
   const sumidos = new Set<string>();
+  const outraTomada = new Set<string>();
+  const fora: number[] = [];
   let ruins = 0;
   const segmentos: SegmentoLegendaP[] = [];
   (Array.isArray(leg.segmentos) ? leg.segmentos : []).forEach((s, i) => {
@@ -636,7 +681,12 @@ export const resolverLegendas = (leg: LegendasCenas | undefined, ctx: {audio?: A
     const c = s.clipe ? clipes.get(s.clipe) : undefined;
     const o = s.clipe ? origens.get(s.clipe) : undefined;
     if (s.clipe && !c && o) sumidos.add(s.clipe);
-    if (c && o) {
+    const bruto = s.clipe ? doDoc.get(s.clipe) : undefined;
+    // tomada trocada: o tempo de antes não vale para o arquivo novo; a legenda fica onde nasceu, com aviso
+    const outra = Boolean(c && o && bruto && typeof bruto.arquivo === 'string' && !mesmaTomada(o, bruto));
+    if (outra) outraTomada.add(s.clipe!);
+    let cortada = false;
+    if (c && o && !outra) {
       const delta = (c.em - c.corte_ms) - (o.em - (o.corte_ms ?? 0));
       if (delta) {
         em += delta;
@@ -645,19 +695,32 @@ export const resolverLegendas = (leg: LegendasCenas | undefined, ctx: {audio?: A
       }
       const ini = c.em;
       const fim = c.em + c.duracao_ms;
-      palavras = palavras.filter((p) => palavraNoTrecho(p, ini, fim));
-      if (!palavras.length) return;
-      em = Math.max(em, ini);
-      sai = Math.min(sai, Math.max(fim, palavras[palavras.length - 1].e));
+      const dentro = palavras.filter((p) => palavraNoTrecho(p, ini, fim));
+      if (!dentro.length) {
+        fora.push(i + 1);
+        return;
+      }
+      // só o clipe aparado corta a legenda: a ponta que a pessoa esticou (para ler antes ou depois da voz) fica
+      if (dentro[0] !== palavras[0]) em = Math.max(em, ini);
+      if (dentro[dentro.length - 1] !== palavras[palavras.length - 1]) sai = Math.min(sai, Math.max(fim, dentro[dentro.length - 1].e));
+      cortada = dentro.length !== palavras.length;
+      palavras = dentro;
     }
     if (em >= ctx.duracao_ms) return;
     sai = Math.min(sai, ctx.duracao_ms);
-    const texto = c && o && palavras.length !== tokensDe(s.texto).length ? palavras.map((p) => p.w).join(' ') : s.texto;
+    const texto = cortada ? palavras.map((p) => p.w).join(' ') : s.texto;
     segmentos.push({id: typeof s.id === 'string' ? s.id : `leg-${i + 1}`, em: Math.round(em), sai: Math.round(sai), texto, palavras,
       ...(s.falante ? {falante: s.falante} : {}), origem: `/legendas/segmentos/${i}`});
   });
   if (ruins) avisos.push(`${ruins === 1 ? 'uma legenda está' : `${ruins} legendas estão`} sem começo, fim ou texto e ${ruins === 1 ? 'ficou' : 'ficaram'} de fora`);
   for (const id of sumidos) avisos.push(`as legendas do clipe "${id}" ficaram no tempo em que foram geradas: o clipe não está mais no vídeo`);
+  for (const id of outraTomada) {
+    avisos.push(`as legendas do clipe "${id}" são de outro arquivo: o clipe trocou de tomada depois delas e elas ficaram no tempo em que nasceram; transcreva e gere de novo`);
+  }
+  if (fora.length) {
+    avisos.push(`${fora.length === 1 ? `a legenda ${fora[0]} ficou` : `as legendas ${fora.join(', ')} ficaram`} fora do trecho que o clipe de voz toca e não `
+      + `${fora.length === 1 ? 'aparece' : 'aparecem'}: traga de volta para dentro do clipe ou gere de novo`);
+  }
   segmentos.sort((a, b) => a.em - b.em);
   return {segmentos, estilo: resolverEstilo(leg.estilo, ctx.tema), area: areaDaLegenda(ctx.largura, ctx.altura), oculto: Boolean(leg.oculto)};
 };
