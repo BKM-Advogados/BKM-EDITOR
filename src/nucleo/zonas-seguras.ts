@@ -75,6 +75,14 @@ export const zonaSugerida = (largura: number, altura: number): IdZonaSegura => {
   return altura / largura > 1.3 ? 'vertical' : 'feed';
 };
 
+/** Onde acaba (y, em px de 1080×1920) a legenda palavra a palavra do carrossel da Cliente: 16 px acima da faixa que a rede cobre
+ *  embaixo (484 px, a do 9:16). A legenda gruda nessa linha e cresce para cima; antes começava em 1480, dentro da faixa
+ *  (que começa em 1436) (video-D17). */
+export const baseDaLegendaCarrossel = (respiro = 16): number => {
+  const faixa = conjuntoDe('vertical')!.zonas.find((z) => z.tipo === 'coberta' && z.largura >= 0.99 && z.y + z.altura >= 0.99)!;
+  return Math.round(faixa.y * 1920) - respiro;
+};
+
 // ---------- onde a marca d'água pode ficar ----------
 export type CantoMarca = 'sup-esq' | 'sup-dir' | 'inf-esq' | 'inf-dir';
 

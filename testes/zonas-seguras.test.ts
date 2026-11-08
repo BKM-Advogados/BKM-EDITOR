@@ -59,3 +59,16 @@ describe('zonas seguras', () => {
     expect(conjuntoDe('youtube')?.proporcao).toBe('16:9');
   });
 });
+
+describe('legenda do carrossel da Cliente (video-D17)', () => {
+  it('acaba acima da faixa que a rede cobre embaixo no 9:16, com respiro', async () => {
+    const {baseDaLegendaCarrossel} = await import('../src/nucleo/zonas-seguras');
+    const faixa = conjuntoDe('vertical')!.zonas.find((z) => z.tipo === 'coberta' && z.largura >= 0.99 && z.y > 0.5)!;
+    const base = baseDaLegendaCarrossel();
+    expect(base).toBeLessThanOrEqual(Math.round(faixa.y * 1920) - 16);
+    expect(base).toBe(1420); // 1920 − 484 = 1436, menos 16 px de respiro
+    // duas linhas de 64 px com entrelinha de 1,12 cabem entre o fim da área dos blocos (~1270) e a base
+    expect(base - 2 * 64 * 1.12).toBeGreaterThanOrEqual(1270);
+    expect(baseDaLegendaCarrossel(40)).toBe(1396);
+  });
+});
