@@ -226,6 +226,20 @@ leva o falante na marca de voz (`<v Nome>`) e escapa `&`, `<` e `>`. A leitura a
 `<font>`, `{\an8}`) e carimbos de palavra do VTT; o que não entende vira aviso. Ida e volta sem perder um milissegundo
 (teste). Ao importar, o tempo de cada palavra é estimado.
 
+## Lista e dicionário (rodada 3)
+
+- **Confiança.** O `p` de cada palavra (a certeza do whisper) vai do `palavras.json` até a legenda; abaixo de 0,6 a
+  palavra aparece em "confira: …" na lista e em `duvidosas` no `ler_legendas`. A palavra corrigida perde o `p`.
+- **Trocar uma palavra por duas** (fala-D5): `realinharPalavras` alinha o texto novo ao antigo pelo começo e pelo fim
+  iguais e reparte só o trecho que mudou, no tempo das palavras trocadas ("FGTS" → "Fundo de Garantia" reparte só o
+  tempo do "FGTS"); inserir sem vão divide o tempo da vizinha. Vale na lista, no substituir em lote e no patch do texto.
+- **Dicionário.** O da casa (`DICIONARIO_CASA`: CLT, FGTS, INSS, TST, TRT, STF, STJ, CTPS, PIS, CPF, CNPJ, MTE, OAB, PLR,
+  NR em caixa alta) e o do vídeo (`legendas.dicionario`: [{de, para, palavra_inteira?, caixa?}], que o "guardar no
+  dicionário" do localizar e substituir preenche) valem em toda legenda gerada, então a troca guardada sobrevive a gerar
+  de novo; os termos do dicionário do vídeo entram no fim do vocabulário do whisper.
+- **Teclado.** Com uma legenda selecionada, `[` e `]` mudam o começo e `{` e `}` o fim, um quadro por vez, encaixando na
+  grade de quadros (`passoDeQuadro`). O atalho lê o caractere, então vale em qualquer teclado (ABNT2 também).
+
 ## Cortes pela fala
 
 `src/nucleo/cortes-fala.ts` (a conta, pura), `src/main/cortes-fala.ts` (o WAV), `src/nucleo/mcp-fala.ts` (as duas
@@ -266,6 +280,10 @@ Texto para a coordenação juntar no `claudeMd` (seção do vídeo de cenas):
 > de 17); a correção é esticar o `sai` no vão (`editar_legenda`), dividir ou encurtar o texto. A quebra é pela largura
 > medida da fonte, até 42 caracteres por linha, em duas linhas, e não deixa artigo, preposição, auxiliar ou "não" no fim
 > da linha. No 4:5 a legenda fica no corte 1:1 (`estilo.no_quadrado: false` usa a altura toda).
+> **Dicionário.** `legendas.dicionario` [{de, para, palavra_inteira?, caixa?}] guarda trocas que voltam a valer em toda
+> legenda gerada (as siglas da casa, como CLT e FGTS, já valem sempre); acrescente por patch quando a pessoa corrigir o
+> mesmo termo mais de uma vez. `ler_legendas` traz `duvidosas` (palavras em que o whisper teve pouca certeza): proponha
+> conferir essas.
 > **Cortes pela fala.** `propor_cortes_fala` {clipe?} sugere tirar pausas longas (ficam 300 ms) e "ãh"/"hum", em ms do
 > arquivo, com o contexto de cada corte; mostre à pessoa e aplique com `aplicar_cortes_fala` {clipe?, cortes?} (todos ou
 > os escolhidos; nunca a menos de 80 ms de uma palavra). O clipe passa a tocar um WAV novo e guarda o de antes em
