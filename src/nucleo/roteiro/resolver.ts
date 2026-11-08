@@ -209,8 +209,19 @@ export const resolverRoteiro = (r: Roteiro, palavras: Palavra[]): Resolvido => {
       if (cena.n === undefined) cena.n = parte;
     }
     if (c.tipo === 'duvida') {
+      // a cena de dúvida acompanha as palavras "ficou" e "procure" da narração, mas não depende delas (video-D6): sem uma
+      // das duas, o vídeo monta do mesmo jeito, com o aviso, e a composição usa o começo da cena e +1,5 s
       const ini = lerAncora(c.inicio!).ms;
-      cena.ev = {duvida: n.ancora(`ficou@${ini}`), advogado: n.ancora(`procure@${ini}`)};
+      const ev: Record<string, number> = {};
+      for (const [campo, palavra] of [['duvida', 'ficou'], ['advogado', 'procure']] as const) {
+        try {
+          ev[campo] = n.ancora(`${palavra}@${ini}`);
+        } catch (e) {
+          if (!(e instanceof ErroRoteiro)) throw e;
+          avisos.push(`cena de dúvida: não achei "${palavra}" na narração depois de ${ini} ms; a animação usa o tempo da cena`);
+        }
+      }
+      cena.ev = ev;
     }
     const blocos = (cena.blocos ?? []) as Record<string, unknown>[];
     blocos.forEach((b, ib) => {
@@ -250,7 +261,7 @@ export const resolverRoteiro = (r: Roteiro, palavras: Palavra[]): Resolvido => {
         sons.push(S('papel_desliza_0.wav', b.em, 0.35));
         if (b.carimbo) sons.push(S('carimbo_0.wav', b.carimbo.em + 120, 0.5));
       } else if (tp === 'foto') {
-        usaFoto = true;
+        if (!b.src) usaFoto = true; // foto própria do bloco (src e credito) dispensa a de Cidade Exemplo (video-D7)
         sons.push(S('papel_desliza_0.wav', b.em + 60, 0.5));
       }
     }
