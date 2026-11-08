@@ -238,6 +238,8 @@ const rotuloObjeto = (v: any, caminho: string) => {
   return caminho.split('/').slice(-2).join('/');
 };
 
+const NOME_AREA: Record<string, string> = {video: 'Vídeo', imagem: 'Imagem', '3d': '3D', efeitos: 'Efeitos', musica: 'Música'};
+
 const useAnexos = (): Anexo[] => {
   const selecao = useLoja((e) => e.selecao);
   const docs = useLoja((e) => e.docs);
@@ -245,8 +247,14 @@ const useAnexos = (): Anexo[] => {
   const comentarios = useLoja((e) => e.comentarios);
   const area = useLoja((e) => e.area);
   const segundo = useLoja((e) => Math.floor(e.tempo_ms / 1000));
+  const ativo = useLoja((e) => e.ativo);
+  const info = useLoja((e) => e.info);
   return useMemo(() => {
     const r: Anexo[] = [];
+    // frente IA, F6: a IA sempre sabe em que módulo e documento a pessoa está, com qualquer provedor
+    const doc = info?.manifesto.documentos.find((d) => d.id === (ativo as Record<string, string | undefined>)[area === '3d' ? '3d' : area]);
+    r.push({chave: 'modulo', tipo: 'modulo', rotulo: `${NOME_AREA[area] ?? area}${doc ? ` · ${doc.titulo ?? doc.id}` : ''}`,
+      contexto: `módulo ${NOME_AREA[area] ?? area}${doc ? `, documento ${doc.id} ("${doc.titulo ?? doc.id}")` : ''}`});
     if (selecao) {
       const v = valorEm(docs[selecao.documento]?.doc, selecao.caminho);
       const rotulo = rotuloObjeto(v, selecao.caminho);
@@ -259,7 +267,7 @@ const useAnexos = (): Anexo[] => {
       r.push({chave: 'tempo', tipo: 'tempo', rotulo: tc(ms), contexto: `tempo da prévia do vídeo: ${tc(ms)} (${ms} ms)`});
     }
     return r;
-  }, [selecao, docs, aberto, comentarios, area, segundo]);
+  }, [selecao, docs, aberto, comentarios, area, segundo, ativo, info]);
 };
 
 const ChipAnexo: React.FC<{a: Anexo; tirar?: () => void}> = ({a, tirar}) => (

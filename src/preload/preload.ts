@@ -141,6 +141,9 @@ const api: ApiEstudio = {
     appsNovo: (n) => ipcRenderer.invoke(CANAL.iaAppsNovo, n),
     appsConfigs: (id) => ipcRenderer.invoke(CANAL.iaAppsConfigs, id),
     appsRevogar: (id) => ipcRenderer.invoke(CANAL.iaAppsRevogar, id),
+    guardar: (id, c) => ipcRenderer.invoke(CANAL.iaGuardar, id, c),
+    guardadas: () => ipcRenderer.invoke(CANAL.iaGuardadas),
+    apagarGuardada: (s) => ipcRenderer.invoke(CANAL.iaApagarGuardada, s),
   },
 };
 

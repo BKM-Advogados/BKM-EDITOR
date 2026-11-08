@@ -426,6 +426,9 @@ const api: ApiEstudio = {
     },
     appsConfigs: async (id) => iaNaPrevia.configs(id),
     appsRevogar: async (id) => ((iaNaPrevia.apps = iaNaPrevia.apps.filter((x) => x.id !== id)), iaNaPrevia.estadoApps()),
+    guardar: async () => null,
+    guardadas: async () => [],
+    apagarGuardada: async () => undefined,
   },
 };
 

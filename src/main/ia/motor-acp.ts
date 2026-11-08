@@ -15,6 +15,7 @@ export type OpcoesAcp = {
   mcp: {url: string; headers: Record<string, string>};
   ambiente: Record<string, string>;
   evento: (e: EventoConversa) => void;
+  sessao?: string;
 };
 
 type Pendente = {opcoes: OpcaoPermissao[]; ok: (r: RespostaPermissaoAcp) => void};
@@ -28,7 +29,7 @@ const textoDe = (conteudo: any): string => {
 };
 
 export class SessaoAcp {
-  readonly sessao = randomUUID();
+  readonly sessao: string; // a conversa guardada volta com a mesma sessão (F6)
   private proc: ChildProcessWithoutNullStreams | null = null;
   private cliente: ClienteAcp | null = null;
   private inicio: InicioAcp | null = null;
@@ -38,10 +39,21 @@ export class SessaoAcp {
   private ocupada = false;
   private custoVisto = 0;
 
-  constructor(private readonly o: OpcoesAcp) {}
+  constructor(private readonly o: OpcoesAcp) {
+    this.sessao = o.sessao ?? randomUUID();
+  }
 
   vivo() {
     return this.proc !== null;
+  }
+
+  /** O sessionId do agente, para guardar a conversa e voltar com session/load (F6). */
+  get idDoAgente() {
+    return this.idAgente;
+  }
+
+  retomarDe(idAgente: string) {
+    this.idAgente = idAgente;
   }
 
   async enviar(texto: string) {

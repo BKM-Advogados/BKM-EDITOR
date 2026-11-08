@@ -1,0 +1,3 @@
+/* frente IA, F6: faixa de contexto acima do terminal (Terminal.tsx, FaixaContexto) */
+.faixa-contexto { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-bottom: 1px solid var(--borda); background: var(--fundo-1); font-size: 11px; color: var(--texto-2); }
+.faixa-contexto .texto { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

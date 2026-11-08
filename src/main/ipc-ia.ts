@@ -9,6 +9,7 @@ import type {McpHttp, Perguntador} from './mcp-http';
 import {acharChave, CofreMemoria, finalDaChave, type Cofre} from './ia/chaves';
 import {CofreArquivo, type Cifra} from './ia/cofre-arquivo';
 import {AppsDeFora} from './ia/apps-de-fora';
+import {apagarGuardada, guardarConversa, lerGuardada, listarGuardadas} from './ia/guardadas';
 import {ConfiguracaoIA} from './ia/config';
 import {textoDeSistema} from './ia/guia';
 import {listarModelos} from './ia/modelos';
@@ -130,7 +131,15 @@ export const cancelarPortaoDe = (origem: string) => {
 
 export type CanaisIa = {provedores: string; gravarChave: string; apagarChave: string; modelos: string; configurar: string; padrao: string;
   usoDoMes: string; conversaModelo: string; portaoPedido: string; portaoResposta: string; portaoCancelado: string; reverter: string;
-  apps: string; appsLigar: string; appsNovo: string; appsConfigs: string; appsRevogar: string};
+  apps: string; appsLigar: string; appsNovo: string; appsConfigs: string; appsRevogar: string;
+  guardar: string; guardadas: string; apagarGuardada: string};
+
+/** Para o conversaAbrir do main: o que a conversa guardada precisa para continuar (histórico do laço, sessão do ACP). */
+export const retomadaDe = (p: Projeto, sessao?: string) => {
+  if (!sessao) return undefined;
+  const g = lerGuardada(p, sessao);
+  return g ? {historico: g.historico, agente: g.agente} : undefined;
+};
 
 // apps de IA de fora (padrão Screenpipe): criados no registro, ligados quando o MCP HTTP existir (iniciarAppsDeFora)
 let apps: AppsDeFora | null = null;
@@ -138,7 +147,7 @@ export const iniciarAppsDeFora = () => apps?.iniciar();
 export const fecharAppsDeFora = () => apps?.fechar();
 
 export const registrarIpcIa = (o: {lidar: Lidar; canais: CanaisIa; claudeInstalado: () => boolean; pasta: string; cifra: Cifra;
-  conversas: () => Pick<SessoesIA, 'definirModelo'>; enviar: (canal: string, ...a: unknown[]) => void;
+  conversas: () => Pick<SessoesIA, 'definirModelo' | 'exportar'>; enviar: (canal: string, ...a: unknown[]) => void;
   ouvir: (canal: string, f: (...a: any[]) => void) => void; projeto: () => Projeto;
   mcp: () => McpHttp | null; ponte: () => {exe: string; script: string}}) => {
   enviarATela = o.enviar;
@@ -170,4 +179,13 @@ export const registrarIpcIa = (o: {lidar: Lidar; canais: CanaisIa; claudeInstala
   lidar(canais.appsNovo, (nome: string) => apps!.novo(nome));
   lidar(canais.appsConfigs, (id: string) => apps!.configs(String(id)));
   lidar(canais.appsRevogar, (id: string) => apps!.revogar(String(id)));
+  // conversas guardadas por projeto (F6, transversal-D9): a tela manda o que desenha; o processo principal junta o que a
+  // via precisa para continuar (histórico do laço, sessão do agente ACP) e grava em .estudio/conversas/
+  lidar(canais.guardar, (id: number, c: {titulo: string; itens: unknown[]; uso?: unknown}) => {
+    const x = o.conversas().exportar(Number(id));
+    if (!x) return null;
+    return guardarConversa(o.projeto(), {...x, titulo: String(c.titulo ?? ''), itens: Array.isArray(c.itens) ? c.itens : [], uso: c.uso});
+  });
+  lidar(canais.guardadas, () => listarGuardadas(o.projeto()));
+  lidar(canais.apagarGuardada, (sessao: string) => apagarGuardada(o.projeto(), String(sessao)));
 };

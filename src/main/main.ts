@@ -29,7 +29,7 @@ import {registrarPrefsExportacao} from './ipc-exportacao';
 import {apagarLimposSemUso, registrarIpcLimpeza} from './limpeza-voz';
 import {registrarIpcLoudness} from './loudness';
 import {registrarRemoverFundo} from './remover-fundo';
-import {criarSessoesIA, fecharAppsDeFora, iniciarAppsDeFora, perguntarAPessoa, registrarIpcIa} from './ipc-ia'; // frente IA
+import {criarSessoesIA, fecharAppsDeFora, iniciarAppsDeFora, perguntarAPessoa, registrarIpcIa, retomadaDe} from './ipc-ia'; // frente IA
 
 // o mesmo id do instalador (electron-builder.yml): a barra de tarefas agrupa a janela com o atalho
 app.setAppUserModelId('br.com.bkmadvogados.estudio');
@@ -344,7 +344,7 @@ lidar(CANAL.terminalCriar, (o: {tipo: 'claude' | 'shell'; colunas: number; linha
     arquivoMcp: o.tipo === 'claude' ? mcpHttp!.novaAba(midia.origem, conversas.novoRotulo('claude')) : undefined}));
 lidar(CANAL.conversaConta, () => contaClaude(terminais.caminhoClaude));
 lidar(CANAL.conversaAbrir, (o: {sessao?: string; provedor?: string; modelo?: string}) =>
-  conversas.abrir({cwd: exigirProjeto().raiz, sessao: o.sessao, provedor: o.provedor, modelo: o.modelo}));
+  conversas.abrir({cwd: exigirProjeto().raiz, sessao: o.sessao, provedor: o.provedor, modelo: o.modelo, retomar: retomadaDe(exigirProjeto(), o.sessao)}));
 lidar(CANAL.conversaEnviar, (id: number, texto: string) => conversas.enviar(id, texto, PERFIL.sessoes_claude));
 lidar(CANAL.conversaHibernar, (id: number) => conversas.hibernar(id));
 // ---------- exportação: um ou mais arquivos em saidas/, com andamento na interface e na barra de tarefas, e Cancelar ----------
@@ -468,7 +468,8 @@ registrarIpcIa({lidar, claudeInstalado: () => claude, pasta: path.join(app.getPa
   canais: {provedores: CANAL.iaProvedores, gravarChave: CANAL.iaGravarChave, apagarChave: CANAL.iaApagarChave, modelos: CANAL.iaModelos,
     configurar: CANAL.iaConfigurar, padrao: CANAL.iaPadrao, usoDoMes: CANAL.iaUsoDoMes, conversaModelo: CANAL.conversaModelo,
     portaoPedido: CANAL.iaPortaoPedido, portaoResposta: CANAL.iaPortaoResposta, portaoCancelado: CANAL.iaPortaoCancelado, reverter: CANAL.iaReverter,
-    apps: CANAL.iaApps, appsLigar: CANAL.iaAppsLigar, appsNovo: CANAL.iaAppsNovo, appsConfigs: CANAL.iaAppsConfigs, appsRevogar: CANAL.iaAppsRevogar}});
+    apps: CANAL.iaApps, appsLigar: CANAL.iaAppsLigar, appsNovo: CANAL.iaAppsNovo, appsConfigs: CANAL.iaAppsConfigs, appsRevogar: CANAL.iaAppsRevogar,
+    guardar: CANAL.iaGuardar, guardadas: CANAL.iaGuardadas, apagarGuardada: CANAL.iaApagarGuardada}});
 
 app.on('ready', async () => {
   await midia.iniciar();

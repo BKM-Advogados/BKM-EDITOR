@@ -124,6 +124,9 @@ export const CANAL = {
   iaAppsNovo: 'estudio:ia-apps-novo',
   iaAppsConfigs: 'estudio:ia-apps-configs',
   iaAppsRevogar: 'estudio:ia-apps-revogar',
+  iaGuardar: 'estudio:ia-guardar',
+  iaGuardadas: 'estudio:ia-guardadas',
+  iaApagarGuardada: 'estudio:ia-apagar-guardada',
 } as const;
 
 /** O projeto aberto. `estado` é o último que a pessoa viu (área, documento, seleção), para reabrir onde parou; `git`
@@ -343,6 +346,10 @@ export type ApiEstudio = {
     appsNovo: (nome: string) => Promise<{id: string; configs: ConfigsDoApp}>;
     appsConfigs: (id: string) => Promise<ConfigsDoApp>;
     appsRevogar: (id: string) => Promise<EstadoAppsDeFora>;
+    /** Conversas guardadas por projeto (F6): gravar a conversa aberta, listar as guardadas e apagar uma. */
+    guardar: (id: number, c: {titulo: string; itens: unknown[]; uso?: unknown}) => Promise<string | null>;
+    guardadas: () => Promise<ConversaGuardadaTela[]>;
+    apagarGuardada: (sessao: string) => Promise<void>;
   };
 };
 
@@ -384,6 +391,9 @@ export type ResultadoReverter = {ok: true; seq: number; rotulo: string} | {ok: f
 export type EstadoAppsDeFora = {ligado: boolean; porta: number; ouvindo: boolean; erro?: string; apps: {id: string; nome: string; criado_em: string}[]};
 /** A configuração pronta para colar no app de fora, por HTTP e por stdio (com a ponte do próprio Estúdio). */
 export type ConfigsDoApp = {http: string; stdio: string};
+/** Conversa guardada no projeto (.estudio/conversas/): o que a tela desenha e de quem é. */
+export type ConversaGuardadaTela = {sessao: string; provedor: string; titulo: string; modelo?: string; criada_em: string; atualizada_em: string;
+  itens: unknown[]; uso?: unknown};
 /** Soma do mês por provedor, no PC: tokens e custo estimado pela tabela de preços. */
 export type UsoDoMes = Record<string, {entrada: number; cache: number; saida: number; custo_usd: number; turnos: number}>;
 

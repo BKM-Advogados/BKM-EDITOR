@@ -81,7 +81,16 @@ export class SessoesIA {
     return `${curto} ${n}`;
   }
 
-  abrir(o: {cwd: string; provedor?: string; sessao?: string; modelo?: string; base?: string}) {
+  /** O que cada via precisa para continuar a conversa depois de fechar o projeto (conversas guardadas, F6). */
+  exportar(id: number): {sessao: string; provedor: string; modelo?: string; historico?: unknown[]; agente?: string} | undefined {
+    const i = this.itens.get(id);
+    if (!i) return undefined;
+    if (i.via === 'openai') return {sessao: i.sessao, provedor: i.provedor.id, modelo: i.modelo, historico: i.laco.exportar()};
+    if (i.via === 'acp') return {sessao: i.sessao, provedor: i.provedor.id, agente: i.acp.idDoAgente ?? undefined};
+    return {sessao: i.sessao, provedor: i.provedor.id};
+  }
+
+  abrir(o: {cwd: string; provedor?: string; sessao?: string; modelo?: string; base?: string; retomar?: {historico?: unknown[]; agente?: string}}) {
     const p = acharProvedor(o.provedor ?? 'claude');
     if (!p) throw new Error(`provedor desconhecido: ${o.provedor}`);
     const id = this.proximo++;
@@ -104,6 +113,7 @@ export class SessoesIA {
       const laco = new LacoOpenAI({conexao: {base, chave, modelo, cabecalhos: p.cabecalhos}, mcp: {url: conexao.url, headers: conexao.headers},
         sistema: this.o.sistema(o.cwd), evento: (e) => this.doLaco(id, e), fetch: this.o.fetch});
       const sessao = o.sessao ?? `${p.id}-${Date.now().toString(36)}-${id}`;
+      if (o.retomar?.historico) laco.importar(o.retomar.historico as Parameters<LacoOpenAI['importar']>[0]);
       this.itens.set(id, {via: 'openai', provedor: p, laco, sessao, modelo, pronto: false, rotulo});
       return {id, sessao, provedor: p.id, rotulo};
     }
@@ -113,6 +123,7 @@ export class SessoesIA {
       cwd: o.cwd,
       mcp: {url: conexao.url, headers: conexao.headers},
       ambiente: this.o.ambiente(),
+      sessao: o.sessao,
       evento: (e) => {
         if (e.tipo === 'uso' && e.custo_usd) this.o.aoUso?.(p.id, '', {entrada: 0, entrada_cache: 0, saida: 0}, e.custo_usd);
         this.o.evento(id, e);
@@ -122,6 +133,7 @@ export class SessoesIA {
         return exe ? {arquivo: exe.arquivo, args: [...(exe.prefixo ?? []), ...(p.args ?? [])], shell: exe.shell} : null;
       },
     });
+    if (o.retomar?.agente) acp.retomarDe(o.retomar.agente);
     this.itens.set(id, {via: 'acp', provedor: p, acp, sessao: acp.sessao, rotulo});
     return {id, sessao: acp.sessao, provedor: p.id, rotulo};
   }

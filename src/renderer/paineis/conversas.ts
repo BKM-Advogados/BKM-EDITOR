@@ -5,7 +5,7 @@
 import type {ContaClaude, EstadoProvedor, EventoConversa, PedidoPortaoTela} from '../../compartilhado/api';
 import {avisar, quandoTrocarProjeto} from '../estado/loja';
 
-export type Anexo = {chave: string; tipo: 'selecao' | 'comentario' | 'tempo' | 'projeto'; rotulo: string; contexto: string};
+export type Anexo = {chave: string; tipo: 'selecao' | 'comentario' | 'tempo' | 'projeto' | 'modulo'; rotulo: string; contexto: string};
 export type Bloco =
   | {tipo: 'texto'; texto: string; aoVivo?: boolean}
   | {tipo: 'acao'; uso: string; nome: string; entrada: Record<string, unknown>; ok?: boolean; resultado?: string}
@@ -138,6 +138,7 @@ const aoEvento = (id: number, e: EventoConversa) => {
       c.estado = 'pronta';
       c.detalhe = undefined;
       c.desde = undefined;
+      guardarDepois(c);
       break;
     }
     case 'uso': {
@@ -150,6 +151,7 @@ const aoEvento = (id: number, e: EventoConversa) => {
     }
     case 'hibernou':
       c.estado = 'hibernada';
+      guardarDepois(c);
       break;
     case 'saiu':
       if (c.estado === 'trabalhando' || c.estado === 'precisa') {
@@ -250,6 +252,9 @@ export const hibernarConversa = async (id: number) => {
 };
 
 export const fecharConversa = (id: number) => {
+  // fechar a aba é a pessoa dizendo que acabou: a conversa guardada sai junto (F6)
+  const fechada = conversas.find((c) => c.id === id);
+  if (fechada) void window.estudio.ia?.apagarGuardada(fechada.sessao).catch(() => undefined);
   window.estudio.conversa.fechar(id);
   conversas = conversas.filter((c) => c.id !== id);
   if (ativa === id) ativa = conversas[conversas.length - 1]?.id ?? null;
@@ -377,3 +382,56 @@ if (typeof window !== 'undefined' && window.estudio?.ia?.aoPedidoPortao) {
   window.estudio.ia.aoPedidoPortao(doPortao);
   window.estudio.ia.aoPortaoCancelado(portaoCancelado);
 }
+
+// ---------- frente IA, F6: conversas guardadas por projeto (transversal-D9) ----------
+// Cada conversa vai para .estudio/conversas/ do projeto a cada fim de resposta; ao abrir o projeto, as mais recentes
+// voltam ao painel como hibernadas, com o que já foi dito, e a próxima mensagem continua a mesma conversa.
+const esperas = new Map<number, number>();
+export const guardarDepois = (c: Conversa) => {
+  if (!window.estudio.ia?.guardar || !c.itens.length) return;
+  window.clearTimeout(esperas.get(c.id));
+  esperas.set(c.id, window.setTimeout(() => {
+    esperas.delete(c.id);
+    void window.estudio.ia.guardar(c.id, {titulo: c.titulo, itens: c.itens, uso: c.uso}).catch(() => undefined);
+  }, 800));
+};
+
+/** Itens guardados podem ter parado no meio (texto ao vivo, permissão sem resposta): voltam fechados. */
+const fecharItens = (itens: Item[]): Item[] => itens.map((it) => {
+  if (it.tipo !== 'claude') return it;
+  return {...it, fim: it.fim ?? {erro: false}, blocos: it.blocos.map((b) => (b.tipo === 'texto' ? {...b, aoVivo: false}
+    : b.tipo === 'permissao' && !b.decisao ? {...b, decisao: 'cancelada' as const} : b))};
+});
+
+const RESTAURAR = 5;
+
+/** Ao abrir o projeto: as conversas guardadas mais recentes voltam ao painel. Devolve quantas voltaram. */
+export const restaurarGuardadas = async () => {
+  ligar();
+  let guardadas: Awaited<ReturnType<typeof window.estudio.ia.guardadas>> = [];
+  try {
+    guardadas = (await window.estudio.ia?.guardadas()) ?? [];
+  } catch {
+    return 0;
+  }
+  let n = 0;
+  for (const g of guardadas.slice(0, RESTAURAR).reverse()) {
+    try {
+      const r = await window.estudio.conversa.abrir({sessao: g.sessao, provedor: g.provedor, modelo: g.modelo});
+      const resto = g.titulo.split(' · ').slice(1).join(' · ');
+      // o rótulo é o desta abertura (é ele que vai ao diário e casa o cartão do portão); o resto do título volta igual
+      const c: Conversa = {id: r.id, sessao: r.sessao, titulo: resto ? `${r.rotulo} · ${resto}` : r.rotulo, estado: 'hibernada',
+        itens: fecharItens(g.itens as Item[]), rascunho: '', provedor: r.provedor, modelo: g.modelo, uso: g.uso as Conversa['uso']};
+      conversas.push(c);
+      ativa = c.id;
+      n += 1;
+    } catch {
+      /* provedor que não existe mais neste PC: a conversa fica guardada e não volta agora */
+    }
+  }
+  if (n) {
+    foco = 'conversa';
+    mudou();
+  }
+  return n;
+};

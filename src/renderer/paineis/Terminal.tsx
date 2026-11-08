@@ -6,8 +6,11 @@ import React, {useEffect, useLayoutEffect, useRef, useSyncExternalStore} from 'r
 import {BotaoMenu, type ItemMenu} from '../componentes/Menu';
 import {Moon, Play, Plus, Sparkle, SquareTerminal, Terminal as IconeTerminal, X} from 'lucide-react';
 import {loja, quandoTrocarProjeto, useLoja} from '../estado/loja';
-import {abrirAba, abrirClaudeNaSessao, ajustar, ativar, fecharAba, fecharClaudeDaSessao, hibernar, retomar, terminais} from './terminais';
-import {abrirConfigIA, ativarConversa, avisarNaConversa, conversarCom, estadoConversas, fecharConversa, focarTerminal, hibernarConversa, lerProvedores, novaConversa} from './conversas';
+import {abrirAba, abrirClaudeNaSessao, ajustar, ativar, enviarParaAtiva, fecharAba, fecharClaudeDaSessao, hibernar, retomar, terminais} from './terminais';
+import './ia.css'; // frente IA: faixa de contexto do terminal
+import {abrirConfigIA, ativarConversa, avisarNaConversa, conversarCom, estadoConversas, fecharConversa, focarTerminal, hibernarConversa, lerProvedores, novaConversa,
+  restaurarGuardadas} from './conversas';
+import {contextoDaTela} from './contexto';
 import {Conversa} from './Conversa';
 
 let primeiraVez = true;
@@ -36,8 +39,14 @@ export const Terminal: React.FC = () => {
       if (pedido && temClaude) {
         loja.definir({pedidoClaude: undefined});
         void conversarCom(pedido.texto, [{chave: 'projeto-novo', tipo: 'projeto', rotulo: pedido.rotulo, contexto: pedido.contexto}]);
-      } else if (temClaude) void novaConversa();
-      else void abrirAba('shell');
+      } else {
+        // frente IA, F6: as conversas guardadas no projeto voltam primeiro; sem nenhuma, abre uma nova como antes
+        void restaurarGuardadas().then((n) => {
+          if (n) return;
+          if (temClaude) void novaConversa();
+          else void abrirAba('shell');
+        });
+      }
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -127,9 +136,27 @@ export const Terminal: React.FC = () => {
       {conversa ? (
         <Conversa key={conversa.id} c={conversa} abrirTerminal={entrar} liberarSessao={fecharClaudeDaSessao} />
       ) : (
-        <div className="terminal-corpo" ref={corpo} onClick={() => pty?.term.focus()} />
+        <>
+          {pty?.tipo === 'claude' && pty.estado === 'viva' && <FaixaContexto />}
+          <div className="terminal-corpo" ref={corpo} onClick={() => pty?.term.focus()} />
+        </>
       )}
       {!conversa && !pty && <div className="vazio">Abra uma conversa com o Claude ou um terminal.</div>}
+    </div>
+  );
+};
+
+// frente IA, F6: o terminal não recebe o contexto da tela sozinho (sem hook do agente); a faixa mostra o que a pessoa
+// está vendo e cola numa linha só no terminal, como se fosse digitado (bracketed paste), para ela mandar com Enter
+const FaixaContexto: React.FC = () => {
+  const area = useLoja((e) => e.area);
+  const selecao = useLoja((e) => e.selecao);
+  const segundo = useLoja((e) => Math.floor(e.tempo_ms / 1000));
+  const texto = React.useMemo(() => contextoDaTela(), [area, selecao, segundo]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="faixa-contexto" title={texto}>
+      <span className="texto">{texto}</span>
+      <button className="bt mini fantasma" onClick={() => enviarParaAtiva(`Contexto do Estúdio: ${texto}. `)}>Mandar contexto</button>
     </div>
   );
 };

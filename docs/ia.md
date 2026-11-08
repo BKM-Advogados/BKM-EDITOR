@@ -135,3 +135,47 @@ Nada muda no `claudeMd`.
 
 A conversa e os terminais vivem fora do React e o painel está nas quatro áreas: trocar de módulo não perde a
 conversa, com qualquer provedor. A ida e volta com a seleção (`levar_para`, `concluir_transicao`) é da frente Música.
+
+## Conversas guardadas e contexto (F6)
+
+- Cada conversa do painel vai para `.estudio/conversas/<sessao>.json` do projeto a cada fim de resposta. A pasta entra
+  no `.gitignore` do projeto na primeira vez.
+- Ao abrir o projeto, as 5 conversas mais recentes voltam ao painel como hibernadas, com o que já foi dito, e cada uma
+  continua do seu jeito:
+  - o Claude volta com `--resume`;
+  - o laço próprio volta com o histórico de mensagens;
+  - o agente ACP volta com `session/load`.
+- Fechar a aba apaga a conversa guardada.
+- A caixa de pedido sempre leva o módulo e o documento como contexto, com qualquer provedor.
+- Na aba de terminal de um agente, uma faixa mostra o contexto da tela. O botão "Mandar contexto" cola o contexto no
+  terminal, para a pessoa mandar com Enter.
+
+## Roteiro de teste no app (10 minutos)
+
+Para o responsável, no Estúdio instalado, com a chave ou a conta dele. Nada aqui foi testado no Electron real.
+
+1. **Abrir.** Abra um projeto qualquer. No painel da IA, clique em "+ Conversa": a lista mostra Claude, DeepSeek,
+   Gemini, os outros provedores e o que falta em cada um.
+2. **Chave.** Clique em "Provedores e chaves…", abra DeepSeek (ou Gemini), cole a chave e clique em "Testar e gravar".
+   Deve aparecer "chave aceita e guardada cifrada neste PC" e o final da chave. Escolha o modelo na lista.
+3. **Conversa.** Em "+ Conversa", escolha DeepSeek e peça "deixe o título do vídeo em amarelo". Confira:
+   - o cartão "Mudou…" com Ver e Reverter;
+   - o rodapé com tokens e custo;
+   - no Histórico, a entrada com a origem "DeepSeek 1".
+
+   Clique em Reverter: o título volta.
+4. **Permissão.** Peça "leia a página https://www.planalto.gov.br/ccivil_03/decreto-lei/del5452.htm". Deve aparecer
+   o cartão "DeepSeek quer abrir uma página da internet". Negue e veja que nada roda; peça de novo e permita.
+5. **Seletor de modelo.** Troque o modelo no rodapé da caixa e mande outra mensagem. O aviso diz que o modelo novo vale
+   a partir dela.
+6. **Fechar e reabrir.** Feche o projeto e abra de novo. A conversa do DeepSeek volta hibernada, com o que foi dito.
+   Mande "o que você fez antes?": ela lembra.
+7. **App de fora.** Em Provedores e chaves, ligue "Apps de IA de fora", crie "Cursor" (ou "Claude Desktop") e copie a
+   configuração para o app. Peça a ele para listar os documentos do projeto e mudar uma cor. No Histórico, a mudança
+   aparece com a origem "Cursor". Se ele pedir para ler a web, o cartão aparece solto no canto. Revogue e veja que ele
+   perde o acesso.
+8. **Claude.** Abra uma conversa com o Claude e peça a mesma mudança de cor: o cartão, o Reverter e o Histórico são
+   iguais.
+
+Se algo falhar, anote o passo e a mensagem. O que é do Electron (cofre, cartão solto, ponte stdio, `claude.cmd`) só se
+confirma aqui.
