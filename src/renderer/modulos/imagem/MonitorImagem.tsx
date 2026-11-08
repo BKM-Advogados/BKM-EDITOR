@@ -4,17 +4,21 @@
 // escolhe e arrastar a move, mesmo sem estar selecionada (o gesto do Canva); Shift+clique põe ou tira da seleção,
 // arrastar no vazio faz o laço, Ctrl+A escolhe a página toda e Esc solta. Várias selecionadas andam juntas e a barra
 // de cima alinha e distribui (BarraSelecao.tsx). Grupo (Ctrl+G, Ctrl+Shift+G): o clique escolhe o grupo inteiro e o
-// duplo clique uma camada dele. Camada travada (Ctrl+Shift+L) se escolhe mas não anda nem muda de tamanho. A alça redimensiona uma camada (Shift mantém a proporção; girada, o
+// duplo clique uma camada dele. Camada travada (Ctrl+Shift+L) se escolhe mas não anda nem muda de tamanho. No arrasto,
+// a caixa encaixa nas bordas e centros da prancheta e das outras camadas, na margem segura e na grade (5 px de tela; Alt
+// solta), com as guias e a distância até o vizinho à vista; réguas, grade e margem ligam no menu Guias (Guias.tsx). A alça redimensiona uma camada (Shift mantém a proporção; girada, o
 // canto oposto fica parado), com um patch só ao soltar. Com a ferramenta de comentário (M), clicar abre um balão ancorado na camada e
 // no ponto da imagem; os pinos mostram os comentários do documento. Num carrossel, o monitor mostra a página ativa (a
 // barra de páginas fica entre a peça e o transporte, PaginasImagem.tsx) e os caminhos das camadas levam a página.
 // Foto recortada por máscara: o clique escolhe a máscara e arrastá-la leva a foto junto; o duplo clique escolhe a foto,
 // que então anda e muda de tamanho dentro da máscara sem mexer nela.
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
-import {Check, ChevronDown, Download, Hand, ImagePlus, Lock, MessageSquarePlus, MousePointer2, Square, Type, X, ZoomIn} from 'lucide-react';
+import {Check, ChevronDown, Download, Hand, ImagePlus, Lock, Magnet, MessageSquarePlus, MousePointer2, Square, Type, X, ZoomIn} from 'lucide-react';
 import type {CamadaImagem, Comentario, DocImagem} from '../../../nucleo/documentos';
 import {caminhoDoAlvo, paginaDoAlvo, paginaDoCaminho, temPaginas} from '../../../nucleo/carrossel';
-import {caixaDe, comAcompanhantes, membrosDoGrupo, patchMover, redimensionarGirada, tocadasPor, travada} from '../../../nucleo/layout-imagem';
+import {caixaDe, caixaDeVarias, comAcompanhantes, membrosDoGrupo, patchMover, redimensionarGirada, tocadasPor, travada, type Caixa} from '../../../nucleo/layout-imagem';
+import {mascarasEmUso} from '../../../nucleo/acabamento';
+import {alvosDeEncaixe, distancias, encaixar, margemSegura, passoDaGrade, TOLERANCIA_TELA, type Alvos, type Distancia, type Guia} from '../../../nucleo/encaixe-imagem';
 import {CamadaEfeitos} from '../../../composicoes/efeitos/CamadaEfeitos';
 import {aplicar, caminhosDaSelecao, comentar, loja, patchTrocar, selecionar, selecionarVarias, useLoja} from '../../estado/loja';
 import {SemDocumento} from '../../componentes/SemDocumento';
@@ -28,12 +32,14 @@ import {PaginasImagem} from './PaginasImagem';
 import {CamadasDaPagina, FundoPintado} from './Prancheta';
 import {BarraSelecao, type VistaAlvo} from './BarraSelecao';
 import {agruparSelecao, alternarTravaSelecao, desagruparSelecao} from './acoesSelecao';
+import {AjudaDoArrasto, Grade, Margem, Reguas, ROTULOS_GUIAS, usarOpcoesGuias} from './Guias';
 
 type Geometria = {x: number; y: number; largura: number; altura: number};
 // uma camada no gesto: índice, id (para o test do patch) e a geometria
 type Peca = Geometria & {i: number; id: string};
 // mover: as selecionadas (mais a foto de cada máscara) com o mesmo deslocamento; redimensionar: uma só, com o giro dela
-type Arrasto = {x0: number; y0: number; modo: 'mover' | 'redimensionar'; pecas: Peca[]; rot: number; alvo: Peca[] | null};
+// no mover, `encaixe` traz onde encaixar e as caixas das outras camadas (para as distâncias), calculados no apertar
+type Arrasto = {x0: number; y0: number; modo: 'mover' | 'redimensionar'; pecas: Peca[]; rot: number; alvo: Peca[] | null; encaixe?: {alvos: Alvos; outras: Caixa[]}};
 // laço: retângulo arrastado no vazio, em px do documento; `somar` é a seleção de antes (com Shift)
 type Laco = {x0: number; y0: number; x1: number; y1: number; somar: string[]};
 type Ferramenta = 'mover' | 'mao' | 'zoom' | 'texto' | 'forma';
@@ -103,6 +109,8 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
   const [laco, setLaco] = useState<Laco | null>(null);
   const lacoAtual = useRef<Laco | null>(null); // o laço em curso (o estado só desenha; os eventos leem daqui)
   const [vistaAlvo, setVistaAlvo] = useState<VistaAlvo>(null);
+  const [opcoesGuias, alternarGuia] = usarOpcoesGuias();
+  const [ajuda, setAjuda] = useState<{guias: Guia[]; distancias: Distancia[]} | null>(null);
   const [nova, setNova] = useState<Geometria | null>(null); // forma sendo desenhada
   const [hover, setHover] = useState<string | null>(null);
   const [balao, setBalao] = useState<{x: number; y: number; caminho?: string} | null>(null);
@@ -360,7 +368,12 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
     const pecas = (modo === 'mover' ? comAcompanhantes(camadasPag, indices) : indices).filter((i) => !travada(camadasPag[i])).map((i) => pecaDe(camadasPag[i], i));
     if (!pecas.length) return;
     ev.currentTarget.setPointerCapture(ev.pointerId);
-    arrasto.current = {x0: ev.clientX, y0: ev.clientY, modo, pecas, rot: modo === 'redimensionar' ? (camadasPag[indices[0]].rotacao ?? 0) : 0, alvo: null};
+    const andando = new Set(pecas.map((p) => p.i));
+    const encaixe = modo === 'mover' ? {
+      alvos: alvosDeEncaixe(camadasPag, andando, {largura: W, altura: H}, opcoesGuias.margem ? margemSegura(W, H) : undefined),
+      outras: camadasPag.flatMap((c, i) => (!c || andando.has(i) || c.visivel === false ? [] : [caixaDe(c)])),
+    } : undefined;
+    arrasto.current = {x0: ev.clientX, y0: ev.clientY, modo, pecas, rot: modo === 'redimensionar' ? (camadasPag[indices[0]].rotacao ?? 0) : 0, alvo: null, encaixe};
   };
 
   // mover (V): apertar numa camada a escolhe e já arrasta (D2); dentro da seleção arrasta todas; Shift põe ou tira; no
@@ -409,9 +422,22 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
     const tx = ev.clientX - a.x0;
     const ty = ev.clientY - a.y0;
     if (!a.alvo && Math.hypot(tx, ty) < 3) return;
-    const dx = tx / escala;
-    const dy = ty / escala;
-    if (a.modo === 'mover') a.alvo = a.pecas.map((b) => ({...b, x: Math.round(b.x + dx), y: Math.round(b.y + dy)}));
+    let dx = tx / escala;
+    let dy = ty / escala;
+    if (a.modo === 'mover') {
+      // encaixe: a caixa do que anda encosta no alvo mais perto a 5 px de tela; Alt solta
+      // a caixa que encaixa é a do que se vê: a foto que anda com a máscara fica de fora (o que aparece é a máscara)
+      const fotos = new Set(mascarasEmUso(camadasPag).values());
+      const vistas = a.pecas.filter((b) => !fotos.has(b.i));
+      const base0 = caixaDeVarias((vistas.length ? vistas : a.pecas).map((b) => ({...b, rotacao: camadasPag[b.i]?.rotacao})))!;
+      if (a.encaixe && opcoesGuias.encaixe && !ev.altKey) {
+        const e = encaixar({...base0, x: base0.x + dx, y: base0.y + dy}, a.encaixe.alvos, TOLERANCIA_TELA / escala, opcoesGuias.grade ? passoDaGrade(W) : undefined);
+        dx += e.dx;
+        dy += e.dy;
+        setAjuda({guias: e.guias, distancias: distancias({...base0, x: base0.x + dx, y: base0.y + dy}, a.encaixe.outras, {largura: W, altura: H})});
+      } else setAjuda(a.encaixe ? {guias: [], distancias: distancias({...base0, x: base0.x + dx, y: base0.y + dy}, a.encaixe.outras, {largura: W, altura: H})} : null);
+      a.alvo = a.pecas.map((b) => ({...b, x: Math.round(b.x + dx), y: Math.round(b.y + dy)}));
+    }
     else {
       // camada girada: o arrasto é projetado nos eixos dela, e o canto de cima à esquerda fica parado (D15)
       const b = a.pecas[0];
@@ -454,11 +480,13 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
       if (mudancas.length) await aplicar(documento, [{op: 'test', path: `${caminho}/id`, value: g.id}, ...mudancas], `tamanho da camada ${g.id}`);
     }
     setGesto(null);
+    setAjuda(null);
   };
 
   const cancelar = () => {
     arrasto.current = null;
     setGesto(null);
+    setAjuda(null);
     lacoAtual.current = null;
     setLaco(null);
   };
@@ -558,6 +586,10 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
               )}
               {laco && <div className="laco" style={{left: Math.min(laco.x0, laco.x1) * escala, top: Math.min(laco.y0, laco.y1) * escala,
                 width: Math.abs(laco.x1 - laco.x0) * escala, height: Math.abs(laco.y1 - laco.y0) * escala}} />}
+              {opcoesGuias.grade && <Grade escala={escala} largura={W} altura={H} passo={passoDaGrade(W)} />}
+              {opcoesGuias.margem && <Margem escala={escala} areas={margemSegura(W, H)} />}
+              {opcoesGuias.reguas && <Reguas escala={escala} largura={W} altura={H} />}
+              {ajuda && gesto && <AjudaDoArrasto escala={escala} largura={W} altura={H} guias={ajuda.guias} distancias={ajuda.distancias} />}
               {vistaAlvo?.alvo && <div className="alvo-alinhar" style={{left: vistaAlvo.alvo.x * escala, top: vistaAlvo.alvo.y * escala, width: vistaAlvo.alvo.w * escala, height: vistaAlvo.alvo.h * escala}} />}
               {vistaAlvo?.fantasmas.map((f, k) => <div key={k} className="fantasma-alvo" style={{left: f.x * escala, top: f.y * escala, width: f.w * escala, height: f.h * escala}} />)}
               {pinos.map((c) => (
@@ -599,6 +631,9 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
               {rotulo: '100%', tecla: 'Ctrl+1', acao: () => setZoom(1)},
               {rotulo: '200%', acao: () => setZoom(2)},
             ]} />
+          <BotaoMenu className="bt mini" lado="esquerda" acima titulo="Guias: encaixe, réguas, grade e margem segura" icone={<Magnet className="i14" />}
+            rotulo={<span className="largo">Guias</span>}
+            itens={ROTULOS_GUIAS.map(([k, nome]) => ({rotulo: `${opcoesGuias[k] ? '✓ ' : '   '}${nome}`, acao: () => alternarGuia(k)}))} />
           <span className="coords largo" ref={coords} />
           <button className="bt fantasma" style={{marginLeft: 'auto'}} disabled={exportando} onClick={exportar}
             title={variasPaginas ? 'Exportar só esta página em PNG, com os efeitos (o carrossel inteiro sai pela barra de páginas)' : 'Exportar PNG em resolução cheia, com os efeitos'}>

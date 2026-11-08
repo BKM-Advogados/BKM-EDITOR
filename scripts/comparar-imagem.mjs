@@ -1,7 +1,8 @@
 // Prévia × PNG exportado, fora do Electron (que não roda neste PC): sobe o Vite da prévia web, abre a página no
 // Chromium de render do Remotion (o mesmo do exportar-teste), monta um carrossel de teste com sombra, contorno,
 // degradê, fundo em degradê, foto recortada no círculo e, com --foto e o modelo em testes/saida/modelos/modnet/, a foto
-// da pessoa sem fundo pelo mesmo caminho do botão (worker + ONNX). Fotografa o monitor em 50% e compara pixel a pixel
+// da pessoa sem fundo pelo mesmo caminho do botão (worker + ONNX). Rodada 3: texto com hífen no fim da linha (imagem-D6,
+// em DOM na prévia) e texto que cabe na caixa (`caber`). Fotografa o monitor em 50% e compara pixel a pixel
 // com o desenharDocumento do PNG na mesma escala, página por página; grava em testes/saida/acabamento/ a prévia, o PNG,
 // a diferença ampliada, o carrossel em PNG (resolução cheia) e o PDF (pdfDasPaginas, o mesmo do app).
 // Uso: npx tsx scripts/comparar-imagem.mjs [--foto caminho/da/foto.jpg] [--chrome caminho/do/chrome-headless-shell.exe]
@@ -59,6 +60,9 @@ const advogado = [
       contorno: {cor: '#F4F0EA', espessura: 8}, sombra: {opacidade: 0.5, desfoque: 24, y: 12}},
   {id: 'nome', nome: 'Nome', tipo: 'texto', texto: 'Dra. Ana Exemplo', fonte: 'Archivo', peso: 700, tamanho: 84, alinhar: 'centro', x: 60, y: 1080, largura: 960, altura: 100,
     cor: '#F4F0EA', contorno: {cor: '#171A19', espessura: 4, posicao: 'centro'}, sombra: {opacidade: 0.6, desfoque: 12, x: 4, y: 4}},
+  // rodada 3: hífen no fim da linha em texto sem acabamento (DOM na prévia, imagem-D6) e texto que cabe na caixa
+  {id: 'hifen', nome: 'Hífen', tipo: 'texto', texto: 'Rescisão com pré-aviso indenizado', fonte: 'IBM Plex Sans', peso: 600, tamanho: 44, cor: '#F4F0EA', x: 60, y: 40, largura: 420, altura: 110},
+  {id: 'cabe', nome: 'Cabe', tipo: 'texto', texto: 'Prazo de 10 dias', fonte: 'Archivo', peso: 800, tamanho: 30, cor: '#E4B492', caber: true, x: 560, y: 30, largura: 460, altura: 150},
   {id: 'cargo', nome: 'Cargo', tipo: 'texto', texto: 'Direito do trabalho', fonte: 'IBM Plex Mono', peso: 400, tamanho: 40, alinhar: 'centro', x: 60, y: 1190, largura: 960, altura: 60,
     degrade: {tipo: 'linear', angulo: 90, paradas: [{cor: '#E4B492', posicao: 0}, {cor: '#C88155', posicao: 0.5}, {cor: '#E4B492', posicao: 1}]}},
 ];
