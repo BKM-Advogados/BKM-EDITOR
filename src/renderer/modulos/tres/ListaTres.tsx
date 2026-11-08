@@ -5,6 +5,7 @@ import {Box, Circle, Cone, Cylinder, Eye, EyeOff, Lightbulb, Plus, Square, Sun, 
 import type {DocCena3D, Luz3D} from '../../../nucleo/documentos';
 import {aplicar, documentosDe, loja, selecionar, trocar, useLoja} from '../../estado/loja';
 import {indiceEm, luzesDe, novoObjeto, objetosDe, TIPOS, type TipoObjeto} from './comum';
+import {useCena3d} from './lida';
 
 const ICONE: Record<TipoObjeto, React.ReactNode> = {
   caixa: <Box size={13} />, esfera: <Circle size={13} />, cilindro: <Cylinder size={13} />, cone: <Cone size={13} />, toro: <Torus size={13} />, plano: <Square size={13} />,
@@ -15,7 +16,7 @@ const cortar: React.CSSProperties = {flex: 1, overflow: 'hidden', textOverflow: 
 
 export const ListaTres: React.FC = () => {
   const documento = useLoja((e) => e.ativo['3d']);
-  const doc = useLoja((e) => (documento ? e.docs[documento]?.doc : undefined)) as DocCena3D | undefined;
+  const doc = useCena3d(documento)?.doc; // validada (tres-efeitos-D12)
   const selecao = useLoja((e) => e.selecao);
   const comentarios = useLoja((e) => e.comentarios);
   const [menu, setMenu] = useState(false);

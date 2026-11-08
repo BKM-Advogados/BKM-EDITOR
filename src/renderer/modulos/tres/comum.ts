@@ -1,6 +1,6 @@
 // Peças comuns do módulo 3D: tipos de primitiva, valores padrão do material, arredondamento e leitura dos caminhos
 // (/objetos/i, /luzes/i). Sem Three.js aqui, para a lista e o inspector não dependerem do motor.
-import type {DocCena3D, Objeto3D, Vetor3} from '../../../nucleo/documentos';
+import type {DocCena3D, Luz3D, Objeto3D, Vetor3} from '../../../nucleo/documentos';
 
 export type TipoObjeto = Objeto3D['tipo'];
 export type Transformacao = {posicao: Vetor3; rotacao: Vetor3; escala: Vetor3};
@@ -35,8 +35,10 @@ export const indiceEm = (caminho: string | undefined, lista: 'objetos' | 'luzes'
   return m ? Number(m[1]) : -1;
 };
 
-export const objetosDe = (doc: DocCena3D | undefined): Objeto3D[] => (Array.isArray(doc?.objetos) ? doc.objetos : []);
-export const luzesDe = (doc: DocCena3D | undefined) => (Array.isArray(doc?.luzes) ? doc.luzes : []);
+// um item que não é objeto (JSON à mão) vira {}: a posição na lista continua a do documento e `.id` não derruba nada
+const comoObjeto = <T,>(x: unknown) => (x && typeof x === 'object' ? x : {}) as T;
+export const objetosDe = (doc: DocCena3D | undefined): Objeto3D[] => (Array.isArray(doc?.objetos) ? doc.objetos : []).map((o) => comoObjeto<Objeto3D>(o));
+export const luzesDe = (doc: DocCena3D | undefined) => (Array.isArray(doc?.luzes) ? doc.luzes : []).map((l) => comoObjeto<Luz3D>(l));
 
 /** Primitiva nova com id e nome únicos e transformação padrão. */
 export const novoObjeto = (doc: DocCena3D | undefined, tipo: TipoObjeto): Objeto3D => {

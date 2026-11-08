@@ -8,6 +8,8 @@ import {CampoDeslizante, CampoNumero, CampoTexto, Secao} from '../../componentes
 import {indiceEm, luzesDe, objetosDe, PADRAO_METALICO, PADRAO_RUGOSIDADE, TIPOS, type TipoObjeto} from './comum';
 import {CampoCorAoSoltar, CampoEscolha, CampoVetor} from './CamposTres';
 import {ajustarAoVivo, usarVistaComoCamera} from './vista';
+import {corrigirCena3d, useCena3d} from './lida';
+import type {CenaLida, ProblemaCena3D} from '../../../nucleo/cena3d';
 
 const TIPOS_LUZ: {valor: Luz3D['tipo']; nome: string}[] = [
   {valor: 'ambiente', nome: 'Ambiente'},
@@ -87,20 +89,40 @@ const InspectorCena: React.FC<{documento: string; doc: DocCena3D}> = ({documento
   );
 };
 
+/** O que estava fora do lugar no documento neste item (ou na cena, sem item), com o botão que grava a correção. */
+const AvisosDoDocumento: React.FC<{documento: string; lida: CenaLida; problemas: ProblemaCena3D[]}> = ({documento, lida, problemas}) => {
+  if (!problemas.length) return null;
+  return (
+    <Secao titulo={`Avisos (${problemas.length})`}>
+      <div className="avisos-roteiro" data-avisos-3d>
+        {problemas.map((p, i) => <div key={i}>{p.texto}</div>)}
+      </div>
+      <div style={{padding: '4px 10px 6px'}}>
+        <button className="bt mini" title="Grava no documento os valores que a tela está usando (Ctrl+Z desfaz)" onClick={() => void corrigirCena3d(documento, lida, problemas)}>Corrigir no documento</button>
+      </div>
+    </Secao>
+  );
+};
+
 export const InspectorTres: React.FC = () => {
   const documento = useLoja((e) => e.ativo['3d']);
-  const doc = useLoja((e) => (documento ? e.docs[documento]?.doc : undefined)) as DocCena3D | undefined;
+  const lida = useCena3d(documento); // a cena validada: campo com tipo errado não derruba a janela (tres-efeitos-D12)
+  const doc = lida?.doc;
   const selecao = useLoja((e) => e.selecao);
-  if (!documento || !doc) return <div className="vazio">Sem cena 3D ainda: crie no monitor.</div>;
+  if (!documento || !doc || !lida) return <div className="vazio">Sem cena 3D ainda: crie no monitor.</div>;
   const caminho = selecao?.documento === documento ? selecao.caminho : undefined;
   const iObj = indiceEm(caminho, 'objetos');
   const iLuz = indiceEm(caminho, 'luzes');
   const o = iObj >= 0 ? objetosDe(doc)[iObj] : undefined;
   const l = iLuz >= 0 ? luzesDe(doc)[iLuz] : undefined;
+  // os avisos do item selecionado; sem item, os da cena (fundo e câmera)
+  const problemas = lida.problemas.filter((p) => (o && caminho ? p.caminho.startsWith(`${caminho}/`) || p.caminho === caminho
+    : l && caminho ? p.caminho.startsWith(`${caminho}/`) || p.caminho === caminho : !/^\/(objetos|luzes)\//.test(p.caminho)));
 
   return (
     <div className="painel">
       <div className="painel-corpo">
+        <AvisosDoDocumento documento={documento} lida={lida} problemas={problemas} />
         {o && caminho ? (
           <InspectorObjeto key={o.id} documento={documento} caminho={caminho} o={o} />
         ) : l && caminho ? (
