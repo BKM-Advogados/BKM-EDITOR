@@ -14,11 +14,14 @@ import {EFEITOS} from './efeitos';
 import {MODELOS, type IdModelo} from './modelos';
 import {FORMATOS_IMAGEM, FORMATOS_VIDEO, type Formato} from './formatos';
 import {arquivosDaMarca, patchDaMarca, temaDaMarca} from './marca';
+import {REGRAS_MIDIA_PESADA} from './midia-git';
 import type {MarcaLida} from './pasta-marcas';
 import {serializar} from './projeto';
 
 // o texto baixado de cada fonte (pesquisa/fontes/<id>.txt) fica fora do git: é grande e se baixa de novo pela url
-export const GITIGNORE = 'saidas/\n.estudio/estado.json\n.estudio/miniatura.jpg\n.estudio/mcp*\n*.tmp\npesquisa/fontes/\n';
+// vídeo e áudio sem perda em midia/ também ficam de fora (transversal-D7, midia-git.ts); o que passa de 25 MB entra na regra
+// pelo caminho exato antes de cada commit
+export const GITIGNORE = `saidas/\n.estudio/estado.json\n.estudio/miniatura.jpg\n.estudio/mcp*\n*.tmp\npesquisa/fontes/\n${REGRAS_MIDIA_PESADA.join('\n')}\n`;
 
 const DOIS = (n: number) => String(n).padStart(2, '0');
 

@@ -13,6 +13,7 @@ import {FORMATO_PADRAO} from '../nucleo/formatos';
 import type {DocVideo} from '../nucleo/documentos';
 import type {PropsVideo} from '../compartilhado/api';
 import {lerEnvelopes} from './ipc-audio';
+import {arquivosDaMidia, gitignoreComMidiaPesada} from '../nucleo/midia-git'; // frente Casca (transversal-D7)
 
 const exec = promisify(execFile);
 const IGNORAR = /(^|[\\/])(\.git|node_modules)([\\/]|$)|\.tmp$|estado\.json$|mcp\.json$/;
@@ -90,10 +91,23 @@ export class SessaoProjeto {
     return true;
   }
 
+  /** transversal-D7: vídeo bruto e o que passa de 25 MB em midia/ ficam fora do git (midia-git.ts). Antes de cada commit,
+   *  porque a mídia chega a qualquer hora (gravação, importação, o agente copiando). */
+  private ignorarMidiaPesada() {
+    try {
+      const atual = this.projeto.existe('.gitignore') ? this.projeto.lerTexto('.gitignore') : '';
+      const novo = gitignoreComMidiaPesada(atual, arquivosDaMidia(this.projeto.raiz));
+      if (novo !== atual) this.projeto.gravarTexto('.gitignore', novo);
+    } catch {
+      /* sem permissão para o .gitignore: o commit segue como antes */
+    }
+  }
+
   /** Commit de tudo o que mudou, com os autores tirados do diário. */
   async salvarVersao(mensagem?: string) {
     this.relogioGit = null;
     try {
+      this.ignorarMidiaPesada();
       await this.git('add', '-A');
       const {stdout} = await this.git('status', '--porcelain');
       if (!stdout.trim()) return;
