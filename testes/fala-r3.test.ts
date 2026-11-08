@@ -1,4 +1,6 @@
 // Rodada 3 da frente Fala (docs/legendas.md): os defeitos da área e a régua das legendas. Cada describe cita o id.
+import {readFileSync} from 'node:fs';
+import path from 'node:path';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {describe, expect, it, vi} from 'vitest';
@@ -6,7 +8,7 @@ import {Legendas} from '../src/composicoes/cenas/Legendas';
 import type {ClipeAudio} from '../src/nucleo/audio';
 import {novoDocCenas, resolverCenas, type DocCenas} from '../src/nucleo/cenas';
 import {
-  comTexto, legendasAoDividirClipe, legendasAoDuplicarClipe, lerLegendas, nomeLivreDaLegenda, legendasDeOutraTomada, legendasDoDocumento, limitesDoArrasto, mesmaTomada, resolverLegendas, textoDeLegenda, type LegendasCenas,
+  comTexto, CPS_MAX, cpsDe, MAX_SEGMENTO_MS, MIN_SEGMENTO_MS, PAUSA_QUEBRA_MS, quebrarEmSegmentos, legendasAoDividirClipe, legendasAoDuplicarClipe, lerLegendas, nomeLivreDaLegenda, legendasDeOutraTomada, legendasDoDocumento, limitesDoArrasto, mesmaTomada, resolverLegendas, textoDeLegenda, type LegendasCenas,
 } from '../src/nucleo/legendas';
 
 const tela = vi.hoisted(() => ({quadro: 0}));
@@ -16,6 +18,7 @@ vi.mock('remotion', async (original) => ({
   useVideoConfig: () => ({fps: 30, width: 1080, height: 1920, durationInFrames: 1, id: 'x', defaultProps: {}, props: {}}),
 }));
 const TEMA = novoDocCenas({largura: 1080, altura: 1920, fps: 30}).tema;
+const FALA_C2 = JSON.parse(readFileSync(path.join(__dirname, '..', 'exemplos', 'exemplo', 'video', 'palavras.json'), 'utf-8')) as {w: string; s: number; e: number}[];
 
 const SRT = '1\r\n00:00:01,000 --> 00:00:02,500\r\nA rescisão e o aviso prévio\r\n\r\n2\r\n00:00:03,000 --> 00:00:04,000\r\nmudança de função\r\n';
 /** Windows-1252: ã = E3, é = E9, ç = E7 (o "ANSI" do Bloco de Notas). */
@@ -175,5 +178,48 @@ describe('dividir e duplicar clipe de voz levando as legendas (funções para o 
     const segs = naTela(copia).segs;
     expect(segs.map((s) => [s.texto, s.em])).toEqual([['Recebeu', 1000], ['proposta de mudança', 2000], ['Recebeu', 11_000], ['proposta de mudança', 12_000]]);
     expect(new Set(legendas.segmentos.map((s) => s.id)).size).toBe(4);
+  });
+});
+
+describe('régua: pausa de 300 ms, 833 ms a 7 s e 17 caracteres por segundo', () => {
+  const ws = (texto: string, passo = 300, de = 0) => texto.split(' ').map((w, i) => ({w, s: de + i * passo, e: de + i * passo + passo - 40}));
+
+  it('as constantes são as da régua', () => {
+    expect([PAUSA_QUEBRA_MS, MIN_SEGMENTO_MS, MAX_SEGMENTO_MS, CPS_MAX]).toEqual([300, 833, 7000, 17]);
+  });
+
+  it('o silêncio de 300 ms abre legenda nova; 250 ms não', () => {
+    const fala = [...ws('a empresa mudou', 300), ...ws('de cidade', 300, 900 - 40 + 300)];
+    expect(quebrarEmSegmentos(fala, {max_caracteres: 84}).map((s) => s.texto)).toEqual(['a empresa mudou', 'de cidade']);
+    const colada = [...ws('a empresa mudou', 300), ...ws('de cidade', 300, 900 - 40 + 250)];
+    expect(quebrarEmSegmentos(colada, {max_caracteres: 84}).map((s) => s.texto)).toEqual(['a empresa mudou de cidade']);
+  });
+
+  it('nenhuma legenda passa de 7 s', () => {
+    const longa = ws(Array.from({length: 40}, (_, i) => `p${i}`).join(' '), 300);
+    for (const s of quebrarEmSegmentos(longa, {max_caracteres: 1000})) expect(s.sai - s.em).toBeLessThanOrEqual(7000);
+  });
+
+  it('fala rápida ganha o vão até a próxima para ficar em 17 car/s; sem vão, a medida avisa', () => {
+    // 38 caracteres ditos em 1 s, e a próxima frase 3 s depois: a legenda fica até 38/17 s
+    const rapida = [...ws('Recebeu proposta para mudar de cidade?', 1000 / 6), {w: 'Sim.', s: 4000, e: 4300}];
+    const [a] = quebrarEmSegmentos(rapida, {max_caracteres: 84});
+    expect(a.sai - a.em).toBeGreaterThanOrEqual(Math.ceil((38 / 17) * 1000) - 1);
+    expect(cpsDe(a)).toBeLessThanOrEqual(17);
+    // colada na próxima, não dá para esticar: cpsDe diz quanto passou
+    const colada = [...ws('Recebeu proposta para mudar de cidade?', 1000 / 6), {w: 'Sim.', s: 1100, e: 1400}];
+    const [b] = quebrarEmSegmentos(colada, {max_caracteres: 84});
+    expect(cpsDe(b)).toBeGreaterThan(17);
+    expect(cpsDe({texto: 'linha um\nlinha dois', em: 0, sai: 1000})).toBe(19);
+  });
+
+  it('na narração do C2, a régua vale em toda legenda que tem vão para isso', () => {
+    const segs = quebrarEmSegmentos(FALA_C2, {max_caracteres: 84});
+    for (const [i, s] of segs.entries()) {
+      expect(s.sai - s.em).toBeLessThanOrEqual(7000);
+      const vao = (segs[i + 1]?.em ?? Infinity) - s.em;
+      if (vao >= MIN_SEGMENTO_MS) expect(s.sai - s.em).toBeGreaterThanOrEqual(MIN_SEGMENTO_MS);
+      if (vao >= (s.texto.length / 17) * 1000 + 1) expect(cpsDe(s)).toBeLessThanOrEqual(17);
+    }
   });
 });

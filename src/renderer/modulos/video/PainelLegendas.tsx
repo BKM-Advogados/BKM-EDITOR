@@ -9,7 +9,7 @@ import type {EstadoTranscricao} from '../../../compartilhado/api';
 import {TEMA_NEUTRO, type DocCenas, type PropsCenas} from '../../../nucleo/cenas';
 import {formatoDoVideo} from '../../../nucleo/formatos';
 import {
-  arquivoDaFala, arquivoDasPalavras, clipesDeVoz, legendasDeOutraTomada, localizar, POSICOES_LEGENDA, PREDEFINICOES_LEGENDA, resolverEstilo, segmentosEm, type EstiloLegenda, type IdEstiloLegenda, type PosicaoLegenda,
+  arquivoDaFala, arquivoDasPalavras, clipesDeVoz, CPS_MAX, cpsDe, legendasDeOutraTomada, localizar, POSICOES_LEGENDA, PREDEFINICOES_LEGENDA, resolverEstilo, segmentosEm, type EstiloLegenda, type IdEstiloLegenda, type PosicaoLegenda,
   type EstadoDaFala, type SegmentoLegenda,
 } from '../../../nucleo/legendas';
 import {selecionar, trocar, useLoja} from '../../estado/loja';
@@ -73,6 +73,11 @@ const ItemLegenda: React.FC<{documento: string; s: SegmentoLegenda; em: number; 
             }
           }} />
         {s.falante && <span className="falante">{s.falante}</span>}
+        {cpsDe({texto: s.texto, em, sai}) > CPS_MAX && (
+          <span className="rapida" title={`Rápida para ler: ${String(cpsDe({texto: s.texto, em, sai})).replace('.', ',')} caracteres por segundo (a régua é até ${CPS_MAX}). Estique o fim, divida ou encurte o texto.`}>
+            {String(cpsDe({texto: s.texto, em, sai})).replace('.', ',')} car/s
+          </span>
+        )}
         <span className="acoes-item">
           <button className="bti" title="Juntar com a próxima" disabled={ultima} onClick={() => void juntarComProxima(documento, s.id)}><Combine /></button>
           <button className="bti" title={cabeca > em && cabeca < sai ? 'Dividir na cabeça' : 'Dividir no meio'} onClick={() => void dividir(documento, s.id, cabeca > em && cabeca < sai ? cabeca - (em - s.em) : undefined)}>

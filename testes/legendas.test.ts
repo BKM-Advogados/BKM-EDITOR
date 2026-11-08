@@ -114,9 +114,9 @@ describe('quebrar as palavras em legendas', () => {
     expect(duas.map((s) => s.texto)).toEqual(['Sim.', 'Ok.']);
   });
 
-  it('legenda curta ganha tempo até 0,7 s, sem invadir a próxima', () => {
+  it('legenda curta ganha tempo até 833 ms, sem invadir a próxima', () => {
     const r = quebrarEmSegmentos([{w: 'Sim.', s: 0, e: 150}, {w: 'Não.', s: 400, e: 600}, {w: 'Talvez.', s: 3000, e: 3200}], {max_caracteres: 42});
-    expect(r.map((s) => [s.em, s.sai])).toEqual([[0, 400], [400, 1100], [3000, 3700]]);
+    expect(r.map((s) => [s.em, s.sai])).toEqual([[0, 400], [400, 1233], [3000, 3833]]);
   });
 });
 

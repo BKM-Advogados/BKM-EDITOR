@@ -168,6 +168,7 @@ describe('MCP: transcrever e legendas', () => {
     const guardada = lerVideo().legendas!.segmentos[0];
     const lidas = (await chamar(c, 'ler_legendas', {documento: 'video'})).json;
     expect(lidas.legendas[0]).toMatchObject({id: guardada.id, em: guardada.em + 2000, sai: guardada.sai + 2000});
+    expect(lidas.legendas[0].cps).toBe(Math.round((guardada.texto.length / ((guardada.sai - guardada.em) / 1000)) * 10) / 10);
     expect((await chamar(c, 'ler_legendas', {documento: 'video', de: guardada.sai + 2000, ate: guardada.sai + 2001})).json.legendas.map((s: {id: string}) => s.id)).not.toContain(guardada.id);
     // texto: a palavra corrigida guarda o tempo dela
     const ws = guardada.texto.split(' ');

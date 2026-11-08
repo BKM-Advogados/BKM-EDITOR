@@ -108,9 +108,12 @@ export const caracteresPorLinha = (estilo: EstiloLegenda | undefined, largura: n
 // ---------- gerar a partir das palavras ----------
 
 export type OpcoesQuebra = {max_caracteres: number; max_palavras?: number; pausa_ms?: number; max_ms?: number; min_ms?: number; segura_ms?: number};
-export const PAUSA_QUEBRA_MS = 600; // silêncio que fecha a legenda
-export const MAX_SEGMENTO_MS = 6000;
-export const MIN_SEGMENTO_MS = 700;
+// a régua (Netflix pt-BR e @remotion/captions): página nova no silêncio de ~300 ms, cada legenda entre 5/6 s e 7 s, e
+// até 17 caracteres por segundo para ler
+export const PAUSA_QUEBRA_MS = 300; // silêncio que fecha a legenda
+export const MAX_SEGMENTO_MS = 7000;
+export const MIN_SEGMENTO_MS = 833;
+export const CPS_MAX = 17;
 const SEGURA_MS = 250; // a legenda fica um pouco depois da última palavra
 const FIM_DE_FRASE = /[.?!…]["'”»)]*$/;
 // artigo, preposição e conjunção não terminam legenda quando dá para evitar ("a mudança de | casa")
@@ -134,9 +137,10 @@ export const juntarPedacos = (palavras: PalavraLegenda[]): PalavraLegenda[] => {
   return out;
 };
 
-/** Quebra as palavras em legendas: fecha na pausa longa, no fim de frase, na vírgula quando já há meia legenda, quando
- *  passaria da largura (em caracteres) ou do número de palavras, e aos 6 s. O fim fica 250 ms depois da última palavra,
- *  sem invadir a próxima, e nenhuma dura menos de 0,7 s se houver espaço. */
+/** Quebra as palavras em legendas: fecha no silêncio de 300 ms, no fim de frase, na vírgula quando já há meia legenda,
+ *  quando passaria da largura (em caracteres) ou do número de palavras, e aos 7 s. O fim fica 250 ms depois da última
+ *  palavra e, se precisar, avança no vão até a próxima para dar tempo de ler: pelo menos 833 ms e no máximo 17
+ *  caracteres por segundo, sem passar de 7 s nem invadir a próxima. */
 export const quebrarEmSegmentos = (palavras: PalavraLegenda[], o: OpcoesQuebra): Omit<SegmentoLegenda, 'id'>[] => {
   const pausa = o.pausa_ms ?? PAUSA_QUEBRA_MS;
   const maxMs = o.max_ms ?? MAX_SEGMENTO_MS;
@@ -174,10 +178,12 @@ export const quebrarEmSegmentos = (palavras: PalavraLegenda[], o: OpcoesQuebra):
   return grupos.map((g, i) => {
     const prox = grupos[i + 1]?.[0].s ?? Infinity;
     const em = g[0].s;
+    const texto = g.map((p) => p.w).join(' ');
     let sai = Math.min(g[g.length - 1].e + segura, prox);
-    if (sai - em < min) sai = Math.min(em + min, prox);
-    sai = Math.max(sai, g[g.length - 1].e);
-    return {em, sai, texto: g.map((p) => p.w).join(' '), palavras: g.map((p) => ({...p}))};
+    const leitura = Math.max(min, (texto.length / CPS_MAX) * 1000);
+    if (sai - em < leitura) sai = Math.min(em + leitura, prox, em + maxMs);
+    sai = Math.round(Math.max(sai, g[g.length - 1].e));
+    return {em, sai, texto, palavras: g.map((p) => ({...p}))};
   });
 };
 
@@ -470,6 +476,10 @@ export const estimarPalavras = (texto: string, em: number, sai: number): Palavra
     return {w, s: Math.round(s), e: Math.round(i === ws.length - 1 ? sai : t)};
   });
 };
+
+/** Caracteres por segundo da legenda, como a régua conta: letras, espaços e pontuação; a quebra de linha não conta. */
+export const cpsDe = (s: {texto: string; em: number; sai: number}) =>
+  Math.round((s.texto.replace(/\s*\n\s*/g, ' ').trim().length / Math.max(0.001, (s.sai - s.em) / 1000)) * 10) / 10;
 
 /** As palavras do segmento, sempre com o texto dele. Com as palavras gravadas e o mesmo número de palavras no texto,
  *  cada uma fica com o tempo da que estava no lugar (o texto corrigido por patch, sem mexer em `palavras`, não perde o
