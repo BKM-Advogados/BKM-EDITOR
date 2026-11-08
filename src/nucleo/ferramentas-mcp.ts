@@ -19,6 +19,7 @@ import {
   sinaisDeVigencia, tituloDoHtml, TAMANHO_PAGINA, type Fato, type Fonte,
 } from './pesquisa';
 import {checarTexto, REGRAS_CLIENTE, terminaComUltimaFrase, type Aviso} from './regras';
+import {registrarMidia} from './mcp-midia'; // frente Casca
 import {acharCamada, caminhosDoId} from './carrossel';
 import {MODELO_FUNDO, patchSemFundo, patchVoltarAoOriginal, removedorDeFundo} from './remover-fundo';
 
@@ -243,6 +244,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
 
   registrarFala(servidor, projeto, autor, origem, transcritor); // frente Fala: transcrever e legendas
   registrarAcabamento(servidor, projeto, autor, origem); // acabamento da imagem (rodada 2, B2)
+  registrarMidia(servidor, projeto, autor, origem); // frente Casca (rodada 3): listar_midia e marcar_midia, em mcp-midia.ts
 };
 
 // ---------- pesquisa: fontes e fatos (src/nucleo/pesquisa.ts, docs/pesquisa.md) ----------
