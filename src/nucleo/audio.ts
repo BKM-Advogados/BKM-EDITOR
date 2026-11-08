@@ -4,6 +4,8 @@
 // dois chamam estas funções. Os níveis são em dB com a ponderação K da ITU-R BS.1770 (o que o medidor de LUFS mede),
 // para a diferença voz × música sair em LU medidos, e não em "volume" chutado.
 
+import type {CortesFalaClipe} from './cortes-fala'; // frente Fala
+
 export type PapelFaixa = 'voz' | 'musica' | 'efeitos';
 
 /** A música cai sob a voz: `alvo_lu` abaixo da voz (mediana), com ataque e soltura em ms. Só vale em faixa de música. */
@@ -22,6 +24,7 @@ export type ClipeAudio = {
   mudo?: boolean;
   original?: string; // voz limpa: o arquivo da pessoa, intacto ("Voltar ao original" põe de volta em `arquivo`)
   limpeza?: LimpezaClipe; // o que a limpeza de voz fez e mediu (limpeza-voz.ts)
+  cortes_fala?: CortesFalaClipe; // frente Fala: o clipe toca a narração sem os silêncios e o "ãh" (cortes-fala.ts); aqui o de antes, para voltar
 };
 
 /** Limpeza de voz gravada no clipe: a intensidade usada e o ruído nas pausas e a voz antes e depois, em dB (ponderação K). */
