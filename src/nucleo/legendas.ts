@@ -652,6 +652,62 @@ export const limitesDoArrasto = (doc: {audio?: AudioCenas; legendas?: LegendasCe
   return min <= max ? {min, max} : {min: 0, max: 0};
 };
 
+// ---------- dividir e duplicar clipe de voz (o Som chama; fala-D12) ----------
+
+/** Um id `leg-N` que ainda não existe. */
+const idsLivres = (segs: SegmentoLegenda[]) => {
+  const usados = new Set(segs.map((s) => s.id));
+  let n = segs.length + 1;
+  return () => {
+    while (usados.has(`leg-${n}`)) n++;
+    usados.add(`leg-${n}`);
+    return `leg-${n}`;
+  };
+};
+const comOrigemDe = (leg: LegendasCenas, clipe: string, novo: string): OrigemLegendas[] | undefined => {
+  const origens = Array.isArray(leg.origens) ? leg.origens : undefined;
+  const o = origens?.find((x) => x.clipe === clipe);
+  return origens && o ? [...origens.filter((x) => x.clipe !== novo), {...o, clipe: novo}] : origens;
+};
+
+/** As legendas depois de dividir o clipe de voz `clipe` em `em_ms` (tempo da tela). O pedaço novo (`novo`, que começa em
+ *  em_ms) fica com as legendas cujas palavras caem depois do corte (pelo meio da palavra, como o resolvedor), e a legenda
+ *  cortada no meio vira duas. A origem do clipe é copiada para o novo: o "zero do arquivo" dos dois pedaços é o mesmo
+ *  (em − corte_ms), então nada muda de lugar e nenhuma palavra some da tela. `clipes`: os clipes como estão ANTES da
+ *  divisão. Junto, o Som grava os dois clipes: o de antes com duracao_ms = em_ms − em; o novo com em = em_ms,
+ *  corte_ms = corte_ms + (em_ms − em) e o resto da duração. */
+export const legendasAoDividirClipe = (leg: LegendasCenas | undefined, o: {clipe: string; novo: string; em_ms: number; clipes: {id: string; em: number; corte_ms?: number}[]}):
+  LegendasCenas | undefined => {
+  if (!leg || !Array.isArray(leg.segmentos)) return leg;
+  const corte = o.em_ms - deslocamentoDaLegenda({clipe: o.clipe}, leg.origens, o.clipes); // o corte no tempo guardado
+  const novoId = idsLivres(leg.segmentos);
+  const meio = (p: PalavraLegenda) => (p.s + Math.max(p.s, p.e)) / 2;
+  const segmentos = leg.segmentos.flatMap((s): SegmentoLegenda[] => {
+    if (s?.clipe !== o.clipe) return [s];
+    const ps = palavrasDe(s);
+    const a = ps.filter((p) => meio(p) < corte);
+    const b = ps.filter((p) => meio(p) >= corte);
+    if (!b.length) return [s];
+    if (!a.length) return [{...s, clipe: o.novo}];
+    return [
+      {...s, texto: a.map((p) => p.w).join(' '), palavras: a, sai: Math.max(a[a.length - 1].e, Math.min(s.sai, corte))},
+      {...s, id: novoId(), clipe: o.novo, texto: b.map((p) => p.w).join(' '), palavras: b, em: Math.max(s.em, Math.min(b[0].s, corte))},
+    ];
+  }).sort((x, y) => x.em - y.em);
+  return {...leg, segmentos, origens: comOrigemDe(leg, o.clipe, o.novo)};
+};
+
+/** As legendas depois de duplicar o clipe de voz `clipe` como `novo`: as do clipe ganham uma cópia ligada ao novo (ids
+ *  novos), e a origem é copiada. Onde o Som puser a cópia, as legendas dela vão junto (o resolvedor desloca pelo em e
+ *  pelo corte do clipe novo). */
+export const legendasAoDuplicarClipe = (leg: LegendasCenas | undefined, o: {clipe: string; novo: string}): LegendasCenas | undefined => {
+  if (!leg || !Array.isArray(leg.segmentos)) return leg;
+  const novoId = idsLivres(leg.segmentos);
+  const copias = leg.segmentos.filter((s) => s?.clipe === o.clipe).map((s) => ({...s, id: novoId(), clipe: o.novo,
+    ...(Array.isArray(s.palavras) ? {palavras: s.palavras.map((p) => ({...p}))} : {})}));
+  return {...leg, segmentos: [...leg.segmentos, ...copias], origens: comOrigemDe(leg, o.clipe, o.novo)};
+};
+
 /** Props das legendas, em ms de saída. Segmento que veio de um clipe anda com ele (o clipe mudou de lugar ou foi aparado
  *  depois de gerar) e perde as palavras que o clipe aparado não toca mais; só então a ponta dele é cortada. O que estiver
  *  fora do lugar vira aviso, não erro: o clipe que sumiu, a tomada trocada (a legenda fica no tempo em que nasceu) e a

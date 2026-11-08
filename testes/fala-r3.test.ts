@@ -6,7 +6,7 @@ import {Legendas} from '../src/composicoes/cenas/Legendas';
 import type {ClipeAudio} from '../src/nucleo/audio';
 import {novoDocCenas, resolverCenas, type DocCenas} from '../src/nucleo/cenas';
 import {
-  comTexto, lerLegendas, nomeLivreDaLegenda, legendasDeOutraTomada, legendasDoDocumento, limitesDoArrasto, mesmaTomada, resolverLegendas, textoDeLegenda, type LegendasCenas,
+  comTexto, legendasAoDividirClipe, legendasAoDuplicarClipe, lerLegendas, nomeLivreDaLegenda, legendasDeOutraTomada, legendasDoDocumento, limitesDoArrasto, mesmaTomada, resolverLegendas, textoDeLegenda, type LegendasCenas,
 } from '../src/nucleo/legendas';
 
 const tela = vi.hoisted(() => ({quadro: 0}));
@@ -138,5 +138,42 @@ describe('SRT da tela não grava por cima (fala-D11)', () => {
     expect(nomeLivreDaLegenda('Outro.srt', existe)).toBe('Outro.srt');
     expect(nomeLivreDaLegenda('Mudar.srt', existe)).toBe('Mudar (3).srt');
     expect(nomeLivreDaLegenda('Mudar.pt_BR.srt', existe)).toBe('Mudar (2).pt_BR.srt');
+  });
+});
+
+describe('dividir e duplicar clipe de voz levando as legendas (funções para o Som, fala-D12)', () => {
+  const palavrasNaTela = (doc: DocCenas) => naTela(doc).segs.flatMap((s) => s.palavras.map((p) => `${p.w}@${p.s}`));
+  const dividido = (doc: DocCenas, em_ms: number) => {
+    const c = doc.audio!.faixas[0].clipes[0];
+    const legendas = legendasAoDividirClipe(doc.legendas, {clipe: 'n1', novo: 'n2', em_ms, clipes: doc.audio!.faixas[0].clipes});
+    const a = {...c, duracao_ms: em_ms - c.em};
+    const b = {...c, id: 'n2', em: em_ms, corte_ms: (c.corte_ms ?? 0) + (em_ms - c.em), duracao_ms: c.duracao_ms - (em_ms - c.em)};
+    return {...doc, audio: {faixas: [{...doc.audio!.faixas[0], clipes: [a, b]}]}, legendas};
+  };
+
+  it('dividir no meio de uma legenda: ela vira duas e nenhuma palavra some nem anda', () => {
+    const doc = comClipe({}, LEG);
+    const depois = dividido(doc, 2450);
+    expect(palavrasNaTela(depois)).toEqual(palavrasNaTela(doc));
+    expect(depois.legendas!.segmentos.map((s) => [s.texto, s.clipe])).toEqual([['Recebeu', 'n1'], ['proposta', 'n1'], ['de mudança', 'n2']]);
+    expect(depois.legendas!.origens!.map((x) => x.clipe)).toEqual(['n1', 'n2']);
+    expect(naTela(depois).avisos.filter((x) => /legenda/.test(x))).toEqual([]);
+  });
+
+  it('dividir depois de o clipe andar e com corte: o corte é o da tela', () => {
+    const doc = comClipe({em: 3000, corte_ms: 0}, LEG); // gerado em 1000, arrastado para 3000
+    const depois = dividido(doc, 4100);
+    expect(palavrasNaTela(depois)).toEqual(palavrasNaTela(doc));
+    expect(depois.legendas!.segmentos.filter((s) => s.clipe === 'n2').map((s) => s.texto)).toEqual(['proposta de mudança']);
+  });
+
+  it('duplicar: a cópia leva as legendas para onde o clipe novo for', () => {
+    const doc = comClipe({}, LEG);
+    const legendas = legendasAoDuplicarClipe(doc.legendas, {clipe: 'n1', novo: 'n2'})!;
+    const c = doc.audio!.faixas[0].clipes[0];
+    const copia = {...doc, audio: {faixas: [{...doc.audio!.faixas[0], clipes: [c, {...c, id: 'n2', em: 11_000}]}]}, legendas};
+    const segs = naTela(copia).segs;
+    expect(segs.map((s) => [s.texto, s.em])).toEqual([['Recebeu', 1000], ['proposta de mudança', 2000], ['Recebeu', 11_000], ['proposta de mudança', 12_000]]);
+    expect(new Set(legendas.segmentos.map((s) => s.id)).size).toBe(4);
   });
 });
