@@ -4,8 +4,9 @@
 // caixa invisível que é a camada para o clique; o fundo em degradê também. As regras de texto e encaixe são as de
 // comum.ts, para a miniatura, a prévia e o PNG darem o mesmo pixel.
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
-import type {CamadaImagem, PaginaImagem} from '../../../nucleo/documentos';
+import type {CamadaImagem, Degrade, MarcaDoDocumento, PaginaImagem} from '../../../nucleo/documentos';
 import {intersecao, itensDePintura, temAcabamento, type ItemPintura} from '../../../nucleo/acabamento';
+import {resolverCamadas, resolverCor, resolverDegrade} from '../../../nucleo/cor-marca';
 import {BitmapTrabalho, usarImagem} from './BitmapTrabalho';
 import {ENTRELINHA, PADRAO, alinhamentoCss, esperarFontes, familiaCss} from './comum';
 import {caixaDoItem, fonteCss, pintarFundoDegrade, pintarItem} from './pintura';
@@ -120,13 +121,15 @@ export const FundoPintado: React.FC<{degrade: unknown; largura: number; altura: 
 };
 
 /** A página inteira numa caixa de `altura` px (sem a pilha de efeitos: é para achar a página, não para conferir cor). */
-export const Miniatura: React.FC<{pagina: PaginaImagem; largura: number; altura: number; fundo: string; fundoDegrade?: unknown; alturaCaixa: number}> = ({pagina, largura, altura, fundo, fundoDegrade, alturaCaixa}) => {
+export const Miniatura: React.FC<{pagina: PaginaImagem; largura: number; altura: number; fundo: string; fundoDegrade?: unknown; alturaCaixa: number; marca?: MarcaDoDocumento}> = ({pagina, largura, altura, fundo, fundoDegrade, alturaCaixa, marca}) => {
   const escala = alturaCaixa / Math.max(1, altura);
-  const camadas = Array.isArray(pagina.camadas) ? pagina.camadas : [];
+  // marca: a cor "@destaque" lida do kit da imagem, como no monitor
+  const camadas = useMemo(() => resolverCamadas(Array.isArray(pagina.camadas) ? pagina.camadas : [], marca), [pagina.camadas, marca]);
+  const degrade = useMemo(() => resolverDegrade(fundoDegrade as Degrade | undefined, marca), [fundoDegrade, marca]);
   return (
-    <div className="mini-pagina" style={{width: Math.round(largura * escala), height: alturaCaixa, background: fundo}}>
+    <div className="mini-pagina" style={{width: Math.round(largura * escala), height: alturaCaixa, background: resolverCor(fundo, marca)}}>
       <div style={{position: 'absolute', left: 0, top: 0, width: largura, height: altura, transform: `scale(${escala})`, transformOrigin: '0 0', overflow: 'hidden'}}>
-        {fundoDegrade !== undefined && <FundoPintado degrade={fundoDegrade} largura={largura} altura={altura} escala={escala} />}
+        {degrade !== undefined && <FundoPintado degrade={degrade} largura={largura} altura={altura} escala={escala} />}
         <CamadasDaPagina camadas={camadas} escala={escala} largura={largura} altura={altura} />
       </div>
     </div>

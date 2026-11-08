@@ -4,10 +4,11 @@
 import React, {useEffect, useState} from 'react';
 import {Check, Copy, FolderSearch, ImagePlus, Plus, Type} from 'lucide-react';
 import type {MarcaInfo, Preferencias} from '../../compartilhado/api';
-import {fonte, listarFontes, registrarFontesDeArquivo} from '../../composicoes/fontes';
+import {deFonteArquivo, fonte, listarFontes, registrarFontesDeArquivo} from '../../composicoes/fontes';
 import {ehDocCenas} from '../../nucleo/cenas';
 import {marcaDoDocumento, type Marca} from '../../nucleo/marca';
 import {avisar, carregarDoc, mensagemDe, trocar, useLoja} from '../estado/loja';
+import {definirKit, recarregarKits} from '../estado/kits';
 import {CampoCor, CampoSelecao, CampoTexto} from '../componentes/Campos';
 import {pedirTexto} from '../componentes/Dialogo';
 import './painel-marca.css';
@@ -18,8 +19,8 @@ const rotuloCor = (k: string) => ROTULO[k] ?? k.replace(/([a-z])([A-Z])/g, '$1 $
 
 /** As fontes de arquivo de um kit entram no carregador pelo endereço do kit, para a amostra e o seletor. */
 const registrarFontesDoKit = (k: MarcaInfo) =>
-  registrarFontesDeArquivo(k.fontes.arquivos.map((f) => ({familia: f.familia, peso: f.peso, estilo: f.estilo,
-    url: /^[a-z][a-z0-9+.-]*:/i.test(f.arquivo) ? f.arquivo : `${k.url}/${f.arquivo.split('/').map(encodeURIComponent).join('/')}`})));
+  registrarFontesDeArquivo(k.fontes.arquivos.map((f) => deFonteArquivo(f,
+    /^[a-z][a-z0-9+.-]*:/i.test(f.arquivo) ? f.arquivo : `${k.url}/${f.arquivo.split('/').map(encodeURIComponent).join('/')}`)));
 
 const opcoesDeFonte = (extras: string[] = []): [string, string][] => {
   const lista = listarFontes().map((f): [string, string] => [f.nome, f.origem === 'arquivo' ? `${f.nome} · arquivo` : f.nome]);
@@ -44,6 +45,7 @@ export const PainelMarca: React.FC<{aoFechar: () => void}> = ({aoFechar}) => {
 
   const trocarKit = (k: MarcaInfo) => {
     registrarFontesDoKit(k);
+    definirKit(k); // o inspector da imagem lê a mesma lista: "Da marca" já usa o kit como ficou
     setKits((ks) => (ks ?? []).some((x) => x.id === k.id) ? ks!.map((x) => (x.id === k.id ? k : x)) : [...(ks ?? []), k]);
     setIdSel(k.id);
   };
@@ -96,12 +98,13 @@ export const PainelMarca: React.FC<{aoFechar: () => void}> = ({aoFechar}) => {
     if (!sel || !idDoc || !entrada) return;
     const r = await window.estudio.marcas.aplicar(sel.id, idDoc);
     await carregarDoc(idDoc);
-    avisar(`Kit ${r.nome} aplicado a ${entrada.titulo}${r.copiados.length ? ` (${r.copiados.length} arquivo(s) copiado(s) para o projeto)` : ''}`, 'ok');
+    avisar(`Kit ${r.nome} aplicado a ${entrada.titulo}${r.copiados.length ? ` (${r.copiados.length} arquivo(s) copiado(s) para o projeto)` : ''}${r.atualizados.length ? `; atualizado no projeto: ${r.atualizados.join(', ')}` : ''}`, 'ok');
   });
   const trocarPasta = () => tentar(async () => {
     const pasta = await window.estudio.escolherPasta('Pasta dos kits de marca');
     if (!pasta) return;
     setPrefs(await window.estudio.gravarPreferencias({pasta_marcas: pasta}));
+    void recarregarKits();
     const l = await window.estudio.marcas.listar();
     l.forEach(registrarFontesDoKit);
     setKits(l);
@@ -149,7 +152,7 @@ export const PainelMarca: React.FC<{aoFechar: () => void}> = ({aoFechar}) => {
                     <CampoTexto rotulo="Nome" valor={sel.nome} aoMudar={(v) => void gravar({...sel, nome: v})} />
                     <CampoTexto rotulo="Assinatura" valor={sel.assinatura ?? ''} aoMudar={(v) => void gravar({...sel, assinatura: v || undefined})} dica="O que vai no rodapé: @ do Instagram, site ou o nome por extenso" />
                     {[...PRINCIPAIS, ...Object.keys(sel.cores).filter((k) => !PRINCIPAIS.includes(k))].map((k) => (
-                      <CampoCor key={k} rotulo={rotuloCor(k)} valor={sel.cores[k]} aoMudar={(v) => void gravar({...sel, cores: {...sel.cores, [k]: v}})} />
+                      <CampoCor key={k} rotulo={rotuloCor(k)} valor={sel.cores[k]} paleta={false} aoMudar={(v) => void gravar({...sel, cores: {...sel.cores, [k]: v}})} />
                     ))}
                     <CampoSelecao rotulo="Fonte do título" valor={sel.fontes.titulo} opcoes={opcoesDeFonte(familiasDoKit)} aoMudar={(v) => void gravar({...sel, fontes: {...sel.fontes, titulo: v}})} />
                     <CampoSelecao rotulo="Fonte do texto" valor={sel.fontes.texto} opcoes={opcoesDeFonte(familiasDoKit)} aoMudar={(v) => void gravar({...sel, fontes: {...sel.fontes, texto: v}})} />

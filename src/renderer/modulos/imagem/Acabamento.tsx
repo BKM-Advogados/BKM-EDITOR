@@ -2,7 +2,7 @@
 // prancheta também usa. Cada campo grava um patch no caminho dele (ex.: /camadas/2/sombra/desfoque); o controle que
 // desliza mostra o valor pela prévia ao vivo antes. As predefinições de um clique (sombra suave, contorno e degradê da
 // marca) saem do kit cuja cor de fundo é a da imagem, ou do primeiro kit (acabamento.ts, kitDaImagem).
-import React, {useEffect, useState} from 'react';
+import React from 'react';
 import {Plus, Minus} from 'lucide-react';
 import type {CamadaImagem, Degrade, DocImagem} from '../../../nucleo/documentos';
 import {
@@ -10,27 +10,14 @@ import {
 } from '../../../nucleo/acabamento';
 import {MARCAS_INICIAIS, type Marca} from '../../../nucleo/marca';
 import {avisar, trocar} from '../../estado/loja';
+import {usarKits} from '../../estado/kits';
 import {CampoCor, CampoDeslizante, CampoNumero, CampoSelecao, Secao} from '../../componentes/Campos';
 import {definirPrevia} from './comum';
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
-// os kits mudam pouco: lidos uma vez por sessão do app (o painel Marca grava, a próxima abertura do app relê)
-let kitsLidos: Marca[] | null = null;
-const usarKits = () => {
-  const [kits, setKits] = useState<Marca[]>(kitsLidos ?? MARCAS_INICIAIS);
-  useEffect(() => {
-    if (kitsLidos) return;
-    void window.estudio.marcas.listar().then((l) => {
-      kitsLidos = l.length ? l : MARCAS_INICIAIS;
-      setKits(kitsLidos);
-    }).catch(() => undefined);
-  }, []);
-  return kits;
-};
-
 /** O kit das predefinições desta imagem. */
-export const usarKitDaImagem = (doc: Pick<DocImagem, 'fundo'>) => kitDaImagem(doc, usarKits()) ?? MARCAS_INICIAIS[0];
+export const usarKitDaImagem = (doc: Pick<DocImagem, 'fundo' | 'marca'>) => kitDaImagem(doc, usarKits()) ?? MARCAS_INICIAIS[0];
 
 type Gravar = (campo: string, valor: unknown, rotulo?: string) => void;
 type Ver = (campo: string) => (valor: unknown) => void;
@@ -86,7 +73,7 @@ const Pronto: React.FC<{rotulo: string; dica: string; aoClicar: () => void}> = (
 );
 
 /** Sombra, contorno e degradê da camada. Numa foto recortada, o acabamento é o da máscara (a seção avisa). */
-export const SecoesAcabamento: React.FC<{documento: string; caminho: string; c: CamadaImagem; kit: Marca; recortada?: string}> = ({documento, caminho, c, kit, recortada}) => {
+export const SecoesAcabamento: React.FC<{documento: string; caminho: string; c: CamadaImagem; kit: Marca; referencia?: boolean; recortada?: string}> = ({documento, caminho, c, kit, referencia = false, recortada}) => {
   const gravar: Gravar = (campo, valor, rotulo) => void trocar(documento, `${caminho}/${campo}`, valor, rotulo ?? `${campo} de ${c.id}`);
   const ver: Ver = (campo) => (valor) => definirPrevia({documento, caminho: `${caminho}/${campo}`, valor});
   if (recortada) {
@@ -116,7 +103,7 @@ export const SecoesAcabamento: React.FC<{documento: string; caminho: string; c: 
         )}
       </Secao>
       <Secao titulo="Contorno" chave="imagem:contorno" aoRedefinir={k ? () => gravar('contorno', undefined, `${c.id} sem contorno`) : undefined}
-        acao={<Pronto rotulo="Da marca" dica={`Contorno na cor de destaque de ${kit.nome}, por fora`} aoClicar={() => gravar('contorno', contornoDaMarca(kit, c), `contorno da marca em ${c.id}`)} />}>
+        acao={<Pronto rotulo="Da marca" dica={`Contorno na cor de destaque de ${kit.nome}, por fora`} aoClicar={() => gravar('contorno', contornoDaMarca(kit, c, referencia), `contorno da marca em ${c.id}`)} />}>
         {!k ? <div className="vazio" style={{padding: '4px 0'}}>Sem contorno. "Da marca" põe um{c.tipo === 'imagem' ? ' (numa foto sem fundo, contorna a pessoa)' : ''}.</div> : (
           <>
             <CampoCor rotulo="Cor" valor={k.cor ?? CONTORNO_PADRAO.cor} aoVer={ver('contorno/cor')} aoMudar={(v) => gravar('contorno/cor', v)} />
@@ -127,7 +114,7 @@ export const SecoesAcabamento: React.FC<{documento: string; caminho: string; c: 
       </Secao>
       {temDegrade && (
         <Secao titulo="Degradê" chave="imagem:degrade" aoRedefinir={d ? () => gravar('degrade', undefined, `${c.id} sem degradê`) : undefined}
-          acao={<Pronto rotulo="Da marca" dica={`Degradê com o destaque de ${kit.nome}, no lugar da cor`} aoClicar={() => gravar('degrade', degradeDaMarca(kit), `degradê da marca em ${c.id}`)} />}>
+          acao={<Pronto rotulo="Da marca" dica={`Degradê com o destaque de ${kit.nome}, no lugar da cor`} aoClicar={() => gravar('degrade', degradeDaMarca(kit, 'camada', referencia), `degradê da marca em ${c.id}`)} />}>
           {!d ? <div className="vazio" style={{padding: '4px 0'}}>Sem degradê: vale a cor {c.tipo === 'texto' ? 'do texto' : 'de preenchimento'}. "Da marca" põe um.</div>
             : <EditorDegrade documento={documento} caminho={`${caminho}/degrade`} d={d} />}
         </Secao>
@@ -141,7 +128,7 @@ export const SecaoFundoDegrade: React.FC<{documento: string; doc: DocImagem; kit
   const d = doc.fundo_degrade;
   return (
     <Secao titulo="Fundo em degradê" chave="imagem:fundo-degrade" aoRedefinir={d ? () => void trocar(documento, '/fundo_degrade', undefined, 'fundo sem degradê') : undefined}
-      acao={<Pronto rotulo="Da marca" dica={`Fundo de ${kit.nome} esquentando para baixo com o destaque`} aoClicar={() => void trocar(documento, '/fundo_degrade', degradeDaMarca(kit, 'fundo'), 'fundo em degradê da marca')} />}>
+      acao={<Pronto rotulo="Da marca" dica={`Fundo de ${kit.nome} esquentando para baixo com o destaque`} aoClicar={() => void trocar(documento, '/fundo_degrade', degradeDaMarca(kit, 'fundo', Boolean(doc.marca)), 'fundo em degradê da marca')} />}>
       {!d ? <div className="vazio" style={{padding: '4px 0'}}>Fundo de uma cor só. "Da marca" põe um degradê.</div>
         : <EditorDegrade documento={documento} caminho="/fundo_degrade" d={d} />}
     </Secao>

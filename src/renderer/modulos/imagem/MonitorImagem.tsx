@@ -12,6 +12,7 @@ import {Check, ChevronDown, Download, Hand, ImagePlus, MessageSquarePlus, MouseP
 import type {CamadaImagem, Comentario, DocImagem, OperacaoPatch} from '../../../nucleo/documentos';
 import {paginaDoCaminho, temPaginas} from '../../../nucleo/carrossel';
 import {mascarasEmUso} from '../../../nucleo/acabamento';
+import {resolverCamada, resolverCor, resolverDegrade} from '../../../nucleo/cor-marca';
 import {CamadaEfeitos} from '../../../composicoes/efeitos/CamadaEfeitos';
 import {aplicar, comentar, loja, patchTrocar, selecionar, useLoja} from '../../estado/loja';
 import {SemDocumento} from '../../componentes/SemDocumento';
@@ -113,9 +114,9 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
       if (gesto && gesto.i === i && gesto.id === c.id) r = {...r, x: gesto.x, y: gesto.y, largura: gesto.largura, altura: gesto.altura};
       const j = gesto?.junto;
       if (j && j.i === i && j.id === c.id) r = {...r, x: j.x + gesto!.x - camadasPag[gesto!.i].x, y: j.y + gesto!.y - camadasPag[gesto!.i].y};
-      return r;
+      return resolverCamada(r, doc?.marca); // marca: cor "@destaque" lida do kit da imagem
     });
-  }, [camadasPag, base, previa, gesto, documento]);
+  }, [camadasPag, base, previa, gesto, documento, doc?.marca]);
   // pinos da página ativa (e os sem camada, que são do documento)
   const pinos = useMemo(() => comentarios.filter((c) => c.documento === documento && c.alvo.ponto && (!c.alvo.objeto || !docValido(doc) || !temPaginas(doc) || paginaDoCaminho(doc, c.alvo.objeto) === (ativa?.p ?? 0))),
     [comentarios, documento, doc, ativa?.p]);
@@ -191,9 +192,9 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
   if (!doc) return <div className="vazio">carregando…</div>;
   if (!valido || !ativa) return <div className="vazio" style={{color: 'var(--erro)'}}>o documento {documento} não tem a lista "camadas" nem "paginas"</div>;
 
-  const fundo = previa && previa.documento === documento && previa.caminho === '/fundo' ? String(previa.valor) : doc.fundo;
-  const fundoDegrade = previa && previa.documento === documento && previa.caminho.startsWith('/fundo_degrade/')
-    ? comValor(doc.fundo_degrade, previa.caminho.slice('/fundo_degrade/'.length), previa.valor) : doc.fundo_degrade;
+  const fundo = resolverCor(previa && previa.documento === documento && previa.caminho === '/fundo' ? String(previa.valor) : doc.fundo, doc.marca);
+  const fundoDegrade = resolverDegrade(previa && previa.documento === documento && previa.caminho.startsWith('/fundo_degrade/')
+    ? comValor(doc.fundo_degrade, previa.caminho.slice('/fundo_degrade/'.length), previa.valor) : doc.fundo_degrade, doc.marca);
   const iSel = editavel && selecao?.documento === documento ? indiceDe(selecao.caminho, base) : -1;
   const sel = iSel >= 0 ? camadas[iSel] : undefined;
   const iHover = hover && hover !== selecao?.caminho ? indiceDe(hover, base) : -1;

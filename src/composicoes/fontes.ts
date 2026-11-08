@@ -13,8 +13,13 @@ type Carregador = (estilo: 'normal', opcoes: {subsets: string[]; ignoreTooManyRe
 const GOOGLE: Record<string, Carregador> = {Archivo, IBMPlexMono, IBMPlexSans, Inter} as unknown as Record<string, Carregador>;
 export const FONTES_GOOGLE = ['Archivo', 'IBM Plex Mono', 'IBM Plex Sans', 'Inter'];
 
-/** Uma variante (peso e estilo) de uma fonte de arquivo, pela URL que o servidor de mídia serve. */
-export type FonteDeArquivo = {familia: string; url: string; peso?: number; estilo?: 'normal' | 'italic'};
+/** Uma variante (peso e estilo) de uma fonte de arquivo, pela URL que o servidor de mídia serve. Fonte variável leva
+ *  `pesoMax`: o arquivo serve a todos os pesos de `peso` a `pesoMax` ("100 900"), não a um só. */
+export type FonteDeArquivo = {familia: string; url: string; peso?: number; pesoMax?: number; estilo?: 'normal' | 'italic'};
+
+/** Da fonte que o kit ou o projeto descrevem (peso_max) para a que o carregador pede. */
+export const deFonteArquivo = (f: {familia: string; peso?: number; peso_max?: number; estilo?: 'normal' | 'italic'}, url: string): FonteDeArquivo =>
+  ({familia: f.familia, url, peso: f.peso, pesoMax: f.peso_max, estilo: f.estilo});
 const FORMATO: Record<string, 'truetype' | 'opentype' | 'woff' | 'woff2'> = {ttf: 'truetype', otf: 'opentype', woff: 'woff', woff2: 'woff2'};
 
 const carregadas = new Map<string, string>(); // nome → font-family CSS
@@ -40,7 +45,7 @@ const pedirArquivos = (familia: string) => {
     pedidas.add(v.url);
     if (typeof FontFace === 'undefined') continue; // Node (testes): registra sem carregar
     const ext = v.url.split('?')[0].split('.').pop()?.toLowerCase() ?? '';
-    carregarArquivo({family: familia, url: v.url, format: FORMATO[ext] ?? 'truetype', weight: v.peso ? String(v.peso) : undefined, style: v.estilo})
+    carregarArquivo({family: familia, url: v.url, format: FORMATO[ext] ?? 'truetype', weight: v.pesoMax ? `${v.peso ?? 100} ${v.pesoMax}` : v.peso ? String(v.peso) : undefined, style: v.estilo})
       .catch(() => pedidas.delete(v.url)); // arquivo que não veio: o texto sai na fonte do sistema e a próxima vez tenta de novo
   }
 };

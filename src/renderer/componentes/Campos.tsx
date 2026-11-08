@@ -4,7 +4,9 @@
 // vivo e gravam ao soltar; a cor grava ao fechar o seletor.
 import React, {useEffect, useRef, useState} from 'react';
 import {ChevronDown, ChevronRight, Ellipsis, Pipette} from 'lucide-react';
+import {amostrasDaMarca, avisoDeContraste, ehReferenciaCor, nomeDaCor, resolverCor, type PaletaAtiva} from '../../nucleo/cor-marca';
 import {avisar} from '../estado/loja';
+import {usarPaleta} from '../estado/paleta';
 import {BotaoMenu, type ItemMenu} from './Menu';
 
 /** Número no jeito brasileiro (vírgula decimal), sem casas sobrando. */
@@ -106,50 +108,78 @@ type ConstrutorConta = new () => {open: () => Promise<{sRGBHex: string}>};
 const ContaGotas = (window as unknown as {EyeDropper?: ConstrutorConta}).EyeDropper;
 
 /** Cor: amostra pequena (abre o seletor nativo), hex editável e conta-gotas. O seletor só grava no "change" nativo,
- *  quando fecha (o onChange do React dispara a cada movimento, e esse vai para a prévia ao vivo). */
-export const CampoCor: React.FC<{rotulo: string; valor: string; aoMudar: (v: string) => void; aoVer?: (v: string) => void; padrao?: string}> = ({rotulo, valor, aoMudar, aoVer, padrao}) => {
+ *  quando fecha (o onChange do React dispara a cada movimento, e esse vai para a prévia ao vivo). Com o kit do documento
+ *  aberto (`paleta`, por padrão a da área), mostra as cores dele como amostras com nome: clicar numa grava a referência
+ *  ("@destaque", na imagem) ou o valor. `contra` é a cor do fundo do texto: abaixo de 4,5:1 o campo avisa. */
+export const CampoCor: React.FC<{rotulo: string; valor: string; aoMudar: (v: string) => void; aoVer?: (v: string) => void; padrao?: string;
+  paleta?: PaletaAtiva | false; contra?: string}> = ({rotulo, valor, aoMudar, aoVer, padrao, paleta, contra}) => {
   const seletor = useRef<HTMLInputElement>(null);
   const atual = useRef({valor, aoMudar});
   atual.current = {valor, aoMudar};
   const [texto, setTexto] = useState(valor);
+  const daArea = usarPaleta();
+  const pal = paleta === false ? undefined : paleta ?? daArea;
+  const lida = (v: string) => resolverCor(v, pal?.marca); // "@destaque" → a cor do kit da imagem
   useEffect(() => setTexto(valor), [valor]);
   useEffect(() => {
     const el = seletor.current;
     if (!el) return;
     const fechar = () => {
-      if (el.value.toLowerCase() !== atual.current.valor.toLowerCase()) atual.current.aoMudar(el.value.toUpperCase());
+      if (el.value.toLowerCase() !== lida(atual.current.valor).toLowerCase()) atual.current.aoMudar(el.value.toUpperCase());
     };
     el.addEventListener('change', fechar);
     return () => el.removeEventListener('change', fechar);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const gravarTexto = () => {
     let t = texto.trim();
     if (/^[0-9a-f]{6}$/i.test(t)) t = `#${t}`;
-    if (t && t !== valor && CSS.supports('color', t)) aoMudar(/^#[0-9a-f]{6}$/i.test(t) ? t.toUpperCase() : t);
+    if (t && t !== valor && (ehReferenciaCor(t) || CSS.supports('color', t))) aoMudar(/^#[0-9a-f]{6}$/i.test(t) ? t.toUpperCase() : t);
     else setTexto(valor);
   };
-  const hex = [texto, valor].find((v) => /^#[0-9a-f]{6}$/i.test(v)) ?? '#000000';
+  const hex = [lida(texto), lida(valor)].find((v) => /^#[0-9a-f]{6}$/i.test(v)) ?? '#000000';
   const difere = padrao !== undefined && valor.toLowerCase() !== padrao.toLowerCase();
+  const nome = pal ? nomeDaCor(valor, pal.marca ?? {cores: pal.cores}) : null;
+  const aviso = contra ? avisoDeContraste(valor, contra, pal?.marca) : null;
+  const amostras = pal ? amostrasDaMarca({cores: pal.cores}) : [];
   return (
-    <LinhaCampo rotulo={rotulo} como="div" difere={difere} padrao={padrao} aoRedefinir={padrao !== undefined ? () => aoMudar(padrao) : undefined}>
-      <div className="campo campo-cor">
-        <label className="amostra" title="Escolher a cor">
-          <span style={{background: CSS.supports('color', texto) ? texto : valor}} />
-          <input ref={seletor} type="color" value={hex.toLowerCase()} aria-label={rotulo} onChange={(e) => {
-            setTexto(e.target.value.toUpperCase());
-            aoVer?.(e.target.value.toUpperCase());
-          }} />
-        </label>
-        <input className="hex" value={texto.replace(/^#/, '')} aria-label={`${rotulo} em hexadecimal`} onChange={(e) => setTexto(/^[0-9a-f]{0,8}$/i.test(e.target.value) ? `#${e.target.value}` : e.target.value)}
-          onBlur={gravarTexto} onKeyDown={(e) => e.key === 'Enter' && gravarTexto()} />
-        {ContaGotas && (
-          <button type="button" className="gotas" title="Conta-gotas: pegar uma cor da tela"
-            onClick={() => void new ContaGotas().open().then((r) => aoMudar(r.sRGBHex.toUpperCase())).catch(() => undefined)}>
-            <Pipette className="i14" />
-          </button>
-        )}
-      </div>
-    </LinhaCampo>
+    <>
+      <LinhaCampo rotulo={rotulo} como="div" difere={difere} padrao={padrao} aoRedefinir={padrao !== undefined ? () => aoMudar(padrao) : undefined}>
+        <div className="campo campo-cor">
+          <label className="amostra" title="Escolher a cor">
+            <span style={{background: CSS.supports('color', lida(texto)) ? lida(texto) : lida(valor)}} />
+            <input ref={seletor} type="color" value={hex.toLowerCase()} aria-label={rotulo} onChange={(e) => {
+              setTexto(e.target.value.toUpperCase());
+              aoVer?.(e.target.value.toUpperCase());
+            }} />
+          </label>
+          <input className="hex" value={texto.replace(/^#/, '')} aria-label={`${rotulo} em hexadecimal`} title={nome ? `${nome} do kit` : undefined}
+            onChange={(e) => setTexto(/^[0-9a-f]{0,8}$/i.test(e.target.value) ? `#${e.target.value}` : e.target.value)}
+            onBlur={gravarTexto} onKeyDown={(e) => e.key === 'Enter' && gravarTexto()} />
+          {ContaGotas && (
+            <button type="button" className="gotas" title="Conta-gotas: pegar uma cor da tela"
+              onClick={() => void new ContaGotas().open().then((r) => aoMudar(r.sRGBHex.toUpperCase())).catch(() => undefined)}>
+              <Pipette className="i14" />
+            </button>
+          )}
+        </div>
+      </LinhaCampo>
+      {amostras.length > 0 && (
+        <div className="amostras-marca" role="group" aria-label={`Cores do kit para ${rotulo}`}>
+          {amostras.map((a, k) => {
+            const grava = pal!.referencia ? a.referencia : a.valor;
+            // uma só marcada: a que a referência cita ou, num valor, a primeira de cor igual (fundo e grafite profundo repetem)
+            const ativa = valor.trim().startsWith('@') ? valor.trim().toLowerCase() === a.referencia.toLowerCase()
+              : amostras.findIndex((x) => x.valor.toLowerCase() === valor.trim().toLowerCase()) === k;
+            return (
+              <button key={a.nome} type="button" className={`amostra-marca${ativa ? ' ativa' : ''}`} style={{background: a.valor}} title={`${a.rotulo} · ${a.valor}`}
+                aria-label={`${a.rotulo} do kit`} aria-pressed={ativa} onClick={() => aoMudar(grava)} />
+            );
+          })}
+          {nome && <span className="nome-amostra" title={ehReferenciaCor(valor) ? `${valor} = ${lida(valor)}` : undefined}>{nome}</span>}
+        </div>
+      )}
+      {aviso && <div className="aviso-contraste" role="status">{aviso}</div>}
+    </>
   );
 };
 

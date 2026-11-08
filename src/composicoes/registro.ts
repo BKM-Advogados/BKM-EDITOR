@@ -6,7 +6,7 @@
 import React from 'react';
 import type {FonteArquivo} from '../nucleo/marca';
 import {VideoCenas} from './cenas/VideoCenas';
-import {registrarFontesDeArquivo} from './fontes';
+import {deFonteArquivo, registrarFontesDeArquivo} from './fontes';
 import {CarrosselTema} from './cliente/CarrosselTema';
 import {definirBaseMidia, midia} from './midia';
 import type {MarcaDaguaP} from '../nucleo/exportacao';
@@ -21,7 +21,7 @@ const comFontesDoTema = (Componente: React.FC<Record<string, unknown>>): React.F
     const fontes = p.tema?.fontes_arquivos;
     if (Array.isArray(fontes) && fontes.length) {
       definirBaseMidia(p.base_midia);
-      registrarFontesDeArquivo(fontes.map((f) => ({familia: f.familia, url: midia(f.arquivo), peso: f.peso, estilo: f.estilo})));
+      registrarFontesDeArquivo(fontes.map((f) => deFonteArquivo(f, midia(f.arquivo))));
     }
     // marca d'água da exportação (frente C): por cima de tudo, só quando as props trazem uma
     if (p.marca_dagua) return React.createElement(React.Fragment, null, React.createElement(Componente, p), React.createElement(MarcaDagua, {m: p.marca_dagua, base_midia: p.base_midia}));

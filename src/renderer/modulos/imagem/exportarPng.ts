@@ -6,6 +6,7 @@
 // sai o PNG de sempre; o diálogo de exportar passa formato (PNG, JPG, WebP), qualidade, escala e nome.
 import type {DocImagem} from '../../../nucleo/documentos';
 import {itensDePintura, type ItemPintura} from '../../../nucleo/acabamento';
+import {resolverMarcaNoDoc} from '../../../nucleo/cor-marca';
 import {camadas as camadasDeEfeito, filtroCss, type Efeito} from '../../../nucleo/efeitos';
 import {FORMATOS_IMAGEM_SAIDA, type FormatoImagem} from '../../../nucleo/exportacao';
 import {avisar, loja} from '../../estado/loja';
@@ -87,7 +88,8 @@ const desenharTom = (ctx: CanvasRenderingContext2D, e: Efeito, W: number, H: num
 
 /** Documento inteiro em resolução cheia vezes `escala` (as camadas desenham em px do documento, o canvas é escalado);
  *  devolve o canvas e as camadas cuja imagem não carregou. */
-export const desenharDocumento = async (doc: DocImagem, escala = 1) => {
+export const desenharDocumento = async (documento: DocImagem, escala = 1) => {
+  const doc = resolverMarcaNoDoc(documento); // cor "@destaque" vira a cor do kit da imagem antes de pintar
   const W = Math.round(doc.largura * escala);
   const H = Math.round(doc.altura * escala);
   if (!(W > 0 && H > 0) || W > LADO_MAX || H > LADO_MAX || W * H > AREA_MAX) throw new Error(`tamanho ${W}×${H} fora do que o canvas aceita`);

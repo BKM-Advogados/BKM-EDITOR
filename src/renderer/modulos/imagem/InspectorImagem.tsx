@@ -9,6 +9,7 @@ import {ChevronRight, Copy, FileJson, Image as IconeImagem, Link, Scissors, Undo
 import type {CamadaImagem, DocImagem, OperacaoPatch} from '../../../nucleo/documentos';
 import {baseCamadas, paginaDoCaminho} from '../../../nucleo/carrossel';
 import {mascaraDe, mascarasEmUso, patchRecortar, patchSoltar, podeRecortar} from '../../../nucleo/acabamento';
+import {resolverFonte} from '../../../nucleo/cor-marca';
 import {aplicar, avisar, loja, patchTrocar, trocar, useLoja} from '../../estado/loja';
 import {CabecalhoInspector, CampoCor, CampoDeslizante, CampoLeitura, CampoNumero, CampoSelecao, CampoTexto, Secao, copiar} from '../../componentes/Campos';
 import {IconeEfeitos} from '../../componentes/Icones';
@@ -43,7 +44,7 @@ const InspectorCamada: React.FC<{documento: string; caminho: string; c: CamadaIm
   const gravar = (campo: keyof CamadaImagem) => (v: unknown) => void trocar(documento, `${caminho}/${campo}`, v, `${campo} de ${c.id}`);
   const positivo = (campo: keyof CamadaImagem) => (v: number) => (v > 0 ? gravar(campo)(v) : avisar(`${campo} precisa ser maior que zero`, 'erro'));
   const ver = (campo: keyof CamadaImagem) => (valor: unknown) => definirPrevia({documento, caminho: `${caminho}/${campo}`, valor});
-  const sub = c.tipo === 'texto' ? `Texto · ${c.fonte ?? PADRAO.fonte} ${c.peso ?? PADRAO.peso}` : c.tipo === 'imagem' ? `Imagem · ${c.src ?? ''}` : `Forma · ${c.forma === 'elipse' ? 'elipse' : 'retângulo'}`;
+  const sub = c.tipo === 'texto' ? `Texto · ${resolverFonte(c.fonte ?? PADRAO.fonte, doc.marca)} ${c.peso ?? PADRAO.peso}` : c.tipo === 'imagem' ? `Imagem · ${c.src ?? ''}` : `Forma · ${c.forma === 'elipse' ? 'elipse' : 'retângulo'}`;
 
   return (
     <div className="painel">
@@ -77,7 +78,7 @@ const InspectorCamada: React.FC<{documento: string; caminho: string; c: CamadaIm
             <CampoSelecao rotulo="Fonte" valor={c.fonte ?? PADRAO.fonte} opcoes={FONTES.map((f) => [f, f] as [string, string])} aoMudar={gravar('fonte')} />
             <CampoSelecao rotulo="Peso" valor={String(c.peso ?? PADRAO.peso)} opcoes={PESOS} aoMudar={(v) => gravar('peso')(Number(v))} />
             <CampoNumero rotulo="Tamanho" valor={c.tamanho ?? PADRAO.tamanho} unidade="px" padrao={PADRAO.tamanho} aoRedefinir={() => gravar('tamanho')(undefined)} aoMudar={positivo('tamanho')} />
-            <CampoCor rotulo="Cor" valor={c.cor ?? PADRAO.cor} aoVer={ver('cor')} aoMudar={gravar('cor')} />
+            <CampoCor rotulo="Cor" valor={c.cor ?? PADRAO.cor} contra={doc.fundo} aoVer={ver('cor')} aoMudar={gravar('cor')} />
             <CampoSelecao rotulo="Alinhar" valor={c.alinhar ?? PADRAO.alinhar} opcoes={[['esquerda', 'À esquerda'], ['centro', 'Ao centro'], ['direita', 'À direita']]} aoMudar={gravar('alinhar')} />
           </Secao>
         )}
@@ -130,7 +131,7 @@ const InspectorCamada: React.FC<{documento: string; caminho: string; c: CamadaIm
           </Secao>
         )}
 
-        <SecoesAcabamento documento={documento} caminho={caminho} c={c} kit={kit} recortada={iMascara >= 0 ? rotuloCamada(camadas[iMascara]) : undefined} />
+        <SecoesAcabamento documento={documento} caminho={caminho} c={c} kit={kit} referencia={Boolean(doc.marca)} recortada={iMascara >= 0 ? rotuloCamada(camadas[iMascara]) : undefined} />
       </div>
     </div>
   );
