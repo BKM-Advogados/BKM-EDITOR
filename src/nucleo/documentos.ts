@@ -150,6 +150,7 @@ export type EntradaDiario = {
   versao_depois: string;
   patch: OperacaoPatch[];
   inverso: OperacaoPatch[];
+  desfaz?: number; // frente IA (rodada 3): esta entrada reverteu a de seq indicado (Ctrl+Z, Reverter do cartão ou do Histórico)
 };
 
 /** Estado do editor que o agente pode consultar (o app grava em .estudio/estado.json). */

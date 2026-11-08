@@ -8,7 +8,8 @@ import {execFile, spawn, type ChildProcessWithoutNullStreams} from 'node:child_p
 import {randomUUID} from 'node:crypto';
 import readline from 'node:readline';
 import type {ContaClaude, EventoConversa} from '../compartilhado/api';
-import {ambienteLimpo, PATH_COM_LOCAL} from './terminais';
+import {ambienteLimpo, citarCmd, ehCmd, PATH_COM_LOCAL} from './terminais';
+import {cortarResultado} from '../compartilhado/ferramentas';
 
 const OCIOSA_MS = 10 * 60 * 1000;
 
@@ -121,7 +122,10 @@ export class Conversas {
       // as ferramentas do projeto ficam liberadas: só mexem nos JSON do projeto, com diário e desfazer
       ...(c.arquivoMcp ? ['--mcp-config', c.arquivoMcp, '--allowedTools', 'mcp__estudio'] : []),
       ...(c.modelo ? ['--model', c.modelo] : [])];
-    const proc = spawn(exe, args, {cwd: c.cwd, windowsHide: true, env: {...ambienteLimpo(), PATH: PATH_COM_LOCAL(), ESTUDIO_PROJETO: c.cwd, ...this.o.ambienteExtra}});
+    // claude.cmd do npm (transversal-D22): pelo cmd.exe, com os argumentos entre aspas quando precisam
+    const cmd = ehCmd(exe);
+    const proc = spawn(cmd ? `"${exe}"` : exe, cmd ? args.map(citarCmd) : args,
+      {cwd: c.cwd, windowsHide: true, shell: cmd, env: {...ambienteLimpo(), PATH: PATH_COM_LOCAL(), ESTUDIO_PROJETO: c.cwd, ...this.o.ambienteExtra}});
     c.proc = proc;
     c.iniciada = true;
     c.modeloAtivo = c.modelo;
@@ -206,7 +210,7 @@ export class Conversas {
           if (b.type !== 'tool_result') continue;
           const texto = typeof b.content === 'string' ? b.content
             : Array.isArray(b.content) ? b.content.filter((x: any) => x.type === 'text').map((x: any) => x.text).join('\n') : '';
-          ev({tipo: 'resultado', uso: b.tool_use_id, ok: !b.is_error, texto: texto.slice(0, 4000)});
+          ev({tipo: 'resultado', uso: b.tool_use_id, ok: !b.is_error, texto: cortarResultado(texto)});
         }
         return;
       }

@@ -3,11 +3,12 @@
 // o modelo (da lista do próprio endereço), o endereço (no compatível e nos locais) e o provedor padrão. Embaixo, o
 // uso do mês com a composição: tokens de entrada (parte do cache), de saída e o custo estimado pela tabela.
 import React, {useEffect, useState, useSyncExternalStore} from 'react';
-import {CircleAlert, CircleCheck, ExternalLink, KeyRound, RefreshCw, X} from 'lucide-react';
+import {CircleAlert, CircleCheck, ExternalLink, KeyRound, RefreshCw, ShieldQuestion, X} from 'lucide-react';
 import type {EstadoProvedor, UsoDoMes} from '../../compartilhado/api';
 import {avisar} from '../estado/loja';
-import {estadoConversas, fecharConfigIA, lerProvedores} from './conversas';
+import {estadoConversas, fecharConfigIA, lerProvedores, responderAvulso} from './conversas';
 import './config-ia.css';
+import './conversa.css'; // o cartão de permissão solto usa o mesmo estilo do da conversa
 
 const mil = (n: number) => (n >= 1000 ? `${(n / 1000).toLocaleString('pt-BR', {maximumFractionDigits: 1})} mil` : String(n));
 const usd = (n: number) => `US$ ${n.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: n < 1 ? 4 : 2})}`;
@@ -119,7 +120,7 @@ const LinhaProvedor: React.FC<{p: EstadoProvedor; aberto: boolean; abrir: () => 
   );
 };
 
-export const ConfigIA: React.FC = () => {
+const DialogoConfigIA: React.FC = () => {
   const cfg = useSyncExternalStore(estadoConversas.assinar, estadoConversas.configIA);
   const provedores = useSyncExternalStore(estadoConversas.assinar, estadoConversas.provedores);
   const [aberto, setAberto] = useState<string | undefined>(undefined);
@@ -166,3 +167,33 @@ export const ConfigIA: React.FC = () => {
     </div>
   );
 };
+
+// Pedidos do portão vindos de uma aba sem conversa no painel (o Claude ou outro agente no terminal, um app de IA de
+// fora): o mesmo cartão, solto no canto da tela, com a origem escrita. Sem resposta em 10 min, o servidor nega.
+const PedidosAvulsos: React.FC = () => {
+  const avulsos = useSyncExternalStore(estadoConversas.assinar, estadoConversas.avulsos);
+  if (!avulsos.length) return null;
+  return (
+    <div className="ia-avulsos" role="alertdialog" aria-label="Pedidos de permissão da IA">
+      {avulsos.map((p) => (
+        <div key={p.id} className="permissao ia-avulso">
+          <div className="perm-topo"><ShieldQuestion size={15} />{p.origem} quer {p.motivo}</div>
+          {(p.entrada.url ?? p.entrada.arquivo) !== undefined && <pre className="perm-cmd">{String(p.entrada.url ?? p.entrada.arquivo)}</pre>}
+          <div className="perm-botoes">
+            <button className="bt principal mini" onClick={() => responderAvulso(p.id, true)}>Permitir</button>
+            <button className="bt mini" onClick={() => responderAvulso(p.id, true, true)}>Sempre nesta conversa</button>
+            <button className="bt fantasma mini" onClick={() => responderAvulso(p.id, false)}>Negar</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+/** Montado uma vez no App: o diálogo Configurações › IA e os pedidos de permissão soltos. */
+export const ConfigIA: React.FC = () => (
+  <>
+    <DialogoConfigIA />
+    <PedidosAvulsos />
+  </>
+);

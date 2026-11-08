@@ -29,7 +29,7 @@ import {registrarPrefsExportacao} from './ipc-exportacao';
 import {apagarLimposSemUso, registrarIpcLimpeza} from './limpeza-voz';
 import {registrarIpcLoudness} from './loudness';
 import {registrarRemoverFundo} from './remover-fundo';
-import {criarSessoesIA, registrarIpcIa} from './ipc-ia'; // frente IA
+import {criarSessoesIA, perguntarAPessoa, registrarIpcIa} from './ipc-ia'; // frente IA
 
 // o mesmo id do instalador (electron-builder.yml): a barra de tarefas agrupa a janela com o atalho
 app.setAppUserModelId('br.com.bkmadvogados.estudio');
@@ -48,7 +48,6 @@ let avisoAbertura: string | undefined;
 let claude = false;
 // sem Git não há ponto de restauração (commit inicial, Ctrl+S): a tela inicial avisa
 const gitInstalado = new Promise<boolean>((ok) => execFile('git', ['--version'], {windowsHide: true}, (e) => ok(!e)));
-const desfeitos = new Set<number>();
 const midia = new ServidorMidia();
 // na pasta da pessoa e não em Documentos: com o OneDrive movendo Documentos, a sincronização trava a gravação atômica
 // dos JSON e sobe o .git do projeto
@@ -127,7 +126,6 @@ const fecharSessao = async () => {
   await sessao?.fechar();
   sessao = null;
   avisoAbertura = undefined;
-  desfeitos.clear();
   midia.servir(null);
   tituloDaJanela();
 };
@@ -306,18 +304,12 @@ lidar(CANAL.aplicarPatch, (o: {documento: string; versao_base?: string; patch: O
   const r = exigirProjeto().aplicarPatch({...o, autor: 'pessoa', origem: 'interface'});
   return {versao: r.versao, seq: r.entrada.seq};
 });
+// frente IA (transversal-D1): o desfazer sai do diário (projeto.ts): lembra o que já foi desfeito mesmo depois de reabrir,
+// e uma entrada que a IA mudou depois não trava as seguintes; o Histórico tem o Reverter de cada entrada
 lidar(CANAL.desfazer, () => {
-  const p = exigirProjeto();
-  const minhas = p.diario().filter((e) => e.autor === 'pessoa' && e.origem === 'interface' && !desfeitos.has(e.seq));
-  const ultima = minhas[minhas.length - 1];
-  if (!ultima) return {ok: false, mensagem: 'nada seu para desfazer'};
-  try {
-    p.aplicarPatch({documento: ultima.documento, versao_base: ultima.versao_depois, patch: ultima.inverso, autor: 'pessoa', origem: 'desfazer', rotulo: `desfazer: ${ultima.rotulo}`});
-    desfeitos.add(ultima.seq);
-    return {ok: true, mensagem: `desfeito: ${ultima.rotulo}`};
-  } catch {
-    return {ok: false, mensagem: 'o documento mudou depois (talvez pelo Claude); desfaça pelo histórico'};
-  }
+  const r = exigirProjeto().desfazerUltima({autor: 'pessoa', origem: 'interface', como: {autor: 'pessoa', origem: 'desfazer'}});
+  if (r.ok) return {ok: true, mensagem: `desfeito: ${r.alvo.rotulo}`};
+  return {ok: false, mensagem: 'mudou_depois' in r && r.mudou_depois ? `${r.mensagem}; reverta pelo Histórico` : r.mensagem};
 });
 lidar(CANAL.propsVideo, (documento: string) => {
   exigirProjeto();
@@ -328,7 +320,7 @@ lidar(CANAL.novoComentario, (c: Pick<Comentario, 'documento' | 'texto' | 'alvo'>
 lidar(CANAL.responder, (id: string, texto: string) => exigirProjeto().responder(id, 'pessoa', texto));
 lidar(CANAL.resolverComentario, (id: string) => exigirProjeto().resolver(id, 'pessoa'));
 lidar(CANAL.reabrir, (id: string) => exigirProjeto().reabrir(id));
-lidar(CANAL.diario, (desde?: number) => exigirProjeto().diario(desde ?? 0).slice(-200));
+lidar(CANAL.diario, (desde?: number) => exigirProjeto().diario(desde ?? 0, {tolerante: true}).slice(-200)); // frente IA: transversal-D2
 // pesquisa (docs/pesquisa.md): a interface só lê; o Claude grava pelo MCP e o observador da pasta avisa a tela
 lidar(CANAL.pesquisa, () => exigirProjeto().pesquisa());
 // o texto de uma fonte passa de 600 KB (a CLT inteira): lido sem travar o processo principal
@@ -470,14 +462,17 @@ registrarIpcLimpeza(lidar, exigirProjeto, enviar);
 registrarIpcLoudness(lidar, exigirProjeto, (documento) => (exigirProjeto(), sessao!.propsVideo(documento, midia.base)));
 // frente IA: Configurações › IA (provedores, chaves cifradas pelo safeStorage em userData/ia, modelos, uso do mês)
 registrarIpcIa({lidar, claudeInstalado: () => claude, pasta: path.join(app.getPath('userData'), 'ia'), conversas: () => conversas,
+  enviar, ouvir: (canal, f) => ipcMain.on(canal, (e, ...a) => (confiavel(e), f(...a))), projeto: exigirProjeto,
   cifra: {disponivel: () => safeStorage.isEncryptionAvailable(), cifrar: (t) => safeStorage.encryptString(t), decifrar: (b) => safeStorage.decryptString(b)},
   canais: {provedores: CANAL.iaProvedores, gravarChave: CANAL.iaGravarChave, apagarChave: CANAL.iaApagarChave, modelos: CANAL.iaModelos,
-    configurar: CANAL.iaConfigurar, padrao: CANAL.iaPadrao, usoDoMes: CANAL.iaUsoDoMes, conversaModelo: CANAL.conversaModelo}});
+    configurar: CANAL.iaConfigurar, padrao: CANAL.iaPadrao, usoDoMes: CANAL.iaUsoDoMes, conversaModelo: CANAL.conversaModelo,
+    portaoPedido: CANAL.iaPortaoPedido, portaoResposta: CANAL.iaPortaoResposta, portaoCancelado: CANAL.iaPortaoCancelado, reverter: CANAL.iaReverter}});
 
 app.on('ready', async () => {
   await midia.iniciar();
   // a rede do ler_fonte no app: net.fetch do Electron (proxy e certificados do sistema), assíncrono, 40 s e 20 MB no máximo
-  mcpHttp = new McpHttp(path.join(app.getPath('userData'), 'mcp'), () => sessao?.projeto ?? null, criarRede((url, init) => net.fetch(url, init)));
+  mcpHttp = new McpHttp(path.join(app.getPath('userData'), 'mcp'), () => sessao?.projeto ?? null, criarRede((url, init) => net.fetch(url, init)),
+    perguntarAPessoa); // frente IA: o portão de permissão pergunta à pessoa pela tela
   midia.rota((req, res) => mcpHttp!.atender(req, res));
   claude = await terminais.preparar();
   criarJanela();

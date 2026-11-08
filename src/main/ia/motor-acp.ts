@@ -6,6 +6,7 @@
 import {spawn, type ChildProcessWithoutNullStreams} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
 import type {EventoConversa} from '../../compartilhado/api';
+import {cortarResultado} from '../../compartilhado/ferramentas';
 import {ClienteAcp, type InicioAcp, type McpHttpAcp, type OpcaoPermissao, type PedidoPermissaoAcp, type RespostaPermissaoAcp} from './acp';
 
 export type OpcoesAcp = {
@@ -166,10 +167,10 @@ export class SessaoAcp {
       case 'tool_call':
         this.fecharSegmento();
         this.o.evento({tipo: 'ferramenta', uso: u.toolCallId, nome: u.name ?? u.title ?? 'ferramenta', entrada: u.rawInput ?? {}});
-        if (u.status === 'completed' || u.status === 'failed') this.o.evento({tipo: 'resultado', uso: u.toolCallId, ok: u.status === 'completed', texto: textoDe(u.content).slice(0, 4000)});
+        if (u.status === 'completed' || u.status === 'failed') this.o.evento({tipo: 'resultado', uso: u.toolCallId, ok: u.status === 'completed', texto: cortarResultado(textoDe(u.content))});
         return;
       case 'tool_call_update':
-        if (u.status === 'completed' || u.status === 'failed') this.o.evento({tipo: 'resultado', uso: u.toolCallId, ok: u.status === 'completed', texto: textoDe(u.content).slice(0, 4000)});
+        if (u.status === 'completed' || u.status === 'failed') this.o.evento({tipo: 'resultado', uso: u.toolCallId, ok: u.status === 'completed', texto: cortarResultado(textoDe(u.content))});
         return;
       case 'usage_update': {
         // o ACP manda o contexto ocupado (não os tokens do turno) e, às vezes, o custo da sessão: vira o custo do turno

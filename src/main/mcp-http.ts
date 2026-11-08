@@ -9,7 +9,12 @@ import path from 'node:path';
 import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {StreamableHTTPServerTransport} from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import {registrarFerramentas, type Rede, type TranscritorMcp} from '../nucleo/ferramentas-mcp';
+import {INSTRUCOES_MCP} from '../nucleo/mcp-ia';
+import type {PedidoPortao, Portao} from '../nucleo/portao';
 import type {Projeto} from '../nucleo/projeto';
+
+/** Quem pergunta à pessoa no app (ipc-ia.ts). sempre: a pessoa marcou "Sempre nesta conversa". */
+export type Perguntador = (p: PedidoPortao & {origem: string}) => Promise<{permitir: boolean; sempre?: boolean}>;
 
 type Aba = {origem: string; arquivo: string};
 
@@ -21,8 +26,10 @@ export const definirTranscritorMcp = (t: TranscritorMcp) => {
 
 export class McpHttp {
   private abas = new Map<string, Aba>();
+  private sempre = new Map<string, Set<string>>(); // por token: ferramentas que a pessoa liberou nesta conversa
 
-  constructor(private readonly pastaConfig: string, private readonly projeto: () => Projeto | null, private readonly rede?: Rede) {}
+  constructor(private readonly pastaConfig: string, private readonly projeto: () => Projeto | null, private readonly rede?: Rede,
+    private readonly perguntador?: Perguntador) {}
 
   /** Token e arquivo de configuração (--mcp-config) para uma aba nova do Claude. */
   novaAba(base: string, origem: string): string {
@@ -45,6 +52,7 @@ export class McpHttp {
   esquecerTudo() {
     for (const a of this.abas.values()) rmSync(a.arquivo, {force: true});
     this.abas.clear();
+    this.sempre.clear();
   }
 
   /** Atende /mcp; devolve false se o pedido não é para cá. */
@@ -63,8 +71,19 @@ export class McpHttp {
     }
     let corpo = '';
     for await (const pedaco of req) corpo += pedaco;
-    const servidor = new McpServer({name: 'estudio', version: '0.1.0'});
-    registrarFerramentas(servidor, projeto, 'agente', aba.origem, this.rede, transcritorMcp);
+    const servidor = new McpServer({name: 'estudio', version: '0.1.0'}, {instructions: INSTRUCOES_MCP});
+    // frente IA: o portão pergunta à pessoa pelo app; "Sempre nesta conversa" vale para o token desta aba
+    const perguntar = this.perguntador;
+    const portao: Portao | undefined = perguntar && {
+      perguntar: async (p) => {
+        const lembradas = this.sempre.get(token!);
+        if (lembradas?.has(p.ferramenta)) return true;
+        const r = await perguntar({...p, origem: aba.origem});
+        if (r.permitir && r.sempre) this.sempre.set(token!, new Set([...(lembradas ?? []), p.ferramenta]));
+        return r.permitir;
+      },
+    };
+    registrarFerramentas(servidor, projeto, 'agente', aba.origem, this.rede, transcritorMcp, portao);
     const transporte = new StreamableHTTPServerTransport({sessionIdGenerator: undefined, enableJsonResponse: true});
     res.on('close', () => {
       void transporte.close();

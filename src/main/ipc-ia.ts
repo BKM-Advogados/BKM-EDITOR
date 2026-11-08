@@ -1,8 +1,11 @@
 // Frente IA (rodada 3, docs/ia.md): monta as conversas de todos os provedores e o IPC de Configurações › IA (lista de
 // provedores, chaves, modelos, endereço, padrão e uso do mês). Registrado no main.ts com uma linha. A chave nunca sai
 // daqui para a tela: só "tem chave", a origem e os 4 últimos caracteres.
+import {randomUUID} from 'node:crypto';
 import path from 'node:path';
-import type {EstadoProvedor, ResultadoChave} from '../compartilhado/api';
+import type {EstadoProvedor, PedidoPortaoTela, ResultadoChave} from '../compartilhado/api';
+import type {Projeto} from '../nucleo/projeto';
+import type {Perguntador} from './mcp-http';
 import {acharChave, CofreMemoria, finalDaChave, type Cofre} from './ia/chaves';
 import {CofreArquivo, type Cifra} from './ia/cofre-arquivo';
 import {ConfiguracaoIA} from './ia/config';
@@ -28,6 +31,7 @@ export const criarSessoesIA = (o: Pick<OpcoesSessoes, 'evento' | 'vivasTerminal'
   new SessoesIA({...o, cofre: {ler: (p) => cofre.ler(p), gravar: (p, c) => cofre.gravar(p, c), apagar: (p) => cofre.apagar(p)},
     sistema: textoDeSistema, ambiente: ambienteAgente,
     config: (p) => configuracao?.provedor(p) ?? {},
+    aoParar: (origem) => cancelarPortaoDe(origem),
     aoUso: (p, _m, u, custo) => {
       try {
         configuracao?.registrarUso(p, u, custo ?? 0);
@@ -88,11 +92,53 @@ export const modelosDe = async (id: string, f?: typeof fetch) => {
   return listarModelos({base, chave: acharChave(cofre, id).chave, provedor: p.id, cabecalhos: p.cabecalhos, fetch: f});
 };
 
+// ---------- portão de permissão (src/nucleo/portao.ts): a pergunta vai à tela e a resposta volta por IPC ----------
+const ESPERA_MAXIMA_MS = 10 * 60 * 1000;
+type Espera = {origem: string; ok: (r: {permitir: boolean; sempre?: boolean}) => void; relogio: NodeJS.Timeout};
+const esperas = new Map<string, Espera>();
+let enviarATela: ((canal: string, ...a: unknown[]) => void) | null = null;
+let canalPedido = '';
+let canalCancelado = '';
+
+const encerrarEspera = (id: string, r: {permitir: boolean; sempre?: boolean}, avisarTela: boolean) => {
+  const e = esperas.get(id);
+  if (!e) return;
+  esperas.delete(id);
+  clearTimeout(e.relogio);
+  if (avisarTela) enviarATela?.(canalCancelado, id);
+  e.ok(r);
+};
+
+/** O perguntador que o McpHttp usa: manda o pedido à tela e espera Permitir ou Negar (10 min no máximo). */
+export const perguntarAPessoa: Perguntador = (p) => new Promise((ok) => {
+  if (!enviarATela) return ok({permitir: false});
+  const id = randomUUID();
+  const relogio = setTimeout(() => encerrarEspera(id, {permitir: false}, true), ESPERA_MAXIMA_MS);
+  esperas.set(id, {origem: p.origem, ok, relogio});
+  p.sinal?.addEventListener('abort', () => encerrarEspera(id, {permitir: false}, true), {once: true});
+  // a entrada vai curta: o cartão mostra o essencial (endereço, arquivo), nunca megabytes
+  const entrada = JSON.parse(JSON.stringify(p.entrada, (_k, v) => (typeof v === 'string' && v.length > 300 ? `${v.slice(0, 300)}…` : v)));
+  const pedido: PedidoPortaoTela = {id, origem: p.origem, ferramenta: p.ferramenta, motivo: p.motivo, entrada};
+  enviarATela(canalPedido, pedido);
+});
+
+/** O Parar de uma conversa também nega o que esperava a pessoa naquela aba. */
+export const cancelarPortaoDe = (origem: string) => {
+  for (const [id, e] of esperas) if (e.origem === origem) encerrarEspera(id, {permitir: false}, true);
+};
+
 export type CanaisIa = {provedores: string; gravarChave: string; apagarChave: string; modelos: string; configurar: string; padrao: string;
-  usoDoMes: string; conversaModelo: string};
+  usoDoMes: string; conversaModelo: string; portaoPedido: string; portaoResposta: string; portaoCancelado: string; reverter: string};
 
 export const registrarIpcIa = (o: {lidar: Lidar; canais: CanaisIa; claudeInstalado: () => boolean; pasta: string; cifra: Cifra;
-  conversas: () => Pick<SessoesIA, 'definirModelo'>}) => {
+  conversas: () => Pick<SessoesIA, 'definirModelo'>; enviar: (canal: string, ...a: unknown[]) => void;
+  ouvir: (canal: string, f: (...a: any[]) => void) => void; projeto: () => Projeto}) => {
+  enviarATela = o.enviar;
+  canalPedido = o.canais.portaoPedido;
+  canalCancelado = o.canais.portaoCancelado;
+  o.ouvir(o.canais.portaoResposta, (id: string, permitir: boolean, sempre?: boolean) => encerrarEspera(String(id), {permitir: Boolean(permitir), sempre: Boolean(sempre)}, false));
+  // Reverter por seq (cartão da conversa e Histórico): a pessoa reverte qualquer entrada; "mesmo assim" passa por cima
+  o.lidar(o.canais.reverter, (seq: number, forcar?: boolean) => o.projeto().reverter(Number(seq), {autor: 'pessoa', origem: 'reverter', forcar: Boolean(forcar)}));
   definirCofre(new CofreArquivo(path.join(o.pasta, 'chaves.json'), o.cifra), new ConfiguracaoIA(o.pasta));
   const {lidar, canais} = o;
   lidar(canais.provedores, () => estadoDosProvedores({claudeInstalado: o.claudeInstalado()}));

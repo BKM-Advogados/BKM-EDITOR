@@ -6,6 +6,7 @@
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StreamableHTTPClientTransport} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type {EventoConversa} from '../../compartilhado/api';
+import {cortarResultado} from '../../compartilhado/ferramentas';
 
 export type ConexaoOpenAI = {
   base: string; // até o /v1 (ou equivalente): https://api.deepseek.com, http://127.0.0.1:11434/v1…
@@ -145,7 +146,7 @@ export class LacoOpenAI {
           }
           this.o.evento({tipo: 'ferramenta', uso: ch.id, nome: ch.function.name, entrada});
           const resultado = await this.chamarFerramenta(ch.function.name, entrada, parada.signal);
-          this.o.evento({tipo: 'resultado', uso: ch.id, ok: resultado.ok, texto: resultado.texto.slice(0, 4000)});
+          this.o.evento({tipo: 'resultado', uso: ch.id, ok: resultado.ok, texto: cortarResultado(resultado.texto)});
           this.historico.push({role: 'tool', tool_call_id: ch.id, content: resultado.texto});
         }
         if (passo === MAX_PASSOS - 1) this.o.evento({tipo: 'erro', mensagem: `parei depois de ${MAX_PASSOS} passos seguidos sem resposta final`});

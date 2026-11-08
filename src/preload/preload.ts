@@ -1,5 +1,5 @@
 import {contextBridge, ipcRenderer, type IpcRendererEvent} from 'electron';
-import {CANAL, type ApiEstudio, type EventoConversa, type Mudanca, type Progresso, type ProgressoTranscricao, type Retangulo} from '../compartilhado/api';
+import {CANAL, type ApiEstudio, type EventoConversa, type Mudanca, type PedidoPortaoTela, type Progresso, type ProgressoTranscricao, type Retangulo} from '../compartilhado/api';
 
 const ouvir = <A extends unknown[]>(canal: string, cb: (...a: A) => void) => {
   const h = (_e: IpcRendererEvent, ...a: A) => cb(...a);
@@ -132,6 +132,10 @@ const api: ApiEstudio = {
     padrao: (p) => ipcRenderer.invoke(CANAL.iaPadrao, p),
     usoDoMes: () => ipcRenderer.invoke(CANAL.iaUsoDoMes),
     modeloDaConversa: (id, m) => ipcRenderer.invoke(CANAL.conversaModelo, id, m),
+    aoPedidoPortao: (cb) => ouvir<[PedidoPortaoTela]>(CANAL.iaPortaoPedido, cb),
+    aoPortaoCancelado: (cb) => ouvir<[string]>(CANAL.iaPortaoCancelado, cb),
+    responderPortao: (id, permitir, sempre) => ipcRenderer.send(CANAL.iaPortaoResposta, id, permitir, sempre),
+    reverter: (seq, forcar) => ipcRenderer.invoke(CANAL.iaReverter, seq, forcar),
   },
 };
 

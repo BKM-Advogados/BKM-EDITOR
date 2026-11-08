@@ -13,10 +13,10 @@ import {provedor as acharProvedor, type Provedor} from './provedores';
 
 type Conexao = {arquivo: string; url: string; headers: Record<string, string>};
 
-type Item =
+type Item = {rotulo: string} & (
   | {via: 'claude-cli'; provedor: Provedor; interno: number; sessao: string}
   | {via: 'openai'; provedor: Provedor; laco: LacoOpenAI; sessao: string; modelo: string; pronto: boolean}
-  | {via: 'acp'; provedor: Provedor; acp: SessaoAcp; sessao: string};
+  | {via: 'acp'; provedor: Provedor; acp: SessaoAcp; sessao: string});
 
 export type OpcoesSessoes = {
   evento: (id: number, e: EventoConversa) => void;
@@ -30,6 +30,7 @@ export type OpcoesSessoes = {
   fetch?: typeof fetch;
   config?: (provedor: string) => {modelo?: string; base?: string}; // o que a pessoa escolheu em Configurações › IA
   aoUso?: (provedor: string, modelo: string, u: UsoTokens, custo_usd?: number) => void; // soma do mês
+  aoParar?: (origem: string) => void; // o Parar também cancela o cartão do portão que esperava a pessoa
 };
 
 /** Executável no PATH, aceitando o .cmd que o npm cria no Windows. */
@@ -89,7 +90,7 @@ export class SessoesIA {
     if (p.via === 'claude-cli') {
       const r = this.claude.abrir({cwd: o.cwd, sessao: o.sessao, arquivoMcp: conexao.arquivo});
       this.doInterno.set(r.id, id);
-      this.itens.set(id, {via: 'claude-cli', provedor: p, interno: r.id, sessao: r.sessao});
+      this.itens.set(id, {via: 'claude-cli', provedor: p, interno: r.id, sessao: r.sessao, rotulo});
       return {id, sessao: r.sessao, provedor: p.id, rotulo};
     }
     if (p.via === 'openai') {
@@ -103,7 +104,7 @@ export class SessoesIA {
       const laco = new LacoOpenAI({conexao: {base, chave, modelo, cabecalhos: p.cabecalhos}, mcp: {url: conexao.url, headers: conexao.headers},
         sistema: this.o.sistema(o.cwd), evento: (e) => this.doLaco(id, e), fetch: this.o.fetch});
       const sessao = o.sessao ?? `${p.id}-${Date.now().toString(36)}-${id}`;
-      this.itens.set(id, {via: 'openai', provedor: p, laco, sessao, modelo, pronto: false});
+      this.itens.set(id, {via: 'openai', provedor: p, laco, sessao, modelo, pronto: false, rotulo});
       return {id, sessao, provedor: p.id, rotulo};
     }
     const acharExe: NonNullable<OpcoesSessoes['acharExe']> = this.o.acharExe ?? ((n: string) => acharExecutavel(n, this.o.ambiente()));
@@ -121,7 +122,7 @@ export class SessoesIA {
         return exe ? {arquivo: exe.arquivo, args: [...(exe.prefixo ?? []), ...(p.args ?? [])], shell: exe.shell} : null;
       },
     });
-    this.itens.set(id, {via: 'acp', provedor: p, acp, sessao: acp.sessao});
+    this.itens.set(id, {via: 'acp', provedor: p, acp, sessao: acp.sessao, rotulo});
     return {id, sessao: acp.sessao, provedor: p.id, rotulo};
   }
 
@@ -177,6 +178,7 @@ export class SessoesIA {
 
   parar(id: number) {
     const i = this.itens.get(id);
+    if (i) this.o.aoParar?.(i.rotulo);
     if (i?.via === 'claude-cli') this.claude.parar(i.interno);
     else if (i?.via === 'openai') i.laco.parar();
     else if (i?.via === 'acp') i.acp.parar();

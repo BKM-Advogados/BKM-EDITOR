@@ -2,7 +2,7 @@
 // dito continua. Cada conversa é um `claude -p` no processo principal (src/main/conversa.ts); aqui os eventos que
 // chegam viram itens para desenhar: a fala da pessoa, o texto do Claude, as ações como cartões e os pedidos de
 // permissão.
-import type {ContaClaude, EstadoProvedor, EventoConversa} from '../../compartilhado/api';
+import type {ContaClaude, EstadoProvedor, EventoConversa, PedidoPortaoTela} from '../../compartilhado/api';
 import {avisar, quandoTrocarProjeto} from '../estado/loja';
 
 export type Anexo = {chave: string; tipo: 'selecao' | 'comentario' | 'tempo' | 'projeto'; rotulo: string; contexto: string};
@@ -38,6 +38,8 @@ let conta: ContaClaude | null = null;
 // frente IA: o catálogo de provedores e o diálogo Configurações › IA (aberto com o provedor em foco, ou fechado)
 let provedores: EstadoProvedor[] = [];
 let configIA: {foco?: string} | null = null;
+// pedidos do portão de abas sem conversa no painel (terminal, app de fora): aparecem soltos, por cima da tela
+let avulsos: PedidoPortaoTela[] = [];
 let contagem = 0;
 const ouvintes = new Set<() => void>();
 // os objetos das conversas são mutáveis e de identidade estável (as funções abaixo guardam referência a eles); cada
@@ -54,6 +56,7 @@ export const estadoConversas = {
   conta: () => conta,
   provedores: () => provedores,
   configIA: () => configIA,
+  avulsos: () => avulsos,
   assinar(f: () => void) {
     ouvintes.add(f);
     return () => {
@@ -225,7 +228,9 @@ export const enviar = async (id: number, texto: string, anexos: Anexo[]) => {
 export const responderPermissao = (id: number, pedido: string, decisao: 'permitir' | 'negar', sempre = false) => {
   const c = conversas.find((x) => x.id === id);
   if (!c) return;
-  window.estudio.conversa.permitir(id, pedido, decisao, sempre);
+  // pedido do portão do MCP (src/nucleo/portao.ts): a resposta vai ao servidor, não ao agente
+  if (pedido.startsWith('portao:')) window.estudio.ia.responderPortao(pedido.slice(7), decisao === 'permitir', sempre);
+  else window.estudio.conversa.permitir(id, pedido, decisao, sempre);
   for (const it of c.itens) if (it.tipo === 'claude') for (const b of it.blocos) if (b.tipo === 'permissao' && b.pedido === pedido) b.decisao = decisao === 'permitir' ? 'permitida' : 'negada';
   if (c.estado === 'precisa') c.estado = 'trabalhando';
   mudou();
@@ -337,3 +342,38 @@ export const trocarModelo = async (id: number, modelo: string) => {
     avisar(limpar((e as Error).message), 'erro');
   }
 };
+
+// ---------- frente IA: portão de permissão do MCP ----------
+// O pedido traz a origem (o rótulo da aba: "DeepSeek 1"). Se uma conversa do painel tem esse rótulo, o cartão aparece
+// nela, igual ao de qualquer provedor; senão (aba de terminal, app de fora), aparece solto por cima da tela.
+const doPortao = (p: PedidoPortaoTela) => {
+  const c = conversas.find((x) => x.titulo.split(' · ')[0] === p.origem);
+  if (!c) {
+    avulsos = [...avulsos, p];
+    mudou();
+    return;
+  }
+  ultimoClaude(c).blocos.push({tipo: 'permissao', pedido: `portao:${p.id}`, ferramenta: p.ferramenta, entrada: p.entrada, titulo: p.motivo, pode_sempre: true});
+  c.estado = 'precisa';
+  mudou();
+};
+
+const portaoCancelado = (id: string) => {
+  avulsos = avulsos.filter((p) => p.id !== id);
+  for (const c of conversas) {
+    for (const it of c.itens) if (it.tipo === 'claude') for (const b of it.blocos) if (b.tipo === 'permissao' && b.pedido === `portao:${id}` && !b.decisao) b.decisao = 'cancelada';
+    if (c.estado === 'precisa' && !c.itens.some((it) => it.tipo === 'claude' && it.blocos.some((b) => b.tipo === 'permissao' && !b.decisao))) c.estado = 'trabalhando';
+  }
+  mudou();
+};
+
+export const responderAvulso = (id: string, permitir: boolean, sempre = false) => {
+  window.estudio.ia.responderPortao(id, permitir, sempre);
+  avulsos = avulsos.filter((p) => p.id !== id);
+  mudou();
+};
+
+if (typeof window !== 'undefined' && window.estudio?.ia?.aoPedidoPortao) {
+  window.estudio.ia.aoPedidoPortao(doPortao);
+  window.estudio.ia.aoPortaoCancelado(portaoCancelado);
+}

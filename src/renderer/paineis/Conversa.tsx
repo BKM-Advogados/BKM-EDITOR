@@ -5,18 +5,21 @@ import React, {useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExt
 import {ArrowUp, CircleAlert, CircleCheck, CircleX, LoaderCircle, ShieldQuestion, Sparkle, SquareTerminal, X} from 'lucide-react';
 import type {OperacaoPatch} from '../../nucleo/documentos';
 import {FERRAMENTAS_ESTUDIO, normalizarFerramenta} from '../../compartilhado/ferramentas';
-import {aplicar, avisar, loja, selecionar, useLoja, valorEm} from '../estado/loja';
+import {mudancasDoResultado} from '../../nucleo/portao';
+import {confirmar} from '../componentes/Dialogo';
+import {avisar, loja, selecionar, useLoja, valorEm} from '../estado/loja';
 import {enviar, estadoConversas, guardarRascunho, lerConta, parar, responderPermissao, trocarModelo, type Anexo, type Bloco, type Conversa as TConversa} from './conversas';
 import './conversa.css';
 
 // ── texto do Claude: markdown pequeno (parágrafos, listas, negrito, itálico, código), sempre escapado ──
-const escapar = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+// transversal-D13: aspas também escapadas, para um endereço com aspas não virar atributo no link
+const escapar = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 const emLinha = (s: string) =>
   escapar(s)
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
     .replace(/(^|[^*])\*([^*\s][^*]*)\*/g, '$1<i>$2</i>')
-    .replace(/\[([^\]]+)\]\((https:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
+    .replace(/\[([^\]]+)\]\((https:\/\/[^)\s&]+(?:&amp;[^)\s&]+)*)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
 const markdown = (t: string) => {
   const partes = t.split(/```[^\n]*\n?([\s\S]*?)```/g);
   return partes.map((p, i) => {
@@ -36,7 +39,7 @@ const markdown = (t: string) => {
 
 // ── ações do Claude em português de quem edita ──
 type Diff = {campo: string; antes?: unknown; depois?: unknown; tipo: 'troca' | 'novo' | 'tira'};
-type Desc = {verbo: string; alvo?: string; extra?: string; codigo?: string; diffs?: Diff[]; ir?: {documento: string; caminho: string}; reverter?: {documento: string; patch: OperacaoPatch[]}};
+type Desc = {verbo: string; alvo?: string; extra?: string; codigo?: string; diffs?: Diff[]; ir?: {documento: string; caminho: string}};
 const nomeArquivo = (p: unknown) => (typeof p === 'string' ? p.split(/[\\/]/).pop() : undefined);
 const curto = (v: unknown) => {
   const s = typeof v === 'string' ? v : JSON.stringify(v);
@@ -61,21 +64,16 @@ const descrever = (bruto: string, e: Record<string, any>, resultado?: string): D
     const ops = (Array.isArray(e.patch) ? e.patch : []) as OperacaoPatch[];
     const testes = new Map(ops.filter((o) => o.op === 'test').map((o) => [o.path, (o as {value?: unknown}).value]));
     const diffs: Diff[] = [];
-    const inverso: OperacaoPatch[] = [];
     for (const o of ops) {
       const campo = o.path.split('/').pop() ?? o.path;
-      if (o.op === 'replace') {
-        const antes = testes.get(o.path);
-        diffs.push({campo, antes, depois: o.value, tipo: 'troca'});
-        if (testes.has(o.path)) inverso.push({op: 'test', path: o.path, value: o.value} as OperacaoPatch, {op: 'replace', path: o.path, value: antes} as OperacaoPatch);
-      } else if (o.op === 'add') diffs.push({campo, depois: o.value, tipo: 'novo'});
+      if (o.op === 'replace') diffs.push({campo, antes: testes.get(o.path), depois: o.value, tipo: 'troca'});
+      else if (o.op === 'add') diffs.push({campo, depois: o.value, tipo: 'novo'});
       else if (o.op === 'remove') diffs.push({campo, tipo: 'tira'});
     }
     const primeiro = ops.find((o) => o.op !== 'test');
     const pai = primeiro ? primeiro.path.split('/').slice(0, -1).join('/') : '';
-    const completo = inverso.length === diffs.length * 2 && diffs.every((d) => d.tipo === 'troca');
-    return {verbo: 'Mudou', alvo: e.rotulo ?? e.documento, diffs, ir: e.documento && pai ? {documento: e.documento, caminho: pai} : undefined,
-      reverter: completo && e.documento ? {documento: e.documento, patch: inverso} : undefined};
+    // o Reverter sai do diário (CartaoAcao), para qualquer ferramenta que grave
+    return {verbo: 'Mudou', alvo: e.rotulo ?? e.documento, diffs, ir: e.documento && pai ? {documento: e.documento, caminho: pai} : undefined};
   }
   if (mcp === 'ler_comentario') return {verbo: 'Leu o comentário', alvo: e.id, extra: tentarJson(resultado)?.texto};
   if (mcp === 'responder_comentario') return {verbo: 'Respondeu ao comentário', alvo: e.id, extra: e.texto};
@@ -156,10 +154,30 @@ const SeletorModelo: React.FC<{c: TConversa; desligado: boolean}> = ({c, desliga
   );
 };
 
+// Ver e Reverter pelo diário (frente IA, rodada 3): o portão do MCP põe no resultado as mudanças que a ferramenta fez
+// (seq, documento); o Reverter aplica o inverso daquela entrada, com qualquer provedor e qualquer ferramenta que grave.
+// transversal-D12: falhou, o cartão diz por quê e oferece "Reverter mesmo assim" quando o valor mudou depois.
+const reverterSeqs = async (seqs: number[], forcar = false): Promise<{ok: boolean; mudou?: boolean; mensagem?: string}> => {
+  for (const seq of [...seqs].reverse()) {
+    const r = await window.estudio.ia.reverter(seq, forcar);
+    if (!r.ok) return {ok: false, mudou: r.mudou_depois, mensagem: r.mensagem};
+  }
+  return {ok: true};
+};
+
 const CartaoAcao: React.FC<{b: Extract<Bloco, {tipo: 'acao'}>}> = ({b}) => {
   const d = useMemo(() => descrever(b.nome, b.entrada, b.resultado), [b.nome, b.entrada, b.resultado]);
-  const [revertido, setRevertido] = useState(false);
+  const mudancas = useMemo(() => mudancasDoResultado(b.resultado), [b.resultado]);
+  const [estado, setEstado] = useState<'nada' | 'revertido' | 'mudou' | 'falhou'>('nada');
   const icone = b.ok === undefined ? <LoaderCircle size={14} className="girando" /> : b.ok ? <CircleCheck size={14} className="feito" /> : <CircleX size={14} className="falhou" />;
+  const ir = d.ir ?? (mudancas[0] ? {documento: mudancas[0].documento, caminho: ''} : undefined);
+  const reverter = async (forcar = false) => {
+    if (forcar && !(await confirmar({titulo: 'Reverter mesmo assim?', texto: 'O valor mudou depois desta ação. Reverter agora desfaz também o que veio depois nesse ponto.', botao: 'Reverter', perigo: true}))) return;
+    const r = await reverterSeqs(mudancas.map((m) => m.seq), forcar);
+    if (r.ok) return setEstado('revertido');
+    setEstado(r.mudou ? 'mudou' : 'falhou');
+    avisar(r.mensagem ?? 'não deu para reverter', 'erro');
+  };
   return (
     <div className={`acao${b.ok === false ? ' com-erro' : ''}`} title={b.ok === false ? b.resultado : undefined}>
       {icone}
@@ -170,24 +188,30 @@ const CartaoAcao: React.FC<{b: Extract<Bloco, {tipo: 'acao'}>}> = ({b}) => {
       {d.diffs?.slice(0, 3).map((x, i) => (
         <span key={i} className="diff">{x.campo}{x.tipo === 'troca' && <> <s>{curto(x.antes)}</s> → <ins>{curto(x.depois)}</ins></>}{x.tipo === 'novo' && <> + <ins>{curto(x.depois)}</ins></>}{x.tipo === 'tira' && ' removido'}</span>
       ))}
-      {d.ir && b.ok && <button className="link" onClick={() => irPara(d.ir!.documento, d.ir!.caminho)}>Ver</button>}
-      {d.reverter && b.ok && (
-        <button className="link fraco" disabled={revertido} onClick={() => void aplicar(d.reverter!.documento, d.reverter!.patch, 'reverter mudança do Claude').then(() => setRevertido(true)).catch((e: Error) => avisar(e.message, 'erro'))}>
-          {revertido ? 'Revertido' : 'Reverter'}
-        </button>
-      )}
+      {ir && b.ok && <button className="link" onClick={() => irPara(ir.documento, ir.caminho)}>Ver</button>}
+      {mudancas.length > 0 && b.ok && estado === 'nada' && <button className="link fraco" onClick={() => void reverter()}>Reverter</button>}
+      {estado === 'revertido' && <span className="link fraco">Revertido</span>}
+      {estado === 'mudou' && <button className="link fraco" onClick={() => void reverter(true)}>Mudou depois · Reverter mesmo assim</button>}
+      {estado === 'falhou' && <span className="link fraco" title="Veja o motivo no aviso; o Histórico também reverte">Não revertido</span>}
     </div>
   );
 };
 
+// o resumo do que o portão do MCP vai fazer: endereço, arquivo ou documento, nunca o JSON inteiro
+const resumoDoPortao = (e: Record<string, any>) => {
+  const v = e.url ?? e.arquivo ?? e.origem ?? (e.documento ? `documento ${e.documento}` : undefined);
+  return v === undefined ? undefined : String(v);
+};
+
 const CartaoPermissao: React.FC<{c: TConversa; b: Extract<Bloco, {tipo: 'permissao'}>}> = ({c, b}) => {
-  const p = pedidoEmTexto(b.ferramenta, b.entrada);
+  // pedido do portão do MCP (src/nucleo/portao.ts): o motivo vem pronto, em português; senão, o pedido do próprio agente
+  const p = b.pedido.startsWith('portao:') && b.titulo ? {acao: b.titulo, codigo: resumoDoPortao(b.entrada)} : pedidoEmTexto(b.ferramenta, b.entrada);
   return (
     <div className={`permissao${b.decisao ? ' decidida' : ''}`}>
       <div className="perm-topo"><ShieldQuestion size={15} />{nomeIA(c)} quer {p.acao}</div>
       {p.codigo && <pre className="perm-cmd">{p.codigo}</pre>}
       {b.decisao ? (
-        <div className="perm-decisao">{b.decisao === 'permitida' ? 'Permitido' : b.decisao === 'negada' ? 'Negado' : 'Cancelado pelo Claude'}</div>
+        <div className="perm-decisao">{b.decisao === 'permitida' ? 'Permitido' : b.decisao === 'negada' ? 'Negado' : 'Cancelado'}</div>
       ) : (
         <div className="perm-botoes">
           <button className="bt principal mini" onClick={() => responderPermissao(c.id, b.pedido, 'permitir')}>Permitir</button>

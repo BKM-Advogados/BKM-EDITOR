@@ -32,5 +32,14 @@ export const normalizarFerramenta = (bruto: string, conhecidas?: ReadonlySet<str
 export const FERRAMENTAS_ESTUDIO: ReadonlySet<string> = new Set([
   'projeto_info', 'estado_do_editor', 'ler_documento', 'aplicar_patch', 'criar_documento', 'renomear_projeto', 'listar_comentarios', 'ler_comentario',
   'responder_comentario', 'resolver_comentario', 'listar_mudancas', 'aplicar_marca', 'ler_fonte', 'anotar_fonte', 'registrar_fato', 'listar_pesquisa',
-  'texto_da_fonte', 'checar_texto', 'transcrever', 'exportar_legendas', 'importar_legendas', 'remover_fundo',
+  'texto_da_fonte', 'checar_texto', 'transcrever', 'exportar_legendas', 'importar_legendas', 'remover_fundo', 'ler_legendas', 'editar_legenda',
+  'desfazer', 'reverter', 'guia_do_projeto', 'criar_comentario', 'reabrir_comentario', // frente IA, rodada 3
 ]);
+
+/** Corta o texto do resultado para a tela sem perder as mudanças do diário que o portão põe no fim (Ver e Reverter). */
+export const cortarResultado = (texto: string, max = 4000) => {
+  if (texto.length <= max) return texto;
+  const i = texto.lastIndexOf('{"estudio_mudancas":');
+  const mudancas = i >= 0 ? texto.slice(i) : '';
+  return `${texto.slice(0, Math.max(0, max - mudancas.length))}…${mudancas ? `\n${mudancas}` : ''}`;
+};

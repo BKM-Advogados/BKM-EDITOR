@@ -21,6 +21,8 @@ import {
 import {checarTexto, REGRAS_CLIENTE, terminaComUltimaFrase, type Aviso} from './regras';
 import {acharCamada, caminhosDoId} from './carrossel';
 import {MODELO_FUNDO, patchSemFundo, patchVoltarAoOriginal, removedorDeFundo} from './remover-fundo';
+import {instalarPortao, type Portao} from './portao'; // frente IA: portão de permissão e seq em todo resultado
+import {registrarIa} from './mcp-ia'; // frente IA: desfazer, reverter, guia, comentários
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x, null, 2)}]});
 const erro = (e: unknown) => ({
@@ -107,7 +109,9 @@ export const criarRede = (buscar: Buscar = (url, init) => fetch(url, init), opco
 
 // ---------- ferramentas ----------
 
-export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, autor: string, origem: string, rede?: Rede, transcritor?: TranscritorMcp) => {
+export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, autor: string, origem: string, rede?: Rede, transcritor?: TranscritorMcp, portao?: Portao) => {
+  // frente IA: tudo o que for registrado daqui em diante passa pelo portão (permissão e mudanças do diário no resultado)
+  instalarPortao(servidor, {projeto, origem, portao});
   servidor.registerTool('projeto_info', {
     description: 'Nome do projeto, documentos (id, módulo, caminho), quantos comentários estão abertos e quantas fontes e fatos a pesquisa tem.',
     inputSchema: {},
@@ -158,7 +162,15 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
     },
   }, seguro(({documento, versao_base, patch, rotulo}: {documento: string; versao_base: string; patch: OperacaoPatch[]; rotulo?: string}) => {
     const r = projeto.aplicarPatch({documento, versao_base, patch, autor: autor, origem, rotulo});
-    return {ok: true, versao: r.versao, seq: r.entrada.seq};
+    // video-D14: no vídeo de cenas, os avisos do resolvedor voltam junto (cena curta demais, bloco fora da cena…)
+    let avisos: string[] = [];
+    try {
+      const {doc} = projeto.lerJson<unknown>(projeto.arquivoDoDocumento(documento));
+      if (ehDocCenas(doc)) avisos = resolverCenas(doc as DocCenas).avisos;
+    } catch {
+      /* sem avisos: o patch já foi gravado */
+    }
+    return {ok: true, versao: r.versao, seq: r.entrada.seq, ...(avisos.length ? {avisos} : {})};
   }));
 
   servidor.registerTool('criar_documento', {
@@ -217,10 +229,15 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   }, seguro(({id, nota}: {id: string; nota?: string}) => projeto.resolver(id, autor, nota)));
 
   servidor.registerTool('listar_mudancas', {
-    description: 'Diário de mudanças desde um número de sequência: quem mudou (pessoa ou agente), o rótulo e o patch. Use para ver o que a pessoa editou à mão.',
-    inputSchema: {desde: z.number().optional(), autor: z.string().optional()},
-  }, seguro(({desde = 0, autor}: {desde?: number; autor?: string}) =>
-    projeto.diario(desde).filter((e) => !autor || e.autor === autor).map(({inverso: _i, ...e}) => e)));
+    description: 'Diário de mudanças: quem mudou (pessoa ou agente), o rótulo e o patch, com o número (seq) que reverter usa. Sem "desde", só as últimas 50.',
+    inputSchema: {desde: z.number().optional(), autor: z.string().optional(), documento: z.string().optional(),
+      limite: z.number().int().min(1).max(500).optional().describe('máximo de entradas; padrão 50')},
+  }, seguro(({desde = 0, autor, documento, limite = 50}: {desde?: number; autor?: string; documento?: string; limite?: number}) => {
+    // transversal-D14: sem limite, um projeto com milhares de mudanças mandava megabytes de diário à IA
+    const doc = documento ? projeto.arquivoDoDocumento(documento) : undefined;
+    const lista = projeto.diario(desde).filter((e) => (!autor || e.autor === autor) && (!doc || e.documento === doc));
+    return lista.slice(-limite).map(({inverso: _i, ...e}) => e);
+  }));
 
   registrarPesquisa(servidor, projeto, autor, origem, rede);
 
@@ -243,6 +260,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
 
   registrarFala(servidor, projeto, autor, origem, transcritor); // frente Fala: transcrever e legendas
   registrarAcabamento(servidor, projeto, autor, origem); // acabamento da imagem (rodada 2, B2)
+  registrarIa(servidor, projeto, autor, origem, portao); // frente IA (rodada 3): desfazer, reverter, guia, comentários
 };
 
 // ---------- pesquisa: fontes e fatos (src/nucleo/pesquisa.ts, docs/pesquisa.md) ----------

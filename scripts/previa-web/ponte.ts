@@ -6,7 +6,7 @@
 // Som: "escolher arquivo de áudio" devolve um WAV sintético (uma narração, depois uma música, alternando), como URL de
 // blob que o <audio> e o Web Audio tocam de verdade; o envelope medido fica em memória e entra nas props como no app.
 import jsonpatch, {type Operation} from 'fast-json-patch';
-import type {ApiEstudio, EstadoProvedor, InfoProjeto, MarcaInfo, Mudanca, NovoProjeto, Preferencias, Progresso, ProgressoTranscricao, Recente, ResultadoLimpezaVoz, Trilha} from '../../src/compartilhado/api';
+import type {ApiEstudio, EstadoProvedor, InfoProjeto, PedidoPortaoTela, MarcaInfo, Mudanca, NovoProjeto, Preferencias, Progresso, ProgressoTranscricao, Recente, ResultadoLimpezaVoz, Trilha} from '../../src/compartilhado/api';
 import type {EntradaDocumento, Manifesto, Modulo} from '../../src/nucleo/documentos';
 import type {Envelope, IntensidadeLimpeza} from '../../src/nucleo/audio';
 import {LimpezaCancelada, limparVoz} from '../../src/nucleo/limpeza-voz';
@@ -410,6 +410,13 @@ const api: ApiEstudio = {
     padrao: async (id) => void (iaNaPrevia.padrao = id),
     usoDoMes: async () => ({deepseek: {entrada: 182000, cache: 120000, saida: 9100, custo_usd: 0.0198, turnos: 14}}),
     modeloDaConversa: async () => undefined,
+    aoPedidoPortao: (cb) => {
+      iaNaPrevia.portao.add(cb);
+      return () => iaNaPrevia.portao.delete(cb);
+    },
+    aoPortaoCancelado: () => nada,
+    responderPortao: (id, permitir) => console.log(`[prévia] portão ${id}: ${permitir ? 'permitido' : 'negado'}`),
+    reverter: async (seq) => ({ok: true as const, seq: seq + 1000, rotulo: `reverter: #${seq}`}),
   },
 };
 
@@ -625,6 +632,7 @@ const fundoNaPrevia = (() => {
 // ---------- frente IA: estado da simulação de Configurações › IA ----------
 const iaNaPrevia = {
   padrao: 'claude',
+  portao: new Set<(p: PedidoPortaoTela) => void>(),
   chaves: new Map<string, string>([['deepseek', 'sk-previa-a1f9']]),
   config: {} as Record<string, {modelo?: string; base?: string}>,
   modelos: {deepseek: ['deepseek-flash', 'deepseek-v4-pro'], gemini: ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash'],
@@ -650,3 +658,7 @@ const iaNaPrevia = {
     });
   },
 };
+// na prévia, um pedido do portão sai pelo console: window.__portaoNaPrevia({origem: 'DeepSeek 1', ferramenta: 'ler_fonte', …})
+(window as unknown as {__portaoNaPrevia: (p: Partial<PedidoPortaoTela>) => void}).__portaoNaPrevia = (p) =>
+  iaNaPrevia.portao.forEach((f) => f({id: `previa-${Date.now()}`, origem: 'Claude 1', ferramenta: 'ler_fonte', motivo: 'abrir uma página da internet',
+    entrada: {url: 'https://www.planalto.gov.br/ccivil_03/decreto-lei/del5452.htm'}, ...p}));

@@ -115,6 +115,10 @@ export const CANAL = {
   iaPadrao: 'estudio:ia-padrao',
   iaUsoDoMes: 'estudio:ia-uso-do-mes',
   conversaModelo: 'estudio:conversa-modelo',
+  iaPortaoPedido: 'estudio:ia-portao-pedido',
+  iaPortaoResposta: 'estudio:ia-portao-resposta',
+  iaPortaoCancelado: 'estudio:ia-portao-cancelado',
+  iaReverter: 'estudio:ia-reverter',
 } as const;
 
 /** O projeto aberto. `estado` é o último que a pessoa viu (área, documento, seleção), para reabrir onde parou; `git`
@@ -322,6 +326,12 @@ export type ApiEstudio = {
     usoDoMes: () => Promise<UsoDoMes>;
     /** Seletor de modelo da conversa aberta: vale na próxima mensagem. */
     modeloDaConversa: (id: number, modelo?: string) => Promise<void>;
+    /** Portão de permissão: pedidos de qualquer IA (conversa, terminal, app de fora) e a resposta da pessoa. */
+    aoPedidoPortao: (cb: (p: PedidoPortaoTela) => void) => () => void;
+    aoPortaoCancelado: (cb: (id: string) => void) => () => void;
+    responderPortao: (id: string, permitir: boolean, sempre?: boolean) => void;
+    /** Reverte uma entrada do diário pelo seq; forcar passa por cima de mudança feita depois. */
+    reverter: (seq: number, forcar?: boolean) => Promise<ResultadoReverter>;
   };
 };
 
@@ -356,6 +366,9 @@ export type EstadoProvedor = {id: string; nome: string; via: 'claude-cli' | 'ope
 /** Resultado de gravar uma chave: testada na lista de modelos do provedor (não gasta token). */
 export type ResultadoChave = {ok: boolean; mensagem: string; persistente?: boolean; modelos?: string[]};
 export type ResultadoModelos = {ok: true; modelos: string[]} | {ok: false; status?: number; rede?: boolean; mensagem: string};
+/** Pedido do portão de permissão do MCP (src/nucleo/portao.ts) para a tela: de qual aba, qual ferramenta e por quê. */
+export type PedidoPortaoTela = {id: string; origem: string; ferramenta: string; motivo: string; entrada: Record<string, unknown>};
+export type ResultadoReverter = {ok: true; seq: number; rotulo: string} | {ok: false; mensagem: string; mudou_depois?: boolean};
 /** Soma do mês por provedor, no PC: tokens e custo estimado pela tabela de preços. */
 export type UsoDoMes = Record<string, {entrada: number; cache: number; saida: number; custo_usd: number; turnos: number}>;
 

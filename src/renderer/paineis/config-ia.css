@@ -26,3 +26,7 @@
 .ia-uso td { padding: 3px 4px; border-bottom: 1px solid var(--borda); }
 .ia-uso td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .config-ia .fraco { color: var(--texto-2); font-size: 12px; }
+
+/* pedidos do portão de abas sem conversa no painel (terminal, app de fora) */
+.ia-avulsos { position: fixed; right: 16px; bottom: 32px; z-index: 90; display: flex; flex-direction: column; gap: 8px; width: min(380px, calc(100vw - 32px)); }
+.ia-avulso { background: var(--fundo-2); border: 1px solid var(--borda-forte); border-radius: 10px; padding: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); }
