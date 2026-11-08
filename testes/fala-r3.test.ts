@@ -8,8 +8,11 @@ import {Legendas} from '../src/composicoes/cenas/Legendas';
 import type {ClipeAudio} from '../src/nucleo/audio';
 import {novoDocCenas, resolverCenas, type DocCenas} from '../src/nucleo/cenas';
 import {
-  comTexto, CPS_MAX, cpsDe, MAX_SEGMENTO_MS, MIN_SEGMENTO_MS, PAUSA_QUEBRA_MS, quebrarEmSegmentos, legendasAoDividirClipe, legendasAoDuplicarClipe, lerLegendas, nomeLivreDaLegenda, legendasDeOutraTomada, legendasDoDocumento, limitesDoArrasto, mesmaTomada, resolverLegendas, textoDeLegenda, type LegendasCenas,
+  capacidadeDaLegenda, comTexto, CPS_MAX, cpsDe, fracaNoFim, legendasAoDividirClipe, legendasAoDuplicarClipe, legendasDaFala, legendasDeOutraTomada, legendasDoDocumento, lerLegendas,
+  limitesDoArrasto, linhasDaLegenda, MAX_SEGMENTO_MS, mesmaTomada, MIN_SEGMENTO_MS, nomeLivreDaLegenda, PAUSA_QUEBRA_MS, quebrarEmLinhas, quebrarEmSegmentos, resolverLegendas,
+  textoDeLegenda, type LegendasCenas,
 } from '../src/nucleo/legendas';
+import {avancosDaFonte, LETRAS_MEDIDAS, medidorDaFonte} from '../src/nucleo/medida-texto';
 
 const tela = vi.hoisted(() => ({quadro: 0}));
 vi.mock('remotion', async (original) => ({
@@ -221,5 +224,79 @@ describe('régua: pausa de 300 ms, 833 ms a 7 s e 17 caracteres por segundo', ()
       if (vao >= MIN_SEGMENTO_MS) expect(s.sai - s.em).toBeGreaterThanOrEqual(MIN_SEGMENTO_MS);
       if (vao >= (s.texto.length / 17) * 1000 + 1) expect(cpsDe(s)).toBeLessThanOrEqual(17);
     }
+  });
+});
+
+describe('linhas: 42 caracteres, corte equilibrado sem palavra fraca no fim e largura medida na fonte (fala-D6)', () => {
+  const porLetra = (largura: number) => ({largura, medir: (s: string) => s.length, max_caracteres: 42});
+  const ws = (t: string) => t.split(' ');
+
+  it('uma linha quando cabe; duas equilibradas quando não; pontuação ajuda', () => {
+    expect(quebrarEmLinhas(ws('Recebeu proposta de mudança?'), porLetra(42))).toEqual([ws('Recebeu proposta de mudança?')]);
+    const duas = quebrarEmLinhas(ws('Antes de responder, entenda as regras da transferência'), porLetra(36));
+    expect(duas.map((l) => l.join(' '))).toEqual(['Antes de responder,', 'entenda as regras da transferência']);
+  });
+
+  it('não deixa artigo, preposição, auxiliar nem "não" no fim da primeira linha', () => {
+    for (const texto of ['o empregador vai pagar o frete da mudança inteira', 'a empresa não pode mudar o contrato sem acordo', 'quem decide é o juiz da vara do trabalho local']) {
+      const [a] = quebrarEmLinhas(ws(texto), porLetra(28));
+      expect(fracaNoFim(a[a.length - 1]), `${texto} → ${a.join(' ')}`).toBe(false);
+    }
+    // a vírgula libera: "de," pode fechar a linha
+    expect(fracaNoFim('de,')).toBe(false);
+  });
+
+  it('quando nem duas cabem, quantas precisar, cada uma dentro da largura', () => {
+    const linhas = quebrarEmLinhas(ws('um dois três quatro cinco seis sete oito nove dez onze doze treze'), porLetra(14));
+    expect(linhas.length).toBeGreaterThan(2);
+    for (const l of linhas) expect(l.join(' ').length).toBeLessThanOrEqual(14);
+  });
+
+  it('o SRT e o VTT nunca passam de 42 caracteres por linha', () => {
+    const longa = 'A transferência do empregado para outra cidade depende da sua concordância, com exceções importantes previstas em lei';
+    for (const l of linhasDaLegenda(longa)) expect(l.length).toBeLessThanOrEqual(42);
+  });
+
+  it('o medidor usa a tabela da fonte: a Mono é 0,6 em por letra e a acentuada vale a base', () => {
+    expect(medidorDaFonte({familia: 'IBM Plex Mono', peso: 400, tam: 100})('abc')).toBeCloseTo(180);
+    const inter = medidorDaFonte({familia: '"Inter", sans-serif', peso: 600, tam: 1000});
+    expect(inter('ã')).toBe(inter('a'));
+    expect(inter('Recebeu')).toBe([...'Recebeu'].reduce((s, ch) => s + avancosDaFonte('Inter', 600)[LETRAS_MEDIDAS.indexOf(ch)], 0));
+    expect(medidorDaFonte({familia: 'Inter', peso: 800, tam: 100})('abc')).toBeGreaterThan(medidorDaFonte({familia: 'Inter', peso: 400, tam: 100})('abc'));
+    expect(medidorDaFonte({familia: 'Inter', peso: 600, tam: 100, maiusculas: true})('abc')).toBe(medidorDaFonte({familia: 'Inter', peso: 600, tam: 100})('ABC'));
+    // fonte própria de kit (sem tabela): mede como a Inter
+    expect(medidorDaFonte({familia: 'Fonte da Marca', peso: 600, tam: 100})('abc')).toBe(medidorDaFonte({familia: 'Inter', peso: 600, tam: 100})('abc'));
+  });
+
+  for (const [largura, altura] of [[1920, 1080], [1080, 1920], [1080, 1350]] as const) {
+    it(`a narração do C2 em ${largura}×${altura}: toda legenda cabe em duas linhas medidas, de até 42 caracteres`, () => {
+      for (const predefinicao of ['classica', 'karaoke', 'caixa'] as const) {
+        const leg = legendasDaFala([{clipe: {id: 'n1', arquivo: 'a.wav', em: 0, duracao_ms: 80_000}, faixa: {}, palavras: FALA_C2, caminhoPalavras: 'x'}],
+          {estilo: {predefinicao}, largura, altura, fonte: 'Inter'});
+        const cap = capacidadeDaLegenda({predefinicao, fonte: 'Inter'}, largura, altura);
+        for (const s of leg.segmentos) {
+          const linhas = quebrarEmLinhas(s.palavras!.map((p) => p.w), cap);
+          expect(linhas.length, `${predefinicao}: ${s.texto}`).toBeLessThanOrEqual(2);
+          for (const l of linhas) {
+            expect(l.join(' ').length).toBeLessThanOrEqual(42);
+            expect(cap.medir(l.join(' '))).toBeLessThanOrEqual(cap.largura);
+          }
+        }
+      }
+    });
+  }
+
+  it('a composição desenha as linhas medidas, sem palavra fraca no fim da primeira', () => {
+    const texto = 'A transferência depende da sua concordância por escrito';
+    const palavras = texto.split(' ').map((w, i) => ({w, s: i * 200, e: i * 200 + 180}));
+    const legendas = resolverLegendas({segmentos: [{id: 'leg-1', em: 0, sai: 4000, texto, palavras}], estilo: {predefinicao: 'classica'}},
+      {largura: 1080, altura: 1920, tema: TEMA, duracao_ms: 4000})!;
+    tela.quadro = 30;
+    const html = renderToStaticMarkup(React.createElement(Legendas, {legendas}));
+    const linhas = [...html.matchAll(/<div><span style="[^"]*">(.*?)<\/span><\/div>/g)].map((m) => m[1].replace(/<[^>]+>/g, '').trim());
+    expect(linhas.length).toBe(2);
+    expect(linhas.join(' ')).toBe(texto);
+    for (const l of linhas) expect(l.length).toBeLessThanOrEqual(42);
+    expect(fracaNoFim(linhas[0].split(' ').pop()!)).toBe(false);
   });
 });

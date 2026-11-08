@@ -260,7 +260,7 @@ export const trocarPredefinicao = async (documento: string, estilo: EstiloLegend
   const d = docDe(documento);
   if (!d?.legendas) return;
   const f = formatoDoVideo(d);
-  const quebradas = requebrar(d.legendas, estilo, f.largura, f.altura);
+  const quebradas = requebrar(d.legendas, estilo, f.largura, f.altura, d.tema?.fonte);
   await gravarLegendas(documento, quebradas, `estilo das legendas: ${estilo.predefinicao}`);
 };
 

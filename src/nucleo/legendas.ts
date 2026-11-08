@@ -7,6 +7,7 @@
 import {papelDe, type AudioCenas, type AudioP, type ClipeAudio, type FaixaAudio} from './audio';
 import type {TemaCenas} from './cenas';
 import {conjuntoDe, zonaSugerida} from './zonas-seguras';
+import {medidorDaFonte, type Medir} from './medida-texto';
 
 // ---------- formato no documento ----------
 
@@ -95,19 +96,92 @@ export const areaDaLegenda = (largura: number, altura: number): AreaLegenda => {
   return {topo: topo + 0.01, base: base - 0.01, esq: lado, dir: lado};
 };
 
-/** Quantos caracteres cabem numa linha da legenda nesse formato (letra média de 0,55 em). */
-export const caracteresPorLinha = (estilo: EstiloLegenda | undefined, largura: number, altura: number) => {
-  const p = PREDEFINICOES_LEGENDA[estilo?.predefinicao ?? 'classica'] ?? PREDEFINICOES_LEGENDA.classica;
-  const area = areaDaLegenda(largura, altura);
-  const tam = (estilo?.tam ?? p.tam) * Math.min(largura, altura);
-  const util = (1 - area.esq - area.dir) * largura * (p.caixa === 'nenhuma' ? 1 : 0.92);
-  const largLetra = tam * ((estilo?.maiusculas ?? p.maiusculas) ? 0.68 : 0.55);
-  return Math.max(8, Math.floor(util / largLetra));
+export const MAX_CARACTERES_LINHA = 42; // a régua da Netflix pt-BR
+
+/** A largura do texto numa linha, em px: a área segura entre as margens, menos o respiro da caixa atrás da linha (o
+ *  mesmo que a composição desenha em Legendas.tsx). */
+export const larguraDaLinha = (area: AreaLegenda, largura: number, tam: number, caixa: Predefinicao['caixa']) =>
+  Math.max(tam * 2, (1 - area.esq - area.dir) * largura - (caixa === 'linha' ? tam * 0.64 : 0));
+
+/** Onde a legenda cabe nesse quadro e nesse estilo: a largura útil da linha em px, o medidor da fonte (os avanços de cada
+ *  letra medidos na fonte, medida-texto.ts), o teto de 42 caracteres por linha, as linhas e as palavras por vez. */
+export type CapacidadeLegenda = {largura: number; medir: Medir; max_caracteres: number; linhas: number; max_palavras?: number};
+export const capacidadeDaLegenda = (estilo: {predefinicao?: IdEstiloLegenda; id?: IdEstiloLegenda; tam?: number; maiusculas?: boolean; fonte?: string} | undefined,
+  largura: number, altura: number, o: {fonte?: string; area?: AreaLegenda} = {}): CapacidadeLegenda => {
+  const p = PREDEFINICOES_LEGENDA[estilo?.predefinicao ?? estilo?.id ?? 'classica'] ?? PREDEFINICOES_LEGENDA.classica;
+  const tam = (numeroOuNada(estilo?.tam) ?? p.tam) * Math.min(largura, altura);
+  const maiusculas = typeof estilo?.maiusculas === 'boolean' ? estilo.maiusculas : p.maiusculas;
+  return {
+    largura: larguraDaLinha(o.area ?? areaDaLegenda(largura, altura), largura, tam, p.caixa),
+    // a caixa alta da legenda leva 0,01 em entre as letras (Legendas.tsx)
+    medir: ((m: Medir) => (maiusculas ? (s: string) => m(s) + s.length * tam * 0.01 : m))(medidorDaFonte({familia: estilo?.fonte || o.fonte, peso: p.peso, tam, maiusculas})),
+    max_caracteres: MAX_CARACTERES_LINHA, linhas: p.linhas, ...(p.max_palavras ? {max_palavras: p.max_palavras} : {}),
+  };
 };
+const numeroOuNada = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0.01 && v < 0.3 ? v : null);
+
+// uma frase comum de narração, para a largura média das letras
+const AMOSTRA_PT = 'A transferência do empregado para outra cidade depende da sua concordância, com exceções.';
+
+/** Quantos caracteres cabem numa linha da legenda nesse formato: a largura útil pela largura média das letras de uma
+ *  frase em português, medida na fonte, e no máximo 42 (a régua). Serve à regra da vírgula; o que decide se cabe é a
+ *  medida de cada linha (cabeNaLegenda). */
+export const caracteresPorLinha = (estilo: EstiloLegenda | undefined, largura: number, altura: number, fonte?: string) => {
+  const cap = capacidadeDaLegenda(estilo, largura, altura, {fonte});
+  const media = cap.medir(AMOSTRA_PT) / AMOSTRA_PT.length;
+  return Math.max(8, Math.min(MAX_CARACTERES_LINHA, Math.floor(cap.largura / media)));
+};
+
+/** Palavra que não termina linha nem legenda quando dá para evitar: artigo, preposição, conjunção, verbo auxiliar e
+ *  "não" (régua da Netflix pt-BR: não separar artigo do nome nem verbo do auxiliar). Com pontuação no fim, pode. */
+export const fracaNoFim = (w: string) => !/[,;:.?!…]["'”»)]*$/.test(w) && (PALAVRA_FRACA.test(w) || AUXILIAR.test(w));
+
+/** As linhas de uma legenda: uma só se couber; senão duas, no corte mais equilibrado pela largura medida, de preferência
+ *  depois de pontuação e sem palavra fraca no fim da primeira quando dá para evitar; se nem em duas couber, quantas
+ *  precisar, levando a palavra fraca para a linha de baixo. Cada linha cabe na largura e no teto de caracteres. */
+export const quebrarEmLinhas = (palavras: string[], cap: {largura: number; medir: Medir; max_caracteres?: number}): string[][] => {
+  if (!palavras.length) return [];
+  const max = cap.max_caracteres ?? Infinity;
+  const larg = (ws: string[]) => cap.medir(ws.join(' '));
+  const cabe = (ws: string[]) => ws.join(' ').length <= max && larg(ws) <= cap.largura;
+  if (palavras.length === 1 || cabe(palavras)) return [palavras];
+  let melhor = 0;
+  let nota = Infinity;
+  for (let k = 1; k < palavras.length; k++) {
+    const a = palavras.slice(0, k);
+    const b = palavras.slice(k);
+    if (!cabe(a) || !cabe(b)) continue;
+    const ultima = palavras[k - 1];
+    const n = Math.max(larg(a), larg(b)) - (/[,;:.?!…]["'”»)]*$/.test(ultima) ? cap.largura * 0.25 : 0) + (fracaNoFim(ultima) ? cap.largura * 0.3 : 0);
+    if (n < nota) {
+      nota = n;
+      melhor = k;
+    }
+  }
+  if (melhor) return [palavras.slice(0, melhor), palavras.slice(melhor)];
+  const linhas: string[][] = [];
+  let atual: string[] = [];
+  for (const w of palavras) {
+    if (atual.length && !cabe([...atual, w])) {
+      const f = atual.length > 1 && fracaNoFim(atual[atual.length - 1]) ? atual.pop()! : null;
+      linhas.push(atual);
+      atual = f ? [f] : [];
+    }
+    atual.push(w);
+  }
+  if (atual.length) linhas.push(atual);
+  return linhas;
+};
+
+/** A legenda cabe nas linhas do estilo (pela largura medida e pelo teto de caracteres) e nas palavras por vez? */
+export const cabeNaLegenda = (palavras: string[], cap: CapacidadeLegenda) =>
+  (!cap.max_palavras || palavras.length <= cap.max_palavras) && quebrarEmLinhas(palavras, cap).length <= cap.linhas;
 
 // ---------- gerar a partir das palavras ----------
 
-export type OpcoesQuebra = {max_caracteres: number; max_palavras?: number; pausa_ms?: number; max_ms?: number; min_ms?: number; segura_ms?: number};
+/** `cabe`: se as palavras cabem numa legenda (a medida da fonte, cabeNaLegenda); sem ele, vale `max_caracteres`. */
+export type OpcoesQuebra = {max_caracteres: number; max_palavras?: number; pausa_ms?: number; max_ms?: number; min_ms?: number; segura_ms?: number;
+  cabe?: (palavras: string[]) => boolean};
 // a régua (Netflix pt-BR e @remotion/captions): página nova no silêncio de ~300 ms, cada legenda entre 5/6 s e 7 s, e
 // até 17 caracteres por segundo para ler
 export const PAUSA_QUEBRA_MS = 300; // silêncio que fecha a legenda
@@ -118,6 +192,8 @@ const SEGURA_MS = 250; // a legenda fica um pouco depois da última palavra
 const FIM_DE_FRASE = /[.?!…]["'”»)]*$/;
 // artigo, preposição e conjunção não terminam legenda quando dá para evitar ("a mudança de | casa")
 const PALAVRA_FRACA = /^(a|o|as|os|um|uma|uns|umas|de|da|do|das|dos|em|na|no|nas|nos|e|ou|que|para|pra|por|pela|pelo|com|se|ao|à|aos|às|sem|sua|seu)$/i;
+// verbo auxiliar e "não" ficam com o verbo que vem depois ("vai | pagar", "não | pode")
+const AUXILIAR = /^(é|são|foi|foram|era|eram|ser|sido|está|estão|estava|estavam|tem|têm|tinha|tinham|ter|tido|vai|vão|ia|iam|ir|pode|podem|podia|podiam|deve|devem|devia|deviam|há|havia|haver|será|serão|seria|seriam|fica|ficam|ficou|precisa|precisam|não)$/i;
 const PAUSA_DE_FRASE = /[,;:]["'”»)]*$/;
 
 /** Junta o que o Whisper às vezes separa ("25 %", "seguro -desemprego") e tira palavras vazias. */
@@ -147,6 +223,7 @@ export const quebrarEmSegmentos = (palavras: PalavraLegenda[], o: OpcoesQuebra):
   const grupos: PalavraLegenda[][] = [];
   let atual: PalavraLegenda[] = [];
   const tamanho = (ws: PalavraLegenda[]) => ws.reduce((n, p, i) => n + p.w.length + (i ? 1 : 0), 0);
+  const excede = (ws: PalavraLegenda[]) => (o.cabe ? !o.cabe(ws.map((p) => p.w)) : tamanho(ws) > o.max_caracteres);
   const fechar = () => {
     if (atual.length) grupos.push(atual);
     atual = [];
@@ -155,7 +232,7 @@ export const quebrarEmSegmentos = (palavras: PalavraLegenda[], o: OpcoesQuebra):
   // para a próxima ("Com o fim | da produção")
   const fecharSemFraca = () => {
     const ultima = atual[atual.length - 1];
-    if (atual.length > 1 && PALAVRA_FRACA.test(ultima.w)) {
+    if (atual.length > 1 && fracaNoFim(ultima.w)) {
       atual.pop();
       fechar();
       atual = [ultima];
@@ -165,14 +242,14 @@ export const quebrarEmSegmentos = (palavras: PalavraLegenda[], o: OpcoesQuebra):
     if (atual.length) {
       const ultima = atual[atual.length - 1];
       if (p.s - ultima.e >= pausa) fechar();
-      else if (tamanho([...atual, p]) > o.max_caracteres || (o.max_palavras && atual.length >= o.max_palavras) || p.e - atual[0].s > maxMs) fecharSemFraca();
+      else if (excede([...atual, p]) || (o.max_palavras && atual.length >= o.max_palavras) || p.e - atual[0].s > maxMs) fecharSemFraca();
     }
     atual.push(p);
     if (FIM_DE_FRASE.test(p.w)) fechar();
     else if (PAUSA_DE_FRASE.test(p.w) && tamanho(atual) >= o.max_caracteres * 0.5) fechar();
   }
   fechar();
-  equilibrar(grupos, o, tamanho, pausa);
+  equilibrar(grupos, o, tamanho, pausa, excede);
   const min = o.min_ms ?? MIN_SEGMENTO_MS;
   const segura = o.segura_ms ?? SEGURA_MS;
   return grupos.map((g, i) => {
@@ -187,9 +264,15 @@ export const quebrarEmSegmentos = (palavras: PalavraLegenda[], o: OpcoesQuebra):
   });
 };
 
+/** As opções da quebra para um estilo nesse quadro: a medida da fonte decide o que cabe. */
+const opcoesDaQuebra = (estilo: EstiloLegenda, largura: number, altura: number, fonte?: string): OpcoesQuebra => {
+  const cap = capacidadeDaLegenda(estilo, largura, altura, {fonte});
+  return {max_caracteres: caracteresPorLinha(estilo, largura, altura, fonte) * cap.linhas, max_palavras: cap.max_palavras, cabe: (ws) => cabeNaLegenda(ws, cap)};
+};
+
 /** A legenda curta que sobrou da largura no meio de uma frase ("concordância." sozinha) divide o texto com a anterior:
  *  o corte mais equilibrado que caiba nas duas, de preferência depois de vírgula. */
-const equilibrar = (grupos: PalavraLegenda[][], o: OpcoesQuebra, tamanho: (ws: PalavraLegenda[]) => number, pausa: number) => {
+const equilibrar = (grupos: PalavraLegenda[][], o: OpcoesQuebra, tamanho: (ws: PalavraLegenda[]) => number, pausa: number, excede: (ws: PalavraLegenda[]) => boolean) => {
   for (let i = 1; i < grupos.length; i++) {
     const a = grupos[i - 1];
     const b = grupos[i];
@@ -200,10 +283,10 @@ const equilibrar = (grupos: PalavraLegenda[][], o: OpcoesQuebra, tamanho: (ws: P
     for (let k = 1; k < todas.length; k++) {
       const x = todas.slice(0, k);
       const y = todas.slice(k);
-      if (tamanho(x) > o.max_caracteres || tamanho(y) > o.max_caracteres) continue;
+      if (excede(x) || excede(y)) continue;
       if (o.max_palavras && (x.length > o.max_palavras || y.length > o.max_palavras)) continue;
       const ultima = x[x.length - 1].w;
-      const n = Math.max(tamanho(x), tamanho(y)) - (PAUSA_DE_FRASE.test(ultima) ? o.max_caracteres * 0.15 : 0) + (PALAVRA_FRACA.test(ultima) ? o.max_caracteres * 0.1 : 0);
+      const n = Math.max(tamanho(x), tamanho(y)) - (PAUSA_DE_FRASE.test(ultima) ? o.max_caracteres * 0.15 : 0) + (fracaNoFim(ultima) ? o.max_caracteres * 0.1 : 0);
       if (n < nota) {
         nota = n;
         melhor = k;
@@ -243,11 +326,10 @@ export const nomeDoFalante = (c: {nome?: string; arquivo: string}) => {
 /** Legendas de um ou mais clipes de voz, cada um com as palavras transcritas dele (ms do arquivo). O falante é o nome do
  *  clipe, se a pessoa deu um, ou o da faixa. Os ids saem `leg-1`, `leg-2`… na ordem do tempo. */
 export const legendasDaFala = (fontes: {clipe: ClipeFala; faixa: {nome?: string}; palavras: PalavraLegenda[]; caminhoPalavras: string; sha256?: string}[], o: {
-  estilo?: EstiloLegenda; largura: number; altura: number; quebra?: Partial<OpcoesQuebra>;
+  estilo?: EstiloLegenda; largura: number; altura: number; quebra?: Partial<OpcoesQuebra>; fonte?: string;
 }): LegendasCenas => {
   const estilo = o.estilo ?? ESTILO_PADRAO;
-  const p = PREDEFINICOES_LEGENDA[estilo.predefinicao] ?? PREDEFINICOES_LEGENDA.classica;
-  const quebra: OpcoesQuebra = {max_caracteres: caracteresPorLinha(estilo, o.largura, o.altura) * p.linhas, max_palavras: p.max_palavras, ...o.quebra};
+  const quebra: OpcoesQuebra = {...opcoesDaQuebra(estilo, o.largura, o.altura, o.fonte), ...o.quebra};
   const segs = fontes.flatMap((f) => {
     const falante = nomeDoFalante(f.clipe) || f.faixa.nome?.trim() || undefined;
     return quebrarEmSegmentos(palavrasDoClipe(f.palavras, f.clipe), quebra).map((s) => ({...s, ...(falante ? {falante} : {}), clipe: f.clipe.id}));
@@ -432,7 +514,7 @@ export const legendasDoDocumento = (doc: {audio?: AudioCenas; legendas?: Legenda
     }
     fontes.push({clipe: {...clipe, arquivo, em: Number(clipe.em) || 0, duracao_ms: Number(clipe.duracao_ms) || 0}, faixa, palavras, caminhoPalavras: caminho, sha256});
   }
-  const nova = legendasDaFala(fontes, {estilo: o.estilo ?? antes?.estilo, largura: o.largura, altura: o.altura});
+  const nova = legendasDaFala(fontes, {estilo: o.estilo ?? antes?.estilo, largura: o.largura, altura: o.altura, fonte: (doc as {tema?: {fonte?: string}}).tema?.fonte});
   const resto = {faltam, clipes: fontes.length, mantidos, corrigidas, geradas: nova.segmentos.length};
   if (!antes) return {legendas: {...doc.legendas, ...nova}, ...resto};
   const trocados = new Set(fontes.map((f) => f.clipe.id));
@@ -442,10 +524,10 @@ export const legendasDoDocumento = (doc: {audio?: AudioCenas; legendas?: Legenda
   return {legendas: {...antes, estilo: nova.estilo, segmentos, origens}, ...resto};
 };
 
-/** Quebra de novo as legendas de um estilo para outro (largura e palavras por vez mudam), mantendo falante e clipe. */
-export const requebrar = (leg: LegendasCenas, estilo: EstiloLegenda, largura: number, altura: number): LegendasCenas => {
-  const p = PREDEFINICOES_LEGENDA[estilo.predefinicao] ?? PREDEFINICOES_LEGENDA.classica;
-  const quebra: OpcoesQuebra = {max_caracteres: caracteresPorLinha(estilo, largura, altura) * p.linhas, max_palavras: p.max_palavras};
+/** Quebra de novo as legendas de um estilo para outro (largura e palavras por vez mudam), mantendo falante e clipe.
+ *  `fonte`: a do tema, quando o estilo não diz. */
+export const requebrar = (leg: LegendasCenas, estilo: EstiloLegenda, largura: number, altura: number, fonte?: string): LegendasCenas => {
+  const quebra = opcoesDaQuebra(estilo, largura, altura, fonte);
   // os segmentos seguidos do mesmo falante e clipe voltam a ser uma fala só e são quebrados de novo
   const blocos: SegmentoLegenda[][] = [];
   for (const s of [...leg.segmentos].sort((a, b) => a.em - b.em)) {
@@ -799,9 +881,9 @@ export const legendasNoDestino = (leg: LegendasP, largura: number, altura: numbe
   const area = areaDaLegenda(largura, altura);
   if (doc && Math.abs(largura / altura - doc.largura / doc.altura) < 0.01) return {...leg, area};
   const e = leg.estilo;
-  const quebra: OpcoesQuebra = {max_caracteres: caracteresPorLinha({predefinicao: e.id, tam: e.tam, maiusculas: e.maiusculas}, largura, altura) * e.linhas,
-    max_palavras: e.max_palavras};
-  const cabe = (ps: PalavraLegenda[]) => ps.reduce((n, p, i) => n + p.w.length + (i ? 1 : 0), 0) <= quebra.max_caracteres && (!quebra.max_palavras || ps.length <= quebra.max_palavras);
+  const cap = capacidadeDaLegenda({predefinicao: e.id, tam: e.tam, maiusculas: e.maiusculas, fonte: e.fonte}, largura, altura, {area});
+  const quebra: OpcoesQuebra = {max_caracteres: MAX_CARACTERES_LINHA * e.linhas, max_palavras: e.max_palavras, cabe: (ws) => cabeNaLegenda(ws, cap)};
+  const cabe = (ps: PalavraLegenda[]) => cabeNaLegenda(ps.map((p) => p.w), cap);
   const segmentos = leg.segmentos.flatMap((s): SegmentoLegendaP[] => {
     if (s.palavras.length < 2 || cabe(s.palavras)) return [s];
     const pedacos = quebrarEmSegmentos(s.palavras, quebra);
@@ -857,23 +939,10 @@ export const carimboLegenda = (ms: number, separador: ',' | '.') => {
 };
 
 /** Quebra o texto em até duas linhas equilibradas de no máximo `max` caracteres (a quebra à mão, "\n", manda). */
-export const linhasDaLegenda = (texto: string, max = 42): string[] => {
+export const linhasDaLegenda = (texto: string, max = MAX_CARACTERES_LINHA): string[] => {
   if (texto.includes('\n')) return texto.split('\n').map((l) => l.trim()).filter(Boolean);
-  const t = texto.trim();
-  if (t.length <= max) return [t];
-  const ws = tokensDe(t);
-  let melhor = 1;
-  let nota = Infinity;
-  for (let k = 1; k < ws.length; k++) {
-    const a = ws.slice(0, k).join(' ').length;
-    const b = ws.slice(k).join(' ').length;
-    const n = Math.max(a, b) + (a > max || b > max ? 1000 : 0);
-    if (n < nota) {
-      nota = n;
-      melhor = k;
-    }
-  }
-  return [ws.slice(0, melhor).join(' '), ws.slice(melhor).join(' ')];
+  // no arquivo de legenda a linha se mede em caracteres; a regra do corte é a mesma do vídeo
+  return quebrarEmLinhas(tokensDe(texto.trim()), {largura: max, medir: (s) => s.length, max_caracteres: max}).map((l) => l.join(' '));
 };
 
 type SegmentoExportavel = {em: number; sai: number; texto: string; falante?: string};

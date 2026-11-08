@@ -14,7 +14,7 @@ import {novoDocCenas, resolverCenas, type DocCenas} from '../src/nucleo/cenas';
 import {Projeto} from '../src/nucleo/projeto';
 import {fonteDoAudio, Transcritor} from '../src/main/transcricao';
 import {
-  areaDaLegenda, arquivoDaFala, recusaDoDestino, caracteresPorLinha, comTexto, conferirFala, ENTRA_LEGENDA_MS, legendaNoAr, legendasDaFala, legendasDoDocumento, legendasNoDestino, levarCorrecoes,
+  areaDaLegenda, arquivoDaFala, recusaDoDestino, cabeNaLegenda, capacidadeDaLegenda, comTexto, conferirFala, ENTRA_LEGENDA_MS, legendaNoAr, legendasDaFala, legendasDoDocumento, legendasNoDestino, levarCorrecoes,
   palavrasValidas, resolverLegendas, SAI_LEGENDA_MS, VERSAO_PALAVRAS, type LegendasP, type PalavraLegenda, type SegmentoLegenda, type SegmentoLegendaP,
 } from '../src/nucleo/legendas';
 
@@ -114,10 +114,11 @@ describe('legenda na área e na quebra de cada destino (video-N1, transversal-N2
     const reels = legendasNoDestino(doc, 1080, 1920, {largura: 1920, altura: 1080});
     expect(reels.area).toEqual(areaDaLegenda(1080, 1920));
     expect(reels.area.base).toBeLessThan(1 - 484 / 1920);
-    const max = caracteresPorLinha({predefinicao: 'classica'}, 1080, 1920) * 2;
-    expect(caracteresPorLinha({predefinicao: 'classica'}, 1920, 1080) * 2).toBeGreaterThan(max);
-    expect(doc.segmentos.some((s) => s.texto.length > max)).toBe(true);
-    for (const s of reels.segmentos) expect(s.texto.length).toBeLessThanOrEqual(max);
+    // cabe pela largura medida na fonte, em duas linhas de até 42 caracteres (a régua)
+    const cap = capacidadeDaLegenda({predefinicao: 'classica', fonte: doc.estilo.fonte}, 1080, 1920);
+    const ws = (t: string) => t.split(/\s+/).filter(Boolean);
+    expect(doc.segmentos.some((s) => !cabeNaLegenda(ws(s.texto), cap))).toBe(true);
+    for (const s of reels.segmentos) expect(cabeNaLegenda(ws(s.texto), cap)).toBe(true);
     expect(reels.segmentos.length).toBeGreaterThan(doc.segmentos.length);
     // nenhuma palavra some ou muda de tempo; os pedaços ficam dentro da legenda de onde vieram, em ordem e sem sobrepor
     expect(palavras(reels)).toEqual(palavras(doc));

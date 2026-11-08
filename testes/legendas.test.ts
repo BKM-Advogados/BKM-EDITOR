@@ -257,9 +257,10 @@ describe('área segura e largura', () => {
     expect(areaDaLegenda(1080, 1350)).toEqual({topo: 0.060000000000000005, base: 0.94, esq: 0.05, dir: 0.05});
   });
 
-  it('caracteres por linha crescem no 16:9 e caem na letra grande', () => {
+  it('caracteres por linha crescem no 16:9 até o teto de 42 e caem na letra grande', () => {
     const v = caracteresPorLinha({predefinicao: 'classica'}, 1080, 1920);
-    expect(caracteresPorLinha({predefinicao: 'classica'}, 1920, 1080)).toBeGreaterThan(v * 1.5);
+    expect(v).toBeLessThan(42);
+    expect(caracteresPorLinha({predefinicao: 'classica'}, 1920, 1080)).toBe(42);
     expect(caracteresPorLinha({predefinicao: 'caixa'}, 1080, 1920)).toBeLessThan(v);
   });
 
