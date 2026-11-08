@@ -9,7 +9,7 @@ import {z} from 'zod';
 import type {OperacaoPatch} from './documentos';
 import {ehDocCenas, type DocCenas} from './cenas';
 import {ehDocMusica, NOME_PECA, PECAS, posicaoEmCompasso, PRESETS, resolverMusica, type DocMusica, type PecaBateria, type PresetSintetizador} from './musica';
-import {aplicarProgressao, criarPadrao, editarArranjo, escreverNotas, ESTILOS_GERADOS, gerarNotas, trocarKit, type Edicao, type EstiloGerado, type PedidoArranjo, type PedidoGerar,
+import {aplicarProgressao, criarPadrao, editarArranjo, editarNotas, escreverNotas, ESTILOS_GERADOS, gerarNotas, trocarKit, type PedidoEditarNotas, type Edicao, type EstiloGerado, type PedidoArranjo, type PedidoGerar,
   type PedidoNotas, type PedidoPadrao, type PedidoProgressao} from './musica-acoes';
 import {acordeDe, escalaDe, NOMES} from './musica-teoria';
 import {KITS, notasDoClipe} from './musica-som';
@@ -22,7 +22,7 @@ import {ESTILOS} from './musica-estilos';
 /** Classe de cada ferramenta para o portão de permissão (frente IA): todas gravam no diário com Reverter ou só leem. */
 export const CLASSES_MUSICA: Record<string, 'livre' | 'cartao'> = {
   ler_musica: 'livre', arranjar: 'livre', medir_musica: 'livre', por_no_video: 'livre', levar_para: 'livre', concluir_transicao: 'livre',
-  cancelar_transicao: 'livre', trocar_kit: 'livre', escrever_notas: 'livre', criar_padrao: 'livre', aplicar_progressao: 'livre', gerar_notas: 'livre',
+  cancelar_transicao: 'livre', trocar_kit: 'livre', escrever_notas: 'livre', criar_padrao: 'livre', aplicar_progressao: 'livre', gerar_notas: 'livre', editar_notas: 'livre',
 };
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x)}]});
@@ -101,6 +101,7 @@ export const registrarMusica = (servidor: McpServer, projeto: Projeto, autor: st
       canais: r.canais.map((c) => ({id: c.id, nome: c.nome, tipo: c.tipo, ...(c.tipo === 'bateria' ? {kit: c.kit} : {}), ...(c.tipo === 'sintetizador' ? {preset: c.preset, macros: c.macros} : {}),
         faixa_mixer: c.faixa_mixer, ...(c.mudo ? {mudo: true} : {}), ...(c.solo ? {solo: true} : {})})),
       escala_notas: escalaDe(m.doc.tom, m.doc.escala).map((pc) => NOMES[pc]),
+      ...(m.doc.secoes?.length ? {secoes: m.doc.secoes.map((x) => ({...x, onde: posicaoEmCompasso(x.em, r.compasso)}))} : {}),
       ...(m.doc.acordes?.length ? {acordes: m.doc.acordes.map((x) => ({...x, nome: acordeDe(x.acorde, m.doc.tom, m.doc.escala)?.nome ?? '?'}))} : {}),
       padroes: Object.values(r.padroes).map((p) => ({id: p.id, nome: p.nome, canal: p.canal, dur: p.dur, passos: p.passos, notas: p.notas.length})),
       clipes: r.clipes.map((c) => ({id: c.id, canal: c.canal, em: c.em, dur: c.dur, onde: posicaoEmCompasso(c.em, r.compasso), em_s: r3(c.em_s), dur_s: r3(c.dur_s),
@@ -119,10 +120,10 @@ export const registrarMusica = (servidor: McpServer, projeto: Projeto, autor: st
 
   // ---------- arranjo ----------
   servidor.registerTool('arranjar', {
-    description: 'Mexe nos clipes do arranjo (em batidas): por (canal + audio ou padrao), mover, aparar (novo em e/ou dur), dividir (em = batida do corte), apagar, ajustar (ganho_db, fades em batidas, mudo).',
+    description: 'Mexe no arranjo (em batidas): por (canal + audio ou padrao), mover, aparar (novo em e/ou dur), dividir (em = batida do corte), apagar, ajustar (ganho_db, fades, mudo), repetir (clipe, vezes), secao (nome, em, dur; com secao = id, muda a que existe) e mover_secao (secao, em: leva os clipes dela).',
     inputSchema: {
       documento: z.string().optional(),
-      acao: z.enum(['por', 'mover', 'aparar', 'dividir', 'apagar', 'ajustar']),
+      acao: z.enum(['por', 'mover', 'aparar', 'dividir', 'apagar', 'ajustar', 'repetir', 'secao', 'mover_secao']),
       clipe: z.string().optional().describe('id do clipe (todas menos por)'),
       canal: z.string().optional().describe('por: canal de destino; mover: outro canal do mesmo tipo'),
       audio: z.string().optional().describe('por, canal de áudio: caminho no projeto, ex.: midia/cama.mp3'),
@@ -134,6 +135,9 @@ export const registrarMusica = (servidor: McpServer, projeto: Projeto, autor: st
       fade_in: z.number().min(0).optional().describe('batidas'),
       fade_out: z.number().min(0).optional().describe('batidas'),
       mudo: z.boolean().optional(),
+      vezes: z.number().int().min(1).max(64).optional().describe('repetir: quantas cópias'),
+      secao: z.string().optional().describe('id da seção (s1, s2…)'),
+      nome: z.string().optional().describe('secao: nome, ex.: Refrão'),
     },
   }, seguro(async (a: PedidoArranjo & {documento?: string}) => {
     const m = musicaDe(projeto, a.documento);
@@ -221,6 +225,8 @@ export const registrarMusica = (servidor: McpServer, projeto: Projeto, autor: st
       clonar: z.string().optional().describe('id do padrão a copiar'),
       estilo: z.enum(ESTILOS.map((e) => e.id) as [string, ...string[]]).optional(),
       no_arranjo: z.object({em: z.number().min(0).optional(), dur: z.number().positive().optional()}).optional().describe('batidas; o clipe repete o padrão até dur'),
+      variar: z.object({de: z.string(), quanto: z.number().min(0).max(1).optional(), semente: z.number().int().optional()}).optional()
+        .describe('cópia com mudanças pequenas de um padrão (quanto: 0 a 1, padrão 0,3)'),
     },
   }, seguro(async (a: PedidoPadrao & {documento?: string}) => {
     const m = musicaDe(projeto, a.documento);
@@ -249,6 +255,24 @@ export const registrarMusica = (servidor: McpServer, projeto: Projeto, autor: st
   }, seguro(async (a: PedidoNotas & {documento?: string}) => {
     const m = musicaDe(projeto, a.documento);
     return aplicarEdicao(m, escreverNotas(m.doc, a));
+  }));
+
+  // ---------- piano roll (item 17) ----------
+  const refNota = z.object({em: z.number().min(0), nota: z.number().int().min(0).max(127).optional(), peca: z.enum(PECAS as [PecaBateria, ...PecaBateria[]]).optional()});
+  servidor.registerTool('editar_notas', {
+    description: 'Opera sobre notas de um padrão: as dadas em selecao.notas, as do trecho selecao.de..ate (batidas) ou todas. quantizar (grade), transpor (valor = semitons), duplicar (logo depois, ou valor batidas adiante), apagar, forca (valor 1 a 127), humanizar (valor = batidas, padrão 0,02; pela semente), esticar (valor = fator).',
+    inputSchema: {
+      documento: z.string().optional(),
+      padrao: z.string(),
+      acao: z.enum(['quantizar', 'transpor', 'duplicar', 'apagar', 'forca', 'humanizar', 'esticar']),
+      selecao: z.object({de: z.number().min(0).optional(), ate: z.number().min(0).optional(), notas: z.array(refNota).max(512).optional()}).optional(),
+      valor: z.number().optional(),
+      grade: z.enum(['1/4', '1/8', '1/16', '1/32']).optional().describe('quantizar: padrão 1/16'),
+      semente: z.number().int().optional(),
+    },
+  }, seguro(async (a: PedidoEditarNotas & {documento?: string}) => {
+    const m = musicaDe(projeto, a.documento);
+    return aplicarEdicao(m, editarNotas(m.doc, a));
   }));
 
   // ---------- tom, acordes e notas geradas (itens 18 e 19) ----------

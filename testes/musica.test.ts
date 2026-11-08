@@ -313,3 +313,70 @@ describe('teoria, sintetizadores e acordes', () => {
     expect(rms(som)).toBeGreaterThan(0.01);
   });
 });
+
+describe('piano roll, variação e arranjo (itens 16, 17 e 20)', () => {
+  const comSint = () => {
+    const d = novaMusica();
+    d.canais.push({id: 'lead', nome: 'Lead', tipo: 'sintetizador', preset: 'lead'});
+    d.padroes.push({id: 'p1', canal: 'lead', dur: 4, passos: 16, notas: [{nota: 60, em: 0, dur: 1}, {nota: 64, em: 1}, {nota: 67, em: 2.5, forca: 90}]});
+    d.arranjo.clipes.push({id: 'c1', canal: 'lead', em: 0, dur: 4, padrao: 'p1'});
+    return d;
+  };
+  const aplicarE = (d: DocMusica, e: {patch: unknown[]}) => jsonpatch.applyPatch(structuredClone(d), e.patch as Operation[]).newDocument;
+
+  it('move, estica e troca a força de uma nota; o carimbo põe o acorde', async () => {
+    const {carimbarAcorde, trocarNota} = await import('../src/nucleo/musica-acoes');
+    let d = comSint();
+    d = aplicarE(d, trocarNota(d, 'p1', {em: 1, nota: 64}, {em: 1.5, nota: 65, dur: 2}));
+    expect(d.padroes[0].notas.find((n) => n.nota === 65)).toEqual({nota: 65, em: 1.5, dur: 2});
+    expect(() => trocarNota(d, 'p1', {em: 3, nota: 70}, {em: 0})).toThrow(/nota não achada/);
+    d = aplicarE(d, carimbarAcorde(d, 'p1', {raiz: 57, qualidade: 'm7', em: 3, dur: 1}));
+    expect(d.padroes[0].notas.filter((n) => n.em === 3).map((n) => n.nota)).toEqual([57, 60, 64, 67]);
+  });
+
+  it('editar_notas: quantizar, transpor, duplicar, apagar, força, humanizar e esticar', async () => {
+    const {editarNotas} = await import('../src/nucleo/musica-acoes');
+    const d = comSint();
+    const notas = (e: {patch: unknown[]}) => aplicarE(d, e).padroes[0].notas;
+    expect(notas(editarNotas(d, {padrao: 'p1', acao: 'quantizar', grade: '1/4'})).map((n) => n.em)).toEqual([0, 1, 3]);
+    expect(notas(editarNotas(d, {padrao: 'p1', acao: 'transpor', valor: 12, selecao: {de: 0, ate: 2}})).map((n) => n.nota)).toEqual([72, 76, 67]);
+    expect(notas(editarNotas(d, {padrao: 'p1', acao: 'duplicar', selecao: {notas: [{em: 0, nota: 60}]}, valor: 2})).filter((n) => n.nota === 60).map((n) => n.em)).toEqual([0, 2]);
+    expect(notas(editarNotas(d, {padrao: 'p1', acao: 'apagar', selecao: {de: 2}}))).toHaveLength(2);
+    expect(notas(editarNotas(d, {padrao: 'p1', acao: 'forca', valor: 40})).every((n) => n.forca === 40)).toBe(true);
+    const h1 = notas(editarNotas(d, {padrao: 'p1', acao: 'humanizar', semente: 3}));
+    expect(notas(editarNotas(d, {padrao: 'p1', acao: 'humanizar', semente: 3}))).toEqual(h1);
+    expect(h1.some((n, i) => n.em !== d.padroes[0].notas[i].em)).toBe(true);
+    expect(notas(editarNotas(d, {padrao: 'p1', acao: 'esticar', valor: 0.5})).map((n) => [n.em, n.dur])).toEqual([[0, 0.5], [0.5, 0.125], [1.25, 0.125]]);
+    expect(() => editarNotas(d, {padrao: 'p1', acao: 'transpor', valor: 2, selecao: {de: 3.9}})).toThrow(/nenhuma nota/);
+  });
+
+  it('a variação muda pouco, sempre igual pela semente, e guarda bumbo e caixa nos tempos', async () => {
+    const {variarNotas} = await import('../src/nucleo/musica-acoes');
+    const d = bateria(padraoDoEstilo('basico').notas);
+    const a = variarNotas(d, 'p1', 0.6, 5);
+    expect(variarNotas(d, 'p1', 0.6, 5)).toEqual(a);
+    expect(variarNotas(d, 'p1', 0.6, 6)).not.toEqual(a);
+    for (const t of [0, 2]) expect(a.some((n) => n.peca === 'bumbo' && n.em === t)).toBe(true);
+    for (const t of [1, 3]) expect(a.some((n) => n.peca === 'caixa' && n.em === t)).toBe(true);
+    expect(variarNotas(d, 'p1', 0, 5).map((n) => [n.peca, n.em])).toEqual(d.padroes[0].notas.map((n) => [n.peca, n.em]));
+  });
+
+  it('repetir um clipe segue o padrão; mover uma seção leva os clipes dela', async () => {
+    const {editarArranjo} = await import('../src/nucleo/musica-acoes');
+    let d = bateria([{peca: 'bumbo', em: 0}, {peca: 'caixa', em: 1}, {peca: 'bumbo', em: 2}, {peca: 'caixa', em: 3}]);
+    d.arranjo.clipes[0].dur = 2;
+    d = aplicarE(d, editarArranjo(d, {acao: 'repetir', clipe: 'c1', vezes: 3}));
+    expect(d.arranjo.clipes.map((c) => [c.em, c.inicio ?? 0])).toEqual([[0, 0], [2, 2], [4, 4], [6, 6]]);
+    // repetir dá o mesmo som que um clipe só, do mesmo tamanho
+    const inteiro = bateria(d.padroes[0].notas, {compassos: 2});
+    const a = renderizarMusica(d, {}).canais[0], b = renderizarMusica(inteiro, {}).canais[0];
+    let dif = 0;
+    for (let i = 0; i < a.length; i++) dif = Math.max(dif, Math.abs(a[i] - b[i]));
+    expect(dif).toBeLessThan(1e-6);
+    d = aplicarE(d, editarArranjo(d, {acao: 'secao', nome: 'Refrão', em: 4, dur: 4}));
+    expect(d.secoes).toEqual([{id: 's1', nome: 'Refrão', em: 4, dur: 4}]);
+    d = aplicarE(d, editarArranjo(d, {acao: 'mover_secao', secao: 's1', em: 8}));
+    expect(d.arranjo.clipes.map((c) => c.em)).toEqual([0, 2, 8, 10]);
+    expect(d.secoes![0].em).toBe(8);
+  });
+});

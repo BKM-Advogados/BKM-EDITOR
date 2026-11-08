@@ -223,4 +223,20 @@ describe('música pelo MCP', () => {
     expect(recusa.erro).toBe(true);
     expect(recusa.dado).toMatch(/estilos da casa são de bateria/);
   });
+
+  it('editar_notas, variação, repetir e seções pelo MCP', async () => {
+    const lead = projeto.lerJson<DocMusica>('musica/musica.json').doc.padroes.find((x) => x.canal === 'melodia')!;
+    const t = await chamar('editar_notas', {documento: 'musica', padrao: lead.id, acao: 'transpor', valor: -12});
+    expect(t.dado).toMatchObject({ok: true, notas: 2});
+    expect(projeto.lerJson<DocMusica>('musica/musica.json').doc.padroes.find((x) => x.id === lead.id)!.notas.map((n) => n.nota)).toEqual([50, 52]);
+    const v = await chamar('criar_padrao', {documento: 'musica', canal: 'bateria', variar: {de: 'p1', quanto: 0.5, semente: 2}});
+    expect(v.dado.ok).toBe(true);
+    const doc = projeto.lerJson<DocMusica>('musica/musica.json').doc;
+    expect(doc.padroes.find((x) => x.id === v.dado.padrao)!.nome).toMatch(/variação/);
+    const r = await chamar('arranjar', {documento: 'musica', acao: 'repetir', clipe: 'c3', vezes: 2});
+    expect(r.dado.clipes).toHaveLength(2);
+    const s1 = await chamar('arranjar', {documento: 'musica', acao: 'secao', nome: 'Intro', em: 0, dur: 4});
+    expect(s1.dado).toMatchObject({ok: true, secao: 's1'});
+    expect((await chamar('ler_musica', {documento: 'musica'})).dado.secoes[0]).toMatchObject({id: 's1', nome: 'Intro', onde: '1.1'});
+  });
 });

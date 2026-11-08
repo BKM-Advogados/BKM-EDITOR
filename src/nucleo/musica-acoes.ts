@@ -4,8 +4,8 @@
 import type {OperacaoPatch} from './documentos';
 import {arredondarBatida, batidasPorCompasso, idLivre, NOME_PRESET, novaFaixaMixer, posicaoEmCompasso, PRESETS, segPorBatida,
   type AcordeNoTempo, type CanalMusica, type ClipeMusica, type DocMusica, type NotaMusica, type PadraoMusica, type PecaBateria, type PresetSintetizador} from './musica';
-import {acordeDe, baixoDoAcorde, encaixarNaEscala, nomeDaNota, vozesDoAcorde} from './musica-teoria';
-import {KITS} from './musica-som';
+import {acordeDe, baixoDoAcorde, encaixarNaEscala, escalaDe, NOMES, nomeDaNota, vozesDoAcorde} from './musica-teoria';
+import {geradorDe, KITS} from './musica-som';
 import {ESTILOS, padraoDoEstilo} from './musica-estilos';
 
 export type Edicao = {patch: OperacaoPatch[]; rotulo: string; caminho: string; extra?: Record<string, unknown>; avisos?: string[]};
@@ -20,15 +20,28 @@ export const indiceDoClipe = (doc: DocMusica, id: string) => {
 };
 
 // ---------- arranjo ----------
-export type AcaoArranjo = 'por' | 'mover' | 'aparar' | 'dividir' | 'apagar' | 'ajustar';
+export type AcaoArranjo = 'por' | 'mover' | 'aparar' | 'dividir' | 'apagar' | 'ajustar' | 'repetir' | 'secao' | 'mover_secao';
 export type PedidoArranjo = {acao: AcaoArranjo; clipe?: string; canal?: string; audio?: string; padrao?: string; em?: number; dur?: number; corte_s?: number;
-  ganho_db?: number; fade_in?: number; fade_out?: number; mudo?: boolean};
+  ganho_db?: number; fade_in?: number; fade_out?: number; mudo?: boolean; vezes?: number; secao?: string; nome?: string};
 
 /** Põe, move, apara, divide, apaga ou ajusta um clipe. Aparar o começo de um áudio anda o corte no arquivo, e o de um
  *  padrão anda o "inicio": o que toca fica no mesmo lugar. Dividir faz o mesmo na segunda metade. */
 export const editarArranjo = (doc: DocMusica, a: PedidoArranjo, o: {existe?: (arquivo: string) => boolean} = {}): Edicao => {
   const spb = segPorBatida(doc.bpm);
   const bpc = batidasPorCompasso(doc.compasso);
+  if (a.acao === 'secao') {
+    const atual = a.secao ? (doc.secoes ?? []).find((x) => x.id === a.secao) : undefined;
+    if (a.secao && !atual) throw new Error(`seção não achada: ${a.secao}`);
+    return porSecao(doc, {id: a.secao, nome: a.nome ?? atual?.nome ?? '', em: a.em ?? atual?.em ?? 0, dur: a.dur ?? atual?.dur ?? 4 * bpc});
+  }
+  if (a.acao === 'mover_secao') {
+    if (!a.secao || a.em === undefined) throw new Error('diga a "secao" e o "em" novo');
+    return moverSecao(doc, a.secao, a.em);
+  }
+  if (a.acao === 'repetir') {
+    if (!a.clipe) throw new Error('diga o "clipe"');
+    return repetirClipe(doc, a.clipe, a.vezes ?? 1);
+  }
   if (a.acao === 'por') {
     const canal = doc.canais.find((c) => c.id === a.canal);
     if (!canal) throw new Error(`diga o canal (${doc.canais.map((c) => c.id).join(', ') || 'a música não tem canais'})`);
@@ -158,7 +171,7 @@ export const alternarPasso = (doc: DocMusica, padrao: string, peca: PecaBateria,
 
 // ---------- padrões, canais e kits ----------
 export type PedidoPadrao = {canal: string; nome?: string; dur?: number; passos?: number; clonar?: string; estilo?: string; no_arranjo?: {em?: number; dur?: number};
-  instrumento?: 'bateria' | PresetSintetizador};
+  instrumento?: 'bateria' | PresetSintetizador; variar?: {de: string; quanto?: number; semente?: number}};
 
 /** Padrão novo num canal (o canal de bateria nasce, com a faixa do mixer, se não existir): vazio, clonado ou de um
  *  estilo da casa; com no_arranjo, também o clipe que o toca. */
@@ -185,13 +198,18 @@ export const criarPadrao = (doc: DocMusica, a: PedidoPadrao): Edicao => {
     if (!fonte) throw new Error(`padrão não achado: ${a.clonar}`);
     notas = structuredClone(fonte.notas);
     dur = a.dur ?? fonte.dur ?? bpc;
+  } else if (a.variar) {
+    const fonte = doc.padroes.find((p) => p.id === a.variar!.de);
+    if (!fonte) throw new Error(`padrão não achado: ${a.variar.de}`);
+    notas = variarNotas(doc, fonte.id, a.variar.quanto, a.variar.semente);
+    dur = a.dur ?? fonte.dur ?? bpc;
   } else if (a.estilo) {
     const e = padraoDoEstilo(a.estilo, bpc);
     notas = e.notas;
     dur = a.dur ?? e.dur;
   }
   const estilo = a.estilo ? ESTILOS.find((e) => e.id === a.estilo) : undefined;
-  const novo: PadraoMusica = {id, nome: a.nome ?? estilo?.nome ?? (a.clonar ? `${doc.padroes.find((p) => p.id === a.clonar)?.nome ?? a.clonar} (cópia)` : `Padrão ${doc.padroes.length + 1}`),
+  const novo: PadraoMusica = {id, nome: a.nome ?? estilo?.nome ?? (a.variar ? `${doc.padroes.find((p) => p.id === a.variar!.de)?.nome ?? a.variar.de} (variação)` : undefined) ?? (a.clonar ? `${doc.padroes.find((p) => p.id === a.clonar)?.nome ?? a.clonar} (cópia)` : `Padrão ${doc.padroes.length + 1}`),
     canal: canal.id, dur, passos: a.passos ?? Math.max(1, Math.round(dur * 4)), notas};
   patch.push({op: 'add', path: '/padroes/-', value: novo});
   let clipe: string | undefined;
@@ -334,3 +352,197 @@ export const gerarNotas = (doc: DocMusica, a: PedidoGerar): Edicao => {
   return {patch, rotulo: `${nome} gerado dos acordes`, caminho: `/padroes/${doc.padroes.length}`, extra: {canal: canal.id, padrao: id, clipe, notas: notas.length}};
 };
 const idLivreCanal = (doc: DocMusica, base: string) => (doc.canais.some((c) => c.id === base) ? idLivre(`${base}-`, doc.canais.map((c) => c.id)) : base);
+
+// ---------- piano roll e operações sobre notas (itens 16, 17 e 20) ----------
+/** Uma nota é achada pelo tempo e pela altura (ou pela peça): notas não têm id. */
+export type RefNota = {em: number; nota?: number; peca?: PecaBateria};
+const mesmaNota = (n: NotaMusica, r: RefNota) => Math.abs(n.em - r.em) < 1e-6 && (r.peca ? n.peca === r.peca : r.nota !== undefined && n.nota === r.nota);
+const emOrdem = (ns: NotaMusica[]) => ns.sort((x, y) => x.em - y.em || (x.nota ?? 0) - (y.nota ?? 0) || String(x.peca ?? '').localeCompare(String(y.peca ?? '')));
+const limitar = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
+
+const padraoPorId = (doc: DocMusica, padrao: string) => {
+  const i = doc.padroes.findIndex((p) => p.id === padrao);
+  if (i < 0) throw new Error(`padrão não achado: ${padrao} (${doc.padroes.map((p) => p.id).join(', ') || 'nenhum'})`);
+  return {i, p: doc.padroes[i], dur: doc.padroes[i].dur ?? batidasPorCompasso(doc.compasso)};
+};
+const edicaoDeNotas = (doc: DocMusica, i: number, notas: NotaMusica[], rotulo: string, extra?: Record<string, unknown>, avisos?: string[]): Edicao => ({
+  patch: [{op: 'test', path: `/padroes/${i}/id`, value: doc.padroes[i].id}, {op: 'replace', path: `/padroes/${i}/notas`, value: emOrdem(notas)}],
+  rotulo, caminho: `/padroes/${i}/notas`, ...(extra ? {extra} : {}), ...(avisos?.length ? {avisos} : {}),
+});
+
+/** Move, estica ou muda a força de uma nota (o piano roll ao soltar o mouse). Nota igual no lugar novo é trocada. */
+export const trocarNota = (doc: DocMusica, padrao: string, de: RefNota, para: {em?: number; nota?: number; dur?: number; forca?: number}): Edicao => {
+  const {i, p, dur} = padraoPorId(doc, padrao);
+  const velha = p.notas.find((n) => mesmaNota(n, de));
+  if (!velha) throw new Error(`nota não achada em ${posicaoEmCompasso(de.em, doc.compasso)}`);
+  const nova: NotaMusica = {...velha};
+  if (para.em !== undefined) nova.em = arredondarBatida(limitar(para.em, 0, dur - 1 / 16));
+  if (para.nota !== undefined && velha.nota !== undefined) nova.nota = Math.round(limitar(para.nota, 0, 127));
+  if (para.dur !== undefined) nova.dur = arredondarBatida(Math.max(1 / 16, para.dur));
+  if (para.forca !== undefined) nova.forca = Math.round(limitar(para.forca, 1, 127));
+  const resto = p.notas.filter((n) => n !== velha && !mesmaNota(n, {em: nova.em, nota: nova.nota, peca: nova.peca}));
+  const oQue = velha.nota !== undefined ? nomeDaNota(nova.nota!) : velha.peca;
+  return edicaoDeNotas(doc, i, [...resto, nova], `nota ${oQue} em ${posicaoEmCompasso(nova.em, doc.compasso)}`);
+};
+
+/** Acordes do carimbo (sufixo de cifra): maior, menor, com sétima, suspensos, diminuto, com nona. */
+export const QUALIDADES_CARIMBO: {id: string; nome: string}[] = [
+  {id: '', nome: 'maior'}, {id: 'm', nome: 'menor'}, {id: '7', nome: 'com 7'}, {id: 'maj7', nome: '7M'}, {id: 'm7', nome: 'm7'},
+  {id: 'sus4', nome: 'sus4'}, {id: 'sus2', nome: 'sus2'}, {id: 'dim', nome: 'dim'}, {id: 'add9', nome: 'add9'},
+];
+
+/** Carimbo de acorde: as notas do acorde com a fundamental na altura clicada, no tempo e com a duração dados. */
+export const carimbarAcorde = (doc: DocMusica, padrao: string, a: {raiz: number; qualidade: string; em: number; dur: number}): Edicao => {
+  const {i, p, dur} = padraoPorId(doc, padrao);
+  const ac = acordeDe(`${NOMES[((a.raiz % 12) + 12) % 12]}${a.qualidade}`);
+  if (!ac) throw new Error(`acorde desconhecido: ${a.qualidade}`);
+  const em = arredondarBatida(limitar(a.em, 0, dur - 1 / 16));
+  const novas = ac.intervalos.map((iv) => ({nota: Math.round(limitar(a.raiz + iv, 0, 127)), em, dur: arredondarBatida(a.dur)}));
+  const resto = p.notas.filter((n) => !novas.some((x) => mesmaNota(n, x)));
+  return edicaoDeNotas(doc, i, [...resto, ...novas], `acorde ${ac.nome} em ${posicaoEmCompasso(em, doc.compasso)}`, {acorde: ac.nome, notas: novas.map((x) => x.nota)});
+};
+
+export type AcaoNotas = 'quantizar' | 'transpor' | 'duplicar' | 'apagar' | 'forca' | 'humanizar' | 'esticar';
+export type PedidoEditarNotas = {padrao: string; acao: AcaoNotas; selecao?: {de?: number; ate?: number; notas?: RefNota[]}; valor?: number; grade?: Quantizar; semente?: number};
+
+/** As operações do piano roll sobre uma seleção (as notas dadas, as do trecho de..ate, ou todas): quantizar na grade,
+ *  transpor `valor` semitons, duplicar logo depois (ou `valor` batidas adiante), apagar, força = `valor`, humanizar (tempo
+ *  e força, pela semente, até `valor` batidas; padrão 0,02) e esticar por `valor` (2 = o dobro, a partir do começo). */
+export const editarNotas = (doc: DocMusica, a: PedidoEditarNotas): Edicao => {
+  const {i, p, dur} = padraoPorId(doc, a.padrao);
+  const s = a.selecao ?? {};
+  const escolhida = (n: NotaMusica) => (s.notas?.length ? s.notas.some((r) => mesmaNota(n, r)) : (s.de === undefined || n.em >= s.de - 1e-9) && (s.ate === undefined || n.em < s.ate - 1e-9));
+  const sel = p.notas.filter(escolhida);
+  if (!sel.length) throw new Error('nenhuma nota na seleção');
+  const resto = p.notas.filter((n) => !sel.includes(n));
+  const avisos: string[] = [];
+  const passo = p.dur && p.passos ? (p.dur ?? dur) / p.passos : 0.25;
+  const comDur = (n: NotaMusica) => n.dur ?? passo;
+  let novas: NotaMusica[];
+  switch (a.acao) {
+    case 'quantizar': {
+      const g = 4 / Number((a.grade ?? '1/16').split('/')[1]);
+      novas = sel.map((n) => ({...n, em: arredondarBatida(limitar(Math.round(n.em / g) * g, 0, dur - 1 / 16))}));
+      break;
+    }
+    case 'transpor': {
+      const v = Math.round(a.valor ?? 0);
+      if (!v) throw new Error('diga em "valor" quantos semitons (12 = uma oitava)');
+      if (sel.some((n) => n.peca)) avisos.push('peças de bateria não se transpõem: ficaram como estavam');
+      novas = sel.map((n) => (n.nota !== undefined ? {...n, nota: Math.round(limitar(n.nota + v, 0, 127))} : n));
+      break;
+    }
+    case 'duplicar': {
+      const ini = Math.min(...sel.map((n) => n.em));
+      const fim = Math.max(...sel.map((n) => n.em + comDur(n)));
+      const desloc = a.valor ?? (s.ate !== undefined && s.de !== undefined ? s.ate - s.de : fim - ini);
+      const copias = sel.map((n) => ({...n, em: arredondarBatida(n.em + desloc)})).filter((n) => n.em < dur);
+      if (copias.length < sel.length) avisos.push(`${sel.length - copias.length} nota(s) passariam do fim do padrão (${dur} batidas) e ficaram de fora`);
+      novas = [...sel, ...copias];
+      const semRepetir = resto.filter((n) => !copias.some((c) => mesmaNota(n, c)));
+      return edicaoDeNotas(doc, i, [...semRepetir, ...novas], `duplica ${sel.length} nota(s)`, {notas: copias.length}, avisos);
+    }
+    case 'apagar':
+      return edicaoDeNotas(doc, i, resto, `apaga ${sel.length} nota(s)`, {notas: 0});
+    case 'forca': {
+      if (a.valor === undefined) throw new Error('diga a força em "valor" (1 a 127)');
+      novas = sel.map((n) => ({...n, forca: Math.round(limitar(a.valor!, 1, 127))}));
+      break;
+    }
+    case 'humanizar': {
+      const r = geradorDe((a.semente ?? doc.semente ?? 1) * 7919 + i);
+      const t = a.valor ?? 0.02;
+      novas = sel.map((n) => ({...n, em: arredondarBatida(limitar(n.em + r() * t, 0, dur - 1 / 960)), forca: Math.round(limitar((n.forca ?? 100) + r() * 12, 1, 127))}));
+      break;
+    }
+    case 'esticar': {
+      const f = a.valor ?? 2;
+      if (!(f > 0)) throw new Error('diga em "valor" o fator (2 = o dobro, 0,5 = a metade)');
+      const ini = Math.min(...sel.map((n) => n.em));
+      novas = sel.map((n) => ({...n, em: arredondarBatida(ini + (n.em - ini) * f), dur: arredondarBatida(Math.max(1 / 16, comDur(n) * f))})).filter((n) => n.em < dur);
+      if (novas.length < sel.length) avisos.push(`${sel.length - novas.length} nota(s) passariam do fim do padrão e ficaram de fora`);
+      break;
+    }
+    default:
+      throw new Error(`ação desconhecida: ${String(a.acao)}`);
+  }
+  const semRepetir = resto.filter((n) => !novas.some((c) => mesmaNota(n, c)));
+  return edicaoDeNotas(doc, i, [...semRepetir, ...novas], `${a.acao} ${sel.length} nota(s)`, {notas: sel.length}, avisos);
+};
+
+/** Variação (item 16): as notas de um padrão com mudanças pequenas, pela semente. Na bateria, chimbais e aros ganham ou
+ *  perdem semicolcheias fracas e as forças mudam um pouco; bumbo e caixa nos tempos ficam. No sintetizador, algumas
+ *  notas passam para a vizinha da escala. `quanto` vai de 0 (igual) a 1 (muda bastante). */
+export const variarNotas = (doc: DocMusica, padrao: string, quanto = 0.3, semente = doc.semente ?? 1): NotaMusica[] => {
+  const {p, dur} = padraoPorId(doc, padrao);
+  const r = geradorDe(semente * 104729 + 17);
+  const q = limitar(quanto, 0, 1);
+  const sorteio = () => (r() + 1) / 2; // 0 a 1
+  const out: NotaMusica[] = [];
+  const fortes = new Set<string>(['bumbo', 'caixa', 'palma']);
+  for (const n of p.notas) {
+    const noTempo = Math.abs(n.em - Math.round(n.em)) < 1e-6;
+    if (n.peca && !(fortes.has(n.peca) && noTempo) && sorteio() < q * 0.35) continue; // tira uma fraca
+    const forca = Math.round(limitar((n.forca ?? 100) + r() * 20 * q, 1, 127));
+    if (n.nota !== undefined && sorteio() < q * 0.4) {
+      const pcs = escalaDe(doc.tom, doc.escala);
+      const sobe = sorteio() < 0.5;
+      let v = n.nota + (sobe ? 1 : -1);
+      while (!pcs.includes(((v % 12) + 12) % 12)) v += sobe ? 1 : -1;
+      out.push({...n, nota: v, forca});
+    } else out.push({...n, forca});
+  }
+  // chimbal ou aro que já existe ganha semicolcheias fracas nos espaços
+  const enfeite = p.notas.find((n) => n.peca === 'chimbal_fechado' || n.peca === 'aro' || n.peca === 'shaker')?.peca;
+  if (enfeite) {
+    for (let t = 0.25; t < dur; t += 0.5) {
+      if (!out.some((n) => n.peca === enfeite && Math.abs(n.em - t) < 1e-6) && sorteio() < q * 0.5) out.push({peca: enfeite, em: arredondarBatida(t), forca: Math.round(45 + 20 * sorteio())});
+    }
+  }
+  return emOrdem(out);
+};
+
+// ---------- arranjo: repetir e seções (item 20) ----------
+/** Repete um clipe `vezes` vezes logo depois dele (o padrão segue do ponto em que o clipe acaba). */
+export const repetirClipe = (doc: DocMusica, clipe: string, vezes = 1): Edicao => {
+  const i = indiceDoClipe(doc, clipe);
+  const c = doc.arranjo.clipes[i];
+  const n = Math.round(limitar(vezes, 1, 64));
+  const ids = doc.arranjo.clipes.map((x) => x.id);
+  const copias: ClipeMusica[] = [];
+  for (let k = 1; k <= n; k++) {
+    const id = idLivre('c', [...ids, ...copias.map((x) => x.id)]);
+    const {origem: _o, ...resto} = c;
+    copias.push({...resto, id, em: arredondarBatida(c.em + k * c.dur), ...(c.padrao ? {inicio: arredondarBatida((c.inicio ?? 0) + k * c.dur)} : {})});
+  }
+  return {patch: copias.map((x) => ({op: 'add' as const, path: '/arranjo/clipes/-', value: x})), rotulo: `repete ${c.id} ${n} vez(es)`, caminho: '/arranjo/clipes',
+    extra: {clipes: copias.map((x) => x.id)}};
+};
+
+export type SecaoMusica = {id: string; nome: string; em: number; dur: number};
+
+/** Seção nova (ou a mesma com outro nome e tamanho, pelo id). Seções são marcas no arranjo; mover leva os clipes. */
+export const porSecao = (doc: DocMusica, a: {id?: string; nome: string; em: number; dur: number}): Edicao => {
+  const secoes = [...(doc.secoes ?? [])];
+  const id = a.id ?? idLivre('s', secoes.map((x) => x.id));
+  const nova: SecaoMusica = {id, nome: a.nome.trim() || id, em: arredondarBatida(Math.max(0, a.em)), dur: arredondarBatida(Math.max(1, a.dur))};
+  const k = secoes.findIndex((x) => x.id === id);
+  if (k >= 0) secoes[k] = nova;
+  else secoes.push(nova);
+  secoes.sort((x, y) => x.em - y.em);
+  return {patch: [{op: doc.secoes ? 'replace' : 'add', path: '/secoes', value: secoes}], rotulo: `seção ${nova.nome}`, caminho: '/secoes', extra: {secao: id}};
+};
+
+/** Move uma seção para `em`, levando os clipes que começam dentro dela. */
+export const moverSecao = (doc: DocMusica, id: string, em: number): Edicao => {
+  const s = (doc.secoes ?? []).find((x) => x.id === id);
+  if (!s) throw new Error(`seção não achada: ${id} (${(doc.secoes ?? []).map((x) => x.id).join(', ') || 'nenhuma'})`);
+  const d = arredondarBatida(Math.max(0, em) - s.em);
+  const patch: OperacaoPatch[] = [];
+  doc.arranjo.clipes.forEach((c, i) => {
+    if (c.em >= s.em - 1e-9 && c.em < s.em + s.dur - 1e-9) patch.push({op: 'test', path: `/arranjo/clipes/${i}/id`, value: c.id}, {op: 'replace', path: `/arranjo/clipes/${i}/em`, value: arredondarBatida(c.em + d)});
+  });
+  const secoes = (doc.secoes ?? []).map((x) => (x.id === id ? {...x, em: arredondarBatida(x.em + d)} : x)).sort((x, y) => x.em - y.em);
+  patch.push({op: 'replace', path: '/secoes', value: secoes});
+  return {patch, rotulo: `move a seção ${s.nome} para ${posicaoEmCompasso(s.em + d, doc.compasso)}`, caminho: '/secoes', extra: {secao: id}};
+};

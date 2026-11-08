@@ -118,6 +118,7 @@ export type DocMusica = {
   marcadores?: MarcadorMusica[];
   video?: VideoMusica;
   acordes?: AcordeNoTempo[];
+  secoes?: {id: string; nome: string; em: number; dur: number}[]; // marcas do arranjo (item 20); mover leva os clipes
 };
 
 export const ehDocMusica = (d: unknown): d is DocMusica => Boolean(d && typeof d === 'object' && (d as {tipo?: unknown}).tipo === 'musica');
