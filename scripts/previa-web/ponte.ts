@@ -22,6 +22,7 @@ import {ehDocMusica, novaMusica, type DocMusica} from '../../src/nucleo/musica';
 import {renderizarMusica, TAXA_MUSICA} from '../../src/nucleo/musica-som';
 import {patchAtualizarLigados, patchClipeNovo, renderDaMusica} from '../../src/nucleo/musica-video';
 import {musicaParaMidi} from '../../src/nucleo/musica-midi'; // frente Música, marco 4
+import {licencasDaMusica, textoDosCreditos} from '../../src/nucleo/musica-licencas'; // frente Música, marco 5
 import type {EntregaEmBytes} from '../../src/nucleo/musica-entrega';
 import type {PedidoExportarMusica, ResultadoExportarMusica} from '../../src/nucleo/musica-projeto';
 import {cancelarTransicao, concluirTransicao, levarPara, registroVazio, type BaseProjeto, type RegistroTransicoes} from '../../src/nucleo/transicoes';
@@ -810,7 +811,16 @@ const musicaPrevia = (() => {
       const arquivos = [`${base}.${pedido.formato}`, ...(e.stems ?? []).map((x) => `${base} - stems/${x.nome}.wav`)];
       exportadas.set(arquivos[0], {bytes: e.mistura.length, lufs: e.medida.lufs, pico_dbtp: e.medida.pico_dbtp});
       (e.stems ?? []).forEach((x, i) => exportadas.set(arquivos[i + 1], {bytes: x.wav.length}));
-      return {arquivos, avisos: [...e.avisos, ...(pedido.formato === 'wav' ? [] : ['na prévia web não há ffmpeg: o arquivo ficou em WAV'])], feito_por: 'janela', duracao_s: e.duracao_s, medida: e.medida};
+      // créditos e comprovante (marco 5), como no processo principal (sem o SHA-256: a prévia não lê o disco)
+      const lic = licencasDaMusica(doc);
+      exportadas.set(`${base}.licencas.json`, {bytes: JSON.stringify(lic).length});
+      arquivos.push(`${base}.licencas.json`);
+      if (lic.creditos.length) {
+        exportadas.set(`${base} - créditos.txt`, {bytes: textoDosCreditos(titulo, lic).length});
+        arquivos.push(`${base} - créditos.txt`);
+      }
+      return {arquivos, avisos: [...e.avisos, ...lic.impede.map((x) => `antes de publicar: ${x}`), ...(pedido.formato === 'wav' ? [] : ['na prévia web não há ffmpeg: o arquivo ficou em WAV'])],
+        feito_por: 'janela', duracao_s: e.duracao_s, medida: e.medida, pode_publicar: lic.pode_publicar, creditos: lic.creditos};
     },
     /** O que a tela grava (pelo aplicarPatch da ponte) também vai para o diário, com a transição aberta. */
     anotar: (documento: string, antes: unknown, depois: unknown, rotulo?: string) => {

@@ -11,10 +11,11 @@ import type {DocCenas} from '../../../nucleo/cenas';
 import type {PropsVideo} from '../../../compartilhado/api';
 import type {AudioP} from '../../../nucleo/audio';
 import {criarDocumento, useLoja} from '../../estado/loja';
+import {MODELOS_MUSICA} from '../../../nucleo/musica-modelos';
 import {numeroBr} from '../../componentes/Campos';
 import {docMusica, musica, selecionarMusica, transicaoAberta, useMusica} from './estado';
 import {motor, vozGuiaDe} from './motor';
-import {campo, campoFaixa, estilo, forcaDaNota, novaBateria, novoPadrao, passo} from './acoes';
+import {campo, campoFaixa, estilo, forcaDaNota, novaBateria, novoPadrao, passo, novaMusicaDoModelo} from './acoes';
 
 export const useDocMusica = () => {
   const id = useLoja((e) => e.ativo.musica);
@@ -325,6 +326,11 @@ export const MonitorMusica: React.FC = () => {
       <div className="musica-vazio">
         <div>Este projeto ainda não tem música.</div>
         <button className="bt principal" onClick={() => void criarDocumento('musica')}>Nova música</button>
+        <div className="modelos-musica">
+          {MODELOS_MUSICA.filter((x) => x.id !== 'vazio').map((x) => (
+            <button key={x.id} className="bt" title={x.descricao} onClick={() => void novaMusicaDoModelo(x.id)}>{x.nome}</button>
+          ))}
+        </div>
         <div>Ou, no vídeo, selecione um clipe de música e clique em "Editar em Música".</div>
       </div>
     );

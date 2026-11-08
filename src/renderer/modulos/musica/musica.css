@@ -126,3 +126,13 @@
 .video-na-musica.vazio { width: 120px; height: 168px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--texto-2); padding: 6px; text-align: center; }
 .video-na-musica .tempo { position: absolute; left: 4px; bottom: 4px; font-size: 10px; color: #fff; background: rgba(0, 0, 0, 0.55); padding: 1px 4px; border-radius: 3px; }
 .tira.master .ler { font-size: 10px; color: var(--texto-2); }
+
+/* marco 5: automação, licenças e modelos */
+.auto-curva { display: block; width: calc(100% - 16px); height: 40px; margin: 2px 8px 4px; background: #1b1b1b; border-radius: var(--raio); }
+.auto-curva polyline { stroke: var(--comentario); stroke-width: 1.5; }
+.auto-curva .cab { stroke: var(--cabeca); stroke-width: 1; }
+.selo-licenca { font-size: 10px; padding: 0 5px; border-radius: 8px; border: 1px solid var(--borda); }
+.selo-licenca.livre { color: var(--trilha-audio); }
+.selo-licenca.credito { color: var(--comentario); }
+.selo-licenca.sem_licenca { color: #ff8a65; border-color: #ff8a65; }
+.modelos-musica { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }

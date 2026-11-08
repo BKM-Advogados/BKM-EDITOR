@@ -6,6 +6,8 @@ import {AudioWaveform, Download, Drum, FileMusic, Music, Piano, Plus, Repeat, Sc
 import {NOME_PECA, NOME_PRESET, PECAS, posicaoEmCompasso, PRESETS, PRESETS_FAIXA, resolverMusica, TEMPOS_DELAY, type CanalMusica, type DocMusica, type PresetFaixa,
   type PresetSintetizador, type TempoDelay} from '../../../nucleo/musica';
 import type {FormatoMusica} from '../../../nucleo/musica-projeto';
+import {LICENCAS, licencasDaMusica, NOME_LICENCA, textoDoCredito, type ClasseLicenca} from '../../../nucleo/musica-licencas';
+import type {IdLicenca, LicencaSom, PecaBateria} from '../../../nucleo/musica';
 import {acordeDe, NOMES} from '../../../nucleo/musica-teoria';
 import {ESTILOS_GERADOS, type TipoGerado} from '../../../nucleo/musica-acoes';
 import {BotaoMenu} from '../../componentes/Menu';
@@ -13,8 +15,8 @@ import {KITS} from '../../../nucleo/musica-som';
 import {CabecalhoInspector, CampoDeslizante, CampoInterruptor, CampoLeitura, CampoNumero, CampoSelecao, CampoTexto, numeroBr, Secao} from '../../componentes/Campos';
 import {avisar, loja, mensagemDe, useLoja} from '../../estado/loja';
 import {musica, selecionarMusica, transicaoAberta, useMusica} from './estado';
-import {arranjar, campo, campoEmObjeto, campoFaixa, dividirNaCabeca, encaixar, exportarMusica, gerar, importarMidiDe, novaBateria, novoAudio, novoSintetizador, presetFaixa,
-  progressao} from './acoes';
+import {arranjar, campo, campoEmObjeto, campoFaixa, dividirNaCabeca, encaixar, exportarMusica, gerar, importarMidiDe, licencaDoSom, novaBateria, novoAudio, novoSintetizador,
+  pontosDeAutomacao, presetFaixa, progressao, sidechainDaFaixa} from './acoes';
 import {useDocMusica} from './Monitor';
 
 const InspectorClipe: React.FC<{doc: DocMusica; id: string}> = ({doc, id}) => {
@@ -51,6 +53,7 @@ const InspectorClipe: React.FC<{doc: DocMusica; id: string}> = ({doc, id}) => {
           <CampoNumero rotulo="Fade de saída" unidade="bat" valor={c.fade_out ?? 0} padrao={0} aoMudar={(v) => void arranjar({acao: 'ajustar', clipe: c.id, fade_out: Math.max(0, v)})} />
           <CampoInterruptor rotulo="Mudo" valor={Boolean(c.mudo)} aoMudar={(v) => void arranjar({acao: 'ajustar', clipe: c.id, mudo: v})} />
         </Secao>
+        {c.audio && <LicencaDoAudio doc={doc} arquivo={c.audio} />}
         {c.origem && <div className="vazio">Este áudio veio do clipe {c.origem.clipe} do vídeo. Os fades, o volume e o ducking continuam lá.</div>}
       </div>
     </div>
@@ -138,6 +141,23 @@ const InspectorFaixa: React.FC<{doc: DocMusica; id: string}> = ({doc, id}) => {
           {eq('medios_db', 'Médios (1 kHz)')}
           {eq('agudos_db', 'Agudos (5 kHz)')}
         </Secao>
+        <Secao titulo="Sidechain" chave="musica:sidechain" fechadaDePadrao={!f.sidechain}>
+          <CampoSelecao rotulo="Abaixa com" valor={f.sidechain?.de ?? ''}
+            opcoes={[['', 'nada'], ...doc.canais.filter((k) => k.tipo !== 'audio' && (k.faixa_mixer || k.id) !== f.id).map((k) => [k.id, k.nome] as [string, string])]}
+            aoMudar={(v) => void sidechainDaFaixa(f.id, v ? {...(docSc(doc, id) ?? {}), de: v} : undefined)} />
+          {f.sidechain && doc.canais.find((k) => k.id === f.sidechain!.de)?.tipo === 'bateria' && (
+            <CampoSelecao rotulo="Peça" valor={f.sidechain.peca} opcoes={PECAS.map((p) => [p, NOME_PECA[p]] as [string, string])} padrao="bumbo"
+              aoMudar={(v) => void sidechainDaFaixa(f.id, {...docSc(doc, id)!, peca: v as PecaBateria})} />
+          )}
+          {f.sidechain && (
+            <>
+              <CampoDeslizante rotulo="Quanto" min={0} max={24} passo={0.5} valor={f.sidechain.quanto_db} padrao={6} formatar={(v) => `−${numeroBr(v, 1)} dB`}
+                aoMudar={(v) => void sidechainDaFaixa(f.id, {...docSc(doc, id)!, quanto_db: v})} />
+              <CampoNumero rotulo="Volta em" unidade="ms" valor={f.sidechain.soltura_ms} padrao={180} aoMudar={(v) => void sidechainDaFaixa(f.id, {...docSc(doc, id)!, soltura_ms: v})} />
+            </>
+          )}
+        </Secao>
+        <AutomacaoVolume doc={doc} alvo={f.id} fader={f.volume_db} />
         <Secao titulo="Compressor" chave="musica:comp" fechadaDePadrao={!f.compressor.ativo}>
           <CampoInterruptor rotulo="Ligado" valor={f.compressor.ativo} aoMudar={(v) => comp('ativo', v || undefined, 'ligar')} />
           <CampoDeslizante rotulo="Limiar" min={-60} max={0} passo={1} valor={f.compressor.limiar_db} padrao={-18} formatar={(v) => `${v} dB`} aoMudar={(v) => comp('limiar_db', v, 'limiar')} />
@@ -150,6 +170,75 @@ const InspectorFaixa: React.FC<{doc: DocMusica; id: string}> = ({doc, id}) => {
     </div>
   );
 };
+const docSc = (doc: DocMusica, id: string) => doc.mixer.faixas.find((f) => f.id === id)?.sidechain;
+
+/** Automação de volume por pontos (item 22): a curva toma o lugar do fader; "Ponto na cabeça" põe um ponto com o valor
+ *  que a curva (ou o fader) tem ali. */
+const AutomacaoVolume: React.FC<{doc: DocMusica; alvo: string; fader: number}> = ({doc, alvo, fader}) => {
+  const m = useMemo(() => resolverMusica(doc).musica, [doc]);
+  const cabeca = useMusica((e) => e.cabeca_s);
+  const pontos = (doc.automacoes ?? []).find((a) => a.alvo === alvo)?.pontos ?? [];
+  const valorEm = (b: number) => {
+    if (!pontos.length) return fader;
+    const o = [...pontos].sort((x, y) => x.em - y.em);
+    if (b <= o[0].em) return o[0].db;
+    const k = o.findIndex((p, i) => i === o.length - 1 || o[i + 1].em > b);
+    const a = o[k], z = o[k + 1];
+    return z ? a.db + ((z.db - a.db) * (b - a.em)) / Math.max(1e-9, z.em - a.em) : a.db;
+  };
+  const total = Math.max(m.duracao_batidas, ...pontos.map((p) => p.em), 1);
+  const y = (db: number) => 4 + (1 - (Math.max(-40, Math.min(6, db)) + 40) / 46) * 32;
+  const cab = cabeca / m.seg_por_batida;
+  return (
+    <Secao titulo="Automação de volume" chave={`musica:auto:${alvo === 'master' ? 'master' : 'faixa'}`} fechadaDePadrao={!pontos.length}>
+      {pontos.length > 0 && (
+        <svg className="auto-curva" viewBox={`0 0 ${total} 40`} preserveAspectRatio="none" aria-label="curva de volume">
+          <polyline points={[[0, valorEm(0)], ...pontos.map((p) => [p.em, p.db] as [number, number]), [total, valorEm(total)]].map(([b, db]) => `${b},${y(db)}`).join(' ')}
+            fill="none" vectorEffect="non-scaling-stroke" />
+          <line x1={cab} x2={cab} y1={0} y2={40} vectorEffect="non-scaling-stroke" className="cab" />
+        </svg>
+      )}
+      {pontos.map((p, i) => (
+        <CampoNumero key={`${i}:${p.em}`} rotulo={posicaoEmCompasso(p.em, m.compasso)} unidade="dB" valor={p.db}
+          aoMudar={(v) => void pontosDeAutomacao(alvo, pontos.map((q, j) => (j === i ? {...q, db: v} : q)))} />
+      ))}
+      <div style={{padding: '2px 8px 6px', display: 'flex', gap: 6, flexWrap: 'wrap'}}>
+        <button className="bt" title="Um ponto na posição da cabeça, com o volume que se ouve ali"
+          onClick={() => void pontosDeAutomacao(alvo, [...pontos.filter((p) => Math.abs(p.em - cab) > 1e-3), {em: cab, db: Math.round(valorEm(cab) * 10) / 10}])}>
+          <Plus size={14} />Ponto na cabeça</button>
+        {pontos.length > 0 && <button className="bt" onClick={() => void pontosDeAutomacao(alvo, pontos.length > 1 ? pontos.filter((p) => Math.abs(p.em - cab) > 1e-3).length < pontos.length
+          ? pontos.filter((p) => Math.abs(p.em - cab) > 1e-3) : pontos.slice(0, -1) : null)} title="O ponto na cabeça, ou o último">Tirar ponto</button>}
+        {pontos.length > 0 && <button className="bt" onClick={() => void pontosDeAutomacao(alvo, null)}>Tirar a automação</button>}
+      </div>
+    </Secao>
+  );
+};
+
+/** A licença de um áudio de fora (item 24): o que a pessoa diz aqui vai para /licencas e sai nos créditos. */
+const LicencaDoAudio: React.FC<{doc: DocMusica; arquivo: string}> = ({doc, arquivo}) => {
+  const atual: LicencaSom = (doc.licencas ?? []).find((x) => x.arquivo === arquivo) ?? {arquivo, licenca: 'nao_sei'};
+  const mudar = (parcial: Partial<LicencaSom>) => void licencaDoSom({...atual, ...parcial, arquivo});
+  return (
+    <Secao titulo="Licença do áudio" chave="musica:licenca" fechadaDePadrao={atual.licenca !== 'nao_sei'}>
+      <CampoSelecao rotulo="Licença" valor={atual.licenca} opcoes={LICENCAS.map((x) => [x, NOME_LICENCA[x]] as [string, string])} padrao="nao_sei"
+        aoMudar={(v) => mudar({licenca: v as IdLicenca})} />
+      {atual.licenca === 'nao_sei' && <CampoLeitura rotulo="Publicar">diga a licença antes de publicar</CampoLeitura>}
+      {(atual.licenca === 'CC-BY-4.0' || atual.credito) && (
+        <>
+          <CampoTexto rotulo="Título" valor={atual.titulo ?? ''} aoMudar={(v) => mudar({titulo: v || undefined})} />
+          <CampoTexto rotulo="Autor" valor={atual.autor ?? ''} aoMudar={(v) => mudar({autor: v || undefined})} />
+          <CampoTexto rotulo="Endereço" valor={atual.link ?? ''} aoMudar={(v) => mudar({link: v || undefined})} />
+          <CampoTexto rotulo="Crédito exigido" valor={atual.credito ?? ''} dica="O texto que a licença pede, literal; vazio, o crédito é montado dos campos acima"
+            aoMudar={(v) => mudar({credito: v || undefined})} />
+          <CampoLeitura rotulo="Sai assim">{textoDoCredito(atual)}</CampoLeitura>
+        </>
+      )}
+    </Secao>
+  );
+};
+
+const CLASSE: Record<ClasseLicenca, string> = {livre: 'livre', credito: 'pede crédito', declarado: 'declarado pela pessoa', sem_licenca: 'sem licença'};
+
 const docEq = (doc: DocMusica, id: string) => doc.mixer.faixas.find((f) => f.id === id)?.eq ?? {};
 const docComp = (doc: DocMusica, id: string) => doc.mixer.faixas.find((f) => f.id === id)?.compressor ?? {};
 
@@ -162,6 +251,7 @@ const InspectorDocumento: React.FC<{doc: DocMusica; id: string}> = ({doc, id}) =
     return (v?.audio?.faixas ?? []).flatMap((f) => (f.clipes ?? []).filter((c) => c.musica === id).map((c) => `${d.id}/${c.id}`));
   }));
   const [viradas, setViradas] = React.useState(true);
+  const licencas = useMemo(() => licencasDaMusica(doc), [doc]);
   const [formato, setFormato] = React.useState<FormatoMusica>('wav');
   const [stems, setStems] = React.useState(false);
   const [exportando, setExportando] = React.useState(false);
@@ -227,6 +317,7 @@ const InspectorDocumento: React.FC<{doc: DocMusica; id: string}> = ({doc, id}) =
               aoMudar={(v) => void campoEmObjeto('/mixer/master/limitador', 'teto_db', v, 'teto do limitador')} />
           )}
         </Secao>
+        <AutomacaoVolume doc={doc} alvo="master" fader={m.master.volume_db} />
         <Secao titulo="Delay (retorno 2)" chave="musica:delay" fechadaDePadrao={!m.faixas.some((x) => x.delay > 0)}>
           <CampoSelecao rotulo="Tempo" valor={m.master.delay.tempo} padrao="1/8."
             opcoes={(Object.keys(TEMPOS_DELAY) as TempoDelay[]).map((t) => [t, `${t} (${numeroBr(TEMPOS_DELAY[t], 2)} batida)`] as [string, string])}
@@ -261,6 +352,15 @@ const InspectorDocumento: React.FC<{doc: DocMusica; id: string}> = ({doc, id}) =
               </div>
             </>
           )}
+        </Secao>
+        <Secao titulo="Licenças e créditos" chave="musica:licencas" fechadaDePadrao={licencas.pode_publicar && !licencas.creditos.length}>
+          {licencas.sons.map((x) => (
+            <CampoLeitura key={`${x.tipo}:${x.id}`} rotulo={x.nome} dica={x.canais.join(', ')}>
+              <span className={`selo-licenca ${x.classe}`}>{CLASSE[x.classe]}</span> {NOME_LICENCA[x.licenca]}</CampoLeitura>
+          ))}
+          {!licencas.sons.length && <CampoLeitura rotulo="Sons">nenhum som tocando</CampoLeitura>}
+          <CampoLeitura rotulo="Publicar">{licencas.pode_publicar ? 'pode' : 'falta dizer a licença (no inspetor do clipe)'}</CampoLeitura>
+          {licencas.creditos.length > 0 && <CampoLeitura rotulo="Créditos">{licencas.creditos.join(' · ')}</CampoLeitura>}
         </Secao>
         <Secao titulo="Exportar" chave="musica:exportar" fechadaDePadrao>
           <CampoSelecao rotulo="Formato" valor={formato} opcoes={[['wav', 'WAV (24 bits)'], ['m4a', 'M4A (AAC)'], ['opus', 'Opus'], ['mid', 'MIDI (só as notas)']]}

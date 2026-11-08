@@ -4,12 +4,14 @@ import type {OperacaoPatch} from '../../../nucleo/documentos';
 import {alternarNota, alternarPasso, aplicarEstilo, aplicarProgressao, criarPadrao, editarArranjo, escreverNotas, gerarNotas, novoCanalDeAudio, type Edicao, type EstiloGerado,
   type PedidoArranjo, type TipoGerado} from '../../../nucleo/musica-acoes';
 import {idLivre, resolverMusica, type DocMusica, type FaixaMixer, type PecaBateria, type PresetSintetizador} from '../../../nucleo/musica';
-import {avisar, loja, mensagemDe, patchTrocar, valorEm} from '../../estado/loja';
-import {presetDaFaixa} from '../../../nucleo/musica-acoes';
+import {avisar, criarDocumento, loja, mensagemDe, patchTrocar, valorEm} from '../../estado/loja';
+import {editarAutomacao, presetDaFaixa} from '../../../nucleo/musica-acoes';
+import {definirLicenca} from '../../../nucleo/musica-licencas';
+import {MODELOS_MUSICA, patchDoModelo, type ModeloMusica} from '../../../nucleo/musica-modelos';
 import {encaixarNoVideo, type ModoEncaixe} from '../../../nucleo/musica-encaixe';
 import {importarMidi} from '../../../nucleo/musica-midi';
 import {ehDocCenas} from '../../../nucleo/cenas';
-import type {PresetFaixa} from '../../../nucleo/musica';
+import type {LicencaSom, PresetFaixa, SidechainFaixa} from '../../../nucleo/musica';
 import type {PedidoExportarMusica} from '../../../nucleo/musica-projeto';
 import {aplicarMusica, docMusica, idMusicaAtiva, musica, selecionarMusica} from './estado';
 import {motor, urlDaMidia} from './motor';
@@ -182,4 +184,19 @@ export const exportarMusica = async (pedido: PedidoExportarMusica) => {
     avisar(mensagemDe(e), 'erro');
     return null;
   }
+};
+
+// ---------- marco 5: sidechain, automação, licenças e modelos (itens 22, 24 e 27) ----------
+export const sidechainDaFaixa = (faixa: string, sc: SidechainFaixa | undefined) => campoFaixa(faixa, 'sidechain', sc, sc ? `sidechain de ${faixa}` : `tira o sidechain de ${faixa}`);
+export const pontosDeAutomacao = (alvo: string, pontos: {em: number; db: number}[] | null) => fazer((d) => editarAutomacao(d, alvo, pontos));
+export const licencaDoSom = (l: LicencaSom) => fazer((d) => definirLicenca(d, l));
+
+/** Música nova a partir de um modelo: cria vazia (o mesmo caminho do "Nova música") e aplica o modelo num passo do
+ *  diário, que o Ctrl+Z desfaz. */
+export const novaMusicaDoModelo = async (modelo: ModeloMusica) => {
+  const nome = MODELOS_MUSICA.find((m) => m.id === modelo)?.nome;
+  const e = await criarDocumento('musica', undefined, modelo === 'vazio' ? undefined : nome);
+  const doc = docMusica();
+  if (!e || modelo === 'vazio' || !doc) return;
+  await aplicarMusica(patchDoModelo(doc, modelo), `modelo ${nome}`);
 };

@@ -3,7 +3,7 @@
 // vídeo (a limpeza, o medidor e as legendas leem o arquivo dela) e na Música toca como guia.
 import React from 'react';
 import {Music, Undo2} from 'lucide-react';
-import type {ClipeAudio, FaixaAudio} from '../../../nucleo/audio';
+import {papelDe, type ClipeAudio, type FaixaAudio} from '../../../nucleo/audio';
 import type {DocCenas} from '../../../nucleo/cenas';
 import {acharAlvoAudio, patchVoltarAoOriginal} from '../../../nucleo/musica-video';
 import {aplicar, loja, useLoja} from '../../estado/loja';
@@ -38,12 +38,18 @@ export const MusicaDoClipe: React.FC<{documento: string; caminho: string; c: Cli
   );
 };
 
-export const CriarEmMusica: React.FC<{documento: string; faixa: FaixaAudio}> = ({documento, faixa}) => (
-  <Secao titulo="Música" chave="audio:criar-musica">
-    <div style={{padding: '2px 8px 6px'}}>
-      <button className="bt principal" title="Abre a Música com uma batida nova; ao concluir, ela entra nesta faixa, na cabeça"
-        onClick={() => void levarParaMusica({alvo: {documento, caminho: `/audio/faixas/@${faixa.id}`}, intencao: 'criar', tempo: {em_ms: loja.get().tempo_ms}})}>
-        <Music size={14} />Criar em Música</button>
-    </div>
-  </Secao>
-);
+export const CriarEmMusica: React.FC<{documento: string; faixa: FaixaAudio}> = ({documento, faixa}) => {
+  // o modelo segue o papel da faixa (item 27): trilha para vídeo na faixa de música, efeito sonoro na de efeitos
+  const modelo = papelDe(faixa) === 'efeitos' ? 'efeito_sonoro' : 'trilha_video';
+  const criar = (m: 'vazio' | 'trilha_video' | 'efeito_sonoro') =>
+    void levarParaMusica({alvo: {documento, caminho: `/audio/faixas/@${faixa.id}`}, intencao: 'criar', tempo: {em_ms: loja.get().tempo_ms}, modelo: m});
+  return (
+    <Secao titulo="Música" chave="audio:criar-musica">
+      <div style={{padding: '2px 8px 6px', display: 'flex', gap: 6, flexWrap: 'wrap'}}>
+        <button className="bt principal" title={`Abre a Música com ${modelo === 'efeito_sonoro' ? 'um efeito sonoro' : 'uma trilha'} pronta, do tamanho do vídeo; ao concluir, ela entra nesta faixa, na cabeça`}
+          onClick={() => criar(modelo)}><Music size={14} />Criar em Música</button>
+        <button className="bt" title="Abre a Música com uma bateria vazia" onClick={() => criar('vazio')}>Vazia</button>
+      </div>
+    </Secao>
+  );
+};

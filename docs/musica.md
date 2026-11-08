@@ -5,7 +5,9 @@ Versão 1, de 08/11/2026 (rodada 3, frente Música, onda 1: marcos A e B do plan
 os sintetizadores da casa, tom, escala, acordes e o baixo, o arpejo e os acordes gerados (itens 14, 18 e 19). Versão
 3: o piano roll com mouse, carimbo e teclado (item 17), o medidor ao vivo, a variação de padrão (16), repetir e seções
 (20). Versão 4: o mixer completo, com delay, dois retornos, presets e limitador (item 21), a música em arquivo (23), o
-encaixe no vídeo com o monitor do vídeo dentro da Música (25) e o MIDI (26). A música é uma vista do mesmo projeto: um documento
+encaixe no vídeo com o monitor do vídeo dentro da Música (25) e o MIDI (26). Versão 5, que fecha a onda 1: sidechain e
+automação de volume por pontos (22), licenças, créditos e comprovante (24) e os modelos Batida, Trilha para vídeo e
+Efeito sonoro (27), só com som gerado. A música é uma vista do mesmo projeto: um documento
 `musica/<id>.json` que a pessoa e a IA editam pelo mesmo JSON Patch com diário, ligado a um clipe de áudio do vídeo de
 cenas. A ida e volta entre o vídeo e a Música é a primeira coisa que funciona, e o clipe do vídeo acompanha cada mudança
 da música sem exportar arquivo.
@@ -67,6 +69,20 @@ dela), a seção **Vídeo** tem **Fechar no fim do vídeo** (compassos inteiros 
 (uma seção por cena, no compasso de cada corte) e **Encaixar tudo**; com **Viradas**, a bateria abre dois tempos antes de
 cada corte para uma virada e põe um prato nele. O ícone da claquete no transporte mostra o quadro do vídeo na posição da
 cabeça, sem som, ao lado dos passos e do mixer.
+
+**Sidechain e automação** (item 22): no inspetor da faixa, **Sidechain** escolhe o canal que abaixa a faixa ("Abaixa
+com"), a peça (bumbo, por padrão), quanto e em quanto tempo volta. **Automação de volume** (na faixa e, no inspetor da
+música, no master) põe pontos com **Ponto na cabeça** e muda o dB de cada um; a curva aparece em cima, com a cabeça.
+Enquanto houver pontos, eles valem no lugar do fader.
+
+**Licenças e créditos** (item 24): no inspetor de um clipe de áudio, **Licença do áudio** diz de onde ele vem (própria,
+CC0, MIT, CC BY 4.0, uso próprio declarado ou não informada); para CC BY, título, autor, endereço e o crédito exigido, e
+o campo "Sai assim" mostra a linha de crédito. No inspetor da música, **Licenças e créditos** lista cada som com a
+classe e diz se pode publicar. A exportação grava o comprovante e, se algum som pede, o arquivo de créditos.
+
+**Modelos** (item 27): sem música no projeto, o monitor oferece **Batida**, **Trilha para vídeo** e **Efeito sonoro**
+além da "Nova música" vazia. No vídeo, o **Criar em Música** de uma faixa de música abre a Trilha para vídeo do tamanho
+do que falta do vídeo, e o de uma faixa de efeitos abre o Efeito sonoro; **Vazia** abre a bateria vazia de antes.
 
 ## O contrato da transição
 
@@ -138,6 +154,14 @@ toca como guia, fora da música.
   `volume_db`); `limitador` (`ativo`, `teto_db` de −12 a 0, `soltura_ms`). Sem o campo, o limitador fica desligado (o
   documento antigo soa igual); a música nova nasce com ele ligado em −1 dB.
 - **`alvo_lufs`** e **`pico_dbtp`**: o alvo da música em arquivo (padrão −14 LUFS e −1 dBTP).
+- **`sidechain`** na faixa do mixer: `{de, peca?, quanto_db?, ataque_ms?, soltura_ms?}`; `de` é o id de um canal de
+  bateria (dispara nas notas da `peca`, padrão `bumbo`) ou de sintetizador (todas as notas); `quanto_db` de 0 a 24
+  (padrão 6), `ataque_ms` 0 a 50 (5), `soltura_ms` 20 a 2000 (180). Dispara pelas notas: o bumbo mudo também dispara.
+- **`automacoes`**: `[{alvo, parametro?: "volume", pontos: [{em, db}]}]`, `alvo` = id da faixa ou `"master"`, `em` em
+  batidas. Reta em dB entre os pontos; antes do primeiro e depois do último, o valor deles. Toma o lugar do fader.
+- **`licencas`**: `[{arquivo | kit, licenca, titulo?, autor?, link?, credito?}]`, a licença dos áudios de fora (por
+  arquivo) e dos kits importados (por kit). `licenca`: `proprio`, `CC0-1.0`, `MIT`, `CC-BY-4.0`, `uso_proprio` ou
+  `nao_sei`. Áudio sem entrada vale `nao_sei`.
 - **`swing`** de 0 (reto) a 1 (tercina): atrasa as semicolcheias do contratempo até 1/12 de batida.
 - **`tom`** (`C`, `F#`, `Bb`…) e **`escala`** (`maior` ou `menor`) dão a escala que a grade de notas destaca e que o
   `na_escala` usa. **`acordes`**: a faixa de acordes, `[{em, dur, acorde}]` em batidas, cada um por grau no tom (`I`, `vi`,
@@ -224,6 +248,29 @@ grave 45, chimbal aberto 46, prato 49, tom agudo 50, shaker 82), os sintetizador
 = bateria; o resto, sintetizador pelo nome da trilha ou pelo programa), um padrão com as notas em batidas (até 4.096) e
 um clipe em `em`; numa música sem clipes, o BPM e o compasso vêm do arquivo, e os marcadores viram seções.
 
+**Sidechain e automação** (item 22): o sidechain dispara pelas notas do canal de origem (não pelo som), então é exato
+e barato: a faixa desce até `−quanto_db` numa rampa de `ataque_ms` que termina na nota e volta numa curva quadrática em
+`soltura_ms`; notas próximas valem pela maior redução. A automação é uma reta em dB entre os pontos, amostra a amostra,
+aplicada depois do processamento da faixa (no lugar do volume do fader) e antes dos envios aos retornos. No master,
+vale para a mistura e para os stems. As duas entram na chave do cache da faixa.
+
+**Licenças e créditos** (item 24, `src/nucleo/musica-licencas.ts`): cada som que se ouve (canal e clipe não mudos) tem
+origem e licença: o kit pela lista de kits (o eletrônico é próprio) ou por `licencas` (kit importado), o sintetizador
+da casa é próprio, e o áudio por `licencas`. Classes: **livre** (própria, CC0, MIT: publica sem crédito), **credito**
+(CC BY 4.0: publica com o crédito), **declarado** (uso próprio que a pessoa declarou) e **sem_licenca** (impede
+publicar até alguém dizer: aviso, nunca erro). A linha de crédito é o texto exigido, literal, ou "título" por autor
+(endereço), licença CC BY 4.0 (endereço da licença). A exportação grava sempre `saidas/<título>.licencas.json` (o
+comprovante: cada som, licença, classe e o SHA-256 do áudio) e, quando algum som pede crédito, `saidas/<título> -
+créditos.txt`. Ao pôr no vídeo uma música com som CC BY, o `por_no_video` e o `concluir_transicao` avisam.
+`creditosDoVideo` (`musica-projeto.ts`) junta os créditos das músicas ligadas a um vídeo, para a exportação do vídeo.
+
+**Modelos** (item 27, `src/nucleo/musica-modelos.ts`): montados com as mesmas edições da tela e do MCP. **Batida**: Lá
+menor, 100 BPM, `i VI III VII`, bateria pop, baixo em oitavas com sidechain do bumbo e acordes em batidas, 8 compassos,
+duas seções. **Trilha para vídeo**: Dó maior, 90 BPM, `I V vi IV`, pad longo, arpejo, baixo longo e bateria calma, todos
+com o preset "Cama sob a voz" (o pad com o "Pad") e volumes baixos, 16 compassos, fade de um compasso no master.
+**Efeito sonoro**: 120 BPM, uma subida de notas e um rufar da caixa até o impacto (bumbo, prato, tom grave e um grave
+longo), com reverb e delay. Com `dur_s` (do vídeo), o modelo enche essa duração em compassos inteiros, para cima.
+
 **Na janela**, três buffers tocam juntos com o mesmo loop nativo: a música, a voz do vídeo como guia e o metrônomo.
 "Ouvir como no vídeo" aplica ao volume a curva do clipe ligado (faixa × clipe × fades × ducking, `volumeDoClipe`).
 
@@ -252,7 +299,7 @@ Em `src/nucleo/mcp-musica.ts`, registradas por uma linha em `registrarFerramenta
 | `arranjar` | `documento?, acao: por\|mover\|aparar\|dividir\|apagar\|ajustar\|repetir\|secao\|mover_secao, clipe?, canal?, audio?, padrao?, em?, dur?, corte_s?, ganho_db?, fade_in?, fade_out?, mudo?, vezes?, secao?, nome?` | Põe, move, apara, divide, apaga, ajusta e repete clipes; cria, renomeia e move seções (mover leva os clipes); aparar o começo anda o corte do áudio ou o início do padrão | livre |
 | `medir_musica` | `documento?, por_faixa?` | LUFS integrado e pico da música e de cada faixa | livre |
 | `por_no_video` | `musica?, video?, faixa?, em_ms?, substituir?` | Clipe novo ligado à música, ou liga um clipe que existe | livre |
-| `levar_para` | `modulo, alvo: {documento, caminho}, intencao?, tempo?: {em_ms?, dur_ms?}` | Abre a Música com o clipe ou a faixa do vídeo e guarda de onde veio | livre |
+| `levar_para` | `modulo, alvo: {documento, caminho}, intencao?, tempo?: {em_ms?, dur_ms?}, modelo?` | Abre a Música com o clipe ou a faixa do vídeo e guarda de onde veio; ao criar, `modelo` (`vazio`, `batida`, `trilha_video`, `efeito_sonoro`) escolhe a música nova | livre |
 | `concluir_transicao` | `transicao, aplicar?, resultado?: {documento?, midia?}` | Põe a música no vídeo por patch e volta | livre |
 | `cancelar_transicao` | `transicao, descartar?` | Volta sem mudar a origem; com descartar, desfaz o que se fez no destino | livre |
 | `trocar_kit` | `documento?, canal, kit` | Troca o kit de um canal de bateria (hoje: `eletronico`) | livre |
@@ -264,8 +311,9 @@ Em `src/nucleo/mcp-musica.ts`, registradas por uma linha em `registrarFerramenta
 | `encaixar_no_video` | `documento?, video?, modo?: duracao\|cortes\|tudo, viradas?` | Fecha a música no último quadro em compassos inteiros (o BPM muda até 8%; com áudio, o BPM fica), põe uma seção por cena no compasso de cada corte e, com viradas, uma virada antes de cada corte e um prato nele | livre |
 | `exportar_musica` | `documento?, formato: wav\|m4a\|opus\|mid, stems?, alvo_lufs?, nome?` | Grava em `saidas/` no alvo de loudness (stems em WAV), ou o MIDI; devolve os arquivos e a medida | cartao |
 | `importar_midi` | `arquivo, documento?, em?, usar_bpm?, nome?` | Lê um .mid (do projeto ou do computador) e cria um canal, um padrão e um clipe por trilha | cartao |
+| `licencas_do_projeto` | `documento?` | Cada som que a música toca, com licença, classe, SHA-256 do áudio e o que impede publicar, e os créditos; sem documento, todas as músicas e os créditos de cada vídeo | livre |
 
-Estendidas: `criar_documento` aceita `modulo: "musica"`; `estado_do_editor` mostra a transição em curso e, na Música, a
+Estendidas: `criar_documento` aceita `modulo: "musica"` e `modelo`; `estado_do_editor` mostra a transição em curso e, na Música, a
 seleção como caminho no documento (`/arranjo/clipes/2`) e a cabeça em ms. As "livre" gravam no diário e têm Reverter,
 ou só leem. As duas "cartao" passam do diário: `exportar_musica` grava arquivo em `saidas/` (fora do Ctrl+Z) e
 `importar_midi` pode ler um arquivo de fora do projeto (o que ela escreve na música vai ao diário). Nenhuma baixa nem
@@ -274,7 +322,8 @@ encaixe vêm desse vídeo).
 
 **Patch descrito** (sem ferramenta, pelo `aplicar_patch`): BPM, compasso, swing, semente, tom e escala; nome, kit,
 peças, `preset`, `macros`, mudo e solo dos canais; volume, pan, mudo, solo, EQ, compressor, reverb e delay das faixas
-do mixer; volume, reverb, delay e limitador do master; `alvo_lufs` e `pico_dbtp`; `video`. Os presets de faixa são só
+do mixer; volume, reverb, delay e limitador do master; `alvo_lufs` e `pico_dbtp`; `video`; `sidechain` das faixas;
+`automacoes`; `licencas` (a licença de um áudio de fora: `{op: "add", path: "/licencas/-", value: {arquivo, licenca, ...}}`). Os presets de faixa são só
 valores (EQ graves/médios/agudos em dB, compressor, envios): Limpo 0/0/0, sem compressor; Bateria +2/−1/+2, compressor
 −18 dB 4:1, reverb 0,1; Baixo +3/−2/−4, compressor −20 dB 4:1; Pad −3/0/+1, reverb 0,4, delay 0,15; Lead −2/+2/+1,5,
 compressor −16 dB 3:1, reverb 0,2, delay 0,25; Cama sob a voz 0/−4/−2, compressor −24 dB 2:1, reverb 0,15; Voz
@@ -313,6 +362,14 @@ Texto para a seção do CLAUDE.md do projeto (a coordenação junta no `claudeMd
 - Arquivo: `exportar_musica {formato: "wav"|"m4a"|"opus"|"mid", stems?}` grava em `saidas/` a −14 LUFS (só quando a
   pessoa pedir o arquivo: no vídeo, a música já toca ligada). `importar_midi {arquivo}` traz um .mid como canais e
   padrões.
+- Sidechain e automação: `mixer.faixas[i].sidechain = {de: "bateria", peca: "bumbo", quanto_db: 6}` faz a faixa abaixar
+  a cada bumbo; `automacoes: [{alvo: "master", pontos: [{em: 28, db: 0}, {em: 32, db: -40}]}]` faz um fade (a curva toma
+  o lugar do fader).
+- Licenças: cada áudio de fora precisa de uma entrada em `licencas` (`{arquivo, licenca: "CC-BY-4.0", titulo, autor,
+  link}` ou `"uso_proprio"`); sem ela, `licencas_do_projeto` diz que impede publicar. Não invente licença: pergunte à
+  pessoa. Os sons do Estúdio (kit eletrônico, sintetizadores) são próprios.
+- Modelos: `criar_documento {modulo: "musica", modelo: "batida"|"trilha_video"|"efeito_sonoro"}`; do vídeo,
+  `levar_para {..., intencao: "criar", modelo: "trilha_video"}`.
 ```
 
 ## Licenças
@@ -338,13 +395,19 @@ baixado; os kits de terceiros entram na onda 2, cada pacote com o LICENSE de den
 - O monitor do vídeo dentro da Música busca o quadro a cada mudança da cabeça; conferido na prévia web parado e
   andando a cabeça, não tocando por muito tempo num vídeo pesado.
 - O som do delay e do limitador foi conferido por medida (tempo e lado de cada repetição, teto do pico), não de ouvido.
-- Sidechain e automação (item 22), créditos e comprovante de licenças (24) e os modelos (27) não entraram.
+- A automação aparece no inspetor (lista de pontos e a curva), não desenhada sobre o arranjo; os pontos não se
+  arrastam com o mouse.
+- A licença dos kits de terceiros ainda não tem de onde vir (onda 2): o kit.json de cada kit vai dar o `spdx` e o
+  crédito; o teste usa um kit CC BY de exemplo, que não existe.
+- Áudio do próprio projeto sem licença informada (a cama que já estava no vídeo) aparece como "sem licença" e impede
+  publicar no comprovante, mas não trava a exportação (pergunta ao responsável na nota da frente).
+- Os modelos foram ouvidos por medida (resolvem sem aviso, tocam, só sons próprios), não de ouvido.
 - O modo "só o padrão" (tocar o padrão em loop fora do arranjo) não entrou: o L no clipe selecionado faz a mesma coisa.
 - "Pintar" clipes arrastando no vazio do arranjo não entrou; Repetir cobre o caso de encher compassos.
 - O som dos sintetizadores foi conferido por medida (altura por autocorrelação, brilho pela energia nos agudos), não de
   ouvido.
 
-## Roteiro para o responsável no app (15 minutos)
+## Roteiro para o responsável no app (20 minutos)
 
 1. Abra um projeto com um vídeo de cenas que tenha narração e uma música (ou ponha as duas com "+ Áudio").
 2. Selecione o clipe da música na linha do tempo. No inspetor, seção **Música**, clique em **Editar em Música**. A área
@@ -376,5 +439,13 @@ baixado; os kits de terceiros entram na onda 2, cada pacote com o LICENSE de den
     stems e o M4A; o rodapé disse o loudness (perto de −14 LUFS).
 15. Exporte em **MIDI**, abra uma música nova e use **+ MIDI…** com o arquivo de `saidas/`: os canais voltam com as
     mesmas notas.
+16. Num projeto sem música, área Música: **Batida**. Toque: o baixo abaixa a cada bumbo (inspetor da faixa do Baixo,
+    seção **Sidechain**; suba o "Quanto" para ouvir melhor).
+17. No inspetor da música, **Automação de volume**: **Ponto na cabeça** no começo, leve a cabeça ao fim, outro ponto, e
+    ponha −30 dB nele. Toque: a música some aos poucos.
+18. Num clipe de áudio de fora, **Licença do áudio** › CC BY 4.0, com título e autor. Exporte em WAV: em `saidas/` saem
+    o `.licencas.json` e o `- créditos.txt` com a linha de crédito.
+19. No vídeo, numa faixa de música, **Criar em Música**: a Trilha para vídeo abre do tamanho do vídeo; **Concluir e
+    voltar** e toque o vídeo.
 
 Anote o que travar ou demorar: o tempo do render na sua máquina é o que falta medir.
