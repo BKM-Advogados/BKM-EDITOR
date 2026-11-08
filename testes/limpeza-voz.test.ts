@@ -5,7 +5,7 @@ import {execFileSync} from 'node:child_process';
 import {existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {afterAll, describe, expect, it} from 'vitest';
+import {afterAll, describe, expect, it, vi} from 'vitest';
 import {envelopeDeAmostras} from '../src/nucleo/audio';
 import {gravarPlano, planoDoProjeto} from '../src/nucleo/criar-projeto';
 import {INTENSIDADES, LimpezaCancelada, limparVoz, medirRuido} from '../src/nucleo/limpeza-voz';
@@ -13,6 +13,9 @@ import {Projeto} from '../src/nucleo/projeto';
 import {amostrasPorPacote, gravarWav, lerEntrada, lerWav} from '../src/main/ffmpeg-som';
 import {arquivoDoEnvelope, lerEnvelope} from '../src/main/ipc-audio';
 import {apagarLimposSemUso, arquivoLimpo, garantirForaDoGit, limparArquivo, REGRAS_GIT, versoesLimpas} from '../src/main/limpeza-voz';
+
+// DSP, ffmpeg e git de verdade: com a suíte inteira e outras sessões rodando juntas, os 5 s padrão do vitest não bastam
+vi.setConfig({testTimeout: 30_000});
 
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'estudio-limpeza-'));
 afterAll(() => rmSync(tmp, {recursive: true, force: true}));
