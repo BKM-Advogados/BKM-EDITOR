@@ -10,7 +10,9 @@ import {indicePagina, paginasDe} from '../../nucleo/carrossel';
 
 export type Area = 'video' | 'imagem' | '3d' | 'efeitos';
 export type Lido = {doc: any; versao: string};
-export type Selecao = {documento: string; caminho: string} | null;
+// `caminho` é a camada (ou objeto) principal, a última escolhida; `outros` são as demais da seleção múltipla da imagem
+// (B2, rodada 3), no mesmo documento. Quem só conhece uma seleção lê `caminho` como sempre; caminhosDaSelecao dá todas.
+export type Selecao = {documento: string; caminho: string; outros?: string[]} | null;
 export type TipoAviso = 'ok' | 'erro' | 'info' | 'agente';
 export type Aviso = {texto: string; tipo: TipoAviso; em: number};
 
@@ -211,6 +213,7 @@ export const observarProjeto = () =>
     const info = estado.info;
     if (!info) return;
     if (arquivo === 'comentarios.json') return void carregarComentarios();
+    if (arquivo === '.estudio/selecao.json') return void aplicarSelecaoPedida(); // imagem, B2 rodada 3
     if (arquivo.startsWith('.estudio/diario')) return void carregarDiario();
     // pesquisa.json ou o texto de uma fonte (pesquisa/fontes/<id>.txt): a lista relê; o texto aberto relê pelo sha256
     if (arquivo.startsWith('pesquisa/')) return void carregarPesquisa();
@@ -261,6 +264,38 @@ export const desfazer = async () => {
 };
 
 export const selecionar = (s: Selecao) => loja.definir({selecao: s});
+
+// ---------- seleção múltipla (imagem, B2 rodada 3) ----------
+/** Todos os caminhos selecionados (o principal primeiro); vazio sem seleção ou noutro documento. */
+export const caminhosDaSelecao = (s: Selecao, documento?: string): string[] =>
+  !s || (documento && s.documento !== documento) ? [] : [s.caminho, ...(s.outros ?? []).filter((c) => c !== s.caminho)];
+
+/** Seleciona vários caminhos de um documento; o principal é o último da lista. Lista vazia limpa a seleção. */
+export const selecionarVarias = (documento: string, caminhos: string[]) => {
+  const unicos = [...new Set(caminhos)];
+  const caminho = unicos[unicos.length - 1];
+  selecionar(caminho ? {documento, caminho, ...(unicos.length > 1 ? {outros: unicos.slice(0, -1)} : {})} : null);
+};
+
+/** Shift+clique: põe ou tira o caminho da seleção (o que entra vira o principal). */
+export const alternarNaSelecao = (documento: string, caminho: string) => {
+  const atuais = caminhosDaSelecao(estado.selecao, documento);
+  selecionarVarias(documento, atuais.includes(caminho) ? atuais.filter((c) => c !== caminho) : [...atuais, caminho]);
+};
+
+/** Seleção pedida pela IA (ferramenta selecionar_camadas grava .estudio/selecao.json): a área e o documento vêm para a
+ *  frente, com a página da primeira camada num carrossel. */
+const aplicarSelecaoPedida = async () => {
+  const p = await window.estudio.lerJson('.estudio/selecao.json').catch(() => null) as {documento?: string; caminhos?: string[]} | null;
+  const entrada = p?.documento ? entradaDe(p.documento) : undefined;
+  if (!p || !entrada || !Array.isArray(p.caminhos)) return;
+  const doc = estado.docs[entrada.id]?.doc as DocImagem | undefined;
+  const m = /^\/paginas\/(\d+)\//.exec(p.caminhos[0] ?? '');
+  const pagina = doc && m ? paginasDe(doc)[Number(m[1])]?.id : undefined;
+  loja.definir((e) => ({area: entrada.modulo, ativo: {...e.ativo, [entrada.modulo]: entrada.id},
+    ...(pagina ? {paginaAtiva: {...e.paginaAtiva, [entrada.id]: pagina}} : {})}));
+  selecionarVarias(entrada.id, p.caminhos);
+};
 
 export const comentar = async (documento: string, texto: string, alvo: Comentario['alvo']) => {
   const c = await window.estudio.novoComentario({documento, texto, alvo});

@@ -160,4 +160,5 @@ export type EstadoEditor = {
   tempo_ms?: number;
   pagina?: string; // imagem com várias páginas: caminho da página ativa, ex.: /paginas/2
   atualizado_em: string;
+  selecao_varias?: string[]; // imagem (B2, rodada 3): todos os caminhos da seleção múltipla, o principal primeiro
 };

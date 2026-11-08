@@ -1,0 +1,15 @@
+/* Seleção múltipla no monitor da imagem (MonitorImagem.tsx, BarraSelecao.tsx): a barra de alinhar e distribuir em cima
+   do monitor, o contorno de cada camada selecionada, o laço (caixa de seleção arrastada no vazio), o alvo do alinhamento
+   e os fantasmas de onde cada camada vai cair. */
+.barra-selecao { position: absolute; top: 8px; left: calc(var(--trilho) + (100% - var(--trilho)) / 2); transform: translateX(-50%); z-index: 4; display: flex; align-items: center;
+  gap: 2px; padding: 3px 6px; background: var(--fundo-1); border: 1px solid var(--borda-forte); border-radius: var(--raio-2);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35); }
+.barra-selecao .quem { font-size: var(--tam-1); color: var(--texto-2); padding: 0 6px 0 2px; max-width: 140px; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; }
+.barra-selecao .sep { width: 1px; height: 18px; background: var(--borda); margin: 0 4px; }
+.barra-selecao .bti { width: 26px; height: 26px; }
+.sobreposicao .caixa-multi { position: absolute; border: 1px solid var(--acento); opacity: 0.85; }
+.sobreposicao .caixa-grupo { position: absolute; border: 1px dashed var(--acento); pointer-events: auto; cursor: move; }
+.sobreposicao .laco { position: absolute; border: 1px solid var(--acento); background: var(--acento-fraco); }
+.sobreposicao .alvo-alinhar { position: absolute; border: 2px dashed var(--acento); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35); }
+.sobreposicao .fantasma-alvo { position: absolute; border: 1px dashed rgba(255, 255, 255, 0.85); background: rgba(112, 184, 255, 0.12); }

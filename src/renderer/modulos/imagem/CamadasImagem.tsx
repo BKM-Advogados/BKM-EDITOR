@@ -2,12 +2,13 @@
 // Cada ação é um patch: ver ou ocultar, subir ou descer (move) e excluir (com test do id). Criar texto, forma e imagem
 // fica no trilho do monitor (T, U, inserir imagem). Num carrossel, o cabeçalho diz em que página se está; trocar de
 // página é na barra de páginas do monitor (ou PageUp/PageDown). O menu ⋯ da camada recorta a imagem pela camada de
-// cima e solta (acabamento.ts); a foto recortada aparece recuada, e subir ou descer leva a máscara junto.
+// cima e solta (acabamento.ts); a foto recortada aparece recuada, e subir ou descer leva a máscara junto. Shift ou
+// Ctrl+clique põe ou tira a camada da seleção múltipla (as selecionadas ficam acesas).
 import React from 'react';
 import {ArrowDown, ArrowUp, Circle, CornerLeftUp, Ellipsis, Eye, EyeOff, Image as IconeImagem, Square, Trash2, Type} from 'lucide-react';
 import type {CamadaImagem, DocImagem, OperacaoPatch} from '../../../nucleo/documentos';
 import {blocoDe, mascaraDe, mascarasEmUso, patchMoverCamada, patchRecortar, patchSoltar, podeRecortar} from '../../../nucleo/acabamento';
-import {aplicar, avisar, documentosDe, loja, selecionar, trocar, useLoja} from '../../estado/loja';
+import {alternarNaSelecao, aplicar, avisar, caminhosDaSelecao, documentosDe, loja, selecionar, trocar, useLoja} from '../../estado/loja';
 import {BotaoMenu, type ItemMenu} from '../../componentes/Menu';
 import {docValido, indiceDe, rotuloCamada, usarDocumentoImagem, usarPaginaAtiva, visivel} from './comum';
 
@@ -29,6 +30,8 @@ export const CamadasImagem: React.FC = () => {
 
   const {base, camadas, pagina, paginas, p} = ativa;
   const iSel = selecao?.documento === documento ? indiceDe(selecao.caminho, base) : -1;
+  // seleção múltipla: todas acesas; os botões de subir, descer e excluir ficam na principal
+  const selecionadas = new Set(caminhosDaSelecao(selecao, documento).map((c) => indiceDe(c, base)).filter((i) => i >= 0));
   const comComentario = new Set(comentarios.filter((c) => c.estado === 'aberto' && c.documento === documento).flatMap((c) => [c.alvo.objeto_id, c.alvo.objeto]));
 
   // sobe ou desce a camada (com a máscara junto, se for par recortado); a seleção segue a mesma camada pelo id
@@ -97,7 +100,8 @@ export const CamadasImagem: React.FC = () => {
             const [lo, hi] = blocoDe(camadas, i);
             const menu = ativaL ? menuDe(c, i) : [];
             return (
-              <li key={c.id || i} className={`${ativaL ? 'sel' : ''}${visivel(c) ? '' : ' oculto'}`} onClick={ir} tabIndex={0}
+              <li key={c.id || i} className={`${selecionadas.has(i) ? 'sel' : ''}${visivel(c) ? '' : ' oculto'}`} tabIndex={0}
+                onClick={(e) => (e.shiftKey || e.ctrlKey || e.metaKey ? alternarNaSelecao(documento, caminho) : ir())}
                 title={recortada ? `${c.id} · recortada por ${rotuloCamada(camadas[i + 1])}` : mascaras.has(i) ? `${c.id} · máscara de ${rotuloCamada(camadas[mascaras.get(i)!])}` : c.id}
                 style={recortada ? {paddingLeft: 22} : undefined} onKeyDown={(e) => e.key === 'Enter' && ir()}>
                 {recortada && <CornerLeftUp className="i12" style={{marginLeft: -14, color: 'var(--texto-3)'}} />}
