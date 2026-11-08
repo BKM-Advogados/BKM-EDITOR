@@ -22,6 +22,22 @@ export type ClipeAudio = {
   mudo?: boolean;
   original?: string; // voz limpa: o arquivo da pessoa, intacto ("Voltar ao original" põe de volta em `arquivo`)
   limpeza?: LimpezaClipe; // o que a limpeza de voz fez e mediu (limpeza-voz.ts)
+  fade_in_curva?: CurvaFade; // frente Som (rodada 3): a forma do fade de entrada (padrão linear)
+  fade_out_curva?: CurvaFade; // e a do fade de saída
+};
+
+/** Forma do fade. `linear`: o ganho sobe em linha reta (dois clipes iguais somam o mesmo nível; música diferente cai 3 dB
+ *  no meio). `potencia`: seno/cosseno, a potência soma constante (o crossfade de música: no meio, o nível fica o de antes).
+ *  `suave`: coseno levantado, o ganho começa e termina devagar (a soma dos ganhos é 1, como a linear). */
+export type CurvaFade = 'linear' | 'suave' | 'potencia';
+export const CURVAS_FADE: CurvaFade[] = ['linear', 'suave', 'potencia'];
+export const ehCurvaFade = (x: unknown): x is CurvaFade => typeof x === 'string' && (CURVAS_FADE as string[]).includes(x);
+/** Ganho (0 a 1) da curva depois de `u` (0 a 1) do fade andado; a de saída usa o que falta (1 − andado). */
+export const ganhoDaCurva = (curva: CurvaFade | undefined, u: number) => {
+  const x = Math.min(1, Math.max(0, u));
+  if (curva === 'potencia') return Math.sin((x * Math.PI) / 2);
+  if (curva === 'suave') return 0.5 - 0.5 * Math.cos(x * Math.PI);
+  return x;
 };
 
 /** Limpeza de voz gravada no clipe: a intensidade usada e o ruído nas pausas e a voz antes e depois, em dB (ponderação K). */
@@ -48,7 +64,7 @@ const PORTA_ABSOLUTA_DB = -70; // abaixo disto é silêncio, como a porta absolu
 const PORTA_RELATIVA_LU = 10; // janelas 10 LU abaixo da média não contam no nível (porta relativa do BS.1770)
 const PORTA_VOZ_LU = 18; // há voz na janela quando ela está a menos de 18 LU da referência da narração
 const MUSICA_SEM_MEDIDA_DB = -14; // música sem envelope ainda: nível típico de música masterizada para streaming
-const VOZ_SEM_MEDIDA_DB = -20; // narração sem envelope ainda: nível típico de voz gravada e normalizada
+export const VOZ_SEM_MEDIDA_DB = -20; // narração sem envelope ainda: nível típico de voz gravada e normalizada
 
 export const DUCKING_PADRAO = {alvo_lu: 20, ataque_ms: 80, soltura_ms: 500} as const; // a casa mixa música de 18 a 23 LU abaixo da voz
 export const ALVO_LU_MIN = 6;
@@ -284,6 +300,8 @@ export type ClipeAudioP = {
   volume: number;
   fade_in_ms: number;
   fade_out_ms: number;
+  fade_in_curva?: CurvaFade; // só vem quando não é linear
+  fade_out_curva?: CurvaFade;
   mudo: boolean;
   fora: boolean; // começa depois do fim do vídeo: não toca
   envelope?: Envelope;
@@ -332,6 +350,8 @@ export const resolverAudio = (audio: AudioCenas | undefined, duracao_video: numb
       const fade_out_ms = limitar(numero(c.fade_out_ms, 0), 0, duracao_ms);
       return {
         origem, id: c.id, arquivo: c.arquivo, nome: nomeClipe, em, duracao_ms, corte_ms, volume: volumeClipe, fade_in_ms, fade_out_ms, mudo: Boolean(c.mudo), fora,
+        ...(ehCurvaFade(c.fade_in_curva) && c.fade_in_curva !== 'linear' ? {fade_in_curva: c.fade_in_curva} : {}),
+        ...(ehCurvaFade(c.fade_out_curva) && c.fade_out_curva !== 'linear' ? {fade_out_curva: c.fade_out_curva} : {}),
         envelope: env, nivel_db: env ? nivelDeReferencia(env, corte_ms, corte_ms + duracao_ms) ?? undefined : undefined,
       };
     });
@@ -356,6 +376,19 @@ export const resolverAudio = (audio: AudioCenas | undefined, duracao_video: numb
       if (!c.envelope) avisos.push(`a música "${c.nome}" ainda não foi medida; o ducking supõe ${MUSICA_SEM_MEDIDA_DB} dB até a interface medir`);
     }
   }
+  // música sobre música (som-D7): dois clipes da mesma faixa de música que tocam juntos sem um crossfade que cubra a sobreposição
+  for (const f of faixas) {
+    if (f.papel !== 'musica') continue;
+    const ordem = f.clipes.filter((c) => !c.mudo && !c.fora).sort((a, b) => a.em - b.em);
+    for (let i = 0; i + 1 < ordem.length; i++) {
+      const a = ordem[i];
+      const b = ordem[i + 1];
+      const sobra = a.em + a.duracao_ms - b.em;
+      if (sobra > DURACAO_CLIPE_MIN && !(a.fade_out_ms >= sobra - 1 && b.fade_in_ms >= sobra - 1)) {
+        avisos.push(`a música "${a.nome}" e a "${b.nome}" tocam juntas por ${seg(Math.min(sobra, b.duracao_ms))} s, de ${seg(b.em)} s a ${seg(Math.min(a.em + a.duracao_ms, b.em + b.duracao_ms))} s: faça um crossfade entre elas, ou silencie uma`);
+      }
+    }
+  }
   if (semEnvelopeVoz) avisos.push(`${semEnvelopeVoz === 1 ? 'um clipe de narração ainda não foi medido' : `${semEnvelopeVoz} clipes de narração ainda não foram medidos`}; a música cai o tempo todo sob ${semEnvelopeVoz === 1 ? 'ele' : 'eles'}`);
   // o alvo do arquivo exportado (loudness.ts mede o arquivo final e corrige o ganho até ele)
   const alvo_lufs = limitar(numero(audio.alvo_lufs, ALVO_LUFS_PADRAO), ALVO_LUFS_MIN, ALVO_LUFS_MAX);
@@ -366,9 +399,9 @@ export const resolverAudio = (audio: AudioCenas | undefined, duracao_video: numb
 };
 
 /** Fator dos fades em `t_ms` desde o começo do clipe (0 a 1). */
-export const fatorFades = (c: {duracao_ms: number; fade_in_ms: number; fade_out_ms: number}, t_ms: number) => {
-  const entrada = c.fade_in_ms > 0 ? limitar(t_ms / c.fade_in_ms, 0, 1) : 1;
-  const saida = c.fade_out_ms > 0 ? limitar((c.duracao_ms - t_ms) / c.fade_out_ms, 0, 1) : 1;
+export const fatorFades = (c: {duracao_ms: number; fade_in_ms: number; fade_out_ms: number; fade_in_curva?: CurvaFade; fade_out_curva?: CurvaFade}, t_ms: number) => {
+  const entrada = c.fade_in_ms > 0 ? ganhoDaCurva(c.fade_in_curva, t_ms / c.fade_in_ms) : 1;
+  const saida = c.fade_out_ms > 0 ? ganhoDaCurva(c.fade_out_curva, (c.duracao_ms - t_ms) / c.fade_out_ms) : 1;
   return entrada * saida;
 };
 

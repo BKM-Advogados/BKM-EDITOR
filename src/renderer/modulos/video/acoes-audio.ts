@@ -4,8 +4,9 @@
 // música, efeitos) no primeiro clipe. Cada patch confere o id do que vai mexer, para não pisar no que o agente mudou por baixo.
 import {Mic, Music, Volume2, type LucideIcon} from 'lucide-react';
 import {ehDocCenas, idLivre, type DocCenas} from '../../../nucleo/cenas';
-import {DURACAO_CLIPE_MIN, nomeDoClipe, novaFaixaAudio, novoAudioCenas, PAPEIS, papelDe, type ClipeAudio, type Envelope, type FaixaAudio, type IntensidadeLimpeza,
+import {DURACAO_CLIPE_MIN, nivelDeReferencia, nomeDoClipe, novaFaixaAudio, novoAudioCenas, PAPEIS, papelDe, type AudioP, type ClipeAudio, type Envelope, type FaixaAudio, type IntensidadeLimpeza,
   type PapelFaixa} from '../../../nucleo/audio';
+import {copiarClipe, crossfadeEntre, dividirClipe, nivelDaVoz, recusou, volumeDoEfeito} from '../../../nucleo/clipes-audio';
 import type {OperacaoPatch} from '../../../nucleo/documentos';
 import {aplicar, avisar, loja, mensagemDe, patchTrocar, selecionar, valorEm} from '../../estado/loja';
 import {msAtual} from './tocador';
@@ -18,6 +19,10 @@ const docDe = (documento: string) => loja.get().docs[documento]?.doc as DocCenas
 const duracaoDoVideo = (documento: string) => {
   const m = loja.get().props[documento];
   return m && 'props' in m ? m.props.duracao_ms : 0;
+};
+const propsAudioDe = (documento: string): AudioP | undefined => {
+  const m = loja.get().props[documento];
+  return m && 'props' in m ? (m.props as {audio?: AudioP}).audio : undefined;
 };
 const testeId = (caminho: string, id: unknown): OperacaoPatch[] => (typeof id === 'string' ? [{op: 'test', path: `${caminho}/id`, value: id}] : []);
 const r50 = (v: number) => Math.round(v / 50) * 50;
@@ -76,7 +81,28 @@ const clipeNovo = (d: DocCenas, faixa: FaixaAudio, papel: PapelFaixa, arquivo: s
   return c;
 };
 
-/** Adiciona um clipe: sem `arquivo`, abre o diálogo (copia para midia/). Mede o envelope antes, para já saber a duração. */
+/** Música que entra numa faixa de música já cheia (som-D7): na cabeça, com crossfade com a que toca ali; a cabeça no começo ou
+ *  no fim do vídeo não dá lugar para isso, e a música nova vai para uma faixa de música nova. */
+const musicaSobreMusica = (d: DocCenas, documento: string, indice: number, faixa: FaixaAudio, arquivo: string, env: Envelope, dv: number): OperacaoPatch[] | null => {
+  const t = r50(msAtual());
+  const tocando = (faixa.clipes ?? []).find((c) => c.em <= t && c.em + c.duracao_ms > t);
+  if (!tocando || t < 500 || t > dv - 1000) return null;
+  const j = faixa.clipes.length;
+  const novo: ClipeAudio = {id: idNovo(d, 'clipe'), arquivo, em: t, duracao_ms: Math.max(DURACAO_CLIPE_MIN, Math.min(Math.max(DURACAO_CLIPE_MIN, env.duracao_ms), dv - t))};
+  if (novo.duracao_ms > FADE_MUSICA_MS * 2) novo.fade_out_ms = FADE_MUSICA_MS;
+  const virtual = structuredClone(d);
+  virtual.audio!.faixas[indice].clipes.push(novo);
+  const r = crossfadeEntre(virtual, {de: tocando.id, para: novo.id, duracao_ms: FADE_MUSICA_MS}, duracoesMedidas(documento));
+  if (recusou(r)) return null;
+  const antes = `/audio/faixas/${indice}/clipes/${faixa.clipes.findIndex((c) => c.id === tocando.id)}`;
+  return [...testeId(antes, tocando.id), {op: 'add', path: `/audio/faixas/${indice}/clipes/${j}`, value: r.para}, {op: 'replace', path: antes, value: r.de}];
+};
+
+const fimDaFaixaDe = (faixa: FaixaAudio) => (faixa.clipes ?? []).reduce((m, c) => Math.max(m, numero(c.em) + numero(c.duracao_ms)), 0);
+
+/** Adiciona um clipe: sem `arquivo`, abre o diálogo (copia para midia/). Mede o envelope antes, para já saber a duração.
+ *  Efeito sonoro entra com o volume na medida da casa (20 LU abaixo da voz, som-D4); a segunda música não entra por cima da
+ *  primeira (som-D7). */
 export const adicionarClipeAudio = async (documento: string, papel: PapelFaixa, arquivo?: string) => {
   if (!ehDocCenas(docDe(documento))) return avisar('Só o vídeo de cenas tem faixas de áudio.', 'info');
   try {
@@ -86,21 +112,54 @@ export const adicionarClipeAudio = async (documento: string, papel: PapelFaixa, 
     const env = await garantirEnvelope(arq);
     const d = docDe(documento); // o documento pode ter mudado enquanto media
     if (!ehDocCenas(d)) return;
-    const {indice, faixa, criar} = faixaPara(d, documento, papel);
-    const clipe = clipeNovo(d, faixa, papel, arq, env, duracaoDoVideo(documento));
-    let ops: OperacaoPatch[];
+    const dv = duracaoDoVideo(documento);
+    let {indice, faixa, criar} = faixaPara(d, documento, papel);
+    const cheia = papel === 'musica' && !criar && dv > 0 && (faixa.clipes ?? []).length > 0 && fimDaFaixaDe(faixa) >= dv - DURACAO_CLIPE_MIN;
+    let aviso = '';
+    let ops: OperacaoPatch[] | null = null;
     let j = 0;
-    if (criar === 'audio') {
-      const audio = novoAudioCenas();
-      audio.faixas[indice].clipes.push(clipe);
-      ops = [{op: 'add', path: '/audio', value: audio}];
-    } else if (criar === 'faixa') ops = [{op: 'add', path: `/audio/faixas/${indice}`, value: {...faixa, clipes: [clipe]}}];
-    else {
-      j = Array.isArray(faixa.clipes) ? faixa.clipes.length : 0;
-      ops = [...testeId(`/audio/faixas/${indice}`, faixa.id),
-        Array.isArray(faixa.clipes) ? {op: 'add', path: `/audio/faixas/${indice}/clipes/${j}`, value: clipe} : {op: 'add', path: `/audio/faixas/${indice}/clipes`, value: [clipe]}];
+    if (cheia) {
+      ops = musicaSobreMusica(d, documento, indice, faixa, arq, env, dv);
+      if (ops) {
+        j = faixa.clipes.length;
+        aviso = 'A música nova entra na cabeça e a de antes desce em crossfade.';
+      } else {
+        // sem lugar na cabeça: faixa de música nova, para as duas não se atropelarem sem a pessoa ver
+        const n = d.audio!.faixas.filter((f) => papelDe(f) === 'musica').length;
+        indice = d.audio!.faixas.length;
+        faixa = {...novaFaixaAudio('musica', idNovo(d, PAPEIS.musica.id)), nome: `${PAPEIS.musica.nome_faixa} ${n + 1}`};
+        criar = 'faixa';
+        aviso = `A faixa de música já está cheia: a nova foi para "${faixa.nome}". Silencie uma das duas para ouvir só uma.`;
+      }
     }
-    if (await aplicar(documento, ops, `${PAPEIS[papel].nome.toLowerCase()}: ${nomeDoClipe(clipe)}`)) selecionar({documento, caminho: `/audio/faixas/${indice}/clipes/${j}`});
+    if (!ops) {
+      const clipe = clipeNovo(d, faixa, papel, arq, env, dv);
+      if (papel === 'efeitos') {
+        // som-D4: o efeito normalizado a 0 dBFS entrava a 100 % e passava a voz; entra 20 LU abaixo dela
+        const v = volumeDoEfeito(nivelDeReferencia(env), nivelDaVoz(propsAudioDe(documento)));
+        if (v < 1) clipe.volume = v;
+        aviso = v < 1 ? `Efeito a ${Math.round(v * 100)} %: fica 20 LU abaixo da voz, a regra da casa. Ajuste o volume do clipe se quiser.` : '';
+      }
+      if (criar === 'audio') {
+        const audio = novoAudioCenas();
+        audio.faixas[indice].clipes.push(clipe);
+        ops = [{op: 'add', path: '/audio', value: audio}];
+      } else if (criar === 'faixa') ops = [{op: 'add', path: `/audio/faixas/${indice}`, value: {...faixa, clipes: [clipe]}}];
+      else {
+        j = Array.isArray(faixa.clipes) ? faixa.clipes.length : 0;
+        ops = [...testeId(`/audio/faixas/${indice}`, faixa.id),
+          Array.isArray(faixa.clipes) ? {op: 'add', path: `/audio/faixas/${indice}/clipes/${j}`, value: clipe} : {op: 'add', path: `/audio/faixas/${indice}/clipes`, value: [clipe]}];
+      }
+      if (await aplicar(documento, ops, `${PAPEIS[papel].nome.toLowerCase()}: ${nomeDoClipe(clipe)}`)) {
+        selecionar({documento, caminho: `/audio/faixas/${indice}/clipes/${j}`});
+        if (aviso) avisar(aviso, 'info');
+      }
+      return;
+    }
+    if (await aplicar(documento, ops, `${PAPEIS[papel].nome.toLowerCase()}: ${arq.split('/').pop()}`)) {
+      selecionar({documento, caminho: `/audio/faixas/${indice}/clipes/${j}`});
+      if (aviso) avisar(aviso, 'info');
+    }
   } catch (e) {
     avisar(mensagemDe(e), 'erro');
   }
@@ -141,9 +200,22 @@ export const moverClipe = async (documento: string, caminho: string, novo: {em?:
   const c = valorEm(d, caminho) as ClipeAudio | undefined;
   if (!c) return false;
   const patch: OperacaoPatch[] = [...testeId(caminho, c.id)];
-  if (novo.em !== undefined && r50(novo.em) !== c.em) patch.push(...patchTrocar(d, `${caminho}/em`, Math.max(0, r50(novo.em))));
-  if (novo.corte_ms !== undefined && r50(novo.corte_ms) !== (c.corte_ms ?? 0)) patch.push(...patchTrocar(d, `${caminho}/corte_ms`, r50(novo.corte_ms) > 0 ? r50(novo.corte_ms) : undefined));
-  if (novo.duracao_ms !== undefined && r50(novo.duracao_ms) !== c.duracao_ms) patch.push(...patchTrocar(d, `${caminho}/duracao_ms`, Math.max(DURACAO_CLIPE_MIN, r50(novo.duracao_ms))));
+  if (novo.em !== undefined && novo.corte_ms !== undefined) {
+    // aparar o começo: o começo anda em passos de 50 ms e o corte anda o mesmo tanto, o fim fica no lugar. Arredondar os
+    // dois à parte (clipe de uma divisão, que não cai em múltiplos de 50) deslocaria o som no tempo (som-D1)
+    const emNovo = Math.max(0, r50(novo.em));
+    const passo = emNovo - c.em;
+    const corteNovo = Math.max(0, (c.corte_ms ?? 0) + passo);
+    if (passo !== 0) {
+      patch.push(...patchTrocar(d, `${caminho}/em`, emNovo));
+      patch.push(...patchTrocar(d, `${caminho}/corte_ms`, corteNovo > 0 ? corteNovo : undefined));
+      patch.push(...patchTrocar(d, `${caminho}/duracao_ms`, Math.max(DURACAO_CLIPE_MIN, c.duracao_ms - passo)));
+    }
+  } else {
+    if (novo.em !== undefined && r50(novo.em) !== c.em) patch.push(...patchTrocar(d, `${caminho}/em`, Math.max(0, r50(novo.em))));
+    if (novo.corte_ms !== undefined && r50(novo.corte_ms) !== (c.corte_ms ?? 0)) patch.push(...patchTrocar(d, `${caminho}/corte_ms`, r50(novo.corte_ms) > 0 ? r50(novo.corte_ms) : undefined));
+    if (novo.duracao_ms !== undefined && r50(novo.duracao_ms) !== c.duracao_ms) patch.push(...patchTrocar(d, `${caminho}/duracao_ms`, Math.max(DURACAO_CLIPE_MIN, r50(novo.duracao_ms))));
+  }
   if (patch.length <= (c.id ? 1 : 0)) return false;
   return aplicar(documento, patch, rotulo);
 };
@@ -163,10 +235,10 @@ export const duplicarSelecaoAudio = async (documento: string) => {
   }
   const c = faixa.clipes[p.clipe];
   if (!c) return;
-  // a cópia entra logo depois do original, na mesma faixa
-  const copia: ClipeAudio = {...structuredClone(c), id: idNovo(d, c.id), em: c.em + c.duracao_ms};
-  const destino = `/audio/faixas/${p.faixa}/clipes/${p.clipe + 1}`;
-  if (await aplicar(documento, [...testeId(sel!.caminho, c.id), {op: 'add', path: destino, value: copia}], `duplicar clipe ${nomeDoClipe(c)}`)) selecionar({documento, caminho: destino});
+  // a cópia entra logo depois do original, na mesma faixa, com as legendas dele (clipes-audio.ts)
+  const r = copiarClipe(d, c.id);
+  if (recusou(r)) return avisar(r.erro, 'info');
+  if (await aplicar(documento, r.patch, `duplicar clipe ${nomeDoClipe(c)}`)) selecionar({documento, caminho: r.caminho_copia});
 };
 
 export const excluirSelecaoAudio = async (documento: string) => {
@@ -247,4 +319,49 @@ export const voltarAoOriginal = async (documento: string, caminho: string) => {
   const patch = [...testeId(caminho, c.id), ...patchTrocar(d, `${caminho}/arquivo`, c.original), ...patchTrocar(d, `${caminho}/original`, undefined),
     ...patchTrocar(d, `${caminho}/limpeza`, undefined)];
   if (await aplicar(documento, patch, `voltar ao original: ${nomeDoClipe(c)}`)) avisar('O clipe voltou ao arquivo original. Ctrl+Z desfaz.', 'ok');
+};
+
+// ---------- dividir e crossfade (frente Som, rodada 3): a conta é a de src/nucleo/clipes-audio.ts, a mesma do MCP ----------
+const segTxt = (ms: number) => (ms / 1000).toLocaleString('pt-BR', {maximumFractionDigits: 2});
+
+/** Divide o clipe selecionado na cabeça (Ctrl+K): as duas metades tocam o mesmo som, e as legendas e a voz limpa vão junto. */
+export const dividirSelecaoAudio = async (documento: string) => {
+  const sel = loja.get().selecao;
+  const d = docDe(documento);
+  const p = sel?.documento === documento ? partesAudio(sel.caminho) : null;
+  const c = p && p.clipe !== null && ehDocCenas(d) ? d.audio?.faixas?.[p.faixa]?.clipes?.[p.clipe] : undefined;
+  if (!p || !c || !ehDocCenas(d)) return avisar('Selecione um clipe de áudio para dividir.', 'info');
+  const r = dividirClipe(d, c.id, msAtual());
+  if (recusou(r)) return avisar(r.erro, 'info');
+  if (await aplicar(documento, r.patch, `dividir ${nomeDoClipe(c)} em ${segTxt(r.corte_ms)} s`)) {
+    selecionar({documento, caminho: r.caminho_segundo});
+    avisar(r.avisos.length ? `Clipe dividido. ${r.avisos.join('; ')}.` : 'Clipe dividido na cabeça. Ctrl+Z desfaz.', 'ok');
+  }
+};
+
+/** Duração (ms) de cada arquivo de áudio já medido, para o crossfade saber o som que sobra além do corte. */
+const duracoesMedidas = (documento: string) => {
+  const m = loja.get().props[documento];
+  const out: Record<string, number | undefined> = {};
+  if (m && 'props' in m) for (const f of (m.props as {audio?: AudioP}).audio?.faixas ?? []) for (const c of f.clipes) out[c.arquivo] = c.envelope?.duracao_ms;
+  return out;
+};
+
+/** Crossfade do clipe selecionado com o seguinte da faixa. Se os dois já se sobrepõem, a sobreposição vira o crossfade;
+ *  senão, 1 s. A curva é a da faixa (potência igual na música e nos efeitos, linear na voz). */
+export const crossfadeComSeguinte = async (documento: string, duracao_ms?: number) => {
+  const sel = loja.get().selecao;
+  const d = docDe(documento);
+  const p = sel?.documento === documento ? partesAudio(sel.caminho) : null;
+  const faixa = p && ehDocCenas(d) ? d.audio?.faixas?.[p.faixa] : undefined;
+  const c = faixa && p && p.clipe !== null ? faixa.clipes?.[p.clipe] : undefined;
+  if (!faixa || !c || !ehDocCenas(d)) return avisar('Selecione um clipe de áudio para fazer o crossfade.', 'info');
+  const seguinte = faixa.clipes.filter((x) => x.id !== c.id && x.em >= c.em).sort((a, b) => a.em - b.em)[0];
+  if (!seguinte) return avisar('Não há clipe depois deste na faixa.', 'info');
+  const sobreposto = c.em + c.duracao_ms - seguinte.em;
+  const r = crossfadeEntre(d, {de: c.id, para: seguinte.id, duracao_ms: duracao_ms ?? (sobreposto >= 100 ? sobreposto : 1000)}, duracoesMedidas(documento));
+  if (recusou(r)) return avisar(r.erro, 'info');
+  if (await aplicar(documento, r.patch, `crossfade de ${segTxt(r.duracao_ms)} s: ${nomeDoClipe(c)} → ${nomeDoClipe(seguinte)}`)) {
+    avisar(`Crossfade de ${segTxt(r.duracao_ms)} s (${r.curva === 'potencia' ? 'potência igual' : r.curva}).${r.mudancas.length ? ` ${r.mudancas.join('; ')}.` : ''} Ctrl+Z desfaz.`, 'ok');
+  }
 };

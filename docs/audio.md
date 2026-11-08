@@ -226,6 +226,74 @@ são as do BS.1770, na forma em que o libebur128 (MIT) as escreve.
   clipe (arquivo, trocar arquivo, nome, começa em, duração, corte, volume, fades, mudo, a redução sob a voz e, na voz, a
   limpeza). Sem nada selecionado, o resumo do vídeo traz a seção "Loudness" (alvo, pico máximo e os medidores).
 
+## Dividir, copiar e crossfade (rodada 3)
+
+A conta é de `src/nucleo/clipes-audio.ts`: a interface (`acoes-audio.ts`) e o MCP (`mcp-som.ts`) chamam as mesmas
+funções, então a pessoa e a IA obtêm o mesmo documento. Tudo sai como JSON Patch (diário, Ctrl+Z, "Ver" e "Reverter").
+
+**Dividir na cabeça** (clipe selecionado + Ctrl+K, o botão "Dividir na cabeça" do inspetor ou `dividir_clipe`). O corte
+cai num **número inteiro de quadros contado do começo do clipe**: o Remotion põe o clipe no quadro mais perto de `em` e
+pula `corte_ms` em quadros, e só com o corte em quadros inteiros as duas metades tocam, juntas, exatamente o que o clipe
+inteiro tocava (a cabeça do monitor anda em quadros e o corte pode ficar até meio quadro de onde ela estava). A
+segunda metade nasce com id novo (`n1` → `n1-1`) e leva o resto do clipe: arquivo, volume, mudo, nome e a voz limpa
+(`original` e `limpeza`). O fade de entrada fica na primeira metade e o de saída na segunda; fade mais longo que a
+metade em que está avisa e fica só nessa metade. Cada metade tem pelo menos 100 ms.
+
+**Legendas.** O segmento que fica inteiro de um lado vai com aquele clipe; o que o corte atravessa é partido na
+primeira palavra depois do corte (`dividirSegmento`), e o clipe novo ganha a `origem` do clipe de onde veio. Assim a
+tela mostra as mesmas palavras nos mesmos tempos, e mover a segunda metade leva só as legendas dela.
+Duplicar (Ctrl+D, `copiar_clipe`) faz o mesmo: a cópia traz as legendas, deslocadas para onde a cópia começa, e anda
+com ela. Duplicar a *faixa* inteira ainda não leva as legendas dos clipes.
+
+**Crossfade** (inspetor → "Crossfade com o seguinte", ou `crossfade`). O fim do primeiro clipe desce e o começo do
+segundo sobe durante `duracao_ms`, com os dois tocando juntos. A forma vem de `fade_in_curva` e `fade_out_curva` no clipe:
+
+| curva | ganho depois de `u` do fade | quando usar |
+|---|---|---|
+| `linear` | `u` | a mesma tomada dos dois lados (voz): a soma dos ganhos é 1 |
+| `suave` | `(1 − cos πu) / 2` | começa e termina devagar; soma dos ganhos 1 |
+| `potencia` | `sin(πu/2)` | músicas e efeitos diferentes: a soma das potências é 1, e **no meio o nível fica o de antes** (a linear cairia 3 dB) |
+
+O padrão é `potencia` em faixa de música e efeitos, e `linear` em voz. Para os dois se sobreporem por `duracao_ms`
+há dois modos: `estender` usa o som que sobra nos arquivos (primeiro a cauda do primeiro clipe, depois o começo do
+segundo; nada muda de lugar, então a narração presa a eles segue no tempo) e `sobrepor` puxa o segundo clipe para trás
+(ele acaba antes). `auto` (padrão) estende o que der e sobrepõe o resto, dizendo o que fez. Se os dois já se
+sobrepõem mais do que o pedido, o primeiro encurta.
+
+**Medido** (`MEDIR=1 npx vitest run testes/clipes-audio.test.ts`, mistura simulada com o posicionamento por quadro do
+`VideoCenas`, 48 kHz): metades somadas menos o clipe inteiro = −222 dB (zero, no limite do ponto flutuante; o critério
+é −60 dB), contra +1,7 dB com o corte em milissegundos fora da grade. Crossfade de potência igual entre dois ruídos
+diferentes, com 2 s: +0,01, +0,07 e +0,08 dB em relação ao nível de antes a 25, 50 e 75 % da sobreposição; o linear cai
+2,9 dB no meio. **Não medido:** o render real do Remotion (a mistura é a simulação, não o MP4) e o ducking de uma
+música dividida (cada metade calcula a redução pela mediana do seu trecho).
+
+## Efeito sonoro na medida da casa (som-D4)
+
+Um efeito novo (Efeito sonoro…) entra com o volume do clipe calculado para a mediana dele ficar **20 LU abaixo da voz**
+(a casa mixa de 18 a 23): `volumeDoEfeito` usa a mediana da voz medida, com o volume de faixa e de clipe (`nivelDaVoz`);
+sem voz medida, a voz típica de −20 dB. Um efeito que já é mais baixo que o alvo fica a 100 %: não se sobe o volume.
+Medido: whoosh a −3 dB sobre voz a −22,9 dB entra a 1 % e fica 20,08 LU abaixo dela.
+
+## Música sobre música (som-D7)
+
+Escolher uma segunda música quando a faixa já vai até o fim do vídeo não a põe mais no zero por cima da primeira: ela
+entra na cabeça (se a cabeça está a mais de 0,5 s do começo e a 1 s do fim), e a que toca ali desce em crossfade de 1,5 s;
+sem lugar na cabeça, vai para uma faixa de música nova ("Música 2"), com aviso. Em qualquer caso, duas músicas da
+mesma faixa que tocam juntas sem um crossfade que cubra a sobreposição geram o aviso "tocam juntas por N s" no
+resolvedor (e o Claude o vê nos avisos do documento).
+
+## Ferramentas MCP do som (`src/nucleo/mcp-som.ts`)
+
+| ferramenta | o que faz | classe |
+|---|---|---|
+| `dividir_clipe` | divide o clipe em `em_ms` (ou onde está a cabeça) na grade de quadros, levando as legendas | livre |
+| `copiar_clipe` | copia o clipe na mesma faixa (depois do original ou em `em_ms`), com as legendas | livre |
+| `crossfade` | crossfade entre dois clipes da mesma faixa: `duracao_ms`, `curva`, `modo` | livre |
+
+Classe **livre**: grava no diário como o agente e tem Reverter. Nenhuma lê a web, baixa modelo ou toca em arquivo de
+fora do projeto. Como chegar vindo de outro módulo: a seleção de um clipe de áudio (`estado_do_editor`) diz o `clipe`; o
+`em_ms` omitido usa a cabeça gravada em `estado.json`. Como voltar: `listar_mudancas` + Reverter, ou Ctrl+Z na tela.
+
 ## Pasta de trilhas
 
 Preferência `pasta_trilhas` (padrão `%USERPROFILE%\Estudio\trilhas`). "Música da biblioteca…" lista os mp3, wav,
@@ -238,6 +306,8 @@ para depois: por ora a pasta é da pessoa.
 - `src/nucleo/audio.ts`: tipos, envelope (ponderação K), referência por mediana, `calcularDucking`, `resolverAudio`,
   `volumeDoClipe`. Puro, sem disco.
 - `src/nucleo/cenas.ts`: `audio` no documento e nas props; `resolverCenas(doc, {envelopes})`.
+- `src/nucleo/clipes-audio.ts`: `dividirClipe`, `copiarClipe`, `crossfadeEntre`, `volumeDoEfeito` (puros, em JSON Patch).
+  `src/nucleo/mcp-som.ts`: as ferramentas MCP do som (`registrarSom`, uma linha em `ferramentas-mcp.ts`).
 - `src/composicoes/cenas/VideoCenas.tsx`: `<Som>` com um `<Html5Audio>` por clipe.
 - `src/nucleo/loudness.ts`: medidor BS.1770 aos pedaços e `medirMistura`. `src/nucleo/limpeza-voz.ts`: a limpeza.
 - `src/main/ipc-audio.ts`: grava o envelope com o carimbo (`gravarEnvelope`), lista a pasta de trilhas, importa trilha;
@@ -249,7 +319,7 @@ para depois: por ora a pasta é da pessoa.
 - `src/renderer/modulos/video/`: `envelope.ts` (mede com Web Audio), `acoes-audio.ts` (patches, limpar e voltar ao
   original), `FaixasAudio.tsx` (linha do tempo), `BibliotecaTrilhas.tsx`, `MedidorLoudness.tsx`, e as partes de áudio em
   `LinhaDoTempo.tsx` e `InspectorCenas.tsx`.
-- `testes/audio.test.ts`, `testes/loudness.test.ts`, `testes/limpeza-voz.test.ts`; `scripts/audio-sintetico.ts` (WAV de
+- `testes/audio.test.ts`, `testes/loudness.test.ts`, `testes/limpeza-voz.test.ts`, `testes/clipes-audio.test.ts`, `testes/mcp-som.test.ts`; `scripts/audio-sintetico.ts` (WAV de
   teste da prévia web e do script de exportação), `scripts/limpeza-teste.mjs` e `scripts/exportar-teste-som.mjs`.
 - Prévia web: a ponte limpa e mede de verdade (o mesmo núcleo) sobre os WAV sintéticos.
 
@@ -260,3 +330,10 @@ limpo, trocar `arquivo` à mão deixa `original` e `limpeza` desatualizados (apa
 Os `*.limpo*.wav` ficam fora do git (estão no `.gitignore`) e se refazem do original; não os versione. Gravar uma tomada
 nova por cima de um áudio de `midia/` é seguro: o envelope dele deixa de valer e a interface mede de novo.
 A limpeza de voz e a medição são da interface (precisam do ffmpeg do processo principal); o Claude não as dispara pelo MCP.
+
+Dividir, copiar e fazer crossfade de clipes tem ferramenta própria (`dividir_clipe`, `copiar_clipe`, `crossfade`): use-as
+no lugar de montar o patch, porque elas cuidam da grade de quadros, do fade, da voz limpa e das legendas do clipe. Para
+um efeito sonoro novo por `aplicar_patch`, ponha `volume` no clipe para a mediana dele ficar 20 LU abaixo da voz (a
+interface faz essa conta; um efeito a 100 % passa por cima da narração). Duas músicas na mesma faixa só se sobrepõem
+com `fade_out_ms` e `fade_in_ms` iguais ao tempo da sobreposição (e `fade_*_curva: "potencia"`): senão o documento avisa
+que tocam juntas.
