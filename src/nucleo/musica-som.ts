@@ -1,6 +1,6 @@
 // O som da música, em TypeScript puro: o kit eletrônico sintetizado (sem arquivo nem licença de terceiros), os clipes
-// de áudio com corte, ganho e fades, e o mixer (EQ de três bandas, compressor, volume, pan, envio ao reverb) até o
-// master. É a mesma conta na prévia da janela (Web Audio só toca o resultado), no render que vai para o vídeo
+// de áudio com corte, ganho e fades, e o mixer (EQ de três bandas, compressor, volume, pan, envios ao reverb e ao
+// delay) até o master, com o limitador no fim. É a mesma conta na prévia da janela (Web Audio só toca o resultado), no render que vai para o vídeo
 // (src/main/musica-render.ts) e no MCP por stdio, então a prévia e o render saem iguais amostra por amostra. Nada de
 // Math.random: o ruído vem da semente do documento. Ver docs/musica.md.
 import type {FonteAudio} from './loudness';
@@ -404,6 +404,93 @@ export const reverberar = (entrada: Float32Array[], tamanho: number, amortecimen
   });
 };
 
+// ---------- retorno 2: delay preso ao BPM (item 21) ----------
+/** Delay estéreo com realimentação e um passa-baixas de um polo no laço (brilho 0 = 1,5 kHz, 1 = 12 kHz, cada
+ *  repetição mais escura). No pingue-pongue, a entrada (em mono) começa à esquerda e cada volta troca de lado. Sai só a
+ *  parte molhada: é um retorno. */
+export const atrasar = (entrada: Float32Array[], atraso_s: number, realimentacao: number, brilho: number, pingue: boolean, taxa: number): Float32Array[] => {
+  const n = entrada[0].length;
+  const d = Math.max(1, Math.round(atraso_s * taxa));
+  const a = Math.exp((-DUAS_PI * 1500 * Math.pow(8, brilho)) / taxa);
+  const out = [new Float32Array(n), new Float32Array(n)];
+  const linhaL = new Float32Array(d), linhaR = new Float32Array(d);
+  let fl = 0, fr = 0, k = 0;
+  for (let i = 0; i < n; i++) {
+    const yl = linhaL[k], yr = linhaR[k];
+    out[0][i] = yl;
+    out[1][i] = yr;
+    fl = (1 - a) * yl + a * fl;
+    fr = (1 - a) * yr + a * fr;
+    const xl = entrada[0][i], xr = entrada[1][i];
+    if (pingue) {
+      linhaL[k] = (xl + xr) * 0.5 + fr * realimentacao;
+      linhaR[k] = fl * realimentacao;
+    } else {
+      linhaL[k] = xl + fl * realimentacao;
+      linhaR[k] = xr + fr * realimentacao;
+    }
+    if (++k >= d) k = 0;
+  }
+  return out;
+};
+
+// ---------- limitador do master (item 21) ----------
+/** Segura o pico de amostra em `teto_db`, no lugar. O ganho desce 1,5 ms antes do pico, numa rampa (média do mínimo
+ *  pedido na janela), e volta em `soltura_ms`; como cada ponto da rampa já é menor ou igual ao que o pico pede, nada
+ *  passa do teto. Devolve a maior redução, em dB (0 quando nada passou). */
+export const limitarNoLugar = (canais: Float32Array[], teto_db: number, soltura_ms: number, taxa: number): number => {
+  const n = canais[0]?.length ?? 0;
+  const teto = ganhoDeDb(teto_db);
+  const la = Math.max(1, Math.round(0.0015 * taxa));
+  const pedido = new Float32Array(n);
+  let algum = false;
+  for (let i = 0; i < n; i++) {
+    let pk = 0;
+    for (const c of canais) {
+      const v = Math.abs(c[i]);
+      if (v > pk) pk = v;
+    }
+    if (pk > teto) {
+      pedido[i] = teto / pk;
+      algum = true;
+    } else pedido[i] = 1;
+  }
+  if (!algum) return 0;
+  // minAte[i] = mínimo do pedido em [i − la, i] (fila monotônica); o mínimo à frente de j é minAte[j + la]
+  const minAte = new Float32Array(n);
+  const fila = new Int32Array(n);
+  let ini = 0, fim = 0;
+  for (let i = 0; i < n; i++) {
+    while (fim > ini && pedido[fila[fim - 1]] >= pedido[i]) fim--;
+    fila[fim++] = i;
+    while (fila[ini] < i - la) ini++;
+    minAte[i] = pedido[fila[ini]];
+  }
+  const frente = new Float32Array(n);
+  let cauda = 1;
+  for (let j = n - 1; j >= 0; j--) {
+    if (j + la < n) frente[j] = minAte[j + la];
+    else frente[j] = cauda = Math.min(cauda, pedido[j]);
+  }
+  const so = Math.exp(-1 / ((soltura_ms / 1000) * taxa));
+  let r = 1, soma = la + 1, menor = 1; // a janela da média começa cheia de 1 (antes do começo, nada a reduzir)
+  const janela = new Float32Array(la + 1).fill(1);
+  let w = 0;
+  for (let i = 0; i < n; i++) {
+    r = Math.min(frente[i], 1 - (1 - r) * so);
+    soma += r - janela[w];
+    janela[w] = r;
+    if (++w > la) w = 0;
+    const g = Math.min(1, soma / (la + 1));
+    if (g < menor) menor = g;
+    for (const c of canais) {
+      const y = c[i] * g;
+      c[i] = y > teto ? teto : y < -teto ? -teto : y; // só o primeiro 1,5 ms e o arredondamento chegam aqui
+    }
+  }
+  return menor < 1 ? Math.round(-20 * Math.log10(menor) * 10) / 10 : 0;
+};
+
 // ---------- sintetizadores da casa (item 14) ----------
 // Quatro sons de partida, todos da mesma receita: dois osciladores com PolyBLEP (serra e quadrada sem o serrilhado do
 // ingênuo), um sub em seno no baixo, filtro passa-baixas de dois polos com envelope próprio e o envelope de volume
@@ -518,7 +605,10 @@ const renderSintetizador = (m: MusicaP, canal: CanalMusicaP, n: number, taxa: nu
 };
 
 // ---------- a música inteira ----------
-export type ResultadoSom = {canais: Float32Array[]; taxa: number; duracao_s: number; avisos: string[]; faltando: string[]; faixas?: Record<string, Float32Array[]>};
+/** `faixas` e `retornos` (com porFaixa) são o som de cada faixa e de cada retorno antes do master: somados e passados
+ *  pelo volume do master, dão a mistura antes do limitador (os stems da exportação). `limitador_db` é a maior redução. */
+export type ResultadoSom = {canais: Float32Array[]; taxa: number; duracao_s: number; avisos: string[]; faltando: string[]; faixas?: Record<string, Float32Array[]>;
+  retornos?: Partial<Record<'reverb' | 'delay', Float32Array[]>>; limitador_db?: number};
 
 /** Chave do som seco de um canal: o que muda o que ele toca (não o mixer). */
 const chaveDoCanal = (m: MusicaP, canal: CanalMusicaP, n: number, taxa: number, fontes: Record<string, FonteAudio | undefined>) => {
@@ -573,11 +663,12 @@ export const renderizarMusica = (doc: DocMusica, fontes: Record<string, FonteAud
   }
   const L = new Float32Array(n), R = new Float32Array(n);
   const envios: {chave: string; som: Float32Array[]; quanto: number}[] = [];
+  const enviosDelay: typeof envios = [];
   const faixas: Record<string, Float32Array[]> = {};
   for (const f of m.faixas) {
     const entram = secos.get(f.id);
     if (!entram || f.mudo || (algumSoloFaixa && !f.solo)) continue;
-    const chave = `faixa:${JSON.stringify({f: {...f, mudo: false, solo: false, reverb: 0}, de: entram.map((e) => e.chave)})}`;
+    const chave = `faixa:${JSON.stringify({f: {...f, mudo: false, solo: false, reverb: 0, delay: 0}, de: entram.map((e) => e.chave)})}`;
     const bus = doCache(chave, () => {
       const b = [Float32Array.from(entram[0].som[0]), Float32Array.from(entram[0].som[1])];
       for (const e of entram.slice(1)) for (let k = 0; k < 2; k++) for (let i = 0; i < n; i++) b[k][i] += e.som[k][i];
@@ -589,7 +680,24 @@ export const renderizarMusica = (doc: DocMusica, fontes: Record<string, FonteAud
       R[i] += bus[1][i];
     }
     if (f.reverb > 0) envios.push({chave, som: bus, quanto: f.reverb});
+    if (f.delay > 0) enviosDelay.push({chave, som: bus, quanto: f.delay});
     if (o.porFaixa) faixas[f.id] = bus;
+  }
+  const retornos: NonNullable<ResultadoSom['retornos']> = {};
+  if (enviosDelay.length) {
+    const d = m.master.delay;
+    const atraso_s = d.batidas * m.seg_por_batida;
+    const volta = doCache(`delay:${JSON.stringify({d: [atraso_s, d.realimentacao, d.brilho, d.pingue_pongue], e: enviosDelay.map((e) => [e.chave, e.quanto]), taxa})}`, () => {
+      const envio = [new Float32Array(n), new Float32Array(n)];
+      for (const e of enviosDelay) for (let k = 0; k < 2; k++) for (let i = 0; i < n; i++) envio[k][i] += e.som[k][i] * e.quanto;
+      return atrasar(envio, atraso_s, d.realimentacao, d.brilho, d.pingue_pongue, taxa);
+    });
+    const g = ganhoDeDb(d.volume_db);
+    for (let i = 0; i < n; i++) {
+      L[i] += volta[0][i] * g;
+      R[i] += volta[1][i] * g;
+    }
+    if (o.porFaixa) retornos.delay = g === 1 ? volta : volta.map((x) => x.map((v) => v * g));
   }
   if (envios.length) {
     const r = m.master.reverb;
@@ -603,6 +711,7 @@ export const renderizarMusica = (doc: DocMusica, fontes: Record<string, FonteAud
       L[i] += volta[0][i] * g;
       R[i] += volta[1][i] * g;
     }
+    if (o.porFaixa) retornos.reverb = g === 1 ? volta : volta.map((x) => x.map((v) => v * g));
   }
   for (const k of [...cache.keys()]) if (!usadas.has(k) && !k.startsWith('peca:')) cache.delete(k);
   const gm = ganhoDeDb(m.master.volume_db);
@@ -610,8 +719,11 @@ export const renderizarMusica = (doc: DocMusica, fontes: Record<string, FonteAud
     L[i] *= gm;
     R[i] *= gm;
   }
+  const lim = m.master.limitador;
+  const limitador_db = lim.ativo ? limitarNoLugar([L, R], lim.teto_db, lim.soltura_ms, taxa) : undefined;
   for (const a of faltando) avisos.push(`o áudio ${a} não foi lido; o clipe fica calado`);
-  return {canais: [L, R], taxa, duracao_s: n / taxa, avisos, faltando: [...faltando], ...(o.porFaixa ? {faixas} : {})};
+  return {canais: [L, R], taxa, duracao_s: n / taxa, avisos, faltando: [...faltando], ...(o.porFaixa ? {faixas, retornos} : {}),
+    ...(limitador_db !== undefined ? {limitador_db} : {})};
 };
 
 /** Uma batida só, para o pad e a prévia de som: a peça com o ajuste do canal, em estéreo. */

@@ -3,7 +3,8 @@
 // rótulo do diário e o caminho do que mudou; nada aqui grava. Erro é Error com a frase para a pessoa ou para a IA.
 import type {OperacaoPatch} from './documentos';
 import {arredondarBatida, batidasPorCompasso, idLivre, NOME_PRESET, novaFaixaMixer, posicaoEmCompasso, PRESETS, segPorBatida,
-  type AcordeNoTempo, type CanalMusica, type ClipeMusica, type DocMusica, type NotaMusica, type PadraoMusica, type PecaBateria, type PresetSintetizador} from './musica';
+  type AcordeNoTempo, type CanalMusica, type ClipeMusica, type DocMusica, type NotaMusica, type PadraoMusica, type PecaBateria, type PresetFaixa, type PresetSintetizador,
+  PRESETS_FAIXA} from './musica';
 import {acordeDe, baixoDoAcorde, encaixarNaEscala, escalaDe, NOMES, nomeDaNota, vozesDoAcorde} from './musica-teoria';
 import {geradorDe, KITS} from './musica-som';
 import {ESTILOS, padraoDoEstilo} from './musica-estilos';
@@ -237,6 +238,25 @@ export const trocarKit = (doc: DocMusica, canal: string, kit: string): Edicao =>
   if (!KITS.some((k) => k.id === kit)) throw new Error(`kit desconhecido: ${kit} (kits: ${KITS.map((k) => k.id).join(', ')})`);
   return {patch: [{op: 'test', path: `/canais/${i}/id`, value: canal}, {op: doc.canais[i].kit === undefined ? 'add' : 'replace', path: `/canais/${i}/kit`, value: kit}],
     rotulo: `kit ${kit} em ${canal}`, caminho: `/canais/${i}`, extra: {sem_som: []}};
+};
+
+/** Preset de faixa (item 21): escreve EQ, compressor e os dois envios; volume, pan, mudo e solo ficam. */
+export const presetDaFaixa = (doc: DocMusica, faixa: string, preset: PresetFaixa): Edicao => {
+  const i = doc.mixer.faixas.findIndex((f) => f.id === faixa);
+  const p = PRESETS_FAIXA[preset];
+  if (!p) throw new Error(`preset desconhecido: ${preset} (presets: ${Object.keys(PRESETS_FAIXA).join(', ')})`);
+  if (i < 0) {
+    // a faixa que um canal pede existe mesmo sem estar no documento: o preset a escreve inteira
+    const canal = doc.canais.find((c) => (c.faixa_mixer || c.id) === faixa);
+    if (!canal) throw new Error(`faixa do mixer não achada: ${faixa} (faixas: ${doc.mixer.faixas.map((f) => f.id).join(', ') || 'nenhuma'})`);
+    return {patch: [{op: 'add', path: '/mixer/faixas/-', value: {...novaFaixaMixer(faixa, canal.nome), eq: {...p.eq}, compressor: {...p.compressor}, reverb: p.reverb, delay: p.delay}}],
+      rotulo: `preset ${p.nome} em ${canal.nome}`, caminho: `/mixer/faixas/${doc.mixer.faixas.length}`};
+  }
+  const f = doc.mixer.faixas[i];
+  const base = `/mixer/faixas/${i}`;
+  const por = (campo: string, valor: unknown): OperacaoPatch => ({op: (f as Record<string, unknown>)[campo] === undefined ? 'add' : 'replace', path: `${base}/${campo}`, value: valor});
+  return {patch: [{op: 'test', path: `${base}/id`, value: faixa}, por('eq', {...p.eq}), por('compressor', {...p.compressor}), por('reverb', p.reverb), por('delay', p.delay)],
+    rotulo: `preset ${p.nome} em ${f.nome ?? faixa}`, caminho: base};
 };
 
 /** Canal de áudio novo com um clipe do arquivo, no fim do arranjo (a duração em segundos vira batidas). */

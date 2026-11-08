@@ -84,11 +84,18 @@ export type EqFaixa = {graves_db?: number; medios_db?: number; agudos_db?: numbe
 /** Compressor: limiar e ganho de compensação em dB, razão (2 = 2:1), ataque e soltura em ms. */
 export type CompressorFaixa = {ativo?: boolean; limiar_db?: number; razao?: number; ataque_ms?: number; soltura_ms?: number; ganho_db?: number};
 
-/** Faixa do mixer: volume em dB, pan, mudo, solo, EQ, compressor e quanto vai para o reverb (0 a 1, depois do volume).
- *  A lista de efeitos livre (delay, presets) vem com o mixer completo, sem tirar estes campos. */
-export type FaixaMixer = {id: string; nome?: string; volume_db?: number; pan?: number; mudo?: boolean; solo?: boolean; eq?: EqFaixa; compressor?: CompressorFaixa; reverb?: number};
+/** Faixa do mixer: volume em dB, pan, mudo, solo, EQ, compressor e quanto vai para cada retorno (0 a 1, depois do
+ *  volume): `reverb` (retorno 1) e `delay` (retorno 2). Os presets (PRESETS_FAIXA) só escrevem estes campos. */
+export type FaixaMixer = {id: string; nome?: string; volume_db?: number; pan?: number; mudo?: boolean; solo?: boolean; eq?: EqFaixa; compressor?: CompressorFaixa; reverb?: number;
+  delay?: number};
 export type ReverbMaster = {tamanho?: number; amortecimento?: number; volume_db?: number};
-export type MixerMusica = {faixas: FaixaMixer[]; master?: {volume_db?: number; reverb?: ReverbMaster}};
+/** Retorno 2, delay preso ao BPM (item 21): `tempo` em figura ("1/8." = colcheia pontuada), realimentação de 0 a 0,9,
+ *  brilho de 0 (escuro) a 1, pingue-pongue alterna os lados. */
+export type TempoDelay = '1/16' | '1/8' | '1/8.' | '1/4' | '1/4.' | '1/2';
+export type DelayMaster = {tempo?: TempoDelay; realimentacao?: number; brilho?: number; pingue_pongue?: boolean; volume_db?: number};
+/** Limitador no fim do master: segura o pico de amostra em `teto_db` (dBFS), com 1,5 ms de antecipação. */
+export type LimitadorMaster = {ativo?: boolean; teto_db?: number; soltura_ms?: number};
+export type MixerMusica = {faixas: FaixaMixer[]; master?: {volume_db?: number; reverb?: ReverbMaster; delay?: DelayMaster; limitador?: LimitadorMaster}};
 
 export type MarcadorMusica = {id: string; em: number; nome: string};
 
@@ -143,6 +150,25 @@ export const posicaoEmCompasso = (batida: number, compasso: [number, number] | u
   return `${c + 1}.${Math.floor(t + 1e-9) + 1}${t % 1 > 1e-6 ? `+${r3(t % 1)}` : ''}`;
 };
 
+// ---------- mixer completo (item 21) ----------
+/** Batidas de cada figura do delay (a batida é a semínima). */
+export const TEMPOS_DELAY: Record<TempoDelay, number> = {'1/16': 0.25, '1/8': 0.5, '1/8.': 0.75, '1/4': 1, '1/4.': 1.5, '1/2': 2};
+export type PresetFaixa = 'limpo' | 'bateria' | 'baixo' | 'pad' | 'lead' | 'cama' | 'voz';
+/** Presets de faixa: escrevem EQ, compressor e os dois envios; volume, pan, mudo e solo ficam. "cama" tira médios, onde
+ *  a fala mora, para a trilha ficar debaixo da voz. */
+export const PRESETS_FAIXA: Record<PresetFaixa, {nome: string; eq: Required<EqFaixa>; compressor: CompressorFaixa; reverb: number; delay: number}> = {
+  limpo: {nome: 'Limpo', eq: {graves_db: 0, medios_db: 0, agudos_db: 0}, compressor: {ativo: false}, reverb: 0, delay: 0},
+  bateria: {nome: 'Bateria', eq: {graves_db: 2, medios_db: -1, agudos_db: 2}, compressor: {ativo: true, limiar_db: -18, razao: 4, ataque_ms: 5, soltura_ms: 100, ganho_db: 3}, reverb: 0.1, delay: 0},
+  baixo: {nome: 'Baixo', eq: {graves_db: 3, medios_db: -2, agudos_db: -4}, compressor: {ativo: true, limiar_db: -20, razao: 4, ataque_ms: 10, soltura_ms: 150, ganho_db: 4}, reverb: 0, delay: 0},
+  pad: {nome: 'Pad', eq: {graves_db: -3, medios_db: 0, agudos_db: 1}, compressor: {ativo: false}, reverb: 0.4, delay: 0.15},
+  lead: {nome: 'Lead', eq: {graves_db: -2, medios_db: 2, agudos_db: 1.5}, compressor: {ativo: true, limiar_db: -16, razao: 3, ataque_ms: 10, soltura_ms: 120, ganho_db: 2}, reverb: 0.2, delay: 0.25},
+  cama: {nome: 'Cama sob a voz', eq: {graves_db: 0, medios_db: -4, agudos_db: -2}, compressor: {ativo: true, limiar_db: -24, razao: 2, ataque_ms: 20, soltura_ms: 200, ganho_db: 2}, reverb: 0.15, delay: 0},
+  voz: {nome: 'Voz', eq: {graves_db: -4, medios_db: 2, agudos_db: 2}, compressor: {ativo: true, limiar_db: -20, razao: 3, ataque_ms: 5, soltura_ms: 120, ganho_db: 4}, reverb: 0.08, delay: 0},
+};
+export const DELAY_PADRAO: Required<DelayMaster> = {tempo: '1/8.', realimentacao: 0.35, brilho: 0.5, pingue_pongue: true, volume_db: 0};
+/** Sem o campo, o limitador fica desligado (documento antigo soa igual); a música nova nasce com ele ligado em −1 dB. */
+export const LIMITADOR_PADRAO: Required<LimitadorMaster> = {ativo: false, teto_db: -1, soltura_ms: 80};
+
 // ---------- documento novo ----------
 export const novaFaixaMixer = (id: string, nome: string): FaixaMixer => ({id, nome, volume_db: 0, pan: 0});
 
@@ -160,7 +186,7 @@ export const novaMusica = (o: {titulo?: string; bpm?: number} = {}): DocMusica =
   canais: [],
   padroes: [],
   arranjo: {clipes: []},
-  mixer: {faixas: [], master: {volume_db: 0, reverb: {tamanho: 0.6, amortecimento: 0.4, volume_db: 0}}},
+  mixer: {faixas: [], master: {volume_db: 0, reverb: {tamanho: 0.6, amortecimento: 0.4, volume_db: 0}, delay: {...DELAY_PADRAO}, limitador: {ativo: true, teto_db: -1}}},
   marcadores: [],
 });
 
@@ -224,7 +250,8 @@ export type ClipeMusicaP = {
   mudo: boolean;
 };
 
-export type FaixaMixerP = {id: string; nome: string; volume_db: number; pan: number; mudo: boolean; solo: boolean; eq: Required<EqFaixa>; compressor: Required<CompressorFaixa>; reverb: number};
+export type FaixaMixerP = {id: string; nome: string; volume_db: number; pan: number; mudo: boolean; solo: boolean; eq: Required<EqFaixa>; compressor: Required<CompressorFaixa>; reverb: number;
+  delay: number};
 export type CanalMusicaP = {id: string; nome: string; tipo: 'audio' | 'bateria' | 'sintetizador'; faixa_mixer: string; kit: string; pecas: Partial<Record<PecaBateria, AjustePeca>>;
   preset: PresetSintetizador; macros: Required<MacrosSintetizador>; mudo: boolean; solo: boolean};
 
@@ -241,7 +268,7 @@ export type MusicaP = {
   clipes: ClipeMusicaP[];
   padroes: Record<string, PadraoMusica & {dur: number; passos: number}>;
   faixas: FaixaMixerP[];
-  master: {volume_db: number; reverb: Required<ReverbMaster>};
+  master: {volume_db: number; reverb: Required<ReverbMaster>; delay: Required<DelayMaster> & {batidas: number}; limitador: Required<LimitadorMaster>};
   video?: {documento: string; em_ms: number; voz_guia: boolean};
 };
 
@@ -282,10 +309,11 @@ export const resolverMusica = (doc: DocMusica): {musica: MusicaP; avisos: string
       razao: limitar(numero(f.compressor?.razao, COMPRESSOR_PADRAO.razao), 1, 20), ataque_ms: limitar(numero(f.compressor?.ataque_ms, COMPRESSOR_PADRAO.ataque_ms), 0.1, 200),
       soltura_ms: limitar(numero(f.compressor?.soltura_ms, COMPRESSOR_PADRAO.soltura_ms), 5, 2000), ganho_db: limitar(numero(f.compressor?.ganho_db, 0), 0, 24)},
     reverb: limitar(numero(f.reverb, 0), 0, 1),
+    delay: limitar(numero(f.delay, 0), 0, 1),
   }));
   for (const c of canais) {
     if (!faixas.some((f) => f.id === c.faixa_mixer)) {
-      faixas.push({id: c.faixa_mixer, nome: c.nome, volume_db: 0, pan: 0, mudo: false, solo: false, eq: {graves_db: 0, medios_db: 0, agudos_db: 0}, compressor: {...COMPRESSOR_PADRAO}, reverb: 0});
+      faixas.push({id: c.faixa_mixer, nome: c.nome, volume_db: 0, pan: 0, mudo: false, solo: false, eq: {graves_db: 0, medios_db: 0, agudos_db: 0}, compressor: {...COMPRESSOR_PADRAO}, reverb: 0, delay: 0});
     }
   }
 
@@ -332,13 +360,20 @@ export const resolverMusica = (doc: DocMusica): {musica: MusicaP; avisos: string
   const duracao_batidas = clipes.reduce((m, c) => Math.max(m, c.em + c.dur), 0);
   const master = doc.mixer?.master ?? {};
   const r = master.reverb ?? {};
+  const dl = master.delay ?? {};
+  const tempoDelay: TempoDelay = typeof dl.tempo === 'string' && dl.tempo in TEMPOS_DELAY ? dl.tempo : DELAY_PADRAO.tempo;
+  if (dl.tempo !== undefined && dl.tempo !== tempoDelay) avisos.push(`o tempo do delay "${String(dl.tempo)}" não existe; vai com ${tempoDelay} (${Object.keys(TEMPOS_DELAY).join(', ')})`);
+  const lim = master.limitador ?? {};
   const v = doc.video;
   return {
     musica: {
       bpm, compasso, seg_por_batida: spb, batidas_por_compasso: bpc, swing, semente: Math.trunc(numero(doc.semente, 1)),
       duracao_batidas, duracao_s: duracao_batidas * spb, canais, clipes, padroes, faixas,
       master: {volume_db: db(master.volume_db), reverb: {tamanho: limitar(numero(r.tamanho, REVERB_PADRAO.tamanho), 0, 1),
-        amortecimento: limitar(numero(r.amortecimento, REVERB_PADRAO.amortecimento), 0, 1), volume_db: db(r.volume_db)}},
+        amortecimento: limitar(numero(r.amortecimento, REVERB_PADRAO.amortecimento), 0, 1), volume_db: db(r.volume_db)},
+        delay: {tempo: tempoDelay, batidas: TEMPOS_DELAY[tempoDelay], realimentacao: limitar(numero(dl.realimentacao, DELAY_PADRAO.realimentacao), 0, 0.9),
+          brilho: limitar(numero(dl.brilho, DELAY_PADRAO.brilho), 0, 1), pingue_pongue: dl.pingue_pongue !== false, volume_db: db(dl.volume_db)},
+        limitador: {ativo: Boolean(lim.ativo), teto_db: limitar(numero(lim.teto_db, LIMITADOR_PADRAO.teto_db), -12, 0), soltura_ms: limitar(numero(lim.soltura_ms, LIMITADOR_PADRAO.soltura_ms), 10, 1000)}},
       ...(v && typeof v.documento === 'string' ? {video: {documento: v.documento, em_ms: Math.max(0, numero(v.em_ms, 0)), voz_guia: v.voz_guia !== false}} : {}),
     },
     avisos,

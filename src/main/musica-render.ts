@@ -2,7 +2,9 @@
 // o documento usa a 48 kHz (WAV direto; o resto pelo ffmpeg do Remotion), soma com src/nucleo/musica-som.ts (a mesma
 // conta da prévia da janela), grava midia/musica/<id>.<código>.wav, a medida ao lado (.json) e o envelope (o ducking e
 // a linha do tempo do vídeo já o veem sem medir de novo). O mesmo documento dá o mesmo código: o render se reaproveita.
-// Na abertura do projeto, apagarRendersSemUso tira os que nenhum vídeo nem o diário citam. Ver docs/musica.md.
+// Na abertura do projeto, apagarRendersSemUso tira os que nenhum vídeo nem o diário citam. Exportar (item 23) grava em
+// saidas/: a conta (alvo de loudness, stems) vem do worker da janela ou é feita aqui, e o ffmpeg só codifica M4A e Opus.
+// Ver docs/musica.md.
 import {mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import {envelopeDeAmostras, type Envelope} from '../nucleo/audio';
@@ -13,7 +15,11 @@ import {naTaxa, renderizarMusica, TAXA_MUSICA} from '../nucleo/musica-som';
 import {ehRenderDeMusica, medidaDoRender, renderDaMusica} from '../nucleo/musica-video';
 import {assinaturaDe, atualizarLigados, garantirMusicaForaDoGit, ligacoesDe, type MedidaMusica, type MedidaRender, type ServicoMusica} from '../nucleo/musica-projeto';
 import {serializar, type Projeto} from '../nucleo/projeto';
-import {decodificarAudio, gravarWav, lerWav} from './ffmpeg-som';
+import {decodificarAudio, gravarWav, lerWav, rodarFfmpeg} from './ffmpeg-som';
+import {medirArquivo} from './loudness';
+import {entregaEmBytes, type EntregaEmBytes} from '../nucleo/musica-entrega';
+import {musicaParaMidi} from '../nucleo/musica-midi';
+import type {PedidoExportarMusica, ResultadoExportarMusica} from '../nucleo/musica-projeto';
 import {gravarEnvelope} from './ipc-audio';
 
 const lerMusica = (p: Projeto, id: string) => {
@@ -104,6 +110,7 @@ export const servicoDeRender = (o: {binarios?: () => string | null | undefined; 
     }
     return {...alvo, novo: true, medida};
   },
+  exportar: (p, id, pedido) => exportarMusica(p, id, pedido, o),
   medir: async (p, id, opcoes = {}): Promise<MedidaMusica> => {
     const doc = lerMusica(p, id);
     const daJanela = o.janela ? await o.janela('musica:render', {doc, porFaixa: opcoes.porFaixa, sohMedir: true}, {tempo_ms: 120_000}) : null;
@@ -122,6 +129,57 @@ export const servicoDeRender = (o: {binarios?: () => string | null | undefined; 
     return {integrado_lufs: m.integrado_lufs, pico_dbtp: m.pico_dbtp, duracao_ms: Math.round(som.duracao_s * 1000), ...(faixas ? {faixas} : {}), avisos: som.avisos};
   },
 });
+
+/** Nome de arquivo a partir do título (sem os caracteres que o Windows recusa). */
+export const nomeDeSaida = (titulo: string) => titulo.replace(/[\\/:*?"<>|\x00-\x1f]+/g, '-').replace(/\s+/g, ' ').trim().replace(/[. ]+$/, '') || 'musica';
+
+/** Codificação de cada formato com perda: AAC no M4A (o mesmo codificador da exportação do vídeo) e Opus. */
+const CODIFICAR: Record<'m4a' | 'opus', string[]> = {m4a: ['-c:a', 'libfdk_aac', '-b:a', '256k', '-movflags', '+faststart', '-f', 'mp4'] /* o ffmpeg do Remotion não tem o ipod */, opus: ['-c:a', 'libopus', '-b:a', '192k']};
+
+/** A música em arquivo em saidas/ (item 23). */
+export const exportarMusica = async (p: Projeto, id: string, pedido: PedidoExportarMusica,
+  o: {binarios?: () => string | null | undefined; janela?: PedirAJanela} = {}): Promise<ResultadoExportarMusica> => {
+  const doc = lerMusica(p, id);
+  const titulo = nomeDeSaida(pedido.nome?.trim() || p.manifesto().documentos.find((d) => d.id === id)?.titulo || doc.titulo || id);
+  const base = `saidas/${titulo}`;
+  if (pedido.formato === 'mid') {
+    const r = musicaParaMidi(doc);
+    gravarBinario(p, `${base}.mid`, Buffer.from(r.bytes));
+    return {arquivos: [`${base}.mid`], avisos: r.avisos, feito_por: 'processo', trilhas: r.trilhas, notas: r.notas};
+  }
+  const folga_db = pedido.formato === 'wav' ? 0 : 0.5; // o codificador sobe um pouco o pico verdadeiro
+  const entregaPedido = {stems: pedido.stems, alvo_lufs: pedido.alvo_lufs, folga_db};
+  const daJanela = o.janela ? await o.janela('musica:exportar', {doc, pedido: entregaPedido}, {tempo_ms: 300_000}) : null;
+  const e: EntregaEmBytes = daJanela?.ok && daJanela.dados ? (daJanela.dados as EntregaEmBytes)
+    : entregaEmBytes(doc, await fontesDe(p, doc, o.binarios?.()), entregaPedido);
+  const buf = (b: Uint8Array) => Buffer.from(b.buffer, b.byteOffset, b.byteLength);
+  const arquivos: string[] = [];
+  const avisos = [...e.avisos];
+  let medidaArquivo: {arquivo_lufs?: number; arquivo_dbtp?: number} = {};
+  if (pedido.formato === 'wav') {
+    gravarBinario(p, `${base}.wav`, buf(e.mistura));
+    arquivos.push(`${base}.wav`);
+  } else {
+    const tmp = p.caminho(`${base}.${process.pid}.tmp.wav`);
+    gravarBinario(p, `${base}.${process.pid}.tmp.wav`, buf(e.mistura));
+    const destino = `${base}.${pedido.formato}`;
+    try {
+      await rodarFfmpeg(['-y', '-i', tmp, ...CODIFICAR[pedido.formato], p.caminho(destino)], {binarios: o.binarios?.()});
+    } finally {
+      rmSync(tmp, {force: true});
+    }
+    arquivos.push(destino);
+    const m = await medirArquivo(p.caminho(destino), {binarios: o.binarios?.()}).catch(() => null);
+    if (m) medidaArquivo = {arquivo_lufs: Math.round(m.i * 10) / 10, arquivo_dbtp: Math.round(m.tp * 10) / 10};
+  }
+  for (const s of e.stems ?? []) {
+    const rel = `${base} - stems/${nomeDeSaida(s.nome)}.wav`;
+    gravarBinario(p, rel, buf(s.wav));
+    arquivos.push(rel);
+  }
+  if (e.stems?.length) avisos.push('os stems saem em WAV, com o mesmo ganho da mistura e sem o limitador: somados, dão a mistura');
+  return {arquivos, avisos, feito_por: daJanela?.ok ? 'janela' : 'processo', duracao_s: Math.round(e.duracao_s * 1000) / 1000, medida: e.medida, ...medidaArquivo};
+};
 
 /** Renders em midia/musica/ que nenhum vídeo toca agora. O render se refaz pelo documento (o mesmo documento dá o mesmo
  *  nome), então o Ctrl+Z na música não precisa do arquivo de antes: guardar cada versão encheria a pasta a cada edição.

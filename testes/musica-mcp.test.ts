@@ -240,3 +240,68 @@ describe('música pelo MCP', () => {
     expect((await chamar('ler_musica', {documento: 'musica'})).dado.secoes[0]).toMatchObject({id: 's1', nome: 'Intro', onde: '1.1'});
   });
 });
+
+// ---------- marco 4: exportar, MIDI e encaixe no vídeo (itens 23, 25 e 26) ----------
+describe('música em arquivo, MIDI e encaixe pelo MCP', () => {
+  let id = '';
+  beforeAll(async () => {
+    const c = await chamar('criar_documento', {modulo: 'musica', titulo: 'Batida: entrega/final'});
+    id = c.dado.id;
+    await chamar('criar_padrao', {documento: id, canal: 'bateria', estilo: 'pop', no_arranjo: {em: 0, dur: 16}});
+    await chamar('criar_padrao', {documento: id, canal: 'baixo', instrumento: 'baixo', no_arranjo: {em: 0, dur: 16}});
+    await chamar('escrever_notas', {documento: id, padrao: 'p2', notas: [{nota: 36, em: 0, dur: 1}, {nota: 43, em: 2, dur: 1}]});
+  });
+
+  it('as classes: exportar e importar são cartão; encaixar é livre', () => {
+    expect(CLASSES_MUSICA).toMatchObject({exportar_musica: 'cartao', importar_midi: 'cartao', encaixar_no_video: 'livre'});
+  });
+
+  it('exporta WAV de 24 bits em −14 LUFS e os stems, com nome de arquivo limpo', async () => {
+    const r = await chamar('exportar_musica', {documento: id, formato: 'wav', stems: true});
+    expect(r.erro).toBe(false);
+    expect(r.dado.arquivos).toEqual(['saidas/Batida- entrega-final.wav', 'saidas/Batida- entrega-final - stems/Bateria.wav', 'saidas/Batida- entrega-final - stems/Baixo.wav']);
+    expect(Math.abs(r.dado.lufs + 14)).toBeLessThanOrEqual(0.3);
+    expect(r.dado.pico_dbtp).toBeLessThanOrEqual(-0.95);
+    for (const a of r.dado.arquivos) expect(existsSync(path.join(pasta, a))).toBe(true);
+    // fora do diário: exportar não mexe no documento
+    expect(projeto.diario().at(-1)?.rotulo).not.toMatch(/export/);
+  });
+
+  it('exporta M4A e Opus pelo ffmpeg e mede o arquivo codificado', async () => {
+    for (const formato of ['m4a', 'opus']) {
+      const r = await chamar('exportar_musica', {documento: id, formato, nome: `batida-${formato}`});
+      expect(r.erro, JSON.stringify(r.dado)).toBe(false);
+      expect(existsSync(path.join(pasta, 'saidas', `batida-${formato}.${formato}`))).toBe(true);
+      expect(Math.abs(r.dado.arquivo_lufs + 14)).toBeLessThanOrEqual(1);
+      expect(r.dado.arquivo_dbtp).toBeLessThanOrEqual(-0.5);
+      expect(existsSync(path.join(pasta, 'saidas', `batida-${formato}.${process.pid}.tmp.wav`))).toBe(false);
+    }
+  }, 60_000);
+
+  it('exporta MIDI e importa de volta numa música nova, com as mesmas notas', async () => {
+    const e = await chamar('exportar_musica', {documento: id, formato: 'mid', nome: 'batida'});
+    expect(e.dado).toMatchObject({arquivos: ['saidas/batida.mid'], trilhas: 2});
+    const nova = (await chamar('criar_documento', {modulo: 'musica', titulo: 'Do MIDI'})).dado.id;
+    const i = await chamar('importar_midi', {documento: nova, arquivo: 'saidas/batida.mid'});
+    expect(i.erro, JSON.stringify(i.dado)).toBe(false);
+    expect(i.dado.canais).toHaveLength(2);
+    const lida = (await chamar('ler_musica', {documento: nova})).dado;
+    expect(lida.canais.map((c: {tipo: string}) => c.tipo)).toEqual(['bateria', 'sintetizador']);
+    const notas = i.dado.canais.reduce((s: number, c: {notas: number}) => s + c.notas, 0);
+    expect(notas).toBe(e.dado.notas);
+    expect((await chamar('importar_midi', {documento: nova, arquivo: 'saidas/nada.mid'})).dado).toMatch(/não achei o arquivo/);
+  });
+
+  it('encaixa no vídeo: fecha na duração, seções nas cenas e viradas antes do corte', async () => {
+    await chamar('por_no_video', {musica: id, video: 'video', faixa: 'efeitos', em_ms: 0});
+    const r = await chamar('encaixar_no_video', {documento: id, modo: 'tudo', viradas: true});
+    expect(r.erro, JSON.stringify(r.dado)).toBe(false);
+    // o vídeo tem 8 s (3 + 5) e um corte em 3 s: 4 compassos a 120 BPM; o corte cai entre os compassos 2 e 3 (2 s e 4 s) e o
+    // empate vai para o de depois
+    expect(r.dado).toMatchObject({ok: true, compassos: 4, bpm: 120, secoes: 2, viradas: 1});
+    const lida = (await chamar('ler_musica', {documento: id})).dado;
+    expect(lida.duracao).toEqual({batidas: 16, compassos: 4, s: 8});
+    expect(lida.secoes.map((s: {nome: string; onde: string}) => [s.nome, s.onde])).toEqual([['Cena 1', '1.1'], ['Cena 2', '3.1']]);
+    expect(r.dado.avisos?.join(' ')).toMatch(/cortes longe do compasso/);
+  });
+});

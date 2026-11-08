@@ -7,6 +7,7 @@ import {rmSync, statSync} from 'node:fs';
 import type {DocCenas} from './cenas';
 import {ehDocCenas} from './cenas';
 import {ehDocMusica, type DocMusica} from './musica';
+import type {MedidaEntrega} from './musica-entrega';
 import {acharClipePorId, caminhoPorId, ehRenderDeMusica, medidaDoRender, patchAtualizarLigados, patchClipeNovo, patchLigarClipe, renderDaMusica} from './musica-video';
 import type {OperacaoPatch} from './documentos';
 import {ErroProjeto, serializar, type Projeto} from './projeto';
@@ -69,7 +70,14 @@ export type ServicoMusica = {
   renderizar: (p: Projeto, id: string) => Promise<{arquivo: string; duracao_ms: number; novo: boolean; medida: MedidaRender}>;
   /** LUFS e pico da mistura e, com porFaixa, de cada faixa do mixer. */
   medir: (p: Projeto, id: string, o?: {porFaixa?: boolean}) => Promise<MedidaMusica>;
+  /** A música em arquivo em saidas/ (item 23): WAV de 24 bits, M4A ou Opus no alvo de loudness, stems em WAV, ou MIDI. */
+  exportar?: (p: Projeto, id: string, pedido: PedidoExportarMusica) => Promise<ResultadoExportarMusica>;
 };
+export type FormatoMusica = 'wav' | 'm4a' | 'opus' | 'mid';
+export type PedidoExportarMusica = {formato: FormatoMusica; stems?: boolean; alvo_lufs?: number; nome?: string};
+/** `medida` é a da mistura no alvo (antes do codificador); `arquivo_lufs` e `arquivo_dbtp`, as do arquivo codificado. */
+export type ResultadoExportarMusica = {arquivos: string[]; avisos: string[]; feito_por: 'janela' | 'processo'; duracao_s?: number; medida?: MedidaEntrega;
+  arquivo_lufs?: number; arquivo_dbtp?: number; trilhas?: number; notas?: number};
 let servico: ServicoMusica | null = null;
 export const definirServicoMusica = (s: ServicoMusica | null) => {
   servico = s;
@@ -178,7 +186,7 @@ export const depoisDeMudarMusica = async (p: Projeto, idMusica: string) => {
 /** "Pôr no vídeo": um clipe novo ligado à música (na faixa dada ou na de música do vídeo), ou um clipe existente que
  *  passa a tocá-la (`substituir`). A tela e a ferramenta por_no_video usam esta mesma função. */
 export const porNoVideo = (p: Projeto, o: {musica: string; video?: string; faixa?: string; em_ms?: number; substituir?: string}, quem: {autor: string; origem: string}) => {
-  const doc = lerMusica(p, o.musica);
+  let doc = lerMusica(p, o.musica);
   const idMusica = p.manifesto().documentos.find((d) => d.id === o.musica || d.caminho === o.musica)!.id;
   const idVideo = o.video ?? doc.video?.documento ?? p.manifesto().documentos.find((d) => d.modulo === 'video')?.id;
   if (!idVideo) throw new ErroProjeto('o projeto não tem vídeo', 'nao_achado');
@@ -186,6 +194,15 @@ export const porNoVideo = (p: Projeto, o: {musica: string; video?: string; faixa
   const lido = p.lerJson<unknown>(relVideo);
   if (!ehDocCenas(lido.doc)) throw new ErroProjeto(`${idVideo} não é um vídeo de cenas`, 'patch');
   const v = lido.doc as DocCenas;
+  if (!doc.video) {
+    // a música sem vídeo passa a ser a trilha deste: a voz guia, os cortes e o encaixe (item 25) vêm dele. Antes do
+    // clipe, para o render já sair com o código da música ligada
+    const em_ms = o.substituir ? acharClipePorId(v, o.substituir)?.clipe?.em ?? 0 : o.em_ms ?? 0;
+    const relM = p.arquivoDoDocumento(idMusica);
+    p.aplicarPatch({documento: relM, versao_base: p.lerJson<unknown>(relM).versao, patch: [{op: 'add', path: '/video', value: {documento: idVideo, em_ms: Math.max(0, Math.round(em_ms)), voz_guia: true}}],
+      autor: quem.autor, origem: quem.origem, rotulo: `música ligada ao vídeo ${idVideo}`});
+    doc = lerMusica(p, idMusica);
+  }
   const render = renderDaMusica(idMusica, doc, assinaturaDe(p));
   let patch: OperacaoPatch[];
   let caminho: string;

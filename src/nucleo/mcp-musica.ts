@@ -3,7 +3,7 @@
 // OpenAI, modelos locais): esquema Zod sem z.any() nem união solta, descrição curta, resultado curto. Toda escrita passa
 // pelo diário e devolve {seq, documento, caminho}; depois de mudar uma música, os clipes do vídeo ligados a ela trocam
 // de render (musica-projeto.ts). A classe de cada ferramenta (para o portão de permissão da frente IA) fica em
-// CLASSES_MUSICA: "livre" grava no diário e tem Reverter.
+// CLASSES_MUSICA: "livre" grava no diário e tem Reverter; "cartao" exporta ou traz arquivo de fora do projeto.
 import type {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {z} from 'zod';
 import type {OperacaoPatch} from './documentos';
@@ -18,11 +18,17 @@ import {assinaturaDe, baseDoProjeto, depoisDeMudarMusica, ligacoesDe, porNoVideo
 import {cancelarTransicao, concluirTransicao, levarPara, transicaoEmCurso} from './transicoes';
 import {ErroProjeto, type Projeto} from './projeto';
 import {ESTILOS} from './musica-estilos';
+import {encaixarNoVideo, type ModoEncaixe} from './musica-encaixe';
+import {importarMidi} from './musica-midi';
+import {readFileSync} from 'node:fs';
+import path from 'node:path';
 
-/** Classe de cada ferramenta para o portão de permissão (frente IA): todas gravam no diário com Reverter ou só leem. */
+/** Classe de cada ferramenta para o portão de permissão (frente IA): "livre" grava no diário com Reverter ou só lê;
+ *  "cartao" grava fora do diário (exportar em saidas/) ou lê arquivo de fora do projeto (importar_midi). */
 export const CLASSES_MUSICA: Record<string, 'livre' | 'cartao'> = {
   ler_musica: 'livre', arranjar: 'livre', medir_musica: 'livre', por_no_video: 'livre', levar_para: 'livre', concluir_transicao: 'livre',
   cancelar_transicao: 'livre', trocar_kit: 'livre', escrever_notas: 'livre', criar_padrao: 'livre', aplicar_progressao: 'livre', gerar_notas: 'livre', editar_notas: 'livre',
+  encaixar_no_video: 'livre', exportar_musica: 'cartao', importar_midi: 'cartao',
 };
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x)}]});
@@ -301,6 +307,66 @@ export const registrarMusica = (servidor: McpServer, projeto: Projeto, autor: st
   }, seguro(async (a: PedidoGerar & {documento?: string}) => {
     const m = musicaDe(projeto, a.documento);
     return aplicarEdicao(m, gerarNotas(m.doc, a));
+  }));
+
+  // ---------- encaixe no vídeo (item 25) ----------
+  servidor.registerTool('encaixar_no_video', {
+    description: 'Ajusta a música ao vídeo dela. duracao: fecha no último quadro em compassos inteiros (BPM muda até 8%; com áudio, só apara ou estende). cortes: uma seção por cena, no compasso do corte. tudo: os dois. viradas: virada de bateria antes de cada corte e prato nele.',
+    inputSchema: {
+      documento: z.string().optional().describe('id da música'),
+      video: z.string().optional().describe('id do vídeo de cenas (padrão: o ligado à música)'),
+      modo: z.enum(['duracao', 'cortes', 'tudo']).optional().describe('padrão: tudo'),
+      viradas: z.boolean().optional(),
+    },
+  }, seguro(async (a: {documento?: string; video?: string; modo?: ModoEncaixe; viradas?: boolean}) => {
+    const m = musicaDe(projeto, a.documento);
+    const idVideo = a.video ?? m.doc.video?.documento ?? projeto.manifesto().documentos.find((d) => d.modulo === 'video')?.id;
+    if (!idVideo) throw new ErroProjeto('a música não está ligada a um vídeo: diga o "video" ou ponha com por_no_video', 'nao_achado');
+    const {doc: v} = projeto.lerJson<unknown>(projeto.arquivoDoDocumento(idVideo));
+    if (!ehDocCenas(v)) throw new ErroProjeto(`${idVideo} não é um vídeo de cenas`, 'patch');
+    return aplicarEdicao(m, encaixarNoVideo(m.doc, v as DocCenas, a));
+  }));
+
+  // ---------- exportar e importar (itens 23 e 26) ----------
+  servidor.registerTool('exportar_musica', {
+    description: 'Grava a música em saidas/: wav (24 bits), m4a ou opus no alvo de loudness (padrão −14 LUFS, até −1 dBTP), stems em WAV por faixa e retorno, ou mid (as notas, sem os áudios). Devolve os arquivos e a medida.',
+    inputSchema: {
+      documento: z.string().optional(),
+      formato: z.enum(['wav', 'm4a', 'opus', 'mid']),
+      stems: z.boolean().optional().describe('também um WAV por faixa do mixer'),
+      alvo_lufs: z.number().min(-30).max(-6).optional(),
+      nome: z.string().optional().describe('nome do arquivo sem extensão (padrão: o título)'),
+    },
+  }, seguro(async (a: {documento?: string; formato: 'wav' | 'm4a' | 'opus' | 'mid'; stems?: boolean; alvo_lufs?: number; nome?: string}) => {
+    const m = musicaDe(projeto, a.documento);
+    const s = servicoMusica();
+    if (!s?.exportar) throw new ErroProjeto('exportar precisa do render: abra o projeto no Estúdio ou use o MCP por stdio (mcp/nucleo.ts)', 'patch');
+    const r = await s.exportar(projeto, m.id, {formato: a.formato, stems: a.stems, alvo_lufs: a.alvo_lufs, nome: a.nome});
+    const md = r.medida;
+    return {ok: true, documento: m.id, arquivos: r.arquivos, ...(md ? {lufs: md.lufs, pico_dbtp: md.pico_dbtp, ganho_db: md.ganho_db, limitador_db: md.limitador_db} : {}),
+      ...(r.arquivo_lufs !== undefined ? {arquivo_lufs: r.arquivo_lufs, arquivo_dbtp: r.arquivo_dbtp} : {}), ...(r.notas !== undefined ? {trilhas: r.trilhas, notas: r.notas} : {}),
+      ...(r.avisos.length ? {avisos: r.avisos} : {})};
+  }));
+
+  servidor.registerTool('importar_midi', {
+    description: 'Lê um .mid (caminho no projeto ou no computador) e cria um canal por trilha (canal 10 = bateria; o resto, sintetizador pelo programa), com um padrão e um clipe em "em". Numa música sem clipes, o BPM e o compasso vêm do arquivo.',
+    inputSchema: {
+      arquivo: z.string().describe('ex.: midia/groove.mid'),
+      documento: z.string().optional(),
+      em: z.number().min(0).optional().describe('batida onde os clipes entram (padrão 0)'),
+      usar_bpm: z.boolean().optional().describe('trocar BPM e compasso pelos do arquivo'),
+      nome: z.string().optional().describe('prefixo do nome dos canais'),
+    },
+  }, seguro(async (a: {arquivo: string; documento?: string; em?: number; usar_bpm?: boolean; nome?: string}) => {
+    const m = musicaDe(projeto, a.documento);
+    const abs = path.isAbsolute(a.arquivo) ? a.arquivo : projeto.caminho(a.arquivo);
+    let bytes: Uint8Array;
+    try {
+      bytes = new Uint8Array(readFileSync(abs));
+    } catch {
+      throw new ErroProjeto(`não achei o arquivo: ${a.arquivo}`, 'nao_achado');
+    }
+    return aplicarEdicao(m, importarMidi(m.doc, bytes, {em: a.em, usar_bpm: a.usar_bpm, nome: a.nome}));
   }));
 };
 

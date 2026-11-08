@@ -45,8 +45,8 @@ describe('MCP estudio', () => {
   it('lista as ferramentas', async () => {
     const {tools} = await cliente.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
-      'anotar_fonte', 'aplicar_marca', 'aplicar_patch', 'aplicar_progressao', 'arranjar', 'cancelar_transicao', 'checar_texto', 'concluir_transicao', 'criar_documento', 'criar_padrao', 'editar_legenda', 'editar_notas',
-      'escrever_notas', 'estado_do_editor', 'exportar_legendas', 'gerar_notas', 'importar_legendas', 'ler_comentario', 'ler_documento', 'ler_fonte', 'ler_legendas', 'ler_musica', 'levar_para',
+      'anotar_fonte', 'aplicar_marca', 'aplicar_patch', 'aplicar_progressao', 'arranjar', 'cancelar_transicao', 'checar_texto', 'concluir_transicao', 'criar_documento', 'criar_padrao', 'editar_legenda', 'editar_notas', 'encaixar_no_video',
+      'escrever_notas', 'estado_do_editor', 'exportar_legendas', 'exportar_musica', 'gerar_notas', 'importar_legendas', 'importar_midi', 'ler_comentario', 'ler_documento', 'ler_fonte', 'ler_legendas', 'ler_musica', 'levar_para',
       'listar_comentarios', 'listar_mudancas', 'listar_pesquisa', 'medir_musica', 'por_no_video', 'projeto_info', 'registrar_fato', 'remover_fundo', 'renomear_projeto',
       'resolver_comentario', 'responder_comentario', 'texto_da_fonte', 'transcrever', 'trocar_kit',
     ]);
