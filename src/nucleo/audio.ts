@@ -446,3 +446,63 @@ export const etiquetasDeAudio = (audio: AudioP | undefined) => {
   const pico = picoDeClipesSimultaneos(audio) + 1; // uma de folga para a troca de clipe no mesmo quadro
   return pico <= ETIQUETAS_AUDIO_MIN ? ETIQUETAS_AUDIO_MIN : pico <= 24 ? 24 : ETIQUETAS_AUDIO_MAX;
 };
+
+// ---------- envelope em pedaços (som-D8) ----------
+type EstadoBiquad = {x1: number; x2: number; y1: number; y2: number};
+const passoBiquad = (f: Biquad, s: EstadoBiquad, x0: number) => {
+  const y0 = f.b0 * x0 + f.b1 * s.x1 + f.b2 * s.x2 - f.a1 * s.y1 - f.a2 * s.y2;
+  s.x2 = s.x1;
+  s.x1 = x0;
+  s.y2 = s.y1;
+  s.y1 = y0;
+  return y0;
+};
+
+/** O mesmo envelope de `envelopeDeAmostras`, mas alimentado aos pedaços: um arquivo de uma hora não precisa estar inteiro na
+ *  memória (som-D8: a interface decodificava tudo, mais de 3 GB, para medir). Guarda só o estado dos filtros e a energia de cada
+ *  janela de 50 ms. A conta é a mesma (ponderação K em Float32 entre as duas etapas), então o resultado é igual ao de uma vez só. */
+export class ConstrutorDeEnvelope {
+  private readonly prateleira: Biquad;
+  private readonly altas: Biquad;
+  private readonly estados: {a: EstadoBiquad; b: EstadoBiquad}[];
+  private readonly porJanela: number;
+  private soma: number[] = [];
+  private n = 0;
+
+  constructor(private readonly taxa: number, canais: number, private readonly janela_ms = JANELA_MS) {
+    [this.prateleira, this.altas] = coeficientesK(taxa);
+    this.estados = Array.from({length: Math.max(1, canais)}, () => ({a: {x1: 0, x2: 0, y1: 0, y2: 0}, b: {x1: 0, x2: 0, y1: 0, y2: 0}}));
+    this.porJanela = Math.max(1, Math.round((taxa * janela_ms) / 1000));
+  }
+
+  /** Um pedaço: um vetor por canal, todos do mesmo tamanho. */
+  alimentar(canais: Float32Array[]) {
+    const len = canais[0]?.length ?? 0;
+    for (let c = 0; c < this.estados.length; c++) {
+      const x = canais[c];
+      if (!x) continue;
+      const e = this.estados[c];
+      for (let i = 0; i < len; i++) {
+        const k = Math.fround(passoBiquad(this.altas, e.b, Math.fround(passoBiquad(this.prateleira, e.a, x[i]))));
+        const j = Math.floor((this.n + i) / this.porJanela);
+        this.soma[j] = (this.soma[j] ?? 0) + k * k;
+      }
+    }
+    this.n += len;
+  }
+
+  get amostras() {
+    return this.n;
+  }
+
+  resultado(): Envelope {
+    const janelas = Math.ceil(this.n / this.porJanela);
+    const db = new Array<number>(janelas);
+    for (let j = 0; j < janelas; j++) {
+      const amostras = Math.min(this.porJanela, this.n - j * this.porJanela);
+      const potencia = (this.soma[j] ?? 0) / Math.max(1, amostras);
+      db[j] = potencia > 0 ? Math.max(SILENCIO_DB, Math.round((-0.691 + 10 * Math.log10(potencia)) * 10) / 10) : SILENCIO_DB;
+    }
+    return {versao: VERSAO_ENVELOPE, janela_ms: this.janela_ms, duracao_ms: Math.round((this.n / this.taxa) * 1000), db};
+  }
+}

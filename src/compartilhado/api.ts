@@ -74,6 +74,7 @@ export const CANAL = {
   audioLimpezaCancelar: 'estudio:audio-limpeza-cancelar',
   audioLimpezaProgresso: 'estudio:audio-limpeza-progresso',
   audioMedirLoudness: 'estudio:audio-medir-loudness',
+  audioMedirEnvelope: 'estudio:audio-medir-envelope', // frente Som (rodada 3): arquivo grande medido no processo principal, em pedaços
   audioSalvarTomada: 'estudio:audio-salvar-tomada', // frente Som (rodada 3): a narração gravada na interface
   marcasListar: 'estudio:marcas-listar',
   marcasGravar: 'estudio:marcas-gravar',
@@ -245,6 +246,8 @@ export type ApiEstudio = {
     aoProgressoLimpeza: (cb: (p: {arquivo: string; progresso: number}) => void) => () => void;
     /** Loudness da mistura, da narração e de cada faixa do vídeo, como o render vai soar (BS.1770). */
     medirLoudness: (documento: string) => Promise<MedidasLoudness | {erro: string}>;
+    /** Mede o envelope de um arquivo grande no processo principal, sem decodificá-lo inteiro, e o grava ao lado (carimbado); devolve-o. */
+    medirEnvelope: (arquivo: string) => Promise<Envelope>;
     /** Grava a tomada que a interface capturou (WAV PCM 48 kHz) em midia/; devolve o caminho no projeto. */
     salvarTomada: (wav: ArrayBuffer) => Promise<string>;
   };

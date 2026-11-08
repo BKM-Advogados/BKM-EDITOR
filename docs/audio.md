@@ -320,12 +320,56 @@ seno de 0,5 a 300 Hz sai a −9,7 dB. **Não medido:** o microfone de verdade, a
 teleprompter na tela (o Electron não roda neste PC; a prévia web não tem microfone). Se o Windows bloquear o microfone, a
 mensagem manda para Configurações › Privacidade › Microfone.
 
+## Correções de som da rodada 3 (D5, D6, D8, D10, D11, D12, N8)
+
+- **som-D5, carrossel narrado da Cliente:** `igualarLoudness` agora também acerta o MP4 do `CarrosselTema` (narração em `props.audio`) para
+  −14 LUFS e −1 dBTP, o alvo padrão da casa. Medido num MP4 só de áudio com um tom baixo: **−29,9 → −14,1 LUFS, pico −10,2 dBTP**.
+  **Não feito:** os efeitos do carrossel continuam com os volumes fixos de `roteiro/resolver.ts` (pensados para uma narração perto de
+  −20 LUFS); como o ganho é um só para o arquivo, a diferença entre narração e efeitos fica a de antes, e numa narração gravada
+  muito baixa os efeitos saem relativamente mais altos. Escalar `sons[].vol` pelo nível da narração pede medi-la antes do render
+  (a pasta pública fica no pacote da exportação), o que toca `exportar.ts` (frente Vídeo).
+- **som-D6, ducking:** a música começa a cair `ataque_ms` antes de a voz entrar (olha à frente só para o começo; a soltura não
+  antecipa). Medido: na janela da primeira sílaba o ganho já está a −26,0 dB, o alvo da redução.
+- **som-D8, arquivo longo:** acima de 48 MB a interface não baixa nem decodifica o arquivo: o canal `audio:medir-envelope` mede no
+  processo principal, em pedaços (`decodificarEmPedacos` lê o WAV de 24 bits do ffmpeg no pipe e `ConstrutorDeEnvelope` soma as
+  janelas), e grava o envelope carimbado. O resultado é **igual** ao de uma vez só (testado com pedaços de 1 a 100 000 amostras).
+  **Medido** com 10 min de WAV estéreo de 48 kHz: pico de memória do processo **94 MB em pedaços contra 845 MB inteiro**
+  (decodificar inteiro cresce com a duração: uma hora passa de 5 GB; em pedaços fica nos mesmos ~100 MB). **Não feito:** a
+  limpeza de voz e o medidor de loudness da mistura ainda decodificam o arquivo do clipe inteiro; uma live de uma hora usada para
+  tirar um corte ainda pesa nesses dois (o corte só mede o trecho, mas decodifica tudo).
+- **som-D10, prévia:** `numberOfSharedAudioTags` do Player acompanha o pico de clipes juntos (`etiquetasDeAudio`: 12, 24 ou 48),
+  e não mais 12 fixo.
+- **som-D11:** `ler_documento` do vídeo de cenas traz `som` (nível e ducking medidos de cada clipe) e `avisos` do resolvedor.
+- **som-D12:** a mesma trilha da biblioteca não vira uma cópia nova em `midia/` a cada uso (os mesmos bytes reaproveitam a cópia).
+- **som-N8:** o canal do envelope grava pelo `gravarEnvelope` (carimba a data).
+
+## Músicas livres com curadoria (rodada 3)
+
+`src/nucleo/biblioteca-musicas.ts`: cada faixa tem uma **ficha** ao lado do arquivo (`<arquivo>.ficha.json`: `id`, `titulo`, `autor`,
+`url_pagina` em que a licença foi conferida, `licenca`, `url_licenca`, `conferido_em`, `atribuicao` e, opcionais, `sha256`,
+`duracao_s`, `humor`, `genero`, `risco_content_id`). Só entra a faixa **CC0, domínio público (PDM) ou CC BY 3.0/4.0**; a ficha
+com licença NC (não comercial), ND (sem derivações), SA (compartilha igual) ou que o validador não reconhece é **recusada com o
+motivo**: aparece na lista como "licença recusada", não pode ser escolhida e `escolher_trilha` se nega a usá-la. CC BY exige a
+`atribuicao`. A faixa sem ficha (o arquivo que a pessoa pôs na pasta de trilhas) continua valendo, e a licença é dela. Ao escolher,
+a ficha é copiada para `midia/` junto com a trilha, e `creditos_das_musicas` junta os créditos que o vídeo precisa pôr na descrição.
+
+| ferramenta | o que faz | classe |
+|---|---|---|
+| `listar_trilhas` | as trilhas da pasta (licença, autor, humor, duração; "sem ficha" ou "recusada") | livre |
+| `escolher_trilha` | copia para `midia/` (uma vez só) e põe o clipe na música ou nos efeitos, com a ficha | **cartão** (traz arquivo de fora do projeto) |
+| `creditos_das_musicas` | os créditos CC BY das músicas do vídeo, prontos para a descrição, e as sem ficha | livre |
+
+**Lista proposta:** `docs/musicas-livres.md` (e `.json`) traz 30 faixas com a licença conferida na página em 08/11/2026 (21 CC BY 4.0
+e 9 CC0; Scott Buckley, Audionautix, Lee Rosevere, HoliznaCC0, Open Goldberg Variations e Chopin pelo Musopen). **Nenhuma foi
+baixada**: a escolha é do responsável. Depois do ok, baixar só as escolhidas para a pasta de trilhas, gravar a ficha ao lado com o
+`sha256` e conferir. O validador roda o arquivo da proposta inteiro nos testes.
+
 ## Pasta de trilhas
 
 Preferência `pasta_trilhas` (padrão `%USERPROFILE%\Estudio\trilhas`). "Música da biblioteca…" lista os mp3, wav,
 m4a, ogg e aac dela (até dois níveis de subpasta), com filtro, "Abrir" no Explorador e "Trocar pasta…". Escolher uma
-trilha copia para `midia/` e cria o clipe na faixa de música. A curadoria de músicas livres com licença conferida fica
-para depois: por ora a pasta é da pessoa.
+trilha copia para `midia/` (uma vez só) e cria o clipe na faixa de música. A curadoria de músicas livres com licença conferida
+está na seção acima; a pasta continua sendo da pessoa.
 
 ## Onde está
 
@@ -337,7 +381,8 @@ para depois: por ora a pasta é da pessoa.
   `src/nucleo/mcp-som.ts`: as ferramentas MCP do som (`registrarSom`, uma linha em `ferramentas-mcp.ts`).
 - `src/composicoes/cenas/VideoCenas.tsx`: `<Som>` com um `<Html5Audio>` por clipe.
 - `src/nucleo/loudness.ts`: medidor BS.1770 aos pedaços e `medirMistura`. `src/nucleo/limpeza-voz.ts`: a limpeza.
-- `src/main/ipc-audio.ts`: grava o envelope com o carimbo (`gravarEnvelope`), lista a pasta de trilhas, importa trilha;
+- `src/main/ipc-audio.ts`: grava o envelope com o carimbo (`gravarEnvelope`), mede arquivo grande em pedaços (`medirEnvelopeDoArquivo`);
+  `src/nucleo/pasta-trilhas.ts` lista a pasta de trilhas com as fichas e importa a trilha; `src/nucleo/biblioteca-musicas.ts` valida a ficha;
   `lerEnvelopes` para as props (só o envelope em dia).
 - `src/main/ffmpeg-som.ts`: acha e roda o ffmpeg do Remotion, decodifica para amostras, lê e grava WAV.
 - `src/main/limpeza-voz.ts` (IPC `audio:limpar-voz`, `audio:limpeza-cancelar`, evento `audio:limpeza-progresso`; as

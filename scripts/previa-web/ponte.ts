@@ -317,7 +317,13 @@ const api: ApiEstudio = {
       };
     },
     medirLoudness: (documento) => medirNaPrevia(documento),
-    // frente Som (rodada 3): a tomada gravada vira um blob que o clipe toca, como o arquivo em midia/ no app
+    // frente Som (rodada 3): na prévia web não há arquivo grande de verdade; o envelope do blob já está medido
+    medirEnvelope: async (arquivo) => {
+      const e = envelopes[arquivo];
+      if (!e) throw new Error('a prévia web mede pela própria janela');
+      return e;
+    },
+    // a tomada gravada vira um blob que o clipe toca, como o arquivo em midia/ no app
     salvarTomada: async (wav) => {
       const url = URL.createObjectURL(new Blob([wav], {type: 'audio/wav'}));
       audios.set(url, {url, nome: 'narração gravada.wav'});

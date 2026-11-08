@@ -5,10 +5,11 @@
 // envelope de outra versão da conta, conta como não medido, e a linha do tempo mede de novo.
 import {statSync, type Stats} from 'node:fs';
 import {CANAL, type Preferencias} from '../compartilhado/api';
-import {conferirEnvelope, ehEnvelope, type Envelope} from '../nucleo/audio';
+import {conferirEnvelope, ConstrutorDeEnvelope, ehEnvelope, type Envelope} from '../nucleo/audio';
 import type {DocCenas} from '../nucleo/cenas';
 import {EXTENSOES_AUDIO, importarTrilha, listarTrilhas, sha256DoArquivo} from '../nucleo/pasta-trilhas';
 import {ErroProjeto, type Projeto} from '../nucleo/projeto';
+import {decodificarEmPedacos, type Parar} from './ffmpeg-som';
 
 export const arquivoDoEnvelope = (arquivo: string) => `${arquivo}.envelope.json`;
 
@@ -61,6 +62,23 @@ export const gravarEnvelope = (p: Projeto, arquivo: string, envelope: Envelope, 
   return rel;
 };
 
+/** Mede o envelope de um arquivo de áudio do projeto no processo principal, em pedaços (o ffmpeg decodifica e o construtor soma as
+ *  janelas): a memória fica nos poucos MB de um pedaço, qualquer que seja a duração (som-D8). Grava ao lado, carimbado, e devolve. */
+export const medirEnvelopeDoArquivo = async (p: Projeto, arquivo: string, o: Parar & {binarios?: string | null} = {}): Promise<Envelope> => {
+  if (typeof arquivo !== 'string' || !p.existe(arquivo)) throw new ErroProjeto(`o arquivo de áudio não está no projeto: ${String(arquivo)}`, 'nao_achado');
+  const tamanho = statSync(p.caminho(arquivo)).size;
+  let construtor: ConstrutorDeEnvelope | null = null;
+  await decodificarEmPedacos(p.caminho(arquivo), (canais, taxa) => {
+    construtor ??= new ConstrutorDeEnvelope(taxa, canais.length);
+    construtor.alimentar(canais);
+  }, o);
+  if (!construtor) throw new ErroProjeto(`${arquivo} não tem som para medir`);
+  const env = (construtor as ConstrutorDeEnvelope).resultado();
+  // o tamanho de antes da medida: se o arquivo mudou no meio, o gravarEnvelope recusa
+  gravarEnvelope(p, arquivo, {...env, fonte: {tamanho}});
+  return lerEnvelope(p, arquivo) ?? env;
+};
+
 /** Envelopes de todos os clipes do documento, por arquivo (o resolvedor recebe isto em `opcoes.envelopes`). */
 export const lerEnvelopes = (p: Projeto, doc: DocCenas): Record<string, Envelope | undefined> => {
   const out: Record<string, Envelope | undefined> = {};
@@ -84,6 +102,7 @@ export const registrarIpcAudio = (lidar: Lidar, projeto: () => Projeto, prefs: (
     // no meio da medida. Sem a data, todo envelope da tela caía em 'conferir' e cada sessão lia o áudio inteiro para o sha256.
     return gravarEnvelope(p, arquivo, envelope);
   });
+  lidar(CANAL.audioMedirEnvelope, (arquivo: string) => medirEnvelopeDoArquivo(projeto(), arquivo));
   lidar(CANAL.audioListarTrilhas, () => ({pasta: prefs().pasta_trilhas, trilhas: listarTrilhas(prefs().pasta_trilhas)}));
   lidar(CANAL.audioImportarTrilha, (caminho: string) => importarTrilha(projeto(), prefs().pasta_trilhas, caminho));
 };

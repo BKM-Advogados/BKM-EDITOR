@@ -1,10 +1,15 @@
 // Medidor de loudness (BS.1770-4): casos da EBU Tech 3341, pico verdadeiro, pedaços, curto prazo, a mistura do vídeo
 // como o render a faz (quadros, volume, mono em estéreo, faixa muda, arquivo que falta), o alvo no documento e a
 // leitura do que o loudnorm do ffmpeg escreve.
+import {execFileSync} from 'node:child_process';
+import {existsSync, mkdtempSync, rmSync, writeFileSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
 import {describe, expect, it} from 'vitest';
 import {coeficientesK, resolverAudio, type AudioCenas} from '../src/nucleo/audio';
+import {codificarWavPcm} from '../src/nucleo/gravacao';
 import {curtoPrazoEm, Medidor, medirAmostras, medirMistura, type FonteAudio} from '../src/nucleo/loudness';
-import {lerLoudnorm} from '../src/main/loudness';
+import {igualarLoudness, lerLoudnorm, medirArquivo} from '../src/main/loudness';
 
 const seno = (hz: number, segundos: number, taxa: number, amplitude: number, fase = 0) => {
   const out = new Float32Array(Math.round(segundos * taxa));
@@ -207,4 +212,31 @@ describe('leitura do loudnorm', () => {
     expect(lerLoudnorm(saida('-inf', '-inf'))).toBeNull();
     expect(lerLoudnorm('Output file is empty, nothing was encoded')).toBeNull();
   });
+});
+
+describe('loudness do carrossel narrado da Cliente (som-D5)', () => {
+  const FFMPEG = path.join('node_modules', '@remotion', `compositor-${process.platform}-${process.arch}${process.platform === 'win32' ? '-msvc' : ''}`, process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
+  it.skipIf(!existsSync(FFMPEG))('o MP4 do carrossel com narração a −26 LUFS sai em −14 LUFS e pico até −1 dBTP; sem narração, nada muda', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'estudio-d5-'));
+    try {
+      const mp4 = path.join(dir, 'carrossel.mp4');
+      // 6 s de um tom a 300 Hz baixo (perto de −26 LUFS) em AAC, num MP4 só de áudio: o ffmpeg do Remotion não traz filtros nem demuxers de teste
+      // para fabricar vídeo, e a correção copia o vídeo que houver (`-map 0:v?`), então o som é o que ela mede e regrava
+      writeFileSync(path.join(dir, 'tom.wav'), codificarWavPcm([seno(300, 6, 48000, 0.05)], 48000, 16));
+      execFileSync(FFMPEG, ['-y', '-i', path.join(dir, 'tom.wav'), '-c:a', 'libfdk_aac', '-b:a', '192k', '-f', 'mp4', mp4], {stdio: 'pipe'});
+      const antes = await medirArquivo(mp4);
+      expect(antes!.i).toBeLessThan(-22); // narração baixa: sairia assim
+      const r = await igualarLoudness({arquivo: mp4, props: {composicao: 'CarrosselTema', audio: 'narracao.wav'}});
+      expect(r).not.toBeNull();
+      const depois = await medirArquivo(mp4);
+      console.info('[medida] carrossel: antes', antes!.i.toFixed(1), 'LUFS → depois', depois!.i.toFixed(1), 'LUFS, pico', depois!.tp.toFixed(1), 'dBTP');
+      expect(Math.abs(depois!.i - -14)).toBeLessThanOrEqual(0.6);
+      expect(depois!.tp).toBeLessThanOrEqual(-0.9);
+      // sem narração em props.audio, o carrossel não é tocado; e outra composição sem som também não
+      expect(await igualarLoudness({arquivo: mp4, props: {composicao: 'CarrosselTema'}})).toBeNull();
+      expect(await igualarLoudness({arquivo: mp4, props: {composicao: 'Outra', audio: 'x.wav'}})).toBeNull();
+    } finally {
+      rmSync(dir, {recursive: true, force: true});
+    }
+  }, 120_000);
 });
