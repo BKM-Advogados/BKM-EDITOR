@@ -5,13 +5,12 @@ import {useSyncExternalStore} from 'react';
 import {loadFont as Archivo} from '@remotion/google-fonts/Archivo';
 import {loadFont as IBMPlexMono} from '@remotion/google-fonts/IBMPlexMono';
 import {loadFont as IBMPlexSans} from '@remotion/google-fonts/IBMPlexSans';
-import type {CamadaImagem, DocImagem, PaginaImagem} from '../../../nucleo/documentos';
+import type {CamadaImagem, DocImagem, MarcaDoDocumento, PaginaImagem} from '../../../nucleo/documentos';
 import {baseCamadas, idLivre, indiceNaBase, paginaDoCaminho, paginasDe, slug} from '../../../nucleo/carrossel';
-import {fonte} from '../../../composicoes/fontes';
+import {fonte, listarFontes} from '../../../composicoes/fontes';
 import {loja, useLoja, type Estado} from '../../estado/loja';
 
 export const ENTRELINHA = 1.15;
-export const FONTES = ['Archivo', 'IBM Plex Sans', 'IBM Plex Mono', 'system-ui'];
 const GENERICAS = new Set(['system-ui', 'sans-serif', 'serif', 'monospace']);
 
 export const PADRAO = {fonte: 'system-ui', tamanho: 48, peso: 400, cor: '#FFFFFF', alinhar: 'esquerda', preenchimento: '#808080', raio: 0, ajuste: 'cobrir'} as const;
@@ -110,6 +109,23 @@ export const idNovo = (base: string, camadas: CamadaImagem[]) => idLivre(camadas
 // document.fonts.ready não enxerga esse download. Chamar o loadFont com as mesmas opções reaproveita o mesmo cache.
 type Carregador = (estilo: 'normal', opcoes: {subsets: string[]; ignoreTooManyRequestsWarning: boolean}) => {waitUntilDone: () => Promise<void>};
 const CARREGADORES: Record<string, Carregador> = {Archivo, IBMPlexMono, IBMPlexSans} as unknown as Record<string, Carregador>;
+
+/** As fontes do seletor da imagem: primeiro as do kit da peça ("@titulo" e as outras, que seguem o kit), depois as de
+ *  arquivo (do kit e do projeto), as do Google que o app tem e a do sistema. A fonte que a camada já usa entra mesmo que
+ *  não seja de nenhuma lista, para o seletor nunca ficar em branco. */
+export const opcoesDeFonte = (marca: MarcaDoDocumento | undefined, atual?: string): [string, string][] => {
+  const lista: [string, string][] = [];
+  if (marca) {
+    lista.push(['@titulo', `Título do kit · ${marca.fontes.titulo}`], ['@texto', `Texto do kit · ${marca.fontes.texto}`], ['@mono', `Mono do kit · ${marca.fontes.mono ?? marca.fontes.texto}`]);
+  }
+  const doKit = new Set(marca ? [marca.fontes.titulo, marca.fontes.texto, marca.fontes.mono ?? marca.fontes.texto] : []);
+  const todas = listarFontes();
+  const ordenadas = [...todas.filter((f) => doKit.has(f.nome)), ...todas.filter((f) => !doKit.has(f.nome))];
+  for (const f of ordenadas) lista.push([f.nome, `${f.nome}${f.origem === 'arquivo' ? ' · arquivo' : ''}${doKit.has(f.nome) ? ' · do kit' : ''}`]);
+  lista.push(['system-ui', 'Fonte do sistema']);
+  if (atual && !lista.some(([v]) => v === atual)) lista.push([atual, atual]);
+  return lista;
+};
 
 export const familiaCss = (nome?: string) => {
   const n = nome || PADRAO.fonte;

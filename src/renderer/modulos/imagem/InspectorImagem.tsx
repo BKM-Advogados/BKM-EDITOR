@@ -13,7 +13,7 @@ import {resolverFonte} from '../../../nucleo/cor-marca';
 import {aplicar, avisar, loja, patchTrocar, trocar, useLoja} from '../../estado/loja';
 import {CabecalhoInspector, CampoCor, CampoDeslizante, CampoLeitura, CampoNumero, CampoSelecao, CampoTexto, Secao, copiar} from '../../componentes/Campos';
 import {IconeEfeitos} from '../../componentes/Icones';
-import {FONTES, PADRAO, caminhoNoProjeto, definirPrevia, docValido, indiceDe, rotuloCamada, usarDocumentoImagem, usarPaginaAtiva, type PaginaAtiva} from './comum';
+import {PADRAO, caminhoNoProjeto, definirPrevia, docValido, indiceDe, opcoesDeFonte, rotuloCamada, usarDocumentoImagem, usarPaginaAtiva, type PaginaAtiva} from './comum';
 import {renomearPagina} from './acoes';
 import {SecaoFundoDegrade, SecoesAcabamento, usarKitDaImagem} from './Acabamento';
 import {removerFundoDaCamada, voltarAoOriginal} from './removerFundo';
@@ -75,7 +75,7 @@ const InspectorCamada: React.FC<{documento: string; caminho: string; c: CamadaIm
         {c.tipo === 'texto' && (
           <Secao titulo="Texto" chave="imagem:texto">
             <CampoTexto rotulo="Texto" valor={c.texto ?? ''} multilinha dica="Enter quebra a linha; grava ao sair do campo ou com Ctrl+Enter" aoMudar={gravar('texto')} />
-            <CampoSelecao rotulo="Fonte" valor={c.fonte ?? PADRAO.fonte} opcoes={FONTES.map((f) => [f, f] as [string, string])} aoMudar={gravar('fonte')} />
+            <CampoSelecao rotulo="Fonte" valor={c.fonte ?? PADRAO.fonte} opcoes={opcoesDeFonte(doc.marca, c.fonte ?? PADRAO.fonte)} aoMudar={gravar('fonte')} />
             <CampoSelecao rotulo="Peso" valor={String(c.peso ?? PADRAO.peso)} opcoes={PESOS} aoMudar={(v) => gravar('peso')(Number(v))} />
             <CampoNumero rotulo="Tamanho" valor={c.tamanho ?? PADRAO.tamanho} unidade="px" padrao={PADRAO.tamanho} aoRedefinir={() => gravar('tamanho')(undefined)} aoMudar={positivo('tamanho')} />
             <CampoCor rotulo="Cor" valor={c.cor ?? PADRAO.cor} contra={doc.fundo} aoVer={ver('cor')} aoMudar={gravar('cor')} />
