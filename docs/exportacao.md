@@ -133,7 +133,8 @@ Conferido: `testes/numero.test.ts`, `testes/corte-limpo.test.ts`, `testes/carros
   7680; fora disso o campo fica marcado e o Exportar espera; ao sair do campo, prende à faixa. Digitar 1920 não passa por 16 e 7680.
 - **Trecho** (video-D11): as pontas a menos de 50 ms do começo e do fim encostam neles (47,4 s num vídeo de 47,383 s é o vídeo
   inteiro). **Props tardias** (video-D18): se o vídeo termina de montar depois de o diálogo abrir, ele assume o formato, o destino e
-  a duração do vídeo, se a pessoa ainda não mexeu em nada.
+  a duração do vídeo, se a pessoa ainda não mexeu em nada; se já escolheu destinos, eles ficam e só o fim do trecho (ainda 0 s) passa à
+  duração. A regra é `ajusteDasPropsTardias`, em `src/nucleo/exportacao.ts`.
 - **Prévia por destino** (video-D4): linha "Prévia" com uma miniatura por destino marcado, no tamanho dele. Os blocos que a composição
   desenhou e se sobrepõem naquele quadro (a medida é a do DOM, no quadro em que a cabeça parou) ficam destacados e listados antes do
   render; bloco ainda invisível no quadro não conta.

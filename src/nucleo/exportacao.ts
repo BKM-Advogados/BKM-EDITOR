@@ -82,6 +82,15 @@ export const destinoDoFormato = (f: {largura: number; altura: number}): Destino 
   return p ? {id: p.id, largura: p.largura, altura: p.altura} : {id: 'personalizado', largura: f.largura, altura: f.altura};
 };
 
+/** O que o diálogo de exportar muda quando as props do vídeo chegam depois de ele abrir (video-D18). Até lá o formato é o padrão
+ *  (1080×1920) e a duração é 0; quando chegam, o diálogo assume o formato e a duração do vídeo. Se a pessoa já mexeu nos destinos, eles
+ *  ficam como ela deixou e só o fim do trecho (ainda 0 s) passa à duração, se ela não ligou o trecho; se já ligou, nada muda. */
+export type AjusteTardio = {destino: Destino; personalizado: {largura: number; altura: number}; ate_ms: number} | {ate_ms: number} | null;
+export const ajusteDasPropsTardias = (o: {mexeu: boolean; trechoLigado: boolean; formato: {largura: number; altura: number}; duracaoMs: number}): AjusteTardio => {
+  if (!o.mexeu) return {destino: destinoDoFormato(o.formato), personalizado: {largura: o.formato.largura, altura: o.formato.altura}, ate_ms: o.duracaoMs};
+  return o.trechoLigado ? null : {ate_ms: o.duracaoMs};
+};
+
 /** Sufixo do arquivo por destino: "-9x16" nos presets; no personalizado, a medida ("-1000x500"). */
 export const sufixoDestino = (d: {largura: number; altura: number}) =>
   FORMATOS_VIDEO.some((f) => f.largura === d.largura && f.altura === d.altura) ? `-${proporcaoDe(d.largura, d.altura).replace(':', 'x')}` : `-${d.largura}x${d.altura}`;

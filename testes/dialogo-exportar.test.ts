@@ -1,7 +1,7 @@
 // Rodada 3, frente C: ajudantes do diálogo de exportar (video-D5 tamanho personalizado, video-D11 trecho nascendo inválido e
 // video-D4 blocos que se sobrepõem num destino).
 import {describe, expect, it} from 'vitest';
-import {encostarTrecho, fecharMedidaPersonalizada, lerMedidaPersonalizada, LIMITE_PERSONALIZADO, sobreposicoes, trechoValido} from '../src/nucleo/exportacao';
+import {ajusteDasPropsTardias, encostarTrecho, fecharMedidaPersonalizada, lerMedidaPersonalizada, LIMITE_PERSONALIZADO, sobreposicoes, trechoValido} from '../src/nucleo/exportacao';
 
 describe('tamanho personalizado (video-D5)', () => {
   it('digitar 1920 passa por 1, 19 e 192 sem virar 16 nem 7680', () => {
@@ -66,5 +66,30 @@ describe('blocos que se sobrepõem num destino (video-D4)', () => {
   it('vários pares e caixa vazia', () => {
     const caixas = [caixa('a', 0, 0, 1, 0.4), caixa('b', 0, 0.2, 1, 0.4), caixa('c', 0, 0.3, 1, 0.4), caixa('v', 0.5, 0.5, 0, 0)];
     expect(sobreposicoes(caixas)).toEqual([['a', 'b'], ['a', 'c'], ['b', 'c']]);
+  });
+});
+
+describe('props do vídeo que chegam depois de o diálogo abrir (video-D18)', () => {
+  const youtube = {largura: 1920, altura: 1080};
+
+  it('sem a pessoa ter mexido, o diálogo assume o formato, o destino e a duração do vídeo', () => {
+    // até as props chegarem o formato é o padrão (1080×1920, 0 s); o vídeo de verdade é 16:9 de 4 s
+    expect(ajusteDasPropsTardias({mexeu: false, trechoLigado: false, formato: youtube, duracaoMs: 4000}))
+      .toEqual({destino: {id: 'youtube', largura: 1920, altura: 1080}, personalizado: youtube, ate_ms: 4000});
+  });
+
+  it('um formato fora da lista vira o destino personalizado, com a medida do vídeo', () => {
+    const r = ajusteDasPropsTardias({mexeu: false, trechoLigado: false, formato: {largura: 1000, altura: 500}, duracaoMs: 2500});
+    expect(r).toMatchObject({destino: {id: 'personalizado', largura: 1000, altura: 500}, personalizado: {largura: 1000, altura: 500}, ate_ms: 2500});
+  });
+
+  it('se a pessoa já escolheu destinos, eles não são trocados; só o fim do trecho, que ainda é 0 s, passa à duração', () => {
+    const r = ajusteDasPropsTardias({mexeu: true, trechoLigado: false, formato: youtube, duracaoMs: 4000});
+    expect(r).toEqual({ate_ms: 4000});
+    expect(r).not.toHaveProperty('destino');
+  });
+
+  it('se a pessoa já ligou o trecho e escreveu o fim, nada muda', () => {
+    expect(ajusteDasPropsTardias({mexeu: true, trechoLigado: true, formato: youtube, duracaoMs: 4000})).toBeNull();
   });
 });

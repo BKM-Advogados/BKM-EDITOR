@@ -15,7 +15,7 @@ import {CONTRASTE_MINIMO, placaParaMarca, type AvaliacaoContraste, type CorDaPla
 import type {DocImagem} from '../../nucleo/documentos';
 import {paginasDe, temPaginas} from '../../nucleo/carrossel';
 import {
-  CANTOS_MARCA, CODECS, configPadraoMarca, destinoDoFormato, ESCALAS_IMAGEM, ESCALAS_VIDEO, estimarExportacao, fontesDaMarcaDagua, formatarBytes, FORMATOS_IMAGEM_SAIDA,
+  ajusteDasPropsTardias, CANTOS_MARCA, CODECS, configPadraoMarca, destinoDoFormato, ESCALAS_IMAGEM, ESCALAS_VIDEO, estimarExportacao, fontesDaMarcaDagua, formatarBytes, FORMATOS_IMAGEM_SAIDA,
   encostarTrecho, fecharMedidaPersonalizada, legendasDasProps, legendasNoDestino, lerMedidaPersonalizada, marcaDaguaDoDestino, nomesDosArquivos, sobreposicoes, normalizarConfigMarca, OPACIDADE_MARCA, QUALIDADES, TAMANHO_MARCA, trechoValido,
   type CodecVideo, type ConfigMarcaDagua, type Destino, type FontesMarcaDagua, type FormatoImagem, type MarcaDaguaP, type OpcoesExportarVideo, type QualidadeVideo,
 } from '../../nucleo/exportacao';
@@ -320,13 +320,16 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
   // chegam, o diálogo assume o formato e a duração do vídeo, se a pessoa ainda não mexeu em nada
   const prontas = Boolean(props);
   useEffect(() => {
-    if (!prontas || mexeu.current) return;
-    const d = destinoDoFormato(formato);
-    setDestinos([d]);
-    setEditando(d.id);
-    setPersonalizado({largura: formato.largura, altura: formato.altura});
-    setTextoPers({largura: String(formato.largura), altura: String(formato.altura)});
-    setAte(numeroBr(duracaoMs / 1000, 1));
+    if (!prontas) return;
+    const ajuste = ajusteDasPropsTardias({mexeu: mexeu.current, trechoLigado, formato, duracaoMs});
+    if (!ajuste) return;
+    if ('destino' in ajuste) {
+      setDestinos([ajuste.destino]);
+      setEditando(ajuste.destino.id);
+      setPersonalizado(ajuste.personalizado);
+      setTextoPers({largura: String(ajuste.personalizado.largura), altura: String(ajuste.personalizado.altura)});
+    }
+    setAte(numeroBr(ajuste.ate_ms / 1000, 1));
   }, [prontas]); // eslint-disable-line react-hooks/exhaustive-deps
   const [nome, setNome] = useState(titulo);
   const [fase, setFase] = useState<FaseVideo>({tipo: 'opcoes'});
