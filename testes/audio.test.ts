@@ -1,6 +1,6 @@
 // Som do vídeo de cenas: envelope com ponderação K, ducking medido, resolução das faixas (fades, limites, avisos) e o
 // IPC de áudio (envelope ao lado do arquivo, biblioteca de trilhas).
-import {mkdirSync, mkdtempSync, rmSync, statSync, utimesSync, writeFileSync} from 'node:fs';
+import {mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {afterAll, describe, expect, it} from 'vitest';
@@ -11,7 +11,8 @@ import {
 import {novoDocCenas, resolverCenas, type DocCenas} from '../src/nucleo/cenas';
 import {gravarPlano, planoDoProjeto} from '../src/nucleo/criar-projeto';
 import {Projeto} from '../src/nucleo/projeto';
-import {arquivoDoEnvelope, gravarEnvelope, importarTrilha, lerEnvelope, lerEnvelopes, listarTrilhas, sha256DoArquivo} from '../src/main/ipc-audio';
+import {arquivoDoEnvelope, gravarEnvelope, importarTrilha, lerEnvelope, lerEnvelopes, listarTrilhas, registrarIpcAudio, sha256DoArquivo} from '../src/main/ipc-audio';
+import {CANAL} from '../src/compartilhado/api';
 
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'estudio-audio-'));
 afterAll(() => rmSync(tmp, {recursive: true, force: true}));
@@ -258,6 +259,29 @@ describe('ipc de áudio', () => {
     expect(() => gravarEnvelope(p, 'midia/narracao.wav', {...envelope(30000, -20), fonte: {tamanho: 9, sha256: gravado!.fonte!.sha256}})).toThrow(/mudou enquanto era medido/);
     gravarEnvelope(p, 'midia/narracao.wav', {...envelope(40000, -20), fonte: {tamanho: 25, sha256: sha256DoArquivo(abs)}});
     expect(lerEnvelope(p, 'midia/narracao.wav')?.duracao_ms).toBe(40000);
+  });
+
+  it('som-N8: o canal que a tela usa grava pelo gravarEnvelope: carimba a data e recusa o arquivo que mudou no meio da medida', () => {
+    const raiz = gravarPlano(path.join(tmp, 'proj-ipc'), planoDoProjeto({nome: 'IPC', modelo: 'video-branco'}));
+    const p = new Projeto(raiz);
+    const abs = path.join(raiz, 'midia', 'voz.wav');
+    writeFileSync(abs, 'tomada do ipc');
+    const canais = new Map<string, (...a: any[]) => unknown>();
+    registrarIpcAudio((canal, f) => void canais.set(canal, f as (...a: any[]) => unknown), () => p, () => ({pasta_trilhas: path.join(tmp, 'trilhas-ipc')} as never));
+    const gravar = canais.get(CANAL.audioGravarEnvelope)!;
+    // a tela manda o que mediu: tamanho e sha256 dos bytes (como medirArquivo, no envelope.ts)
+    gravar('midia/voz.wav', {...envelope(1000, -20), fonte: {tamanho: 13, sha256: sha256DoArquivo(abs)}});
+    const gravado = JSON.parse(readFileSync(path.join(raiz, 'midia', 'voz.wav.envelope.json'), 'utf-8'));
+    expect(gravado.fonte).toEqual({tamanho: 13, modificado_ms: statSync(abs).mtimeMs, sha256: sha256DoArquivo(abs)}); // a data entra
+    // com a data, a próxima sessão confere sem ler o áudio: em_dia, sem sha256
+    expect(conferirEnvelope(gravado, {tamanho: 13, modificado_ms: statSync(abs).mtimeMs})).toBe('em_dia');
+    // a tomada foi regravada enquanto a tela media: recusa, e o envelope de antes não é trocado
+    writeFileSync(abs, 'outra tomada, maior');
+    expect(() => gravar('midia/voz.wav', {...envelope(1000, -10), fonte: {tamanho: 13, sha256: gravado.fonte.sha256}})).toThrow(/mudou enquanto era medido/);
+    expect(JSON.parse(readFileSync(path.join(raiz, 'midia', 'voz.wav.envelope.json'), 'utf-8')).db[0]).toBe(-20);
+    // envelope inválido e arquivo que não existe continuam recusados
+    expect(() => gravar('midia/voz.wav', {versao: 2})).toThrow(/inválido/);
+    expect(() => gravar('midia/nada.wav', envelope(1000, -20))).toThrow(/não está no projeto/);
   });
 
   it('confere o envelope pelo carimbo: tamanho, depois data, depois o sha256', () => {

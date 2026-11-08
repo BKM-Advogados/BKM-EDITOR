@@ -149,8 +149,9 @@ export const registrarIpcAudio = (lidar: Lidar, projeto: () => Projeto, prefs: (
     const p = projeto();
     if (typeof arquivo !== 'string' || !p.existe(arquivo)) throw new ErroProjeto(`o arquivo de áudio não está no projeto: ${String(arquivo)}`, 'nao_achado');
     if (!ehEnvelope(envelope) || envelope.db.length > 2_000_000 || !envelope.db.every((v) => typeof v === 'number' && Number.isFinite(v))) throw new ErroProjeto('envelope inválido');
-    p.gravarTexto(arquivoDoEnvelope(arquivo), `${JSON.stringify(envelope)}\n`);
-    return arquivoDoEnvelope(arquivo);
+    // som-N8: pelo gravarEnvelope, como a limpeza: carimba tamanho, data e sha256 do arquivo como está e recusa se ele mudou
+    // no meio da medida. Sem a data, todo envelope da tela caía em 'conferir' e cada sessão lia o áudio inteiro para o sha256.
+    return gravarEnvelope(p, arquivo, envelope);
   });
   lidar(CANAL.audioListarTrilhas, () => ({pasta: prefs().pasta_trilhas, trilhas: listarTrilhas(prefs().pasta_trilhas)}));
   lidar(CANAL.audioImportarTrilha, (caminho: string) => importarTrilha(projeto(), prefs().pasta_trilhas, caminho));
