@@ -10,7 +10,7 @@ import {novoDocCenas, resolverCenas, type DocCenas} from '../src/nucleo/cenas';
 import {
   areaDaLegenda, capacidadeDaLegenda, comTexto, CPS_MAX, cpsDe, fracaNoFim, legendasAoDividirClipe, legendasAoDuplicarClipe, legendasDaFala, legendasDeOutraTomada, legendasDoDocumento, lerLegendas,
   legendasNoDestino, limitesDoArrasto, linhasDaLegenda, MAX_SEGMENTO_MS, mesmaTomada, MIN_SEGMENTO_MS, nomeLivreDaLegenda, PAUSA_QUEBRA_MS, quebrarEmLinhas, quebrarEmSegmentos, resolverLegendas,
-  palavrasDe, realinharPalavras, substituirEmLote, textoDeLegenda, type LegendasCenas,
+  palavrasDe, palavrasDuvidosas, palavrasValidas, realinharPalavras, substituirEmLote, textoDeLegenda, type LegendasCenas,
 } from '../src/nucleo/legendas';
 import {avancosDaFonte, LETRAS_MEDIDAS, medidorDaFonte} from '../src/nucleo/medida-texto';
 
@@ -372,5 +372,22 @@ describe('trocar uma palavra por duas reparte só o tempo dela (fala-D5)', () =>
     expect(r[1].s).toBe(120);
     expect(r[2].e).toBe(700);
     expect(tempos(r.slice(3))).toEqual(['cai@750-950', 'na@960-1050', 'conta@1060-1500']);
+  });
+});
+
+describe('confiança do whisper na lista: palavra abaixo de 0,6 vai para "confira"', () => {
+  it('a certeza vem do palavras.json até a legenda resolvida; corrigida, sai da lista', () => {
+    const lidas = palavrasValidas({versao: 2, fonte: {tamanho: 1}, palavras: [{w: 'Recebeu', s: 0, e: 300, p: 0.95}, {w: 'propósito', s: 300, e: 700, p: 0.41},
+      {w: 'de', s: 700, e: 800, p: 0.9}, {w: 'mudar.', s: 800, e: 1200, p: 0.88}]});
+    expect(lidas[1].p).toBe(0.41);
+    const leg = legendasDaFala([{clipe: {id: 'n1', arquivo: 'a.wav', em: 0, duracao_ms: 5000}, faixa: {}, palavras: lidas, caminhoPalavras: 'x'}], {largura: 1080, altura: 1920});
+    const s = leg.segmentos[0];
+    expect(palavrasDuvidosas(s.palavras)).toEqual(['propósito']);
+    const tela = resolverLegendas(leg, {largura: 1080, altura: 1920, tema: TEMA, duracao_ms: 5000})!;
+    expect(palavrasDuvidosas(tela.segmentos[0].palavras)).toEqual(['propósito']);
+    // a pessoa corrigiu: a palavra trocada perde o p, e a lista não pede mais para conferir
+    expect(palavrasDuvidosas(comTexto(s, 'Recebeu proposta de mudar.').palavras)).toEqual([]);
+    // "25 %" juntado fica com a menor certeza dos pedaços
+    expect(quebrarEmSegmentos([{w: '25', s: 0, e: 200, p: 0.9}, {w: '%', s: 200, e: 300, p: 0.5}], {max_caracteres: 42})[0].palavras).toEqual([{w: '25%', s: 0, e: 300, p: 0.5}]);
   });
 });

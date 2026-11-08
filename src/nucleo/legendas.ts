@@ -11,7 +11,11 @@ import {medidorDaFonte, type Medir} from './medida-texto';
 
 // ---------- formato no documento ----------
 
-export type PalavraLegenda = {w: string; s: number; e: number}; // ms na linha do tempo do vídeo
+export type PalavraLegenda = {w: string; s: number; e: number; p?: number}; // ms na linha do tempo do vídeo; p: a certeza do whisper (0 a 1)
+/** Abaixo disto a palavra vai para "confira" na lista e em `duvidosas` no ler_legendas. */
+export const P_DUVIDA = 0.6;
+/** As palavras em que o whisper teve pouca certeza (p abaixo de 0,6); a palavra corrigida à mão não entra. */
+export const palavrasDuvidosas = (ps: PalavraLegenda[] | undefined) => (Array.isArray(ps) ? ps : []).filter((p) => typeof p.p === 'number' && p.p < P_DUVIDA).map((p) => p.w);
 export type SegmentoLegenda = {
   id: string;
   em: number; // ms na linha do tempo do vídeo
@@ -219,9 +223,10 @@ export const juntarPedacos = (palavras: PalavraLegenda[]): PalavraLegenda[] => {
     if (u && (w === '%' || /^[.,;:!?…]+$/.test(w) || (w.startsWith('-') && w.length > 1))) {
       u.w += w;
       u.e = Math.max(u.e, p.e);
+      if (typeof p.p === 'number') u.p = Math.min(u.p ?? 1, p.p);
       continue;
     }
-    out.push({w, s: p.s, e: Math.max(p.s, p.e)});
+    out.push({w, s: p.s, e: Math.max(p.s, p.e), ...(typeof p.p === 'number' ? {p: p.p} : {})});
   }
   return out;
 };
@@ -323,7 +328,8 @@ export const palavrasDoClipe = (palavras: PalavraLegenda[], clipe: ClipeFala): P
   const corte = clipe.corte_ms ?? 0;
   const fim = corte + clipe.duracao_ms;
   return palavras.filter((p) => palavraNoTrecho(p, corte, fim))
-    .map((p) => ({w: p.w, s: Math.round(clipe.em + Math.max(p.s, corte) - corte), e: Math.round(clipe.em + Math.min(p.e, fim) - corte)}));
+    .map((p) => ({w: p.w, s: Math.round(clipe.em + Math.max(p.s, corte) - corte), e: Math.round(clipe.em + Math.min(p.e, fim) - corte),
+      ...(typeof p.p === 'number' ? {p: p.p} : {})}));
 };
 
 /** O nome que a pessoa deu ao clipe, se deu: nome de arquivo ("narracao.wav", ou o do próprio clipe sem a extensão) não
@@ -462,7 +468,7 @@ export const clipesDeVoz = (doc: {audio?: AudioCenas}, filtro: {clipe?: string; 
  *  for palavra fica de fora. */
 export const palavrasValidas = (x: unknown): PalavraLegenda[] =>
   (Array.isArray(x) ? x : Array.isArray((x as {palavras?: unknown} | null)?.palavras) ? (x as {palavras: unknown[]}).palavras : []).filter((p): p is PalavraLegenda => Boolean(p) && typeof p.w === 'string' && Number.isFinite(p.s) && Number.isFinite(p.e))
-    .map((p) => ({w: p.w, s: p.s, e: p.e}));
+    .map((p) => ({w: p.w, s: p.s, e: p.e, ...(typeof p.p === 'number' && Number.isFinite(p.p) ? {p: p.p} : {})}));
 
 /** As palavras que a pessoa corrigiu nas legendas de um clipe, passadas para a transcrição (ms do arquivo): a palavra da
  *  legenda que está no tempo de uma palavra transcrita (até 40 ms no começo e no fim) e tem outro texto. Só entre legendas

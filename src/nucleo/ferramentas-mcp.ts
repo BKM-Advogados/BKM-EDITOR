@@ -14,7 +14,7 @@ import {FORMATOS_IMAGEM, FORMATOS_VIDEO, formatoDoVideo} from './formatos';
 import {MARCAS_INICIAIS} from './marca';
 import {PastaMarcas} from './pasta-marcas';
 import {ehDocCenas, resolverCenas, type DocCenas} from './cenas';
-import {arquivoDaFala, arquivoDasPalavras, clipesDeVoz, comTexto, CPS_MAX, cpsDe, deslocamentoDaLegenda, legendasDeArquivo, legendasDeOutraTomada, limitesDoArrasto, nomeLivreDaLegenda, textoDeLegenda, recusaDoDestinoNoProjeto, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt, type EstadoDaFala, type IdEstiloLegenda} from './legendas';
+import {arquivoDaFala, arquivoDasPalavras, clipesDeVoz, comTexto, CPS_MAX, cpsDe, deslocamentoDaLegenda, legendasDeArquivo, legendasDeOutraTomada, limitesDoArrasto, nomeLivreDaLegenda, palavrasDuvidosas, textoDeLegenda, type PalavraLegenda, recusaDoDestinoNoProjeto, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt, type EstadoDaFala, type IdEstiloLegenda} from './legendas';
 import {CATALOGO_FONTES} from './catalogo-fontes';
 import {
   acharTrecho, caminhoTextoFonte, conferirDigitos, decodificarComAviso, entorno, estadoDoFato, hashTexto, limparHtml, nivelDe, numerosDe, paginar, proximoId,
@@ -624,11 +624,12 @@ const registrarFala = (servidor: McpServer, projeto: Projeto, autor: string, ori
   // de voz andou depois (origens); ler e corrigir por aqui evita o Claude escrever o tempo da tela no campo guardado
   const naTela = (doc: DocCenas) => resolverCenas(doc).props.legendas_cenas?.segmentos ?? [];
   // cps: caracteres por segundo; acima de 17 a legenda é rápida para ler (a régua da casa)
-  const resumo = (s: {id: string; em: number; sai: number; texto: string; falante?: string}) => ({id: s.id, em: s.em, sai: s.sai, texto: s.texto, cps: cpsDe(s),
-    ...(s.falante ? {falante: s.falante} : {})});
+  // duvidosas: as palavras em que o whisper teve pouca certeza (p < 0,6), para conferir
+  const resumo = (s: {id: string; em: number; sai: number; texto: string; falante?: string; palavras?: PalavraLegenda[]}) => ({id: s.id, em: s.em, sai: s.sai,
+    texto: s.texto, cps: cpsDe(s), ...(s.falante ? {falante: s.falante} : {}), ...(palavrasDuvidosas(s.palavras).length ? {duvidosas: palavrasDuvidosas(s.palavras)} : {})});
 
   servidor.registerTool('ler_legendas', {
-    description: 'As legendas do vídeo de cenas como aparecem na tela: id, em e sai em ms do vídeo (já com o clipe de voz no lugar em que está agora), texto, falante e cps (caracteres por segundo; acima de 17 é rápida para ler). "de" e "ate" (ms) pegam só as de um trecho. Para corrigir, use editar_legenda com esses tempos.',
+    description: 'As legendas do vídeo de cenas como aparecem na tela: id, em e sai em ms do vídeo (já com o clipe de voz no lugar em que está agora), texto, falante, cps (caracteres por segundo; acima de 17 é rápida para ler) e duvidosas (palavras em que o whisper teve pouca certeza: confira). "de" e "ate" (ms) pegam só as de um trecho. Para corrigir, use editar_legenda com esses tempos.',
     inputSchema: {documento: z.string().optional(), de: z.number().optional().describe('ms do vídeo'), ate: z.number().optional().describe('ms do vídeo')},
   }, seguro(({documento, de, ate}: {documento?: string; de?: number; ate?: number}) => {
     const {alvo, doc} = docCenasDe(projeto, documento);

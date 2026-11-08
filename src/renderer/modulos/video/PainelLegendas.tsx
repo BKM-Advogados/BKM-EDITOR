@@ -9,7 +9,7 @@ import type {EstadoTranscricao} from '../../../compartilhado/api';
 import {TEMA_NEUTRO, type DocCenas, type PropsCenas} from '../../../nucleo/cenas';
 import {formatoDoVideo} from '../../../nucleo/formatos';
 import {
-  arquivoDaFala, arquivoDasPalavras, clipesDeVoz, CPS_MAX, cpsDe, legendasDeOutraTomada, localizar, POSICOES_LEGENDA, PREDEFINICOES_LEGENDA, resolverEstilo, segmentosEm, type EstiloLegenda, type IdEstiloLegenda, type PosicaoLegenda,
+  arquivoDaFala, arquivoDasPalavras, clipesDeVoz, CPS_MAX, cpsDe, P_DUVIDA, palavrasDuvidosas, legendasDeOutraTomada, localizar, POSICOES_LEGENDA, PREDEFINICOES_LEGENDA, resolverEstilo, segmentosEm, type EstiloLegenda, type IdEstiloLegenda, type PosicaoLegenda,
   type EstadoDaFala, type PalavraLegenda, type SegmentoLegenda,
 } from '../../../nucleo/legendas';
 import type {CorteFala} from '../../../nucleo/cortes-fala';
@@ -74,6 +74,11 @@ const ItemLegenda: React.FC<{documento: string; s: SegmentoLegenda; em: number; 
             }
           }} />
         {s.falante && <span className="falante">{s.falante}</span>}
+        {palavrasDuvidosas(s.palavras).length > 0 && (
+          <span className="duvida" title={`O whisper teve pouca certeza nestas palavras (p < ${String(P_DUVIDA).replace('.', ',')}): ouça e corrija se for o caso`}>
+            confira: {palavrasDuvidosas(s.palavras).join(', ')}
+          </span>
+        )}
         {cpsDe({texto: s.texto, em, sai}) > CPS_MAX && (
           <span className="rapida" title={`Rápida para ler: ${String(cpsDe({texto: s.texto, em, sai})).replace('.', ',')} caracteres por segundo (a régua é até ${CPS_MAX}). Estique o fim, divida ou encurte o texto.`}>
             {String(cpsDe({texto: s.texto, em, sai})).replace('.', ',')} car/s

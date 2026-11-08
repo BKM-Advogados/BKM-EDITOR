@@ -45,6 +45,7 @@
 .painel-legendas .item-legenda .tempo { font: 11px/1.4 var(--fonte-mono); color: var(--texto-3); background: none; border: 0; padding: 2px 0; cursor: pointer; text-align: left;
   white-space: nowrap; }
 .painel-legendas .item-legenda .tempo:hover { color: var(--acento); }
+.painel-legendas .item-legenda .duvida { grid-column: 2; font-size: 10px; color: var(--aviso, #ffa057); }
 .painel-legendas .item-legenda .rapida { grid-column: 2; font-size: 10px; color: var(--aviso, #ffa057); }
 .painel-legendas .item-legenda .falante { grid-column: 2; font-size: 10px; color: var(--texto-3); text-transform: uppercase; letter-spacing: 0.04em; }
 .painel-legendas .item-legenda textarea { grid-column: 2; grid-row: 1; width: 100%; min-height: 22px; resize: vertical; background: var(--fundo-1); color: var(--texto);
