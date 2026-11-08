@@ -131,6 +131,9 @@ const Pilha: React.FC = () => {
                       setArrastando(null);
                     }}>
                     <div className="efeito-linha" tabIndex={0} onClick={abrir} onKeyDown={(ev) => {
+                      // a tecla vinda de um botão da linha (fx, subir, excluir…) é do botão: sem isto, Enter ligava o efeito e abria o
+                      // acordeão, e D em outro botão também ligava (tres-efeitos-D14)
+                      if (ev.target !== ev.currentTarget) return;
                       if (ev.altKey && ev.key === 'ArrowUp') {
                         ev.preventDefault();
                         mover(i, i - 1);
@@ -164,7 +167,7 @@ const Pilha: React.FC = () => {
                             <button className="bt mini" title="Grava no documento o valor que a tela está usando" onClick={() => corrigir(i, e)}><Wrench size={12} />Corrigir</button>
                           </div>
                         )}
-                        <CampoDeslizante rotulo="Valor" valor={e.valor} min={d.min} max={d.max} passo={d.passo} unidade={d.unidade} padrao={d.padrao} aoVer={(v) => previa(i, v)}
+                        <CampoDeslizante rotulo="Valor" valor={e.valor} min={d.min} max={d.max} passo={d.passo} unidade={d.unidade} padrao={d.padrao} aoVer={(v) => previa(i, v)} aoFimSemMudar={() => loja.definir({previaEfeitos: undefined})}
                           aoMudar={(v) => void trocar(alvo, `/efeitos/${i}/valor`, v, `${d.nome}: ${v}`).then(() => loja.definir({previaEfeitos: undefined}))} />
                         {e.tipo === 'tom' && <CampoCor rotulo="Cor" valor={e.cor ?? '#C88155'} padrao="#C88155" aoMudar={(c) => void trocar(alvo, `/efeitos/${i}/cor`, c, `cor do ${e.id}`)} />}
                       </div>
@@ -196,9 +199,13 @@ const InspectorEfeito: React.FC = () => {
     const p = e.alvoEfeitos ? e.props[e.alvoEfeitos] : undefined;
     return p && 'props' in p ? p.props.duracao_ms : undefined;
   });
+  const medidaVideo = useLoja((e) => {
+    const p = e.alvoEfeitos ? e.props[e.alvoEfeitos] : undefined;
+    return p && 'props' in p ? `${Number(p.props.largura) || 1080} × ${Number(p.props.altura) || 1920}` : '1080 × 1920';
+  });
   if (!alvo) return <div className="vazio">sem alvo</div>;
   const ligados = efeitos.filter((e) => e.ativo !== false).length;
-  const sub = modulo === 'video' ? `Vídeo 1080 × 1920${duracao ? ` · ${Math.round(duracao / 1000)} s` : ''}` : `Imagem ${doc?.largura ?? '?'} × ${doc?.altura ?? '?'}`;
+  const sub = modulo === 'video' ? `Vídeo ${medidaVideo}${duracao ? ` · ${Math.round(duracao / 1000)} s` : ''}` : `Imagem ${doc?.largura ?? '?'} × ${doc?.altura ?? '?'}`;
   const semEfeitos = () => loja.definir({previaEfeitos: {documento: alvo, efeitos: efeitos.map((x) => ({...x, ativo: false}))}});
   const comEfeitos = () => loja.definir({previaEfeitos: undefined});
   return (

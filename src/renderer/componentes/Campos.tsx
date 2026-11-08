@@ -83,7 +83,8 @@ export const CampoNumero: React.FC<{rotulo: string; valor: number | undefined; a
 };
 
 export const CampoDeslizante: React.FC<{rotulo: string; valor: number; min: number; max: number; passo: number; unidade?: string; aoMudar: (v: number) => void;
-  aoVer?: (v: number) => void; formatar?: (v: number) => string; padrao?: number}> = ({rotulo, valor, min, max, passo, unidade, aoMudar, aoVer, formatar, padrao}) => {
+  aoVer?: (v: number) => void; formatar?: (v: number) => string; padrao?: number;
+  aoFimSemMudar?: () => void}> = ({rotulo, valor, min, max, passo, unidade, aoMudar, aoVer, formatar, padrao, aoFimSemMudar}) => {
   const [v, setV] = useState(valor);
   useEffect(() => setV(valor), [valor]);
   return (
@@ -95,7 +96,8 @@ export const CampoDeslizante: React.FC<{rotulo: string; valor: number; min: numb
             setV(Number(e.target.value));
             aoVer?.(Number(e.target.value));
           }}
-          onPointerUp={() => v !== valor && aoMudar(v)} onKeyUp={() => v !== valor && aoMudar(v)} />
+          // soltar no mesmo valor de antes não grava nada, mas a prévia de `aoVer` tem de acabar (tres-efeitos-D3)
+          onPointerUp={() => (v !== valor ? aoMudar(v) : aoFimSemMudar?.())} onKeyUp={() => (v !== valor ? aoMudar(v) : aoFimSemMudar?.())} />
         <span className="v">{formatar ? formatar(v) : `${numeroBr(v, 2)}${unidade ?? ''}`}</span>
       </div>
     </LinhaCampo>
