@@ -254,7 +254,7 @@ export type ApiEstudio = {
     importarLogo: (id: string) => Promise<MarcaInfo | null>;
     importarFonte: (id: string) => Promise<MarcaInfo | null>;
     /** Copia logo e fontes para o projeto e troca o tema do documento (vai para o diário). */
-    aplicar: (id: string, documento: string) => Promise<{versao: string; marca: string; nome: string; copiados: string[]}>;
+    aplicar: (id: string, documento: string) => Promise<{versao: string; marca: string; nome: string; copiados: string[]; atualizados: string[]}>;
     fontesDoProjeto: () => Promise<FonteArquivo[]>;
   };
   /** Carrossel: PNG por página em saidas/<nome>/01.png… e, com `pdf`, saidas/<nome>.pdf (uma página por imagem, sem margem). */

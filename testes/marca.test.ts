@@ -8,7 +8,7 @@ import {afterAll, describe, expect, it} from 'vitest';
 import {novoDocCenas, TEMA_NEUTRO, type DocCenas} from '../src/nucleo/cenas';
 import {aplicarMarcaAoPlano, claudeMd, gravarPlano, novoDocImagem, planoDoProjeto} from '../src/nucleo/criar-projeto';
 import type {DocImagem} from '../src/nucleo/documentos';
-import {idDeMarca, inferirFonte, MARCA_CLIENTE, MARCA_NEUTRO, marcaDoDocumento, normalizarMarca, patchDaMarca, temaDaMarca} from '../src/nucleo/marca';
+import {idDeMarca, inferirFonte, MARCA_CLIENTE, MARCA_NEUTRO, marcaDoDocumento, marcaDoKit, normalizarMarca, patchDaMarca, temaDaMarca} from '../src/nucleo/marca';
 import {fontesDoProjeto, PastaMarcas} from '../src/nucleo/pasta-marcas';
 import {Projeto} from '../src/nucleo/projeto';
 import {fonte, listarFontes, registrarFontesDeArquivo} from '../src/composicoes/fontes';
@@ -112,7 +112,7 @@ describe('kit de marca', () => {
     expect(() => marcas.aplicar(p, 'cliente', 'nao-existe', quem)).toThrow(/não achado/);
   });
 
-  it('não aplica em cena 3D e, na imagem, troca fundo, fonte por peso e cor dos textos', () => {
+  it('não aplica em cena 3D e, na imagem, troca o fundo, a fonte (por peso, sem fonte) e a cor dos textos e guarda o kit', () => {
     expect(patchDaMarca({formato: 1, fundo: '#000', camera: {}, luzes: [], objetos: []}, MARCA_CLIENTE)).toEqual([]);
     const img: DocImagem = {...novoDocImagem(1080, 1350), camadas: [
       {id: 'f', nome: 'Faixa', tipo: 'forma', x: 0, y: 0, largura: 10, altura: 10, preenchimento: '#123456'},
@@ -122,7 +122,8 @@ describe('kit de marca', () => {
     expect(patchDaMarca(img, MARCA_CLIENTE)).toEqual([
       {op: 'replace', path: '/fundo', value: '#171A19'},
       {op: 'add', path: '/camadas/1/fonte', value: 'Archivo'}, {op: 'replace', path: '/camadas/1/cor', value: '#F4F0EA'},
-      {op: 'add', path: '/camadas/2/fonte', value: 'IBM Plex Sans'}, {op: 'add', path: '/camadas/2/cor', value: '#F4F0EA'},
+      {op: 'add', path: '/camadas/2/fonte', value: 'IBM Plex Sans'}, {op: 'add', path: '/camadas/2/cor', value: '@texto'},
+      {op: 'add', path: '/marca', value: marcaDoKit(MARCA_CLIENTE)},
     ]);
   });
 

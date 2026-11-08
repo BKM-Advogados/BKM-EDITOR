@@ -3,13 +3,16 @@
 // documento já tem. A Cliente sai do código por aqui: o CarrosselNarrado lê a paleta e as fontes de MARCA_CLIENTE, com os mesmos
 // valores de sempre. Só dados e regras (sem disco): a interface e as composições importam deste arquivo; quem lê e
 // grava a pasta é pasta-marcas.ts.
+import {hex} from './acabamento';
+import {nomeDeFonteVariavel} from './fonte-variavel';
 import {ehDocCenas, TEMA_NEUTRO, type TemaCenas} from './cenas';
-import type {DocImagem, OperacaoPatch} from './documentos';
+import type {CamadaImagem, Degrade, DocImagem, MarcaDoDocumento, OperacaoPatch} from './documentos';
 
 /** As quatro cores que todo tema usa e, por nome, as de apoio da paleta (cobre, grafite, osso…). */
 export type CoresMarca = {fundo: string; texto: string; destaque: string; suave: string} & Record<string, string>;
-/** Fonte de arquivo. `arquivo` é relativo à pasta do kit ("fontes/Archivo-Bold.ttf") ou, depois de copiada, à do projeto. */
-export type FonteArquivo = {familia: string; arquivo: string; peso?: number; estilo?: 'normal' | 'italic'};
+/** Fonte de arquivo. `arquivo` é relativo à pasta do kit ("fontes/Archivo-Bold.ttf") ou, depois de copiada, à do projeto.
+ *  Fonte variável leva a faixa do eixo de peso: `peso` (o menor) e `peso_max`, e serve a todos os pesos entre os dois. */
+export type FonteArquivo = {familia: string; arquivo: string; peso?: number; peso_max?: number; estilo?: 'normal' | 'italic'};
 export type FontesMarca = {titulo: string; texto: string; mono?: string; arquivos: FonteArquivo[]};
 export type Marca = {
   formato: 1;
@@ -90,7 +93,8 @@ const fonteArquivo = (x: unknown): FonteArquivo | null => {
   const arquivo = texto(o.arquivo)?.replace(/\\/g, '/');
   if (!familia || !arquivo) return null;
   const peso = typeof o.peso === 'number' && o.peso >= 100 && o.peso <= 900 ? Math.round(o.peso) : undefined;
-  return {familia, arquivo, ...(peso ? {peso} : {}), ...(o.estilo === 'italic' ? {estilo: 'italic' as const} : {})};
+  const pesoMax = typeof o.peso_max === 'number' && o.peso_max <= 900 && o.peso_max > (peso ?? 100) ? Math.round(o.peso_max) : undefined;
+  return {familia, arquivo, ...(peso ? {peso} : {}), ...(pesoMax ? {peso_max: pesoMax} : {}), ...(o.estilo === 'italic' ? {estilo: 'italic' as const} : {})};
 };
 
 /** Lê um marca.json com calma: campo ausente ou fora do lugar volta ao neutro, nunca derruba o app. */
@@ -128,6 +132,12 @@ const PESOS: [RegExp, number][] = [
 /** "Montserrat-SemiBoldItalic.ttf" → família Montserrat, peso 600, itálico: o que dá para saber só pelo nome do arquivo. */
 export const inferirFonte = (nomeArquivo: string): Omit<FonteArquivo, 'arquivo'> => {
   const base = nomeArquivo.replace(/^.*[\\/]/, '').replace(/\.[^.]+$/, '');
+  if (nomeDeFonteVariavel(base)) {
+    // "Roboto-VariableFont_wght", "Inter[opsz,wght]-Italic": a família é o que vem antes, e o arquivo serve a todos os pesos
+    const nome = base.replace(/\[[^\]]*\]/g, '').replace(/[-_]?variable.*$/i, '').replace(/[-_]?(italic|oblique)$/i, '');
+    const familia = nomeDeFamilia(nome.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[-_]+/g, ' ')) || 'Fonte';
+    return {familia, peso: 100, peso_max: 900, ...(/italic|oblique/i.test(base) ? {estilo: 'italic' as const} : {})};
+  }
   const corte = Math.max(base.lastIndexOf('-'), base.lastIndexOf('_'));
   const variante = corte > 0 ? base.slice(corte + 1) : '';
   const peso = PESOS.find(([re]) => re.test(variante))?.[1] ?? (/^\d{3}$/.test(variante) ? Number(variante) : undefined);
@@ -173,30 +183,104 @@ const ehDocImagem = (doc: unknown): doc is DocImagem => {
 };
 const por = (atual: unknown, path: string, value: unknown): OperacaoPatch => ({op: atual === undefined ? 'add' : 'replace', path, value});
 
-/** Patch que aplica o kit a um documento: o vídeo de cenas troca o `tema` inteiro; a imagem troca o fundo e, nos textos
- *  (da raiz e de cada página do carrossel), a fonte (negrito leva a de título) e a cor. Outro tipo de documento: lista
- *  vazia (não recebe kit). */
+/** O kit como a imagem o guarda: id, nome, cores por nome e fontes, para a cor "@destaque" das camadas se ler daí. */
+export const marcaDoKit = (m: Pick<Marca, 'id' | 'nome' | 'cores' | 'fontes'>): MarcaDoDocumento => ({
+  id: m.id,
+  nome: m.nome,
+  cores: {...m.cores},
+  fontes: {titulo: m.fontes.titulo, texto: m.fontes.texto, ...(m.fontes.mono ? {mono: m.fontes.mono} : {})},
+});
+
+// ---------- trocar de kit na imagem ----------
+// Cor e fonte que a camada tem hoje são o papel que cada uma fazia no kit anterior (destaque, texto, suave, título…):
+// o kit novo põe a dele no mesmo papel. O kit anterior é o que a imagem guarda em `marca`; sem ele (imagem de antes
+// do campo), vale o primeiro kit de fábrica que tenha aquele valor. Cor ou fonte que não é de nenhum kit é escolha da
+// pessoa e fica como está; cor por referência ("@destaque") nem entra: ela já lê o kit novo.
+const PAPEIS_PRINCIPAIS = ['destaque', 'texto', 'suave', 'fundo'];
+// o modelo de carrossel de antes do campo `marca`: o neutro com o cobre da Cliente e um cinza-azulado de apoio
+const CARROSSEL_ANTIGO = {fundo: '#111418', texto: '#F2F2F2', destaque: '#C88155', suave: '#B8BEC7'};
+const PALETAS_DE_FABRICA: Record<string, string>[] = [MARCA_CLIENTE.cores, MARCA_BKM.cores, MARCA_NEUTRO.cores, CARROSSEL_ANTIGO];
+const FONTES_DE_FABRICA = [MARCA_CLIENTE.fontes, MARCA_BKM.fontes, MARCA_NEUTRO.fontes];
+const GENERICAS = new Set(['system-ui', 'sans-serif', 'serif', 'monospace']);
+
+const canais = (cor: string) => {
+  const c = hex(cor);
+  return c ? `${c.r},${c.g},${c.b},${c.a}` : cor.trim().toLowerCase();
+};
+const ehReferencia = (v: string) => v.trim().startsWith('@');
+
+const papelDaCor = (cor: string, paletas: Record<string, string>[]): string | undefined => {
+  const n = canais(cor);
+  for (const p of paletas) {
+    for (const k of [...PAPEIS_PRINCIPAIS, ...Object.keys(p).filter((x) => !PAPEIS_PRINCIPAIS.includes(x))]) if (p[k] && canais(p[k]) === n) return k;
+  }
+  return undefined;
+};
+
+type PapelFonte = 'titulo' | 'texto' | 'mono';
+const papelDaFonte = (fonte: string | undefined, peso: number | undefined, conjuntos: FontesMarca[]): PapelFonte | undefined => {
+  const f = fonte?.trim();
+  const pelaEspessura: PapelFonte = (peso ?? 400) >= 600 ? 'titulo' : 'texto';
+  if (!f || GENERICAS.has(f)) return pelaEspessura;
+  for (const set of conjuntos) {
+    const papeis = (['titulo', 'texto', 'mono'] as const).filter((r) => set[r]?.toLowerCase() === f.toLowerCase());
+    if (!papeis.length) continue;
+    if (papeis.length === 1) return papeis[0];
+    return papeis.includes(pelaEspessura) ? pelaEspessura : papeis[0];
+  }
+  return undefined;
+};
+
+/** Os patches que passam o conteúdo da imagem do kit anterior (`doc.marca`, ou os de fábrica) para o `m`. */
+const patchDaImagem = (doc: DocImagem, m: Marca): OperacaoPatch[] => {
+  const paletas = [...(doc.marca ? [doc.marca.cores] : []), ...PALETAS_DE_FABRICA];
+  const fontes = [...(doc.marca ? [doc.marca.fontes as FontesMarca] : []), ...FONTES_DE_FABRICA];
+  const ops: OperacaoPatch[] = [];
+  const cor = (atual: string | undefined, path: string) => {
+    if (typeof atual !== 'string' || !atual.trim() || ehReferencia(atual)) return;
+    const papel = papelDaCor(atual, paletas);
+    const nova = papel ? m.cores[papel] : undefined;
+    if (nova && canais(nova) !== canais(atual)) ops.push({op: 'replace', path, value: nova});
+  };
+  const degrade = (d: Degrade | undefined, path: string) => d?.paradas?.forEach((p, k) => cor(p?.cor, `${path}/paradas/${k}/cor`));
+  const camada = (c: CamadaImagem, base: string) => {
+    if (!c) return;
+    if (c.tipo === 'texto') {
+      const papel = typeof c.fonte === 'string' && ehReferencia(c.fonte) ? undefined : papelDaFonte(c.fonte, c.peso, fontes);
+      const nova = papel === 'titulo' ? m.fontes.titulo : papel === 'mono' ? (m.fontes.mono ?? m.fontes.texto) : papel === 'texto' ? m.fontes.texto : undefined;
+      if (nova && nova !== c.fonte) ops.push(por(c.fonte, `${base}/fonte`, nova));
+      // sem cor, ou no branco padrão que nenhum kit tem, o texto é o do kit; as outras cores seguem o papel que tinham
+      if (c.cor === undefined) ops.push({op: 'add', path: `${base}/cor`, value: '@texto'});
+      else if (typeof c.cor === 'string' && canais(c.cor) === canais('#FFFFFF') && !papelDaCor(c.cor, paletas)) ops.push({op: 'replace', path: `${base}/cor`, value: m.cores.texto});
+      else cor(c.cor, `${base}/cor`);
+    }
+    if (c.tipo === 'forma') cor(c.preenchimento, `${base}/preenchimento`);
+    if (c.tipo !== 'imagem') degrade(c.degrade, `${base}/degrade`);
+    cor(c.sombra?.cor, `${base}/sombra/cor`);
+    cor(c.contorno?.cor, `${base}/contorno/cor`);
+  };
+  cor(doc.fundo, '/fundo');
+  degrade(doc.fundo_degrade, '/fundo_degrade');
+  doc.camadas.forEach((c, i) => camada(c, `/camadas/${i}`));
+  doc.paginas?.forEach((p, i) => p.camadas?.forEach((c, j) => camada(c, `/paginas/${i}/camadas/${j}`)));
+  ops.push(por(doc.marca, '/marca', marcaDoKit(m)));
+  return ops;
+};
+
+/** Patch que aplica o kit a um documento: o vídeo de cenas troca o `tema` inteiro; a imagem passa cada cor e fonte para
+ *  o mesmo papel no kit novo (ver acima) e guarda o kit em `marca`. Outro tipo de documento: lista vazia (não recebe
+ *  kit). */
 export const patchDaMarca = (doc: unknown, m: Marca, tema: TemaDeMarca = temaDaMarca(m)): OperacaoPatch[] => {
   if (ehDocCenas(doc)) {
     return doc.tema === undefined ? [{op: 'add', path: '/tema', value: tema}] : [{op: 'test', path: '/tema', value: doc.tema}, {op: 'replace', path: '/tema', value: tema}];
   }
-  if (ehDocImagem(doc)) {
-    const ops = [por(doc.fundo, '/fundo', m.cores.fundo)];
-    const textos = (camadas: DocImagem['camadas'], base: string) =>
-      camadas.forEach((c, i) => {
-        if (!c || c.tipo !== 'texto') return;
-        ops.push(por(c.fonte, `${base}/${i}/fonte`, (c.peso ?? 400) >= 600 ? m.fontes.titulo : m.fontes.texto));
-        ops.push(por(c.cor, `${base}/${i}/cor`, m.cores.texto));
-      });
-    textos(doc.camadas, '/camadas');
-    doc.paginas?.forEach((p, i) => textos(p.camadas, `/paginas/${i}/camadas`));
-    return ops;
-  }
+  if (ehDocImagem(doc)) return patchDaImagem(doc, m);
   return [];
 };
 
-/** Id do kit que um documento carrega (tema.marca), se tiver. */
+/** Id do kit que um documento carrega (tema.marca no vídeo, marca.id na imagem), se tiver. */
 export const marcaDoDocumento = (doc: unknown): string | undefined => {
-  const t = (doc as {tema?: {marca?: unknown}} | null)?.tema;
-  return typeof t?.marca === 'string' ? t.marca : undefined;
+  const d = doc as {tema?: {marca?: unknown}; marca?: {id?: unknown}} | null;
+  if (typeof d?.tema?.marca === 'string') return d.tema.marca;
+  return typeof d?.marca?.id === 'string' ? d.marca.id : undefined;
 };

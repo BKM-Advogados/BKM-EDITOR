@@ -3,7 +3,8 @@
 // só, em memória; o arquivo da pessoa só ganha `paginas` quando ela cria a segunda página (ou renomeia a primeira).
 // Cada operação devolve o patch e a lista de páginas que resulta dele, para a interface escolher a página ativa sem
 // reler o disco. Ver docs/carrossel.md.
-import type {CamadaImagem, DocImagem, OperacaoPatch, PaginaImagem} from './documentos';
+import type {CamadaImagem, DocImagem, MarcaDoDocumento, OperacaoPatch, PaginaImagem} from './documentos';
+import {MARCA_NEUTRO, marcaDoKit} from './marca';
 
 export const NOME_PAGINA = (n: number) => `Página ${n}`;
 
@@ -155,15 +156,18 @@ export const patchRenomearPagina = (doc: DocImagem, p: number, nome: string): Re
 };
 
 // ---------- modelo "Novo carrossel" ----------
-export type OpcoesCarrossel = {largura: number; altura: number; paginas: number; fundo?: string};
+export type OpcoesCarrossel = {largura: number; altura: number; paginas: number; fundo?: string; marca?: MarcaDoDocumento};
 
-const COR = {texto: '#F2F2F2', suave: '#B8BEC7', destaque: '#C88155'};
+// cores por referência ao kit da imagem: o carrossel nasce na marca da peça (o neutro, sem kit) e troca com ela
+const COR = {texto: '@texto', suave: '@suave', destaque: '@destaque'};
 const ENTRELINHA = 1.15;
 
 /** Modelo do carrossel: capa, páginas de conteúdo e página final, cada uma com camadas de texto nomeadas (`titulo`,
- *  `texto`, `subtitulo`, `chamada` e `pagina` com "2/7") que o Claude preenche por aplicar_patch. As cores são as do
- *  documento em branco; o kit de marca entra depois pelo tema. */
+ *  `texto`, `subtitulo`, `chamada` e `pagina` com "2/7") que o Claude preenche por aplicar_patch. Cores e fontes são as
+ *  do kit em `marca` (as cores como referência, "@destaque"); sem kit, as do neutro. */
 export const docCarrossel = (o: OpcoesCarrossel): DocImagem => {
+  const marca = o.marca ?? marcaDoKit(MARCA_NEUTRO);
+  const F = {titulo: '@titulo', texto: '@texto', mono: '@mono'}; // fontes por referência: o kit da imagem decide
   const W = Math.round(o.largura);
   const H = Math.round(o.altura);
   const n = Math.max(1, Math.min(30, Math.round(o.paginas)));
@@ -178,10 +182,10 @@ export const docCarrossel = (o: OpcoesCarrossel): DocImagem => {
   const yConta = H - m - alt(tamConta, 1);
 
   const texto = (id: string, nome: string, t: string, x: number, y: number, largura: number, altura: number, extra: Partial<CamadaImagem>): CamadaImagem =>
-    ({id, nome, tipo: 'texto', x, y, largura, altura, texto: t, fonte: 'IBM Plex Sans', peso: 400, tamanho: tamTexto, cor: COR.texto, alinhar: 'esquerda', ...extra});
+    ({id, nome, tipo: 'texto', x, y, largura, altura, texto: t, fonte: F.texto, peso: 400, tamanho: tamTexto, cor: COR.texto, alinhar: 'esquerda', ...extra});
   const faixa = (y: number): CamadaImagem => ({id: 'faixa', nome: 'Faixa', tipo: 'forma', forma: 'retangulo', preenchimento: COR.destaque, x: m, y, largura: Math.round(cw * 0.12), altura: Math.max(6, Math.round(menor * 0.008))});
   const contador = (i: number): CamadaImagem =>
-    texto('pagina', 'Número da página', `${i}/${n}`, W - m - Math.round(cw * 0.3), yConta, Math.round(cw * 0.3), alt(tamConta, 1), {fonte: 'IBM Plex Mono', peso: 500, tamanho: tamConta, cor: COR.suave, alinhar: 'direita'});
+    texto('pagina', 'Número da página', `${i}/${n}`, W - m - Math.round(cw * 0.3), yConta, Math.round(cw * 0.3), alt(tamConta, 1), {fonte: F.mono, peso: 500, tamanho: tamConta, cor: COR.suave, alinhar: 'direita'});
 
   const capa = (): PaginaImagem => {
     const yFaixa = Math.round(H * 0.3);
@@ -189,7 +193,7 @@ export const docCarrossel = (o: OpcoesCarrossel): DocImagem => {
     const hTitulo = alt(tamTitulo, 3);
     return {id: 'capa', nome: 'Capa', camadas: [
       faixa(yFaixa),
-      texto('titulo', 'Título', 'Seu título em\npoucas palavras', m, yTitulo, cw, hTitulo, {fonte: 'Archivo', peso: 800, tamanho: tamTitulo}),
+      texto('titulo', 'Título', 'Seu título em\npoucas palavras', m, yTitulo, cw, hTitulo, {fonte: F.titulo, peso: 800, tamanho: tamTitulo}),
       texto('subtitulo', 'Subtítulo', 'Uma linha que diz o que vem nas próximas páginas', m, yTitulo + hTitulo + Math.round(menor * 0.02), cw, alt(tamSub, 2), {tamanho: tamSub, cor: COR.suave}),
       texto('chamada', 'Chamada', 'Arraste para o lado →', m, yConta, Math.round(cw * 0.6), alt(tamConta, 1), {tamanho: tamConta, cor: COR.suave}),
       contador(1),
@@ -201,7 +205,7 @@ export const docCarrossel = (o: OpcoesCarrossel): DocImagem => {
     const yTexto = yTitulo + hTitulo + Math.round(menor * 0.025);
     return {id: `pagina-${i}`, nome: NOME_PAGINA(i), camadas: [
       faixa(m),
-      texto('titulo', 'Título', `Título da página ${i}`, m, yTitulo, cw, hTitulo, {fonte: 'Archivo', peso: 800, tamanho: tamSub}),
+      texto('titulo', 'Título', `Título da página ${i}`, m, yTitulo, cw, hTitulo, {fonte: F.titulo, peso: 800, tamanho: tamSub}),
       texto('texto', 'Texto', 'Escreva aqui o ponto principal desta página, em poucas frases curtas.', m, yTexto, cw, Math.max(alt(tamTexto, 2), yConta - Math.round(menor * 0.04) - yTexto), {}),
       contador(i),
     ]};
@@ -211,7 +215,7 @@ export const docCarrossel = (o: OpcoesCarrossel): DocImagem => {
     const hTitulo = alt(tamTitulo, 2);
     return {id: 'final', nome: 'Final', camadas: [
       faixa(yTitulo - Math.round(menor * 0.03)),
-      texto('titulo', 'Título', 'Gostou?\nSalve e compartilhe', m, yTitulo, cw, hTitulo, {fonte: 'Archivo', peso: 800, tamanho: tamTitulo}),
+      texto('titulo', 'Título', 'Gostou?\nSalve e compartilhe', m, yTitulo, cw, hTitulo, {fonte: F.titulo, peso: 800, tamanho: tamTitulo}),
       texto('texto', 'Texto', 'Siga para ver mais conteúdos como este.', m, yTitulo + hTitulo + Math.round(menor * 0.02), cw, alt(tamSub, 2), {tamanho: tamSub, cor: COR.suave}),
       contador(n),
     ]};
@@ -220,12 +224,13 @@ export const docCarrossel = (o: OpcoesCarrossel): DocImagem => {
   const paginas: PaginaImagem[] = [capa()];
   for (let i = 2; i < n; i++) paginas.push(conteudo(i));
   if (n >= 2) paginas.push(final());
-  return {formato: 1, largura: W, altura: H, fundo: o.fundo ?? '#111418', camadas: [], paginas, efeitos: []};
+  return {formato: 1, largura: W, altura: H, fundo: o.fundo ?? '@fundo', camadas: [], paginas, efeitos: [], marca};
 };
 
 /** Patch que transforma um documento de imagem recém-criado no carrossel do modelo (mesmo tamanho). */
 export const patchCarrossel = (modelo: DocImagem): OperacaoPatch[] => [
   {op: 'add', path: '/fundo', value: modelo.fundo},
+  ...(modelo.marca ? [{op: 'add' as const, path: '/marca', value: modelo.marca}] : []),
   {op: 'add', path: '/camadas', value: []},
   {op: 'add', path: '/paginas', value: modelo.paginas},
 ];

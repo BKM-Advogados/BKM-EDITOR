@@ -70,7 +70,7 @@ const aplicarMarca = (p: Proj, idMarca: string, documento: string) => {
   if (!patch.length) throw new Error(`o documento ${documento} não recebe kit de marca (só vídeo de cenas e imagem)`);
   p.docs[documento] = jsonpatch.applyPatch(structuredClone(p.docs[documento]), patch as Operation[], true, false).newDocument;
   p.versao++;
-  return {versao: String(p.versao), marca: m.id, nome: m.nome, copiados: []};
+  return {versao: String(p.versao), marca: m.id, nome: m.nome, copiados: [], atualizados: []};
 };
 const recentes: Recente[] = new URLSearchParams(location.search).has('vazio') ? [] : [
   {raiz: 'C:\\Users\\pessoa\\Estudio\\Cliente C2', nome: 'Cliente · C2 · Transferência de cidade', aberto_em: new Date(Date.now() - 3 * 3600e3).toISOString(), existe: true, modulos: ['video', 'imagem', '3d']},

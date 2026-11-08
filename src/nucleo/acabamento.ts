@@ -82,7 +82,7 @@ export const elipseDoDegrade = (centro: {x: number; y: number}, w: number, h: nu
 };
 
 /** "#C88155", "#C815", "rgb(200, 129, 85)" ou "rgba(200, 129, 85, 0.5)" em canais; null para o resto (nomes de cor). */
-const hex = (cor: string) => {
+export const hex = (cor: string) => {
   const t = cor.trim();
   const f = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+)\s*)?\)$/i.exec(t);
   if (f) return {r: Math.round(Number(f[1])), g: Math.round(Number(f[2])), b: Math.round(Number(f[3])), a: f[4] === undefined ? 1 : Math.min(1, Number(f[4]))};
@@ -254,20 +254,33 @@ export const patchMoverCamada = (camadas: CamadaImagem[], base: string, i: numbe
 /** Sombra suave: preta a 35%, 24 px de desfoque, 8 px para baixo. */
 export const SOMBRA_SUAVE: Sombra = {...SOMBRA_PADRAO};
 
-/** Contorno na cor de destaque do kit, por fora; num texto, a espessura acompanha o tamanho da letra. */
-export const contornoDaMarca = (m: Pick<Marca, 'cores'>, c?: Pick<CamadaImagem, 'tipo' | 'tamanho'>): Contorno => ({
-  cor: m.cores.destaque,
+/** Contorno na cor de destaque do kit, por fora; num texto, a espessura acompanha o tamanho da letra. Com `referencia`
+ *  (a imagem guarda o kit), a cor é "@destaque" e acompanha o kit; sem ela, o hexadecimal do kit. */
+export const contornoDaMarca = (m: Pick<Marca, 'cores'>, c?: Pick<CamadaImagem, 'tipo' | 'tamanho'>, referencia = false): Contorno => ({
+  cor: referencia ? '@destaque' : m.cores.destaque,
   espessura: c?.tipo === 'texto' ? Math.max(2, Math.round((c.tamanho ?? 48) * 0.06)) : 6,
   posicao: 'fora',
 });
 
 /** Degradê do kit: no texto e na forma, o destaque clareando em diagonal; no fundo, a cor de fundo esquentando
- *  para baixo com um quarto do destaque. */
-export const degradeDaMarca = (m: Pick<Marca, 'cores'>, alvo: 'camada' | 'fundo' = 'camada'): Degrade =>
+ *  para baixo com um quarto do destaque. Com `referencia`, as paradas são "@destaque", "@destaque+35", "@fundo" e
+ *  "@fundo:destaque:25" (cor-marca.ts): a peça segue o kit. */
+export const degradeDaMarca = (m: Pick<Marca, 'cores'>, alvo: 'camada' | 'fundo' = 'camada', referencia = false): Degrade =>
   alvo === 'fundo'
-    ? {tipo: 'linear', angulo: 180, paradas: [{cor: m.cores.fundo, posicao: 0}, {cor: misturar(m.cores.fundo, m.cores.destaque, 0.25), posicao: 1}]}
-    : {tipo: 'linear', angulo: 135, paradas: [{cor: m.cores.destaque, posicao: 0}, {cor: misturar(m.cores.destaque, '#FFFFFF', 0.35), posicao: 1}]};
+    ? {tipo: 'linear', angulo: 180, paradas: referencia
+      ? [{cor: '@fundo', posicao: 0}, {cor: '@fundo:destaque:25', posicao: 1}]
+      : [{cor: m.cores.fundo, posicao: 0}, {cor: misturar(m.cores.fundo, m.cores.destaque, 0.25), posicao: 1}]}
+    : {tipo: 'linear', angulo: 135, paradas: referencia
+      ? [{cor: '@destaque', posicao: 0}, {cor: '@destaque+35', posicao: 1}]
+      : [{cor: m.cores.destaque, posicao: 0}, {cor: misturar(m.cores.destaque, '#FFFFFF', 0.35), posicao: 1}]};
 
-/** Kit da imagem: o que tem a cor de fundo do documento (o kit aplicado troca o fundo) ou, sem nenhum, o primeiro. */
-export const kitDaImagem = <M extends Pick<Marca, 'cores' | 'id'>>(doc: Pick<DocImagem, 'fundo'>, kits: M[]): M | undefined =>
-  kits.find((k) => typeof doc.fundo === 'string' && k.cores.fundo.toUpperCase() === doc.fundo.toUpperCase()) ?? kits[0];
+/** Kit da imagem: o que ela guarda em `marca` (a lista, ou, se o kit saiu da pasta, a cópia que a imagem tem); numa
+ *  imagem de antes do campo, o que tem a cor de fundo do documento (o kit aplicado troca o fundo) ou, sem nenhum, o
+ *  primeiro. */
+export const kitDaImagem = <M extends Pick<Marca, 'cores' | 'id'>>(doc: Pick<DocImagem, 'fundo' | 'marca'>, kits: M[]): M | undefined => {
+  if (doc.marca) {
+    const gravado = kits.find((k) => k.id === doc.marca!.id);
+    if (gravado) return gravado;
+  }
+  return kits.find((k) => typeof doc.fundo === 'string' && k.cores.fundo.toUpperCase() === doc.fundo.toUpperCase()) ?? kits[0];
+};

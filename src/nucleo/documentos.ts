@@ -73,6 +73,11 @@ export type PaginaImagem = {
 // Uma prancheta só tem `camadas` na raiz (a capa da Cliente, os projetos de antes). O carrossel tem `paginas`, cada uma
 // com as suas camadas, e a lista `camadas` da raiz fica vazia. Documento sem `paginas` vale como uma página só, em
 // memória, sem reescrever o arquivo (src/nucleo/carrossel.ts, docs/carrossel.md).
+/** O kit que a imagem recebeu, copiado para o documento: `id` do kit, as cores por nome (fundo, texto, destaque, suave e
+ *  o apoio) e as fontes. As cores "@destaque" das camadas se leem daqui (src/nucleo/cor-marca.ts), e ele diz de que kit
+ *  vêm as cores e as fontes na hora de aplicar outro. */
+export type MarcaDoDocumento = {id: string; nome?: string; cores: Record<string, string>; fontes: {titulo: string; texto: string; mono?: string}};
+
 export type DocImagem = {
   formato: 1;
   largura: number;
@@ -82,6 +87,7 @@ export type DocImagem = {
   paginas?: PaginaImagem[];
   efeitos?: Efeito[];
   fundo_degrade?: Degrade; // por cima da cor de `fundo`, em todas as páginas (acabamento, docs/imagem.md)
+  marca?: MarcaDoDocumento; // o kit aplicado; cor "@destaque" numa camada vem daqui (frente Marca, rodada 3)
 };
 
 // ---------- 3D ----------

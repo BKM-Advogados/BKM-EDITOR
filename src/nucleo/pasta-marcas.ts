@@ -4,8 +4,10 @@
 import {copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import zlib from 'node:zlib';
 import {ARQUIVO_MARCA, arquivosDaMarca, EXTENSOES_FONTE, EXTENSOES_LOGO, idDeMarca, inferirFonte, MARCA_NEUTRO, MARCAS_INICIAIS, normalizarMarca, PASTA_FONTES,
   patchDaMarca, temaDaMarca, type FonteArquivo, type Marca} from './marca';
+import {lerEixoDePeso} from './fonte-variavel';
 import {ErroProjeto, serializar, type Projeto} from './projeto';
 
 /** Um kit lido do disco: o kit e a pasta dele. */
@@ -20,6 +22,21 @@ export const definirPastaMarcas = (f: (() => string) | null) => {
   configurada = f;
 };
 export const pastaMarcas = () => configurada?.() || pastaPadraoMarcas();
+
+/** Família, peso e estilo de um arquivo de fonte: pelo nome do arquivo e, se ele é variável, pela faixa do eixo de peso que
+ *  a própria fonte declara (fica o 100 a 900 do nome quando o WOFF2 não deixa ler). */
+export const fonteDoArquivo = (arquivo: string): Omit<FonteArquivo, 'arquivo'> => {
+  const nome = inferirFonte(arquivo);
+  try {
+    const eixo = lerEixoDePeso(readFileSync(arquivo), (b) => zlib.inflateSync(b));
+    if (eixo.variavel && eixo.min !== undefined && eixo.max !== undefined && eixo.max > eixo.min) return {...nome, peso: eixo.min, peso_max: eixo.max};
+    if (eixo.variavel && nome.peso_max === undefined) return {...nome, peso: 100, peso_max: 900};
+    if (!eixo.variavel && nome.peso_max !== undefined && !/\.woff2$/i.test(arquivo)) return {familia: nome.familia, peso: 400, ...(nome.estilo ? {estilo: nome.estilo} : {})};
+  } catch {
+    /* arquivo ilegível: vale o nome */
+  }
+  return nome;
+};
 
 const ORDEM = new Map(MARCAS_INICIAIS.map((m, i) => [m.id, i]));
 
@@ -123,36 +140,40 @@ export class PastaMarcas {
     mkdirSync(path.join(m.pasta, PASTA_FONTES), {recursive: true});
     const rel = `${PASTA_FONTES}/${path.basename(origem)}`;
     copyFileSync(origem, path.join(m.pasta, rel));
-    const inferido = inferirFonte(origem);
-    const nova: FonteArquivo = {familia: dados.familia?.trim() || inferido.familia, arquivo: rel, peso: dados.peso ?? inferido.peso,
+    const inferido = fonteDoArquivo(origem);
+    const peso = dados.peso ?? inferido.peso;
+    const pesoMax = dados.peso !== undefined ? dados.peso_max : inferido.peso_max; // peso dito à mão vale um peso só
+    const nova: FonteArquivo = {familia: dados.familia?.trim() || inferido.familia, arquivo: rel, peso, ...(pesoMax ? {peso_max: pesoMax} : {}),
       ...((dados.estilo ?? inferido.estilo) === 'italic' ? {estilo: 'italic' as const} : {})};
     return this.gravar({...m, fontes: {...m.fontes, arquivos: [...m.fontes.arquivos.filter((f) => f.arquivo !== rel), nova]}});
   }
 
-  /** Aplica o kit a um documento do projeto: copia o logo (midia/) e as fontes (fontes/) que ainda não estão lá e troca
-   *  o tema por patch, que vai para o diário com o autor. */
+  /** Aplica o kit a um documento do projeto: copia o logo (midia/) e as fontes (fontes/) que faltam, troca os que mudaram
+   *  no kit (`atualizados`) e troca o tema por patch, que vai para o diário com o autor. */
   aplicar(projeto: Projeto, id: string, documento: string, o: {autor: string; origem: string}) {
     const m = this.ler(id);
     const rel = projeto.arquivoDoDocumento(documento);
     const {doc} = projeto.lerJson<unknown>(rel);
     const {copiar, logo, fontes_arquivos} = arquivosDaMarca(m);
     const copiados: string[] = [];
+    const atualizados: string[] = [];
     const presentes = new Set<string>();
     for (const c of copiar) {
       const de = path.join(m.pasta, c.de);
       if (!existsSync(de)) continue; // o kit aponta para um arquivo que não está mais lá: o tema não o cita
       presentes.add(c.para);
       const para = projeto.caminho(c.para);
-      if (existsSync(para)) continue;
+      const jaTem = existsSync(para);
+      if (jaTem && readFileSync(de).equals(readFileSync(para))) continue;
       mkdirSync(path.dirname(para), {recursive: true});
-      copyFileSync(de, para);
-      copiados.push(c.para);
+      copyFileSync(de, para); // o kit manda: logo e fonte novos com o mesmo nome trocam os que o projeto já tinha
+      (jaTem ? atualizados : copiados).push(c.para);
     }
     const tema = temaDaMarca(m, {logo: logo && presentes.has(logo) ? logo : undefined, fontes_arquivos: fontes_arquivos.filter((f) => presentes.has(f.arquivo))});
     const patch = patchDaMarca(doc, m, tema);
     if (!patch.length) throw new ErroProjeto(`o documento ${documento} não recebe kit de marca (só vídeo de cenas e imagem)`, 'patch');
     const r = projeto.aplicarPatch({documento, patch, autor: o.autor, origem: o.origem, rotulo: `kit de marca: ${m.nome}`});
-    return {versao: r.versao, seq: r.entrada.seq, marca: m.id, nome: m.nome, copiados, tema};
+    return {versao: r.versao, seq: r.entrada.seq, marca: m.id, nome: m.nome, copiados, atualizados, tema};
   }
 }
 
@@ -163,5 +184,5 @@ export const fontesDoProjeto = (raiz: string): FonteArquivo[] => {
   return readdirSync(pasta)
     .filter((f) => EXTENSOES_FONTE.includes(path.extname(f).toLowerCase()))
     .sort()
-    .map((f) => ({...inferirFonte(f), arquivo: `${PASTA_FONTES}/${f}`}));
+    .map((f) => ({...fonteDoArquivo(path.join(pasta, f)), arquivo: `${PASTA_FONTES}/${f}`}));
 };
