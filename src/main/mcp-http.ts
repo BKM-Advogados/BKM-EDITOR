@@ -16,7 +16,7 @@ import type {Projeto} from '../nucleo/projeto';
 /** Quem pergunta à pessoa no app (ipc-ia.ts). sempre: a pessoa marcou "Sempre nesta conversa". */
 export type Perguntador = (p: PedidoPortao & {origem: string}) => Promise<{permitir: boolean; sempre?: boolean}>;
 
-type Aba = {origem: string; arquivo: string};
+type Aba = {origem: string; arquivo?: string; fixo?: boolean}; // fixo: app de IA de fora, com token que sobrevive a trocar de projeto
 
 // frente Fala: o transcritor local (transcricao.ts) chega depois do construtor, pelo registro do IPC da fala
 let transcritorMcp: TranscritorMcp | undefined;
@@ -49,10 +49,25 @@ export class McpHttp {
     return {arquivo, url, headers};
   }
 
+  /** Projeto fechado: esquece os tokens das abas; os dos apps de fora (registrarFixo) ficam até a pessoa revogar. */
   esquecerTudo() {
-    for (const a of this.abas.values()) rmSync(a.arquivo, {force: true});
-    this.abas.clear();
-    this.sempre.clear();
+    for (const [token, a] of [...this.abas]) {
+      if (a.fixo) continue;
+      if (a.arquivo) rmSync(a.arquivo, {force: true});
+      this.abas.delete(token);
+      this.sempre.delete(token);
+    }
+  }
+
+  /** Padrão Screenpipe (frente IA): um app de IA de fora (Cursor, Cline, Claude Desktop) entra com um token próprio, que
+   *  vira a origem no diário e passa pelo mesmo portão de permissão. */
+  registrarFixo(token: string, origem: string) {
+    this.abas.set(token, {origem, fixo: true});
+  }
+
+  esquecerFixo(token: string) {
+    this.abas.delete(token);
+    this.sempre.delete(token);
   }
 
   /** Atende /mcp; devolve false se o pedido não é para cá. */

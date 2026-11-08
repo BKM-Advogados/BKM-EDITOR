@@ -119,6 +119,11 @@ export const CANAL = {
   iaPortaoResposta: 'estudio:ia-portao-resposta',
   iaPortaoCancelado: 'estudio:ia-portao-cancelado',
   iaReverter: 'estudio:ia-reverter',
+  iaApps: 'estudio:ia-apps',
+  iaAppsLigar: 'estudio:ia-apps-ligar',
+  iaAppsNovo: 'estudio:ia-apps-novo',
+  iaAppsConfigs: 'estudio:ia-apps-configs',
+  iaAppsRevogar: 'estudio:ia-apps-revogar',
 } as const;
 
 /** O projeto aberto. `estado` é o último que a pessoa viu (área, documento, seleção), para reabrir onde parou; `git`
@@ -332,6 +337,12 @@ export type ApiEstudio = {
     responderPortao: (id: string, permitir: boolean, sempre?: boolean) => void;
     /** Reverte uma entrada do diário pelo seq; forcar passa por cima de mudança feita depois. */
     reverter: (seq: number, forcar?: boolean) => Promise<ResultadoReverter>;
+    /** Apps de IA de fora: ligar a porta, criar um app (devolve a configuração com o token), rever e revogar. */
+    apps: () => Promise<EstadoAppsDeFora>;
+    appsLigar: (ligado: boolean, porta?: number) => Promise<EstadoAppsDeFora>;
+    appsNovo: (nome: string) => Promise<{id: string; configs: ConfigsDoApp}>;
+    appsConfigs: (id: string) => Promise<ConfigsDoApp>;
+    appsRevogar: (id: string) => Promise<EstadoAppsDeFora>;
   };
 };
 
@@ -369,6 +380,10 @@ export type ResultadoModelos = {ok: true; modelos: string[]} | {ok: false; statu
 /** Pedido do portão de permissão do MCP (src/nucleo/portao.ts) para a tela: de qual aba, qual ferramenta e por quê. */
 export type PedidoPortaoTela = {id: string; origem: string; ferramenta: string; motivo: string; entrada: Record<string, unknown>};
 export type ResultadoReverter = {ok: true; seq: number; rotulo: string} | {ok: false; mensagem: string; mudou_depois?: boolean};
+/** Apps de IA de fora (padrão Screenpipe): a porta fixa só em 127.0.0.1 e os apps com token próprio. */
+export type EstadoAppsDeFora = {ligado: boolean; porta: number; ouvindo: boolean; erro?: string; apps: {id: string; nome: string; criado_em: string}[]};
+/** A configuração pronta para colar no app de fora, por HTTP e por stdio (com a ponte do próprio Estúdio). */
+export type ConfigsDoApp = {http: string; stdio: string};
 /** Soma do mês por provedor, no PC: tokens e custo estimado pela tabela de preços. */
 export type UsoDoMes = Record<string, {entrada: number; cache: number; saida: number; custo_usd: number; turnos: number}>;
 

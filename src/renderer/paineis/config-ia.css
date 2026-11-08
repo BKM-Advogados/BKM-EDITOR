@@ -30,3 +30,11 @@
 /* pedidos do portão de abas sem conversa no painel (terminal, app de fora) */
 .ia-avulsos { position: fixed; right: 16px; bottom: 32px; z-index: 90; display: flex; flex-direction: column; gap: 8px; width: min(380px, calc(100vw - 32px)); }
 .ia-avulso { background: var(--fundo-2); border: 1px solid var(--borda-forte); border-radius: 10px; padding: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); }
+
+/* apps de IA de fora (padrão Screenpipe) */
+.ia-apps { border-top: 1px solid var(--borda); padding-top: 8px; display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+.ia-apps .espaco { flex: 1; }
+.ia-apps .campo.porta { flex: 0 0 72px; min-width: 72px; }
+.ia-configs { display: flex; flex-direction: column; gap: 4px; }
+.ia-config { display: flex; align-items: center; gap: 8px; }
+.ia-configs pre { max-height: 140px; overflow: auto; font-size: 11px; white-space: pre; }

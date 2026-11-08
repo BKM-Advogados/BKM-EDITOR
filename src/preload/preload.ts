@@ -136,6 +136,11 @@ const api: ApiEstudio = {
     aoPortaoCancelado: (cb) => ouvir<[string]>(CANAL.iaPortaoCancelado, cb),
     responderPortao: (id, permitir, sempre) => ipcRenderer.send(CANAL.iaPortaoResposta, id, permitir, sempre),
     reverter: (seq, forcar) => ipcRenderer.invoke(CANAL.iaReverter, seq, forcar),
+    apps: () => ipcRenderer.invoke(CANAL.iaApps),
+    appsLigar: (l, p) => ipcRenderer.invoke(CANAL.iaAppsLigar, l, p),
+    appsNovo: (n) => ipcRenderer.invoke(CANAL.iaAppsNovo, n),
+    appsConfigs: (id) => ipcRenderer.invoke(CANAL.iaAppsConfigs, id),
+    appsRevogar: (id) => ipcRenderer.invoke(CANAL.iaAppsRevogar, id),
   },
 };
 

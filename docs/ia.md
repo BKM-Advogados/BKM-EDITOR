@@ -45,12 +45,67 @@ preenchido onde foi conferido na fonte (DeepSeek `deepseek-flash`, Gemini `gemin
   cartão da conversa usa esse nome.
 - O rótulo da aba ("Claude 1", "DeepSeek 1", "Gemini CLI 1") vira a origem no diário e o aviso "DeepSeek 1: rótulo".
 
-## Chaves
+## Chaves, Configurações › IA e custo
 
-A chave fica só no processo principal. A tela recebe "tem chave", a origem (cofre ou variável de ambiente) e os 4
-últimos caracteres. Até a tela de chaves entrar, valem as variáveis de ambiente do PC (`DEEPSEEK_API_KEY`,
-`GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, `MISTRAL_API_KEY`, `XAI_API_KEY`,
-`GROQ_API_KEY`). Os testes conferem que nenhuma chave aparece em evento nem na lista de provedores.
+- Cofre: `src/main/ia/cofre-arquivo.ts`. A chave fica cifrada pelo `safeStorage` (DPAPI no Windows) em
+  `%APPDATA%\Estudio\ia\chaves.json`. Sem cifra, vale só na sessão. A chave só vive no processo principal. A tela
+  recebe "tem chave", a origem (cofre ou variável de ambiente, como `DEEPSEEK_API_KEY`) e os 4 últimos caracteres.
+- Antes de gravar, a chave é testada na lista de modelos do provedor (`GET /models`), que não gasta token. Na
+  Anthropic, o teste é no `/v1/models` nativo, com `x-api-key`. Chave recusada (401/403) não grava; sem rede, grava e
+  avisa.
+- Configurações › IA (`src/renderer/paineis/ConfigIA.tsx`), aberta pelo menu "+ Conversa" → "Provedores e chaves…".
+  Mostra os provedores e o que falta em cada um, e permite trocar o modelo (da lista do próprio endereço), o endereço
+  (no compatível e nos locais) e o provedor padrão. Embaixo ficam os apps de IA de fora e o uso do mês.
+- Custo: tabela em `src/main/ia/precos.ts`, conferida em 07 e 08/11/2026. O DeepSeek tem pico e fora de pico; o
+  Gemini troca de preço por data. O evento `uso` ganha o custo estimado, e a soma do mês fica em
+  `%APPDATA%\Estudio\ia\uso-AAAA-MM.json`.
+- Seletor de modelo na caixa da conversa: vale na próxima mensagem. No Claude, o processo volta com `--resume` e
+  `--model`. Agente ACP usa o modelo da configuração dele.
+
+## Portão de permissão (`src/nucleo/portao.ts`)
+
+Envolve o `registerTool`: toda ferramenta registrada depois dele passa por ele, de qualquer frente.
+
+- **Classe "cartao"** (pergunta à pessoa antes de rodar):
+  - a tabela `CLASSES`: `ler_fonte`, `transcrever`, `remover_fundo`, `exportar_legendas`;
+  - ou quem declara `annotations: {openWorldHint: true}` (sai do PC ou do projeto) ou `destructiveHint: true` (apaga)
+    no `registerTool`.
+- **Classe "livre"**: o resto. Grava no diário e tem Reverter.
+- **Para declarar a classe de uma ferramenta nova**: uma linha em `CLASSES` ou a anotação. Não precisa devolver o
+  `seq`: o portão acrescenta ao resultado `{"estudio_mudancas":[{seq, documento, rotulo}]}`.
+- **Onde aparece o pedido**: na conversa da aba ou, sem conversa (terminal, app de fora), num cartão solto no canto da
+  tela. "Sempre nesta conversa" vale para o token. O Parar da conversa cancela. Sem resposta em 10 minutos, o pedido é
+  negado.
+- **Reverter por `seq`**: o cartão de qualquer provedor e o Histórico usam `Projeto.reverter`. Antes de reverter, ele
+  confere que os valores trocados ainda estão lá. Se mudaram, devolve `mudou_depois`, e só passa por cima com
+  `forcar`. O Ctrl+Z (`desfazerUltima`) lembra o que já desfez pelo campo `desfaz` da entrada.
+
+## Apps de IA de fora (padrão Screenpipe, `src/main/ia/apps-de-fora.ts`)
+
+- Desligado por padrão. Ligado, abre uma porta fixa (47815, ajustável) só em `127.0.0.1` e só com `/mcp`. Recusa pedido
+  de página web (cabeçalho `Origin`) e `Host` diferente de `127.0.0.1:<porta>` ou `localhost:<porta>`.
+- Cada app tem um token próprio no cofre, que vira a origem no diário ("Cursor") e passa pelo mesmo portão. O token
+  sobrevive a fechar o projeto e a reabrir o app. Revogar corta o acesso na hora.
+- Configuração pronta para copiar:
+  - **HTTP**, para Cursor, Cline, Windsurf e VS Code;
+  - **stdio**, para o Claude Desktop e quem só aceita stdio. Usa a ponte `mcp/ponte.mjs` (gerada em
+    `dist-mcp/ponte.cjs` pelo `mcp:build`), rodada pelo próprio Estúdio com `ELECTRON_RUN_AS_NODE=1`. A escrita passa
+    pelo app, com diário e portão, e não pelo MCP de arquivo.
+- Se um dia a fuse `RunAsNode` do Electron for desligada, a ponte stdio para de funcionar. A configuração HTTP
+  continua.
+
+## Ferramentas MCP da frente (`src/nucleo/mcp-ia.ts`)
+
+| Ferramenta | Parâmetros | Classe |
+|---|---|---|
+| `desfazer` | `{n?}` (só as mudanças da própria aba) | livre |
+| `reverter` | `{seq, mesmo_se_mudou?}` | livre; pergunta à pessoa se a mudança é de outra aba |
+| `guia_do_projeto` | — | livre |
+| `criar_comentario` | `{documento, texto, objeto?, tempo_ms?}` | livre |
+| `reabrir_comentario` | `{id}` | livre |
+
+O servidor também manda `instructions` na abertura, para todo cliente MCP. O `listar_mudancas` traz no máximo 50
+entradas e filtra por documento. O `aplicar_patch` devolve os avisos do resolvedor no vídeo de cenas.
 
 ## Testes
 
@@ -58,7 +113,11 @@ A chave fica só no processo principal. A tela recebe "tem chave", a origem (cof
 |---|---|
 | `testes/laco-openai.test.ts` | laço próprio contra `fixtures/api-falsa.ts` e o MCP real |
 | `testes/acp-cliente.test.ts` | cliente ACP contra `fixtures/acp-falso.mjs` e o MCP real |
-| `testes/contrato-ia.test.ts` | a mesma checagem nas três vias (Claude falso, API falsa, ACP falso), catálogo sem chave, nomes de ferramenta |
+| `testes/contrato-ia.test.ts` | a mesma checagem nas três vias, catálogo sem chave, nomes de ferramenta |
+| `testes/ia-config.test.ts` | cofre, preços, configuração, teste da chave, custo e seletor de modelo |
+| `testes/diario.test.ts` | linha quebrada, seq pelo fim do arquivo, reverter, Ctrl+Z depois de reabrir |
+| `testes/portao.test.ts` | portão, seq no resultado, reverter de outra aba, limite do listar, avisos do resolvedor |
+| `testes/apps-de-fora.test.ts` | porta fixa, token por app, Origin e Host, ponte stdio, revogar |
 | `testes/prova-acp-qwen.test.ts` | opcional: o Qwen Code real dirigido pela API falsa |
 
 ## Licenças

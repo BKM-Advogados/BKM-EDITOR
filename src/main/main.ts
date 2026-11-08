@@ -29,7 +29,7 @@ import {registrarPrefsExportacao} from './ipc-exportacao';
 import {apagarLimposSemUso, registrarIpcLimpeza} from './limpeza-voz';
 import {registrarIpcLoudness} from './loudness';
 import {registrarRemoverFundo} from './remover-fundo';
-import {criarSessoesIA, perguntarAPessoa, registrarIpcIa} from './ipc-ia'; // frente IA
+import {criarSessoesIA, fecharAppsDeFora, iniciarAppsDeFora, perguntarAPessoa, registrarIpcIa} from './ipc-ia'; // frente IA
 
 // o mesmo id do instalador (electron-builder.yml): a barra de tarefas agrupa a janela com o atalho
 app.setAppUserModelId('br.com.bkmadvogados.estudio');
@@ -463,16 +463,19 @@ registrarIpcLoudness(lidar, exigirProjeto, (documento) => (exigirProjeto(), sess
 // frente IA: Configurações › IA (provedores, chaves cifradas pelo safeStorage em userData/ia, modelos, uso do mês)
 registrarIpcIa({lidar, claudeInstalado: () => claude, pasta: path.join(app.getPath('userData'), 'ia'), conversas: () => conversas,
   enviar, ouvir: (canal, f) => ipcMain.on(canal, (e, ...a) => (confiavel(e), f(...a))), projeto: exigirProjeto,
+  mcp: () => mcpHttp, ponte: () => ({exe: process.execPath, script: recursos(path.join('dist-mcp', 'ponte.cjs'))}),
   cifra: {disponivel: () => safeStorage.isEncryptionAvailable(), cifrar: (t) => safeStorage.encryptString(t), decifrar: (b) => safeStorage.decryptString(b)},
   canais: {provedores: CANAL.iaProvedores, gravarChave: CANAL.iaGravarChave, apagarChave: CANAL.iaApagarChave, modelos: CANAL.iaModelos,
     configurar: CANAL.iaConfigurar, padrao: CANAL.iaPadrao, usoDoMes: CANAL.iaUsoDoMes, conversaModelo: CANAL.conversaModelo,
-    portaoPedido: CANAL.iaPortaoPedido, portaoResposta: CANAL.iaPortaoResposta, portaoCancelado: CANAL.iaPortaoCancelado, reverter: CANAL.iaReverter}});
+    portaoPedido: CANAL.iaPortaoPedido, portaoResposta: CANAL.iaPortaoResposta, portaoCancelado: CANAL.iaPortaoCancelado, reverter: CANAL.iaReverter,
+    apps: CANAL.iaApps, appsLigar: CANAL.iaAppsLigar, appsNovo: CANAL.iaAppsNovo, appsConfigs: CANAL.iaAppsConfigs, appsRevogar: CANAL.iaAppsRevogar}});
 
 app.on('ready', async () => {
   await midia.iniciar();
   // a rede do ler_fonte no app: net.fetch do Electron (proxy e certificados do sistema), assíncrono, 40 s e 20 MB no máximo
   mcpHttp = new McpHttp(path.join(app.getPath('userData'), 'mcp'), () => sessao?.projeto ?? null, criarRede((url, init) => net.fetch(url, init)),
     perguntarAPessoa); // frente IA: o portão de permissão pergunta à pessoa pela tela
+  await iniciarAppsDeFora(); // frente IA: apps de IA de fora (tokens de volta ao MCP e, se ligada, a porta fixa)
   midia.rota((req, res) => mcpHttp!.atender(req, res));
   claude = await terminais.preparar();
   criarJanela();
@@ -481,6 +484,7 @@ app.on('ready', async () => {
 });
 
 app.on('window-all-closed', () => {
+  void fecharAppsDeFora(); // frente IA
   terminais.fecharTodos();
   conversas.fecharTodas();
   mcpHttp?.esquecerTudo();

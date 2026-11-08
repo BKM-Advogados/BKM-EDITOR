@@ -417,6 +417,15 @@ const api: ApiEstudio = {
     aoPortaoCancelado: () => nada,
     responderPortao: (id, permitir) => console.log(`[prévia] portão ${id}: ${permitir ? 'permitido' : 'negado'}`),
     reverter: async (seq) => ({ok: true as const, seq: seq + 1000, rotulo: `reverter: #${seq}`}),
+    apps: async () => iaNaPrevia.estadoApps(),
+    appsLigar: async (ligado, porta) => ((iaNaPrevia.appsLigado = ligado), porta && (iaNaPrevia.porta = porta), iaNaPrevia.estadoApps()),
+    appsNovo: async (nome) => {
+      const id = `app${iaNaPrevia.apps.length + 1}`;
+      iaNaPrevia.apps.push({id, nome, criado_em: new Date().toISOString()});
+      return {id, configs: iaNaPrevia.configs(id)};
+    },
+    appsConfigs: async (id) => iaNaPrevia.configs(id),
+    appsRevogar: async (id) => ((iaNaPrevia.apps = iaNaPrevia.apps.filter((x) => x.id !== id)), iaNaPrevia.estadoApps()),
   },
 };
 
@@ -633,6 +642,20 @@ const fundoNaPrevia = (() => {
 const iaNaPrevia = {
   padrao: 'claude',
   portao: new Set<(p: PedidoPortaoTela) => void>(),
+  appsLigado: false,
+  porta: 47815,
+  apps: [] as {id: string; nome: string; criado_em: string}[],
+  estadoApps() {
+    return {ligado: this.appsLigado, porta: this.porta, ouvindo: this.appsLigado, apps: this.apps.slice()};
+  },
+  configs(id: string) {
+    const url = `http://127.0.0.1:${this.porta}/mcp`;
+    const token = `token-da-previa-${id}`;
+    return {http: JSON.stringify({mcpServers: {estudio: {type: 'http', url, headers: {Authorization: `Bearer ${token}`}}}}, null, 2),
+      stdio: JSON.stringify({mcpServers: {estudio: {command: String.raw`C:\Users\pessoa\AppData\Local\Programs\Estudio\Estudio.exe`,
+        args: [String.raw`C:\Users\pessoa\AppData\Local\Programs\Estudio\resources\dist-mcp\ponte.cjs`],
+        env: {ELECTRON_RUN_AS_NODE: '1', ESTUDIO_MCP_URL: url, ESTUDIO_MCP_TOKEN: token}}}}, null, 2)};
+  },
   chaves: new Map<string, string>([['deepseek', 'sk-previa-a1f9']]),
   config: {} as Record<string, {modelo?: string; base?: string}>,
   modelos: {deepseek: ['deepseek-flash', 'deepseek-v4-pro'], gemini: ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash'],

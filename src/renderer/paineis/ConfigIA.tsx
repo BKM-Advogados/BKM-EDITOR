@@ -4,7 +4,8 @@
 // uso do mês com a composição: tokens de entrada (parte do cache), de saída e o custo estimado pela tabela.
 import React, {useEffect, useState, useSyncExternalStore} from 'react';
 import {CircleAlert, CircleCheck, ExternalLink, KeyRound, RefreshCw, ShieldQuestion, X} from 'lucide-react';
-import type {EstadoProvedor, UsoDoMes} from '../../compartilhado/api';
+import type {ConfigsDoApp, EstadoAppsDeFora, EstadoProvedor, UsoDoMes} from '../../compartilhado/api';
+import {copiar} from '../componentes/Campos';
 import {avisar} from '../estado/loja';
 import {estadoConversas, fecharConfigIA, lerProvedores, responderAvulso} from './conversas';
 import './config-ia.css';
@@ -120,6 +121,62 @@ const LinhaProvedor: React.FC<{p: EstadoProvedor; aberto: boolean; abrir: () => 
   );
 };
 
+// Apps de IA de fora (padrão Screenpipe): ligar a porta só deste PC, criar um app com token próprio, copiar a
+// configuração (HTTP para Cursor, Cline, Windsurf, VS Code; stdio para o Claude Desktop) e revogar. Quem entra por fora
+// passa pelo mesmo portão de permissão e aparece no Histórico com o nome do app.
+const SecaoAppsDeFora: React.FC = () => {
+  const [e, setE] = useState<EstadoAppsDeFora | null>(null);
+  const [nome, setNome] = useState('');
+  const [porta, setPorta] = useState('');
+  const [mostrar, setMostrar] = useState<{nome: string; configs: ConfigsDoApp} | null>(null);
+  const atualizar = (x: EstadoAppsDeFora) => (setE(x), setPorta(String(x.porta)));
+  useEffect(() => {
+    void window.estudio.ia.apps().then(atualizar).catch(() => setE(null));
+  }, []);
+  if (!e) return null;
+  const falhar = (err: unknown) => avisar(String((err as Error).message).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), 'erro');
+  return (
+    <div className="ia-apps">
+      <div className="ia-uso-titulo">Apps de IA de fora (Claude Desktop, Cursor, Cline, Windsurf…)</div>
+      <div className="ia-linha">
+        <label><input type="checkbox" checked={e.ligado} onChange={(ev) => void window.estudio.ia.appsLigar(ev.target.checked, Number(porta)).then(atualizar).catch(falhar)} /> Deixar apps deste PC usarem o projeto aberto</label>
+        <span className="rot">Porta</span>
+        <input className="campo porta" value={porta} onChange={(ev) => setPorta(ev.target.value.replace(/\D/g, ''))}
+          onBlur={() => Number(porta) !== e.porta && void window.estudio.ia.appsLigar(e.ligado, Number(porta)).then(atualizar).catch(falhar)} />
+        {e.ligado && <span className={e.ouvindo ? 'ia-estado pronto' : 'ia-estado falta'}>{e.ouvindo ? 'ouvindo só em 127.0.0.1' : e.erro ?? 'fechada'}</span>}
+      </div>
+      {e.apps.map((a) => (
+        <div key={a.id} className="ia-linha">
+          <span className="ia-nome">{a.nome}</span>
+          <span className="fraco">desde {new Date(a.criado_em).toLocaleDateString('pt-BR')}</span>
+          <span className="espaco" />
+          <button className="bt mini fantasma" onClick={() => void window.estudio.ia.appsConfigs(a.id).then((c) => setMostrar({nome: a.nome, configs: c})).catch(falhar)}>Configuração</button>
+          <button className="bt mini fantasma" onClick={() => void window.estudio.ia.appsRevogar(a.id).then((x) => (atualizar(x), setMostrar(null))).catch(falhar)}>Revogar</button>
+        </div>
+      ))}
+      <div className="ia-linha">
+        <input className="campo" placeholder="nome do app (ex.: Cursor)" value={nome} onChange={(ev) => setNome(ev.target.value)} />
+        <button className="bt mini" disabled={!nome.trim()} onClick={() => void window.estudio.ia.appsNovo(nome).then(async (r) => {
+          setMostrar({nome, configs: r.configs});
+          setNome('');
+          atualizar(await window.estudio.ia.apps());
+        }).catch(falhar)}>Conectar outro app de IA</button>
+      </div>
+      {mostrar && (
+        <div className="ia-configs">
+          <div className="fraco">Cole no arquivo de servidores MCP do {mostrar.nome}. O token é dele: se vazar, revogue e crie outro.</div>
+          <div className="ia-config"><span className="rot">HTTP</span><span className="fraco">Cursor, Cline, Windsurf, VS Code</span>
+            <button className="bt mini fantasma" onClick={() => copiar(mostrar.configs.http, 'Configuração copiada')}>Copiar</button></div>
+          <pre className="perm-cmd">{mostrar.configs.http}</pre>
+          <div className="ia-config"><span className="rot">stdio</span><span className="fraco">Claude Desktop e quem só aceita stdio (usa a ponte do Estúdio)</span>
+            <button className="bt mini fantasma" onClick={() => copiar(mostrar.configs.stdio, 'Configuração copiada')}>Copiar</button></div>
+          <pre className="perm-cmd">{mostrar.configs.stdio}</pre>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const DialogoConfigIA: React.FC = () => {
   const cfg = useSyncExternalStore(estadoConversas.assinar, estadoConversas.configIA);
   const provedores = useSyncExternalStore(estadoConversas.assinar, estadoConversas.provedores);
@@ -145,6 +202,7 @@ const DialogoConfigIA: React.FC = () => {
         <div className="ia-lista">
           {provedores.map((p) => <LinhaProvedor key={p.id} p={p} aberto={aberto === p.id} abrir={() => setAberto((a) => (a === p.id ? undefined : p.id))} />)}
         </div>
+        <SecaoAppsDeFora />
         <div className="ia-uso">
           <div className="ia-uso-titulo">Uso deste mês neste PC</div>
           {linhasUso.length ? (

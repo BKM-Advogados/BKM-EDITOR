@@ -5,9 +5,10 @@ import {randomUUID} from 'node:crypto';
 import path from 'node:path';
 import type {EstadoProvedor, PedidoPortaoTela, ResultadoChave} from '../compartilhado/api';
 import type {Projeto} from '../nucleo/projeto';
-import type {Perguntador} from './mcp-http';
+import type {McpHttp, Perguntador} from './mcp-http';
 import {acharChave, CofreMemoria, finalDaChave, type Cofre} from './ia/chaves';
 import {CofreArquivo, type Cifra} from './ia/cofre-arquivo';
+import {AppsDeFora} from './ia/apps-de-fora';
 import {ConfiguracaoIA} from './ia/config';
 import {textoDeSistema} from './ia/guia';
 import {listarModelos} from './ia/modelos';
@@ -128,11 +129,18 @@ export const cancelarPortaoDe = (origem: string) => {
 };
 
 export type CanaisIa = {provedores: string; gravarChave: string; apagarChave: string; modelos: string; configurar: string; padrao: string;
-  usoDoMes: string; conversaModelo: string; portaoPedido: string; portaoResposta: string; portaoCancelado: string; reverter: string};
+  usoDoMes: string; conversaModelo: string; portaoPedido: string; portaoResposta: string; portaoCancelado: string; reverter: string;
+  apps: string; appsLigar: string; appsNovo: string; appsConfigs: string; appsRevogar: string};
+
+// apps de IA de fora (padrão Screenpipe): criados no registro, ligados quando o MCP HTTP existir (iniciarAppsDeFora)
+let apps: AppsDeFora | null = null;
+export const iniciarAppsDeFora = () => apps?.iniciar();
+export const fecharAppsDeFora = () => apps?.fechar();
 
 export const registrarIpcIa = (o: {lidar: Lidar; canais: CanaisIa; claudeInstalado: () => boolean; pasta: string; cifra: Cifra;
   conversas: () => Pick<SessoesIA, 'definirModelo'>; enviar: (canal: string, ...a: unknown[]) => void;
-  ouvir: (canal: string, f: (...a: any[]) => void) => void; projeto: () => Projeto}) => {
+  ouvir: (canal: string, f: (...a: any[]) => void) => void; projeto: () => Projeto;
+  mcp: () => McpHttp | null; ponte: () => {exe: string; script: string}}) => {
   enviarATela = o.enviar;
   canalPedido = o.canais.portaoPedido;
   canalCancelado = o.canais.portaoCancelado;
@@ -155,4 +163,11 @@ export const registrarIpcIa = (o: {lidar: Lidar; canais: CanaisIa; claudeInstala
   lidar(canais.padrao, (id: string) => configuracao!.definirPadrao(id));
   lidar(canais.usoDoMes, () => configuracao!.usoDoMes());
   lidar(canais.conversaModelo, (id: number, modelo?: string) => o.conversas().definirModelo(id, modelo));
+  apps = new AppsDeFora({pasta: o.pasta, cofre: {ler: (p) => cofre.ler(p), gravar: (p, c) => cofre.gravar(p, c), apagar: (p) => cofre.apagar(p)},
+    mcp: o.mcp, ponte: o.ponte});
+  lidar(canais.apps, () => apps!.estado());
+  lidar(canais.appsLigar, (ligado: boolean, porta?: number) => apps!.ligar(Boolean(ligado), porta === undefined ? undefined : Number(porta)));
+  lidar(canais.appsNovo, (nome: string) => apps!.novo(nome));
+  lidar(canais.appsConfigs, (id: string) => apps!.configs(String(id)));
+  lidar(canais.appsRevogar, (id: string) => apps!.revogar(String(id)));
 };
