@@ -281,5 +281,5 @@ describe('versões limpas fora do git (som-D13)', () => {
     const entrou = git(p.raiz, 'diff', '--cached', '--name-only').split('\n').filter(Boolean);
     expect(entrou).toEqual(expect.arrayContaining(['.gitignore', 'midia/narracao.wav']));
     expect(entrou.filter((f) => f.includes('.limpo'))).toEqual([]);
-  });
+  }, 30_000); // git + ffmpeg + DSP de verdade: passa de 5 s quando a suíte inteira roda junto
 });
