@@ -29,6 +29,7 @@ import {registrarPrefsExportacao} from './ipc-exportacao';
 import {apagarLimposSemUso, registrarIpcLimpeza} from './limpeza-voz';
 import {registrarIpcLoudness} from './loudness';
 import {registrarRemoverFundo} from './remover-fundo';
+import {avisoDeQuedaEmLaco, decidirRecarga, garantirInstanciaUnica, trazerParaFrente} from './janela-segura'; // frente Casca
 
 // o mesmo id do instalador (electron-builder.yml): a barra de tarefas agrupa a janela com o atalho
 app.setAppUserModelId('br.com.bkmadvogados.estudio');
@@ -42,6 +43,9 @@ const PERFIL: Perfil = GB <= 8.5
   : GB <= 16.5 ? {nome: 'padrao', sessoes_claude: 4, escala_previa: 0.75, pixel_ratio: 1.5} : {nome: 'forte', sessoes_claude: 8, escala_previa: 1, pixel_ratio: 2};
 
 let janela: BrowserWindow | null = null;
+// frente Casca (transversal-D5): um Estúdio só por pasta de dados. A segunda abertura traz a primeira para a frente e sai.
+// ESTUDIO_VARIAS_INSTANCIAS=1 libera uma instância de desenvolvimento ao lado da instalada.
+const primeiraInstancia = process.env.ESTUDIO_VARIAS_INSTANCIAS === '1' || garantirInstanciaUnica(app, () => trazerParaFrente(janela));
 let sessao: SessaoProjeto | null = null;
 let avisoAbertura: string | undefined;
 let claude = false;
@@ -208,7 +212,18 @@ const criarJanela = () => {
   janela.webContents.on('did-start-navigation', (d) => {
     if (d.isMainFrame && !d.isSameDocument) largarTerminais();
   });
-  janela.webContents.on('render-process-gone', largarTerminais);
+  // frente Casca (transversal-D6): o renderer que cai (falta de memória no perfil leve) recarrega a janela em vez de ficar
+  // branca; o projeto segue aberto aqui e a tela o relê. Depois de quedas em laço, avisa em vez de recarregar de novo.
+  let recargas: number[] = [];
+  janela.webContents.on('render-process-gone', (_e, detalhes) => {
+    largarTerminais();
+    const decisao = decidirRecarga(detalhes.reason, recargas, Date.now());
+    recargas = decisao.recargas;
+    if (decisao.recarregar) janela?.webContents.reload();
+    else if (decisao.motivo === 'cai_em_laco' && janela && !janela.isDestroyed()) {
+      void dialog.showMessageBox(janela, {type: 'error', title: 'Estúdio', message: avisoDeQuedaEmLaco(detalhes.reason)});
+    }
+  });
   // ao fechar com um projeto aberto, a miniatura sai antes (meio segundo no máximo)
   let fechando = false;
   janela.on('close', (e) => {
@@ -468,6 +483,7 @@ registrarIpcLimpeza(lidar, exigirProjeto, enviar);
 registrarIpcLoudness(lidar, exigirProjeto, (documento) => (exigirProjeto(), sessao!.propsVideo(documento, midia.base)));
 
 app.on('ready', async () => {
+  if (!primeiraInstancia) return; // a segunda instância já pediu para sair (garantirInstanciaUnica)
   await midia.iniciar();
   // a rede do ler_fonte no app: net.fetch do Electron (proxy e certificados do sistema), assíncrono, 40 s e 20 MB no máximo
   mcpHttp = new McpHttp(path.join(app.getPath('userData'), 'mcp'), () => sessao?.projeto ?? null, criarRede((url, init) => net.fetch(url, init)));
