@@ -296,8 +296,10 @@ export const LinhaDoTempo: React.FC = () => {
     marcas.push(<div key={`M${s}`} className="tq maior" style={{left: x(s * 1000)}} />, <div key={`R${s}`} className="rot-t" style={{left: x(s * 1000)}}>{rotuloSeg(s)}</div>);
     if (menor) for (let m = s + menor; m < s + passo - 1e-6 && m <= durS; m += menor) marcas.push(<div key={`m${m.toFixed(2)}`} className="tq menor" style={{left: x(m * 1000)}} />);
   }
+  // o traço de quadro segue os qps do vídeo (60 qps = um traço a cada 1/60 s, não a cada 1/30 s; video-D16)
+  const qps = Number((props as {fps?: number}).fps) > 0 ? Number((props as {fps?: number}).fps) : 30;
   const quadros: React.CSSProperties | undefined = pxs >= 240 ? {
-    backgroundImage: `repeating-linear-gradient(90deg, var(--borda) 0 1px, transparent 1px ${pxs / 30}px)`,
+    backgroundImage: `repeating-linear-gradient(90deg, var(--borda) 0 1px, transparent 1px ${pxs / qps}px)`,
     backgroundSize: `${x(props.duracao_ms) - ESQ}px 3px`, backgroundPosition: `${ESQ}px 100%`, backgroundRepeat: 'no-repeat',
   } : undefined;
 
