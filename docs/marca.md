@@ -54,12 +54,27 @@ Camada nova (`textoNovo` e `formaNova`, em `camadas-novas.ts`) e o modelo de car
 
 ## Fontes
 
+- **Dentro do app, sem internet** (video-D9): Inter, Archivo, IBM Plex Sans e IBM Plex Mono vêm em
+  `src/composicoes/fontes-pacote/` (woff2 do subconjunto latin, que cobre o português, com a licença OFL de cada uma
+  ao lado). Antes cada família ia buscar o arquivo em `fonts.gstatic.com` e, sem rede ou atrás de um proxy, o render
+  esperava 60 s e falhava; legenda e marca d'água passavam pelo mesmo caminho. Agora `fontes.ts` carrega pelo CSS
+  (`FontFace` com `url()`, que vale em http e em `file://`) e o pacote do Remotion não cita a internet
+  (`scripts/exportar-teste-fontes.mjs` confere). Pesos: Inter e Archivo variáveis (100 a 900); Plex Sans e Mono, um
+  arquivo por peso de 100 a 700. Sem itálico: o navegador inclina. Caractere fora do latin cai numa fonte do sistema.
+- **Fonte que não carrega não cancela** (video-D10): o `loadFont` do `@remotion/fonts` chamava `cancelRender` em
+  qualquer erro, então uma fonte de kit apagada de `fontes/` derrubava a exportação inteira. `fontes.ts` carrega a
+  variante sozinho: se falha, avisa no console e registra a mesma família como apelido de uma fonte do sistema (Segoe
+  UI, Helvetica Neue, Arial, Roboto, DejaVu Sans; o negrito de verdade quando o peso é 600 ou mais), e o render segue.
+  Tenta de novo depois de 5 s. O `@remotion/fonts` deixou de ser importado (continua no `package.json`).
+- **A exportação da imagem espera** (imagem-D7): `aguardarFontes(nomes)` espera cada variante da família terminar de
+  carregar, ou de falhar, antes do PNG e do PDF; antes só as três famílias do Google que a imagem conhecia (sem a
+  Inter) eram esperadas e as de arquivo nunca.
 - **Seletor da imagem** (`opcoesDeFonte`, `comum.ts`): primeiro "Título do kit", "Texto do kit" e "Mono do kit"
-  (referências), depois as famílias do kit e do projeto (`fontes/`), as do Google e a do sistema. Inclui a Inter, e a
+  (referências), depois as famílias do kit e do projeto (`fontes/`), as do app e a do sistema. Inclui a Inter, e a
   fonte que a camada já usa entra sempre (imagem-D10).
-- **Fonte variável** (imagem-D14): `peso_max` em `FonteArquivo` e `pesoMax` em `FonteDeArquivo`. O arquivo é lido
-  (`fonte-variavel.ts`: tabela `fvar`, eixo `wght`, TTF/OTF/WOFF; o WOFF2 só pelo nome, "VariableFont" ou
-  "[wght]") e a fonte entra no navegador com `font-weight: 100 900`, não preso no 400. Peso dito à mão vale um só.
+- **Fonte variável importada no kit** (imagem-D14): `peso_max` em `FonteArquivo` e `pesoMax` em `FonteDeArquivo`. O
+  arquivo é lido (`fonte-variavel.ts`: tabela `fvar`, eixo `wght`, TTF/OTF/WOFF; o WOFF2 só pelo nome, "VariableFont"
+  ou "[wght]") e a fonte entra no navegador com `font-weight: 100 900`, não presa no 400. Peso dito à mão vale um só.
 - **Reaplicar o kit** (imagem-D13): o logo e as fontes que mudaram no kit trocam os do projeto (mesmo nome) e voltam
   em `atualizados`; o painel Marca avisa quais.
 
@@ -100,9 +115,16 @@ com o `documento` do vídeo. Volta: Ctrl+Z desfaz o patch do kit (a troca é um 
 
 ## Licenças desta frente
 
-Nenhuma dependência nova até aqui. Lucide (ISC) e `@remotion/fonts` já estavam no `package.json`.
+- Fontes empacotadas (`src/composicoes/fontes-pacote/`): **SIL Open Font License 1.1**, que permite uso comercial e
+  embutir no app. Origem: pacotes `@fontsource-variable/inter` 5.3.0, `@fontsource-variable/archivo` 5.3.0,
+  `@fontsource/ibm-plex-sans` 5.3.0 e `@fontsource/ibm-plex-mono` 5.3.0 (só o woff2 latin copiado; o texto da licença
+  de cada uma está ao lado, `LICENSE-*.txt`). Inter: The Inter Project Authors; Archivo: The Archivo Project Authors;
+  IBM Plex: IBM Corp. Nenhuma dependência nova no `package.json`.
+- Lucide (ISC) e `@remotion/fonts` (já no `package.json`; não é mais importado).
 
 ## O que não foi verificado
 
 Nada rodou no Electron (Bitdefender). A interface foi conferida na prévia web (porta 5202); a exportação, só por
-testes e fora do Electron.
+testes e por render do Remotion fora do Electron (`scripts/exportar-teste-fontes.mjs`). Sem rede de verdade desligada:
+o que se prova é que o pacote não cita `fonts.gstatic.com` e que as quatro famílias saem no quadro; o proxy que
+bloqueia o Google não foi simulado.
