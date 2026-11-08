@@ -401,9 +401,23 @@ export const trechosDeVoz = async (o: {cli: string; arquivoModelo: string; wav: 
   return trechos.length ? trechos : null;
 };
 
-/** Fica só a palavra que encosta num trecho de voz, com uma folga (o detector às vezes começa um pouco depois). */
-export const soNaVoz = <P extends {s: number; e: number}>(palavras: P[], trechos: {de: number; ate: number}[], folga_ms = 300): P[] =>
-  palavras.filter((p) => trechos.some((t) => p.e > t.de - folga_ms && p.s < t.ate + folga_ms));
+/** Fica a frase que encosta num trecho de voz. Frase: palavras seguidas com vão de até `emenda_ms`; basta uma palavra
+ *  dela encostar num trecho (com `folga_ms`) para a frase inteira ficar. Medido no conjunto da casa: palavra a palavra, o
+ *  filtro tirou "Amigo, você perdeu seu" do começo do vídeo do WhatsApp (o detector não pegou os primeiros 2,9 s, com
+ *  música, e o whisper deixou 410 ms entre "seu" e "emprego") e um "O" do C7. O que o whisper inventa no silêncio fica
+ *  isolado, segundos longe da fala. */
+export const soNaVoz = <P extends {s: number; e: number}>(palavras: P[], trechos: {de: number; ate: number}[], folga_ms = 300, emenda_ms = 1000): P[] => {
+  const naVoz = (p: P) => trechos.some((t) => p.e > t.de - folga_ms && p.s < t.ate + folga_ms);
+  const out: P[] = [];
+  for (let i = 0; i < palavras.length;) {
+    let j = i;
+    while (j + 1 < palavras.length && palavras[j + 1].s - palavras[j].e <= emenda_ms) j++;
+    const frase = palavras.slice(i, j + 1);
+    if (frase.some(naVoz)) out.push(...frase);
+    i = j + 1;
+  }
+  return out;
+};
 
 /** Roda o whisper-cli no WAV e devolve as palavras em ms desde o começo do WAV. */
 export const rodarWhisper = async (o: {cli: string; modelo: ModeloWhisper; arquivoModelo: string; wav: string; idioma?: string; threads?: number; sinal?: AbortSignal;

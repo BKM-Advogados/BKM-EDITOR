@@ -9,7 +9,7 @@
 //   npx tsx scripts/conjunto-casa.mjs medir      lê o que foi conferido e mede: palavras erradas (WER), glossário da
 //                                                casa e começo das palavras (até 100 ms). Com --refazer, transcreve de
 //                                                novo com o código de agora (para comparar modelo, vocabulário ou VAD).
-// Opções: --base <pasta das mídias>, --conferencia <pasta>, --modelo small|base, --sem-vad.
+// Opções: --base <pasta das mídias>, --conferencia <pasta>, --modelo small|base, --sem-vad; no preparar, --so <id,id>.
 import {createHash} from 'node:crypto';
 import {copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import os from 'node:os';
@@ -78,9 +78,13 @@ const rotulosDaAmostra = (palavras, n) => {
 
 if (comando === 'preparar') {
   mkdirSync(conf, {recursive: true});
-  const registro = {preparado_em: new Date().toISOString(), modelo: idModelo, vad: comVad, itens: {}};
+  // --so a,b: só esses itens (o registro dos outros fica como estava)
+  const so = opcao('--so')?.split(',');
+  const antes = so && existsSync(C('conjunto.json')) ? JSON.parse(readFileSync(C('conjunto.json'), 'utf-8')) : null;
+  const registro = {preparado_em: new Date().toISOString(), modelo: idModelo, vad: comVad, itens: {...(antes?.itens ?? {})}};
   let total = 0;
   for (const item of manifesto.itens) {
+    if (so && !so.includes(item.id)) { total += registro.itens[item.id] ? item.segundos : 0; continue; }
     const fonte = path.join(base, item.arquivo);
     if (!existsSync(fonte)) { log(`${item.id}: não achei ${fonte}`); continue; }
     const {palavras, segundos, fora_da_voz} = await transcrever(item);

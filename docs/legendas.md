@@ -66,7 +66,13 @@ baixa junto com o modelo. Quem já tem o whisper baixa o detector na próxima tr
 1. Uma passada do `whisper-cli` só com o VAD (`--vad -d 1`, que não decodifica nada; 2 a 3 s, quase tudo para
    carregar o modelo) dá os trechos de voz no relógio do arquivo.
 2. O whisper ouve o arquivo inteiro, como antes.
-3. Só fica a palavra que encosta num trecho de voz, com 300 ms de folga nas pontas.
+3. Fica a **frase** que encosta num trecho de voz. A frase são palavras seguidas com vão de até 1 s; basta uma
+   palavra dela encostar num trecho (300 ms de folga) para ela ficar inteira.
+
+Palavra a palavra, o filtro tirava fala de verdade no conjunto da casa. Tirou "Amigo, você perdeu seu" do começo do
+vídeo do WhatsApp: com música por baixo, o detector só achou voz em 2,9 s, e o whisper deixou 410 ms entre "seu" e
+"emprego". Também tirou um "O" do C7. Pela frase, tira 0 das 1.673 palavras do conjunto. O que o whisper inventa no
+silêncio fica isolado, segundos longe da fala.
 
 Sem voz nenhuma, sai lista vazia. Se o registro do `whisper-cli` não disser os trechos (outra versão), nada é filtrado.
 

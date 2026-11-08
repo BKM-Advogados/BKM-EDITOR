@@ -508,10 +508,14 @@ describe('VAD: o tempo das palavras volta ao relógio do arquivo e o que não é
     expect(semAnotacoes(['[nota', 'sem', 'fim'].map((w) => ({w}))).map((x) => x.w)).toEqual(['[nota', 'sem', 'fim']);
   });
 
-  it('como filtro: só fica a palavra que encosta num trecho de voz (com 300 ms de folga)', () => {
+  it('como filtro: fica a frase que encosta num trecho de voz; a palavra isolada no silêncio sai', () => {
     const ps = [{w: 'Obrigado.', s: 2000, e: 2400}, {w: 'Recebeu', s: 14100, e: 14500}, {w: 'proposta', s: 14600, e: 15000}, {w: 'fim', s: 16400, e: 16600}];
     expect(soNaVoz(ps, [{de: 14270, ate: 16220}]).map((p) => p.w)).toEqual(['Recebeu', 'proposta', 'fim']);
     expect(soNaVoz(ps, [])).toEqual([]);
+    // o começo do vídeo do WhatsApp: o detector só achou voz em 2,9 s, mas a frase vem colada desde 0,16 s
+    const zap = [{w: 'Amigo,', s: 160, e: 630}, {w: 'você', s: 880, e: 1380}, {w: 'perdeu', s: 1390, e: 2140}, {w: 'seu', s: 2150, e: 2530},
+      {w: 'emprego', s: 2940, e: 3260}];
+    expect(soNaVoz(zap, [{de: 2910, ate: 6000}]).map((p) => p.w)).toEqual(['Amigo,', 'você', 'perdeu', 'seu', 'emprego']);
   });
 
   it('o detector de voz entra nos argumentos e na lista do que falta baixar (0,9 MB, com SHA-256)', () => {
