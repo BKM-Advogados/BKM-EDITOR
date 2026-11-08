@@ -295,3 +295,45 @@ mais o recorte para a gêmea.
   trata o grupo como um). `agrupar_camadas` e `desagrupar_camadas` fazem e desfazem.
 - Comentário de carrossel traz `pagina_id`: ache a camada pela página com esse id e pelo `objeto_id` dentro dela; o
   caminho gravado pode estar velho.
+
+## Texto que cabe, guias e encaixe, PDF do A4 e exportação em partes (rodada 3)
+
+**Texto que cabe na caixa.** Campo opcional `caber: true` no texto: o tamanho passa a ser o maior, em px inteiros, em
+que as linhas cabem na altura da caixa e nenhum pedaço de palavra passa da largura (nada parte por letra); o `tamanho`
+fica de lado enquanto `caber` está ligado. A conta é `tamanhoQueCabe` em `pintura.ts`, com o mesmo `measureText` da
+pintura, e o texto com `caber` vai pelo canvas também na prévia: prévia, PNG e PDF dão o mesmo tamanho. Na tela: o
+botão "Caber na caixa" da barra de seleção, com um texto escolhido. Medido em 08/11/2026 com
+`scripts/comparar-imagem.mjs` (monitor em 50% contra o PNG em 0,5): diferença média 0,01 de 255 na página com o texto
+que cabe e o texto com hífen.
+
+**Quebra depois do hífen (imagem-D6).** A quebra de linha do canvas (`quebrarLinhas`) quebra também depois do hífen e
+dos travessões seguidos de letra, como o CSS da prévia: "Rescisão com pré-aviso indenizado" deixa "pré-" no fim da
+linha nos dois. Número com traço ("2026-11", "-10") não quebra. Antes, o PNG descia a palavra inteira e ganhava uma
+linha que a tela não tinha.
+
+**Guias e encaixe.** No arrasto (mover), a caixa do que anda (sem a foto recortada, que aparece pela máscara) encosta,
+a 5 px de tela, nas bordas e no centro da prancheta, nas bordas e centros das outras camadas visíveis, nas bordas da
+margem segura (com ela ligada) e nas linhas da grade (com ela ligada). As guias acesas aparecem em linha inteira
+(tracejada na grade), e a distância até o vizinho de cada lado (a camada mais perto cuja faixa cruza a da caixa, ou a
+borda da prancheta) aparece com o número em px. Alt segura o encaixe durante o arrasto. O menu **Guias** do transporte
+liga e desliga o encaixe (ligado por padrão), as réguas (por dentro das bordas de cima e da esquerda, com marcas a pelo
+menos 60 px de tela), a grade (doze colunas: 90 px num post de 1080) e a margem segura (as zonas da rede no feed 4:5,
+no story 9:16 e na miniatura do YouTube: coberta em vermelho translúcido, contorno tracejado; nos outros tamanhos, 5%
+de cada lado). A escolha fica por pessoa, no navegador; nada disso sai no PNG. Código: `src/nucleo/encaixe-imagem.ts`
+(puro) e `Guias.tsx`. Sem ferramenta do MCP: o encaixe é do gesto na tela; a IA alinha com `alinhar_camadas`.
+
+**PDF do A4 (imagem-D12).** O PDF do carrossel em A4 a 300 dpi (2480 × 3508, em pé ou deitado) sai com 72/300 pt por px:
+página de 21 × 29,7 cm (lido de volta no teste), e não de 87 × 124 cm. As imagens de rede continuam com 1 px = 1 pt,
+o que o LinkedIn espera (`pontosPorPixel` em `carrossel.ts`).
+
+**Exportação em partes (imagem-D19).** "Exportar carrossel" desenha, manda e solta uma página por vez:
+`exportarPaginasEmPartes.abrir` reserva a pasta, `parte` grava o PNG no disco assim que chega e `fechar` monta o PDF
+lendo os PNG de lá, na ordem. Antes, todos os PNG ficavam em base64 na memória e iam num pedido só. Os canais novos
+(`estudio:exportar-paginas-abrir`, `-parte`, `-fechar`) se registram dentro de `registrarExportarPaginas`. A página
+sozinha ("Exportar página") continua pelo pedido de sempre.
+
+### Para o guia da IA
+
+- Texto com `caber: true` ganha o maior tamanho que cabe na caixa; para mudar o tamanho da letra, mude a caixa
+  (`largura`, `altura`) ou tire o `caber` e use `tamanho`.
+- Para quebrar uma linha num ponto certo, use `\n` no texto; o hífen também é ponto de quebra.
