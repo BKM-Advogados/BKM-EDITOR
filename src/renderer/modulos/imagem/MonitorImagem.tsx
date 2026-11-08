@@ -8,7 +8,7 @@
 // Foto recortada por máscara: o clique escolhe a máscara e arrastá-la leva a foto junto; o duplo clique escolhe a foto,
 // que então anda e muda de tamanho dentro da máscara sem mexer nela.
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
-import {Check, ChevronDown, Download, Hand, ImagePlus, MessageSquarePlus, MousePointer2, Shapes, Square, Type, X, ZoomIn} from 'lucide-react';
+import {Check, ChevronDown, Download, Hand, ImagePlus, MessageSquarePlus, MousePointer2, MoveUpRight, Shapes, Square, Type, X, ZoomIn} from 'lucide-react';
 import type {CamadaImagem, Comentario, DocImagem, OperacaoPatch} from '../../../nucleo/documentos';
 import {paginaDoCaminho, temPaginas} from '../../../nucleo/carrossel';
 import {mascarasEmUso} from '../../../nucleo/acabamento';
@@ -23,6 +23,7 @@ import {novaForma, novaImagem, novoTexto} from './acoes';
 import {exportarPng} from './exportarPng';
 import {exportarPagina} from './exportarPaginas';
 import {BuscaIcones} from './BuscaIcones';
+import {InserirLinha} from './InserirLinha';
 import {PaginasImagem} from './PaginasImagem';
 import {CamadasDaPagina, FundoPintado} from './Prancheta';
 
@@ -93,6 +94,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
   const [ferramenta, setFerramenta] = useState<Ferramenta>('mover');
   const [inserindo, setInserindo] = useState(false);
   const [buscandoIcone, setBuscandoIcone] = useState(false); // frente Marca: busca de ícones do Lucide
+  const [inserindoLinha, setInserindoLinha] = useState(false); // frente Marca: linha e seta
   const [gesto, setGesto] = useState<Gesto | null>(null);
   const [nova, setNova] = useState<Geometria | null>(null); // forma sendo desenhada
   const [hover, setHover] = useState<string | null>(null);
@@ -404,6 +406,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
       {id: 'forma', nome: 'Forma (Shift faz quadrado)', tecla: 'U', icone: <Square />, ativa: !modoComentario && ferramenta === 'forma', aoClicar: usar('forma')},
       {id: 'imagem', nome: 'Inserir imagem do projeto', icone: <ImagePlus />, ativa: inserindo, aoClicar: () => setInserindo(true)},
       {id: 'icone', nome: 'Inserir ícone (balança, contrato, prazo…)', icone: <Shapes />, ativa: buscandoIcone, aoClicar: () => setBuscandoIcone(true)},
+      {id: 'linha', nome: 'Inserir linha ou seta', icone: <MoveUpRight />, ativa: inserindoLinha, aoClicar: () => setInserindoLinha(true)},
     ]] : []),
     [{id: 'm', nome: 'Comentário', tecla: 'M', icone: <MessageSquarePlus />, ativa: modoComentario, aoClicar: () => loja.definir({modoComentario: true})}],
   ];
@@ -493,6 +496,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
       </div>
       {inserindo && editavel && <InserirImagem documento={documento} doc={doc} fechar={() => setInserindo(false)} />}
       {buscandoIcone && editavel && <BuscaIcones documento={documento} doc={doc} fechar={() => setBuscandoIcone(false)} />}
+      {inserindoLinha && editavel && <InserirLinha documento={documento} doc={doc} fechar={() => setInserindoLinha(false)} />}
     </div>
   );
 };

@@ -39,7 +39,7 @@ export type CamadaImagem = {
   peso?: number;
   cor?: string;
   alinhar?: 'esquerda' | 'centro' | 'direita';
-  forma?: 'retangulo' | 'elipse' | 'icone'; // 'icone': um ícone do Lucide (campo `icone`), pintado como traço na cor de `preenchimento`
+  forma?: 'retangulo' | 'elipse' | 'icone' | 'linha'; // 'icone': ícone do Lucide (campo `icone`); 'linha': segmento com pontas e setas (campo `linha`)
   preenchimento?: string;
   raio?: number;
   // acabamento (src/nucleo/acabamento.ts, docs/imagem.md): o mesmo desenho na prévia e no PNG
@@ -51,13 +51,26 @@ export type CamadaImagem = {
   // ícones (frente Marca, rodada 3, src/nucleo/icones.ts): forma 'icone'; a cor é `preenchimento` (ou `degrade`)
   icone?: string; // nome do ícone do Lucide, em inglês e com hífen: "scale", "file-text"
   icone_espessura?: number; // espessura do traço na grade de 24 do ícone (padrão 2); acompanha a caixa
+  // linha e seta (frente Marca, rodada 3, src/nucleo/linha.ts): forma 'linha'; a cor é `preenchimento`, o ângulo é `rotacao`
+  linha?: Linha;
 };
 
 /** Sombra projetada, na direção da página (não gira com a camada). Desfoque e deslocamento em px do documento. */
 export type Sombra = {cor?: string; opacidade?: number; desfoque?: number; x?: number; y?: number};
 
-/** Contorno: por fora (padrão), centrado na borda ou por dentro. */
-export type Contorno = {cor?: string; espessura: number; posicao?: 'fora' | 'centro' | 'dentro'};
+/** Como o traço se desenha, no contorno e na linha: sólido, tracejado ou pontilhado; pontas retas, redondas ou quadradas;
+ *  junção redonda, pontuda ou chanfrada (o canto do retângulo, a dobra do texto). */
+export type EstiloDeTraco = 'solido' | 'tracejado' | 'pontilhado';
+export type PontaDeTraco = 'redonda' | 'reta' | 'quadrada';
+export type JuncaoDeTraco = 'redonda' | 'pontuda' | 'chanfrada';
+/** O que fica na ponta de uma linha. */
+export type PontaDeSeta = 'nenhuma' | 'seta' | 'triangulo' | 'losango' | 'circulo' | 'barra';
+
+/** Contorno: por fora (padrão), centrado na borda ou por dentro. Sólido, de pontas e junções redondas se não disser outra coisa. */
+export type Contorno = {cor?: string; espessura: number; posicao?: 'fora' | 'centro' | 'dentro'; estilo?: EstiloDeTraco; pontas?: PontaDeTraco; juncao?: JuncaoDeTraco};
+
+/** Linha ou seta (forma 'linha'): um segmento horizontal no meio da caixa, de ponta a ponta, que gira com `rotacao`. */
+export type Linha = {espessura?: number; estilo?: EstiloDeTraco; pontas?: PontaDeTraco; juncao?: JuncaoDeTraco; inicio?: PontaDeSeta; fim?: PontaDeSeta; tamanho_seta?: number};
 
 /** Parada do degradê: cor, posição de 0 a 1 e opacidade de 0 a 1. */
 export type ParadaDegrade = {cor: string; posicao: number; opacidade?: number};

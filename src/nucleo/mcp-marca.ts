@@ -1,5 +1,5 @@
 // Ferramentas do MCP para a marca na imagem (rodada 3, frente Marca): ver o kit do documento, pôr uma cor ou uma fonte do kit
-// numa camada e buscar e inserir ícones do Lucide. O que a pessoa faz no campo de cor e no seletor de fonte a IA faz aqui: a
+// numa camada, buscar e inserir ícones do Lucide e inserir linhas e setas. O que a pessoa faz no campo de cor e no seletor de fonte a IA faz aqui: a
 // camada recebe a referência ("@destaque", "@titulo"), não uma cópia do valor, e acompanha o kit quando ele troca. Todas
 // são da classe `livre` (gravam no diário com o autor e têm Reverter); nenhuma lê a web nem traz arquivo de fora.
 // Descrições curtas e esquemas sem z.any() nem união solta, porque o Gemini, o DeepSeek (modo strict) e os modelos locais
@@ -11,7 +11,8 @@ import {iconeNovo, type OpcoesIcone} from './camadas-novas';
 import {ehDocCenas} from './cenas';
 import {amostrasDaMarca, avisoDeContraste, ehReferenciaCor, resolverCor} from './cor-marca';
 import {buscarIcones, etiquetasDoIcone, existeIcone, sugerirIcones, VERSAO_LUCIDE} from './icones';
-import type {CamadaImagem, DocImagem, MarcaDoDocumento, OperacaoPatch} from './documentos';
+import {linhaNova, PONTAS_DE_SETA, type OpcoesLinha} from './linha';
+import type {CamadaImagem, DocImagem, MarcaDoDocumento, OperacaoPatch, PontaDeSeta} from './documentos';
 import {MARCA_NEUTRO, marcaDoKit} from './marca';
 import {ErroProjeto, type Projeto} from './projeto';
 
@@ -135,6 +136,7 @@ export const registrarMarca = (servidor: McpServer, projeto: Projeto, autor: str
   };
 
   registrarIcones(servidor, projeto, autor, origem, imagem);
+  registrarLinhas(servidor, projeto, autor, origem, imagem);
 
   servidor.registerTool('ver_marca', {
     description: 'Mostra o kit de marca do documento: nome, cores (com o nome que se usa em cor_da_marca) e fontes. Sem documento, o que a pessoa está vendo.',
@@ -228,6 +230,62 @@ export const registrarIcones = (servidor: McpServer, projeto: Projeto, autor: st
     const r = patchInserirIcone(doc, a);
     const gravado = projeto.aplicarPatch({documento: alvo, versao_base: versao, patch: r.patch, autor, origem, rotulo: `ícone ${r.icone} em ${r.pagina}`});
     return {ok: true, documento: alvo, camada: r.caminho, id: r.id, icone: r.icone, pagina: r.pagina, versao: gravado.versao, ...(r.avisos.length ? {avisos: r.avisos} : {})};
+  }));
+};
+
+// ---------- linha e seta ----------
+const ESTILOS = ['solido', 'tracejado', 'pontilhado'] as const;
+const PONTAS = ['redonda', 'reta', 'quadrada'] as const;
+const JUNCOES = ['redonda', 'pontuda', 'chanfrada'] as const;
+const PONTAS_SETA = PONTAS_DE_SETA.map(([v]) => v) as [PontaDeSeta, ...PontaDeSeta[]];
+
+export type PedidoLinha = Omit<OpcoesLinha, 'cor'> & {cor?: string; pagina?: string};
+
+/** O patch que insere uma linha ou seta do ponto (x1, y1) ao (x2, y2), em px do documento, numa página (a primeira, sem `pagina`). */
+export const patchInserirLinha = (doc: DocImagem, p: PedidoLinha) => {
+  const paginas = paginasDe(doc);
+  const i = p.pagina === undefined ? 0 : paginas.findIndex((x) => x.id === p.pagina);
+  if (i < 0) throw new ErroProjeto(`página não achada: ${p.pagina} (ids: ${paginas.map((x) => x.id).join(', ')})`, 'nao_achado');
+  const {marca, semKit} = kitDa(doc);
+  const avisos: string[] = [];
+  let cor: string | undefined;
+  if (p.cor !== undefined && p.cor.trim()) {
+    const c = p.cor.trim();
+    cor = /^(#|rgb|hsl)/i.test(c) ? c : referenciaDeCor(c, marca);
+  }
+  if (semKit && (cor === undefined || ehReferenciaCor(cor))) avisos.push('a imagem ainda não tem kit: a cor vem do neutro até aplicar_marca');
+  if (p.x1 === p.x2 && p.y1 === p.y2) avisos.push('os dois pontos são o mesmo: a linha tem 2 px');
+  const camadas = Array.isArray(paginas[i].camadas) ? paginas[i].camadas : [];
+  const nova = linhaNova({...p, cor});
+  const camada = {id: idLivre(camadas, nova.nome === 'Seta' ? 'seta' : 'linha'), ...nova};
+  const base = baseCamadas(doc, i);
+  return {patch: [{op: 'add', path: `${base}/-`, value: camada}] as OperacaoPatch[], id: camada.id, caminho: `${base}/${camadas.length}`, pagina: paginas[i].id, rotacao: camada.rotacao ?? 0, avisos};
+};
+
+export const registrarLinhas = (servidor: McpServer, projeto: Projeto, autor: string, origem: string, imagem: (documento?: string) => {alvo: string; doc: DocImagem; versao: string}) => {
+  servidor.registerTool('inserir_linha', {
+    description: 'Insere uma linha ou seta na imagem, do ponto (x1, y1) ao (x2, y2) em px, na cor de destaque do kit. A camada é uma forma "linha" com a caixa do comprimento do segmento e o ângulo em rotacao (0 aponta para a direita, 90 para baixo). Com fim "triangulo" é uma seta; estilo tracejado e pontilhado, pontas e junção mudam o traço.',
+    inputSchema: {
+      documento: z.string().optional().describe('id do documento de imagem'),
+      x1: z.number().describe('ponto de partida, x em px'),
+      y1: z.number().describe('ponto de partida, y em px'),
+      x2: z.number().describe('ponto de chegada, x em px'),
+      y2: z.number().describe('ponto de chegada, y em px'),
+      pagina: z.string().optional().describe('id da página do carrossel (padrão a primeira)'),
+      cor: z.string().optional().describe('nome da cor do kit (destaque) ou #RRGGBB'),
+      espessura: z.number().optional().describe('espessura em px (padrão 6)'),
+      estilo: z.enum(ESTILOS).optional().describe('solido, tracejado ou pontilhado'),
+      pontas: z.enum(PONTAS).optional().describe('pontas do traço: redonda, reta ou quadrada'),
+      juncao: z.enum(JUNCOES).optional().describe('junção: redonda, pontuda ou chanfrada'),
+      inicio: z.enum(PONTAS_SETA).optional().describe('ponta do início: nenhuma, seta, triangulo, losango, circulo ou barra'),
+      fim: z.enum(PONTAS_SETA).optional().describe('ponta do fim: nenhuma, seta, triangulo, losango, circulo ou barra'),
+      tamanho_seta: z.number().optional().describe('tamanho da ponta em px'),
+    },
+  }, seguro((a: PedidoLinha & {documento?: string}) => {
+    const {alvo, doc, versao} = imagem(a.documento);
+    const r = patchInserirLinha(doc, a);
+    const gravado = projeto.aplicarPatch({documento: alvo, versao_base: versao, patch: r.patch, autor, origem, rotulo: `${r.id} em ${r.pagina}`});
+    return {ok: true, documento: alvo, camada: r.caminho, id: r.id, pagina: r.pagina, rotacao: r.rotacao, versao: gravado.versao, ...(r.avisos.length ? {avisos: r.avisos} : {})};
   }));
 };
 

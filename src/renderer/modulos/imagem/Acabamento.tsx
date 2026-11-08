@@ -6,7 +6,7 @@ import React from 'react';
 import {Plus, Minus} from 'lucide-react';
 import type {CamadaImagem, Degrade, DocImagem} from '../../../nucleo/documentos';
 import {
-  CONTORNO_PADRAO, POSICOES_CONTORNO, SOMBRA_PADRAO, SOMBRA_SUAVE, contornoDaMarca, degradeDaMarca, degradeDe, kitDaImagem,
+  CONTORNO_PADRAO, ESTILOS_TRACO, JUNCOES_TRACO, POSICOES_CONTORNO, PONTAS_TRACO, SOMBRA_PADRAO, SOMBRA_SUAVE, contornoDaMarca, degradeDaMarca, degradeDe, ehVetorial, kitDaImagem,
 } from '../../../nucleo/acabamento';
 import {MARCAS_INICIAIS, type Marca} from '../../../nucleo/marca';
 import {avisar, trocar} from '../../estado/loja';
@@ -109,6 +109,13 @@ export const SecoesAcabamento: React.FC<{documento: string; caminho: string; c: 
             <CampoCor rotulo="Cor" valor={k.cor ?? CONTORNO_PADRAO.cor} aoVer={ver('contorno/cor')} aoMudar={(v) => gravar('contorno/cor', v)} />
             <CampoNumero rotulo="Espessura" valor={k.espessura} unidade="px" aoMudar={(v) => (v > 0 ? gravar('contorno/espessura', v) : avisar('a espessura precisa ser maior que zero', 'erro'))} />
             <CampoSelecao rotulo="Posição" valor={k.posicao ?? CONTORNO_PADRAO.posicao} opcoes={POSICOES_CONTORNO} aoMudar={(v) => gravar('contorno/posicao', v)} />
+            {c.tipo !== 'imagem' && !ehVetorial(c) && (
+              <>
+                <CampoSelecao rotulo="Estilo" valor={k.estilo ?? CONTORNO_PADRAO.estilo} opcoes={ESTILOS_TRACO} aoMudar={(v) => gravar('contorno/estilo', v === 'solido' ? undefined : v)} />
+                <CampoSelecao rotulo="Pontas" valor={k.pontas ?? CONTORNO_PADRAO.pontas} opcoes={PONTAS_TRACO} aoMudar={(v) => gravar('contorno/pontas', v === 'redonda' ? undefined : v)} />
+                <CampoSelecao rotulo="Junção" valor={k.juncao ?? CONTORNO_PADRAO.juncao} opcoes={JUNCOES_TRACO} aoMudar={(v) => gravar('contorno/juncao', v === 'redonda' ? undefined : v)} />
+              </>
+            )}
           </>
         )}
       </Secao>

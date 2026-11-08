@@ -3,12 +3,15 @@
 // padrão, os pontos do degradê, a folga que a sombra e o contorno pedem em volta da caixa e quem recorta quem; o
 // inspector lê as predefinições do kit de marca. Campo ausente ou fora do lugar volta ao padrão, nunca derruba a tela
 // (o Claude pode gravar o JSON à mão). Ver docs/imagem.md.
-import type {CamadaImagem, Contorno, Degrade, DocImagem, OperacaoPatch, ParadaDegrade, Sombra} from './documentos';
+import type {CamadaImagem, Contorno, Degrade, DocImagem, EstiloDeTraco, JuncaoDeTraco, OperacaoPatch, ParadaDegrade, PontaDeTraco, Sombra} from './documentos';
 import type {Marca} from './marca';
 
 export const SOMBRA_PADRAO: Required<Sombra> = {cor: '#000000', opacidade: 0.35, desfoque: 24, x: 0, y: 8};
-export const CONTORNO_PADRAO: Required<Contorno> = {cor: '#FFFFFF', espessura: 4, posicao: 'fora'};
+export const CONTORNO_PADRAO: Required<Contorno> = {cor: '#FFFFFF', espessura: 4, posicao: 'fora', estilo: 'solido', pontas: 'redonda', juncao: 'redonda'};
 export const POSICOES_CONTORNO: [Required<Contorno>['posicao'], string][] = [['fora', 'Por fora'], ['centro', 'Na borda'], ['dentro', 'Por dentro']];
+export const ESTILOS_TRACO: [EstiloDeTraco, string][] = [['solido', 'Sólido'], ['tracejado', 'Tracejado'], ['pontilhado', 'Pontilhado']];
+export const PONTAS_TRACO: [PontaDeTraco, string][] = [['redonda', 'Redondas'], ['reta', 'Retas'], ['quadrada', 'Quadradas']];
+export const JUNCOES_TRACO: [JuncaoDeTraco, string][] = [['redonda', 'Redonda'], ['pontuda', 'Pontuda'], ['chanfrada', 'Chanfrada']];
 
 const numero = (v: unknown, padrao: number, min = -Infinity, max = Infinity) =>
   typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : padrao;
@@ -32,7 +35,30 @@ export const contornoDe = (c: Pick<CamadaImagem, 'contorno'>): Required<Contorno
   const espessura = numero(k.espessura, 0, 0, 1000);
   if (!(espessura > 0)) return null;
   const posicao = k.posicao === 'centro' || k.posicao === 'dentro' ? k.posicao : 'fora';
-  return {cor: corOu(k.cor, CONTORNO_PADRAO.cor), espessura, posicao};
+  const {estilo, pontas, juncao} = tracoDe(k);
+  return {cor: corOu(k.cor, CONTORNO_PADRAO.cor), espessura, posicao, estilo, pontas, juncao};
+};
+
+/** Estilo, pontas e junção de um traço (contorno ou linha) com os padrões: sólido, pontas e junção redondas. Valor fora do
+ *  lugar volta ao padrão. */
+export const tracoDe = (t: {estilo?: unknown; pontas?: unknown; juncao?: unknown}) => ({
+  estilo: (t.estilo === 'tracejado' || t.estilo === 'pontilhado' ? t.estilo : 'solido') as EstiloDeTraco,
+  pontas: (t.pontas === 'reta' || t.pontas === 'quadrada' ? t.pontas : 'redonda') as PontaDeTraco,
+  juncao: (t.juncao === 'pontuda' || t.juncao === 'chanfrada' ? t.juncao : 'redonda') as JuncaoDeTraco,
+});
+
+/** O traço para o canvas: o desenho dos tracinhos (em px do documento, pela espessura `k`), as pontas e a junção. O tracejado
+ *  tem tracinhos de 3 espessuras e vãos de 2; o pontilhado, pontos de uma espessura com vãos de uma. Ponta redonda ou
+ *  quadrada aumenta cada tracinho de meia espessura de cada lado, então o tracinho encolhe e o vão cresce na mesma medida:
+ *  o desenho visto é o mesmo nas três pontas. */
+export const tracoParaCanvas = (t: {estilo?: unknown; pontas?: unknown; juncao?: unknown}, k: number, largura = k) => {
+  const {estilo, pontas, juncao} = tracoDe(t);
+  const cap: CanvasLineCap = pontas === 'reta' ? 'butt' : pontas === 'quadrada' ? 'square' : 'round';
+  const join: CanvasLineJoin = juncao === 'pontuda' ? 'miter' : juncao === 'chanfrada' ? 'bevel' : 'round';
+  const [tracinho, vao] = estilo === 'tracejado' ? [3 * k, 2 * k] : estilo === 'pontilhado' ? [k, k] : [0, 0];
+  const mais = cap === 'butt' ? 0 : largura; // o que cada tracinho ganha com a ponta (a largura desenhada: no contorno por fora, o dobro da espessura)
+  const dash = estilo === 'solido' ? [] : [Math.max(0.01, tracinho - mais), vao + mais];
+  return {dash, cap, join, miterLimit: 4};
 };
 
 /** Paradas em ordem de posição, presas de 0 a 1; uma parada só vira cor chapada (duas iguais). */
@@ -58,9 +84,15 @@ export const degradeDe = (d: unknown): (Required<Pick<Degrade, 'tipo' | 'angulo'
 /** Um ícone do Lucide (forma "icone" com o nome dele): sempre pintado em canvas, como traço vetorial. */
 export const ehIcone = (c: Pick<CamadaImagem, 'tipo' | 'forma' | 'icone'>) => c.tipo === 'forma' && c.forma === 'icone' && typeof c.icone === 'string' && c.icone !== '';
 
+/** Uma linha ou seta (forma "linha"): sempre pintada em canvas, como traço vetorial. */
+export const ehLinha = (c: Pick<CamadaImagem, 'tipo' | 'forma'>) => c.tipo === 'forma' && c.forma === 'linha';
+
+/** Ícone ou linha: o corpo é um traço vetorial (não uma caixa cheia), e o contorno sai do alfa dele, como o de uma foto. */
+export const ehVetorial = (c: Pick<CamadaImagem, 'tipo' | 'forma' | 'icone'>) => ehIcone(c) || ehLinha(c);
+
 /** A camada pede o caminho do acabamento (canvas na prévia)? Sem nada disso, a prévia continua em DOM. */
 export const temAcabamento = (c: CamadaImagem) =>
-  Boolean(ehIcone(c) || sombraDe(c) || contornoDe(c) || (c.tipo !== 'imagem' && degradeDe(c.degrade)));
+  Boolean(ehVetorial(c) || sombraDe(c) || contornoDe(c) || (c.tipo !== 'imagem' && degradeDe(c.degrade)));
 
 // ---------- geometria do degradê (a mesma do CSS) ----------
 

@@ -6,3 +6,9 @@
 .busca-icones-item { display: grid; place-items: center; aspect-ratio: 1; padding: 0; border: 1px solid transparent; border-radius: var(--raio); background: var(--fundo-3); color: var(--texto); cursor: pointer; }
 .busca-icones-item:hover, .busca-icones-item:focus-visible { border-color: var(--texto-2); }
 .busca-icones-grade .vazio { grid-column: 1 / -1; }
+
+/* Inserir linha ou seta do trilho (InserirLinha.tsx). */
+.inserir-linha { display: flex; flex-direction: column; gap: 2px; width: 220px; padding: 6px; }
+.inserir-linha-item { display: flex; align-items: center; gap: 10px; padding: 4px 6px; border: 1px solid transparent; border-radius: var(--raio); background: none; color: var(--texto); cursor: pointer; text-align: left; font-size: var(--tam-2); }
+.inserir-linha-item:hover, .inserir-linha-item:focus-visible { background: var(--fundo-3); border-color: var(--texto-2); }
+.amostra-linha { width: 120px; height: 28px; flex: none; color: var(--texto); }

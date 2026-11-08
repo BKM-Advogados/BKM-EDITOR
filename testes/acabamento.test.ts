@@ -27,7 +27,7 @@ describe('leitura do acabamento', () => {
     expect(sombraDe(camada('a', 'texto', {sombra: {opacidade: 0}}))).toBeNull();
     expect(sombraDe(camada('a', 'texto', {sombra: {opacidade: 3, desfoque: -5, x: Number.NaN}}))).toMatchObject({opacidade: 1, desfoque: 0, x: 0});
     expect(contornoDe(camada('a', 'forma', {contorno: {espessura: 0}}))).toBeNull();
-    expect(contornoDe(camada('a', 'forma', {contorno: {espessura: 6, posicao: 'qualquer' as never}}))).toEqual({cor: '#FFFFFF', espessura: 6, posicao: 'fora'});
+    expect(contornoDe(camada('a', 'forma', {contorno: {espessura: 6, posicao: 'qualquer' as never}}))).toEqual({cor: '#FFFFFF', espessura: 6, posicao: 'fora', estilo: 'solido', pontas: 'redonda', juncao: 'redonda'});
     expect(degradeDe({tipo: 'linear', paradas: []})).toBeNull();
     expect(degradeDe({tipo: 'x', paradas: [{cor: '#000', posicao: 0}]})).toMatchObject({tipo: 'linear', angulo: 180, centro: {x: 0.5, y: 0.5}});
   });

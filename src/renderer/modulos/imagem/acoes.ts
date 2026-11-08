@@ -3,6 +3,7 @@
 // um patch e deixa a seleção (ou a página ativa) no que acabou de nascer. As camadas entram sempre na página ativa.
 import type {CamadaImagem, DocImagem} from '../../../nucleo/documentos';
 import {formaNova, iconeNovo, textoNovo} from '../../../nucleo/camadas-novas';
+import {linhaDaPredefinicao} from '../../../nucleo/linha';
 import {docCarrossel, patchCarrossel, patchDuplicarPagina, patchExcluirPagina, patchMoverPagina, patchNovaPagina, patchRenomearPagina, type ResultadoPaginas} from '../../../nucleo/carrossel';
 import {aplicar, avisar, criarDocumento, loja, selecionar} from '../../estado/loja';
 import {pedirTexto} from '../../componentes/Dialogo';
@@ -32,6 +33,12 @@ export const novaForma = (documento: string, doc: DocImagem, caixa?: {x: number;
 
 /** Ícone novo do Lucide no centro da página ativa, na cor de destaque do kit. */
 export const novoIcone = (documento: string, doc: DocImagem, nome: string) => adicionarCamada(documento, 'icone', iconeNovo(doc, nome));
+
+/** Linha ou seta de uma predefinição (segmento horizontal de 40% da largura, no centro): o giro, o inspector. */
+export const novaLinha = async (documento: string, doc: DocImagem, predefinicao: string) => {
+  const camada = linhaDaPredefinicao(doc, predefinicao);
+  return camada ? adicionarCamada(documento, camada.nome === 'Seta' ? 'seta' : 'linha', camada) : false;
+};
 
 export const novaImagem = async (documento: string, doc: DocImagem, bruto: string) => {
   const src = caminhoNoProjeto(bruto);

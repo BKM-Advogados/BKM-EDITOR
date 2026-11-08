@@ -8,7 +8,8 @@ import React from 'react';
 import {ChevronRight, Copy, FileJson, Image as IconeImagem, Link, Scissors, Undo2, Unlink, WandSparkles} from 'lucide-react';
 import type {CamadaImagem, DocImagem, OperacaoPatch} from '../../../nucleo/documentos';
 import {baseCamadas, paginaDoCaminho} from '../../../nucleo/carrossel';
-import {mascaraDe, mascarasEmUso, patchRecortar, patchSoltar, podeRecortar} from '../../../nucleo/acabamento';
+import {ESTILOS_TRACO, JUNCOES_TRACO, PONTAS_TRACO, mascaraDe, mascarasEmUso, patchRecortar, patchSoltar, podeRecortar} from '../../../nucleo/acabamento';
+import {ESPESSURA_LINHA, PONTAS_DE_SETA, linhaDe} from '../../../nucleo/linha';
 import {resolverFonte} from '../../../nucleo/cor-marca';
 import {existeIcone, sugerirIcones} from '../../../nucleo/icones';
 import {aplicar, avisar, loja, patchTrocar, trocar, useLoja} from '../../estado/loja';
@@ -45,7 +46,7 @@ const InspectorCamada: React.FC<{documento: string; caminho: string; c: CamadaIm
   const gravar = (campo: keyof CamadaImagem) => (v: unknown) => void trocar(documento, `${caminho}/${campo}`, v, `${campo} de ${c.id}`);
   const positivo = (campo: keyof CamadaImagem) => (v: number) => (v > 0 ? gravar(campo)(v) : avisar(`${campo} precisa ser maior que zero`, 'erro'));
   const ver = (campo: keyof CamadaImagem) => (valor: unknown) => definirPrevia({documento, caminho: `${caminho}/${campo}`, valor});
-  const sub = c.tipo === 'texto' ? `Texto · ${resolverFonte(c.fonte ?? PADRAO.fonte, doc.marca)} ${c.peso ?? PADRAO.peso}` : c.tipo === 'imagem' ? `Imagem · ${c.src ?? ''}` : c.forma === 'icone' ? `Ícone · ${c.icone ?? ''}` : `Forma · ${c.forma === 'elipse' ? 'elipse' : 'retângulo'}`;
+  const sub = c.tipo === 'texto' ? `Texto · ${resolverFonte(c.fonte ?? PADRAO.fonte, doc.marca)} ${c.peso ?? PADRAO.peso}` : c.tipo === 'imagem' ? `Imagem · ${c.src ?? ''}` : c.forma === 'icone' ? `Ícone · ${c.icone ?? ''}` : c.forma === 'linha' ? 'Linha' : `Forma · ${c.forma === 'elipse' ? 'elipse' : 'retângulo'}`;
 
   return (
     <div className="painel">
@@ -95,7 +96,27 @@ const InspectorCamada: React.FC<{documento: string; caminho: string; c: CamadaIm
           </Secao>
         )}
 
-        {c.tipo === 'forma' && c.forma !== 'icone' && (
+        {c.tipo === 'forma' && c.forma === 'linha' && (() => {
+          const l = linhaDe(c);
+          // a primeira edição cria o objeto `linha`; as outras mudam o campo dele
+          const gravarLinha = (campo: string) => (valor: unknown) => void trocar(documento, c.linha ? `${caminho}/linha/${campo}` : `${caminho}/linha`, c.linha ? valor : {[campo]: valor}, `${campo} da linha ${c.id}`);
+          return (
+            <Secao titulo="Linha" chave="imagem:linha">
+              <CampoCor rotulo="Cor" valor={c.preenchimento ?? PADRAO.preenchimento} aoVer={ver('preenchimento')} aoMudar={gravar('preenchimento')} />
+              <CampoNumero rotulo="Espessura" valor={l.espessura} unidade="px" padrao={ESPESSURA_LINHA} aoRedefinir={() => gravarLinha('espessura')(undefined)}
+                aoMudar={(v) => (v > 0 ? gravarLinha('espessura')(v) : avisar('a espessura precisa ser maior que zero', 'erro'))} />
+              <CampoSelecao rotulo="Estilo" valor={l.estilo} opcoes={ESTILOS_TRACO} aoMudar={(v) => gravarLinha('estilo')(v === 'solido' ? undefined : v)} />
+              <CampoSelecao rotulo="Pontas" valor={l.pontas} opcoes={PONTAS_TRACO} aoMudar={(v) => gravarLinha('pontas')(v === 'redonda' ? undefined : v)} />
+              <CampoSelecao rotulo="Junção" valor={l.juncao} opcoes={JUNCOES_TRACO} aoMudar={(v) => gravarLinha('juncao')(v === 'redonda' ? undefined : v)} />
+              <CampoSelecao rotulo="Início" valor={l.inicio} opcoes={PONTAS_DE_SETA} aoMudar={(v) => gravarLinha('inicio')(v === 'nenhuma' ? undefined : v)} />
+              <CampoSelecao rotulo="Fim" valor={l.fim} opcoes={PONTAS_DE_SETA} aoMudar={(v) => gravarLinha('fim')(v === 'nenhuma' ? undefined : v)} />
+              <CampoNumero rotulo="Seta" valor={Math.round(l.tamanho)} unidade="px" dica="Tamanho da ponta: seta, triângulo, losango, círculo ou barra. A linha aponta pelo Giro da camada."
+                aoMudar={(v) => (v > 0 ? gravarLinha('tamanho_seta')(v) : avisar('o tamanho da seta precisa ser maior que zero', 'erro'))} />
+            </Secao>
+          );
+        })()}
+
+        {c.tipo === 'forma' && c.forma !== 'icone' && c.forma !== 'linha' && (
           <Secao titulo="Forma" chave="imagem:forma">
             <CampoSelecao rotulo="Forma" valor={c.forma ?? 'retangulo'} opcoes={[['retangulo', 'Retângulo'], ['elipse', 'Elipse']]} aoMudar={gravar('forma')} />
             <CampoCor rotulo="Preenchimento" valor={c.preenchimento ?? PADRAO.preenchimento} aoVer={ver('preenchimento')} aoMudar={gravar('preenchimento')} />

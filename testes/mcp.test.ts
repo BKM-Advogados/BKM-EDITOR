@@ -45,7 +45,7 @@ describe('MCP estudio', () => {
   it('lista as ferramentas', async () => {
     const {tools} = await cliente.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
-      'anotar_fonte', 'aplicar_marca', 'aplicar_patch', 'buscar_icone', 'checar_texto', 'cor_da_marca', 'criar_documento', 'editar_legenda', 'estado_do_editor', 'exportar_legendas', 'fonte_da_marca', 'importar_legendas', 'inserir_icone',
+      'anotar_fonte', 'aplicar_marca', 'aplicar_patch', 'buscar_icone', 'checar_texto', 'cor_da_marca', 'criar_documento', 'editar_legenda', 'estado_do_editor', 'exportar_legendas', 'fonte_da_marca', 'importar_legendas', 'inserir_icone', 'inserir_linha',
       'ler_comentario', 'ler_documento', 'ler_fonte', 'ler_legendas', 'listar_comentarios', 'listar_mudancas', 'listar_pesquisa', 'projeto_info', 'registrar_fato', 'remover_fundo', 'renomear_projeto',
       'resolver_comentario', 'responder_comentario', 'texto_da_fonte', 'transcrever', 'ver_marca',
     ]);

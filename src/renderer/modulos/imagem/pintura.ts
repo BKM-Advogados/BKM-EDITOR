@@ -7,11 +7,12 @@
 // (comum.ts). Ver docs/imagem.md.
 import type {CamadaImagem} from '../../../nucleo/documentos';
 import {
-  alcanceDaSombra, caixaPintada, contornoDe, corComOpacidade, degradeDe, ehIcone, elipseDoDegrade, intersecao, linhaDoDegrade, sombraDe, temAcabamento,
+  alcanceDaSombra, caixaPintada, contornoDe, corComOpacidade, degradeDe, ehLinha, ehVetorial, elipseDoDegrade, intersecao, linhaDoDegrade, sombraDe, temAcabamento, tracoParaCanvas,
   type ItemPintura, type Retangulo,
 } from '../../../nucleo/acabamento';
 import {ENTRELINHA, PADRAO, encaixe, familiaCss} from './comum';
-import {desenharIcone} from './icone';
+import {folgaDaLinha} from '../../../nucleo/linha';
+import {desenharVetorial} from './vetorial';
 
 /** Imagem pronta para desenhar e o tamanho natural do arquivo (o encaixe é sempre pelo original, mesmo num bitmap menor). */
 export type FonteImagem = {fonte: CanvasImageSource; iw: number; ih: number};
@@ -130,7 +131,7 @@ const silhueta = (ctx: CanvasRenderingContext2D, c: CamadaImagem) =>
   naCaixa(ctx, c, () => {
     ctx.fillStyle = '#000000';
     if (c.tipo === 'texto') escreverLinhas(ctx, layoutTexto(ctx, c), 'fillText');
-    else if (ehIcone(c)) desenharIcone(ctx, c, '#000000');
+    else if (ehVetorial(c)) desenharVetorial(ctx, c, '#000000');
     else if (c.tipo === 'forma') {
       caminhoForma(ctx, c);
       ctx.fill();
@@ -196,7 +197,7 @@ const pintarCorpo = (ctx: CanvasRenderingContext2D, c: CamadaImagem, img: FonteI
       const l = layoutTexto(ctx, c);
       ctx.fillStyle = d ? '#000000' : (c.cor ?? PADRAO.cor);
       escreverLinhas(ctx, l, 'fillText');
-    } else if (ehIcone(c)) desenharIcone(ctx, c, d ? '#000000' : (c.preenchimento ?? PADRAO.preenchimento));
+    } else if (ehVetorial(c)) desenharVetorial(ctx, c, d ? '#000000' : (c.preenchimento ?? PADRAO.preenchimento));
     else {
       ctx.fillStyle = d ? '#000000' : (c.preenchimento ?? PADRAO.preenchimento);
       caminhoForma(ctx, c);
@@ -222,8 +223,12 @@ const tracoDoCaminho = (forma: CamadaImagem, k: NonNullable<ReturnType<typeof co
   const {c, ctx} = canvasIgual(w, h, t);
   naCaixa(ctx, forma, () => {
     ctx.lineWidth = k.posicao === 'centro' ? k.espessura : k.espessura * 2;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
+    // estilo, pontas e junção do contorno (sólido, redondas e redonda se não disser): o mesmo traço na prévia e no PNG
+    const t = tracoParaCanvas(k, k.espessura, ctx.lineWidth);
+    ctx.lineJoin = t.join;
+    ctx.lineCap = t.cap;
+    ctx.miterLimit = t.miterLimit;
+    ctx.setLineDash(t.dash);
     ctx.strokeStyle = cor(ctx, k.cor);
     if (forma.tipo === 'texto') escreverLinhas(ctx, layoutTexto(ctx, forma), 'strokeText');
     else if (forma.tipo === 'forma') {
@@ -292,8 +297,10 @@ const tracoDoAlfa = (corpo: HTMLCanvasElement, k: NonNullable<ReturnType<typeof 
  *  todos os lados (o contorno por dentro precisa de avesso em volta da foto para engordar). */
 const folgaLocal = (forma: CamadaImagem) => {
   if (forma.tipo === 'texto') return folgaDoTexto(forma);
-  const e = forma.tipo === 'imagem' || ehIcone(forma) ? (contornoDe(forma)?.espessura ?? 0) : 0;
-  return {esq: e, dir: e, cima: e, baixo: e};
+  const e = forma.tipo === 'imagem' || ehVetorial(forma) ? (contornoDe(forma)?.espessura ?? 0) : 0;
+  if (!ehLinha(forma)) return {esq: e, dir: e, cima: e, baixo: e};
+  const l = folgaDaLinha(forma); // a seta e a ponta redonda passam da caixa
+  return {esq: l.esq + e, dir: l.dir + e, cima: l.cima + e, baixo: l.baixo + e};
 };
 
 /** Região do canvas (px do canvas, inteiros) que o corpo e o contorno ocupam, presa ao canvas mais o alcance da sombra
@@ -331,7 +338,7 @@ const pintarComAcabamento = (ctx: CanvasRenderingContext2D, item: ItemPintura, i
 
   const k = contornoDe(forma);
   if (k) {
-    const traco = forma.tipo === 'imagem' || ehIcone(forma) ? tracoDoAlfa(corpo, k, escala) : tracoDoCaminho(forma, k, r.w, r.h, t);
+    const traco = forma.tipo === 'imagem' || ehVetorial(forma) ? tracoDoAlfa(corpo, k, escala) : tracoDoCaminho(forma, k, r.w, r.h, t);
     cc.save();
     cc.setTransform(1, 0, 0, 1, 0, 0);
     cc.drawImage(traco, 0, 0);
