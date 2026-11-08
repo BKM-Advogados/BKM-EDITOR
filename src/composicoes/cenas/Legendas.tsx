@@ -1,7 +1,8 @@
 // Legendas do vídeo de cenas (src/nucleo/legendas.ts, docs/legendas.md): o segmento da hora, com a palavra falada em
 // destaque, no estilo escolhido (posição, tamanho, caixa, destaque) e com as cores e a fonte do tema, que o kit de marca
 // preenche. A legenda fica dentro da área segura do destino (o que a interface de cada rede cobre, zonas-seguras.ts),
-// por cima dos efeitos. Entra no VideoCenas com uma linha; sem `legendas_cenas` nas props, não desenha nada.
+// por cima dos efeitos. Entra no VideoCenas com uma linha; sem `legendas_cenas` nas props, não desenha nada. A legenda
+// leva `data-origem` (/legendas/segmentos/N) e recebe o clique: no monitor, clicar seleciona e M comenta nela.
 import React from 'react';
 import {useCurrentFrame, useVideoConfig} from 'remotion';
 import {fonte} from '../fontes';
@@ -51,7 +52,7 @@ const Segmento: React.FC<{s: SegmentoLegendaP; ms: number; e: EstiloLegendaP; ta
     ? {background: comAlfa(e.fundo, 0.82), padding: `${tam * 0.12}px ${tam * 0.32}px`, borderRadius: tam * 0.22, boxDecorationBreak: 'clone', WebkitBoxDecorationBreak: 'clone'}
     : {};
   return (
-    <div data-legenda={s.origem} style={{opacity: o, transform: `translateY(${(1 - entra) * tam * 0.25}px)`, textAlign: 'center', fontFamily: familia, fontWeight: e.peso,
+    <div data-legenda={s.origem} data-origem={s.origem} style={{pointerEvents: 'auto', opacity: o, transform: `translateY(${(1 - entra) * tam * 0.25}px)`, textAlign: 'center', fontFamily: familia, fontWeight: e.peso,
       fontSize: tam, lineHeight: e.caixa === 'linha' ? 1.42 : 1.18, textShadow: sombra, letterSpacing: e.maiusculas ? '0.01em' : undefined, ...contorno}}>
       {e.falante && s.falante && <div style={{fontSize: tam * 0.62, fontWeight: 600, color: e.cor_suave, marginBottom: tam * 0.12}}>{s.falante}</div>}
       {linhasDe(s).map((l, i) => (

@@ -1,6 +1,18 @@
 // Rodada 3 da frente Fala (docs/legendas.md): os defeitos da área e a régua das legendas. Cada describe cita o id.
-import {describe, expect, it} from 'vitest';
-import {lerLegendas, textoDeLegenda} from '../src/nucleo/legendas';
+import React from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+import {describe, expect, it, vi} from 'vitest';
+import {Legendas} from '../src/composicoes/cenas/Legendas';
+import {novoDocCenas} from '../src/nucleo/cenas';
+import {lerLegendas, resolverLegendas, textoDeLegenda} from '../src/nucleo/legendas';
+
+const tela = vi.hoisted(() => ({quadro: 0}));
+vi.mock('remotion', async (original) => ({
+  ...(await original<typeof import('remotion')>()),
+  useCurrentFrame: () => tela.quadro,
+  useVideoConfig: () => ({fps: 30, width: 1080, height: 1920, durationInFrames: 1, id: 'x', defaultProps: {}, props: {}}),
+}));
+const TEMA = novoDocCenas({largura: 1080, altura: 1920, fps: 30}).tema;
 
 const SRT = '1\r\n00:00:01,000 --> 00:00:02,500\r\nA rescisão e o aviso prévio\r\n\r\n2\r\n00:00:03,000 --> 00:00:04,000\r\nmudança de função\r\n';
 /** Windows-1252: ã = E3, é = E9, ç = E7 (o "ANSI" do Bloco de Notas). */
@@ -25,5 +37,17 @@ describe('legenda em ANSI importa com os acentos certos (video-N6)', () => {
     expect(lerLegendas(lido.texto, 'x.srt').segmentos.map((s) => s.texto)).toEqual(['A rescisão e o aviso prévio', 'mudança de função']);
     // sem a correção, o UTF-8 frouxo trocava cada acento pelo caractere de substituição
     expect(new TextDecoder('utf-8').decode(ansi(SRT))).toContain('�');
+  });
+});
+
+describe('legenda se seleciona e se comenta no monitor (transversal-N7)', () => {
+  it('o segmento leva data-origem com o caminho no documento e recebe o clique', () => {
+    const legendas = resolverLegendas({segmentos: [{id: 'leg-1', em: 0, sai: 2000, texto: 'primeira'}, {id: 'leg-2', em: 2000, sai: 4000, texto: 'segunda'}]},
+      {largura: 1080, altura: 1920, tema: TEMA, duracao_ms: 4000})!;
+    tela.quadro = 75; // 2,5 s: a segunda
+    const html = renderToStaticMarkup(React.createElement(Legendas, {legendas}));
+    expect(html).toMatch(/data-origem="\/legendas\/segmentos\/1" style="pointer-events:auto/);
+    // o monitor procura [data-origem] sob o clique (MonitorVideo.tsx, origemSob); a caixa de fora segue sem eventos
+    expect(html).toMatch(/data-legendas="true" style="[^"]*pointer-events:none/);
   });
 });

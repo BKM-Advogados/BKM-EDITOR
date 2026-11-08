@@ -40,7 +40,7 @@ const legendasC2 = (predefinicao: 'classica' | 'caixa' | 'karaoke', largura = 10
 const desenhadas = (legendas: LegendasP, quadro: number) => {
   tela.quadro = quadro;
   const html = renderToStaticMarkup(React.createElement(Legendas, {legendas}));
-  return [...html.matchAll(/data-legenda="([^"]+)" style="opacity:([\d.e-]+)/g)].map((m) => ({origem: m[1], opacidade: Number(m[2])}));
+  return [...html.matchAll(/data-legenda="([^"]+)"[^>]*? style="[^"]*?opacity:([\d.e-]+)/g)].map((m) => ({origem: m[1], opacidade: Number(m[2])}));
 };
 
 describe('uma legenda por quadro (video-N3)', () => {
