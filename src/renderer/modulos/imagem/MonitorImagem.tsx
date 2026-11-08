@@ -3,19 +3,20 @@
 // Z zoom | T texto, U forma, inserir imagem | M comentário (as teclas valem neste monitor). Apertar numa camada já a
 // escolhe e arrastar a move, mesmo sem estar selecionada (o gesto do Canva); Shift+clique põe ou tira da seleção,
 // arrastar no vazio faz o laço, Ctrl+A escolhe a página toda e Esc solta. Várias selecionadas andam juntas e a barra
-// de cima alinha e distribui (BarraSelecao.tsx). A alça redimensiona uma camada (Shift mantém a proporção; girada, o
+// de cima alinha e distribui (BarraSelecao.tsx). Grupo (Ctrl+G, Ctrl+Shift+G): o clique escolhe o grupo inteiro e o
+// duplo clique uma camada dele. Camada travada (Ctrl+Shift+L) se escolhe mas não anda nem muda de tamanho. A alça redimensiona uma camada (Shift mantém a proporção; girada, o
 // canto oposto fica parado), com um patch só ao soltar. Com a ferramenta de comentário (M), clicar abre um balão ancorado na camada e
 // no ponto da imagem; os pinos mostram os comentários do documento. Num carrossel, o monitor mostra a página ativa (a
 // barra de páginas fica entre a peça e o transporte, PaginasImagem.tsx) e os caminhos das camadas levam a página.
 // Foto recortada por máscara: o clique escolhe a máscara e arrastá-la leva a foto junto; o duplo clique escolhe a foto,
 // que então anda e muda de tamanho dentro da máscara sem mexer nela.
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
-import {Check, ChevronDown, Download, Hand, ImagePlus, MessageSquarePlus, MousePointer2, Square, Type, X, ZoomIn} from 'lucide-react';
+import {Check, ChevronDown, Download, Hand, ImagePlus, Lock, MessageSquarePlus, MousePointer2, Square, Type, X, ZoomIn} from 'lucide-react';
 import type {CamadaImagem, Comentario, DocImagem} from '../../../nucleo/documentos';
-import {paginaDoCaminho, temPaginas} from '../../../nucleo/carrossel';
-import {caixaDe, comAcompanhantes, patchMover, redimensionarGirada, tocadasPor} from '../../../nucleo/layout-imagem';
+import {caminhoDoAlvo, paginaDoAlvo, paginaDoCaminho, temPaginas} from '../../../nucleo/carrossel';
+import {caixaDe, comAcompanhantes, membrosDoGrupo, patchMover, redimensionarGirada, tocadasPor, travada} from '../../../nucleo/layout-imagem';
 import {CamadaEfeitos} from '../../../composicoes/efeitos/CamadaEfeitos';
-import {alternarNaSelecao, aplicar, caminhosDaSelecao, comentar, loja, patchTrocar, selecionar, selecionarVarias, useLoja} from '../../estado/loja';
+import {aplicar, caminhosDaSelecao, comentar, loja, patchTrocar, selecionar, selecionarVarias, useLoja} from '../../estado/loja';
 import {SemDocumento} from '../../componentes/SemDocumento';
 import {BotaoMenu, usarFora} from '../../componentes/Menu';
 import {Trilho, teclaLivre} from '../../componentes/Trilho';
@@ -26,6 +27,7 @@ import {exportarPagina} from './exportarPaginas';
 import {PaginasImagem} from './PaginasImagem';
 import {CamadasDaPagina, FundoPintado} from './Prancheta';
 import {BarraSelecao, type VistaAlvo} from './BarraSelecao';
+import {agruparSelecao, alternarTravaSelecao, desagruparSelecao} from './acoesSelecao';
 
 type Geometria = {x: number; y: number; largura: number; altura: number};
 // uma camada no gesto: índice, id (para o test do patch) e a geometria
@@ -126,8 +128,10 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
     });
   }, [camadasPag, base, previa, gesto, documento]);
   // pinos da página ativa (e os sem camada, que são do documento)
-  const pinos = useMemo(() => comentarios.filter((c) => c.documento === documento && c.alvo.ponto && (!c.alvo.objeto || !docValido(doc) || !temPaginas(doc) || paginaDoCaminho(doc, c.alvo.objeto) === (ativa?.p ?? 0))),
-    [comentarios, documento, doc, ativa?.p]);
+  // num carrossel, o pino fica na página do comentário pelo id dela (imagem-D5), não pelo caminho gravado
+  const pinos = useMemo(() => comentarios.filter((c) => c.documento === documento && c.alvo.ponto
+    && (!(c.alvo.objeto || c.alvo.pagina_id) || !docValido(doc) || !temPaginas(doc) || paginaDoAlvo(doc, c.alvo) === (ativa?.p ?? 0))),
+  [comentarios, documento, doc, ativa?.p]);
   // a prévia vale até o documento mudar (o patch dela chegou, ou outra mão mexeu)
   useEffect(() => definirPrevia(null), [doc]);
   // seleção numa camada de outra página (pelo painel de comentários, pelo pino): a página dela vem para a frente
@@ -136,6 +140,16 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
     const p = paginaDoCaminho(doc, selecao.caminho);
     if (p >= 0 && p !== ativa.p) irParaPagina(documento, doc, p);
   }, [selecao, documento, doc, ativa]);
+  // comentário aberto pelo painel (que escolhe o caminho gravado): a camada é achada de novo pela página e pelo id dela,
+  // que não mudam quando as páginas mudam de lugar (imagem-D5)
+  useEffect(() => {
+    const c = comentarios.find((x) => x.id === comentarioAberto);
+    if (!c || !documento || c.documento !== documento || !docValido(doc) || !temPaginas(doc) || !c.alvo.pagina_id) return;
+    const caminho = caminhoDoAlvo(doc, c.alvo);
+    const atual = loja.get().selecao;
+    if (caminho && !(atual?.documento === documento && atual.caminho === caminho)) selecionar({documento, caminho});
+    else if (!caminho && paginaDoAlvo(doc, c.alvo) >= 0) irParaPagina(documento, doc, paginaDoAlvo(doc, c.alvo));
+  }, [comentarioAberto]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const valido = docValido(doc);
   const W = valido ? Math.max(1, doc.largura) : 1;
@@ -198,6 +212,13 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
           return;
         }
         if (e.key === 'Escape' && !e.ctrlKey && loja.get().selecao?.documento === documento) return void selecionar(null);
+        // Ctrl+G agrupa, Ctrl+Shift+G desagrupa, Ctrl+Shift+L trava ou destrava (com seleção nesta imagem)
+        const tecla = e.key.toLowerCase();
+        if ((e.ctrlKey || e.metaKey) && !e.altKey && (tecla === 'g' || (tecla === 'l' && e.shiftKey)) && loja.get().selecao?.documento === documento) {
+          e.preventDefault();
+          void (tecla === 'l' ? alternarTravaSelecao() : e.shiftKey ? desagruparSelecao() : agruparSelecao());
+          return;
+        }
       }
       if (!teclaLivre(e) || e.shiftKey) return;
       const f = POR_TECLA[e.key.toLowerCase()];
@@ -266,6 +287,10 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
       const foto = ((el as HTMLElement).closest?.('[data-foto]') as HTMLElement | null)?.dataset.foto;
       if (foto && palco.current?.contains(el)) return selecionar({documento, caminho: foto});
     }
+    // dentro de um grupo: só a camada sob o cursor
+    const caminho = caminhoSob(ev.clientX, ev.clientY);
+    const i = caminho ? indiceDe(caminho, base) : -1;
+    if (caminho && i >= 0 && camadasPag[i]?.grupo) selecionar({documento, caminho});
   };
 
   const mover = (ev: React.MouseEvent) => {
@@ -331,7 +356,8 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
   const naSelecao = (x: number, y: number) => document.elementsFromPoint(x, y).some((el) => (el as HTMLElement).dataset?.sel !== undefined && palco.current?.contains(el));
 
   const comecarArrasto = (ev: React.PointerEvent, modo: Arrasto['modo'], indices: number[]) => {
-    const pecas = (modo === 'mover' ? comAcompanhantes(camadasPag, indices) : indices).map((i) => pecaDe(camadasPag[i], i));
+    // camada travada fica (o resto da seleção anda)
+    const pecas = (modo === 'mover' ? comAcompanhantes(camadasPag, indices) : indices).filter((i) => !travada(camadasPag[i])).map((i) => pecaDe(camadasPag[i], i));
     if (!pecas.length) return;
     ev.currentTarget.setPointerCapture(ev.pointerId);
     arrasto.current = {x0: ev.clientX, y0: ev.clientY, modo, pecas, rot: modo === 'redimensionar' ? (camadasPag[indices[0]].rotacao ?? 0) : 0, alvo: null};
@@ -344,11 +370,17 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
     if ((ev.target as HTMLElement).closest?.('.pino, .balao')) return;
     const caminho = caminhoSob(ev.clientX, ev.clientY);
     const i = caminho ? indiceDe(caminho, base) : -1;
-    if (ev.shiftKey && caminho) return alternarNaSelecao(documento, caminho);
+    // camada de grupo vem com o grupo inteiro (a que se apertou fica como principal)
+    const grupo = i >= 0 ? membrosDoGrupo(camadasPag, i) : [];
+    if (ev.shiftKey && caminho) {
+      const todos = grupo.map((k) => `${base}/${k}`);
+      const dentro = caminhosSel.includes(caminho);
+      return selecionarVarias(documento, dentro ? caminhosSel.filter((c) => !todos.includes(c)) : [...caminhosSel, ...todos.filter((c) => c !== caminho), caminho]);
+    }
     if (!ev.shiftKey && (naSelecao(ev.clientX, ev.clientY) || idxSel.includes(i)) && idxSel.length) return comecarArrasto(ev, 'mover', idxSel);
     if (caminho && i >= 0) {
-      selecionar({documento, caminho});
-      return comecarArrasto(ev, 'mover', [i]);
+      selecionarVarias(documento, [...grupo.filter((k) => k !== i).map((k) => `${base}/${k}`), caminho]);
+      return comecarArrasto(ev, 'mover', grupo);
     }
     // vazio: o laço (com Shift, soma à seleção de agora)
     if (!ev.shiftKey) selecionar(null);
@@ -438,6 +470,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
     await comentar(documento, textoBalao.trim(), {
       objeto: c ? balao.caminho : undefined, objeto_id: c?.id, contexto: c ? contextoDe(c) : undefined,
       ponto: {x: +(balao.x / b.width).toFixed(4), y: +(balao.y / b.height).toFixed(4)},
+      ...(temPaginas(doc) ? {pagina_id: ativa.pagina.id} : {}), // a página pelo id: o caminho muda quando as páginas mudam (imagem-D5)
     });
     setBalao(null);
     loja.definir({modoComentario: false});
@@ -446,8 +479,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
   const abrirPino = (c: Comentario) => {
     loja.definir({comentarioAberto: c.id});
     if (!editavel) return;
-    const porId = c.alvo.objeto_id ? camadasPag.findIndex((x) => x.id === c.alvo.objeto_id) : -1;
-    const caminho = porId >= 0 ? `${base}/${porId}` : c.alvo.objeto;
+    const caminho = caminhoDoAlvo(doc, c.alvo) ?? (c.alvo.pagina_id ? undefined : c.alvo.objeto);
     if (caminho) selecionar({documento, caminho});
   };
 
@@ -509,10 +541,11 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
               {sobre && <div className="caixa-hover" style={caixaCss(sobre, escala)} />}
               {nova && <div className="caixa-nova" style={{left: nova.x * escala, top: nova.y * escala, width: nova.largura * escala, height: nova.altura * escala}} />}
               {sel && (
-                <div className="caixa-sel" data-sel="" style={{...caixaCss(sel, escala), pointerEvents: modoComentario || ferr !== 'mover' ? 'none' : undefined, borderStyle: visivel(sel) ? undefined : 'dashed'}}
+                <div className="caixa-sel" data-sel="" style={{...caixaCss(sel, escala), pointerEvents: modoComentario || ferr !== 'mover' ? 'none' : undefined,
+                  borderStyle: visivel(sel) && !travada(sel) ? undefined : 'dashed', cursor: travada(sel) ? 'not-allowed' : undefined}} title={travada(sel) ? 'Travada: Ctrl+Shift+L destrava' : undefined}
                   onClick={(e) => e.stopPropagation()}>
-                  {!sel.rotacao && sel.y * escala > 20 && <span className="etiqueta-sel">{rotuloCamada(sel)}</span>}
-                  <div className="alca" onPointerDown={iniciarRedimensionar} title="Redimensionar (Shift mantém a proporção)" />
+                  {!sel.rotacao && sel.y * escala > 20 && <span className="etiqueta-sel">{travada(sel) && <Lock className="i12" style={{marginRight: 3}} />}{rotuloCamada(sel)}</span>}
+                  {!travada(sel) && <div className="alca" onPointerDown={iniciarRedimensionar} title="Redimensionar (Shift mantém a proporção)" />}
                 </div>
               )}
               {caixaSel && (

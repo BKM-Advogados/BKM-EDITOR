@@ -7,7 +7,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import {ArrowLeft, ArrowRight, Copy, Download, FolderOpen, LayoutGrid, MoreHorizontal, Pencil, Plus, Trash2} from 'lucide-react';
 import type {ResultadoExportarPaginas} from '../../../compartilhado/api';
 import type {DocImagem} from '../../../nucleo/documentos';
-import {paginaDoCaminho} from '../../../nucleo/carrossel';
+import {paginaDoAlvo} from '../../../nucleo/carrossel';
 import {FORMATOS_IMAGEM} from '../../../nucleo/formatos';
 import {useLoja} from '../../estado/loja';
 import {BotaoMenu, type ItemMenu} from '../../componentes/Menu';
@@ -26,7 +26,7 @@ type Alvo = {i: number; lado: 'antes' | 'depois'};
 export const PaginasImagem: React.FC<{documento: string; doc: DocImagem}> = ({documento, doc}) => {
   const ativa = usarPaginaAtiva(documento, doc);
   // páginas com comentário aberto (lista de índices: a loja compara listas por item e não reavisa à toa)
-  const comComentario = useLoja((e) => e.comentarios.filter((c) => c.estado === 'aberto' && c.documento === documento).map((c) => paginaDoCaminho(doc, c.alvo.objeto)));
+  const comComentario = useLoja((e) => e.comentarios.filter((c) => c.estado === 'aberto' && c.documento === documento).map((c) => paginaDoAlvo(doc, c.alvo)));
   const [renomeando, setRenomeando] = useState<number | null>(null);
   const [nome, setNome] = useState('');
   const [arrastando, setArrastando] = useState<number | null>(null); // para a classe da miniatura

@@ -3,11 +3,14 @@
 // fica no trilho do monitor (T, U, inserir imagem). Num carrossel, o cabeçalho diz em que página se está; trocar de
 // página é na barra de páginas do monitor (ou PageUp/PageDown). O menu ⋯ da camada recorta a imagem pela camada de
 // cima e solta (acabamento.ts); a foto recortada aparece recuada, e subir ou descer leva a máscara junto. Shift ou
-// Ctrl+clique põe ou tira a camada da seleção múltipla (as selecionadas ficam acesas).
+// Ctrl+clique põe ou tira a camada da seleção múltipla (as selecionadas ficam acesas). O cadeado trava e destrava; a
+// camada de grupo mostra o ícone do grupo.
 import React from 'react';
-import {ArrowDown, ArrowUp, Circle, CornerLeftUp, Ellipsis, Eye, EyeOff, Image as IconeImagem, Square, Trash2, Type} from 'lucide-react';
+import {ArrowDown, ArrowUp, Circle, CornerLeftUp, Ellipsis, Eye, EyeOff, Group, Image as IconeImagem, Lock, LockOpen, Square, Trash2, Type} from 'lucide-react';
 import type {CamadaImagem, DocImagem, OperacaoPatch} from '../../../nucleo/documentos';
 import {blocoDe, mascaraDe, mascarasEmUso, patchMoverCamada, patchRecortar, patchSoltar, podeRecortar} from '../../../nucleo/acabamento';
+import {caminhoDoAlvo} from '../../../nucleo/carrossel';
+import {patchTravar, travada} from '../../../nucleo/layout-imagem';
 import {alternarNaSelecao, aplicar, avisar, caminhosDaSelecao, documentosDe, loja, selecionar, trocar, useLoja} from '../../estado/loja';
 import {BotaoMenu, type ItemMenu} from '../../componentes/Menu';
 import {docValido, indiceDe, rotuloCamada, usarDocumentoImagem, usarPaginaAtiva, visivel} from './comum';
@@ -32,7 +35,8 @@ export const CamadasImagem: React.FC = () => {
   const iSel = selecao?.documento === documento ? indiceDe(selecao.caminho, base) : -1;
   // seleção múltipla: todas acesas; os botões de subir, descer e excluir ficam na principal
   const selecionadas = new Set(caminhosDaSelecao(selecao, documento).map((c) => indiceDe(c, base)).filter((i) => i >= 0));
-  const comComentario = new Set(comentarios.filter((c) => c.estado === 'aberto' && c.documento === documento).flatMap((c) => [c.alvo.objeto_id, c.alvo.objeto]));
+  // o ponto vale para a camada de agora do comentário, na página dele (o id da camada se repete entre páginas: imagem-N1)
+  const comComentario = new Set(comentarios.filter((c) => c.estado === 'aberto' && c.documento === documento).map((c) => caminhoDoAlvo(doc, c.alvo)));
 
   // sobe ou desce a camada (com a máscara junto, se for par recortado); a seleção segue a mesma camada pelo id
   const mover = async (i: number, direcao: 1 | -1) => {
@@ -105,9 +109,10 @@ export const CamadasImagem: React.FC = () => {
                 title={recortada ? `${c.id} · recortada por ${rotuloCamada(camadas[i + 1])}` : mascaras.has(i) ? `${c.id} · máscara de ${rotuloCamada(camadas[mascaras.get(i)!])}` : c.id}
                 style={recortada ? {paddingLeft: 22} : undefined} onKeyDown={(e) => e.key === 'Enter' && ir()}>
                 {recortada && <CornerLeftUp className="i12" style={{marginLeft: -14, color: 'var(--texto-3)'}} />}
+                {c.grupo && <span className="tipo" title={`no ${c.grupo}: o clique no monitor escolhe o grupo inteiro`} style={{color: 'var(--texto-3)'}}><Group className="i12" /></span>}
                 <span className="tipo">{iconeCamada(c)}</span>
                 <span className="nome">{rotuloCamada(c)}</span>
-                {(comComentario.has(c.id) || comComentario.has(caminho)) && <span className="ponto-c" title="comentário aberto" />}
+                {comComentario.has(caminho) && <span className="ponto-c" title="comentário aberto" />}
                 {ativaL && (
                   <>
                     <button className="bti" disabled={hi === camadas.length - 1} title="Subir" onClick={(e) => (e.stopPropagation(), void mover(i, 1))}><ArrowUp className="i14" /></button>
@@ -119,6 +124,10 @@ export const CamadasImagem: React.FC = () => {
                 <button className={`bti olho${visivel(c) ? '' : ' sempre'}`} title={visivel(c) ? 'Ocultar' : 'Mostrar'}
                   onClick={(e) => (e.stopPropagation(), void trocar(documento, `${caminho}/visivel`, visivel(c) ? false : undefined, `${visivel(c) ? 'ocultar' : 'mostrar'} ${c.id}`))}>
                   {visivel(c) ? <Eye className="i14" /> : <EyeOff className="i14" />}
+                </button>
+                <button className={`bti olho${travada(c) ? ' sempre' : ''}`} title={travada(c) ? 'Destravar' : 'Travar: não anda nem muda de tamanho, e a IA não mexe'}
+                  onClick={(e) => (e.stopPropagation(), void aplicar(documento, patchTravar(camadas, base, [i], !travada(c)), `${travada(c) ? 'destravar' : 'travar'} ${c.id}`))}>
+                  {travada(c) ? <Lock className="i14" /> : <LockOpen className="i14" />}
                 </button>
               </li>
             );
