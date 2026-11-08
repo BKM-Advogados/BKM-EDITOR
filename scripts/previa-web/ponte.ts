@@ -6,7 +6,7 @@
 // Som: "escolher arquivo de áudio" devolve um WAV sintético (uma narração, depois uma música, alternando), como URL de
 // blob que o <audio> e o Web Audio tocam de verdade; o envelope medido fica em memória e entra nas props como no app.
 import jsonpatch, {type Operation} from 'fast-json-patch';
-import type {ApiEstudio, InfoProjeto, MarcaInfo, Mudanca, NovoProjeto, Preferencias, Progresso, ProgressoTranscricao, Recente, ResultadoLimpezaVoz, Trilha} from '../../src/compartilhado/api';
+import type {ApiEstudio, RespostaJanela, InfoProjeto, MarcaInfo, Mudanca, NovoProjeto, Preferencias, Progresso, ProgressoTranscricao, Recente, ResultadoLimpezaVoz, Trilha} from '../../src/compartilhado/api';
 import type {EntradaDocumento, Manifesto, Modulo} from '../../src/nucleo/documentos';
 import type {Envelope, IntensidadeLimpeza} from '../../src/nucleo/audio';
 import {LimpezaCancelada, limparVoz} from '../../src/nucleo/limpeza-voz';
@@ -22,7 +22,7 @@ import {ehDocMusica, novaMusica, type DocMusica} from '../../src/nucleo/musica';
 import {renderizarMusica, TAXA_MUSICA} from '../../src/nucleo/musica-som';
 import {patchAtualizarLigados, patchClipeNovo, renderDaMusica} from '../../src/nucleo/musica-video';
 import {cancelarTransicao, concluirTransicao, levarPara, registroVazio, type BaseProjeto, type RegistroTransicoes} from '../../src/nucleo/transicoes';
-import {envelopeDeAmostras} from '../../src/nucleo/audio';
+import {envelopeDeAmostras, type Envelope as EnvelopeMusica} from '../../src/nucleo/audio';
 import type {EntradaDiario, OperacaoPatch} from '../../src/nucleo/documentos';
 
 type Proj = {raiz: string; manifesto: Manifesto; docs: Record<string, unknown>; versao: number};
@@ -401,6 +401,14 @@ const api: ApiEstudio = {
     aoPedido: () => nada,
     responder: nada,
   },
+  // ponte com a janela (05 §0.1): o "processo principal" da prévia pede à janela pelo mesmo caminho do app
+  janela: {
+    aoPedido: (cb) => {
+      ponteDaJanela.ouvintes.add(cb);
+      return () => ponteDaJanela.ouvintes.delete(cb);
+    },
+    responder: (id, r) => ponteDaJanela.responder(id, r),
+  },
   // frente Música: as mesmas funções do núcleo, sobre o projeto em memória (simulação no fim do arquivo)
   musica: {
     levar: async (p) => musicaPrevia.levar(p),
@@ -625,6 +633,28 @@ const fundoNaPrevia = (() => {
 // (seq, inverso, transição), então o "Cancelar e desfazer" desfaz como no app. O render é o mesmo renderizarMusica do
 // app; o WAV vai para um blob, e a tela recebe a URL dele no lugar do caminho midia/musica/... (paraTela), que volta a
 // ser caminho quando a tela manda um patch (doDisco).
+const ponteDaJanela = (() => {
+  const ouvintes = new Set<(id: string, acao: string, dados: unknown) => void>();
+  const esperando = new Map<string, (r: RespostaJanela) => void>();
+  let n = 0;
+  return {
+    ouvintes,
+    responder: (id: string, r: RespostaJanela) => {
+      esperando.get(id)?.(r);
+      esperando.delete(id);
+    },
+    pedir: (acao: string, dados: unknown) => new Promise<RespostaJanela>((ok) => {
+      if (!ouvintes.size) return ok({ok: false, mensagem: 'sem janela'});
+      const id = `p${++n}`;
+      esperando.set(id, ok);
+      ouvintes.forEach((f) => f(id, acao, dados));
+    }),
+  };
+})();
+let renderFeitoPor = '';
+/** Para conferir na prévia: quem fez o último render para o vídeo ("janela" = o Web Worker). */
+(window as unknown as {renderDaMusicaFeitoPor: () => string}).renderDaMusicaFeitoPor = () => renderFeitoPor;
+
 const musicaPrevia = (() => {
   let registro: RegistroTransicoes = registroVazio();
   const diario: EntradaDiario[] = [];
@@ -640,6 +670,8 @@ const musicaPrevia = (() => {
     };
     return andar(x) as T;
   };
+  // a janela decodifica pelo endereço que a tela usa (a URL do blob), não pelo caminho do disco
+  const paraTelaDoc = (d: DocMusica) => trocar(d, blobDe);
   const entrada = (documento: string) => {
     const e = aberto!.manifesto.documentos.find((d) => d.id === documento || d.caminho === documento);
     if (!e) throw new Error(`documento não achado: ${documento}`);
@@ -697,12 +729,23 @@ const musicaPrevia = (() => {
         fontes[c.audio] = undefined;
       }
     }
-    const som = renderizarMusica(doc, fontes, {taxa: TAXA_MUSICA});
-    const url = URL.createObjectURL(new Blob([codificarWav(som.canais, TAXA_MUSICA)], {type: 'audio/wav'}));
+    // como no app: a janela faz no Web Worker dela; sem quem atenda, a conta é feita aqui
+    const daJanela = await ponteDaJanela.pedir('musica:render', {doc: paraTelaDoc(doc)});
+    const feito = daJanela.ok ? (daJanela.dados as {wav?: Uint8Array<ArrayBuffer>; envelope?: EnvelopeMusica}) : null;
+    let wav: Uint8Array<ArrayBuffer>;
+    if (feito?.wav && feito.envelope) {
+      wav = feito.wav;
+      envelopes[r.arquivo] = feito.envelope;
+    } else {
+      const som = renderizarMusica(doc, fontes, {taxa: TAXA_MUSICA});
+      wav = codificarWav(som.canais, TAXA_MUSICA);
+      envelopes[r.arquivo] = envelopeDeAmostras(som.canais, TAXA_MUSICA);
+    }
+    const url = URL.createObjectURL(new Blob([wav], {type: 'audio/wav'}));
     blobDe.set(r.arquivo, url);
     caminhoDe.set(url, r.arquivo);
     audios.set(url, {url, nome: `${id}.wav`});
-    envelopes[r.arquivo] = envelopeDeAmostras(som.canais, TAXA_MUSICA);
+    renderFeitoPor = feito ? 'janela' : 'ponte';
     return r;
   };
   const depoisDeMudar = async (id: string) => {

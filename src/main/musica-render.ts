@@ -5,7 +5,8 @@
 // Na abertura do projeto, apagarRendersSemUso tira os que nenhum vídeo nem o diário citam. Ver docs/musica.md.
 import {mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
-import {envelopeDeAmostras} from '../nucleo/audio';
+import {envelopeDeAmostras, type Envelope} from '../nucleo/audio';
+import type {PedirAJanela} from './ponte-janela';
 import {medirAmostras, type FonteAudio} from '../nucleo/loudness';
 import {audiosDaMusica, ehDocMusica, type DocMusica} from '../nucleo/musica';
 import {naTaxa, renderizarMusica, TAXA_MUSICA} from '../nucleo/musica-som';
@@ -57,8 +58,14 @@ const gravarBinario = (p: Projeto, rel: string, dados: Buffer) => {
   renameSync(tmp, abs);
 };
 
-/** O serviço que o MCP e o IPC usam (definirServicoMusica). */
-export const servicoDeRender = (o: {binarios?: () => string | null | undefined} = {}): ServicoMusica => ({
+/** O que a janela devolve ao pedido "musica:render" (o Web Worker dela fez a conta). */
+type RenderDaJanela = {wav?: Uint8Array; duracao_s?: number; avisos?: string[]; faltando?: string[]; medida?: {integrado_lufs: number | null; pico_dbtp: number | null};
+  faixas?: Record<string, {integrado_lufs: number | null; pico_dbtp: number | null}>; envelope?: Envelope};
+
+/** O serviço que o MCP e o IPC usam (definirServicoMusica). Com a janela (o app aberto), o som é feito no Web Worker
+ *  dela, com o cache da prévia, e o processo principal só grava: nada pesado na thread que atende a janela. Sem janela
+ *  (MCP por stdio, janela fechada ou ocupada), a conta é feita aqui. */
+export const servicoDeRender = (o: {binarios?: () => string | null | undefined; janela?: PedirAJanela} = {}): ServicoMusica => ({
   renderizar: async (p, id) => {
     const doc = lerMusica(p, id);
     const alvo = renderDaMusica(id, doc, assinaturaDe(p));
@@ -66,15 +73,32 @@ export const servicoDeRender = (o: {binarios?: () => string | null | undefined} 
     if (p.existe(alvo.arquivo) && p.existe(rotuloMedida)) {
       return {...alvo, novo: false, medida: p.lerJson<MedidaRender>(rotuloMedida).doc};
     }
-    const som = renderizarMusica(doc, await fontesDe(p, doc, o.binarios?.()), {taxa: TAXA_MUSICA});
+    // a janela recebe o documento lido aqui (o mesmo que deu o nome do arquivo), não o que ela tiver na tela
+    const daJanela = o.janela ? await o.janela('musica:render', {doc}, {tempo_ms: 120_000}) : null;
+    const r = daJanela?.ok ? (daJanela.dados as RenderDaJanela) : null;
+    let canais: Float32Array[] | null = null;
+    let som: {avisos: string[]; faltando: string[]};
+    let m: {integrado_lufs: number | null; pico_dbtp: number | null};
+    let envelope: Envelope | undefined;
     garantirMusicaForaDoGit(p);
-    gravarBinario(p, alvo.arquivo, gravarWav(som.canais, som.taxa));
-    const m = medirAmostras(som.canais, som.taxa);
+    if (r?.wav && r.medida) {
+      gravarBinario(p, alvo.arquivo, Buffer.from(r.wav.buffer, r.wav.byteOffset, r.wav.byteLength));
+      som = {avisos: r.avisos ?? [], faltando: r.faltando ?? []};
+      m = r.medida;
+      envelope = r.envelope;
+    } else {
+      const feito = renderizarMusica(doc, await fontesDe(p, doc, o.binarios?.()), {taxa: TAXA_MUSICA});
+      canais = feito.canais;
+      gravarBinario(p, alvo.arquivo, gravarWav(feito.canais, feito.taxa));
+      som = feito;
+      const x = medirAmostras(feito.canais, feito.taxa);
+      m = {integrado_lufs: x.integrado_lufs, pico_dbtp: x.pico_dbtp};
+    }
     const medida: MedidaRender = {formato: 1, musica: id, duracao_ms: alvo.duracao_ms, integrado_lufs: m.integrado_lufs, pico_dbtp: m.pico_dbtp,
-      avisos: som.avisos, faltando: som.faltando, feito_em: new Date().toISOString()};
+      avisos: som.avisos, faltando: som.faltando, feito_em: new Date().toISOString(), feito_por: r ? 'janela' : 'processo'};
     p.gravarTexto(rotuloMedida, serializar(medida));
     try {
-      gravarEnvelope(p, alvo.arquivo, envelopeDeAmostras(som.canais, som.taxa));
+      gravarEnvelope(p, alvo.arquivo, envelope ?? envelopeDeAmostras(canais!, TAXA_MUSICA));
     } catch {
       /* o envelope é conveniência: sem ele, a linha do tempo mede */
     }
@@ -82,6 +106,11 @@ export const servicoDeRender = (o: {binarios?: () => string | null | undefined} 
   },
   medir: async (p, id, opcoes = {}): Promise<MedidaMusica> => {
     const doc = lerMusica(p, id);
+    const daJanela = o.janela ? await o.janela('musica:render', {doc, porFaixa: opcoes.porFaixa, sohMedir: true}, {tempo_ms: 120_000}) : null;
+    if (daJanela?.ok) {
+      const r = daJanela.dados as RenderDaJanela;
+      if (r.medida) return {...r.medida, duracao_ms: Math.round((r.duracao_s ?? 0) * 1000), ...(r.faixas ? {faixas: r.faixas} : {}), avisos: r.avisos ?? []};
+    }
     const som = renderizarMusica(doc, await fontesDe(p, doc, o.binarios?.()), {taxa: TAXA_MUSICA, porFaixa: opcoes.porFaixa});
     const m = medirAmostras(som.canais, som.taxa);
     const faixas = som.faixas

@@ -5,6 +5,7 @@ import type {DocImagem} from '../nucleo/documentos';
 import {caminhoPagina, paginasDe} from '../nucleo/carrossel';
 import {abrirProjeto, loja, observarProjeto, useLoja} from './estado/loja';
 import {estadoDaMusica, musica} from './modulos/musica/estado'; // frente Música
+import {ligarPonteDaJanela} from './ponte-janela';
 import {Inicio} from './inicio/Inicio';
 import {RaizDialogo} from './componentes/Dialogo';
 import {registrarFontesDoProjeto} from './casca/fontes-do-projeto';
@@ -35,6 +36,8 @@ export const App: React.FC = () => {
       parar();
     };
   }, []);
+
+  useEffect(() => ligarPonteDaJanela(), []); // ponte com a janela (05 §0.1): pedidos do processo principal
 
   // o que a pessoa está vendo vai para .estudio/estado.json: o agente lê com estado_do_editor e o projeto reabre ali
   useEffect(() => {

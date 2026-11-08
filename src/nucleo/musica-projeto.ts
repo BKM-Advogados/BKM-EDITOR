@@ -60,7 +60,8 @@ export const baseDoProjeto = (p: Projeto, autor: string, origem: string): BasePr
 
 // ---------- render: quem faz ----------
 /** Medida gravada ao lado do render (midia/musica/x.<código>.json). */
-export type MedidaRender = {formato: 1; musica: string; duracao_ms: number; integrado_lufs: number | null; pico_dbtp: number | null; avisos: string[]; faltando: string[]; feito_em: string};
+export type MedidaRender = {formato: 1; musica: string; duracao_ms: number; integrado_lufs: number | null; pico_dbtp: number | null; avisos: string[]; faltando: string[]; feito_em: string;
+  feito_por?: 'janela' | 'processo'};
 export type MedidaMusica = {integrado_lufs: number | null; pico_dbtp: number | null; duracao_ms: number; faixas?: Record<string, {integrado_lufs: number | null; pico_dbtp: number | null}>; avisos: string[]};
 
 export type ServicoMusica = {

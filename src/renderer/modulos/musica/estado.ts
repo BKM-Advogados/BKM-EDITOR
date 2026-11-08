@@ -9,6 +9,7 @@ import type {OperacaoPatch} from '../../../nucleo/documentos';
 import type {DocMusica} from '../../../nucleo/musica';
 import type {PedidoLevar, ResultadoVolta, Transicao} from '../../../nucleo/transicoes';
 import {abrirProjeto, aplicar, avisar, loja, mensagemDe, quandoTrocarProjeto} from '../../estado/loja';
+import {atender} from '../../ponte-janela';
 
 export type SelecaoMusica = {tipo: 'clipe' | 'canal' | 'faixa' | 'padrao' | 'documento'; id: string} | null;
 
@@ -212,6 +213,13 @@ export const observarMusica = () => {
   };
   comecar();
   const largarTroca = quandoTrocarProjeto(() => setTimeout(comecar, 300));
+  // o render que vai para o vídeo: o processo principal pede, o Web Worker da janela faz (motor.ts carrega só aqui)
+  const largarRender = atender('musica:render', async (dados) => {
+    const {doc, porFaixa, sohMedir} = dados as {doc: DocMusica; porFaixa?: boolean; sohMedir?: boolean};
+    const r = await (await import('./motor')).motor.renderParaVideo(doc, porFaixa);
+    if (!r.ok) throw new Error(r.mensagem);
+    return {duracao_s: r.duracao_s, avisos: r.avisos, faltando: r.faltando, medida: r.medida, faixas: r.faixas, ...(sohMedir ? {} : {wav: r.wav, envelope: r.envelope})};
+  });
   const largar = window.estudio.aoMudar(({arquivo}) => {
     if (arquivo === '.estudio/transicoes.json') return void lerTransicoes();
     const d = loja.get().info?.manifesto.documentos.find((x) => x.caminho === arquivo && x.modulo === 'musica');
@@ -220,5 +228,6 @@ export const observarMusica = () => {
   return () => {
     largar();
     largarTroca();
+    largarRender();
   };
 };

@@ -1,13 +1,18 @@
 // Motor da Música na janela. O som sai de src/nucleo/musica-som.ts (a mesma conta do render que vai para o vídeo); o Web
 // Audio só decodifica os arquivos (a 48 kHz) e toca o resultado. Três buffers tocam juntos, com o mesmo loop nativo:
 // a música, a voz do vídeo como guia (fora do render) e o metrônomo. "Ouvir como no vídeo" aplica ao volume a curva do
-// clipe ligado (faixa × clipe × fades × ducking, volumeDoClipe de audio.ts). Mudou o documento: refaz só o que mudou
-// (o cache guarda o som seco de cada canal) e, tocando, troca o buffer na mesma posição.
+// clipe ligado (faixa × clipe × fades × ducking, volumeDoClipe de audio.ts). O som é feito num Web Worker
+// (render.worker.ts), fora da thread da interface; mudou o documento, o worker refaz só o que mudou (o cache por camada
+// fica lá) e, tocando, o buffer troca na mesma posição. O mesmo worker faz o render que vai para o vídeo.
 import type {AudioP, ClipeAudioP, FaixaAudioP} from '../../../nucleo/audio';
 import {volumeDoClipe} from '../../../nucleo/audio';
-import type {FonteAudio} from '../../../nucleo/loudness';
+import {medirAmostras, type FonteAudio} from '../../../nucleo/loudness';
+import {envelopeDeAmostras} from '../../../nucleo/audio';
 import {audiosDaMusica, partesDoSom, resolverMusica, type AjustePeca, type DocMusica, type PecaBateria} from '../../../nucleo/musica';
-import {renderizarMusica, somDeUmaBatida, TAXA_MUSICA, type CacheSom} from '../../../nucleo/musica-som';
+import {codificarWav16, renderizarMusica, somDeUmaBatida, TAXA_MUSICA, type CacheSom} from '../../../nucleo/musica-som';
+import type {PedidoRender, RespostaRender} from './render.worker';
+
+type SemId<T> = T extends unknown ? Omit<T, 'id'> : never;
 import {loja} from '../../estado/loja';
 
 /** Endereço de um arquivo do projeto (o servidor de mídia do app; na prévia web, a URL de blob já vem pronta). */
@@ -21,11 +26,12 @@ export type VozGuia = {clipes: {arquivo: string; em_s: number; dur_s: number; co
 
 class MotorMusica {
   private ctx: AudioContext | null = null;
-  private cache: CacheSom = new Map();
-  private fontes = new Map<string, FonteAudio | null>();
+  private fontes = new Map<string, FonteAudio | null>(); // a voz guia (fica aqui)
+  private naObra = new Map<string, number | null>(); // áudios da música, já no worker: amostras (null = não leu)
   private pedidos = new Map<string, Promise<void>>();
   private musica: AudioBuffer | null = null;
   private chaveMusica = '';
+  private geracao = 0;
   private guia: AudioBuffer | null = null;
   private chaveGuia = '';
   private metro: AudioBuffer | null = null;
@@ -35,36 +41,119 @@ class MotorMusica {
   duracao_s = 0;
   ultimoRender_ms = 0;
 
+  // ---------- o worker do som (render.worker.ts) ----------
+  private trabalhador: Worker | null = null;
+  private semWorker = false;
+  private proximo = 1;
+  private esperando = new Map<number, (r: RespostaRender) => void>();
+  private cacheLocal: CacheSom = new Map(); // só se o worker não subir
+  private fontesLocais = new Map<string, FonteAudio>();
+
+  private pedir(p: SemId<PedidoRender>, transferir: Transferable[] = []): Promise<RespostaRender> {
+    if (!this.trabalhador && !this.semWorker) {
+      try {
+        const w = new Worker(new URL('./render.worker.ts', import.meta.url), {type: 'module'});
+        w.addEventListener('message', (e: MessageEvent<RespostaRender>) => {
+          const f = this.esperando.get(e.data.id);
+          this.esperando.delete(e.data.id);
+          f?.(e.data);
+        });
+        w.addEventListener('error', (e) => {
+          // worker que não sobe: os pedidos em curso falham e o som passa a ser feito aqui mesmo
+          this.semWorker = true;
+          this.trabalhador = null;
+          for (const [id, f] of this.esperando) f({id, ok: false, mensagem: e.message || 'o worker do som não abriu'});
+          this.esperando.clear();
+        });
+        this.trabalhador = w;
+      } catch {
+        this.semWorker = true;
+      }
+    }
+    const id = this.proximo++;
+    if (!this.trabalhador) return Promise.resolve(this.local({...p, id} as PedidoRender));
+    return new Promise((ok) => {
+      this.esperando.set(id, ok);
+      this.trabalhador!.postMessage({...p, id}, transferir);
+    });
+  }
+
+  /** A mesma conta, na thread da janela: só quando o worker não sobe. */
+  private local(p: PedidoRender): RespostaRender {
+    if (p.tipo === 'fonte') {
+      this.fontesLocais.set(p.arquivo, {canais: p.canais, taxa: p.taxa});
+      return {id: p.id, ok: true};
+    }
+    if (p.tipo === 'esquecer') {
+      if (p.arquivo) this.fontesLocais.delete(p.arquivo);
+      else this.fontesLocais.clear();
+      this.cacheLocal.clear();
+      return {id: p.id, ok: true};
+    }
+    const t0 = performance.now();
+    const r = renderizarMusica(p.doc, Object.fromEntries(this.fontesLocais), {taxa: p.taxa, cache: this.cacheLocal, porFaixa: p.porFaixa});
+    const ms = Math.round(performance.now() - t0);
+    if (!p.paraVideo) return {id: p.id, ok: true, canais: r.canais, duracao_s: r.duracao_s, avisos: r.avisos, faltando: r.faltando, ms};
+    const m = medirAmostras(r.canais, p.taxa);
+    return {id: p.id, ok: true, duracao_s: r.duracao_s, avisos: r.avisos, faltando: r.faltando, ms, medida: {integrado_lufs: m.integrado_lufs, pico_dbtp: m.pico_dbtp},
+      envelope: envelopeDeAmostras(r.canais, p.taxa), wav: codificarWav16(r.canais, p.taxa)};
+  }
+
   contexto() {
     if (!this.ctx) this.ctx = new AudioContext({sampleRate: TAXA_MUSICA, latencyHint: 'interactive'});
     return this.ctx;
   }
 
+  private async lerArquivo(arquivo: string): Promise<FonteAudio | null> {
+    try {
+      const r = await fetch(urlDaMidia(arquivo));
+      if (!r.ok) throw new Error(String(r.status));
+      const b = await this.contexto().decodeAudioData(await r.arrayBuffer());
+      return {canais: Array.from({length: b.numberOfChannels}, (_, i) => b.getChannelData(i).slice()), taxa: b.sampleRate};
+    } catch {
+      return null;
+    }
+  }
+
+  /** Áudio da voz guia: decodificado e guardado aqui. */
   private async decodificar(arquivo: string) {
     if (this.fontes.has(arquivo)) return;
-    let p = this.pedidos.get(arquivo);
+    const chave = `guia:${arquivo}`;
+    let p = this.pedidos.get(chave);
+    if (!p) {
+      p = this.lerArquivo(arquivo).then((f) => void this.fontes.set(arquivo, f)).finally(() => this.pedidos.delete(chave));
+      this.pedidos.set(chave, p);
+    }
+    await p;
+  }
+
+  /** Áudio da música: decodificado uma vez e entregue ao worker (sem cópia aqui). */
+  private async levarAoWorker(arquivo: string) {
+    if (this.naObra.has(arquivo)) return;
+    const chave = `obra:${arquivo}`;
+    let p = this.pedidos.get(chave);
     if (!p) {
       p = (async () => {
-        try {
-          const r = await fetch(urlDaMidia(arquivo));
-          if (!r.ok) throw new Error(String(r.status));
-          const b = await this.contexto().decodeAudioData(await r.arrayBuffer());
-          this.fontes.set(arquivo, {canais: Array.from({length: b.numberOfChannels}, (_, i) => b.getChannelData(i).slice()), taxa: b.sampleRate});
-        } catch {
-          this.fontes.set(arquivo, null);
-        } finally {
-          this.pedidos.delete(arquivo);
-        }
-      })();
-      this.pedidos.set(arquivo, p);
+        const f = await this.lerArquivo(arquivo);
+        if (f) await this.pedir({tipo: 'fonte', arquivo, canais: f.canais, taxa: f.taxa}, f.canais.map((c) => c.buffer));
+        this.naObra.set(arquivo, f ? f.canais[0]?.length ?? 0 : null);
+      })().finally(() => this.pedidos.delete(chave));
+      this.pedidos.set(chave, p);
     }
     await p;
   }
 
   /** Arquivo regravado (outra tomada com o mesmo nome): esquece a decodificação dele. */
   esquecer(arquivo?: string) {
-    if (arquivo) this.fontes.delete(arquivo);
-    else this.fontes.clear();
+    if (arquivo) {
+      this.fontes.delete(arquivo);
+      this.naObra.delete(arquivo);
+    } else {
+      this.fontes.clear();
+      this.naObra.clear();
+    }
+    void this.pedir({tipo: 'esquecer', arquivo});
+    this.chaveMusica = '';
   }
 
   private paraBuffer(canais: Float32Array[], taxa: number) {
@@ -74,23 +163,29 @@ class MotorMusica {
     return b;
   }
 
-  /** Deixa o buffer da música em dia com o documento; devolve se mudou. */
+  /** Deixa o buffer da música em dia com o documento (o som vem do worker); devolve se mudou. Pedido que chega
+   *  depois de outro mais novo é descartado. */
   async preparar(doc: DocMusica): Promise<boolean> {
-    await Promise.all(audiosDaMusica(doc).map((a) => this.decodificar(a)));
-    const fontes: Record<string, FonteAudio | undefined> = {};
-    for (const a of audiosDaMusica(doc)) fontes[a] = this.fontes.get(a) ?? undefined;
-    const chave = JSON.stringify({s: partesDoSom(doc), f: Object.entries(fontes).map(([k, v]) => [k, v?.canais[0]?.length ?? 0])});
+    const minha = ++this.geracao;
+    await Promise.all(audiosDaMusica(doc).map((a) => this.levarAoWorker(a)));
+    const chave = JSON.stringify({s: partesDoSom(doc), f: audiosDaMusica(doc).map((a) => [a, this.naObra.get(a) ?? 0])});
     if (chave === this.chaveMusica && this.musica) return false;
-    const t0 = performance.now();
-    const r = renderizarMusica(doc, fontes, {taxa: TAXA_MUSICA, cache: this.cache});
-    this.ultimoRender_ms = Math.round(performance.now() - t0);
-    if (this.cache.size > 400) this.cache.clear();
-    this.musica = this.paraBuffer(r.canais, r.taxa);
-    this.duracao_s = r.duracao_s;
-    this.avisos = r.avisos;
+    const r = await this.pedir({tipo: 'render', doc, taxa: TAXA_MUSICA});
+    if (minha !== this.geracao || !r.ok || !r.canais) return false;
+    this.ultimoRender_ms = r.ms ?? 0;
+    this.musica = this.paraBuffer(r.canais, TAXA_MUSICA);
+    this.duracao_s = r.duracao_s ?? 0;
+    this.avisos = r.avisos ?? [];
     this.chaveMusica = chave;
     if (this.tocando) this.retomar();
     return true;
+  }
+
+  /** O render que vai para o vídeo (pedido do processo principal pela ponte com a janela): WAV, medida e envelope,
+   *  feitos no worker com os mesmos áudios e o mesmo cache da prévia. */
+  async renderParaVideo(doc: DocMusica, porFaixa = false) {
+    await Promise.all(audiosDaMusica(doc).map((a) => this.levarAoWorker(a)));
+    return this.pedir({tipo: 'render', doc, taxa: TAXA_MUSICA, paraVideo: true, porFaixa});
   }
 
   /** A voz do vídeo no tempo da música (o começo da música no vídeo é o zero daqui). Não entra no render. */

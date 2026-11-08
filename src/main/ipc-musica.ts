@@ -7,6 +7,7 @@ import {baseDoProjeto, definirServicoMusica, depoisDeMudarMusica, porNoVideo, se
 import type {Projeto} from '../nucleo/projeto';
 import {cancelarTransicao, concluirTransicao, levarPara, type PedidoLevar} from '../nucleo/transicoes';
 import {acertarRenders, servicoDeRender} from './musica-render';
+import type {PedirAJanela} from './ponte-janela';
 
 type Lidar = <A extends unknown[], R>(canal: string, f: (...a: A) => R | Promise<R>) => void;
 
@@ -17,8 +18,9 @@ export const aoAbrirMusica = (p: Projeto) => {
   setTimeout(() => void acertarRenders(p, servico()).catch(() => undefined), 1500);
 };
 
-export const registrarIpcMusica = (lidar: Lidar, projeto: () => Projeto) => {
-  servico();
+export const registrarIpcMusica = (lidar: Lidar, projeto: () => Projeto, janela?: PedirAJanela) => {
+  // o render pede à janela (o Web Worker dela) e, sem ela, faz aqui; o MCP por HTTP do app usa este mesmo serviço
+  definirServicoMusica(servicoDeRender({janela}));
   const base = () => baseDoProjeto(projeto(), 'pessoa', 'interface');
   const levarAoVideo = async (id: string) => {
     const r = await depoisDeMudarMusica(projeto(), id);

@@ -30,6 +30,7 @@ import {apagarLimposSemUso, registrarIpcLimpeza} from './limpeza-voz';
 import {registrarIpcLoudness} from './loudness';
 import {registrarRemoverFundo} from './remover-fundo';
 import {aoAbrirMusica, registrarIpcMusica} from './ipc-musica'; // frente Música
+import {criarPonteJanela} from './ponte-janela';
 
 // o mesmo id do instalador (electron-builder.yml): a barra de tarefas agrupa a janela com o atalho
 app.setAppUserModelId('br.com.bkmadvogados.estudio');
@@ -468,7 +469,9 @@ registrarPrefsExportacao(lidar, exigirProjeto); // marca d'água por destino, le
 // frente Som (rodada 2): limpeza de voz (limpeza-voz.ts) e medidor de loudness da mistura (loudness.ts)
 registrarIpcLimpeza(lidar, exigirProjeto, enviar);
 registrarIpcLoudness(lidar, exigirProjeto, (documento) => (exigirProjeto(), sessao!.propsVideo(documento, midia.base)));
-registrarIpcMusica(lidar, exigirProjeto); // frente Música: ida e volta com o vídeo e o render ligado
+// frente Música: ida e volta com o vídeo e o render ligado, feito no Web Worker da janela pela ponte com a janela
+registrarIpcMusica(lidar, exigirProjeto, criarPonteJanela({enviar, temJanela: () => Boolean(janela && !janela.isDestroyed()),
+  ouvir: (canal, f) => ipcMain.on(canal, (e, ...a) => (confiavel(e), f(...(a as never[]))))}));
 
 app.on('ready', async () => {
   await midia.iniciar();

@@ -506,3 +506,35 @@ export const somDeUmaBatida = (peca: PecaBateria, aj: {volume_db?: number; pan?:
   const [gl, gr] = panLei(aj.pan ?? 0);
   return [s.map((x) => x * g * gl), s.map((x) => x * g * gr)];
 };
+
+/** WAV PCM de 16 bits, sem Node (o worker da janela grava o render que vai para o vídeo com isto; o processo principal
+ *  usa gravarWav do ffmpeg-som.ts, que dá os mesmos bytes). */
+export const codificarWav16 = (canais: Float32Array[], taxa: number): Uint8Array<ArrayBuffer> => {
+  const nc = canais.length;
+  const n = canais[0]?.length ?? 0;
+  const buf = new ArrayBuffer(44 + n * nc * 2);
+  const v = new DataView(buf);
+  const texto = (p: number, s: string) => {
+    for (let i = 0; i < s.length; i++) v.setUint8(p + i, s.charCodeAt(i));
+  };
+  texto(0, 'RIFF');
+  v.setUint32(4, buf.byteLength - 8, true);
+  texto(8, 'WAVEfmt ');
+  v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true);
+  v.setUint16(22, nc, true);
+  v.setUint32(24, taxa, true);
+  v.setUint32(28, taxa * nc * 2, true);
+  v.setUint16(32, nc * 2, true);
+  v.setUint16(34, 16, true);
+  texto(36, 'data');
+  v.setUint32(40, n * nc * 2, true);
+  let p = 44;
+  for (let i = 0; i < n; i++) {
+    for (const c of canais) {
+      v.setInt16(p, Math.round(Math.max(-1, Math.min(1, c[i])) * 32767), true);
+      p += 2;
+    }
+  }
+  return new Uint8Array(buf);
+};

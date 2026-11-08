@@ -114,6 +114,9 @@ export const CANAL = {
   musicaCancelar: 'estudio:musica-cancelar',
   musicaDepoisDeMudar: 'estudio:musica-depois-de-mudar',
   musicaPorNoVideo: 'estudio:musica-por-no-video',
+  // ponte com a janela (05 §0.1, src/main/ponte-janela.ts): o processo principal pede uma ação à janela e espera
+  mcpPedido: 'estudio:mcp-pedido',
+  mcpResposta: 'estudio:mcp-resposta',
 } as const;
 
 /** O projeto aberto. `estado` é o último que a pessoa viu (área, documento, seleção), para reabrir onde parou; `git`
@@ -317,7 +320,15 @@ export type ApiEstudio = {
     depoisDeMudar: (documento: string) => Promise<{trocados: {video: string; clipe: string}[]; renderizado: boolean; aviso?: string}>;
     porNoVideo: (o: {musica: string; video?: string; faixa?: string; em_ms?: number; substituir?: string}) => Promise<{documento: string; caminho: string}>;
   };
+  // ponte com a janela (05 §0.1): pedidos do processo principal ({id, acao, dados}); a janela responde pelo id
+  janela: {
+    aoPedido: (cb: (id: string, acao: string, dados: unknown) => void) => () => void;
+    responder: (id: string, r: RespostaJanela) => void;
+  };
 };
+
+/** Resposta da janela a um pedido do processo principal (ponte com a janela). */
+export type RespostaJanela = {ok: boolean; dados?: unknown; mensagem?: string};
 
 // ---------- frente Fala ----------
 /** Pedido de transcrição: um arquivo do projeto (normalmente midia/…), o trecho opcional e o modelo. */

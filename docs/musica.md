@@ -107,10 +107,27 @@ fades e o ducking do clipe continuam valendo, porque para o vídeo é um clipe c
 `src/nucleo/musica-som.ts`, em TypeScript puro: o kit eletrônico sintetizado (seno com queda de afinação, ruído filtrado
 e quadradas desafinadas, sem arquivo nem licença de terceiros), os clipes de áudio com corte, ganho e fades, o mixer
 (filtros do Audio EQ Cookbook, compressor de alimentação direta, pan de potência igual) e o reverb Freeverb (Jezar,
-domínio público) no master. A mesma conta roda na janela (o Web Audio só decodifica a 48 kHz e toca o resultado), no
-render que vai para o vídeo (`src/main/musica-render.ts`) e no MCP por stdio, então a prévia e o render saem iguais
-amostra por amostra. Decisão da frente (dentro da D1: só Web Audio, sem módulo nativo nem VST): o motor não usa Tone.js;
-um renderizador puro é testável no vitest, roda sem janela e não traz dependência nova.
+domínio público) no master. A mesma conta roda na janela, num Web Worker (o Web Audio só decodifica a 48 kHz e toca o
+resultado), no render que vai para o vídeo e no MCP por stdio, então a prévia e o render saem iguais amostra por amostra.
+
+**Por que um motor próprio e não o Tone.js** (decisão da frente, dentro da D1: só Web Audio, sem módulo nativo nem VST):
+- O Tone.js toca no Web Audio da janela e renderiza com o `OfflineAudioContext`, que só existe no navegador. O MCP por
+  stdio (outro app de IA, sem a janela do Estúdio) e o processo principal não teriam como fazer o render para o vídeo; a
+  ligação viva dependeria da janela aberta.
+- Um renderizador puro roda igual no vitest: os testes medem o som (tempo de cada batida, swing, grupo de corte, ganho em
+  dB, divisão de clipe sem mudar nada) e comparam o render da janela com o do processo byte a byte.
+- O mesmo código na prévia e no render garante que se ouve o que vai para o vídeo; com dois motores (Tone.js na prévia e
+  outro no render) isso viraria teste de semelhança.
+- Nenhuma dependência nova no instalador. O que o Tone.js traz e falta aqui (sintetizadores prontos, agendador de tempo
+  real) entra pelos itens do plano, escrito na mesma conta.
+
+**Fora da thread da interface.** Na janela, o som é feito no Web Worker `src/renderer/modulos/musica/render.worker.ts`,
+que guarda os áudios decodificados e o cache por camada. O render que vai para o vídeo também sai dele: o processo
+principal pede pela ponte com a janela (`src/main/ponte-janela.ts`, os canais `estudio:mcp-pedido` e
+`estudio:mcp-resposta` da seção 0.1 do 05), mandando o documento que leu, e só grava o WAV, a medida e o envelope que
+voltam. Como a prévia já fez a mesma conta, o render para o vídeo costuma sair do cache. Sem janela (MCP por stdio,
+janela fechada) ou sem resposta em 2 minutos, a conta é feita no processo, como antes. A medida ao lado do render diz quem
+fez (`feito_por`: `janela` ou `processo`).
 
 O cache guarda três camadas (o som seco de cada canal, cada faixa processada e o retorno do reverb) e, a cada render,
 só o que aquele render usou. **Medido** (este PC, com as oito frentes rodando; 60 s, dois canais de bateria e um de
@@ -194,9 +211,10 @@ baixado; os kits de terceiros entram na onda 2, cada pacote com o LICENSE de den
 - O app real (Electron): o Bitdefender bloqueia o Electron de desenvolvimento neste PC. A tela foi conferida na prévia
   web (porta 5209) e o núcleo e as ferramentas no vitest, com o MCP em processo e por stdio.
 - Latência de tocar no Electron e no notebook de 8 GB.
-- O render roda na linha principal da janela e no processo principal: numa música de 60 s com reverb, uma mudança trava
-  a janela perto de 1 s. Passar para um Web Worker na janela e um `worker_thread` no processo principal é o próximo
-  ajuste.
+- Com o app aberto, o render roda no Web Worker da janela (conferido na prévia web: o worker carrega e o render que vai
+  para o vídeo volta com `feito_por: janela`). Sem janela, ele ainda roda no processo que pediu: no MCP por stdio isso só
+  segura aquele processo, mas no processo principal (janela fechada no meio de um pedido do MCP por HTTP) seguraria a
+  janela por perto de 1 s numa música de 60 s.
 - Áudio que não é WAV a 48 kHz no render para o vídeo passa pelo ffmpeg do Remotion; o teste usa WAV a 48 kHz.
 - O medidor ao vivo do mixer (nível por faixa durante a reprodução) não entrou; `medir_musica` dá o LUFS e o pico.
 

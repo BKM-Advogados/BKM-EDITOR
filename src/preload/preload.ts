@@ -130,6 +130,11 @@ const api: ApiEstudio = {
     depoisDeMudar: (documento) => ipcRenderer.invoke(CANAL.musicaDepoisDeMudar, documento),
     porNoVideo: (o) => ipcRenderer.invoke(CANAL.musicaPorNoVideo, o),
   },
+  // ponte com a janela (05 §0.1)
+  janela: {
+    aoPedido: (cb) => ouvir<[string, string, unknown]>(CANAL.mcpPedido, cb),
+    responder: (id, r) => ipcRenderer.send(CANAL.mcpResposta, id, r),
+  },
 };
 
 contextBridge.exposeInMainWorld('estudio', api);
