@@ -106,6 +106,34 @@ Camada nova (`textoNovo` e `formaNova`, em `camadas-novas.ts`) e o modelo de car
   seção "Ícone" do inspector (nome com sugestão se não existe, cor com as amostras do kit, traço).
 - **MCP**: `buscar_icone` e `inserir_icone` (tabela abaixo).
 
+## Traçado: tracejado, pontas, junções e setas
+
+- **Contorno** (`contorno`): ganha `estilo` (`solido`, `tracejado`, `pontilhado`), `pontas` (`redonda`, `reta`, `quadrada`) e
+  `juncao` (`redonda`, `pontuda`, `chanfrada`). Sem dizer nada é sólido, de pontas e junção redondas, como sempre. Vale em
+  texto e em forma (a junção é o canto do retângulo e a dobra da letra); numa foto e num ícone o contorno sai do alfa e
+  ignora o estilo. O tracejado tem tracinhos de 3 espessuras e vãos de 2; o pontilhado, pontos de 1 com vãos de 1.
+  Ponta redonda e quadrada aumentam cada tracinho, então a pintura encolhe o tracinho e alarga o vão na mesma medida: o
+  desenho que se vê é o mesmo nas três pontas (`tracoParaCanvas`, `src/nucleo/acabamento.ts`).
+- **Linha e seta** (`forma: "linha"`, `src/nucleo/linha.ts`): segmento horizontal no meio da caixa, de ponta a ponta, que gira
+  com `rotacao`: **o ângulo da seta é o giro da camada**. A cor é `preenchimento` (referência ou hex). O campo `linha` guarda
+  só o que difere do padrão: `espessura` (6 px), `estilo`, `pontas`, `juncao`, `inicio` e `fim` (`nenhuma`, `seta`,
+  `triangulo`, `losango`, `circulo`, `barra`) e `tamanho_seta` (4 espessuras, 14 no mínimo).
+
+```json
+{"id": "seta-1", "nome": "Seta", "tipo": "forma", "forma": "linha", "preenchimento": "@destaque", "x": 120, "y": 310, "largura": 424, "altura": 36,
+ "rotacao": 45, "linha": {"fim": "triangulo", "estilo": "tracejado"}}
+```
+
+- **Pintura** (`src/renderer/modulos/imagem/linha.ts`, chamada por `pintura.ts` por `vetorial.ts`): o mesmo código desenha a
+  prévia e o PNG. O traço para antes do triângulo, do losango e do círculo; a seta aberta e a barra não cobrem o traço; as
+  pontas são sempre inteiras (sem tracinhos). Linha mais curta que as pontas: ficam só as pontas.
+- **Medido na prévia web** (`desenharDocumento`, espessura 10): tracejado com tracinho de 30 px e período de 50 px nas três
+  pontas, em 1x e em 2x; pontilhado com ponto de 10 px e período de 20.
+- **Interface**: botão "Inserir linha ou seta" no trilho (oito predefinições desenhadas pelo mesmo código: linha, tracejada,
+  seta, seta aberta, dupla, tracejada, ponto e seta, medida), seção "Linha" no inspector (cor, espessura, estilo, pontas,
+  junção, início, fim, tamanho da seta) e "Estilo", "Pontas" e "Junção" na seção Contorno. O ângulo é o campo Giro.
+- **MCP**: `inserir_linha` (tabela abaixo): dá os dois pontos e a ferramenta calcula a caixa e o ângulo.
+
 ## Campo de cor
 
 `CampoCor` (`componentes/Campos.tsx`) mostra as cores do kit do documento aberto como amostras com nome (tooltip e
@@ -127,6 +155,12 @@ Texto para o `claudeMd` do projeto (a coordenação junta em `criar-projeto.ts`)
 > **Ícones.** `buscar_icone` ("balança", "prazo") acha o nome; `inserir_icone` põe o ícone na página. Ele é uma
 > forma com `forma: "icone"` e `icone: "scale"`: mude `x`, `y`, `largura`, `altura`, `rotacao` e `sombra` por
 > `aplicar_patch` como numa forma, a cor por `cor_da_marca` (campo `preenchimento`) e o traço em `icone_espessura`.
+>
+> **Linhas e setas.** `inserir_linha` põe uma linha do ponto (x1, y1) ao (x2, y2), em px; com `fim: "triangulo"` é uma
+> seta. A camada tem `forma: "linha"`, e o ângulo é `rotacao` (0 aponta para a direita, 90 para baixo): para apontar a seta
+> para outro lado, mude `rotacao`, não troque x e y. `linha` guarda `espessura`, `estilo` (`solido`, `tracejado`,
+> `pontilhado`), `pontas`, `juncao`, `inicio`, `fim` e `tamanho_seta`. O contorno de texto e forma também aceita
+> `estilo`, `pontas` e `juncao`.
 
 ## Ferramentas MCP e classe de permissão
 
@@ -137,6 +171,7 @@ Texto para o `claudeMd` do projeto (a coordenação junta em `criar-projeto.ts`)
 | `fonte_da_marca` | Põe `@titulo`, `@texto` ou `@mono` num texto. | `livre` |
 | `buscar_icone` | Procura ícones do Lucide por palavra em português ou inglês; devolve os nomes. | `livre` (só lê) |
 | `inserir_icone` | Insere um ícone como forma na página, na cor do kit (`@destaque`), com posição, tamanho, cor e traço opcionais. | `livre` |
+| `inserir_linha` | Insere linha ou seta do ponto (x1, y1) ao (x2, y2), com estilo, pontas, junção e setas opcionais; o ângulo vai em `rotacao`. | `livre` |
 | `aplicar_marca` (rodada 1) | Aplica um kit ao documento; na imagem, por papel. | `livre` |
 
 Todas gravam no diário com o autor e têm Reverter; nenhuma lê a web nem traz arquivo de fora do projeto.
