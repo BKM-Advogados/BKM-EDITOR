@@ -19,7 +19,7 @@ import {
   sinaisDeVigencia, tituloDoHtml, TAMANHO_PAGINA, type Fato, type Fonte,
 } from './pesquisa';
 import {checarTexto, REGRAS_CLIENTE, terminaComUltimaFrase, type Aviso} from './regras';
-import {acharCamada, caminhosDoId} from './carrossel';
+import {acharCamada, baseCamadas, caminhosDoId, paginaDoCaminho, paginasDe, temPaginas} from './carrossel';
 import {MODELO_FUNDO, patchSemFundo, patchVoltarAoOriginal, removedorDeFundo} from './remover-fundo';
 import {registrarImagem} from './mcp-imagem';
 
@@ -725,11 +725,15 @@ const registrarAcabamento = (servidor: McpServer, projeto: Projeto, autor: strin
     if (!executar) throw new Error('remover fundo só funciona com o app do Estúdio aberto: o modelo roda na janela dele');
     const original = achada.c.src_original ?? achada.c.src;
     const {caminho: novo, ms} = await executar(original);
-    // o modelo leva segundos: a camada é lida de novo no mesmo caminho, na versão de agora, e tem de ser a mesma (pelo
-    // id); se a pilha mudou nesse meio-tempo, nada é gravado no documento (o id sozinho não basta: página duplicada
-    // repete os ids, e o patch cairia em outra página)
+    // o modelo leva segundos (minutos, se baixa): a camada é lida de novo na mesma página, achada pelo id dela, no mesmo
+    // lugar da pilha, e tem de ter o mesmo id; se algo mudou nesse meio-tempo, nada é gravado no documento. O id da
+    // camada sozinho não basta (página duplicada repete os ids), nem o caminho (página duplicada e reordenada no meio:
+    // o caminho cairia na gêmea, imagem-N6)
     const agora = projeto.lerJson<DocImagem>(rel);
-    const depois = acharCamada(agora.doc, achada.caminho);
+    const paginaAntes = temPaginas(lido.doc) ? paginasDe(lido.doc)[paginaDoCaminho(lido.doc, achada.caminho)]?.id : undefined;
+    const p = paginaAntes ? paginasDe(agora.doc).findIndex((pg) => pg.id === paginaAntes) : paginaDoCaminho(agora.doc, achada.caminho);
+    const indice = /(\d+)$/.exec(achada.caminho)?.[1];
+    const depois = p >= 0 && indice !== undefined ? acharCamada(agora.doc, `${baseCamadas(agora.doc, p)}/${indice}`) : null;
     if (!depois || depois.c.id !== achada.c.id) {
       throw new ErroProjeto(`a camada ${achada.c.id} saiu de ${achada.caminho} enquanto o fundo era removido (${depois ? `agora ali está ${depois.c.id}` : 'o caminho não existe mais'}); `
         + `o documento não mudou e o recorte ficou em ${novo}: chame de novo com o caminho atual`, 'conflito');

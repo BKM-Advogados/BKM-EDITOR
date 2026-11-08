@@ -45,9 +45,10 @@ describe('MCP estudio', () => {
   it('lista as ferramentas', async () => {
     const {tools} = await cliente.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
-      'alinhar_camadas', 'anotar_fonte', 'aplicar_marca', 'aplicar_patch', 'checar_texto', 'criar_documento', 'distribuir_camadas', 'editar_legenda', 'estado_do_editor', 'exportar_legendas', 'importar_legendas',
+      'agrupar_camadas', 'alinhar_camadas', 'anotar_fonte', 'aplicar_marca', 'aplicar_patch', 'checar_texto', 'criar_documento', 'desagrupar_camadas',
+      'destravar_camadas', 'distribuir_camadas', 'editar_legenda', 'estado_do_editor', 'exportar_legendas', 'importar_legendas',
       'ler_comentario', 'ler_documento', 'ler_fonte', 'ler_legendas', 'listar_comentarios', 'listar_mudancas', 'listar_pesquisa', 'projeto_info', 'registrar_fato', 'remover_fundo', 'renomear_projeto',
-      'resolver_comentario', 'responder_comentario', 'selecionar_camadas', 'texto_da_fonte', 'transcrever',
+      'resolver_comentario', 'responder_comentario', 'selecionar_camadas', 'texto_da_fonte', 'transcrever', 'travar_camadas',
     ]);
   });
 

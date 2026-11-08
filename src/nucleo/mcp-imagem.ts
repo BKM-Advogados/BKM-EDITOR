@@ -1,14 +1,16 @@
 // Ferramentas do MCP "estudio" para a seleção e o layout da imagem (frente B2, rodada 3): selecionar camadas na tela da
-// pessoa, alinhar e distribuir. As camadas vêm por id (único no documento) ou por caminho, todas da mesma página. As
-// contas são as do monitor (src/nucleo/layout-imagem.ts); cada mudança é um patch com autor e origem, no diário e com
-// Reverter. Classe de permissão de todas: livre (docs/imagem.md). Esquemas sem união solta, para qualquer provedor.
+// pessoa, alinhar, distribuir, agrupar, desagrupar, travar e destravar. As camadas vêm por id (único no documento) ou
+// por caminho, todas da mesma página. As contas são as do monitor (src/nucleo/layout-imagem.ts); cada mudança é um patch
+// com autor e origem, no diário e com Reverter. Classe de permissão: livre, menos destravar_camadas (cartão: desfaz uma
+// trava que a pessoa pôs). Esquemas sem união solta, para qualquer provedor. Ver docs/imagem.md.
 import type {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import path from 'node:path';
 import {z} from 'zod';
 import {ErroProjeto, PASTA_INTERNA, serializar, type Projeto} from './projeto';
-import type {DocImagem} from './documentos';
+import type {DocImagem, OperacaoPatch} from './documentos';
 import {baseCamadas, caminhosDoId, indiceNaBase, paginasDe, temPaginas} from './carrossel';
-import {ALINHAMENTOS, alinhar, alvoDoAlinhamento, DISTRIBUICOES, distribuir, patchMover, type Alinhamento, type Distribuicao} from './layout-imagem';
+import {ALINHAMENTOS, DISTRIBUICOES, patchAgrupar, patchDesagrupar, patchMover, patchTravar, planoAlinhar, planoDistribuir, unidadesDe, type Alinhamento, type Distribuicao} from './layout-imagem';
+import {destravando} from './travas-imagem';
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x)}]});
 const seguro = <A,>(f: (a: A) => unknown) => async (a: A) => {
@@ -64,7 +66,7 @@ export const registrarImagem = (servidor: McpServer, projeto: Projeto, autor: st
   }));
 
   servidor.registerTool('alinhar_camadas', {
-    description: 'Alinha camadas da imagem. Com uma camada, à prancheta; com várias, à caixa delas (ou à prancheta com alvo "prancheta").',
+    description: 'Alinha camadas da imagem. Com uma camada (ou um grupo), à prancheta; com várias, à caixa delas. Grupo anda inteiro; travada fica.',
     inputSchema: {
       documento: z.string(),
       camadas: camadasSchema,
@@ -75,10 +77,10 @@ export const registrarImagem = (servidor: McpServer, projeto: Projeto, autor: st
     const {doc, versao} = ler(documento);
     if (!camadas.length) throw new ErroProjeto('passe ao menos uma camada', 'patch');
     const r = resolverCamadas(doc, camadas);
-    const cs = r.indices.map((i) => paginasDe(doc)[r.pagina].camadas[i]);
-    const caixa = alvo === 'prancheta' ? {x: 0, y: 0, w: doc.largura, h: doc.altura} : alvoDoAlinhamento(cs, {largura: doc.largura, altura: doc.altura});
-    const patch = patchMover(paginasDe(doc)[r.pagina].camadas, r.base, r.indices, alinhar(cs, como, caixa));
-    if (!patch.length) return {ok: true, movidas: 0, aviso: 'já estavam alinhadas'};
+    const lista = paginasDe(doc)[r.pagina].camadas;
+    const plano = planoAlinhar(lista, r.indices, como, {largura: doc.largura, altura: doc.altura}, alvo === 'prancheta' ? {x: 0, y: 0, w: doc.largura, h: doc.altura} : undefined);
+    const patch = patchMover(lista, r.base, plano.indices, plano.desl);
+    if (!patch.length) return {ok: true, movidas: 0, aviso: r.indices.some((i) => lista[i]?.travada) ? 'nada andou: as camadas que andariam estão travadas' : 'já estavam alinhadas'};
     const feito = projeto.aplicarPatch({documento, versao_base: versao, patch, autor, origem, rotulo: `alinhar (${como}) ${r.indices.length} camada(s)`});
     return {ok: true, movidas: patch.filter((o) => o.op === 'test').length, versao: feito.versao};
   }));
@@ -89,11 +91,36 @@ export const registrarImagem = (servidor: McpServer, projeto: Projeto, autor: st
   }, seguro(({documento, camadas, eixo}: {documento: string; camadas: string[]; eixo: Distribuicao}) => {
     const {doc, versao} = ler(documento);
     const r = resolverCamadas(doc, camadas);
-    if (r.indices.length < 3) throw new ErroProjeto('distribuir pede três camadas ou mais', 'patch');
-    const cs = r.indices.map((i) => paginasDe(doc)[r.pagina].camadas[i]);
-    const patch = patchMover(paginasDe(doc)[r.pagina].camadas, r.base, r.indices, distribuir(cs, eixo));
+    const lista = paginasDe(doc)[r.pagina].camadas;
+    if (unidadesDe(lista, r.indices).length < 3) throw new ErroProjeto('distribuir pede três camadas ou mais (cada grupo conta como uma)', 'patch');
+    const plano = planoDistribuir(lista, r.indices, eixo);
+    const patch = patchMover(lista, r.base, plano.indices, plano.desl);
     if (!patch.length) return {ok: true, movidas: 0, aviso: 'já estavam distribuídas'};
     const feito = projeto.aplicarPatch({documento, versao_base: versao, patch, autor, origem, rotulo: `distribuir na ${eixo} ${r.indices.length} camadas`});
     return {ok: true, movidas: patch.filter((o) => o.op === 'test').length, versao: feito.versao};
   }));
+
+  const mudarCamadas = (nome: string, descricao: string, minimo: number, fazer: (doc: DocImagem, r: ReturnType<typeof resolverCamadas>) => {patch: OperacaoPatch[]; rotulo: string; extra?: object}, embrulho = <T,>(f: () => T) => f()) =>
+    servidor.registerTool(nome, {description: descricao, inputSchema: {documento: z.string(), camadas: camadasSchema}},
+      seguro(({documento, camadas}: {documento: string; camadas: string[]}) => {
+        const {doc, versao} = ler(documento);
+        if (camadas.length < minimo) throw new ErroProjeto(`passe ${minimo === 1 ? 'ao menos uma camada' : `${minimo} camadas ou mais`}`, 'patch');
+        const r = resolverCamadas(doc, camadas);
+        const {patch, rotulo, extra} = fazer(doc, r);
+        if (!patch.length) return {ok: true, mudou: false, ...extra};
+        const feito = embrulho(() => projeto.aplicarPatch({documento, versao_base: versao, patch, autor, origem, rotulo}));
+        return {ok: true, mudou: true, versao: feito.versao, ...extra};
+      }));
+
+  mudarCamadas('agrupar_camadas', 'Agrupa camadas da imagem: escolhidas e movidas juntas, vizinhas na pilha.', 2, (doc, r) => {
+    const g = patchAgrupar(paginasDe(doc)[r.pagina].camadas, r.base, r.indices);
+    if (!g) throw new ErroProjeto('agrupar pede duas camadas ou mais', 'patch');
+    return {patch: g.patch, rotulo: `agrupar ${r.indices.length} camadas (${g.grupo})`, extra: {grupo: g.grupo, caminhos: g.caminhos}};
+  });
+  mudarCamadas('desagrupar_camadas', 'Desfaz os grupos das camadas pedidas (o grupo inteiro).', 1, (doc, r) =>
+    ({patch: patchDesagrupar(paginasDe(doc)[r.pagina].camadas, r.base, r.indices), rotulo: 'desagrupar'}));
+  mudarCamadas('travar_camadas', 'Trava camadas da imagem: não andam na tela e patch da IA nelas é recusado.', 1, (doc, r) =>
+    ({patch: patchTravar(paginasDe(doc)[r.pagina].camadas, r.base, r.indices, true), rotulo: `travar ${r.indices.length} camada(s)`}));
+  mudarCamadas('destravar_camadas', 'Destrava camadas que a pessoa travou. Peça o ok dela antes.', 1, (doc, r) =>
+    ({patch: patchTravar(paginasDe(doc)[r.pagina].camadas, r.base, r.indices, false), rotulo: `destravar ${r.indices.length} camada(s)`}), destravando);
 };
