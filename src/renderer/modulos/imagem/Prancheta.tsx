@@ -1,6 +1,6 @@
 // Uma camada em DOM (imagem, texto ou forma), as camadas de uma página e a miniatura dela: o mesmo desenho do monitor,
-// em escala pequena, para a barra de páginas do carrossel. Camada com acabamento (sombra, contorno, degradê) e foto
-// recortada por máscara saem num canvas pintado por pintura.ts, o mesmo código do PNG exportado, por baixo de uma
+// em escala pequena, para a barra de páginas do carrossel. Camada com acabamento (sombra, contorno, degradê), texto
+// que cabe na caixa (`caber`) e foto recortada por máscara saem num canvas pintado por pintura.ts, o mesmo código do PNG exportado, por baixo de uma
 // caixa invisível que é a camada para o clique; o fundo em degradê também. As regras de texto e encaixe são as de
 // comum.ts, para a miniatura, a prévia e o PNG darem o mesmo pixel.
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
@@ -96,7 +96,7 @@ export const CamadasDaPagina: React.FC<{camadas: CamadaImagem[]; base?: string; 
   const itens = useMemo(() => itensDePintura(camadas), [camadas]);
   return (
     <>
-      {itens.map((it) => (it.mascara || temAcabamento(it.c)
+      {itens.map((it) => (it.mascara || temAcabamento(it.c) || (it.c.tipo === 'texto' && it.c.caber)
         ? <CamadaPintada key={it.c.id || it.i} item={it} base={base} escala={escala} largura={largura} altura={altura} />
         : <Camada key={it.c.id || it.i} c={it.c} caminho={base ? `${base}/${it.i}` : undefined} escala={escala} />))}
     </>

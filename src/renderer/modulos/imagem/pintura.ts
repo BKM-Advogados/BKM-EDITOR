@@ -46,39 +46,68 @@ const alfa = (c: CamadaImagem) => Math.min(1, Math.max(0, c.opacidade ?? 1));
 
 // ---------- texto ----------
 
-export const fonteCss = (c: CamadaImagem) => `${c.peso ?? PADRAO.peso} ${c.tamanho ?? PADRAO.tamanho}px ${familiaCss(c.fonte)}`;
+export const fonteCss = (c: CamadaImagem, tamanho = c.tamanho ?? PADRAO.tamanho) => `${c.peso ?? PADRAO.peso} ${tamanho}px ${familiaCss(c.fonte)}`;
 
-/** Quebra por \n e pela largura da caixa; palavra maior que a caixa parte por letra (o overflow-wrap da prévia). */
-const quebrarLinhas = (ctx: CanvasRenderingContext2D, texto: string, largura: number) => {
+/** Pedaços de uma palavra onde a linha pode quebrar: depois do hífen (e dos travessões) seguido de letra, como o CSS
+ *  ("pré-aviso" → "pré-", "aviso"; "-10" e "2026-11" não quebram). imagem-D6. */
+export const pedacosDaPalavra = (palavra: string) => palavra.split(/(?<=\p{L}[-‐–—])(?=\p{L})/u);
+
+/** Quebra por \n e pela largura da caixa, nos espaços e depois dos hífens; pedaço maior que a caixa parte por letra (o
+ *  overflow-wrap da prévia). */
+export const quebrarLinhas = (ctx: Pick<CanvasRenderingContext2D, 'measureText'>, texto: string, largura: number) => {
   const linhas: string[] = [];
   for (const paragrafo of texto.split('\n')) {
     let linha = '';
     for (const palavra of paragrafo.split(' ')) {
-      const tentativa = linha ? `${linha} ${palavra}` : palavra;
-      if (ctx.measureText(tentativa).width <= largura) {
-        linha = tentativa;
-        continue;
-      }
-      if (linha) linhas.push(linha);
-      linha = '';
-      for (const letra of palavra) {
-        if (linha && ctx.measureText(linha + letra).width > largura) {
-          linhas.push(linha);
-          linha = letra;
-        } else linha += letra;
-      }
+      pedacosDaPalavra(palavra).forEach((pedaco, k) => {
+        const junta = k === 0 && linha ? ' ' : '';
+        const tentativa = `${linha}${junta}${pedaco}`;
+        if (ctx.measureText(tentativa).width <= largura) {
+          linha = tentativa;
+          return;
+        }
+        if (linha) linhas.push(linha);
+        linha = '';
+        for (const letra of pedaco) {
+          if (linha && ctx.measureText(linha + letra).width > largura) {
+            linhas.push(linha);
+            linha = letra;
+          } else linha += letra;
+        }
+      });
     }
     linhas.push(linha);
   }
   return linhas.map((l) => l.trimEnd());
 };
 
+/** Texto que cabe (`caber`): o maior tamanho em px inteiros em que as linhas cabem na altura da caixa e nenhum pedaço de
+ *  palavra passa da largura (nada parte por letra). Busca binária com o mesmo measureText da pintura. */
+export const tamanhoQueCabe = (ctx: Pick<CanvasRenderingContext2D, 'measureText' | 'font'>, c: Pick<CamadaImagem, 'texto' | 'largura' | 'altura' | 'peso' | 'fonte' | 'tamanho'>) => {
+  const texto = c.texto ?? '';
+  const pedacos = texto.split(/\s+/).flatMap(pedacosDaPalavra).filter(Boolean);
+  const cabe = (s: number) => {
+    ctx.font = fonteCss(c as CamadaImagem, s);
+    if (pedacos.some((p) => ctx.measureText(p).width > c.largura)) return false;
+    return quebrarLinhas(ctx, texto, c.largura).length * s * ENTRELINHA <= c.altura + 0.5;
+  };
+  let lo = 4;
+  let hi = Math.max(lo, Math.floor(c.altura / ENTRELINHA));
+  if (!cabe(lo)) return lo;
+  while (lo < hi) {
+    const meio = Math.ceil((lo + hi) / 2);
+    if (cabe(meio)) lo = meio;
+    else hi = meio - 1;
+  }
+  return lo;
+};
+
 type LayoutTexto = {linhas: string[]; x: number; linha0: number; altLinha: number; alinhar: CanvasTextAlign};
 
 /** Fonte, alinhamento e linhas do texto no contexto (que fica com a fonte e o alinhamento dele). */
 const layoutTexto = (ctx: CanvasRenderingContext2D, c: CamadaImagem): LayoutTexto => {
-  const tamanho = c.tamanho ?? PADRAO.tamanho;
-  ctx.font = fonteCss(c);
+  const tamanho = c.caber ? tamanhoQueCabe(ctx, c) : (c.tamanho ?? PADRAO.tamanho);
+  ctx.font = fonteCss(c, tamanho);
   ctx.textBaseline = 'alphabetic';
   const a = c.alinhar ?? PADRAO.alinhar;
   const alinhar: CanvasTextAlign = a === 'centro' ? 'center' : a === 'direita' ? 'right' : 'left';

@@ -1,4 +1,4 @@
-// Barra da seleção no monitor da imagem: alinhar (6), distribuir (2), agrupar e travar. Com uma unidade (camada solta
+// Barra da seleção no monitor da imagem: alinhar (6), distribuir (2), agrupar, travar e, num texto, caber na caixa. Com uma unidade (camada solta
 // ou grupo), o alvo é a prancheta; com várias, a caixa delas. Cada grupo anda inteiro; unidade com camada travada fica.
 // Passar o mouse num botão mostra o alvo (tracejado do acento) e onde cada camada vai cair (fantasmas), antes do
 // clique; o clique é um patch só (a foto recortada vai com a máscara). As contas são as de src/nucleo/layout-imagem.ts,
@@ -6,11 +6,11 @@
 import React from 'react';
 import {
   AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignHorizontalDistributeCenter, AlignStartHorizontal,
-  AlignStartVertical, AlignVerticalDistributeCenter, Group, Lock, LockOpen, Ungroup,
+  AlignStartVertical, AlignVerticalDistributeCenter, Group, Lock, LockOpen, ScanText, Ungroup,
 } from 'lucide-react';
 import type {CamadaImagem} from '../../../nucleo/documentos';
 import {caixaDe, patchMover, planoAlinhar, planoDistribuir, travada, unidadesDe, type Alinhamento, type Caixa, type Deslocamento, type Distribuicao} from '../../../nucleo/layout-imagem';
-import {aplicar} from '../../estado/loja';
+import {aplicar, trocar} from '../../estado/loja';
 import {agruparSelecao, alternarTravaSelecao, desagruparSelecao} from './acoesSelecao';
 import './selecao.css';
 
@@ -79,6 +79,15 @@ export const BarraSelecao: React.FC<{documento: string; base: string; camadas: C
       <span className="sep" />
       <button type="button" className="bti" disabled={validos.length < 2} title="Agrupar (Ctrl+G): escolhidas e movidas juntas" onClick={() => void agruparSelecao()}><Group /></button>
       <button type="button" className="bti" disabled={!algumGrupo} title="Desagrupar (Ctrl+Shift+G)" onClick={() => void desagruparSelecao()}><Ungroup /></button>
+      {validos.length === 1 && camadas[validos[0]].tipo === 'texto' && (() => {
+        const c = camadas[validos[0]];
+        return (
+          <button type="button" className={`bti${c.caber ? ' ligado' : ''}`} title={c.caber ? 'Caber na caixa: ligado (o tamanho é o maior que cabe; clique para voltar ao tamanho fixo)' : 'Caber na caixa: o maior tamanho que cabe, igual na prévia, no PNG e no PDF'}
+            onClick={() => void trocar(documento, `${base}/${validos[0]}/caber`, c.caber ? undefined : true, `${c.id}: ${c.caber ? 'tamanho fixo' : 'caber na caixa'}`)}>
+            <ScanText />
+          </button>
+        );
+      })()}
       <button type="button" className={`bti${todasTravadas ? ' ligado' : ''}`} title={todasTravadas ? 'Destravar (Ctrl+Shift+L)' : 'Travar (Ctrl+Shift+L): não anda nem muda de tamanho, e a IA não mexe'}
         onClick={() => void alternarTravaSelecao()}>
         {todasTravadas ? <Lock /> : <LockOpen />}

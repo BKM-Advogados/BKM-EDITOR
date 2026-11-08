@@ -51,6 +51,7 @@ export type CamadaImagem = {
   // seleção e layout (rodada 3, B2: src/nucleo/layout-imagem.ts e travas-imagem.ts)
   grupo?: string; // id do grupo: as camadas com o mesmo grupo são escolhidas e andam juntas (Ctrl+G)
   travada?: boolean; // não anda nem muda de tamanho na tela; patch da IA nela é recusado
+  caber?: boolean; // texto: o maior tamanho que cabe na caixa (o `tamanho` fica de lado), igual na prévia, no PNG e no PDF
 };
 
 /** Sombra projetada, na direção da página (não gira com a camada). Desfoque e deslocamento em px do documento. */
