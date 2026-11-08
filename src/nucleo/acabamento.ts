@@ -4,6 +4,7 @@
 // inspector lê as predefinições do kit de marca. Campo ausente ou fora do lugar volta ao padrão, nunca derruba a tela
 // (o Claude pode gravar o JSON à mão). Ver docs/imagem.md.
 import type {CamadaImagem, Contorno, Degrade, DocImagem, EstiloDeTraco, JuncaoDeTraco, OperacaoPatch, ParadaDegrade, PontaDeTraco, Sombra} from './documentos';
+import {temLista} from './lista';
 import type {Marca} from './marca';
 
 export const SOMBRA_PADRAO: Required<Sombra> = {cor: '#000000', opacidade: 0.35, desfoque: 24, x: 0, y: 8};
@@ -92,7 +93,7 @@ export const ehVetorial = (c: Pick<CamadaImagem, 'tipo' | 'forma' | 'icone'>) =>
 
 /** A camada pede o caminho do acabamento (canvas na prévia)? Sem nada disso, a prévia continua em DOM. */
 export const temAcabamento = (c: CamadaImagem) =>
-  Boolean(ehVetorial(c) || sombraDe(c) || contornoDe(c) || (c.tipo !== 'imagem' && degradeDe(c.degrade)));
+  Boolean(ehVetorial(c) || temLista(c) || sombraDe(c) || contornoDe(c) || (c.tipo !== 'imagem' && degradeDe(c.degrade)));
 
 // ---------- geometria do degradê (a mesma do CSS) ----------
 

@@ -1,5 +1,5 @@
 // Ferramentas do MCP para a marca na imagem (rodada 3, frente Marca): ver o kit do documento, pôr uma cor ou uma fonte do kit
-// numa camada, buscar e inserir ícones do Lucide e inserir linhas e setas. O que a pessoa faz no campo de cor e no seletor de fonte a IA faz aqui: a
+// numa camada, buscar e inserir ícones do Lucide inserir linhas e setas e fazer listas. O que a pessoa faz no campo de cor e no seletor de fonte a IA faz aqui: a
 // camada recebe a referência ("@destaque", "@titulo"), não uma cópia do valor, e acompanha o kit quando ele troca. Todas
 // são da classe `livre` (gravam no diário com o autor e têm Reverter); nenhuma lê a web nem traz arquivo de fora.
 // Descrições curtas e esquemas sem z.any() nem união solta, porque o Gemini, o DeepSeek (modo strict) e os modelos locais
@@ -12,6 +12,7 @@ import {ehDocCenas} from './cenas';
 import {amostrasDaMarca, avisoDeContraste, ehReferenciaCor, resolverCor} from './cor-marca';
 import {buscarIcones, etiquetasDoIcone, existeIcone, sugerirIcones, VERSAO_LUCIDE} from './icones';
 import {linhaNova, PONTAS_DE_SETA, type OpcoesLinha} from './linha';
+import {MARCADOR_PADRAO} from './lista';
 import type {CamadaImagem, DocImagem, MarcaDoDocumento, OperacaoPatch, PontaDeSeta} from './documentos';
 import {MARCA_NEUTRO, marcaDoKit} from './marca';
 import {ErroProjeto, type Projeto} from './projeto';
@@ -137,6 +138,7 @@ export const registrarMarca = (servidor: McpServer, projeto: Projeto, autor: str
 
   registrarIcones(servidor, projeto, autor, origem, imagem);
   registrarLinhas(servidor, projeto, autor, origem, imagem);
+  registrarListas(servidor, projeto, autor, origem, imagem);
 
   servidor.registerTool('ver_marca', {
     description: 'Mostra o kit de marca do documento: nome, cores (com o nome que se usa em cor_da_marca) e fontes. Sem documento, o que a pessoa está vendo.',
@@ -286,6 +288,48 @@ export const registrarLinhas = (servidor: McpServer, projeto: Projeto, autor: st
     const r = patchInserirLinha(doc, a);
     const gravado = projeto.aplicarPatch({documento: alvo, versao_base: versao, patch: r.patch, autor, origem, rotulo: `${r.id} em ${r.pagina}`});
     return {ok: true, documento: alvo, camada: r.caminho, id: r.id, pagina: r.pagina, rotacao: r.rotacao, versao: gravado.versao, ...(r.avisos.length ? {avisos: r.avisos} : {})};
+  }));
+};
+
+// ---------- listas ----------
+export const TIPOS_FAZER_LISTA = ['nenhuma', 'marcadores', 'numerada'] as const;
+export type PedidoLista = {camada: string; tipo: (typeof TIPOS_FAZER_LISTA)[number]; marcador?: string; recuo?: number};
+
+/** O patch que faz do texto uma lista (um item por linha, marcador na margem, recuo pendente) ou o tira de volta ao texto livre. */
+export const patchLista = (doc: DocImagem, p: PedidoLista) => {
+  const {caminho, c} = camadaDe(doc, p.camada);
+  if (c.tipo !== 'texto') throw new ErroProjeto(`${c.id} é ${c.tipo}: a lista é do texto`, 'patch');
+  const campo = (nome: 'lista' | 'lista_marcador' | 'lista_recuo', valor: unknown): OperacaoPatch[] => {
+    const atual = c[nome];
+    if (valor === undefined) return atual === undefined ? [] : [{op: 'remove', path: `${caminho}/${nome}`}];
+    return [{op: atual === undefined ? 'add' : 'replace', path: `${caminho}/${nome}`, value: valor}];
+  };
+  const avisos: string[] = [];
+  const marcador = p.tipo === 'marcadores' && p.marcador?.trim() && p.marcador.trim() !== MARCADOR_PADRAO ? p.marcador.trim().slice(0, 4) : undefined;
+  if (p.tipo === 'numerada' && p.marcador) avisos.push('o marcador só vale na lista com marcadores: a numerada usa 1., 2., 3.');
+  if (p.recuo !== undefined && p.recuo < 0) throw new ErroProjeto('o recuo não pode ser negativo', 'patch');
+  if (p.tipo !== 'nenhuma' && !(c.texto ?? '').includes('\n')) avisos.push('o texto tem uma linha só: a lista tem um item por linha (\\n separa os itens)');
+  const nenhuma = p.tipo === 'nenhuma';
+  const patch = [...campo('lista', nenhuma ? undefined : p.tipo), ...campo('lista_marcador', nenhuma ? undefined : marcador), ...campo('lista_recuo', nenhuma || !p.recuo ? undefined : p.recuo)];
+  return {patch, camada: caminho, avisos};
+};
+
+export const registrarListas = (servidor: McpServer, projeto: Projeto, autor: string, origem: string, imagem: (documento?: string) => {alvo: string; doc: DocImagem; versao: string}) => {
+  servidor.registerTool('fazer_lista', {
+    description: 'Faz de um texto da imagem uma lista com marcadores ou numerada: cada linha do texto (separadas por \n) é um item, o marcador fica na margem e o texto dos itens, e o que ele quebra, ficam recuados. "nenhuma" volta ao texto livre.',
+    inputSchema: {
+      documento: z.string().optional().describe('id do documento de imagem'),
+      camada: z.string().describe('id ou caminho da camada de texto'),
+      tipo: z.enum(TIPOS_FAZER_LISTA).describe('marcadores, numerada ou nenhuma'),
+      marcador: z.string().optional().describe('o marcador da lista com marcadores, até 4 letras (padrão •)'),
+      recuo: z.number().optional().describe('onde o texto dos itens começa, em px (padrão automático)'),
+    },
+  }, seguro(({documento, ...a}: PedidoLista & {documento?: string}) => {
+    const {alvo, doc, versao} = imagem(documento);
+    const r = patchLista(doc, a);
+    if (!r.patch.length) return {ok: true, documento: alvo, camada: r.camada, aviso: 'nada a mudar: a camada já está assim'};
+    const gravado = projeto.aplicarPatch({documento: alvo, versao_base: versao, patch: r.patch, autor, origem, rotulo: `${r.camada}: ${a.tipo === 'nenhuma' ? 'sem lista' : `lista ${a.tipo}`}`});
+    return {ok: true, documento: alvo, camada: r.camada, lista: a.tipo, versao: gravado.versao, ...(r.avisos.length ? {avisos: r.avisos} : {})};
   }));
 };
 

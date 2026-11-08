@@ -53,6 +53,10 @@ export type CamadaImagem = {
   icone_espessura?: number; // espessura do traço na grade de 24 do ícone (padrão 2); acompanha a caixa
   // linha e seta (frente Marca, rodada 3, src/nucleo/linha.ts): forma 'linha'; a cor é `preenchimento`, o ângulo é `rotacao`
   linha?: Linha;
+  // listas (frente Marca, rodada 3, src/nucleo/lista.ts): texto com um item por linha, marcador na margem e recuo pendente
+  lista?: 'marcadores' | 'numerada';
+  lista_marcador?: string; // o marcador da lista com marcadores (padrão "•"); até 4 letras
+  lista_recuo?: number; // onde o texto dos itens começa, em px (padrão: o maior marcador mais 40% do tamanho da letra)
 };
 
 /** Sombra projetada, na direção da página (não gira com a camada). Desfoque e deslocamento em px do documento. */

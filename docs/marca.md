@@ -134,6 +134,33 @@ Camada nova (`textoNovo` e `formaNova`, em `camadas-novas.ts`) e o modelo de car
   junção, início, fim, tamanho da seta) e "Estilo", "Pontas" e "Junção" na seção Contorno. O ângulo é o campo Giro.
 - **MCP**: `inserir_linha` (tabela abaixo): dá os dois pontos e a ferramenta calcula a caixa e o ângulo.
 
+## Listas com marcadores e numeradas
+
+Um texto da imagem vira lista com o campo `lista` (`"marcadores"` ou `"numerada"`): **cada linha do texto é um item**
+(`
+` separa), o marcador fica na margem e o texto do item, e as linhas que ele quebra, ficam recuados (**recuo
+pendente**). Linha em branco fica em branco e não gasta número.
+
+```json
+{"id": "texto", "tipo": "texto", "texto": "Aviso prévio
+Férias vencidas com o terço
+Décimo terceiro", "largura": 920,
+ "lista": "marcadores", "lista_marcador": "→", "lista_recuo": 44}
+```
+
+| Campo | Vale |
+|---|---|
+| `lista` | `marcadores` ou `numerada` (1., 2., 3.…). Sem o campo, texto livre, em DOM como sempre. |
+| `lista_marcador` | O marcador da lista com marcadores, até 4 letras (padrão `•`). A numerada ignora. |
+| `lista_recuo` | Onde o texto dos itens começa, em px. Sem ele, o maior marcador mais 40% do tamanho da letra (`10.` pede mais que `9.`). |
+
+O alinhamento vale dentro da coluna (a largura menos o recuo): `esquerda` começa no recuo, `centro` fica no meio da coluna e
+`direita` na borda; o marcador fica sempre na margem esquerda. Camada com lista vai sempre pelo canvas (`temAcabamento`),
+então a prévia, o PNG e o PDF quebram do mesmo jeito: `layoutDeLista` (`src/nucleo/lista.ts`) faz a conta, recebendo a
+medida do texto de quem chama, e `pintura.ts` a usa em `layoutTexto` e `escreverLinhas`. Sombra, contorno, degradê e
+máscara do texto valem na lista. Conferido na prévia web: marcadores e numeração na margem, linhas quebradas alinhadas
+no recuo. Interface: "Lista", "Marcador" e "Recuo" na seção Texto do inspector. MCP: `fazer_lista`.
+
 ## Campo de cor
 
 `CampoCor` (`componentes/Campos.tsx`) mostra as cores do kit do documento aberto como amostras com nome (tooltip e
@@ -161,6 +188,11 @@ Texto para o `claudeMd` do projeto (a coordenação junta em `criar-projeto.ts`)
 > para outro lado, mude `rotacao`, não troque x e y. `linha` guarda `espessura`, `estilo` (`solido`, `tracejado`,
 > `pontilhado`), `pontas`, `juncao`, `inicio`, `fim` e `tamanho_seta`. O contorno de texto e forma também aceita
 > `estilo`, `pontas` e `juncao`.
+>
+> **Listas.** `fazer_lista` transforma um texto da imagem em lista (`marcadores` ou `numerada`): cada linha do texto, separada
+> por `
+`, é um item, e o que ele quebra fica recuado. Escreva os itens como linhas do `texto`, sem digitar o marcador;
+> `lista_marcador` troca o marcador (`→`, `–`, `✓`) e `lista_recuo` o recuo, em px.
 
 ## Ferramentas MCP e classe de permissão
 
@@ -172,6 +204,7 @@ Texto para o `claudeMd` do projeto (a coordenação junta em `criar-projeto.ts`)
 | `buscar_icone` | Procura ícones do Lucide por palavra em português ou inglês; devolve os nomes. | `livre` (só lê) |
 | `inserir_icone` | Insere um ícone como forma na página, na cor do kit (`@destaque`), com posição, tamanho, cor e traço opcionais. | `livre` |
 | `inserir_linha` | Insere linha ou seta do ponto (x1, y1) ao (x2, y2), com estilo, pontas, junção e setas opcionais; o ângulo vai em `rotacao`. | `livre` |
+| `fazer_lista` | Faz de um texto uma lista com marcadores ou numerada (um item por linha, recuo pendente) ou o volta a texto livre. | `livre` |
 | `aplicar_marca` (rodada 1) | Aplica um kit ao documento; na imagem, por papel. | `livre` |
 
 Todas gravam no diário com o autor e têm Reverter; nenhuma lê a web nem traz arquivo de fora do projeto.

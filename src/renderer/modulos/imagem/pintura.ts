@@ -12,6 +12,7 @@ import {
 } from '../../../nucleo/acabamento';
 import {ENTRELINHA, PADRAO, encaixe, familiaCss} from './comum';
 import {folgaDaLinha} from '../../../nucleo/linha';
+import {layoutDeLista, temLista} from '../../../nucleo/lista';
 import {desenharVetorial} from './vetorial';
 
 /** Imagem pronta para desenhar e o tamanho natural do arquivo (o encaixe é sempre pelo original, mesmo num bitmap menor). */
@@ -75,7 +76,7 @@ const quebrarLinhas = (ctx: CanvasRenderingContext2D, texto: string, largura: nu
   return linhas.map((l) => l.trimEnd());
 };
 
-type LayoutTexto = {linhas: string[]; x: number; linha0: number; altLinha: number; alinhar: CanvasTextAlign};
+type LayoutTexto = {linhas: string[]; x: number; linha0: number; altLinha: number; alinhar: CanvasTextAlign; lista?: {x: number[]; marcas: (string | null)[]}};
 
 /** Fonte, alinhamento e linhas do texto no contexto (que fica com a fonte e o alinhamento dele). */
 const layoutTexto = (ctx: CanvasRenderingContext2D, c: CamadaImagem): LayoutTexto => {
@@ -89,6 +90,11 @@ const layoutTexto = (ctx: CanvasRenderingContext2D, c: CamadaImagem): LayoutText
   const altLinha = tamanho * ENTRELINHA;
   const m = ctx.measureText('Hg');
   const linha0 = (altLinha - (m.fontBoundingBoxAscent + m.fontBoundingBoxDescent)) / 2 + m.fontBoundingBoxAscent;
+  if (temLista(c)) {
+    // lista: o marcador na margem e o texto recuado, a mesma conta na prévia, no PNG e no PDF (nucleo/lista.ts)
+    const l = layoutDeLista(c, (t) => ctx.measureText(t).width, (t, w) => quebrarLinhas(ctx, t, w));
+    return {linhas: l.linhas, x: 0, linha0, altLinha, alinhar, lista: {x: l.x, marcas: l.marcas}};
+  }
   return {linhas: quebrarLinhas(ctx, c.texto ?? '', c.largura), x: a === 'centro' ? c.largura / 2 : a === 'direita' ? c.largura : 0, linha0, altLinha, alinhar};
 };
 
@@ -124,7 +130,18 @@ const caminhoForma = (ctx: CanvasRenderingContext2D, c: CamadaImagem) => {
 };
 
 const escreverLinhas = (ctx: CanvasRenderingContext2D, l: LayoutTexto, f: 'fillText' | 'strokeText') =>
-  l.linhas.forEach((linha, k) => ctx[f](linha, l.x, l.linha0 + k * l.altLinha));
+  l.linhas.forEach((linha, k) => {
+    const y = l.linha0 + k * l.altLinha;
+    if (!l.lista) return ctx[f](linha, l.x, y);
+    ctx.textAlign = l.alinhar;
+    ctx[f](linha, l.lista.x[k], y);
+    const marca = l.lista.marcas[k];
+    if (marca) {
+      ctx.textAlign = 'left'; // o marcador fica sempre na margem esquerda
+      ctx[f](marca, 0, y);
+      ctx.textAlign = l.alinhar;
+    }
+  });
 
 /** Silhueta opaca da forma ou do texto: recorta a foto da máscara e tira o miolo do contorno. */
 const silhueta = (ctx: CanvasRenderingContext2D, c: CamadaImagem) =>

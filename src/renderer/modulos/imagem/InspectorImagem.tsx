@@ -12,6 +12,7 @@ import {ESTILOS_TRACO, JUNCOES_TRACO, PONTAS_TRACO, mascaraDe, mascarasEmUso, pa
 import {ESPESSURA_LINHA, PONTAS_DE_SETA, linhaDe} from '../../../nucleo/linha';
 import {resolverFonte} from '../../../nucleo/cor-marca';
 import {existeIcone, sugerirIcones} from '../../../nucleo/icones';
+import {MARCADOR_PADRAO, TIPOS_DE_LISTA, type TipoDeLista} from '../../../nucleo/lista';
 import {aplicar, avisar, loja, patchTrocar, trocar, useLoja} from '../../estado/loja';
 import {CabecalhoInspector, CampoCor, CampoDeslizante, CampoLeitura, CampoNumero, CampoSelecao, CampoTexto, Secao, copiar} from '../../componentes/Campos';
 import {IconeEfeitos} from '../../componentes/Icones';
@@ -82,6 +83,10 @@ const InspectorCamada: React.FC<{documento: string; caminho: string; c: CamadaIm
             <CampoNumero rotulo="Tamanho" valor={c.tamanho ?? PADRAO.tamanho} unidade="px" padrao={PADRAO.tamanho} aoRedefinir={() => gravar('tamanho')(undefined)} aoMudar={positivo('tamanho')} />
             <CampoCor rotulo="Cor" valor={c.cor ?? PADRAO.cor} contra={doc.fundo} aoVer={ver('cor')} aoMudar={gravar('cor')} />
             <CampoSelecao rotulo="Alinhar" valor={c.alinhar ?? PADRAO.alinhar} opcoes={[['esquerda', 'À esquerda'], ['centro', 'Ao centro'], ['direita', 'À direita']]} aoMudar={gravar('alinhar')} />
+            <CampoSelecao rotulo="Lista" valor={(c.lista ?? 'nenhuma') as TipoDeLista | 'nenhuma'} opcoes={TIPOS_DE_LISTA} aoMudar={(v) => gravar('lista')(v === 'nenhuma' ? undefined : v)} />
+            {c.lista === 'marcadores' && <CampoTexto rotulo="Marcador" valor={c.lista_marcador ?? MARCADOR_PADRAO} dica="Até 4 letras: •, –, →, ✓" aoMudar={(v) => gravar('lista_marcador')(v.trim() && v.trim() !== MARCADOR_PADRAO ? v.trim().slice(0, 4) : undefined)} />}
+            {c.lista && <CampoNumero rotulo="Recuo" valor={c.lista_recuo ?? 0} unidade="px" padrao={0} dica="Onde o texto dos itens começa; 0 é automático (o marcador mais um espaço)" aoRedefinir={() => gravar('lista_recuo')(undefined)}
+              aoMudar={(v) => (v >= 0 ? gravar('lista_recuo')(v > 0 ? v : undefined) : avisar('o recuo não pode ser negativo', 'erro'))} />}
           </Secao>
         )}
 
