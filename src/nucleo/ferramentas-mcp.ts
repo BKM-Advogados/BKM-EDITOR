@@ -21,6 +21,7 @@ import {
 import {checarTexto, REGRAS_CLIENTE, terminaComUltimaFrase, type Aviso} from './regras';
 import {acharCamada, caminhosDoId} from './carrossel';
 import {MODELO_FUNDO, patchSemFundo, patchVoltarAoOriginal, removedorDeFundo} from './remover-fundo';
+import {registrarImagem} from './mcp-imagem';
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x, null, 2)}]});
 const erro = (e: unknown) => ({
@@ -243,6 +244,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
 
   registrarFala(servidor, projeto, autor, origem, transcritor); // frente Fala: transcrever e legendas
   registrarAcabamento(servidor, projeto, autor, origem); // acabamento da imagem (rodada 2, B2)
+  registrarImagem(servidor, projeto, autor, origem); // seleção e layout da imagem (rodada 3, B2): src/nucleo/mcp-imagem.ts
 };
 
 // ---------- pesquisa: fontes e fatos (src/nucleo/pesquisa.ts, docs/pesquisa.md) ----------
