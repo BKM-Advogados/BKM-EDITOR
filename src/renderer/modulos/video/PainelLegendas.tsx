@@ -219,7 +219,7 @@ const Transcricao: React.FC<{documento: string; doc: DocCenas}> = ({documento, d
       <CampoSelecao rotulo="Modelo" valor={modelo} opcoes={[['small', 'Small · erra pouco (190 MB)'], ['base', 'Base · 2× mais rápido (60 MB)']]} aoMudar={setModelo} />
       {estado && (
         <div className="nota-fala">
-          {!estado.plataforma ? 'A transcrição local por enquanto só roda no Windows x64.'
+          {!estado.plataforma ? (estado.aviso ? `A transcrição local ${estado.aviso}.` : 'A transcrição local por enquanto só roda no Windows x64.')
             : !estado.ffmpeg ? 'Não achei o ffmpeg do compositor do Remotion: reinstale o app.'
             : estado.falta.length ? <>Na primeira vez baixa <b>{estado.falta.join(' e ')}</b> para {estado.pasta}, com o SHA-256 conferido. Leva perto de metade da duração da fala.</>
             : <>Tudo instalado em {estado.pasta}. Leva perto de metade da duração da fala.</>}

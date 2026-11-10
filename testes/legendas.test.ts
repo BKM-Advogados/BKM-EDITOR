@@ -14,7 +14,7 @@ import {
   resolverLegendas, substituirEmLote, type LegendasCenas, type PalavraLegenda, type SegmentoLegenda,
 } from '../src/nucleo/legendas';
 import {norm} from '../src/nucleo/roteiro/resolver';
-import {baixarConferido, extrairZip, palavrasDoWhisper} from '../src/main/transcricao';
+import {acharWhisperCli, baixaBinario, baixarConferido, comoInstalarWhisper, extrairZip, palavrasDoWhisper, Transcritor} from '../src/main/transcricao';
 
 const RAIZ = path.join(__dirname, '..');
 const REFERENCIA = JSON.parse(readFileSync(path.join(RAIZ, 'exemplos', 'exemplo', 'video', 'palavras.json'), 'utf-8')) as PalavraLegenda[];
@@ -444,5 +444,37 @@ describe('transcritor: zip e download conferido', () => {
     await expect(baixarConferido({url: 'https://exemplo/m.bin', destino: outro, bytes: 10, sha256, buscar})).rejects.toThrow(/passou do tamanho/);
     expect(existsSync(`${outro}.parcial`)).toBe(false); // apagado depois de fechar, não antes
     await expect(baixarConferido({url: 'https://exemplo/x', destino: outro, bytes: 10, sha256, buscar: async () => new Response('nada', {status: 404})})).rejects.toThrow(/HTTP 404/);
+  });
+
+  it('acha o whisper-cli: no Windows x64 só o baixado; no Linux o da pasta e depois o do PATH', () => {
+    const tem = (...a: string[]) => (x: string) => a.includes(x);
+    expect(baixaBinario('win32', 'x64')).toBe(true);
+    expect(baixaBinario('linux', 'x64')).toBe(false);
+    // Linux: o da pasta vem antes do PATH; sem a pasta, o primeiro do PATH; sem nenhum, null
+    expect(acharWhisperCli('/m', {plataforma: 'linux', arq: 'x64', PATH: '/a:/b', existe: tem('/m/bin/whisper-cli', '/b/whisper-cli')})).toBe('/m/bin/whisper-cli');
+    expect(acharWhisperCli('/m', {plataforma: 'linux', arq: 'x64', PATH: '/a:/b', existe: tem('/b/whisper-cli')})).toBe('/b/whisper-cli');
+    expect(acharWhisperCli('/m', {plataforma: 'linux', arq: 'x64', PATH: '/a:/b', existe: tem()})).toBeNull();
+    // Windows x64: um whisper-cli.exe qualquer do PATH não serve (o baixado tem o SHA-256 conferido)
+    expect(acharWhisperCli('C:/m', {plataforma: 'win32', arq: 'x64', PATH: 'C:/b', existe: tem(path.join('C:/b', 'whisper-cli.exe'))})).toBeNull();
+    expect(comoInstalarWhisper('/m')).toMatch(/whisper-cli.*v1\.9\.5.*\/m\/bin/s);
+  });
+
+  it.skipIf(baixaBinario())('fora do Windows x64, sem whisper-cli: o estado diz o que falta e transcrever recusa sem baixar nada', async () => {
+    const pasta = mkdtempSync(path.join(tmpdir(), 'estudio-whisper-'));
+    temporarias.push(pasta);
+    const antes = process.env.PATH;
+    process.env.PATH = '';
+    try {
+      let baixou = 0;
+      const t = new Transcritor({pasta, buscar: async () => (baixou++, new Response('x', {status: 500}))});
+      const e = t.estado();
+      expect(e.plataforma).toBe(false);
+      expect(e.pronto).toBe(false);
+      expect(e.aviso).toMatch(/whisper-cli/);
+      await expect(t.preparar('small')).rejects.toThrow(/whisper-cli/);
+      expect(baixou).toBe(0);
+    } finally {
+      process.env.PATH = antes;
+    }
   });
 });

@@ -318,7 +318,11 @@ export type ResultadoTranscricao = {ok: boolean; arquivo: string; palavras?: str
 export type PedidoEmenda = {fonte: string; cortes: {de_ms: number; ate_ms: number}[]; palavras: {w: string; s: number; e: number}[]};
 export type ResultadoEmenda = {arquivo: string; palavras: string; sha256?: string; duracao_ms: number; antes_ms: number; removidas: string[]};
 export type EstadoTranscricao = {pasta: string; modelo: string; modelos: {id: string; nome: string; mb: number; instalado: boolean}[]; pronto: boolean; falta: string[];
-  ffmpeg: boolean; ocupado?: string; plataforma: boolean};
+  ffmpeg: boolean; ocupado?: string;
+  /** dá para transcrever neste sistema: o Windows x64 baixa o whisper-cli; os outros precisam de um já compilado */
+  plataforma: boolean;
+  /** sem plataforma: o que falta e como instalar */
+  aviso?: string};
 
 /** Um arquivo da pasta de trilhas: nome sem extensão, caminho absoluto, subpasta e tamanho. */
 export type Trilha = {nome: string; caminho: string; pasta: string; tamanho_kb: number};

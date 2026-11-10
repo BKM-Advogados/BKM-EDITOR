@@ -1,6 +1,7 @@
 // Transcrição local da fala (docs/legendas.md): o whisper.cpp roda no próprio PC, sem serviço externo. O binário e o
-// modelo não vêm no instalador: baixam no primeiro uso para %USERPROFILE%\Estudio\modelos\whisper\, com o SHA-256
-// conferido antes de usar. O áudio do clipe sai em WAV 16 kHz mono pelo ffmpeg do compositor do Remotion (o mesmo da
+// modelo não vêm no instalador: baixam no primeiro uso para ~/Estudio/modelos/whisper/ (%USERPROFILE% no Windows), com o
+// SHA-256 conferido antes de usar. Só o Windows x64 tem binário pronto; no Linux o whisper-cli vem compilado por quem usa
+// (bin/ da pasta ou o PATH, acharWhisperCli) e os modelos baixam do mesmo jeito. O áudio do clipe sai em WAV 16 kHz mono pelo ffmpeg do compositor do Remotion (o mesmo da
 // exportação), o whisper-cli devolve JSON com o tempo de cada pedaço de palavra, e o resultado vira
 // midia/<arquivo>.palavras.json: {versao: 2, fonte, palavras: [{w, s, e, p}] em ms}, com o carimbo do áudio (tamanho, data
 // e sha256) para transcrever de novo quando a tomada é regravada. Com `destino` (o roteiro da Cliente) grava só a lista, o
@@ -71,7 +72,8 @@ export const VAD_PADRAO: AjustesVad = {limiar: 0.5, fala_min_ms: 250, silencio_m
 export const argumentosVad = (modelo: string, a: AjustesVad = VAD_PADRAO) => ['--vad', '-vm', modelo, '-vt', String(a.limiar),
   '-vspd', String(a.fala_min_ms), '-vsd', String(a.silencio_min_ms), '-vp', String(a.folga_ms)];
 
-export const pastaWhisper = (home = os.homedir()) => path.join(home, 'Estudio', 'modelos', 'whisper');
+/** Onde ficam o whisper-cli e os modelos. ESTUDIO_WHISPER_PASTA troca a pasta (testes e quem guarda os modelos noutro disco). */
+export const pastaWhisper = (home = os.homedir()) => process.env.ESTUDIO_WHISPER_PASTA || path.join(home, 'Estudio', 'modelos', 'whisper');
 
 // ---------- baixar com SHA-256 ----------
 
@@ -209,6 +211,32 @@ export const extrairZip = (zip: Buffer, destino: string, quero: (nome: string) =
 export const EXE_WHISPER = process.platform === 'win32' ? 'whisper-cli.exe' : 'whisper-cli';
 
 export type Pecas = {pasta: string; cli: string; modelo: string; ffmpeg: string | null; vad?: string};
+
+/** O whisper.cpp só publica binário pronto do Windows x64: é o único sistema em que o app baixa o whisper-cli. */
+export const baixaBinario = (plataforma: string = process.platform, arq: string = process.arch) => plataforma === 'win32' && arq === 'x64';
+
+/** O whisper-cli que o app usa: o da pasta do whisper (bin/) e, fora do Windows x64, o primeiro do PATH. No Windows x64
+ *  fica só o baixado (o SHA-256 dele foi conferido). Sem nenhum, null. */
+export const acharWhisperCli = (pasta: string, o: {plataforma?: string; arq?: string; PATH?: string; existe?: (a: string) => boolean} = {}): string | null => {
+  const plataforma = o.plataforma ?? process.platform;
+  const existe = o.existe ?? existsSync;
+  const exe = plataforma === 'win32' ? 'whisper-cli.exe' : 'whisper-cli';
+  const proprio = path.join(pasta, 'bin', exe);
+  if (existe(proprio)) return proprio;
+  if (baixaBinario(plataforma, o.arq ?? process.arch)) return null;
+  const sep = plataforma === 'win32' ? ';' : ':';
+  for (const d of (o.PATH ?? process.env.PATH ?? '').split(sep)) {
+    if (d && existe(path.join(d, exe))) return path.join(d, exe);
+  }
+  return null;
+};
+
+/** O que dizer quando falta o whisper-cli num sistema em que ele não baixa sozinho: compilar o whisper.cpp na versão
+ *  presa e pôr o whisper-cli na pasta (ou no PATH). docs/legendas.md, "Linux". */
+export const comoInstalarWhisper = (pasta: string) =>
+  `falta o whisper-cli (whisper.cpp ${WHISPER_VERSAO}): fora do Windows x64 ele não baixa sozinho. Compile o whisper.cpp v1.9.5 `
+  + `(cmake -B build -DBUILD_SHARED_LIBS=OFF && cmake --build build --target whisper-cli) e copie build/bin/whisper-cli para `
+  + `${path.join(pasta, 'bin')} ou para uma pasta do PATH; os modelos baixam sozinhos`;
 
 /** ffmpeg do compositor do Remotion: no app empacotado fica em app.asar.unpacked; no desenvolvimento, no node_modules. */
 export const caminhoFfmpeg = (o: {raizApp?: string; empacotado?: boolean} = {}): string | null => {
@@ -517,29 +545,32 @@ export class Transcritor {
   /** O que está instalado e o que falta, sem baixar nada. */
   estado(modelo: IdModeloWhisper = this.o.modelo ?? MODELO_PADRAO): EstadoTranscricao {
     const m = MODELOS_WHISPER[modelo];
-    const cli = path.join(this.pasta, 'bin', EXE_WHISPER);
+    const cli = acharWhisperCli(this.pasta);
+    const baixa = baixaBinario();
     const arqModelo = path.join(this.pasta, m.arquivo);
     const ffmpeg = caminhoFfmpeg(this.o);
     const tem = (a: string, bytes?: number) => existsSync(a) && (bytes === undefined || statSync(a).size === bytes);
     const falta: string[] = [];
-    if (!tem(cli)) falta.push(`whisper.cpp ${WHISPER_VERSAO} (${Math.round(BINARIO_WHISPER.bytes / 1e6)} MB)`);
+    if (!cli && baixa) falta.push(`whisper.cpp ${WHISPER_VERSAO} (${Math.round(BINARIO_WHISPER.bytes / 1e6)} MB)`);
     if (!tem(arqModelo, m.bytes)) falta.push(`modelo ${m.arquivo} (${Math.round(m.bytes / 1e6)} MB)`);
     if (this.o.vad !== false && !tem(path.join(this.pasta, MODELO_VAD.arquivo), MODELO_VAD.bytes)) falta.push(`detector de voz ${MODELO_VAD.arquivo} (0,9 MB)`);
     return {
       pasta: this.pasta, modelo, modelos: Object.values(MODELOS_WHISPER).map((x) => ({id: x.id, nome: x.nome, mb: Math.round(x.bytes / 1e6), instalado: tem(path.join(this.pasta, x.arquivo), x.bytes)})),
-      pronto: !falta.length && Boolean(ffmpeg), falta, ffmpeg: Boolean(ffmpeg), ocupado: this.atual?.arquivo,
-      plataforma: process.platform === 'win32' && process.arch === 'x64',
+      pronto: !falta.length && Boolean(ffmpeg) && Boolean(cli || baixa), falta, ffmpeg: Boolean(ffmpeg), ocupado: this.atual?.arquivo,
+      plataforma: baixa || Boolean(cli),
+      ...(cli || baixa ? {} : {aviso: comoInstalarWhisper(this.pasta)}),
     };
   }
 
   /** Baixa o que falta (binário e modelo), conferindo o SHA-256; devolve onde estão as peças. */
   async preparar(modelo: IdModeloWhisper, andamento: Andamento = () => undefined, sinal?: AbortSignal): Promise<Pecas> {
-    if (process.platform !== 'win32' || process.arch !== 'x64') throw new ErroProjeto('a transcrição local por enquanto só tem o binário do Windows x64', 'nao_achado');
+    const achado = acharWhisperCli(this.pasta);
+    if (!achado && !baixaBinario()) throw new ErroProjeto(comoInstalarWhisper(this.pasta), 'nao_achado');
     const ffmpeg = caminhoFfmpeg(this.o);
     if (!ffmpeg) throw new ErroProjeto('não achei o ffmpeg do compositor do Remotion (@remotion/compositor): reinstale o app', 'nao_achado');
     const m = MODELOS_WHISPER[modelo];
     const bin = path.join(this.pasta, 'bin');
-    const cli = path.join(bin, EXE_WHISPER);
+    const cli = achado ?? path.join(bin, EXE_WHISPER);
     if (!existsSync(cli)) {
       const zip = path.join(this.pasta, 'whisper-bin-x64.zip');
       if (!existsSync(zip) || statSync(zip).size !== BINARIO_WHISPER.bytes || sha256DoArquivo(zip) !== BINARIO_WHISPER.sha256) {
