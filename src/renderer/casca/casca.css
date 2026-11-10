@@ -90,7 +90,7 @@
 
 /* ── painel do Claude: abas de conversa e de terminal ── */
 .claude-painel { background: var(--fundo-2); }
-.claude-abas { height: 30px; flex: none; display: flex; align-items: stretch; gap: 0; padding: 0 4px 0 2px; background: var(--fundo-1); border-bottom: 1px solid var(--borda); overflow: hidden; }
+.claude-abas { height: 30px; flex: none; display: flex; align-items: stretch; gap: 0; padding: 0 4px 0 2px; background: var(--fundo-1); border-bottom: 1px solid var(--borda); overflow: visible; position: relative; z-index: 5; }
 .claude-abas .aba { display: flex; align-items: center; gap: 6px; padding: 0 10px; min-width: 0; flex-shrink: 1; color: var(--texto-3); font: 12px var(--fonte); cursor: default; white-space: nowrap; }
 .claude-abas .aba .nome { overflow: hidden; text-overflow: ellipsis; }
 .claude-abas .aba:hover { color: var(--texto-2); }
