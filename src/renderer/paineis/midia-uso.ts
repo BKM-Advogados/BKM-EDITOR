@@ -18,6 +18,9 @@ const docAtivo = (modulo: 'video' | 'imagem') => {
   return id && lido ? {id, doc: lido.doc as unknown} : null;
 };
 
+const tituloDoDoc = (id: string) => loja.get().info?.manifesto.documentos.find((d) => d.id === id)?.titulo ?? id;
+const nomeDe = (caminho: string) => caminho.split('/').pop() ?? caminho;
+
 /** Bloco de imagem na cena de trabalho do vídeo ativo, com o arquivo já no `src`. */
 export const imagemNoVideo = async (caminho: string) => {
   const v = docAtivo('video');
@@ -25,20 +28,23 @@ export const imagemNoVideo = async (caminho: string) => {
   await adicionarBloco(v.id, 'imagem');
   const sel = loja.get().selecao;
   if (sel?.documento === v.id && /^\/cenas\/\d+\/blocos\/\d+$/.test(sel.caminho)) {
-    if (await trocar(v.id, `${sel.caminho}/src`, caminho, `imagem ${caminho.split('/').pop()}`)) selecionar(sel);
+    if (await trocar(v.id, `${sel.caminho}/src`, caminho, `imagem ${nomeDe(caminho)}`)) {
+      selecionar(sel);
+      avisar(`${nomeDe(caminho)} entrou como bloco de imagem em "${tituloDoDoc(v.id)}".`, 'ok');
+    }
   }
 };
 
 export const audioNoVideo = async (caminho: string, papel: PapelFaixa) => {
   const v = docAtivo('video');
   if (!v || !ehDocCenas(v.doc)) return avisar('Abra um vídeo de cenas para pôr o áudio nele.', 'info');
-  await adicionarClipeAudio(v.id, papel, caminho);
+  if (await adicionarClipeAudio(v.id, papel, caminho)) avisar(`${nomeDe(caminho)} entrou na linha do tempo de "${tituloDoDoc(v.id)}".`, 'ok');
 };
 
 export const camadaNaImagem = async (caminho: string) => {
   const i = docAtivo('imagem');
   if (!i) return avisar('Abra uma imagem para pôr a foto nela.', 'info');
-  await novaImagem(i.id, i.doc as DocImagem, caminho);
+  if (await novaImagem(i.id, i.doc as DocImagem, caminho)) avisar(`${nomeDe(caminho)} entrou como camada nova em "${tituloDoDoc(i.id)}".`, 'ok');
 };
 
 /** Os destinos que servem ao arquivo, para o menu "Usar em…". Lista vazia: o botão fica desligado com a razão no título. */

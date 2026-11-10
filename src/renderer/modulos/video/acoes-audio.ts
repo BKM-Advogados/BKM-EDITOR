@@ -100,7 +100,9 @@ export const adicionarClipeAudio = async (documento: string, papel: PapelFaixa, 
       ops = [...testeId(`/audio/faixas/${indice}`, faixa.id),
         Array.isArray(faixa.clipes) ? {op: 'add', path: `/audio/faixas/${indice}/clipes/${j}`, value: clipe} : {op: 'add', path: `/audio/faixas/${indice}/clipes`, value: [clipe]}];
     }
-    if (await aplicar(documento, ops, `${PAPEIS[papel].nome.toLowerCase()}: ${nomeDoClipe(clipe)}`)) selecionar({documento, caminho: `/audio/faixas/${indice}/clipes/${j}`});
+    const entrou = await aplicar(documento, ops, `${PAPEIS[papel].nome.toLowerCase()}: ${nomeDoClipe(clipe)}`);
+    if (entrou) selecionar({documento, caminho: `/audio/faixas/${indice}/clipes/${j}`});
+    return entrou;
   } catch (e) {
     avisar(mensagemDe(e), 'erro');
   }
