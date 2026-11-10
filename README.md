@@ -1,14 +1,14 @@
-# Estúdio 1.0
+# Estúdio V3
 
 App desktop que une edição de **vídeo**, **imagem**, **3D**, **efeitos** e **animação** (2D e arte em pixel) num lugar só. Tudo é JSON na pasta do
 projeto: a pessoa edita na tela, o Claude edita conversando (com a conta da própria pessoa), e as duas mãos passam pelo
 mesmo JSON Patch com versão, diário e desfazer. A tela acompanha o arquivo; o agente vê o que a pessoa mudou.
 
 Nome provisório. Pasta: `C:\Users\usuario\projetos\estudio` (fora do OneDrive, por causa do `node_modules`).
-Repositório: `BKM-Advogados/BKM-EDITOR` (privado). A tag `v1.0.0` é a V1 antiga (pacote 0.1.0); esta é a
-versão 1.0.0 do pacote. No Linux a pasta é `~/Projects/estudio`.
+Repositório: `BKM-Advogados/BKM-EDITOR` (privado). Versões: V1 = tag `v1.0.0` (pacote 0.1.0), V2 = `v2.0.0` (0.2.0),
+V3 = `v3.0.0` (pacote 1.0.0). No Linux a pasta é `~/Projects/estudio`.
 
-## Novidades da 1.0 (10/11/2026)
+## Novidades da V3 (pacote 1.0.0, 10/11/2026)
 
 - **Linux (Omarchy/Hyprland):** roda e se instala no lançador de aplicativos com `bash scripts/instalar-linux.sh`; em
   gerenciador em mosaico a janela vem sem os botões sobrepostos. Detalhes em `STACKS.md`.
