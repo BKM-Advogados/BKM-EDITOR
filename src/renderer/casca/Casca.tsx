@@ -461,6 +461,7 @@ export const Casca: React.FC = () => {
                 <button onClick={() => novoDocumento('video')}><Film size={13} />Vídeo</button>
                 <button onClick={() => novoDocumento('imagem')}><ImageIcon size={13} />Imagem</button>
                 <button onClick={() => novoDocumento('3d')}><Box size={13} />3D</button>
+                <button onClick={() => novoDocumento('animacao')}><Sparkles size={13} />Animação</button>
               </span>
             </div>
             <hr />
