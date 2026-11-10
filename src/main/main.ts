@@ -37,6 +37,10 @@ app.setAppUserModelId('br.com.bkmadvogados.estudio');
 // teste de ponta a ponta: o script de e2e se conecta à janela pelo protocolo de depuração do Chromium
 if (process.env.ESTUDIO_DEPURAR_PORTA) app.commandLine.appendSwitch('remote-debugging-port', process.env.ESTUDIO_DEPURAR_PORTA);
 
+// Linux com gerenciador em mosaico: as janelas vêm sem moldura e sem minimizar, e se fecham pelo teclado (Super+W)
+const MOSAICO = process.platform === 'linux'
+  && (!!process.env.HYPRLAND_INSTANCE_SIGNATURE || /hyprland|sway|i3|river|niri/i.test(process.env.XDG_CURRENT_DESKTOP ?? ''));
+
 const GB = os.totalmem() / 1024 ** 3;
 const PERFIL: Perfil = GB <= 8.5
   ? {nome: 'leve', sessoes_claude: 2, escala_previa: 0.5, pixel_ratio: 1}
@@ -187,9 +191,10 @@ const criarJanela = () => {
     minWidth: 1100,
     minHeight: 640,
     show: false,
-    // barra de título própria (a casca desenha nome, áreas e ações); os botões da janela continuam os do Windows
+    // barra de título própria (a casca desenha nome, áreas e ações); os botões da janela continuam os do sistema, menos
+    // nos gerenciadores em mosaico (Hyprland/Omarchy, Sway…), que não têm moldura nem minimizar
     titleBarStyle: 'hidden',
-    titleBarOverlay: {color: '#0f0f0f', symbolColor: '#b4b4b4', height: 36},
+    ...(MOSAICO ? {} : {titleBarOverlay: {color: '#0f0f0f', symbolColor: '#b4b4b4', height: 36}}),
     backgroundColor: '#0f0f0f',
     title: 'Estúdio',
     autoHideMenuBar: true,
