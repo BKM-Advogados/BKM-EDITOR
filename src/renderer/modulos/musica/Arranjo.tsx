@@ -4,7 +4,7 @@
 // "inicio" do padrão, então o que toca fica no lugar), clicar seleciona, clicar na régua leva a cabeça. Teclas na área
 // Música: Espaço toca, S divide o clipe na cabeça, Delete apaga, L repete o clipe, Home volta ao começo.
 import React, {useEffect, useMemo, useRef, useState} from 'react';
-import {Volume2, VolumeX, ZoomIn, ZoomOut} from 'lucide-react';
+import {Maximize2, Volume2, VolumeX, ZoomIn, ZoomOut} from 'lucide-react';
 import {iconeDoCanal} from './Inspector';
 import {acordeDe} from '../../../nucleo/musica-teoria';
 import {posicaoEmCompasso, resolverMusica, type ClipeMusicaP, type DocMusica} from '../../../nucleo/musica';
@@ -206,6 +206,18 @@ const Arranjo: React.FC<{doc: DocMusica}> = ({doc}) => {
     if (motor.estaTocando()) (motor.parar(), tocarOuPausar());
   };
   const zoomar = (f: number) => musica.definir((s) => ({pxPorBatida: Math.min(160, Math.max(6, s.pxPorBatida * f))}));
+  const ajustar = () => {
+    const w = rolo.current?.clientWidth;
+    if (w) musica.definir({pxPorBatida: Math.min(160, Math.max(6, (w - 48) / Math.max(1, m.duracao_batidas)))});
+  };
+  // tocando, o arranjo acompanha a cabeça: quando ela passa da borda direita, a página seguinte aparece
+  const tocando = useMusica((e) => e.tocando);
+  useEffect(() => {
+    const el = rolo.current;
+    if (!el || !tocando) return;
+    const x = (cabeca / m.seg_por_batida) * px;
+    if (x > el.scrollLeft + el.clientWidth - 24 || x < el.scrollLeft) el.scrollLeft = Math.max(0, x - 40);
+  }, [cabeca, tocando, px, m.seg_por_batida]);
   // Ctrl + roda do mouse: o ouvinte tem de ser nativo e não passivo para o preventDefault valer (o do React é passivo)
   useEffect(() => {
     const el = rolo.current;
@@ -227,10 +239,11 @@ const Arranjo: React.FC<{doc: DocMusica}> = ({doc}) => {
   return (
     <div className="arranjo">
       <div className="cabecas" ref={cabecas}>
-        <div className="cab-regua">{m.bpm} BPM · {m.compasso[0]}/{m.compasso[1]}
+        <div className="cab-regua" title={`${m.bpm} BPM · compasso ${m.compasso[0]}/${m.compasso[1]}`}><span style={{whiteSpace: 'nowrap'}}>{m.bpm} BPM</span>
           <span className="zoom-botoes">
             <button className="bti" title="Afastar (Ctrl + roda do mouse)" onClick={() => zoomar(1 / 1.3)}><ZoomOut size={12} /></button>
             <button className="bti" title="Aproximar (Ctrl + roda do mouse)" onClick={() => zoomar(1.3)}><ZoomIn size={12} /></button>
+            <button className="bti" title="Ajustar: a música inteira cabe na largura" onClick={ajustar}><Maximize2 size={12} /></button>
           </span></div>
         {doc.secoes?.length ? <div className="cab-acordes" style={{color: 'var(--comentario)'}}>Seções</div> : null}
         {doc.acordes?.length ? <div className="cab-acordes">Acordes · {doc.tom ?? 'C'} {doc.escala ?? 'maior'}</div> : null}
