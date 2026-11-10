@@ -81,7 +81,7 @@ describe('MCP: transcrever e legendas', () => {
     pedidos.length = 0;
     const r = await chamar(c, 'transcrever', {documento: 'video', estilo: 'karaoke'});
     expect(r.erro).toBe(false);
-    expect(pedidos).toEqual([{arquivo: 'midia/narracao.wav', modelo: undefined, vocabulario: undefined, destino: undefined}]);
+    expect(pedidos).toEqual([{arquivo: 'midia/narracao.wav', modelo: undefined, vocabulario: undefined, destino: undefined, pela_ia: true}]);
     expect(r.json.legendas).toBeGreaterThan(20);
     // karaokê: até 4 palavras por legenda, e "de cidade?" não fica sozinha; a primeira palavra da narração começa no zero
     // do arquivo, que está em 500 ms
@@ -168,6 +168,7 @@ describe('MCP: transcrever e legendas', () => {
     const guardada = lerVideo().legendas!.segmentos[0];
     const lidas = (await chamar(c, 'ler_legendas', {documento: 'video'})).json;
     expect(lidas.legendas[0]).toMatchObject({id: guardada.id, em: guardada.em + 2000, sai: guardada.sai + 2000});
+    expect(lidas.legendas[0].cps).toBe(Math.round((guardada.texto.length / ((guardada.sai - guardada.em) / 1000)) * 10) / 10);
     expect((await chamar(c, 'ler_legendas', {documento: 'video', de: guardada.sai + 2000, ate: guardada.sai + 2001})).json.legendas.map((s: {id: string}) => s.id)).not.toContain(guardada.id);
     // texto: a palavra corrigida guarda o tempo dela
     const ws = guardada.texto.split(' ');
@@ -184,6 +185,8 @@ describe('MCP: transcrever e legendas', () => {
     expect([movida.em, movida.sai]).toEqual([guardada.em + 300, guardada.sai + 300]);
     expect(movida.palavras![0].s).toBe(guardada.palavras![0].s + 300);
     expect((await chamar(c, 'editar_legenda', {documento: 'video', id: 'nao-ha', texto: 'x'})).texto).toContain('legenda não achada');
+    // andar com as palavras para antes do clipe esconderia a legenda: recusa e diz quanto dá (som-N6)
+    expect((await chamar(c, 'editar_legenda', {documento: 'video', id: guardada.id, em: tela.em - 2000, sai: tela.sai - 2000})).texto).toContain('sairia do trecho');
     expect((await chamar(c, 'editar_legenda', {documento: 'video', id: guardada.id, em: tela.sai, sai: tela.sai + 50})).erro).toBe(true);
     // volta ao lugar de antes, para os testes seguintes
     await chamar(c, 'editar_legenda', {documento: 'video', id: guardada.id, texto: guardada.texto, em: tela.em, sai: tela.sai});
@@ -212,5 +215,71 @@ describe('MCP: transcrever e legendas', () => {
     expect(depois.segmentos.map((s) => [s.em, s.sai, s.texto.replace(/\n/g, ' ')])).toEqual(antes);
     expect(depois.origens).toBeUndefined();
     expect(depois.estilo?.predefinicao).toBe('classica');
+  });
+
+  it('importar_legendas lê o SRT em ANSI (Windows-1252) com os acentos certos (video-N6)', async () => {
+    const c = await conectar(transcritor);
+    const srt = ['1', '00:00:01,000 --> 00:00:02,000', 'rescisão e aviso prévio', ''].join(String.fromCharCode(13, 10));
+    writeFileSync(path.join(pasta, 'midia', 'ansi.srt'), Buffer.from(srt, 'latin1'));
+    const r = await chamar(c, 'importar_legendas', {documento: 'video', arquivo: 'midia/ansi.srt'});
+    expect(r.json).toMatchObject({ok: true, legendas: 1, codificacao: 'windows-1252'});
+    expect(lerVideo().legendas!.segmentos[0].texto).toBe('rescisão e aviso prévio');
+  });
+
+  it('o transcrever da IA marca pela_ia e para quando a conversa é interrompida (transversal-N4)', async () => {
+    const visto = {pela_ia: undefined as boolean | undefined, abortado: false};
+    const lento: TranscritorMcp = {
+      transcrever: (_p, pedido, _a, sinal) => new Promise((ok) => {
+        visto.pela_ia = pedido.pela_ia;
+        sinal?.addEventListener('abort', () => {
+          visto.abortado = true;
+          ok({ok: false, cancelado: true, mensagem: 'Transcrição cancelada'});
+        });
+      }),
+    };
+    const c = await conectar(lento);
+    const antes = readFileSync(path.join(pasta, 'video', 'video.json'), 'utf-8');
+    const chamada = c.callTool({name: 'transcrever', arguments: {documento: 'video', refazer: true}}).catch((e: Error) => e);
+    await new Promise((ok) => setTimeout(ok, 30));
+    expect(visto.pela_ia).toBe(true);
+    await c.close(); // o Esc fecha o pedido HTTP; aqui, o cliente fecha o transporte
+    await chamada;
+    expect(visto.abortado).toBe(true);
+    expect(readFileSync(path.join(pasta, 'video', 'video.json'), 'utf-8')).toBe(antes);
+  });
+
+  it('exportar_legendas com trecho conta do zero e grava o .pt_BR.srt', async () => {
+    const c = await conectar(transcritor);
+    // o teste anterior deixou uma legenda só, de 1 s a 2 s; o trecho de 5 s a 9 s fica vazio e o de 1,5 s a 9 s a pega pela metade
+    const vazio = await chamar(c, 'exportar_legendas', {documento: 'video', nome: 'Trecho', formatos: ['srt_pt_br'], trecho: {de_ms: 5000, ate_ms: 9000}});
+    expect(vazio.erro).toBe(true);
+    expect(vazio.texto).toContain('nenhuma legenda cai no trecho');
+    const r = await chamar(c, 'exportar_legendas', {documento: 'video', nome: 'Trecho', formatos: ['srt_pt_br'], trecho: {de_ms: 1500, ate_ms: 9000}});
+    expect(r.json.arquivos).toEqual(['saidas/Trecho.pt_BR.srt']);
+    const srt = projeto.lerTexto('saidas/Trecho.pt_BR.srt');
+    // contada do começo do trecho: entra no zero e sai em 0,5 s
+    expect(srt).toContain('00:00:00,000 --> 00:00:00,500');
+    expect(srt).toContain('rescisão e aviso prévio');
+  });
+
+  it('o dicionário do vídeo vai ao vocabulário do whisper', async () => {
+    const c = await conectar(transcritor);
+    const v = projeto.lerJson('video/video.json');
+    projeto.aplicarPatch({documento: 'video/video.json', versao_base: v.versao, autor: 'pessoa', origem: 'interface',
+      patch: [{op: 'add', path: '/legendas/dicionario', value: [{de: 'fgts', para: 'FGTS'}, {de: 'fundo', para: 'Fundo de Garantia'}]}]});
+    pedidos.length = 0;
+    await chamar(c, 'transcrever', {documento: 'video', refazer: true, legendas: false});
+    expect((pedidos.at(-1) as {termos?: string[]}).termos).toEqual(['FGTS', 'Fundo de Garantia']);
+  });
+
+  it('exportar_legendas não grava por cima do SRT que já está em saidas/ (fala-D11)', async () => {
+    const c = await conectar(transcritor);
+    writeFileSync(path.join(pasta, 'saidas', 'Corrigido.srt'), 'corrigido à mão');
+    const r = await chamar(c, 'exportar_legendas', {documento: 'video', nome: 'Corrigido', formatos: ['srt']});
+    expect(r.json.arquivos).toEqual(['saidas/Corrigido (2).srt']);
+    expect(readFileSync(path.join(pasta, 'saidas', 'Corrigido.srt'), 'utf-8')).toBe('corrigido à mão');
+    const r2 = await chamar(c, 'exportar_legendas', {documento: 'video', nome: 'Corrigido', formatos: ['srt'], sobrescrever: true});
+    expect(r2.json.arquivos).toEqual(['saidas/Corrigido.srt']);
+    expect(readFileSync(path.join(pasta, 'saidas', 'Corrigido.srt'), 'utf-8')).toContain('-->');
   });
 });

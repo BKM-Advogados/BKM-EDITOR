@@ -45,6 +45,10 @@
 .painel-legendas .item-legenda .tempo { font: 11px/1.4 var(--fonte-mono); color: var(--texto-3); background: none; border: 0; padding: 2px 0; cursor: pointer; text-align: left;
   white-space: nowrap; }
 .painel-legendas .item-legenda .tempo:hover { color: var(--acento); }
+.painel-legendas .dicionario { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: var(--tam-1); color: var(--texto-3); }
+.painel-legendas .dicionario .entrada { display: inline-flex; align-items: center; gap: 2px; color: var(--texto-2); }
+.painel-legendas .item-legenda .duvida { grid-column: 2; font-size: 10px; color: var(--aviso, #ffa057); }
+.painel-legendas .item-legenda .rapida { grid-column: 2; font-size: 10px; color: var(--aviso, #ffa057); }
 .painel-legendas .item-legenda .falante { grid-column: 2; font-size: 10px; color: var(--texto-3); text-transform: uppercase; letter-spacing: 0.04em; }
 .painel-legendas .item-legenda textarea { grid-column: 2; grid-row: 1; width: 100%; min-height: 22px; resize: vertical; background: var(--fundo-1); color: var(--texto);
   border: 1px solid var(--borda); border-radius: var(--raio); padding: 3px 6px; font: inherit; font-size: var(--tam-2); line-height: 1.4; field-sizing: content; }
@@ -54,3 +58,9 @@
 .painel-legendas .item-legenda .acoes-item .bti:hover { color: var(--texto); }
 .painel-legendas .item-legenda .acoes-item .bti:disabled { opacity: 0.3; }
 .painel-legendas .contagem { color: var(--texto-3); font-weight: normal; }
+/* cortes pela fala */
+.painel-legendas .cortes-clipe { padding: 4px 10px 8px; display: flex; flex-direction: column; gap: 6px; }
+.painel-legendas .cortes-clipe .linha-botoes { padding: 0; align-items: center; }
+.painel-legendas .lista-cortes { display: flex; flex-direction: column; gap: 2px; max-height: 180px; overflow: auto; font-size: var(--tam-1); color: var(--texto-2); }
+.painel-legendas .lista-cortes .corte { display: flex; gap: 6px; align-items: center; }
+.painel-legendas .lista-cortes .tempo { color: var(--texto-3); cursor: pointer; font-variant-numeric: tabular-nums; }

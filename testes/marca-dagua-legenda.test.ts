@@ -16,11 +16,12 @@ const FEED = {largura: 1080, altura: 1350};
 const REELS = {largura: 1080, altura: 1920};
 
 /** As legendas como o resolvedor entrega ao render: um vídeo de cenas com uma fala de duas linhas. */
-const legendasEm = (q: {largura: number; altura: number}, posicao?: PosicaoLegenda, predefinicao: IdEstiloLegenda = 'classica', oculto = false): LegendasP => {
+// frente Fala, rodada 3: no 4:5 a legenda fica no corte 1:1 por padrão (fala-D8); `alturaToda` mede como no relatório
+const legendasEm = (q: {largura: number; altura: number}, posicao?: PosicaoLegenda, predefinicao: IdEstiloLegenda = 'classica', oculto = false, alturaToda = false): LegendasP => {
   const doc = {
     ...novoDocCenas({...q, fps: 30}),
     legendas: {segmentos: [{id: 's1', em: 0, sai: 2000, texto: 'Uma frase comprida o bastante para ocupar duas linhas'}],
-      estilo: {predefinicao, ...(posicao ? {posicao} : {})}, ...(oculto ? {oculto} : {})},
+      estilo: {predefinicao, ...(posicao ? {posicao} : {}), ...(alturaToda ? {no_quadrado: false} : {})}, ...(oculto ? {oculto} : {})},
   };
   const l = (resolverCenas(doc).props as unknown as {legendas_cenas?: LegendasP}).legendas_cenas;
   if (!l) throw new Error('o resolvedor não devolveu legendas');
@@ -46,7 +47,7 @@ describe("marca d'água e legenda", () => {
   });
 
   it('4:5 com a Clássica de duas linhas embaixo: a marca sai de cima da primeira linha e continua dentro dos cortes da grade', () => {
-    const l = legendasEm(FEED, 'baixo');
+    const l = legendasEm(FEED, 'baixo', 'classica', false, true);
     const cx = caixaDaLegenda(l, FEED)!;
     // a caixa cobre a legenda que o relatório mediu: duas linhas de 0,845 a 0,94 da altura, de margem a margem (5%)
     expect(cx.y).toBeLessThanOrEqual(0.845);

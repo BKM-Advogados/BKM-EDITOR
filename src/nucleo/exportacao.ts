@@ -10,6 +10,7 @@ import {CANTO_PADRAO, posicaoSegura, zonasDaMarca, zonaSugerida, type CantoMarca
 
 export type CodecVideo = 'h264' | 'h265' | 'webm';
 export type QualidadeVideo = 'alta' | 'media' | 'leve';
+import type {LegendaNaExportacao} from './legendas-exportacao'; // frente Fala
 export type Destino = {id: string; largura: number; altura: number};
 export type Trecho = {de_ms: number; ate_ms: number};
 
@@ -23,6 +24,7 @@ export type OpcoesExportarVideo = {
   marca_dagua?: Record<string, ConfigMarcaDagua>; // por id de destino; ausente ou desligada, sai sem marca
   proporcao_logo?: number; // largura ÷ altura do logo, medida pela interface (sem ela, 3)
   proporcao_texto?: number; // largura ÷ altura da assinatura na fonte do kit, medida pela interface (sem ela, uma estimativa pelas letras)
+  legendas?: Record<string, LegendaNaExportacao>; // frente Fala: por id de destino, queimar, só o SRT ou os dois (padrão: queimar)
 };
 
 export type FormatoImagem = 'png' | 'jpg' | 'webp';
@@ -283,7 +285,7 @@ export const legendasDasProps = (props: Record<string, unknown> | null | undefin
 /** As legendas com a área livre de outro tamanho de quadro: a mesma conta que o resolvedor faz (areaDaLegenda), para a
  *  miniatura do diálogo mostrar a legenda e a marca de cada destino onde a exportação vai pôr. */
 export const legendasNoDestino = (l: LegendasP | null, quadro: {largura: number; altura: number}): LegendasP | null =>
-  l ? {...l, area: areaDaLegenda(quadro.largura, quadro.altura)} : null;
+  l ? {...l, area: areaDaLegenda(quadro.largura, quadro.altura, {no_quadrado: l.estilo?.no_quadrado})} : null; // frente Fala: o 4:5 no corte 1:1
 
 /** Onde a legenda pode aparecer (frações do quadro), pelo pior caso, com a mesma geometria do Legendas.tsx: da margem
  *  esquerda à direita da área (a faixa da marca vai de borda a borda), na posição do estilo (embaixo encostada na base

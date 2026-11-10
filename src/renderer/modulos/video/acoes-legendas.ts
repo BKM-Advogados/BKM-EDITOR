@@ -5,10 +5,11 @@ import type {PedidoTranscricao, ProgressoTranscricao} from '../../../compartilha
 import {idLivre, type DocCenas, type PropsCenas} from '../../../nucleo/cenas';
 import {formatoDoVideo} from '../../../nucleo/formatos';
 import {
-  arquivoDaFala, arquivoDasPalavras, clipesDeVoz, comTexto, dividirSegmento, juntarSegmentos, legendasDeArquivo, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt,
+  arquivoDaFala, arquivoDasPalavras, clipesDeVoz, comTexto, palavrasValidas, termosDoDicionario, type EntradaDicionario, type PalavraLegenda, legendasDeOutraTomada, limitesDoArrasto, dividirSegmento, juntarSegmentos, legendasDeArquivo, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt,
   requebrar, substituirEmLote, type EstadoDaFala, type EstiloLegenda, type LegendasCenas, type OpcoesBusca, type SegmentoLegenda,
 } from '../../../nucleo/legendas';
 import {confirmar} from '../../componentes/Dialogo';
+import {acharClipe, patchDosCortes, patchSemCortes, proporCortes, trechoDoClipe, type CorteFala} from '../../../nucleo/cortes-fala';
 import {aplicar, avisar, loja, mensagemDe, selecionar, trocar} from '../../estado/loja';
 
 export const docDe = (documento: string) => loja.get().docs[documento]?.doc as DocCenas | undefined;
@@ -35,6 +36,9 @@ export const assinarAndamento = (f: () => void) => {
 };
 export const lerAndamento = () => andamento;
 let ligado = false;
+/** Passa a ouvir o andamento das transcrições: as do botão e as que a IA pede pelo MCP (transversal-N4). O painel liga
+ *  ao abrir, para o andamento e o Cancelar aparecerem também quando quem pediu foi a IA. */
+export const ouvirAndamento = () => ligar();
 const ligar = () => {
   if (ligado) return;
   ligado = true;
@@ -80,7 +84,8 @@ export const transcreverEGerar = async (documento: string, o: {clipe?: string; f
     for (const [i, arquivo] of fila.entries()) {
       andamento = {etapa: 'audio', mensagem: `Preparando ${nomeCurto(arquivo)}`, arquivo, progresso: 0};
       avisarOuvintes();
-      const r = await window.estudio.fala.transcrever({arquivo, modelo: o.modelo});
+      const termos = termosDoDicionario(docDe(documento)?.legendas);
+      const r = await window.estudio.fala.transcrever({arquivo, modelo: o.modelo, ...(termos.length ? {termos} : {})});
       if (!r.ok) {
         avisar(r.cancelado ? 'Transcrição cancelada.' : r.mensagem ?? 'A transcrição não terminou.', r.cancelado ? 'info' : 'erro');
         return;
@@ -96,7 +101,9 @@ export const transcreverEGerar = async (documento: string, o: {clipe?: string; f
   }
   let refazer: true | string[] = o.refazer ? true : [];
   // a tomada mudou depois das legendas: as de agora são da fala antiga, mas podem ter correções; a pessoa decide
-  const mudaram = o.refazer ? [] : pedidos.filter(({clipe}) => comLegenda.has(clipe.id) && estados[arquivoDaFala(clipe)] === 'velha');
+  // ou o clipe trocou de arquivo depois das legendas ("Trocar arquivo…"): som-N2
+  const outra = new Set(legendasDeOutraTomada(docDe(documento) ?? d));
+  const mudaram = o.refazer ? [] : pedidos.filter(({clipe}) => comLegenda.has(clipe.id) && (estados[arquivoDaFala(clipe)] === 'velha' || outra.has(clipe.id)));
   if (mudaram.length) {
     const nomes = [...new Set(mudaram.map(({clipe}) => clipe.nome || nomeCurto(arquivoDaFala(clipe))))].join(', ');
     const sim = await confirmar({titulo: 'O áudio mudou depois das legendas', botao: 'Refazer as legendas',
@@ -163,15 +170,22 @@ export const DURACAO_MIN_LEGENDA = 200;
 
 /** Muda o tempo de um segmento em `dms` (passos de 10 ms): "mover" leva tudo junto, as palavras também; "ini" e "fim"
  *  aparam as pontas. Relativo, então vale também para a legenda que anda com o clipe de voz. */
-export const moverSegmento = async (documento: string, id: string, modo: 'mover' | 'ini' | 'fim', dms: number) => {
+export const moverSegmento = async (documento: string, id: string, modo: 'mover' | 'ini' | 'fim', dms: number, o: {exato?: boolean} = {}) => {
   const i = indiceDe(documento, id);
   const s = legendasDe(documento)?.segmentos[i];
   if (!s) return;
-  const d = Math.round(dms / 10) * 10;
+  const d = o.exato ? Math.round(dms) : Math.round(dms / 10) * 10;
   if (!d) return;
   let novo: SegmentoLegenda;
   if (modo === 'mover') {
-    const dd = Math.max(-s.em, d);
+    let dd = Math.max(-s.em, d);
+    // a legenda de um clipe de voz não sai do trecho que ele toca: o resolvedor a esconderia (som-N6)
+    const lim = limitesDoArrasto(docDe(documento) ?? {}, s);
+    if (lim && (dd < lim.min || dd > lim.max)) {
+      dd = Math.min(lim.max, Math.max(lim.min, dd));
+      avisar('A legenda fica dentro do trecho que o clipe de voz toca. Para o texto aparecer antes ou depois da voz, puxe só o começo ou o fim.', 'info');
+      if (!dd) return;
+    }
     novo = {...s, em: s.em + dd, sai: s.sai + dd, ...(s.palavras ? {palavras: s.palavras.map((p) => ({...p, s: p.s + dd, e: p.e + dd}))} : {})};
   } else if (modo === 'ini') novo = {...s, em: Math.max(0, Math.min(s.sai - DURACAO_MIN_LEGENDA, s.em + d))};
   else novo = {...s, sai: Math.max(s.em + DURACAO_MIN_LEGENDA, s.sai + d)};
@@ -231,14 +245,27 @@ export const novaLegenda = async (documento: string, ms: number) => {
   if (await aplicar(documento, patch, 'nova legenda')) selecionar({documento, caminho: caminhoSeg(i)});
 };
 
-export const substituirTudo = async (documento: string, procurar: string, troca: string, o: OpcoesBusca) => {
+/** Substitui em todas as legendas; com `guardar`, a troca entra no dicionário do vídeo e volta a valer quando as
+ *  legendas forem geradas de novo (e no vocabulário do whisper). */
+export const substituirTudo = async (documento: string, procurar: string, troca: string, o: OpcoesBusca & {guardar?: boolean}) => {
   const leg = legendasDe(documento);
   if (!leg || !procurar) return;
   const r = substituirEmLote(leg.segmentos, procurar, troca, o);
-  if (!r.trocas) return avisar(`"${procurar}" não aparece nas legendas.`, 'info');
-  if (await trocar(documento, '/legendas/segmentos', r.segmentos, `substituir "${procurar}" por "${troca}" (${r.trocas})`)) {
-    avisar(`${r.trocas} ${r.trocas === 1 ? 'troca' : 'trocas'}. Ctrl+Z desfaz.`, 'ok');
+  if (!r.trocas && !o.guardar) return avisar(`"${procurar}" não aparece nas legendas.`, 'info');
+  const entrada: EntradaDicionario = {de: procurar, para: troca, ...(o.palavra_inteira ? {} : {palavra_inteira: false}), ...(o.caixa ? {caixa: true} : {})};
+  const dicionario = o.guardar ? [...(leg.dicionario ?? []).filter((e) => e.de !== procurar), entrada] : leg.dicionario;
+  const novo: LegendasCenas = {...leg, segmentos: r.segmentos, ...(dicionario ? {dicionario} : {})};
+  if (await gravarLegendas(documento, novo, `substituir "${procurar}" por "${troca}" (${r.trocas})${o.guardar ? ' e guardar no dicionário' : ''}`)) {
+    avisar(`${r.trocas} ${r.trocas === 1 ? 'troca' : 'trocas'}${o.guardar ? '; guardada no dicionário do vídeo' : ''}. Ctrl+Z desfaz.`, 'ok');
   }
+};
+
+/** Tira uma troca do dicionário do vídeo. */
+export const tirarDoDicionario = async (documento: string, de: string) => {
+  const leg = legendasDe(documento);
+  if (!leg?.dicionario) return;
+  const resto = leg.dicionario.filter((e) => e.de !== de);
+  await trocar(documento, '/legendas/dicionario', resto.length ? resto : undefined, `tirar "${de}" do dicionário`);
 };
 
 // ---------- estilo ----------
@@ -248,7 +275,7 @@ export const trocarPredefinicao = async (documento: string, estilo: EstiloLegend
   const d = docDe(documento);
   if (!d?.legendas) return;
   const f = formatoDoVideo(d);
-  const quebradas = requebrar(d.legendas, estilo, f.largura, f.altura);
+  const quebradas = requebrar(d.legendas, estilo, f.largura, f.altura, d.tema?.fonte);
   await gravarLegendas(documento, quebradas, `estilo das legendas: ${estilo.predefinicao}`);
 };
 
@@ -269,7 +296,8 @@ export const importarArquivo = async (documento: string) => {
     if (!legendas.segmentos.length) return avisar(`Nenhuma legenda lida de ${a.nome}${avisos.length ? `: ${avisos[0]}` : ''}.`, 'erro');
     const {origens: _o, ...antes} = d?.legendas ?? {segmentos: []};
     if (await gravarLegendas(documento, {...antes, ...legendas}, `legendas importadas de ${a.nome}`)) {
-      avisar(`${legendas.segmentos.length} legendas de ${a.nome}${avisos.length ? ` (${avisos.length} ${avisos.length === 1 ? 'trecho ignorado' : 'trechos ignorados'})` : ''}. Ctrl+Z desfaz.`, 'ok');
+      const ansi = a.codificacao === 'windows-1252' ? ' (lido como Windows-1252, o "ANSI": confira os acentos)' : '';
+      avisar(`${legendas.segmentos.length} legendas de ${a.nome}${ansi}${avisos.length ? ` (${avisos.length} ${avisos.length === 1 ? 'trecho ignorado' : 'trechos ignorados'})` : ''}. Ctrl+Z desfaz.`, 'ok');
     }
   } catch (e) {
     avisar(mensagemDe(e), 'erro');
@@ -288,4 +316,47 @@ export const exportarArquivo = async (documento: string, ext: 'srt' | 'vtt') => 
   } catch (e) {
     avisar(mensagemDe(e), 'erro');
   }
+};
+
+// ---------- cortes pela fala (src/nucleo/cortes-fala.ts) ----------
+
+const seg = (ms: number) => (ms / 1000).toFixed(1).replace('.', ',');
+
+/** Os cortes que a fala do clipe sugere (pausas longas, "ãh", pontas), com as palavras dele; null sem transcrição. */
+export const proporCortesDoClipe = async (documento: string, clipeId: string): Promise<{cortes: CorteFala[]; palavras: PalavraLegenda[]} | null> => {
+  const achado = acharClipe(docDe(documento)?.audio, clipeId);
+  if (!achado) return null;
+  try {
+    const palavras = palavrasValidas(await window.estudio.lerJson(arquivoDasPalavras(arquivoDaFala(achado.clipe))));
+    return palavras.length ? {palavras, cortes: proporCortes(palavras, trechoDoClipe(achado.clipe))} : null;
+  } catch {
+    return null;
+  }
+};
+
+/** Grava a narração emendada (processo principal) e troca o clipe por ela, com as legendas no tempo novo. */
+export const aplicarCortesDoClipe = async (documento: string, clipeId: string, cortes: CorteFala[], palavras: PalavraLegenda[]) => {
+  const achado = acharClipe(docDe(documento)?.audio, clipeId);
+  if (!achado || !cortes.length) return false;
+  try {
+    avisar(`Emendando a narração (${cortes.length} ${cortes.length === 1 ? 'corte' : 'cortes'})…`, 'info');
+    const r = await window.estudio.fala.emendar({fonte: achado.clipe.arquivo, cortes: cortes.map((c) => ({de_ms: c.de_ms, ate_ms: c.ate_ms})), palavras});
+    const d = docDe(documento);
+    if (!d) return false;
+    const tirado = r.antes_ms - r.duracao_ms;
+    if (await aplicar(documento, patchDosCortes(d, clipeId, cortes, r), `cortes pela fala (−${seg(tirado)} s)`)) {
+      avisar(`Narração ${seg(tirado)} s mais curta${r.removidas.length ? `, sem ${r.removidas.join(' ')}` : ''}. Ctrl+Z desfaz.`, 'ok');
+      return true;
+    }
+  } catch (e) {
+    avisar(mensagemDe(e), 'erro');
+  }
+  return false;
+};
+
+/** O clipe volta ao áudio de antes dos cortes (as legendas dele também). */
+export const voltarCortesDoClipe = async (documento: string, clipeId: string) => {
+  const d = docDe(documento);
+  const patch = d ? patchSemCortes(d, clipeId) : null;
+  if (patch && (await aplicar(documento, patch, 'voltar ao áudio sem cortes'))) avisar('A narração voltou ao áudio sem cortes. Ctrl+Z desfaz.', 'ok');
 };

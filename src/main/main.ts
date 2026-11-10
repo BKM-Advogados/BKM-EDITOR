@@ -26,8 +26,9 @@ import {registrarIpcAudio} from './ipc-audio';
 import {registrarIpcGravacao} from './ipc-gravacao'; // frente Som (rodada 3)
 import {definirPastaTrilhas} from '../nucleo/pasta-trilhas';
 import {somAcompanhaCenas} from '../nucleo/som-com-cenas';
-import {registrarIpcFala} from './ipc-fala'; // frente Fala
+import {cancelarFala, registrarIpcFala} from './ipc-fala'; // frente Fala
 import {legendasNoDestino, type LegendasP} from '../nucleo/legendas'; // frente Fala: legendas no tamanho de cada destino
+import {arquivosDeLegendaDoVideo, planoDasLegendas} from '../nucleo/legendas-exportacao'; // frente Fala: queimar ou SRT por destino
 import {registrarPrefsExportacao} from './ipc-exportacao';
 import {registrarContrasteMarca} from './contraste-marca';
 import {apagarLimposSemUso, registrarIpcLimpeza} from './limpeza-voz';
@@ -137,6 +138,7 @@ const guardarMiniatura = async () => {
 
 // ---------- abrir, fechar, criar ----------
 const fecharSessao = async () => {
+  cancelarFala(); // frente Fala: o whisper para junto com o projeto (transversal-N4)
   await guardarMiniatura().catch(() => undefined);
   terminais.fecharTodos();
   conversas.fecharTodas();
@@ -413,8 +415,12 @@ lidar(CANAL.exportar, async (documento: string, opcoes?: OpcoesExportarVideo): P
       const destino = arquivoLivre(pasta, plano.nome, args.ext);
       parcial = destino;
       // legendas na área segura e na quebra do destino, não do documento (frente Fala; a área fica em legendas_cenas.area)
-      const legendas = !fixo && props.legendas_cenas ? legendasNoDestino(props.legendas_cenas as LegendasP, args.largura, args.altura, formato) : undefined;
-      const propsDestino = {...(fixo ? props : {...props, largura: args.largura, altura: args.altura}), ...(legendas ? {legendas_cenas: legendas} : {})};
+      // queimar, só o SRT ou os dois, por destino (frente Fala); no 16:9 com o SRT junto, acima das legendas do YouTube
+      const planoLeg = planoDasLegendas(o.legendas?.[plano.destino.id], args);
+      const legendas = !fixo && props.legendas_cenas ? legendasNoDestino(props.legendas_cenas as LegendasP, args.largura, args.altura, formato,
+        {legendas_youtube: planoLeg.legendas_youtube}) : undefined;
+      const propsDestino = {...(fixo ? props : {...props, largura: args.largura, altura: args.altura}),
+        ...(legendas ? {legendas_cenas: planoLeg.queimar ? legendas : {...legendas, oculto: true}} : {})};
       // marca d'água do destino, se ligada: posicionada no tamanho do destino, em frações (vale com qualquer escala), fora
       // da legenda que vai neste render (a das props do destino, já recalculada acima)
       const marca = marcaDaguaDoDestino(o.marca_dagua?.[plano.destino.id], plano.destino, fontesMarca, o.proporcao_logo, legendasDasProps(propsDestino), o.proporcao_texto);
@@ -424,6 +430,13 @@ lidar(CANAL.exportar, async (documento: string, opcoes?: OpcoesExportarVideo): P
       }, avisoDe(i, path.basename(destino)));
       arquivos.push(destino);
       parcial = undefined;
+      // o SRT ao lado do vídeo, com o mesmo nome (e o .pt_BR.srt do Facebook e o .vtt), sem gravar por cima (frente Fala)
+      if (planoLeg.srt && legendas && !legendas.oculto) {
+        for (const a of arquivosDeLegendaDoVideo(path.basename(destino, `.${args.ext}`), legendas.segmentos, args.frameRange ? o.trecho : null, (n) => existsSync(path.join(pasta, n)))) {
+          writeFileSync(path.join(pasta, a.nome), a.texto, 'utf-8');
+          arquivos.push(path.join(pasta, a.nome));
+        }
+      }
     }
     enviar(CANAL.progresso, {tipo: 'status', mensagem: `Exportado: ${arquivos.map((a) => path.relative(p.raiz, a)).join(', ')}`});
     return {ok: true, arquivo: arquivos[0], arquivos, pasta};

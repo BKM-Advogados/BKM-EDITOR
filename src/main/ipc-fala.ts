@@ -5,12 +5,16 @@ import {dialog, ipcMain, type BrowserWindow, type IpcMainEvent} from 'electron';
 import {readFileSync, statSync} from 'node:fs';
 import path from 'node:path';
 import {CANAL} from '../compartilhado/api';
+import {nomeLivreDaLegenda, textoDeLegenda} from '../nucleo/legendas';
 import {ErroProjeto, type Projeto} from '../nucleo/projeto';
 import {definirTranscritorMcp} from './mcp-http';
 import {registrarIpcTranscricao, type Buscar} from './transcricao';
 
 type Lidar = <A extends unknown[], R>(canal: string, f: (...a: A) => R | Promise<R>) => void;
 const LIMITE_LEGENDA = 5 * 1024 * 1024;
+let transcritorAtual: {cancelar: () => void} | null = null;
+/** Para a transcrição em andamento (a do botão ou a que a IA pediu): o main.ts chama ao fechar o projeto. */
+export const cancelarFala = () => transcritorAtual?.cancelar();
 
 export const registrarIpcFala = (o: {lidar: Lidar; confiavel: (e: IpcMainEvent) => void; janela: () => BrowserWindow | null; projeto: () => Projeto;
   enviar: (canal: string, ...a: unknown[]) => void; raizApp: string; empacotado: boolean; buscar?: Buscar}) => {
@@ -21,13 +25,15 @@ export const registrarIpcFala = (o: {lidar: Lidar; confiavel: (e: IpcMainEvent) 
       f();
     }),
   });
-  // só o nome do arquivo: a legenda sempre cai em saidas/ do projeto, com o nome que a interface montou
+  // só o nome do arquivo: a legenda sempre cai em saidas/ do projeto, com o nome que a interface montou, e nunca por
+  // cima do que já está lá: "Título (2).srt" (fala-D11)
   o.lidar(CANAL.falaGravarSaida, (nome: string, texto: string) => {
     const base = path.basename(String(nome ?? ''));
     if (!/\.(srt|vtt)$/i.test(base) || typeof texto !== 'string') throw new ErroProjeto('só grava .srt ou .vtt em saidas/', 'caminho');
     const p = o.projeto();
-    p.gravarTexto(`saidas/${base}`, texto);
-    return p.caminho(`saidas/${base}`);
+    const livre = nomeLivreDaLegenda(base, (n) => p.existe(`saidas/${n}`));
+    p.gravarTexto(`saidas/${livre}`, texto);
+    return p.caminho(`saidas/${livre}`);
   });
   o.lidar(CANAL.falaEscolherLegenda, async () => {
     const j = o.janela();
@@ -36,8 +42,11 @@ export const registrarIpcFala = (o: {lidar: Lidar; confiavel: (e: IpcMainEvent) 
     const arquivo = r.filePaths[0];
     if (r.canceled || !arquivo) return null;
     if (statSync(arquivo).size > LIMITE_LEGENDA) throw new ErroProjeto('o arquivo de legenda passa de 5 MB', 'caminho');
-    return {nome: path.basename(arquivo), texto: readFileSync(arquivo, 'utf-8')};
+    // pelos bytes: o SRT em ANSI (Windows-1252) chega com os acentos certos
+    const {texto, codificacao} = textoDeLegenda(readFileSync(arquivo));
+    return {nome: path.basename(arquivo), texto, codificacao};
   });
   definirTranscritorMcp(transcritor);
+  transcritorAtual = transcritor;
   return transcritor;
 };

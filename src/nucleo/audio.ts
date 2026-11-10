@@ -4,6 +4,8 @@
 // dois chamam estas funções. Os níveis são em dB com a ponderação K da ITU-R BS.1770 (o que o medidor de LUFS mede),
 // para a diferença voz × música sair em LU medidos, e não em "volume" chutado.
 
+import type {CortesFalaClipe} from './cortes-fala'; // frente Fala
+
 export type PapelFaixa = 'voz' | 'musica' | 'efeitos';
 
 /** A música cai sob a voz: `alvo_lu` abaixo da voz (mediana), com ataque e soltura em ms. Só vale em faixa de música. */
@@ -24,6 +26,7 @@ export type ClipeAudio = {
   limpeza?: LimpezaClipe; // o que a limpeza de voz fez e mediu (limpeza-voz.ts)
   fade_in_curva?: CurvaFade; // frente Som (rodada 3): a forma do fade de entrada (padrão linear)
   fade_out_curva?: CurvaFade; // e a do fade de saída
+  cortes_fala?: CortesFalaClipe; // frente Fala: o clipe toca a narração sem os silêncios e o "ãh" (cortes-fala.ts); aqui o de antes, para voltar
 };
 
 /** Forma do fade. `linear`: o ganho sobe em linha reta (dois clipes iguais somam o mesmo nível; música diferente cai 3 dB

@@ -3,9 +3,9 @@
 // começo (o inspector vira a lista das legendas); arrastar move no tempo, com as palavras junto; as alças da legenda
 // selecionada aparam o começo e o fim. Delete exclui a legenda selecionada (ouvido na captura, antes do monitor, que só
 // conhece cenas e blocos). Sem legendas, a faixa convida a transcrever ou importar.
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {Captions, Eye, EyeOff} from 'lucide-react';
-import type {LegendasP, SegmentoLegendaP} from '../../../nucleo/legendas';
+import {passoDeQuadro, type LegendasP, type SegmentoLegendaP} from '../../../nucleo/legendas';
 import {loja, selecionar, trocar, useLoja} from '../../estado/loja';
 import {excluirSegmento, moverSegmento} from './acoes-legendas';
 import {irPara} from './tocador';
@@ -20,10 +20,15 @@ export const FaixaLegendas: React.FC<{documento: string; legendas?: LegendasP; x
     const temNoDoc = useLoja((e) => Boolean((e.docs[documento]?.doc as {legendas?: unknown} | undefined)?.legendas));
     const [arrasto, setArrasto] = useState<Arrasto | null>(null);
 
-    // Delete na legenda selecionada (na captura: o monitor ouve a mesma tecla para cenas e blocos)
+    // as legendas da tela, para o teclado andar de quadro em quadro a partir do tempo que se vê
+    const naTela = useRef(legendas);
+    naTela.current = legendas;
+    // Delete na legenda selecionada (na captura: o monitor ouve a mesma tecla para cenas e blocos); [ e ] mudam o
+    // começo e { e } o fim, um quadro por vez
     useEffect(() => {
       const tecla = (e: KeyboardEvent) => {
-        if (e.key !== 'Delete' || loja.get().area !== 'video') return;
+        const ponta = ({'[': ['ini', -1], ']': ['ini', 1], '{': ['fim', -1], '}': ['fim', 1]} as Record<string, ['ini' | 'fim', -1 | 1]>)[e.key];
+        if ((e.key !== 'Delete' && !ponta) || e.ctrlKey || e.altKey || loja.get().area !== 'video') return;
         const sel = loja.get().selecao;
         const m = sel?.documento === documento ? SEL.exec(sel.caminho) : null;
         const id = m ? (loja.get().docs[documento]?.doc as {legendas?: {segmentos?: {id: string}[]}})?.legendas?.segmentos?.[Number(m[1])]?.id : undefined;
@@ -31,7 +36,10 @@ export const FaixaLegendas: React.FC<{documento: string; legendas?: LegendasP; x
         if (!id || /INPUT|TEXTAREA|SELECT/.test(alvo.tagName) || alvo.isContentEditable || alvo.closest?.('.xterm')) return;
         e.preventDefault();
         e.stopImmediatePropagation();
-        void excluirSegmento(documento, id);
+        if (!ponta) return void excluirSegmento(documento, id);
+        const tela = naTela.current?.segmentos.find((s) => s.id === id);
+        const fps = (loja.get().docs[documento]?.doc as {formato?: {fps?: number}} | undefined)?.formato?.fps ?? 30;
+        if (tela) void moverSegmento(documento, id, ponta[0], passoDeQuadro(ponta[0] === 'ini' ? tela.em : tela.sai, fps, ponta[1]), {exato: true});
       };
       window.addEventListener('keydown', tecla, true);
       return () => window.removeEventListener('keydown', tecla, true);

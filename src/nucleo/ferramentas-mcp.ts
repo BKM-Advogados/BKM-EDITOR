@@ -4,6 +4,9 @@
 // fonte é apagado. A rede do ler_fonte vem de quem registra: net.fetch do Electron no app (src/main/mcp-http.ts),
 // fetch do Node no MCP por stdio e nos testes, as duas montadas por criarRede.
 import type {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
+import {readFileSync} from 'node:fs';
+import {registrarCortesFala, type EmendadorMcp} from './mcp-fala'; // frente Fala: cortes pela fala
+import {legendasNoTrecho} from './legendas-exportacao'; // frente Fala
 import {z} from 'zod';
 import {ErroProjeto, valorEm, type Projeto} from './projeto';
 import type {DocImagem, Modulo, OperacaoPatch} from './documentos';
@@ -13,7 +16,7 @@ import {MARCAS_INICIAIS} from './marca';
 import {registrarMarca} from './mcp-marca';
 import {PastaMarcas} from './pasta-marcas';
 import {ehDocCenas, resolverCenas, type DocCenas} from './cenas';
-import {arquivoDaFala, arquivoDasPalavras, clipesDeVoz, comTexto, deslocamentoDaLegenda, legendasDeArquivo, recusaDoDestinoNoProjeto, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt, type EstadoDaFala, type IdEstiloLegenda} from './legendas';
+import {arquivoDaFala, arquivoDasPalavras, clipesDeVoz, comTexto, CPS_MAX, cpsDe, deslocamentoDaLegenda, legendasDeArquivo, legendasDeOutraTomada, limitesDoArrasto, nomeLivreDaLegenda, palavrasDuvidosas, termosDoDicionario, textoDeLegenda, type PalavraLegenda, recusaDoDestinoNoProjeto, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt, type EstadoDaFala, type IdEstiloLegenda} from './legendas';
 import {CATALOGO_FONTES} from './catalogo-fontes';
 import {
   acharTrecho, caminhoTextoFonte, conferirDigitos, decodificarComAviso, entorno, estadoDoFato, hashTexto, limparHtml, nivelDe, numerosDe, paginar, proximoId,
@@ -264,6 +267,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   }));
 
   registrarFala(servidor, projeto, autor, origem, transcritor); // frente Fala: transcrever e legendas
+  registrarCortesFala(servidor, projeto, autor, origem, transcritor?.emendar && ((p, x) => transcritor.emendar!(p, x))); // frente Fala: cortes pela fala
   registrarAcabamento(servidor, projeto, autor, origem); // acabamento da imagem (rodada 2, B2)
   registrarMarca(servidor, projeto, autor, origem); // cor e fonte do kit na imagem (rodada 3, Marca)
   registrarExportar(servidor, projeto, autor, origem); // marca d'água e contraste (rodada 3, frente C)
@@ -556,10 +560,13 @@ const registrarPesquisa = (servidor: McpServer, projeto: Projeto, autor: string,
 
 /** O que o MCP precisa do transcritor do processo principal (src/main/transcricao.ts): sem ele, a ferramenta avisa. */
 export type TranscritorMcp = {
-  transcrever: (projeto: Projeto, pedido: {arquivo: string; modelo?: 'base' | 'small'; vocabulario?: string; destino?: string}) =>
-    Promise<{ok: boolean; palavras?: string; n?: number; duracao_s?: number; texto?: string; mensagem?: string; cancelado?: boolean}>;
+  /** `sinal`: o do pedido do MCP; aborta quando a conversa é interrompida (Esc) ou a conexão cai. */
+  transcrever: (projeto: Projeto, pedido: {arquivo: string; modelo?: 'base' | 'small'; vocabulario?: string; destino?: string; pela_ia?: boolean; termos?: string[]},
+    andamento?: (p: unknown) => void, sinal?: AbortSignal) => Promise<{ok: boolean; palavras?: string; n?: number; duracao_s?: number; texto?: string; mensagem?: string; cancelado?: boolean}>;
   /** A transcrição do arquivo ainda é do áudio como ele está (o carimbo do palavras.json)? Sem isto, vale a existência. */
   conferir?: (projeto: Projeto, arquivo: string) => EstadoDaFala;
+  /** Cortes pela fala: grava a narração emendada (src/main/cortes-fala.ts). */
+  emendar?: EmendadorMcp;
 };
 
 const LIMITE_TEXTO_TRANSCRITO = 4000;
@@ -573,9 +580,18 @@ const docCenasDe = (projeto: Projeto, documento?: string) => {
   return {alvo, rel, doc: lido.doc, versao: lido.versao};
 };
 
+/** Como `seguro`, passando o sinal do pedido (o SDK aborta quando o cliente cancela ou a conexão fecha). */
+const seguroComSinal = <A,>(f: (a: A, sinal?: AbortSignal) => unknown) => async (a: A, extra?: {signal?: AbortSignal}) => {
+  try {
+    return texto(await f(a, extra?.signal));
+  } catch (e) {
+    return erro(e);
+  }
+};
+
 const registrarFala = (servidor: McpServer, projeto: Projeto, autor: string, origem: string, transcritor: TranscritorMcp | undefined) => {
   servidor.registerTool('transcrever', {
-    description: 'Transcreve a fala no próprio PC (whisper.cpp, nada sai da máquina) e grava <arquivo>.palavras.json com o tempo de cada palavra ({w, s, e, p} em ms do arquivo), o formato que o carrossel da Cliente e as legendas leem. Dois usos: (1) "arquivo" (qualquer áudio ou vídeo do projeto, como a narração de um roteiro ou uma gravação para a pesquisa): devolve o texto; com "destino", grava em outro caminho (ex.: video/palavras.json do roteiro). (2) Vídeo de cenas: "clipe" ou "faixa" (ids de audio.faixas), ou nada para todas as faixas de voz; transcreve a fala que ainda não tem transcrição ou cuja tomada mudou depois dela (a do clipe de voz limpa é a do original) e, com legendas (padrão), gera as legendas dos clipes que ainda não têm (segmentos por pausa, pontuação e largura, com o falante pelo nome do clipe ou da faixa). Clipe que já tem legendas fica como está: para refazer, pergunte à pessoa e use refazer_legendas. Na primeira vez baixa o whisper.cpp (9 MB) e o modelo (small, 190 MB) para %USERPROFILE%\\Estudio\\modelos\\whisper. Leva perto de metade da duração do áudio.',
+    description: 'Transcreve a fala no próprio PC (whisper.cpp, nada sai da máquina) e grava <arquivo>.palavras.json com o tempo de cada palavra ({w, s, e, p} em ms do arquivo), o formato que o carrossel da Cliente e as legendas leem. Dois usos: (1) "arquivo" (qualquer áudio ou vídeo do projeto, como a narração de um roteiro ou uma gravação para a pesquisa): devolve o texto; com "destino", grava em outro caminho (ex.: video/palavras.json do roteiro). (2) Vídeo de cenas: "clipe" ou "faixa" (ids de audio.faixas), ou nada para todas as faixas de voz; transcreve a fala que ainda não tem transcrição ou cuja tomada mudou depois dela (a do clipe de voz limpa é a do original) e, com legendas (padrão), gera as legendas dos clipes que ainda não têm (segmentos por pausa, pontuação e largura, com o falante pelo nome do clipe ou da faixa). Clipe que já tem legendas fica como está: para refazer, pergunte à pessoa e use refazer_legendas. Na primeira vez baixa o modelo (small, 190 MB) e, no Windows x64, o whisper.cpp (9 MB) para ~/Estudio/modelos/whisper; no Linux o whisper-cli precisa estar compilado (na pasta bin/ dela ou no PATH), e o erro diz como. Leva perto de metade da duração do áudio.',
     inputSchema: {
       arquivo: z.string().optional().describe('caminho no projeto, ex.: midia/narracao.wav ou midia/video-exemplo.mp4'),
       destino: z.string().optional().describe('só com "arquivo": onde gravar a lista de palavras, um .json próprio como video/palavras.json (padrão: <arquivo>.palavras.json). Nunca o manifesto, um documento, comentarios.json, a pesquisa ou .estudio/'),
@@ -589,15 +605,16 @@ const registrarFala = (servidor: McpServer, projeto: Projeto, autor: string, ori
       modelo: z.enum(['small', 'base']).optional().describe('small (padrão) erra menos; base é duas vezes mais rápido'),
       vocabulario: z.string().optional().describe('frase com termos que vão aparecer (nomes, siglas); o padrão puxa o vocabulário do direito do trabalho'),
     },
-  }, seguro(async (a: {arquivo?: string; destino?: string; documento?: string; clipe?: string; faixa?: string; legendas?: boolean; estilo?: IdEstiloLegenda;
-    refazer?: boolean; refazer_legendas?: boolean; modelo?: 'small' | 'base'; vocabulario?: string}) => {
-    if (!transcritor) throw new ErroProjeto('este MCP não tem o transcritor: abra o projeto no Estúdio (no Windows) ou use o MCP por stdio (mcp/nucleo.ts)', 'patch');
-    const pedido = (arquivo: string, destino?: string) => ({arquivo, destino, modelo: a.modelo, vocabulario: a.vocabulario});
+  }, seguroComSinal(async (a: {arquivo?: string; destino?: string; documento?: string; clipe?: string; faixa?: string; legendas?: boolean; estilo?: IdEstiloLegenda;
+    refazer?: boolean; refazer_legendas?: boolean; modelo?: 'small' | 'base'; vocabulario?: string}, sinal?: AbortSignal) => {
+    if (!transcritor) throw new ErroProjeto('este MCP não tem o transcritor: abra o projeto no Estúdio ou use o MCP por stdio (mcp/nucleo.ts)', 'patch');
+    // pela_ia: a tela mostra o andamento e o Cancelar dizendo que foi a IA que pediu (transversal-N4)
+    const pedido = (arquivo: string, destino?: string) => ({arquivo, destino, modelo: a.modelo, vocabulario: a.vocabulario, pela_ia: true});
     if (a.arquivo) {
       // grava por cima, fora do diário: nunca no manifesto, num documento, nos comentários, na pesquisa ou em .estudio/
       const recusa = a.destino === undefined ? null : recusaDoDestinoNoProjeto(projeto, a.destino);
       if (recusa) throw new ErroProjeto(recusa, 'caminho');
-      const r = await transcritor.transcrever(projeto, pedido(a.arquivo, a.destino));
+      const r = await transcritor.transcrever(projeto, pedido(a.arquivo, a.destino), undefined, sinal);
       if (!r.ok) throw new ErroProjeto(r.mensagem ?? 'a transcrição não terminou', 'patch');
       const t = r.texto ?? '';
       return {...r, texto: t.slice(0, LIMITE_TEXTO_TRANSCRITO), ...(t.length > LIMITE_TEXTO_TRANSCRITO ? {texto_cortado: true} : {})};
@@ -616,7 +633,8 @@ const registrarFala = (servidor: McpServer, projeto: Projeto, autor: string, ori
         transcritos.push({arquivo, palavras: arquivoDasPalavras(arquivo), ja_tinha: true});
         continue;
       }
-      const r = await transcritor.transcrever(projeto, pedido(arquivo));
+      const termos = termosDoDicionario(doc.legendas); // o dicionário do vídeo entra no vocabulário do whisper
+      const r = await transcritor.transcrever(projeto, {...pedido(arquivo), ...(termos.length ? {termos} : {})}, undefined, sinal);
       if (!r.ok) throw new ErroProjeto(r.mensagem ?? `a transcrição de ${arquivo} não terminou`, 'patch');
       transcritos.push({arquivo, palavras: r.palavras, n: r.n, duracao_s: r.duracao_s, ...(estado === 'velha' ? {audio_mudou: true} : {})});
     }
@@ -627,30 +645,36 @@ const registrarFala = (servidor: McpServer, projeto: Projeto, autor: string, ori
     const r = legendasDoDocumento(atual.doc, (c) => projeto.lerJson<unknown>(c).doc, {largura: f.largura, altura: f.altura, clipe: a.clipe, faixa: a.faixa,
       estilo: a.estilo ? {...(atual.doc.legendas?.estilo ?? {}), predefinicao: a.estilo} : undefined, refazer: a.refazer_legendas === true});
     // clipe com legendas da tomada antiga: não refaz sem a pessoa decidir
-    const desatualizadas = r.mantidos.filter((id) => clipes.some((c) => c.clipe.id === id && estados[arquivoDaFala(c.clipe)] === 'velha'));
+    const outra = new Set(legendasDeOutraTomada(atual.doc));
+    const desatualizadas = r.mantidos.filter((id) => outra.has(id) || clipes.some((c) => c.clipe.id === id && estados[arquivoDaFala(c.clipe)] === 'velha'));
     const mantidos = r.mantidos.length ? {ja_tinham_legendas: r.mantidos, ...(desatualizadas.length ? {legendas_de_audio_antigo: desatualizadas} : {}),
       nota: 'clipes que já tinham legendas ficaram como estavam; para refazer, pergunte à pessoa e chame de novo com refazer_legendas: true (as palavras corrigidas à mão no mesmo tempo ficam)'} : {};
     if (!r.clipes) return {documento: alvo, transcritos, legendas: atual.doc.legendas?.segmentos?.length ?? 0, geradas: 0, ...mantidos, ...(r.faltam.length ? {sem_transcricao: r.faltam} : {})};
     const gravado = projeto.aplicarPatch({documento: atual.rel, versao_base: atual.versao, patch: [{op: 'add', path: '/legendas', value: r.legendas}], autor, origem,
       rotulo: `legendas da fala (${r.geradas})`});
     return {documento: alvo, versao: gravado.versao, transcritos, legendas: r.legendas.segmentos.length, geradas: r.geradas, estilo: r.legendas.estilo?.predefinicao,
-      ...(r.corrigidas ? {corrigidas_a_mao_mantidas: r.corrigidas} : {}), ...mantidos, ...(r.faltam.length ? {sem_transcricao: r.faltam} : {}),
+      ...(r.corrigidas ? {corrigidas_a_mao_mantidas: r.corrigidas} : {}), ...(r.dicionario ? {trocas_do_dicionario: r.dicionario} : {}), ...mantidos, ...(r.faltam.length ? {sem_transcricao: r.faltam} : {}),
       primeiras: r.legendas.segmentos.slice(0, 5).map((s) => ({id: s.id, em: s.em, sai: s.sai, texto: s.texto, falante: s.falante}))};
   }));
 
   // as legendas nos tempos da tela: o documento guarda o tempo de quando a legenda nasceu, e o app soma o quanto o clipe
   // de voz andou depois (origens); ler e corrigir por aqui evita o Claude escrever o tempo da tela no campo guardado
   const naTela = (doc: DocCenas) => resolverCenas(doc).props.legendas_cenas?.segmentos ?? [];
-  const resumo = (s: {id: string; em: number; sai: number; texto: string; falante?: string}) => ({id: s.id, em: s.em, sai: s.sai, texto: s.texto, ...(s.falante ? {falante: s.falante} : {})});
+  // cps: caracteres por segundo; acima de 17 a legenda é rápida para ler (a régua da casa)
+  // duvidosas: as palavras em que o whisper teve pouca certeza (p < 0,6), para conferir
+  const resumo = (s: {id: string; em: number; sai: number; texto: string; falante?: string; palavras?: PalavraLegenda[]}) => ({id: s.id, em: s.em, sai: s.sai,
+    texto: s.texto, cps: cpsDe(s), ...(s.falante ? {falante: s.falante} : {}), ...(palavrasDuvidosas(s.palavras).length ? {duvidosas: palavrasDuvidosas(s.palavras)} : {})});
 
   servidor.registerTool('ler_legendas', {
-    description: 'As legendas do vídeo de cenas como aparecem na tela: id, em e sai em ms do vídeo (já com o clipe de voz no lugar em que está agora), texto e falante. "de" e "ate" (ms) pegam só as de um trecho. Para corrigir, use editar_legenda com esses tempos.',
+    description: 'As legendas do vídeo de cenas como aparecem na tela: id, em e sai em ms do vídeo (já com o clipe de voz no lugar em que está agora), texto, falante, cps (caracteres por segundo; acima de 17 é rápida para ler) e duvidosas (palavras em que o whisper teve pouca certeza: confira). "de" e "ate" (ms) pegam só as de um trecho. Para corrigir, use editar_legenda com esses tempos.',
     inputSchema: {documento: z.string().optional(), de: z.number().optional().describe('ms do vídeo'), ate: z.number().optional().describe('ms do vídeo')},
   }, seguro(({documento, de, ate}: {documento?: string; de?: number; ate?: number}) => {
     const {alvo, doc} = docCenasDe(projeto, documento);
     const todas = naTela(doc);
     const lista = todas.filter((s) => (de === undefined || s.sai > de) && (ate === undefined || s.em < ate));
-    return {documento: alvo, total: todas.length, legendas: lista.slice(0, 300).map(resumo), ...(lista.length > 300 ? {cortado: true} : {})};
+    const rapidas = lista.filter((s) => cpsDe(s) > CPS_MAX).map((s) => s.id);
+    return {documento: alvo, total: todas.length, legendas: lista.slice(0, 300).map(resumo), ...(lista.length > 300 ? {cortado: true} : {}),
+      ...(rapidas.length ? {rapidas_para_ler: rapidas, nota: `acima de ${CPS_MAX} caracteres por segundo: estique o sai no vão, divida ou encurte o texto`} : {})};
   }));
 
   servidor.registerTool('editar_legenda', {
@@ -681,6 +705,10 @@ const registrarFala = (servidor: McpServer, projeto: Projeto, autor: string, ori
       // entrar e sair o mesmo tanto mais cedo ou mais tarde leva as palavras junto; mudar só uma ponta apara
       const d = novoEm - s.em;
       const junto = d !== 0 && novoSai - s.sai === d && Array.isArray(s.palavras);
+      const lim = junto ? limitesDoArrasto(doc, s) : null;
+      if (lim && (d < lim.min || d > lim.max)) {
+        throw new ErroProjeto(`a legenda sairia do trecho que o clipe de voz toca e sumiria: dá para andar de ${lim.min} a ${lim.max} ms; para o texto aparecer antes ou depois da voz, mude só o em ou só o sai`, 'patch');
+      }
       s = {...s, em: novoEm, sai: novoSai, ...(junto ? {palavras: s.palavras!.map((p) => ({...p, s: p.s + d, e: p.e + d}))} : {})};
     }
     const gravado = projeto.aplicarPatch({documento: rel, versao_base: versao, autor, origem, rotulo: `legenda ${id}`,
@@ -690,22 +718,29 @@ const registrarFala = (servidor: McpServer, projeto: Projeto, autor: string, ori
   }));
 
   servidor.registerTool('exportar_legendas', {
-    description: 'Grava as legendas do vídeo de cenas em saidas/<nome>.srt e/ou .vtt, nos tempos de saída (já com o clipe de voz no lugar em que está). O VTT leva o falante na marca de voz (<v Nome>).',
+    description: 'Grava as legendas do vídeo de cenas em saidas/<nome>.srt, .vtt e/ou .pt_BR.srt (srt_pt_br: o nome que o Facebook pede), nos tempos de saída (já com o clipe de voz no lugar em que está). Com trecho, só as legendas dele, contadas do zero (para acompanhar o vídeo exportado com o mesmo trecho). O VTT leva o falante na marca de voz (<v Nome>). Não grava por cima: se o nome existe, sai "<nome> (2).srt", a menos que sobrescrever seja true.',
     inputSchema: {
       documento: z.string().optional(),
-      formatos: z.array(z.enum(['srt', 'vtt'])).optional().describe('padrão: os dois'),
+      formatos: z.array(z.enum(['srt', 'vtt', 'srt_pt_br'])).optional().describe('padrão: srt e vtt'),
+      trecho: z.object({de_ms: z.number(), ate_ms: z.number()}).optional().describe('ms do vídeo; as legendas saem contadas do começo do trecho'),
       nome: z.string().optional().describe('nome do arquivo sem extensão (padrão: o título do vídeo)'),
       falantes_no_srt: z.boolean().optional().describe('"Nome: " antes do texto no SRT'),
+      sobrescrever: z.boolean().optional().describe('true: grava por cima do arquivo de mesmo nome (pergunte à pessoa antes)'),
     },
-  }, seguro(({documento, formatos, nome, falantes_no_srt}: {documento?: string; formatos?: ('srt' | 'vtt')[]; nome?: string; falantes_no_srt?: boolean}) => {
+  }, seguro(({documento, formatos, nome, falantes_no_srt, sobrescrever, trecho}: {documento?: string; formatos?: ('srt' | 'vtt' | 'srt_pt_br')[]; nome?: string;
+    falantes_no_srt?: boolean; sobrescrever?: boolean; trecho?: {de_ms: number; ate_ms: number}}) => {
     const {alvo, doc} = docCenasDe(projeto, documento);
-    const segs = resolverCenas(doc).props.legendas_cenas?.segmentos ?? [];
-    if (!segs.length) throw new ErroProjeto('o vídeo não tem legendas: gere com transcrever ou importe com importar_legendas', 'nao_achado');
+    if (trecho && !(trecho.ate_ms > trecho.de_ms && trecho.de_ms >= 0)) throw new ErroProjeto('o trecho vai de de_ms até ate_ms, maior', 'patch');
+    const todas = resolverCenas(doc).props.legendas_cenas?.segmentos ?? [];
+    if (!todas.length) throw new ErroProjeto('o vídeo não tem legendas: gere com transcrever ou importe com importar_legendas', 'nao_achado');
+    const segs = legendasNoTrecho(todas, trecho);
+    if (!segs.length) throw new ErroProjeto(`nenhuma legenda cai no trecho de ${trecho!.de_ms} a ${trecho!.ate_ms} ms`, 'nao_achado');
     const titulo = nome?.trim() || projeto.manifesto().documentos.find((d) => d.id === alvo)?.titulo || alvo;
-    const lista: ('srt' | 'vtt')[] = formatos?.length ? formatos : ['srt', 'vtt'];
-    const arquivos = lista.map((ext) => {
-      const rel = `saidas/${nomeDoArquivoDeLegenda(titulo, ext)}`;
-      projeto.gravarTexto(rel, ext === 'srt' ? paraSrt(segs, {falantes: falantes_no_srt}) : paraVtt(segs));
+    const lista: ('srt' | 'vtt' | 'srt_pt_br')[] = formatos?.length ? formatos : ['srt', 'vtt'];
+    const arquivos = lista.map((f) => {
+      const base = f === 'srt_pt_br' ? nomeDoArquivoDeLegenda(titulo, 'srt').replace(/\.srt$/, '.pt_BR.srt') : nomeDoArquivoDeLegenda(titulo, f);
+      const rel = `saidas/${sobrescrever ? base : nomeLivreDaLegenda(base, (n) => projeto.existe(`saidas/${n}`))}`;
+      projeto.gravarTexto(rel, f === 'vtt' ? paraVtt(segs) : paraSrt(segs, {falantes: falantes_no_srt}));
       return rel;
     });
     return {ok: true, documento: alvo, legendas: segs.length, arquivos};
@@ -718,12 +753,15 @@ const registrarFala = (servidor: McpServer, projeto: Projeto, autor: string, ori
   }, seguro(({arquivo, documento, estilo}: {arquivo: string; documento?: string; estilo?: IdEstiloLegenda}) => {
     if (!projeto.existe(arquivo)) throw new ErroProjeto(`o arquivo não está no projeto: ${arquivo}`, 'nao_achado');
     const {alvo, rel, doc, versao} = docCenasDe(projeto, documento);
-    const {legendas, avisos} = legendasDeArquivo(projeto.lerTexto(arquivo), arquivo, estilo ? {...(doc.legendas?.estilo ?? {}), predefinicao: estilo} : doc.legendas?.estilo);
+    // pelos bytes: o SRT em ANSI (Windows-1252) chega com os acentos certos (video-N6)
+    const {texto, codificacao} = textoDeLegenda(readFileSync(projeto.caminho(arquivo)));
+    const {legendas, avisos} = legendasDeArquivo(texto, arquivo, estilo ? {...(doc.legendas?.estilo ?? {}), predefinicao: estilo} : doc.legendas?.estilo);
     if (!legendas.segmentos.length) throw new ErroProjeto(`nenhuma legenda lida de ${arquivo}: ${avisos.join('; ')}`, 'patch');
     const {origens: _o, ...antes} = doc.legendas ?? {segmentos: []};
     const gravado = projeto.aplicarPatch({documento: rel, versao_base: versao, patch: [{op: 'add', path: '/legendas', value: {...antes, ...legendas}}],
       autor, origem, rotulo: `legendas importadas de ${arquivo.split('/').pop()}`});
-    return {ok: true, documento: alvo, versao: gravado.versao, legendas: legendas.segmentos.length, ...(avisos.length ? {avisos} : {})};
+    return {ok: true, documento: alvo, versao: gravado.versao, legendas: legendas.segmentos.length, ...(codificacao !== 'utf-8' ? {codificacao} : {}),
+      ...(avisos.length ? {avisos} : {})};
   }));
 };
 

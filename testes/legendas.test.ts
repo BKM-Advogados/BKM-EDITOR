@@ -14,7 +14,7 @@ import {
   resolverLegendas, substituirEmLote, type LegendasCenas, type PalavraLegenda, type SegmentoLegenda,
 } from '../src/nucleo/legendas';
 import {norm} from '../src/nucleo/roteiro/resolver';
-import {baixarConferido, extrairZip, palavrasDoWhisper} from '../src/main/transcricao';
+import {acharWhisperCli, baixaBinario, baixarConferido, comoInstalarWhisper, extrairZip, palavrasDoWhisper, Transcritor} from '../src/main/transcricao';
 
 const RAIZ = path.join(__dirname, '..');
 const REFERENCIA = JSON.parse(readFileSync(path.join(RAIZ, 'exemplos', 'exemplo', 'video', 'palavras.json'), 'utf-8')) as PalavraLegenda[];
@@ -94,6 +94,21 @@ describe('quebrar as palavras em legendas', () => {
     expect(pausa.map((s) => s.texto)).toEqual(['um', 'dois']);
   });
 
+  it('pausa curta depois de palavra fraca não fecha a legenda (medido no app: "as regras da | transferência.")', () => {
+    // os tempos do whisper na narração do C2 (small): 580 ms entre "da" e "transferência."
+    const ws = [{w: 'Antes', s: 2780, e: 2820}, {w: 'de', s: 2820, e: 2940}, {w: 'responder,', s: 2940, e: 3520}, {w: 'entenda', s: 3640, e: 4080},
+      {w: 'as', s: 4080, e: 4170}, {w: 'regras', s: 4270, e: 4560}, {w: 'da', s: 4560, e: 4600}, {w: 'transferência.', s: 5180, e: 5510}, {w: 'Com', s: 5990, e: 6100}];
+    const r = quebrarEmSegmentos(ws, {max_caracteres: 84});
+    expect(r[0].texto).toBe('Antes de responder, entenda as regras da transferência.');
+    expect(r[0].sai - r[0].em).toBeGreaterThanOrEqual(833);
+    // sem caber, a palavra fraca vai para a próxima legenda, como no corte por largura
+    const estreito = quebrarEmSegmentos(ws, {max_caracteres: 42});
+    expect(estreito.map((s) => s.texto)).toEqual(['Antes de responder, entenda as regras', 'da transferência.', 'Com']);
+    // pausa longa (1 s ou mais) fecha como antes
+    const longa = quebrarEmSegmentos([{w: 'regras', s: 0, e: 300}, {w: 'da', s: 300, e: 400}, {w: 'casa.', s: 1500, e: 1900}], {max_caracteres: 42});
+    expect(longa.map((s) => s.texto)).toEqual(['regras da', 'casa.']);
+  });
+
   it('junta "25 %" e "seguro -desemprego", e respeita o máximo de palavras', () => {
     const r = quebrarEmSegmentos([{w: '25', s: 0, e: 200}, {w: '%', s: 200, e: 300}, {w: 'seguro', s: 300, e: 600}, {w: '-desemprego', s: 600, e: 900}], {max_caracteres: 42});
     expect(r[0].texto).toBe('25% seguro-desemprego');
@@ -114,9 +129,9 @@ describe('quebrar as palavras em legendas', () => {
     expect(duas.map((s) => s.texto)).toEqual(['Sim.', 'Ok.']);
   });
 
-  it('legenda curta ganha tempo até 0,7 s, sem invadir a próxima', () => {
+  it('legenda curta ganha tempo até 833 ms, sem invadir a próxima', () => {
     const r = quebrarEmSegmentos([{w: 'Sim.', s: 0, e: 150}, {w: 'Não.', s: 400, e: 600}, {w: 'Talvez.', s: 3000, e: 3200}], {max_caracteres: 42});
-    expect(r.map((s) => [s.em, s.sai])).toEqual([[0, 400], [400, 1100], [3000, 3700]]);
+    expect(r.map((s) => [s.em, s.sai])).toEqual([[0, 400], [400, 1233], [3000, 3833]]);
   });
 });
 
@@ -252,14 +267,16 @@ describe('área segura e largura', () => {
     expect(a.dir).toBe(a.esq);
   });
 
-  it('16:9 sai dos controles do YouTube; 4:5 fica na área de título de 90%', () => {
+  it('16:9 sai dos controles do YouTube; 4:5 fica no corte 1:1 (ou na área de título de 90%, fora do quadrado)', () => {
     expect(areaDaLegenda(1920, 1080)).toEqual({topo: 0.11, base: 0.89, esq: 0.05, dir: 0.05});
-    expect(areaDaLegenda(1080, 1350)).toEqual({topo: 0.060000000000000005, base: 0.94, esq: 0.05, dir: 0.05});
+    expect(areaDaLegenda(1080, 1350)).toEqual({topo: 0.11, base: 0.89, esq: 0.05, dir: 0.05});
+    expect(areaDaLegenda(1080, 1350, {no_quadrado: false})).toEqual({topo: 0.060000000000000005, base: 0.94, esq: 0.05, dir: 0.05});
   });
 
-  it('caracteres por linha crescem no 16:9 e caem na letra grande', () => {
+  it('caracteres por linha crescem no 16:9 até o teto de 42 e caem na letra grande', () => {
     const v = caracteresPorLinha({predefinicao: 'classica'}, 1080, 1920);
-    expect(caracteresPorLinha({predefinicao: 'classica'}, 1920, 1080)).toBeGreaterThan(v * 1.5);
+    expect(v).toBeLessThan(42);
+    expect(caracteresPorLinha({predefinicao: 'classica'}, 1920, 1080)).toBe(42);
     expect(caracteresPorLinha({predefinicao: 'caixa'}, 1080, 1920)).toBeLessThan(v);
   });
 
@@ -442,5 +459,37 @@ describe('transcritor: zip e download conferido', () => {
     await expect(baixarConferido({url: 'https://exemplo/m.bin', destino: outro, bytes: 10, sha256, buscar})).rejects.toThrow(/passou do tamanho/);
     expect(existsSync(`${outro}.parcial`)).toBe(false); // apagado depois de fechar, não antes
     await expect(baixarConferido({url: 'https://exemplo/x', destino: outro, bytes: 10, sha256, buscar: async () => new Response('nada', {status: 404})})).rejects.toThrow(/HTTP 404/);
+  });
+
+  it('acha o whisper-cli: no Windows x64 só o baixado; no Linux o da pasta e depois o do PATH', () => {
+    const tem = (...a: string[]) => (x: string) => a.includes(x);
+    expect(baixaBinario('win32', 'x64')).toBe(true);
+    expect(baixaBinario('linux', 'x64')).toBe(false);
+    // Linux: o da pasta vem antes do PATH; sem a pasta, o primeiro do PATH; sem nenhum, null
+    expect(acharWhisperCli('/m', {plataforma: 'linux', arq: 'x64', PATH: '/a:/b', existe: tem('/m/bin/whisper-cli', '/b/whisper-cli')})).toBe('/m/bin/whisper-cli');
+    expect(acharWhisperCli('/m', {plataforma: 'linux', arq: 'x64', PATH: '/a:/b', existe: tem('/b/whisper-cli')})).toBe('/b/whisper-cli');
+    expect(acharWhisperCli('/m', {plataforma: 'linux', arq: 'x64', PATH: '/a:/b', existe: tem()})).toBeNull();
+    // Windows x64: um whisper-cli.exe qualquer do PATH não serve (o baixado tem o SHA-256 conferido)
+    expect(acharWhisperCli('C:/m', {plataforma: 'win32', arq: 'x64', PATH: 'C:/b', existe: tem(path.join('C:/b', 'whisper-cli.exe'))})).toBeNull();
+    expect(comoInstalarWhisper('/m')).toMatch(/whisper-cli.*v1\.9\.5.*\/m\/bin/s);
+  });
+
+  it.skipIf(baixaBinario())('fora do Windows x64, sem whisper-cli: o estado diz o que falta e transcrever recusa sem baixar nada', async () => {
+    const pasta = mkdtempSync(path.join(tmpdir(), 'estudio-whisper-'));
+    temporarias.push(pasta);
+    const antes = process.env.PATH;
+    process.env.PATH = '';
+    try {
+      let baixou = 0;
+      const t = new Transcritor({pasta, buscar: async () => (baixou++, new Response('x', {status: 500}))});
+      const e = t.estado();
+      expect(e.plataforma).toBe(false);
+      expect(e.pronto).toBe(false);
+      expect(e.aviso).toMatch(/whisper-cli/);
+      await expect(t.preparar('small')).rejects.toThrow(/whisper-cli/);
+      expect(baixou).toBe(0);
+    } finally {
+      process.env.PATH = antes;
+    }
   });
 });

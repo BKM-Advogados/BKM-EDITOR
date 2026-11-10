@@ -21,6 +21,7 @@ import {
 } from '../../nucleo/exportacao';
 import {FORMATO_PADRAO, FORMATOS_VIDEO, proporcaoDe, type Formato} from '../../nucleo/formatos';
 import type {LegendasP} from '../../nucleo/legendas';
+import {OPCOES_LEGENDA_EXPORTACAO, type LegendaNaExportacao} from '../../nucleo/legendas-exportacao'; // frente Fala
 import {conjuntoDe, zonasDaMarca, type CantoMarca} from '../../nucleo/zonas-seguras';
 import {avisar, useLoja} from '../estado/loja';
 import {exportarPng, type SaidaPng} from '../modulos/imagem/exportarPng';
@@ -357,6 +358,7 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
       vivo = false;
     };
   }, [fontesMarca.assinatura, fontesMarca.fonte]);
+  const [legendasPor, setLegendasPor] = useState<Record<string, LegendaNaExportacao>>({}); // frente Fala: queimar, só o SRT ou os dois
 
   useEffect(() => {
     window.estudio.prefsExportacao().then((p) => setMarcas((m) => ({...p.marca_dagua, ...m}))).catch(() => undefined);
@@ -423,11 +425,14 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
   const medidaDe = (d: Destino) => (fixo ? {largura: formato.largura, altura: formato.altura} : d);
   // a legenda de cada destino na área livre dele: a marca se afasta dela, e a miniatura a desenha ali
   const legendas = useMemo(() => legendasDasProps(props), [props]);
-  const legendasDe = (d: Destino) => (fixo ? legendas : legendasNoDestino(legendas, medidaDe(d)));
+  // "Só o SRT": o vídeo desse destino sai sem a legenda (a miniatura e a marca d'água também a ignoram; frente Fala)
+  const legendasDe = (d: Destino) => (legendasPor[d.id] === 'srt' ? null : fixo ? legendas : legendasNoDestino(legendas, medidaDe(d)));
   const marcaDe = (d: Destino) => marcaDaguaDoDestino(configMarca(d), medidaDe(d), fontesMarca, proporcaoLogo, legendasDe(d), proporcaoTexto);
   const temMarca = Boolean(fontesMarca.logo || fontesMarca.assinatura);
   const opcoes: OpcoesExportarVideo = {destinos, codec, qualidade, escala, trecho, nome: nome.trim() || undefined,
-    ...(temMarca ? {marca_dagua: Object.fromEntries(destinos.map((d) => [d.id, configMarca(d)])), ...(proporcaoLogo ? {proporcao_logo: proporcaoLogo} : {}), ...(proporcaoTexto ? {proporcao_texto: proporcaoTexto} : {})} : {})};
+    ...(temMarca ? {marca_dagua: Object.fromEntries(destinos.map((d) => [d.id, configMarca(d)])), ...(proporcaoLogo ? {proporcao_logo: proporcaoLogo} : {}), ...(proporcaoTexto ? {proporcao_texto: proporcaoTexto} : {})} : {}),
+    ...(legendas && !fixo && destinos.some((d) => (legendasPor[d.id] ?? 'video') !== 'video')
+      ? {legendas: Object.fromEntries(destinos.map((d) => [d.id, legendasPor[d.id] ?? 'video']))} : {})};
   const estimativa = estimarExportacao(opcoes, formato, duracaoMs, comAudio);
   const ext = CODECS.find((c) => c.id === codec)!.ext;
   const nomes = nomesDosArquivos(nome.trim() || titulo, destinos, formato);
@@ -507,6 +512,24 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
       {props && destinos.length > 0 && (
         <Linha rotulo="Prévia">
           <PreviaDosDestinos destinos={destinos} props={props} medidaDe={medidaDe} fixo={fixo} fps={formato.fps} duracaoMs={duracaoMs} marcaDe={marcaDe} legendasDe={legendasDe} />
+        </Linha>
+      )}
+      {legendas && !fixo && destinos.length > 0 && ( // frente Fala: por destino, queimar a legenda, só o SRT ao lado, ou os dois
+        <Linha rotulo="Legendas">
+          <div className="legendas-exp">
+            {destinos.map((d) => {
+              const v = legendasPor[d.id] ?? 'video';
+              return (
+                <label key={d.id} title={OPCOES_LEGENDA_EXPORTACAO.find((x) => x.valor === v)!.nota}>
+                  {destinos.length > 1 && <span className="medida">{d.id === 'personalizado' ? `${d.largura}×${d.altura}` : proporcaoDe(d.largura, d.altura)}</span>}
+                  <select className="campo" value={v} aria-label="Legendas neste destino" onChange={(e) => setLegendasPor((x) => ({...x, [d.id]: e.target.value as LegendaNaExportacao}))}>
+                    {OPCOES_LEGENDA_EXPORTACAO.map((x) => <option key={x.valor} value={x.valor}>{x.nome}</option>)}
+                  </select>
+                </label>
+              );
+            })}
+            <span className="nota">O SRT sai com o nome do vídeo, como .pt_BR.srt (o Facebook pede) e em .vtt, sem gravar por cima do que já está em saidas/.</span>
+          </div>
         </Linha>
       )}
       <Linha rotulo="Formato">

@@ -67,3 +67,6 @@
 .previa-destino .nota { color: var(--texto-3); font-size: 11px; }
 .previa-destino .erro-exp { font-size: 11px; line-height: 1.35; }
 .miniatura-exp .sobre { position: absolute; border: 1.5px solid var(--erro); background: rgba(255, 77, 77, 0.22); pointer-events: none; }
+/* frente Fala: a escolha das legendas por destino */
+.legendas-exp { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.legendas-exp label { display: inline-flex; gap: 6px; align-items: center; }

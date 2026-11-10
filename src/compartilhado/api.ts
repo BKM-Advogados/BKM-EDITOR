@@ -101,6 +101,7 @@ export const CANAL = {
   falaGravarSaida: 'estudio:fala-gravar-saida',
   falaEscolherLegenda: 'estudio:fala-escolher-legenda',
   falaConferir: 'estudio:fala-conferir', // a transcrição ainda é do áudio como ele está (carimbo do palavras.json)
+  falaEmendar: 'estudio:fala-emendar', // cortes pela fala: grava a narração emendada (src/main/cortes-fala.ts)
   // preferências da exportação por projeto, .estudio/exportacao.json (src/main/ipc-exportacao.ts; frente C)
   prefsExportacao: 'estudio:prefs-exportacao',
   gravarPrefsExportacao: 'estudio:gravar-prefs-exportacao',
@@ -318,9 +319,11 @@ export type ApiEstudio = {
     /** Grava texto em saidas/<nome> (SRT, VTT); devolve o caminho absoluto. */
     gravarSaida: (nome: string, texto: string) => Promise<string>;
     /** Diálogo para escolher um .srt ou .vtt; devolve nome e texto (null se cancelou). */
-    escolherLegenda: () => Promise<{nome: string; texto: string} | null>;
+    escolherLegenda: () => Promise<{nome: string; texto: string; codificacao?: string} | null>;
     /** Por arquivo de áudio: 'em_dia' (a transcrição é do áudio como ele está), 'velha' (a tomada mudou) ou 'falta'. */
     conferir: (arquivos: string[]) => Promise<Record<string, EstadoDaFala>>;
+    /** Cortes pela fala: grava o WAV emendado e o palavras.json dele; o patch do documento é da interface. */
+    emendar: (p: PedidoEmenda) => Promise<ResultadoEmenda>;
   };
   // exportação (frente C): a escolha de marca d'água por destino, lembrada no projeto
   prefsExportacao: () => Promise<PrefsExportacao>;
@@ -389,11 +392,20 @@ export type ApiEstudio = {
 // ---------- frente Fala ----------
 /** Pedido de transcrição: um arquivo do projeto (normalmente midia/…), o trecho opcional e o modelo. */
 export type PedidoTranscricao = {arquivo: string; de_ms?: number; dur_ms?: number; modelo?: 'base' | 'small'; idioma?: string; destino?: string;
-  vocabulario?: string}; // vocabulario: o começo de conversa do whisper (padrão: termos do direito do trabalho)
-export type ProgressoTranscricao = {etapa: 'baixando' | 'audio' | 'transcrevendo' | 'pronto' | 'cancelado'; mensagem: string; progresso?: number};
+  vocabulario?: string; // vocabulario: o começo de conversa do whisper (padrão: termos do direito do trabalho)
+  pela_ia?: boolean; // pedido pelo MCP: o andamento na tela diz que foi a IA
+  termos?: string[]}; // o dicionário do vídeo, acrescentado ao vocabulário
+export type ProgressoTranscricao = {etapa: 'baixando' | 'audio' | 'transcrevendo' | 'pronto' | 'cancelado'; mensagem: string; progresso?: number; pela_ia?: boolean};
 export type ResultadoTranscricao = {ok: boolean; arquivo: string; palavras?: string; n?: number; modelo?: string; duracao_s?: number; texto?: string; cancelado?: boolean; mensagem?: string};
+/** Cortes pela fala: a fonte (caminho no projeto), os cortes em ms do arquivo e as palavras dela (ms do arquivo). */
+export type PedidoEmenda = {fonte: string; cortes: {de_ms: number; ate_ms: number}[]; palavras: {w: string; s: number; e: number}[]};
+export type ResultadoEmenda = {arquivo: string; palavras: string; sha256?: string; duracao_ms: number; antes_ms: number; removidas: string[]};
 export type EstadoTranscricao = {pasta: string; modelo: string; modelos: {id: string; nome: string; mb: number; instalado: boolean}[]; pronto: boolean; falta: string[];
-  ffmpeg: boolean; ocupado?: string; plataforma: boolean};
+  ffmpeg: boolean; ocupado?: string;
+  /** dá para transcrever neste sistema: o Windows x64 baixa o whisper-cli; os outros precisam de um já compilado */
+  plataforma: boolean;
+  /** sem plataforma: o que falta e como instalar */
+  aviso?: string};
 
 /** Um arquivo da pasta de trilhas: nome sem extensão, caminho absoluto, subpasta e tamanho. */
 /** `ficha`: a licença conferida da faixa (biblioteca-musicas.ts); `recusa`: a ficha existe mas não serve (NC, ND, sem crédito…). */
