@@ -7,7 +7,9 @@ os sintetizadores da casa, tom, escala, acordes e o baixo, o arpejo e os acordes
 (20). Versão 4: o mixer completo, com delay, dois retornos, presets e limitador (item 21), a música em arquivo (23), o
 encaixe no vídeo com o monitor do vídeo dentro da Música (25) e o MIDI (26). Versão 5, que fecha a onda 1: sidechain e
 automação de volume por pontos (22), licenças, créditos e comprovante (24) e os modelos Batida, Trilha para vídeo e
-Efeito sonoro (27), só com som gerado. A música é uma vista do mesmo projeto: um documento
+Efeito sonoro (27), só com som gerado. Versão 6, de 10/11/2026 (retomada: a Música usada de verdade no app, no Electron do Linux): o
+roteiro abaixo rodou no app, os defeitos achados foram corrigidos (medidores, transporte, ida e volta da IA, exportar) e
+entraram a automação desenhada no arranjo e o "pintar" clipes; a seção "Verificado no app" tem as medidas. A música é uma vista do mesmo projeto: um documento
 `musica/<id>.json` que a pessoa e a IA editam pelo mesmo JSON Patch com diário, ligado a um clipe de áudio do vídeo de
 cenas. A ida e volta entre o vídeo e a Música é a primeira coisa que funciona, e o clipe do vídeo acompanha cada mudança
 da música sem exportar arquivo.
@@ -51,15 +53,27 @@ inspetor da música, Seções lista e renomeia as seções e "Seção na cabeça
 faixa de seções fica acima da de acordes, e arrastar uma seção a move com os clipes que começam nela (em compassos
 inteiros). Em Passos, "Variação" cria uma cópia do padrão com mudanças pequenas pela semente.
 
+**Pintar clipes:** arrastar no vazio da linha de um canal de bateria ou de sintetizador põe um clipe do padrão em
+compassos inteiros (o do clipe selecionado ou, sem seleção, o último usado no canal; para na frente do próximo clipe). Um
+clique no vazio continua só tirando a seleção. Canal sem padrão avisa para criar um em Passos.
+
+**Automação desenhada:** no pé do arranjo, a linha **Volume** (aberta pela seta) mostra a curva do master ou da faixa
+escolhida. Clicar no vazio põe um ponto (1/4 de batida; Alt, livre; o primeiro ponto longe do começo leva um parceiro no
+começo, no volume do fader: um clique no fim já faz um fade); arrastar o ponto muda o instante e o volume; duplo clique ou
+botão direito tira. A lista do inspetor continua valendo. **Zoom:** os botões de lupa na régua (ou Ctrl + roda do mouse);
+os clipes de áudio mostram a forma de onda do arquivo.
+
 **Mixer completo** (item 21): cada faixa manda para dois retornos, o reverb e o delay (o "Delay" na tira e no inspetor
 da faixa). No inspetor da música, a seção **Delay (retorno 2)** tem o tempo em figura (preso ao BPM), as repetições, o
 brilho, o pingue-pongue e o volume; a seção **Master** liga o **Limitador** e o teto (a tira do master mostra quanto ele
 tirou dos picos no último render). No inspetor da faixa, **Preset** escreve EQ, compressor e envios de uma vez (Limpo,
 Bateria, Baixo, Pad, Lead, Cama sob a voz, Voz), sem mexer em volume e pan.
 
-**Exportar** (item 23): no inspetor da música, seção **Exportar**: WAV de 24 bits, M4A ou Opus, no alvo de loudness do
-documento (padrão −14 LUFS, pico até −1 dBTP), com **Stems** (um WAV por faixa e por retorno) ou MIDI. Grava em
-`saidas/<título>.<formato>` e os stems em `saidas/<título> - stems/`. O rodapé diz o arquivo e o loudness medido.
+**Exportar** (item 23): o botão **Exportar** do transporte (WAV, WAV com stems, M4A, Opus ou MIDI), o **Exportar** da
+barra do topo e Ctrl+Shift+E (WAV), ou a seção **Exportar** do inspetor da música (formato, stems): WAV de 24 bits, M4A ou
+Opus, no alvo de loudness do documento (padrão −14 LUFS, pico até −1 dBTP), com **Stems** (um WAV por faixa e por retorno)
+ou MIDI. Grava em `saidas/<título>.<formato>` (o título sem a extensão do áudio de onde veio) e os stems em
+`saidas/<título> - stems/`. O rodapé diz o arquivo e o loudness medido; os avisos de licença vêm antes dele.
 
 **MIDI** (item 26): "+ MIDI…" na lista importa um .mid (um canal por trilha, com o padrão e o clipe); o MIDI da música sai
 pelo Exportar.
@@ -72,16 +86,16 @@ cabeça, sem som, ao lado dos passos e do mixer.
 
 **Sidechain e automação** (item 22): no inspetor da faixa, **Sidechain** escolhe o canal que abaixa a faixa ("Abaixa
 com"), a peça (bumbo, por padrão), quanto e em quanto tempo volta. **Automação de volume** (na faixa e, no inspetor da
-música, no master) põe pontos com **Ponto na cabeça** e muda o dB de cada um; a curva aparece em cima, com a cabeça.
-Enquanto houver pontos, eles valem no lugar do fader.
+música, no master) põe pontos com **Ponto na cabeça** e muda o dB de cada um; a curva aparece em cima, com a cabeça (e,
+desenhada com pontos que se arrastam, na linha **Volume** do arranjo). Enquanto houver pontos, eles valem no lugar do fader.
 
 **Licenças e créditos** (item 24): no inspetor de um clipe de áudio, **Licença do áudio** diz de onde ele vem (própria,
 CC0, MIT, CC BY 4.0, uso próprio declarado ou não informada); para CC BY, título, autor, endereço e o crédito exigido, e
 o campo "Sai assim" mostra a linha de crédito. No inspetor da música, **Licenças e créditos** lista cada som com a
 classe e diz se pode publicar. A exportação grava o comprovante e, se algum som pede, o arquivo de créditos.
 
-**Modelos** (item 27): sem música no projeto, o monitor oferece **Batida**, **Trilha para vídeo** e **Efeito sonoro**
-além da "Nova música" vazia. No vídeo, o **Criar em Música** de uma faixa de música abre a Trilha para vídeo do tamanho
+**Modelos** (item 27): sem música no projeto, o monitor mostra cartões com **Batida**, **Trilha para vídeo** e **Efeito
+sonoro** (cada um com o que traz) e a **Música vazia**. No vídeo, o **Criar em Música** de uma faixa de música abre a Trilha para vídeo do tamanho
 do que falta do vídeo, e o de uma faixa de efeitos abre o Efeito sonoro; **Vazia** abre a bateria vazia de antes.
 
 ## O contrato da transição
@@ -380,32 +394,47 @@ Freeverb (Jezar at Dreampoint, domínio público), escrito aqui; os filtros segu
 Bristow-Johnson, de uso livre). Os estilos de bateria da casa foram escritos à mão. Nenhum kit, faixa ou banco de som foi
 baixado; os kits de terceiros entram na onda 2, cada pacote com o LICENSE de dentro conferido e o ok do responsável.
 
-## O que não foi verificado
+## Verificado no app
 
-- O app real (Electron): o Bitdefender bloqueia o Electron de desenvolvimento neste PC. A tela foi conferida na prévia
-  web (porta 5209) e o núcleo e as ferramentas no vitest, com o MCP em processo e por stdio.
-- Latência de tocar no Electron e no notebook de 8 GB.
-- Com o app aberto, o render roda no Web Worker da janela (conferido na prévia web: o worker carrega e o render que vai
-  para o vídeo volta com `feito_por: janela`). Sem janela, ele ainda roda no processo que pediu: no MCP por stdio isso só
-  segura aquele processo, mas no processo principal (janela fechada no meio de um pedido do MCP por HTTP) seguraria a
-  janela por perto de 1 s numa música de 60 s.
-- Áudio que não é WAV a 48 kHz no render para o vídeo passa pelo ffmpeg do Remotion; o teste usa WAV a 48 kHz.
-- M4A e Opus: codificados e medidos pelo ffmpeg do `node_modules` no teste; no app empacotado o ffmpeg vem do
-  `app.asar.unpacked`, o mesmo da exportação do vídeo, mas a exportação da música não rodou no app.
-- O monitor do vídeo dentro da Música busca o quadro a cada mudança da cabeça; conferido na prévia web parado e
-  andando a cabeça, não tocando por muito tempo num vídeo pesado.
-- O som do delay e do limitador foi conferido por medida (tempo e lado de cada repetição, teto do pico), não de ouvido.
-- A automação aparece no inspetor (lista de pontos e a curva), não desenhada sobre o arranjo; os pontos não se
-  arrastam com o mouse.
-- A licença dos kits de terceiros ainda não tem de onde vir (onda 2): o kit.json de cada kit vai dar o `spdx` e o
-  crédito; o teste usa um kit CC BY de exemplo, que não existe.
-- Áudio do próprio projeto sem licença informada (a cama que já estava no vídeo) aparece como "sem licença" e impede
-  publicar no comprovante, mas não trava a exportação (pergunta ao responsável na nota da frente).
-- Os modelos foram ouvidos por medida (resolvem sem aviso, tocam, só sons próprios), não de ouvido.
-- O modo "só o padrão" (tocar o padrão em loop fora do arranjo) não entrou: o L no clipe selecionado faz a mesma coisa.
-- "Pintar" clipes arrastando no vazio do arranjo não entrou; Repetir cobre o caso de encher compassos.
-- O som dos sintetizadores foi conferido por medida (altura por autocorrelação, brilho pela energia nos agudos), não de
-  ouvido.
+Medido no Electron 42 deste PC (Linux/Omarchy, PipeWire 1.6.9, máquina com outros apps abertos), com o app de
+desenvolvimento aberto pela porta de depuração e operado como a pessoa faria (mouse e teclado de verdade pelo CDP, fotos de
+cada passo, console e log do processo principal). ✔ medido, ◐ inferido.
+
+- ✔ **Roteiro**: os passos 1 a 19 rodaram. O passo 10 usou o MCP por stdio como "outro app" no lugar do painel do
+  Claude (a tela abriu na Música com "aberta pela IA" e voltou ao vídeo sozinha quando a transição foi concluída por fora).
+- ✔ **Som**: o `AudioContext` fica `running` a 48 kHz (`baseLatency` 10,7 ms, `outputLatency` 26 a 35 ms); o worker do
+  render carrega (`semWorker` falso); o som chega ao PipeWire (captura do monitor do sink: pico −4,6 dB, média −18,8 dB tocando
+  a música; no vídeo, pico −6,7 dB). **Latência**: do keydown do Espaço ao medidor pintado no DOM, 28 a 38 ms (5 medidas),
+  e a posição já anda em 10 a 21 ms. Mais os 26 a 35 ms da saída de áudio até o alto-falante.
+- ✔ **Ouvir como no vídeo**: com a TV ligada a mistura ficou 4,2 dB mais baixa na média (6 dB no pico) sob a narração.
+- ✔ **Arquivos** (ffprobe e ffmpeg `ebur128`, medidos nos arquivos de `saidas/`): WAV 24 bits, 48 kHz, estéreo, 12,000 s,
+  −14,0 LUFS, pico −3,0 dBFS; M4A (aac) 12,000 s, −14,0 LUFS, −3,0 dBFS; Opus 12,0065 s, −14,0 LUFS, −3,3 dBFS; os cinco
+  stems somados (ffmpeg `amix`, sem normalizar) menos a mistura: −91 dB, resíduo da quantização de 24 bits, e os dois a
+  −14,0 LUFS. Com a automação (0 dB → −29,5 dB em 8,6 s) a média por dois segundos caiu −11,5, −18,5, −24,2, −31,4 e
+  −37,6 dB. O vídeo exportado pelo app (0,5×, leve): H.264 + AAC 48 kHz, 12,000 s, −13,9 LUFS.
+- ✔ **MIDI**: lido por um parser independente (Python): formato 1, 960 ppq, andamento 500000 µs por semínima (120 BPM), 4
+  trilhas, notas 126, 16 e 32, todas as trilhas fechadas com fim de trilha e nenhum byte sobrando; a **importação** devolveu
+  3 canais com 128, 64 e 96 notas de uma Batida exportada.
+- ✔ **Licenças**: CC BY no áudio da cama saiu no `- créditos.txt` e no `.licencas.json` da exportação.
+- ✔ Reabrir o projeto: a música, a ligação, as seções e o render continuam.
+
+### O que ainda não foi verificado
+
+- ◐ Os kits de terceiros (onda 2) não existem: o kit.json de cada kit vai dar o `spdx` e o crédito; o teste usa um kit CC BY
+  de exemplo, que não existe.
+- ◐ Áudio do próprio projeto sem licença informada (a cama que já estava no vídeo) aparece como "sem licença" e avisa no
+  rodapé ao exportar, mas não trava (pergunta ao responsável na nota da frente).
+- ? O som do delay, do limitador, do sidechain, dos sintetizadores e dos modelos foi conferido por medida e por forma de
+  onda, não de ouvido (o sink de áudio deste PC estava mudo).
+- ? O monitor do vídeo dentro da Música busca o quadro a cada mudança da cabeça: conferido parado e andando, não tocando por
+  muito tempo num vídeo pesado.
+- ? Notebook de 8 GB (o app rodou aqui com 800 a 970 MB de memória; o render da Batida de 19 s levou 1,2 a 1,4 s no
+  primeiro render e 17 a 600 ms nas edições).
+- ? M4A e Opus no app **empacotado** (a exportação rodou no app de desenvolvimento, com o ffmpeg do `node_modules`).
+- ? Áudio que não é WAV a 48 kHz no render para o vídeo passa pelo ffmpeg do Remotion; o teste usa WAV a 48 kHz.
+- ? O modo "só o padrão" (tocar o padrão em loop fora do arranjo) não entrou: o L no clipe selecionado faz a mesma coisa.
+- ? Cada abertura da Música num projeto sem `.estudio/transicoes.json` deixa uma linha de erro no log do processo principal
+  (o `ler-json` do registro responde "arquivo não achado"; a tela trata e segue). É só ruído de log.
 
 ## Roteiro para o responsável no app (20 minutos)
 
@@ -427,7 +456,8 @@ baixado; os kits de terceiros entram na onda 2, cada pacote com o LICENSE de den
    batidas** e **Gerar arpejo › sobe**. A faixa de acordes aparece no arranjo, os canais Baixo e Pluck nascem, e a grade
    de notas mostra as notas (as fora da escala apagadas). Clique no nome de uma nota para ouvi-la; mexa nas macros.
 10. No painel do Claude, peça "abra a música do clipe da trilha, ponha um prato no começo e volte ao vídeo". A área
-   deve trocar sozinha na ida e na volta.
+   deve trocar sozinha na ida e na volta. (Na retomada rodou pelo MCP por stdio, `scripts/mcp-externo.mjs`, porque o
+   painel do Claude não foi usado.)
 11. Feche e reabra o projeto: a música, a ligação e o render continuam lá.
 12. Numa música posta no vídeo com "Pôr no vídeo", num vídeo de três cenas: inspetor da música, seção **Vídeo**, ligue
     **Viradas** e clique em **Encaixar tudo**. A música passa a terminar no fim do vídeo, o arranjo ganha as seções
@@ -435,14 +465,15 @@ baixado; os kits de terceiros entram na onda 2, cada pacote com o LICENSE de den
     cabeça: o quadro do vídeo acompanha.
 13. Aba **Mixer**: suba o **Delay** da bateria e toque. No inspetor da faixa, **Preset › Cama sob a voz**. A tira do
     master diz quanto o limitador tirou.
-14. Seção **Exportar**: WAV com **Stems** e depois M4A. Abra `saidas/` no explorador: o arquivo da música, a pasta dos
+14. Botão **Exportar** do transporte (ou a seção **Exportar** do inspetor): WAV com **Stems** e depois M4A. Abra `saidas/` no explorador: o arquivo da música, a pasta dos
     stems e o M4A; o rodapé disse o loudness (perto de −14 LUFS).
 15. Exporte em **MIDI**, abra uma música nova e use **+ MIDI…** com o arquivo de `saidas/`: os canais voltam com as
     mesmas notas.
 16. Num projeto sem música, área Música: **Batida**. Toque: o baixo abaixa a cada bumbo (inspetor da faixa do Baixo,
     seção **Sidechain**; suba o "Quanto" para ouvir melhor).
-17. No inspetor da música, **Automação de volume**: **Ponto na cabeça** no começo, leve a cabeça ao fim, outro ponto, e
-    ponha −30 dB nele. Toque: a música some aos poucos.
+17. Na linha **Volume** no pé do arranjo (clique na seta): clique perto do fim, bem embaixo (−30 dB); arraste o ponto
+    para ajustar. Toque: a música some aos poucos. (O mesmo pelo inspetor da música: **Automação de volume**, **Ponto na
+    cabeça**.) Depois, num canal de bateria, arraste no vazio depois do último clipe: um clipe do padrão aparece.
 18. Num clipe de áudio de fora, **Licença do áudio** › CC BY 4.0, com título e autor. Exporte em WAV: em `saidas/` saem
     o `.licencas.json` e o `- créditos.txt` com a linha de crédito.
 19. No vídeo, numa faixa de música, **Criar em Música**: a Trilha para vídeo abre do tamanho do vídeo; **Concluir e
