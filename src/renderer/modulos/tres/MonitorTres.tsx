@@ -10,6 +10,7 @@ import type {DocCena3D, OperacaoPatch, Vetor3} from '../../../nucleo/documentos'
 import {aplicar, comentar, loja, patchTrocar, selecionar, useLoja} from '../../estado/loja';
 import {SemDocumento} from '../../componentes/SemDocumento';
 import {arredV, iguaisV, indiceEm, objetosDe, type Transformacao} from './comum';
+import {useCena3d} from './lida';
 import {Motor} from './motor';
 import {Trilho, teclaLivre} from '../../componentes/Trilho';
 import {excluirObjeto} from './acoes';
@@ -46,7 +47,7 @@ export const MonitorTres: React.FC = () => {
 };
 
 const Palco: React.FC<{documento: string}> = ({documento}) => {
-  const doc = useLoja((e) => e.docs[documento]?.doc) as DocCena3D | undefined;
+  const doc = useCena3d(documento)?.doc; // validada (tres-efeitos-D12)
   const selecao = useLoja((e) => e.selecao);
   const modoComentario = useLoja((e) => e.modoComentario);
   const comentarios = useLoja((e) => e.comentarios);

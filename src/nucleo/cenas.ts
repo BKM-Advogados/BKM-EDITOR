@@ -5,7 +5,7 @@
 // para a Onda B. O carrossel narrado da Cliente continua no resolvedor de roteiro. `refs` (opcional, no bloco e na cena) cita
 // os fatos da pesquisa (`F3`, em pesquisa/pesquisa.json) que sustentam o que está escrito; o resolvedor só repassa.
 import {resolverAudio, type AudioCenas, type AudioP, type Envelope} from './audio';
-import type {Efeito} from './efeitos';
+import {efeitosValidos, problemasDosEfeitos, type Efeito} from './efeitos';
 import {formatoDoVideo, type Formato} from './formatos';
 import {resolverLegendas, type LegendasCenas, type LegendasP} from './legendas'; // frente Fala: legendas (docs/legendas.md)
 
@@ -35,6 +35,9 @@ export type BlocoCenas = {
   alinhar?: 'esquerda' | 'centro' | 'direita';
   refs?: string[]; // ids dos fatos da pesquisa (F1, F2…) que este bloco afirma
   movimento?: MovimentoImagem; // imagem: zoom dinâmico (Ken Burns) enquanto o bloco está na tela; sem ele, parada (frente C)
+  desde_ms?: number; // lâmina: o bloco já estava na tela há tanto quando esta cena começa (a segunda metade continua a primeira) (frente C)
+  segue_ms?: number; // lâmina: o bloco continua na cena seguinte por mais tanto depois do `sai` (não some no corte) (frente C)
+  casas?: number; // número: casas decimais (0 a 4); sem ele, as dos valores, e duas em dinheiro (R$) com centavos (frente C)
 };
 
 /** Ken Burns do bloco de imagem (composicoes/cenas/movimento.ts): aproximar, afastar ou deslizar para um lado.
@@ -170,10 +173,11 @@ export const resolverCenas = (doc: DocCenas, opcoes: OpcoesResolver = {}): {prop
   const duracao_ms = Math.max(1000, t);
   const som = resolverAudio(doc.audio, duracao_ms, opcoes.envelopes);
   avisos.push(...som.avisos);
+  avisos.push(...problemasDosEfeitos(doc.efeitos).map((p) => `Efeitos: ${p}`)); // frente C (tres-efeitos-D1, D2)
   const legendas = resolverLegendas(doc.legendas, {audio: som.audio, largura: formato.largura, altura: formato.altura, tema, duracao_ms}, avisos); // frente Fala
   return {
     props: {composicao: 'VideoCenas', duracao_ms, largura: formato.largura, altura: formato.altura, fps: formato.fps, tema, cenas,
-      efeitos: doc.efeitos ?? [], ...(som.audio ? {audio: som.audio} : {}), ...(legendas ? {legendas_cenas: legendas} : {})},
+      efeitos: efeitosValidos(doc.efeitos), ...(som.audio ? {audio: som.audio} : {}), ...(legendas ? {legendas_cenas: legendas} : {})},
     avisos,
   };
 };

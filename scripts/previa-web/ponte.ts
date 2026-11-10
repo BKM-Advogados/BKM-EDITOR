@@ -13,6 +13,7 @@ import {LimpezaCancelada, limparVoz} from '../../src/nucleo/limpeza-voz';
 import {medirMistura, type FonteAudio, type MedidasLoudness} from '../../src/nucleo/loudness';
 import type {Fato, Fonte, Pesquisa} from '../../src/nucleo/pesquisa';
 import {novoDocCenas, resolverCenas, type DocCenas} from '../../src/nucleo/cenas';
+import {novoDoc3d} from '../../src/nucleo/cena3d';
 import {idDeMarca, MARCA_NEUTRO, MARCAS_INICIAIS, patchDaMarca, temaDaMarca, type Marca} from '../../src/nucleo/marca';
 import {MODELOS} from '../../src/nucleo/modelos';
 import {codificarWav, decodificarWav, musicaSintetica, narracaoSintetica, TAXA} from '../audio-sintetico';
@@ -138,8 +139,9 @@ const info = (): InfoProjeto | null => aberto && {raiz: aberto.raiz, manifesto: 
 
 const docImagem = (l: number, a: number) => ({formato: 1, largura: l, altura: a, fundo: '#111418', camadas: [{id: 'titulo', nome: 'Título', tipo: 'texto',
   x: Math.round(l * 0.08), y: Math.round(a * 0.4), largura: Math.round(l * 0.84), altura: 200, texto: 'Seu título', fonte: 'Inter', tamanho: 90, peso: 700, cor: '#F2F2F2', alinhar: 'centro'}]});
-const doc3d = () => ({formato: 1, fundo: '#111418', camera: {posicao: [4, 3, 6], alvo: [0, 0.5, 0], fov: 40}, luzes: [{id: 'a', tipo: 'ambiente', cor: '#fff', intensidade: 0.6}],
-  objetos: [{id: 'caixa', nome: 'Caixa', tipo: 'caixa', posicao: [0, 0.75, 0], rotacao: [0, 25, 0], escala: [1.5, 1.5, 1.5], cor: '#70B8FF'}]});
+// a mesma cena que o app cria (criar-projeto.ts: câmera, ambiente e sol, chão e caixa que gira), para a foto e o inspetor da prévia
+// serem os de verdade (tres-efeitos-N3)
+const doc3d = () => novoDoc3d();
 const docVideo = (f?: {largura: number; altura: number; fps?: number}) => {
   const d = novoDocCenas({largura: f?.largura ?? 1080, altura: f?.altura ?? 1920, fps: f?.fps ?? 30});
   // o primeiro bloco já cita um fato da pesquisa de exemplo, para ver as etiquetas no inspetor
@@ -377,6 +379,15 @@ const api: ApiEstudio = {
     const novo = normalizarPrefsExportacao({...atual, marca_dagua: {...atual.marca_dagua, ...normalizarPrefsExportacao(p).marca_dagua}});
     prefsExportacao.set(aberto?.raiz ?? '', novo);
     return structuredClone(novo);
+  },
+  // contraste da marca d'água (frente C): na prévia web não há render; devolve uma medida de exemplo, 2,1:1 sem placa e 9:1 com ela
+  medirContrasteMarca: async (_documento, pedido) => {
+    await new Promise((r) => setTimeout(r, 600));
+    const placa = Boolean(pedido.config.placa);
+    const fundo: [number, number, number] = placa ? [23, 26, 25] : [200, 190, 180];
+    const marca: [number, number, number] = [244, 240, 234];
+    const contraste = placa ? 15 : 1.4;
+    return {ok: true, avaliacao: {contraste, ok: contraste >= 3, quadro_ms: 2000, fundo, marca, medidas: [{quadro_ms: 2000, fundo, marca, contraste}]}};
   },
   // acabamento da imagem (rodada 2, B2): simulação no fim do arquivo
   removerFundo: {

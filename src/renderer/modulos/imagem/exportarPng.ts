@@ -7,7 +7,7 @@
 import type {DocImagem} from '../../../nucleo/documentos';
 import {itensDePintura, type ItemPintura} from '../../../nucleo/acabamento';
 import {resolverMarcaNoDoc} from '../../../nucleo/cor-marca';
-import {camadas as camadasDeEfeito, filtroCss, type Efeito} from '../../../nucleo/efeitos';
+import {camadas as camadasDeEfeito, filtroCss, sementeDoGranulado, svgDoGranulado, type Efeito} from '../../../nucleo/efeitos';
 import {FORMATOS_IMAGEM_SAIDA, type FormatoImagem} from '../../../nucleo/exportacao';
 import {avisar, loja} from '../../estado/loja';
 import {PADRAO, esperarFontes, familiaCss, imagemDoBlob, rotuloCamada, urlMidia, visivel} from './comum';
@@ -34,15 +34,6 @@ const desenharItem = async (ctx: CanvasRenderingContext2D, item: ItemPintura) =>
   return true;
 };
 
-/** Gerador pseudoaleatório com semente (mulberry32): o mesmo documento dá sempre o mesmo granulado. */
-const aleatorio = (semente: number) => () => {
-  semente = (semente + 0x6d2b79f5) | 0;
-  let t = Math.imul(semente ^ (semente >>> 15), 1 | semente);
-  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-};
-const sementeDe = (texto: string) => [...texto].reduce((h, ch) => (Math.imul(h, 31) + ch.charCodeAt(0)) | 0, 7);
-
 const desenharVinheta = (ctx: CanvasRenderingContext2D, valor: number, W: number, H: number) => {
   // radial-gradient(ellipse at center, …) da prévia: elipse com a proporção do quadro passando pelos cantos
   ctx.save();
@@ -56,25 +47,17 @@ const desenharVinheta = (ctx: CanvasRenderingContext2D, valor: number, W: number
   ctx.restore();
 };
 
-const desenharGranulado = (ctx: CanvasRenderingContext2D, e: Efeito, W: number, H: number) => {
-  const ruido = novoCanvas(W, H);
-  const r = contexto(ruido);
-  const dados = r.createImageData(W, H);
-  const d = dados.data;
-  const sorte = aleatorio(sementeDe(e.id));
-  // cinza em torno do meio e meio transparente, perto do feTurbulence da prévia
-  for (let i = 0; i < d.length; i += 4) {
-    const v = 128 + (sorte() + sorte() - 1) * 110;
-    d[i] = d[i + 1] = d[i + 2] = v;
-    d[i + 3] = 128;
-  }
-  r.putImageData(dados, 0, 0);
+/** O granulado é o mesmo SVG da prévia (feTurbulence, mesma frequência, oitavas e semente), desenhado no tamanho do arquivo com o
+ *  grão em unidades do documento; a escala da exportação aumenta o grão junto com a imagem (tres-efeitos-D6). */
+const desenharGranulado = async (ctx: CanvasRenderingContext2D, e: Efeito, doc: DocImagem, W: number, H: number) => {
+  const svg = svgDoGranulado(doc.largura, doc.altura, W, H, sementeDoGranulado(0));
+  const ruido = await imagemDoBlob(new Blob([svg], {type: 'image/svg+xml'}));
   ctx.save();
   ctx.globalCompositeOperation = 'overlay';
   ctx.globalAlpha = Math.min(1, Math.max(0, e.valor));
-  ctx.drawImage(ruido, 0, 0);
+  ctx.drawImage(ruido, 0, 0, W, H);
   ctx.restore();
-  soltar(ruido);
+  ruido.removeAttribute('src');
 };
 
 const desenharTom = (ctx: CanvasRenderingContext2D, e: Efeito, W: number, H: number) => {
@@ -122,7 +105,7 @@ export const desenharDocumento = async (documento: DocImagem, escala = 1) => {
   soltar(composicao);
   for (const e of extras) {
     if (e.tipo === 'vinheta') desenharVinheta(f, e.valor, W, H);
-    else if (e.tipo === 'granulado') desenharGranulado(f, e, W, H);
+    else if (e.tipo === 'granulado') await desenharGranulado(f, e, doc, W, H);
     else desenharTom(f, e, W, H);
   }
   return {canvas: final, faltaram};

@@ -1,9 +1,11 @@
 // Motor do monitor 3D em Three.js puro: renderer, câmera de vista, OrbitControls, gizmo (TransformControls) e raycast.
 // Renderiza só quando algo muda; laço contínuo só com a prévia animada ligada. descartar() devolve memória e contexto.
-import {PerspectiveCamera, Raycaster, Vector2, Vector3, WebGLRenderer} from 'three';
+import {PerspectiveCamera, PMREMGenerator, Raycaster, Texture, Vector2, Vector3, WebGLRenderer} from 'three';
+import {RoomEnvironment} from 'three/examples/jsm/environments/RoomEnvironment.js';
 import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
 import {TransformControls, type TransformControlsMode} from 'three/examples/jsm/controls/TransformControls.js';
 import type {DocCena3D, Vetor3} from '../../../nucleo/documentos';
+import {rotacaoMaisPerto} from '../../../nucleo/cena3d';
 import {arred3, arredV, GRAU, vetor, type Transformacao} from './comum';
 import {CenaDoc} from './cena';
 import type {CameraDoc} from './vista';
@@ -14,6 +16,7 @@ export class Motor {
   readonly cena = new CenaDoc();
   readonly camera = new PerspectiveCamera(CAMERA_PADRAO.fov, 1, 0.05, 1000);
   private readonly renderer: WebGLRenderer;
+  private readonly ambiente: Texture;
   private readonly orbita: OrbitControls;
   private readonly gizmo: TransformControls;
   private readonly raio = new Raycaster();
@@ -41,6 +44,14 @@ export class Motor {
     tela.style.display = 'block';
     tela.style.outline = 'none';
     hospedeiro.appendChild(tela);
+
+    // um ambiente suave (a "sala" do three) para o metálico ter o que refletir: sem mapa de ambiente, o metálico perto de 1 saía
+    // quase preto (tres-efeitos-D16). Pouca intensidade, para o que não é metálico quase não mudar.
+    const pmrem = new PMREMGenerator(this.renderer);
+    this.ambiente = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    pmrem.dispose();
+    this.cena.cena.environment = this.ambiente;
+    this.cena.cena.environmentIntensity = 0.45;
 
     this.orbita = new OrbitControls(this.camera, tela);
     this.orbita.addEventListener('change', this.pedir);
@@ -227,7 +238,11 @@ export class Motor {
   private transformacao(): Transformacao | null {
     const m = this.gizmo.object;
     if (!m) return null;
-    return {posicao: arredV(m.position.toArray()), rotacao: arredV([m.rotation.x / GRAU, m.rotation.y / GRAU, m.rotation.z / GRAU]), escala: arredV(m.scale.toArray())};
+    // o Euler do Three vem com Y entre −90° e 90°: no arrasto fica a forma da mesma pose que está mais perto da rotação de antes
+    // (125° em Y é gravado 0, 125, 0 e não 180, 55, 180; tres-efeitos-D10)
+    const euler: Vetor3 = [m.rotation.x / GRAU, m.rotation.y / GRAU, m.rotation.z / GRAU];
+    const rotacao = this.antes ? rotacaoMaisPerto(euler, this.antes.rotacao) : euler;
+    return {posicao: arredV(m.position.toArray()), rotacao: arredV(rotacao), escala: arredV(m.scale.toArray())};
   }
 
   private arrastando = (e: {value: unknown}) => {
@@ -273,6 +288,7 @@ export class Motor {
     this.gizmo.dispose(); // desliga os eventos e descarta geometrias e materiais do gizmo
     this.orbita.dispose();
     this.cena.descartar();
+    this.ambiente.dispose();
     this.renderer.dispose();
     this.renderer.forceContextLoss();
     tela.remove();

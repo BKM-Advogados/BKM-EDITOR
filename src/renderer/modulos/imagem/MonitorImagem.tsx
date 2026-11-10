@@ -431,7 +431,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
             }}><b>{titulo}</b> · {W} × {H}{variasPaginas && <> · {ativa.p + 1}/{ativa.paginas.length} {ativa.pagina.nome}</>}</span>
             <div style={{position: 'absolute', left: 0, top: 0, width: W, height: H, transform: `scale(${escala})`, transformOrigin: '0 0',
               background: fundo, overflow: 'hidden', userSelect: 'none'}}>
-              <CamadaEfeitos efeitos={previaEfeitos ?? doc.efeitos} quadro={0}>
+              <CamadaEfeitos efeitos={previaEfeitos ?? doc.efeitos} quadro={0} largura={doc.largura} altura={doc.altura}>
                 <div style={{position: 'absolute', inset: 0, background: fundo}} />
                 {fundoDegrade !== undefined && <FundoPintado degrade={fundoDegrade} largura={W} altura={H} escala={escala} />}
                 <CamadasDaPagina camadas={camadas} base={base} escala={escala} largura={W} altura={H} />

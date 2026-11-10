@@ -4,6 +4,7 @@
 // destino: o que o diálogo guarda (ConfigMarcaDagua) e o que a composição desenha (MarcaDaguaP, já posicionada).
 import {FORMATOS_VIDEO, proporcaoDe, type Formato} from './formatos';
 import {MARCA_CLIENTE} from './marca';
+import {PLACAS, type CorDaPlaca} from './contraste';
 import {areaDaLegenda, type LegendasP} from './legendas';
 import {CANTO_PADRAO, posicaoSegura, zonasDaMarca, zonaSugerida, type CantoMarca, type Ret} from './zonas-seguras';
 
@@ -21,6 +22,7 @@ export type OpcoesExportarVideo = {
   nome?: string; // base do nome do arquivo; sem ela, o título do documento
   marca_dagua?: Record<string, ConfigMarcaDagua>; // por id de destino; ausente ou desligada, sai sem marca
   proporcao_logo?: number; // largura ÷ altura do logo, medida pela interface (sem ela, 3)
+  proporcao_texto?: number; // largura ÷ altura da assinatura na fonte do kit, medida pela interface (sem ela, uma estimativa pelas letras)
 };
 
 export type FormatoImagem = 'png' | 'jpg' | 'webp';
@@ -80,6 +82,15 @@ export const destinoDoFormato = (f: {largura: number; altura: number}): Destino 
   return p ? {id: p.id, largura: p.largura, altura: p.altura} : {id: 'personalizado', largura: f.largura, altura: f.altura};
 };
 
+/** O que o diálogo de exportar muda quando as props do vídeo chegam depois de ele abrir (video-D18). Até lá o formato é o padrão
+ *  (1080×1920) e a duração é 0; quando chegam, o diálogo assume o formato e a duração do vídeo. Se a pessoa já mexeu nos destinos, eles
+ *  ficam como ela deixou e só o fim do trecho (ainda 0 s) passa à duração, se ela não ligou o trecho; se já ligou, nada muda. */
+export type AjusteTardio = {destino: Destino; personalizado: {largura: number; altura: number}; ate_ms: number} | {ate_ms: number} | null;
+export const ajusteDasPropsTardias = (o: {mexeu: boolean; trechoLigado: boolean; formato: {largura: number; altura: number}; duracaoMs: number}): AjusteTardio => {
+  if (!o.mexeu) return {destino: destinoDoFormato(o.formato), personalizado: {largura: o.formato.largura, altura: o.formato.altura}, ate_ms: o.duracaoMs};
+  return o.trechoLigado ? null : {ate_ms: o.duracaoMs};
+};
+
 /** Sufixo do arquivo por destino: "-9x16" nos presets; no personalizado, a medida ("-1000x500"). */
 export const sufixoDestino = (d: {largura: number; altura: number}) =>
   FORMATOS_VIDEO.some((f) => f.largura === d.largura && f.altura === d.altura) ? `-${proporcaoDe(d.largura, d.altura).replace(':', 'x')}` : `-${d.largura}x${d.altura}`;
@@ -107,6 +118,51 @@ export type ArgumentosRender = {
 /** Trecho dentro do vídeo e com pelo menos um décimo de segundo. */
 export const trechoValido = (t: Trecho | null | undefined, duracaoMs: number) =>
   Boolean(t && Number.isFinite(t.de_ms) && Number.isFinite(t.ate_ms) && t.de_ms >= 0 && t.ate_ms <= duracaoMs && t.ate_ms - t.de_ms >= 100);
+
+/** Trecho com as pontas encostadas: o "de" a menos de 50 ms do começo vira 0 e o "até" a menos de 50 ms do fim vira a duração
+ *  (o campo mostra um décimo de segundo, e 47,383 s aparece como 47,4: sem isto o Trecho nascia inválido, video-D11). */
+export const encostarTrecho = (t: Trecho, duracaoMs: number): Trecho => ({
+  de_ms: t.de_ms <= 50 && t.de_ms >= 0 ? 0 : t.de_ms,
+  ate_ms: Math.abs(t.ate_ms - duracaoMs) <= 50 ? duracaoMs : t.ate_ms,
+});
+
+// ---------- tamanho personalizado (video-D5) ----------
+export const LIMITE_PERSONALIZADO = {min: 16, max: 7680};
+
+/** O que a pessoa digitou numa medida do Personalizado: só dígitos, até 4; `valor` é o número se já está na faixa e null
+ *  enquanto ainda digita ("1" a caminho de 1920). A tela guarda o texto e só prende na faixa ao sair do campo. */
+export const lerMedidaPersonalizada = (texto: string): {texto: string; valor: number | null} => {
+  const t = texto.replace(/\D/g, '').replace(/^0+(?=\d)/, '').slice(0, 4);
+  const n = Number(t);
+  return {texto: t, valor: t !== '' && n >= LIMITE_PERSONALIZADO.min && n <= LIMITE_PERSONALIZADO.max ? n : null};
+};
+
+/** Ao sair do campo: o número preso à faixa; vazio ou zero volta ao valor de antes. */
+export const fecharMedidaPersonalizada = (texto: string, anterior: number): number => {
+  const n = Number(texto.replace(/\D/g, ''));
+  return n > 0 ? Math.min(LIMITE_PERSONALIZADO.max, Math.max(LIMITE_PERSONALIZADO.min, n)) : anterior;
+};
+
+// ---------- sobreposição de blocos num destino (video-D4) ----------
+export type CaixaMedida = {id: string; x: number; y: number; largura: number; altura: number}; // qualquer unidade, a mesma nas quatro
+
+/** Os pares de caixas que se sobrepõem mais que `minimo` (fração da menor das duas; padrão 8%): blocos medidos no quadro do
+ *  destino pelo diálogo. Encostar não conta. */
+export const sobreposicoes = (caixas: CaixaMedida[], minimo = 0.08): [string, string][] => {
+  const pares: [string, string][] = [];
+  for (let i = 0; i < caixas.length; i++) {
+    for (let j = i + 1; j < caixas.length; j++) {
+      const a = caixas[i];
+      const b = caixas[j];
+      const w = Math.min(a.x + a.largura, b.x + b.largura) - Math.max(a.x, b.x);
+      const h = Math.min(a.y + a.altura, b.y + b.altura) - Math.max(a.y, b.y);
+      if (w <= 0 || h <= 0) continue;
+      const menor = Math.min(a.largura * a.altura, b.largura * b.altura);
+      if (menor > 0 && (w * h) / menor > minimo) pares.push([a.id, b.id]);
+    }
+  }
+  return pares;
+};
 
 /** O que o renderMedia recebe para um destino. O trecho vira quadros: do quadro em que começa ao último antes do fim. */
 export const argumentosDoRender = (o: OpcoesExportarVideo, destino: Destino, formato: Formato, duracaoMs: number): ArgumentosRender => {
@@ -143,11 +199,14 @@ export const estimarExportacao = (o: OpcoesExportarVideo, formato: Formato, dura
 // .estudio/exportacao.json; o canto padrão e a posição fina saem das zonas seguras da rede (posicaoSegura).
 export type ConteudoMarca = 'logo' | 'assinatura';
 /** `tamanho`: altura da marca, fração do lado menor do quadro; `opacidade` de 0,2 a 1. */
-export type ConfigMarcaDagua = {ligada: boolean; conteudo: ConteudoMarca; canto: CantoMarca; tamanho: number; opacidade: number};
+export type ConfigMarcaDagua = {ligada: boolean; conteudo: ConteudoMarca; canto: CantoMarca; tamanho: number; opacidade: number;
+  placa?: CorDaPlaca}; // placa atrás da marca (escura ou clara) para dar contraste com o fundo (mínimo 3:1)
 /** O que a composição recebe em `props.marca_dagua`: o arquivo (caminho de mídia, como o tema) ou o texto e a caixa em
  *  frações do quadro, encostada do lado do canto (`alinhar`). `segura: false` quando nenhuma posição livre coube. */
 export type MarcaDaguaP = {logo?: string; texto?: string; fonte?: string; x: number; y: number; largura: number; altura: number; alinhar: 'esquerda' | 'direita';
-  opacidade: number; segura: boolean};
+  opacidade: number; segura: boolean;
+  /** Placa atrás da marca: a caixa acima já inclui a placa; `pad` (fração do lado menor) é o respiro entre a borda dela e a marca. */
+  placa?: {cor: string; pad: number}};
 /** Preferências de exportação do projeto (.estudio/exportacao.json). */
 export type PrefsExportacao = {marca_dagua?: Record<string, ConfigMarcaDagua>};
 export type FontesMarcaDagua = {logo?: string; assinatura?: string; fonte?: string};
@@ -191,6 +250,7 @@ export const normalizarConfigMarca = (x: unknown, padrao: ConfigMarcaDagua): Con
     canto: CANTOS_MARCA.some((c) => c.id === o.canto) ? (o.canto as CantoMarca) : padrao.canto,
     tamanho: limitar(o.tamanho ?? padrao.tamanho, TAMANHO_MARCA),
     opacidade: limitar(o.opacidade ?? padrao.opacidade, OPACIDADE_MARCA),
+    ...(o.placa === 'escura' || o.placa === 'clara' ? {placa: o.placa} : padrao.placa ? {placa: padrao.placa} : {}),
   };
 };
 
@@ -255,19 +315,26 @@ export const caixaDaLegenda = (l: LegendasP | null | undefined, quadro: {largura
  *  60% do quadro; a posição é a livre mais perto do canto, fora das zonas da rede e da legenda (`legendas`: as que vão
  *  ao render deste destino, legendasDasProps). */
 export const marcaDaguaDoDestino = (c: ConfigMarcaDagua | null | undefined, destino: {largura: number; altura: number}, fontes: FontesMarcaDagua,
-  proporcaoLogo?: number, legendas?: LegendasP | null): MarcaDaguaP | null => {
+  proporcaoLogo?: number, legendas?: LegendasP | null, proporcaoTexto?: number): MarcaDaguaP | null => {
   if (!c?.ligada || !(destino.largura > 0 && destino.altura > 0)) return null;
   const logo = (c.conteudo === 'logo' || !fontes.assinatura) && fontes.logo ? fontes.logo : undefined;
   const texto = logo ? undefined : fontes.assinatura;
   if (!logo && !texto) return null;
   const menor = Math.min(destino.largura, destino.altura);
-  const altura = limitar(c.tamanho, TAMANHO_MARCA) * menor;
+  const conteudo = limitar(c.tamanho, TAMANHO_MARCA) * menor; // a altura da marca em si
   const proporcao = proporcaoLogo && Number.isFinite(proporcaoLogo) && proporcaoLogo > 0 ? Math.min(8, Math.max(0.2, proporcaoLogo)) : PROPORCAO_LOGO_PADRAO;
-  const largura = Math.min(0.6 * destino.largura, logo ? altura * proporcao : larguraDoTexto(texto!, altura * 0.8));
+  // a largura da assinatura é a medida na fonte do kit pela interface (proporcao_texto); sem ela, a estimativa pelas letras
+  const medida = proporcaoTexto && Number.isFinite(proporcaoTexto) && proporcaoTexto > 0 ? Math.min(40, proporcaoTexto) : undefined;
+  const larguraConteudo = logo ? conteudo * proporcao : medida ? conteudo * medida : larguraDoTexto(texto!, conteudo * 0.8);
+  // com placa, a caixa é a placa: a marca ganha um respiro de um quarto da altura em volta
+  const pad = c.placa === 'escura' || c.placa === 'clara' ? conteudo * 0.25 : 0;
+  const altura = conteudo + 2 * pad;
+  const largura = Math.min(0.6 * destino.largura, larguraConteudo + 2 * pad);
   const canto = CANTOS_MARCA.some((x) => x.id === c.canto) ? c.canto : CANTO_PADRAO[zonaSugerida(destino.largura, destino.altura)];
   const legenda = caixaDaLegenda(legendas, destino);
   const pos = posicaoSegura(zonasDaMarca(destino.largura, destino.altura), canto, destino, {largura, altura}, MARGEM_MARCA * menor, legenda ? [legenda] : []);
   const n = (v: number) => Math.round(v * 1e5) / 1e5;
   return {...(logo ? {logo} : {texto}), ...(texto && fontes.fonte ? {fonte: fontes.fonte} : {}), x: n(pos.x), y: n(pos.y), largura: n(largura / destino.largura),
-    altura: n(altura / destino.altura), alinhar: canto.endsWith('dir') ? 'direita' : 'esquerda', opacidade: limitar(c.opacidade, OPACIDADE_MARCA), segura: pos.segura};
+    altura: n(altura / destino.altura), alinhar: canto.endsWith('dir') ? 'direita' : 'esquerda', opacidade: limitar(c.opacidade, OPACIDADE_MARCA), segura: pos.segura,
+    ...(pad > 0 && c.placa ? {placa: {cor: PLACAS[c.placa], pad: n(pad / menor)}} : {})};
 };

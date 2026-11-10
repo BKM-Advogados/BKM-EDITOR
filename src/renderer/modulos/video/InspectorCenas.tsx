@@ -142,6 +142,12 @@ const PropsCena: React.FC<{documento: string; caminho: string; c: CenaCenas; n: 
         <CampoNumero rotulo="Duração" unidade="s" passo={0.1} valor={(c.duracao_ms ?? 4000) / 1000}
           aoMudar={(v) => (v >= 0.3 ? void trocar(documento, `${caminho}/duracao_ms`, Math.round(v * 1000), `duração: ${numeroBr(v, 1)} s`) : avisar('A cena precisa de pelo menos 0,3 s', 'erro'))} />
         <CampoCor rotulo="Fundo" valor={c.fundo ?? ''} aoMudar={(v) => void trocar(documento, `${caminho}/fundo`, v, 'fundo da cena')} />
+        {c.fundo !== undefined && (
+          <div style={{padding: '2px 10px 6px 18px'}}>
+            <button className="bt mini" title="Tira a cor própria: a cena volta a usar o fundo do tema (Ctrl+Z desfaz)"
+              onClick={() => void trocar(documento, `${caminho}/fundo`, undefined, 'fundo da cena volta ao tema')}>Voltar ao fundo do tema</button>
+          </div>
+        )}{/* video-D15 (frente C) */}
       </Secao>
       {c.refs?.length ? <FatosCitados documento={documento} caminho={caminho} refs={c.refs} nome="da cena" /> : null}
       <div className="vazio">Arraste a ponta azul da cena na linha do tempo para mudar a duração.</div>
@@ -182,6 +188,9 @@ const PropsBloco: React.FC<{documento: string; caminho: string; b: BlocoCenas; f
                 <CampoTexto rotulo="Antes" valor={b.prefixo ?? ''} aoMudar={(v) => campo('prefixo', 'prefixo')(v || undefined)} />
                 <CampoTexto rotulo="Depois" valor={b.sufixo ?? ''} aoMudar={(v) => campo('sufixo', 'sufixo')(v || undefined)} />
                 <CampoTexto rotulo="Legenda" valor={b.rotulo ?? ''} aoMudar={(v) => campo('rotulo', 'legenda')(v || undefined)} />
+                <CampoSelecao rotulo="Casas decimais" valor={b.casas === undefined ? 'auto' : String(b.casas)}
+                  opcoes={[['auto', 'Automático'], ['0', '0'], ['1', '1'], ['2', '2'], ['3', '3']]} padrao="auto"
+                  aoMudar={(v) => campo('casas', 'casas decimais')(v === 'auto' ? undefined : Number(v))} />{/* video-D8 (frente C) */}
               </>
             )}
             {b.tipo === 'imagem' && (
@@ -216,6 +225,12 @@ const PropsBloco: React.FC<{documento: string; caminho: string; b: BlocoCenas; f
               <CampoSelecao rotulo="Alinhar" valor={b.alinhar ?? 'centro'} opcoes={ALINHAR} aoMudar={campo('alinhar', 'alinhamento')} />
               <CampoSelecao rotulo="Peso" valor={String(b.peso ?? padrao.peso)} opcoes={PESOS} aoMudar={(v) => campo('peso', 'peso da letra')(Number(v))} />
               <CampoCor rotulo="Cor" valor={b.cor ?? ''} aoMudar={campo('cor', 'cor')} />
+              {b.cor !== undefined && (
+                <div style={{padding: '2px 10px 6px 18px'}}>
+                  <button className="bt mini" title="Tira a cor própria: o bloco volta a usar a cor do tema (Ctrl+Z desfaz)"
+                    onClick={() => campo('cor', 'cor volta ao tema')(undefined)}>Voltar à cor do tema</button>
+                </div>
+              )}{/* video-D15 (frente C) */}
             </Secao>
           )}
           <FatosCitados documento={documento} caminho={caminho} refs={b.refs} nome="do bloco" />

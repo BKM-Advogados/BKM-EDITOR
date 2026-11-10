@@ -11,7 +11,7 @@ import {Player, type PlayerRef} from '@remotion/player';
 import {ChevronDown, Frame, MessageSquarePlus, MousePointer2, Pause, Play, Plus, Repeat2, SkipBack, SkipForward, StepBack, StepForward} from 'lucide-react';
 import {COMPOSICOES, composicaoDe} from '../../../composicoes/registro';
 import {FORMATO_PADRAO} from '../../../nucleo/formatos';
-import {conjuntoDe, ZONAS_SEGURAS, zonaSugerida, type IdZonaSegura} from '../../../nucleo/zonas-seguras';
+import {classeDoQuadro, conjuntoDaClasse, CONJUNTO_QUADRADO, ZONAS_SEGURAS, type ClasseDoQuadro} from '../../../nucleo/zonas-seguras';
 import {aplicar, comentar, loja, patchTrocar, selecionar, useLoja, valorEm} from '../../estado/loja';
 import {Trilho, teclaLivre} from '../../componentes/Trilho';
 import {BotaoMenu} from '../../componentes/Menu';
@@ -59,26 +59,27 @@ const lerTempo = (documento: string) => {
 };
 const jaAbertos = new Set<string>();
 
-// zona segura ligada no monitor: escolha da interface (não do documento), lembrada entre sessões; `ultimaZona` é a que
-// o botão religa
-const CHAVE_ZONA = 'estudio:zona-segura';
-const lerZona = (): IdZonaSegura | null => {
+// zona segura ligada no monitor: escolha da interface (não do documento), lembrada entre sessões **por tipo de quadro**
+// (vertical, feed, YouTube e quadrado): o botão religa a zona que a pessoa usou em quadros como este, ou a do próprio quadro; um
+// vídeo 16:9 não religa a zona do 9:16 de outro vídeo, e o 1:1 mostra só a margem, não as medidas do 4:5 (video-D13)
+const chaveZona = (classe: ClasseDoQuadro) => `estudio:zona-segura:${classe}`;
+const lerZona = (classe: ClasseDoQuadro): ClasseDoQuadro | null => {
   try {
-    const v = localStorage.getItem(CHAVE_ZONA);
-    return v && conjuntoDe(v as IdZonaSegura) ? (v as IdZonaSegura) : null;
+    const v = localStorage.getItem(chaveZona(classe));
+    return v && conjuntoDaClasse(v as ClasseDoQuadro) ? (v as ClasseDoQuadro) : null;
   } catch {
     return null;
   }
 };
-const gravarZona = (z: IdZonaSegura | null) => {
+const gravarZona = (classe: ClasseDoQuadro, z: ClasseDoQuadro | null) => {
   try {
-    if (z) localStorage.setItem(CHAVE_ZONA, z);
-    else localStorage.removeItem(CHAVE_ZONA);
+    if (z) localStorage.setItem(chaveZona(classe), z);
+    else localStorage.removeItem(chaveZona(classe));
   } catch {
     /* sem armazenamento: vale só enquanto o app está aberto */
   }
 };
-let ultimaZona: IdZonaSegura | null = lerZona();
+const ultimaZona = new Map<ClasseDoQuadro, ClasseDoQuadro>(); // a que o botão religa, por tipo de quadro
 
 export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForcado}) => {
   const docAtivo = useLoja((e) => e.ativo.video);
@@ -104,12 +105,7 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
   const [textoBalao, setTextoBalao] = useState('');
   const arrasto = useRef<{x0: number; y0: number; caminho: string; y: number; x: number; largura?: number; modo: 'mover' | 'largura'} | null>(null);
   const [desloc, setDesloc] = useState({dx: 0, dy: 0, dw: 0});
-  const [zona, setZona] = useState<IdZonaSegura | null>(lerZona);
-  const escolherZona = (z: IdZonaSegura | null) => {
-    setZona(z);
-    gravarZona(z);
-    if (z) ultimaZona = z;
-  };
+  const [zona, setZona] = useState<ClasseDoQuadro | null>(null);
 
   const props = montado && 'props' in montado ? montado.props : null;
   // formato do vídeo: o vídeo de cenas traz largura, altura e fps nas props; o carrossel é 1080×1920 a 30
@@ -119,8 +115,15 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
   definirFps(medidas?.fps ?? FORMATO_PADRAO.fps);
   const escala = Math.max(0.05, Math.min((w - margem * 2) / W, (h - margem * 2) / H));
   const cenasRel = props?.composicao === 'VideoCenas'; // posição em frações do quadro (e não em px do 1080×1920)
-  const conjunto = conjuntoDe(zona);
-  const sugerida = zonaSugerida(W, H);
+  const sugerida = classeDoQuadro(W, H);
+  // a zona ligada é a do tipo deste quadro, lida de novo quando o formato do vídeo muda (video-D13)
+  useEffect(() => setZona(lerZona(sugerida)), [sugerida]);
+  const escolherZona = (z: ClasseDoQuadro | null) => {
+    setZona(z);
+    gravarZona(sugerida, z);
+    if (z) ultimaZona.set(sugerida, z);
+  };
+  const conjunto = conjuntoDaClasse(zona);
   const Componente = COMPOSICOES[composicaoDe(props)];
   const duracaoMs = props?.duracao_ms ?? 0;
   const duracao = props ? Math.max(1, Math.ceil((props.duracao_ms / 1000) * FPS)) : 1;
@@ -401,12 +404,12 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
             <button className={`bti largo${controle.repetir ? ' ligado' : ''}`} onClick={alternarRepetir} title="Repetir"><Repeat2 /></button>
           </div>
           <span className="zona-botoes">
-            <button className={`bti${conjunto ? ' ligado' : ''}`} onClick={() => escolherZona(conjunto ? null : ultimaZona ?? sugerida)}
+            <button className={`bti${conjunto ? ' ligado' : ''}`} onClick={() => escolherZona(conjunto ? null : ultimaZona.get(sugerida) ?? lerZona(sugerida) ?? sugerida)}
               title={conjunto ? `Zona segura: ${conjunto.nome}. Clique para desligar` : 'Zona segura das redes: o que a interface do Reels, do TikTok e do YouTube cobre (só na tela, não sai na exportação)'}>
               <Frame />
             </button>
             <BotaoMenu titulo="Escolher a rede da zona segura" icone={<ChevronDown className="i12" />} className="bti estreito" acima lado="direita"
-              itens={ZONAS_SEGURAS.map((z) => ({rotulo: `${z.nome} · ${z.proporcao}${z.id === sugerida ? ' · este quadro' : ''}`, acao: () => escolherZona(z.id)}))} />
+              itens={[...ZONAS_SEGURAS, {...CONJUNTO_QUADRADO, id: 'quadrado' as const}].map((z) => ({rotulo: `${z.nome} · ${z.proporcao}${z.id === sugerida ? ' · este quadro' : ''}`, acao: () => escolherZona(z.id)}))} />
           </span>
           <span className="dur" title="Duração"><span className="longa">{formatarTempo(duracaoMs)}</span><span className="curta">/{formatarCurto(duracaoMs)}</span></span>
         </div>

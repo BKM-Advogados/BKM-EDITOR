@@ -26,6 +26,7 @@ import {registrarIpcAudio} from './ipc-audio';
 import {registrarIpcFala} from './ipc-fala'; // frente Fala
 import {legendasNoDestino, type LegendasP} from '../nucleo/legendas'; // frente Fala: legendas no tamanho de cada destino
 import {registrarPrefsExportacao} from './ipc-exportacao';
+import {registrarContrasteMarca} from './contraste-marca';
 import {apagarLimposSemUso, registrarIpcLimpeza} from './limpeza-voz';
 import {registrarIpcLoudness} from './loudness';
 import {registrarRemoverFundo} from './remover-fundo';
@@ -397,7 +398,7 @@ lidar(CANAL.exportar, async (documento: string, opcoes?: OpcoesExportarVideo): P
       const propsDestino = {...(fixo ? props : {...props, largura: args.largura, altura: args.altura}), ...(legendas ? {legendas_cenas: legendas} : {})};
       // marca d'água do destino, se ligada: posicionada no tamanho do destino, em frações (vale com qualquer escala), fora
       // da legenda que vai neste render (a das props do destino, já recalculada acima)
-      const marca = marcaDaguaDoDestino(o.marca_dagua?.[plano.destino.id], plano.destino, fontesMarca, o.proporcao_logo, legendasDasProps(propsDestino));
+      const marca = marcaDaguaDoDestino(o.marca_dagua?.[plano.destino.id], plano.destino, fontesMarca, o.proporcao_logo, legendasDasProps(propsDestino), o.proporcao_texto);
       await renderizarVideo(preparado, {
         props: {...propsDestino, ...(marca ? {marca_dagua: marca} : {})},
         arquivo: destino, codec: args.codec, videoBitrate: args.videoBitrate, escala: fixo ? args.escala : 1, quadros: args.frameRange, cancelSignal,
@@ -468,6 +469,7 @@ ipcMain.on(CANAL.mostrarArquivo, (e, caminho: string) => {
 const marcas = registrarIpcMarcas({lidar, janela: () => janela, memoria, midia, exigirProjeto, exemplo: pastaDoExemplo()});
 
 registrarPrefsExportacao(lidar, exigirProjeto); // marca d'água por destino, lembrada no projeto (frente C)
+registrarContrasteMarca(lidar, exigirProjeto, (documento) => (exigirProjeto(), sessao!.propsVideo(documento, midia.base)), (aviso) => prepararRender({raizApp: app.getAppPath(), empacotado: app.isPackaged, aviso})); // contraste 3:1 da marca (frente C)
 // frente Som (rodada 2): limpeza de voz (limpeza-voz.ts) e medidor de loudness da mistura (loudness.ts)
 registrarIpcLimpeza(lidar, exigirProjeto, enviar);
 registrarIpcLoudness(lidar, exigirProjeto, (documento) => (exigirProjeto(), sessao!.propsVideo(documento, midia.base)));
