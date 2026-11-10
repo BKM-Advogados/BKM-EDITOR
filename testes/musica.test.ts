@@ -220,6 +220,24 @@ describe('música no vídeo', () => {
     expect(volta.audio!.faixas[1].clipes[0]).toEqual(v.audio!.faixas[1].clipes[0]);
   });
 
+  it('o clipe ligado ganha o título da música (senão a linha do tempo mostra o arquivo do render), sem trocar um nome que a pessoa deu', () => {
+    const v = video();
+    const a = {faixa: v.audio!.faixas[1], fi: 1, clipe: v.audio!.faixas[1].clipes[0], ci: 0};
+    const render = {arquivo: 'midia/musica/musica.0123456789abcdef.wav', duracao_ms: 8000};
+    const ligado = jsonpatch.applyPatch(structuredClone(v), patchLigarClipe(a, 'musica', render, 'Cama do vídeo') as Operation[]).newDocument;
+    expect(ligado.audio!.faixas[1].clipes[0].nome).toBe('Cama do vídeo');
+    const comNome = structuredClone(v);
+    comNome.audio!.faixas[1].clipes[0].nome = 'Minha cama';
+    const b = {...a, clipe: comNome.audio!.faixas[1].clipes[0]};
+    expect(jsonpatch.applyPatch(structuredClone(comNome), patchLigarClipe(b, 'musica', render, 'Cama do vídeo') as Operation[]).newDocument.audio!.faixas[1].clipes[0].nome).toBe('Minha cama');
+  });
+
+  it('a música criada de um clipe se chama como o clipe, sem a extensão nem o código do render', () => {
+    expect(musicaDeClipe({id: 'k', arquivo: 'midia/cama.mp3', em: 0, duracao_ms: 1000}, {video: 'video'}).titulo).toBe('cama');
+    expect(musicaDeClipe({id: 'k', arquivo: 'midia/musica/trilha.0123456789abcdef.wav', em: 0, duracao_ms: 1000}, {video: 'video'}).titulo).toBe('trilha');
+    expect(musicaDeClipe({id: 'k', nome: 'Abertura', arquivo: 'midia/cama.mp3', em: 0, duracao_ms: 1000}, {video: 'video'}).titulo).toBe('Abertura');
+  });
+
   it('a ligação viva troca o arquivo e segue a duração só de quem não foi aparado', () => {
     const v = video();
     v.audio!.faixas[1].clipes = [
