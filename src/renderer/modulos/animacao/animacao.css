@@ -131,11 +131,11 @@
   overflow: hidden;
   position: relative;
 }
+/* o palco tem o tamanho real da cena (1080 px) e só o transform o reduz: o wrapper não pode ser flex, senão o flex
+   encolhe a largura do palco e o centraliza pelo tamanho real, jogando o desenho para fora da área visível */
 .pma-palco-wrapper {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  flex: none;
+  display: block;
   margin: auto;
   position: relative;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
@@ -143,7 +143,9 @@
   overflow: hidden;
 }
 .pma-palco {
-  position: relative;
+  position: absolute;
+  left: 0;
+  top: 0;
 }
 .pma-overlay-interacao {
   position: absolute;
