@@ -272,12 +272,17 @@ describe('empacotamento por sistema', () => {
   });
 });
 
-describe('assinatura e notarização do Mac (desligadas sem as variáveis da Apple)', () => {
+describe('assinatura e notarização do Mac (de verdade só com as variáveis da Apple)', () => {
   const ID = 'Developer ID Application: BKM Advogados (ABCDE12345)';
 
-  it('sem identidade, ou fora do Mac, nada de assinar nem notarizar', () => {
-    expect(assinaturaDoMac({}, 'darwin')).toEqual({});
+  it('fora do Mac nada; no Mac sem identidade, só ad hoc (sem hardened runtime) e nada de notarizar', () => {
     expect(assinaturaDoMac({ESTUDIO_MAC_IDENTIDADE: ID}, 'linux')).toEqual({});
+    expect(assinaturaDoMac({}, 'win32')).toEqual({});
+    const adhoc = assinaturaDoMac({}, 'darwin') as {osxSign: {identity: string; identityValidation: boolean; optionsForFile: (f: string) => unknown}};
+    expect(adhoc.osxSign.identity).toBe('-');
+    expect(adhoc.osxSign.identityValidation).toBe(false);
+    expect(adhoc.osxSign.optionsForFile('/x/Estudio.app')).toEqual({hardenedRuntime: false, timestamp: 'none'});
+    expect(assinaturaDoMac({ESTUDIO_MAC_ADHOC: '0'}, 'darwin')).toEqual({});
     expect(notarizacaoDoMac({APPLE_ID: 'a', APPLE_APP_SPECIFIC_PASSWORD: 'b', APPLE_TEAM_ID: 'c'}, 'darwin')).toEqual({});
   });
 

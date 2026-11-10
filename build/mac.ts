@@ -42,23 +42,41 @@ export const entitlementsDoArquivo = (arquivo: string) => (ehBinarioFilho(arquiv
 
 type Ambiente = Record<string, string | undefined>;
 
-/** Assinatura com o certificado "Developer ID Application" do keychain, só no Mac e só com ESTUDIO_MAC_IDENTIDADE
- *  (ex.: "Developer ID Application: BKM Advogados (ABCDE12345)"). Sem ela, nada: o .app sai sem assinatura. */
+/** Assinatura, só quando o empacotamento roda num Mac (o codesign é da Apple):
+ *  - com ESTUDIO_MAC_IDENTIDADE (ex.: "Developer ID Application: BKM Advogados (ABCDE12345)"): o certificado do keychain,
+ *    com hardened runtime e os entitlements de cada arquivo;
+ *  - sem ela: assinatura ad hoc ("-"), sem hardened runtime. O packager troca o Info.plist e renomeia os auxiliares do
+ *    Electron depois da assinatura ad hoc que vem do Electron; assinar de novo deixa o bundle inteiro coerente (o Apple
+ *    Silicon não roda binário com assinatura inválida). ESTUDIO_MAC_ADHOC=0 desliga.
+ *  Fora do Mac, nada: o .app sai como o packager deixa (docs/portes.md ensina a assinar ad hoc no Mac de quem usa). */
 export const assinaturaDoMac = (env: Ambiente, plataforma: string = process.platform) => {
+  if (plataforma !== 'darwin') return {};
   const identidade = env.ESTUDIO_MAC_IDENTIDADE?.trim();
-  if (!identidade || plataforma !== 'darwin') return {};
+  if (identidade) {
+    return {
+      osxSign: {
+        identity: identidade,
+        optionsForFile: (arquivo: string) => ({hardenedRuntime: true, entitlements: entitlementsDoArquivo(arquivo)}),
+      },
+    };
+  }
+  if (env.ESTUDIO_MAC_ADHOC === '0') return {};
   return {
     osxSign: {
-      identity: identidade,
-      optionsForFile: (arquivo: string) => ({hardenedRuntime: true, entitlements: entitlementsDoArquivo(arquivo)}),
+      identity: '-',
+      identityValidation: false,
+      optionsForFile: () => ({hardenedRuntime: false, timestamp: 'none'}),
     },
   };
 };
 
+/** Se a assinatura é de verdade (Developer ID), a única que a Apple notariza. */
+const assinaturaDeVerdade = (env: Ambiente, plataforma: string) => plataforma === 'darwin' && Boolean(env.ESTUDIO_MAC_IDENTIDADE?.trim());
+
 /** Notarização pela Apple depois de assinar: pela chave da API do App Store Connect (preferida no CI) ou pelo Apple ID
  *  com senha de app. Sem assinatura não há notarização. */
 export const notarizacaoDoMac = (env: Ambiente, plataforma: string = process.platform) => {
-  if (!('osxSign' in assinaturaDoMac(env, plataforma))) return {};
+  if (!assinaturaDeVerdade(env, plataforma)) return {};
   if (env.APPLE_API_KEY && env.APPLE_API_KEY_ID && env.APPLE_API_ISSUER) {
     return {osxNotarize: {appleApiKey: env.APPLE_API_KEY, appleApiKeyId: env.APPLE_API_KEY_ID, appleApiIssuer: env.APPLE_API_ISSUER}};
   }
