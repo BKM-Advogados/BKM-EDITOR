@@ -12,6 +12,7 @@
 // barra de páginas fica entre a peça e o transporte, PaginasImagem.tsx) e os caminhos das camadas levam a página.
 // Foto recortada por máscara: o clique escolhe a máscara e arrastá-la leva a foto junto; o duplo clique escolhe a foto,
 // que então anda e muda de tamanho dentro da máscara sem mexer nela.
+import {comando} from '../../teclas';
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import {Check, ChevronDown, Download, Hand, ImagePlus, Lock, Magnet, MessageSquarePlus, MousePointer2, MoveUpRight, Shapes, Square, Type, X, ZoomIn} from 'lucide-react';
 import type {CamadaImagem, Comentario, DocImagem} from '../../../nucleo/documentos';
@@ -209,7 +210,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
   // teclas das ferramentas deste monitor (V também sai do modo comentário, pela casca)
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => {
-      if (e.ctrlKey && !e.altKey && (e.key === '0' || e.key === '1')) {
+      if (comando(e) && !e.altKey && (e.key === '0' || e.key === '1')) {
         const alvo = e.target as HTMLElement;
         if (/INPUT|TEXTAREA|SELECT/.test(alvo.tagName) || alvo.closest?.('.xterm')) return;
         e.preventDefault();

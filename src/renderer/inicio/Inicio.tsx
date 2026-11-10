@@ -3,6 +3,7 @@
 // direita, continuar: o último projeto com miniatura e a grade de recentes. Clicar no formato marca; clicar no modelo
 // cria; Enter cria com o que está marcado. Nada pergunta fps, codec ou pasta: tudo tem padrão e fica em "Mais opções".
 // Esta tela não carrega o editor (Remotion, Player, dockview): a casca vem depois, com React.lazy.
+import {comando, rotuloDoAtalho} from '../teclas';
 import React, {useEffect, useMemo, useState} from 'react';
 import {ArrowUp, BookOpen, Box, Check, ChevronDown, ChevronRight, Copy, Film, FolderOpen, FolderSearch, Image as ImageIcon, MoreHorizontal, Music, Sparkle, Sparkles, Trash2,
   TriangleAlert, X} from 'lucide-react';
@@ -225,7 +226,7 @@ export const Inicio: React.FC = () => {
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => {
       const alvo = e.target as HTMLElement;
-      if (e.ctrlKey && e.key.toLowerCase() === 'o') {
+      if (comando(e) && e.key.toLowerCase() === 'o') {
         e.preventDefault();
         void abrirPasta();
       }
@@ -398,7 +399,7 @@ export const Inicio: React.FC = () => {
             </>
           )}
           <div className="inicio-acoes">
-            <button className="bt fantasma" onClick={() => void abrirPasta()}><FolderOpen size={14} />Abrir pasta…<kbd>Ctrl+O</kbd></button>
+            <button className="bt fantasma" onClick={() => void abrirPasta()}><FolderOpen size={14} />Abrir pasta…<kbd>{rotuloDoAtalho('Ctrl+O')}</kbd></button>
             <button className="bt fantasma" onClick={() => void verExemplo()}><BookOpen size={14} />Ver um pronto</button>
           </div>
         </div>

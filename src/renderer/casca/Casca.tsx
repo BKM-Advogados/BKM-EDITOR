@@ -15,6 +15,7 @@ import {FORMATOS_IMAGEM, FORMATOS_VIDEO} from '../../nucleo/formatos';
 import {abrirProjeto, avisar, criarDocumento, desfazer, fecharProjeto, loja, mensagemDe, quandoVerFato, useLoja, type Area} from '../estado/loja';
 import {pedirTexto} from '../componentes/Dialogo';
 import {acaoDeArquivo} from './atalhos';
+import {comando, comModificador, rotuloDoAtalho} from '../teclas';
 import {SeloSalvo} from './SeloSalvo';
 import {Midia} from '../paineis/Midia'; // frente Casca (rodada 3): painel de mídia
 import type {PaineisDoModulo} from './contrato';
@@ -363,11 +364,13 @@ export const Casca: React.FC = () => {
       // Alt+1 a 6, Ctrl+' e Ctrl+S valem até com o terminal em foco (escuta na captura, antes do xterm). Ctrl+O, N e W são
       // de arquivo só fora do terminal, onde o Ctrl+W apaga uma palavra (transversal-D4, atalhos.ts)
       const arquivo = acaoDeArquivo(ev, Boolean(alvo.closest('.xterm')));
-      if (ev.altKey && !ev.ctrlKey && /^Digit[1-6]$/.test(ev.code)) {
+      // Ctrl no Windows e no Linux, Cmd no Mac (teclas.ts)
+      const cmd = comando(ev);
+      if (ev.altKey && !ev.ctrlKey && !ev.metaKey && /^Digit[1-6]$/.test(ev.code)) {
         ev.preventDefault();
         ev.stopPropagation();
         loja.definir({area: AREAS[Number(ev.code.slice(5)) - 1].id});
-      } else if (ev.ctrlKey && !ev.altKey && (ev.code === 'Quote' || ev.code === 'Backquote')) {
+      } else if (cmd && !ev.altKey && (ev.code === 'Quote' || ev.code === 'Backquote')) {
         ev.preventDefault();
         ev.stopPropagation();
         api.current?.getPanel('terminal')?.api.setActive();
@@ -381,20 +384,20 @@ export const Casca: React.FC = () => {
       } else if (arquivo === 'fechar') {
         ev.preventDefault();
         voltarAoInicio();
-      } else if (ev.ctrlKey && !ev.altKey && !ev.shiftKey && k === 's') {
+      } else if (cmd && !ev.altKey && !ev.shiftKey && k === 's') {
         ev.preventDefault();
         void marcarVersao();
-      } else if (ev.ctrlKey && ev.shiftKey && !ev.altKey && k === 'e') {
+      } else if (cmd && ev.shiftKey && !ev.altKey && k === 'e') {
         ev.preventDefault();
         exportarArea();
-      } else if (ev.ctrlKey && k === 'z' && !digitando) {
+      } else if (cmd && k === 'z' && !digitando) {
         ev.preventDefault();
         void desfazer();
-      } else if (!digitando && !ev.ctrlKey && !ev.altKey && /^[1-6]$/.test(ev.key)) {
+      } else if (!digitando && !comModificador(ev) && /^[1-6]$/.test(ev.key)) {
         loja.definir({area: AREAS[Number(ev.key) - 1].id});
-      } else if (!digitando && !ev.ctrlKey && k === 'm') {
+      } else if (!digitando && !ev.ctrlKey && !ev.metaKey && k === 'm') {
         loja.definir((s) => ({modoComentario: !s.modoComentario}));
-      } else if (!digitando && !ev.ctrlKey && k === 'v') {
+      } else if (!digitando && !ev.ctrlKey && !ev.metaKey && k === 'v') {
         loja.definir({modoComentario: false});
       } else if (ev.key === 'Escape') {
         loja.definir({modoComentario: false, comentarioAberto: undefined});
@@ -454,7 +457,7 @@ export const Casca: React.FC = () => {
         </button>
         {menu && (
           <div className="menu-app" onPointerDown={(e) => e.stopPropagation()}>
-            <button onClick={item(novoProjeto)}><Plus size={14} />Novo projeto…<kbd>Ctrl+N</kbd></button>
+            <button onClick={item(novoProjeto)}><Plus size={14} />Novo projeto…<kbd>{rotuloDoAtalho('Ctrl+N')}</kbd></button>
             <div className="menu-sub">
               <span className="menu-rotulo"><FilePlus2 size={14} />Novo neste projeto</span>
               <span className="menu-linha">
@@ -465,7 +468,7 @@ export const Casca: React.FC = () => {
               </span>
             </div>
             <hr />
-            <button onClick={item(() => void abrir())}><FolderOpen size={14} />Abrir pasta…<kbd>Ctrl+O</kbd></button>
+            <button onClick={item(() => void abrir())}><FolderOpen size={14} />Abrir pasta…<kbd>{rotuloDoAtalho('Ctrl+O')}</kbd></button>
             {recentes.length > 0 && (
               <>
                 <span className="menu-rotulo">Abrir recente</span>
@@ -475,7 +478,7 @@ export const Casca: React.FC = () => {
             <hr />
             <button onClick={item(() => void duplicar())}><Copy size={14} />Duplicar projeto…</button>
             <button onClick={item(() => window.estudio.mostrarNaPasta())}><FolderSearch size={14} />Mostrar na pasta</button>
-            <button onClick={item(() => void marcarVersao())}><Check size={14} />Marcar ponto de restauração<kbd>Ctrl+S</kbd></button>
+            <button onClick={item(() => void marcarVersao())}><Check size={14} />Marcar ponto de restauração<kbd>{rotuloDoAtalho('Ctrl+S')}</kbd></button>
             <button onClick={item(() => void window.estudio.abrirExemplo().then(abrirProjeto).catch((e: Error) => avisar(mensagemDe(e), 'erro')))}><BookOpen size={14} />Ver um pronto (exemplo Cliente)</button>
             <hr />
             <button onClick={item(abrirMidia)}><Images size={14} />Mídia do projeto</button>
@@ -483,7 +486,7 @@ export const Casca: React.FC = () => {
             <button onClick={item(() => setPreferencias(true))}><Settings size={14} />Preferências…</button>
             <button onClick={item(() => montar(area, true))}><LayoutPanelLeft size={14} />Redefinir os painéis desta área</button>
             <hr />
-            <button onClick={item(voltarAoInicio)}><Home size={14} />Fechar projeto e ir ao início<kbd>Ctrl+W</kbd></button>
+            <button onClick={item(voltarAoInicio)}><Home size={14} />Fechar projeto e ir ao início<kbd>{rotuloDoAtalho('Ctrl+W')}</kbd></button>
           </div>
         )}
         <span className="projeto">
@@ -503,10 +506,10 @@ export const Casca: React.FC = () => {
           <button className={`bt fantasma${modoComentario ? ' ligado' : ''}`} onClick={() => loja.definir((s) => ({modoComentario: !s.modoComentario}))} title="Comentar na tela (M)">
             <MessageSquarePlus size={15} />Comentar<kbd>M</kbd>
           </button>
-          <button className="bt fantasma" onClick={() => void desfazer()} title="Desfazer a sua última edição (Ctrl+Z)"><Undo2 size={15} /></button>
+          <button className="bt fantasma" onClick={() => void desfazer()} title={`Desfazer a sua última edição (${rotuloDoAtalho('Ctrl+Z')})`}><Undo2 size={15} /></button>
           <button className="bt exportar" disabled={!podeExportar} onClick={exportarArea}
-            title={podeExportar ? (docAtivo!.modulo === 'musica' ? 'Exportar a música em WAV para a pasta saidas (M4A, Opus, MIDI e stems: botão Exportar do transporte) (Ctrl+Shift+E)'
-              : `Exportar ${docAtivo!.modulo === 'video' ? 'o vídeo' : docAtivo!.modulo === 'animacao' ? 'a animação' : 'a imagem'} para a pasta saidas… (Ctrl+Shift+E)`)
+            title={podeExportar ? (docAtivo!.modulo === 'musica' ? 'Exportar a música em WAV para a pasta saidas (M4A, Opus, MIDI e stems: botão Exportar do transporte) (' + rotuloDoAtalho('Ctrl+Shift+E') + ')'
+              : `Exportar ${docAtivo!.modulo === 'video' ? 'o vídeo' : docAtivo!.modulo === 'animacao' ? 'a animação' : 'a imagem'} para a pasta saidas… (${rotuloDoAtalho('Ctrl+Shift+E')})`)
             : area === '3d' ? 'A cena 3D ainda não exporta' : 'Nada para exportar nesta área'}>
             <Download size={15} />Exportar
           </button>

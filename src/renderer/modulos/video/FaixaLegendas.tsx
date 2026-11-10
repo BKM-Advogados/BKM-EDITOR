@@ -3,6 +3,7 @@
 // começo (o inspector vira a lista das legendas); arrastar move no tempo, com as palavras junto; as alças da legenda
 // selecionada aparam o começo e o fim. Delete exclui a legenda selecionada (ouvido na captura, antes do monitor, que só
 // conhece cenas e blocos). Sem legendas, a faixa convida a transcrever ou importar.
+import {comModificador, teclaDeApagar} from '../../teclas';
 import React, {useEffect, useRef, useState} from 'react';
 import {Captions, Eye, EyeOff} from 'lucide-react';
 import {passoDeQuadro, type LegendasP, type SegmentoLegendaP} from '../../../nucleo/legendas';
@@ -28,7 +29,7 @@ export const FaixaLegendas: React.FC<{documento: string; legendas?: LegendasP; x
     useEffect(() => {
       const tecla = (e: KeyboardEvent) => {
         const ponta = ({'[': ['ini', -1], ']': ['ini', 1], '{': ['fim', -1], '}': ['fim', 1]} as Record<string, ['ini' | 'fim', -1 | 1]>)[e.key];
-        if ((e.key !== 'Delete' && !ponta) || e.ctrlKey || e.altKey || loja.get().area !== 'video') return;
+        if ((!teclaDeApagar(e) && !ponta) || comModificador(e) || loja.get().area !== 'video') return;
         const sel = loja.get().selecao;
         const m = sel?.documento === documento ? SEL.exec(sel.caminho) : null;
         const id = m ? (loja.get().docs[documento]?.doc as {legendas?: {segmentos?: {id: string}[]}})?.legendas?.segmentos?.[Number(m[1])]?.id : undefined;
