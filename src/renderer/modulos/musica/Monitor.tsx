@@ -28,16 +28,27 @@ const tempoTexto = (s: number) => {
   return `${m}:${(s - m * 60).toFixed(1).padStart(4, '0')}`;
 };
 
-/** O clipe do vídeo ligado a esta música (para "Ouvir como no vídeo"). */
-const clipeLigado = (id: string, video: DocCenas | undefined, props: PropsVideo | undefined) => {
+/** O clipe do vídeo ligado a esta música (para "Ouvir como no vídeo"); durante a transição, antes de concluir, o clipe
+ *  de origem do áudio (a música ainda não está ligada a ele). */
+const clipeLigado = (id: string, doc: DocMusica | undefined, video: DocCenas | undefined, props: PropsVideo | undefined) => {
   if (!video?.audio || !props || !('props' in props)) return null;
   const audio = (props.props as {audio?: AudioP}).audio;
-  for (const [fi, f] of video.audio.faixas.entries()) {
-    const ci = (f.clipes ?? []).findIndex((c) => c.musica === id);
-    if (ci < 0) continue;
+  const por = (fi: number, ci: number) => {
     const fp = audio?.faixas.find((x) => x.origem === `/audio/faixas/${fi}`);
     const cp = fp?.clipes.find((x) => x.origem === `/audio/faixas/${fi}/clipes/${ci}`);
-    if (fp && cp) return {f: fp, c: cp};
+    return fp && cp ? {f: fp, c: cp} : null;
+  };
+  for (const [fi, f] of video.audio.faixas.entries()) {
+    const ci = (f.clipes ?? []).findIndex((c) => c.musica === id);
+    if (ci >= 0) return por(fi, ci);
+  }
+  // o clipe de origem (o áudio do vídeo que abriu esta música), que ainda não tem `musica`
+  const origem = doc?.arranjo.clipes.map((c) => c.origem).find((o) => o?.documento === doc?.video?.documento && o?.clipe);
+  if (origem) {
+    for (const [fi, f] of video.audio.faixas.entries()) {
+      const ci = (f.clipes ?? []).findIndex((c) => c.id === origem.clipe);
+      if (ci >= 0) return por(fi, ci);
+    }
   }
   return null;
 };
@@ -58,7 +69,7 @@ const useMotorVivo = (id: string | undefined, doc: DocMusica | undefined) => {
         const audio = props && 'props' in props ? (props.props as {audio?: AudioP}).audio : undefined;
         await motor.prepararGuia(doc.video?.voz_guia === false ? null : vozGuiaDe(audio, doc.video?.em_ms ?? 0));
         motor.prepararMetronomo(doc);
-        motor.definirCurva(comoNoVideo && id ? clipeLigado(id, video, props) : null);
+        motor.definirCurva(comoNoVideo && id ? clipeLigado(id, doc, video, props) : null);
         musica.definir({avisos: motor.avisos});
         if (novo) mudou();
       });
