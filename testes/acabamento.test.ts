@@ -11,7 +11,8 @@ import {
 } from '../src/nucleo/acabamento';
 import {acharCamada} from '../src/nucleo/carrossel';
 import type {CamadaImagem, DocImagem, OperacaoPatch} from '../src/nucleo/documentos';
-import {MARCA_BKM, MARCA_CLIENTE, MARCAS_INICIAIS} from '../src/nucleo/marca';
+import {MARCA_BKM, MARCAS_INICIAIS} from '../src/nucleo/marca';
+import {KIT_TESTE} from './fixtures/kit-teste';
 
 const EXEMPLO = path.join(__dirname, 'fixtures', 'projeto');
 const capa = (): DocImagem => JSON.parse(readFileSync(path.join(EXEMPLO, 'imagem', 'capa.json'), 'utf-8')) as DocImagem;
@@ -193,21 +194,22 @@ describe('máscara de recorte', () => {
 
 describe('predefinições do kit', () => {
   it('contorno na cor de destaque, por fora; no texto, a espessura acompanha a letra', () => {
-    expect(contornoDaMarca(MARCA_CLIENTE)).toEqual({cor: '#C88155', espessura: 6, posicao: 'fora'});
-    expect(contornoDaMarca(MARCA_CLIENTE, {tipo: 'texto', tamanho: 100})).toMatchObject({espessura: 6});
-    expect(contornoDaMarca(MARCA_CLIENTE, {tipo: 'texto', tamanho: 20})).toMatchObject({espessura: 2});
+    expect(contornoDaMarca(KIT_TESTE)).toEqual({cor: '#C88155', espessura: 6, posicao: 'fora'});
+    expect(contornoDaMarca(KIT_TESTE, {tipo: 'texto', tamanho: 100})).toMatchObject({espessura: 6});
+    expect(contornoDaMarca(KIT_TESTE, {tipo: 'texto', tamanho: 20})).toMatchObject({espessura: 2});
   });
 
   it('degradê do destaque na camada e do fundo esquentando no fundo da prancheta', () => {
-    expect(degradeDaMarca(MARCA_CLIENTE)).toEqual({tipo: 'linear', angulo: 135, paradas: [{cor: '#C88155', posicao: 0}, {cor: misturar('#C88155', '#FFFFFF', 0.35), posicao: 1}]});
-    const fundo = degradeDaMarca(MARCA_CLIENTE, 'fundo');
+    expect(degradeDaMarca(KIT_TESTE)).toEqual({tipo: 'linear', angulo: 135, paradas: [{cor: '#C88155', posicao: 0}, {cor: misturar('#C88155', '#FFFFFF', 0.35), posicao: 1}]});
+    const fundo = degradeDaMarca(KIT_TESTE, 'fundo');
     expect(fundo.paradas[0].cor).toBe('#171A19');
     expect(fundo.angulo).toBe(180);
   });
 
   it('o kit da imagem é o da cor de fundo dela; sem nenhum, o primeiro', () => {
     expect(kitDaImagem({fundo: '#101826'}, MARCAS_INICIAIS)?.id).toBe(MARCA_BKM.id);
-    expect(kitDaImagem({fundo: '#171a19'}, MARCAS_INICIAIS)?.id).toBe('cliente');
+    expect(kitDaImagem({fundo: '#111418'}, MARCAS_INICIAIS)?.id).toBe('neutro');
+    expect(kitDaImagem({fundo: '#171a19'}, [...MARCAS_INICIAIS, KIT_TESTE])?.id).toBe('teste');
     expect(kitDaImagem({fundo: '#123456'}, MARCAS_INICIAIS)?.id).toBe(MARCAS_INICIAIS[0].id);
   });
 });

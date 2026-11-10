@@ -1,6 +1,6 @@
 // Kit de marca e fontes próprias (itens 11 e 12 da Ordem sugerida, 06/11/2026): a pasta de kits, aplicar ao documento,
-// a Cliente inalterada, o projeto novo com kit, as fontes de arquivo no carregador e no servidor de mídia.
-import {existsSync, mkdtempSync, rmSync, writeFileSync} from 'node:fs';
+// os kits de fábrica (bkm e neutro), o projeto novo com kit, as fontes de arquivo no carregador e no servidor de mídia.
+import {copyFileSync, existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
@@ -8,17 +8,18 @@ import {afterAll, describe, expect, it} from 'vitest';
 import {novoDocCenas, TEMA_NEUTRO, type DocCenas} from '../src/nucleo/cenas';
 import {aplicarMarcaAoPlano, claudeMd, gravarPlano, novoDocImagem, planoDoProjeto} from '../src/nucleo/criar-projeto';
 import type {DocImagem} from '../src/nucleo/documentos';
-import {idDeMarca, inferirFonte, MARCA_CLIENTE, MARCA_NEUTRO, marcaDoDocumento, marcaDoKit, normalizarMarca, patchDaMarca, temaDaMarca} from '../src/nucleo/marca';
+import {idDeMarca, inferirFonte, MARCA_NEUTRO, MARCAS_INICIAIS, marcaDoDocumento, marcaDoKit, normalizarMarca, patchDaMarca, temaDaMarca} from '../src/nucleo/marca';
 import {fontesDoProjeto, PastaMarcas} from '../src/nucleo/pasta-marcas';
 import {Projeto} from '../src/nucleo/projeto';
 import {fonte, listarFontes, registrarFontesDeArquivo} from '../src/composicoes/fontes';
 import {ServidorMidia} from '../src/main/servidor-midia';
+import {KIT_TESTE} from './fixtures/kit-teste';
 
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'estudio-marca-'));
 afterAll(() => rmSync(tmp, {recursive: true, force: true}));
-const EXEMPLO = path.join(__dirname, '..', 'exemplos', 'exemplo');
+const LOGO = path.join(__dirname, 'fixtures', 'projeto', 'midia', 'logo.png');
 const PASTA = path.join(tmp, 'marcas');
-const marcas = new PastaMarcas({pasta: () => PASTA, exemplo: EXEMPLO});
+const marcas = new PastaMarcas({pasta: () => PASTA});
 const quem = {autor: 'pessoa', origem: 'teste'};
 /** GET com o caminho como está (o fetch normalizaria ".." antes de mandar). */
 const bruto = (origem: string, caminho: string) => new Promise<number>((ok, erro) => {
@@ -30,10 +31,8 @@ const bruto = (origem: string, caminho: string) => new Promise<number>((ok, erro
 });
 
 describe('kit de marca', () => {
-  it('a Cliente do kit é a Cliente de sempre (paleta do manual, sem laranja; Archivo, IBM Plex Sans e Mono)', () => {
-    expect(MARCA_CLIENTE.cores).toMatchObject({cobre: '#C88155', cobreProfundo: '#795033', cobreClaro: '#E4B492', grafite: '#2E3331', grafiteProfundo: '#171A19',
-      nevoa: '#3D4142', osso: '#F4F0EA', aco: '#37556A', fundo: '#171A19', texto: '#F4F0EA', destaque: '#C88155'});
-    expect(MARCA_CLIENTE.fontes).toMatchObject({titulo: 'Archivo', texto: 'IBM Plex Sans', mono: 'IBM Plex Mono'});
+  it('os de fábrica são o bkm e o neutro', () => {
+    expect(MARCAS_INICIAIS.map((m) => m.id)).toEqual(['bkm', 'neutro']);
   });
 
   it('o neutro dá exatamente o tema neutro, com o id do kit', () => {
@@ -42,15 +41,19 @@ describe('kit de marca', () => {
     expect(marcaDoDocumento(novoDocCenas({largura: 1080, altura: 1920, fps: 30}))).toBeUndefined();
   });
 
-  it('cria os três de fábrica na primeira vez, com o logo da Cliente vindo do exemplo', () => {
+  it('cria os de fábrica na primeira vez; um kit que já estava na pasta (de fábrica numa versão antiga) fica como está', () => {
+    // um kit gravado por uma versão anterior, com logo: não é mais de fábrica, mas continua listado e lido
+    marcas.gravar(KIT_TESTE);
+    copyFileSync(LOGO, path.join(marcas.pastaDe('teste'), 'logo.png'));
     marcas.garantir();
-    expect(marcas.listar().map((m) => m.id)).toEqual(['cliente', 'bkm', 'neutro']);
-    const ks = marcas.ler('cliente');
-    expect(ks.logo).toBe('logo.png');
-    expect(existsSync(path.join(ks.pasta, 'logo.png'))).toBe(true);
+    expect(marcas.listar().map((m) => m.id)).toEqual(['bkm', 'neutro', 'teste']);
+    const teste = marcas.ler('teste');
+    expect(teste.logo).toBe('logo.png');
+    expect(existsSync(path.join(teste.pasta, 'logo.png'))).toBe(true);
     expect(existsSync(path.join(PASTA, 'bkm', 'marca.json'))).toBe(true);
     marcas.garantir(); // de novo não muda nada
     expect(marcas.listar()).toHaveLength(3);
+    expect(readdirSync(PASTA).sort()).toEqual(['bkm', 'neutro', 'teste']);
   });
 
   it('cria, grava, relê e duplica (a cópia leva o logo)', () => {
@@ -58,11 +61,11 @@ describe('kit de marca', () => {
     expect(k).toMatchObject({id: 'escritorio-teste', nome: 'Escritório Teste', cores: MARCA_NEUTRO.cores});
     marcas.gravar({...k, cores: {...k.cores, destaque: '#ff0000', ouro: '#c9a961'}, assinatura: '@teste'});
     expect(marcas.ler('escritorio-teste')).toMatchObject({cores: {destaque: '#FF0000', ouro: '#C9A961'}, assinatura: '@teste'});
-    const copia = marcas.duplicar('cliente', 'Cliente cópia');
-    expect(copia.id).toBe('ks-copia');
-    expect(copia.cores.cobre).toBe('#C88155');
+    const copia = marcas.duplicar('teste', 'Teste cópia');
+    expect(copia.id).toBe('teste-copia');
+    expect(copia.cores.terracota).toBe('#C88155');
     expect(existsSync(path.join(copia.pasta, 'logo.png'))).toBe(true);
-    expect(marcas.listar().map((m) => m.id)).toEqual(['cliente', 'bkm', 'neutro', 'escritorio-teste', 'ks-copia']);
+    expect(marcas.listar().map((m) => m.id)).toEqual(['bkm', 'neutro', 'escritorio-teste', 'teste', 'teste-copia']);
     expect(() => marcas.ler('nao-existe')).toThrow(/não achado/);
   });
 
@@ -70,7 +73,7 @@ describe('kit de marca', () => {
     const m = normalizarMarca({nome: ' X ', cores: {fundo: '#abcdef', texto: 7}, fontes: 'nada', logo: ''}, 'q');
     expect(m).toMatchObject({id: 'q', nome: 'X', cores: {fundo: '#ABCDEF', texto: TEMA_NEUTRO.texto}, fontes: {titulo: 'Inter', texto: 'Inter', arquivos: []}});
     expect(m.logo).toBeUndefined();
-    expect(idDeMarca('Cliente Advogados · 2026')).toBe('ks-advogados-2026');
+    expect(idDeMarca('Escritório Exemplo · 2026')).toBe('escritorio-exemplo-2026');
     expect(idDeMarca('???')).toBe('marca');
   });
 
@@ -88,42 +91,42 @@ describe('kit de marca', () => {
   it('importa fonte e aplica ao vídeo de cenas: tema, logo em midia/ e fonte em fontes/; trocar o kit limpa o tema', () => {
     const ttf = path.join(tmp, 'Teste-Bold.ttf');
     writeFileSync(ttf, 'fonte de mentira');
-    expect(() => marcas.importarFonte('cliente', path.join(tmp, 'x.txt'))).toThrow(/fonte em/);
-    const ks = marcas.importarFonte('cliente', ttf);
-    expect(ks.fontes.arquivos).toEqual([{familia: 'Teste', arquivo: 'fontes/Teste-Bold.ttf', peso: 700}]);
-    expect(existsSync(path.join(ks.pasta, 'fontes', 'Teste-Bold.ttf'))).toBe(true);
+    expect(() => marcas.importarFonte('teste', path.join(tmp, 'x.txt'))).toThrow(/fonte em/);
+    const kit = marcas.importarFonte('teste', ttf);
+    expect(kit.fontes.arquivos).toEqual([{familia: 'Teste', arquivo: 'fontes/Teste-Bold.ttf', peso: 700}]);
+    expect(existsSync(path.join(kit.pasta, 'fontes', 'Teste-Bold.ttf'))).toBe(true);
 
     const destino = gravarPlano(path.join(tmp, 'proj'), planoDoProjeto({nome: 'P', modelo: 'video-branco'}));
     const p = new Projeto(destino);
-    const r = marcas.aplicar(p, 'cliente', 'video', quem);
-    expect(r.copiados.sort()).toEqual(['fontes/Teste-Bold.ttf', 'midia/logo-exemplo.png']);
+    const r = marcas.aplicar(p, 'teste', 'video', quem);
+    expect(r.copiados.sort()).toEqual(['fontes/Teste-Bold.ttf', 'midia/logo-teste.png']);
     expect(p.lerJson<DocCenas>('video/video.json').doc.tema).toEqual({
-      fundo: '#171A19', texto: '#F4F0EA', destaque: '#C88155', suave: '#A09F9B', fonte: 'Archivo', marca: 'cliente', logo: 'midia/logo-exemplo.png', assinatura: '@escritorioexemplo',
+      fundo: '#171A19', texto: '#F4F0EA', destaque: '#C88155', suave: '#A09F9B', fonte: 'Archivo', marca: 'teste', logo: 'midia/logo-teste.png', assinatura: '@escritorio.teste',
       fontes_arquivos: [{familia: 'Teste', arquivo: 'fontes/Teste-Bold.ttf', peso: 700}],
     });
-    expect(p.diario()[0]).toMatchObject({autor: 'pessoa', origem: 'teste', rotulo: 'kit de marca: Cliente Advogados'});
+    expect(p.diario()[0]).toMatchObject({autor: 'pessoa', origem: 'teste', rotulo: 'kit de marca: Kit de Teste'});
     expect(fontesDoProjeto(destino)).toEqual([{familia: 'Teste', peso: 700, arquivo: 'fontes/Teste-Bold.ttf'}]);
 
     // aplicar de novo não copia de novo; o neutro tira logo, assinatura e fontes do tema (os arquivos ficam no projeto)
-    expect(marcas.aplicar(p, 'cliente', 'video', quem).copiados).toEqual([]);
+    expect(marcas.aplicar(p, 'teste', 'video', quem).copiados).toEqual([]);
     marcas.aplicar(p, 'neutro', 'video', quem);
     expect(p.lerJson<DocCenas>('video/video.json').doc.tema).toEqual({...TEMA_NEUTRO, marca: 'neutro'});
-    expect(existsSync(path.join(destino, 'midia', 'logo-exemplo.png'))).toBe(true);
-    expect(() => marcas.aplicar(p, 'cliente', 'nao-existe', quem)).toThrow(/não achado/);
+    expect(existsSync(path.join(destino, 'midia', 'logo-teste.png'))).toBe(true);
+    expect(() => marcas.aplicar(p, 'teste', 'nao-existe', quem)).toThrow(/não achado/);
   });
 
   it('não aplica em cena 3D e, na imagem, troca o fundo, a fonte (por peso, sem fonte) e a cor dos textos e guarda o kit', () => {
-    expect(patchDaMarca({formato: 1, fundo: '#000', camera: {}, luzes: [], objetos: []}, MARCA_CLIENTE)).toEqual([]);
+    expect(patchDaMarca({formato: 1, fundo: '#000', camera: {}, luzes: [], objetos: []}, KIT_TESTE)).toEqual([]);
     const img: DocImagem = {...novoDocImagem(1080, 1350), camadas: [
       {id: 'f', nome: 'Faixa', tipo: 'forma', x: 0, y: 0, largura: 10, altura: 10, preenchimento: '#123456'},
       {id: 't', nome: 'Título', tipo: 'texto', x: 0, y: 0, largura: 10, altura: 10, texto: 'Oi', peso: 800, cor: '#FFFFFF'},
       {id: 's', nome: 'Sub', tipo: 'texto', x: 0, y: 0, largura: 10, altura: 10, texto: 'oi'},
     ]};
-    expect(patchDaMarca(img, MARCA_CLIENTE)).toEqual([
+    expect(patchDaMarca(img, KIT_TESTE)).toEqual([
       {op: 'replace', path: '/fundo', value: '#171A19'},
       {op: 'add', path: '/camadas/1/fonte', value: 'Archivo'}, {op: 'replace', path: '/camadas/1/cor', value: '#F4F0EA'},
       {op: 'add', path: '/camadas/2/fonte', value: 'IBM Plex Sans'}, {op: 'add', path: '/camadas/2/cor', value: '@texto'},
-      {op: 'add', path: '/marca', value: marcaDoKit(MARCA_CLIENTE)},
+      {op: 'add', path: '/marca', value: marcaDoKit(KIT_TESTE)},
     ]);
   });
 
@@ -133,15 +136,15 @@ describe('kit de marca', () => {
       assinatura: 'bkmadvogados.com.br'});
     expect(bkm.copiar).toBeUndefined();
 
-    const destino = gravarPlano(path.join(tmp, 'novo-cliente'), aplicarMarcaAoPlano(planoDoProjeto({nome: 'K', modelo: 'imagem-branco'}), marcas.ler('cliente')));
-    expect(existsSync(path.join(destino, 'midia', 'logo-exemplo.png'))).toBe(true);
+    const destino = gravarPlano(path.join(tmp, 'novo-teste'), aplicarMarcaAoPlano(planoDoProjeto({nome: 'K', modelo: 'imagem-branco'}), marcas.ler('teste')));
+    expect(existsSync(path.join(destino, 'midia', 'logo-teste.png'))).toBe(true);
     expect(existsSync(path.join(destino, 'fontes', 'Teste-Bold.ttf'))).toBe(true);
     const img = new Projeto(destino).lerJson<DocImagem>('imagem/imagem.json').doc;
     expect(img.fundo).toBe('#171A19');
     expect(img.camadas[0]).toMatchObject({fonte: 'Archivo', cor: '#F4F0EA'});
 
     // o que o kit cita mas não está na pasta fica fora do tema
-    const semLogo = aplicarMarcaAoPlano(planoDoProjeto({nome: 'S', modelo: 'video-branco'}), marcas.ler('cliente'), () => false);
+    const semLogo = aplicarMarcaAoPlano(planoDoProjeto({nome: 'S', modelo: 'video-branco'}), marcas.ler('teste'), () => false);
     const tema = JSON.parse(semLogo.arquivos['video/video.json']).tema;
     expect(tema.logo).toBeUndefined();
     expect(tema.fontes_arquivos).toBeUndefined();
@@ -176,14 +179,14 @@ describe('servidor de mídia', () => {
       expect(fonteProjeto.status).toBe(200);
       expect(fonteProjeto.headers.get('content-type')).toBe('font/ttf');
       expect(await fonteProjeto.text()).toBe('fonte de mentira');
-      expect((await fetch(`${s.urlMarca('cliente')}/fontes/Teste-Bold.ttf`)).status).toBe(200);
-      const logo = await fetch(`${s.urlMarca('cliente')}/logo.png`);
+      expect((await fetch(`${s.urlMarca('teste')}/fontes/Teste-Bold.ttf`)).status).toBe(200);
+      const logo = await fetch(`${s.urlMarca('teste')}/logo.png`);
       expect(logo.status).toBe(200);
       expect(logo.headers.get('content-type')).toBe('image/png');
-      expect((await fetch(`${s.urlMarca('cliente')}/marca.json`)).status).toBe(404);
+      expect((await fetch(`${s.urlMarca('teste')}/marca.json`)).status).toBe(404);
       // sair da pasta não pode: ".." (que a URL já dobra) ou "\.." codificado, que só o Windows entenderia como pasta acima
       const token = s.base.split('/').pop()!;
-      for (const caminho of [`/${token}/~marcas/../proj/midia/logo-exemplo.png`, `/${token}/~marcas/cliente/..%5c..%5cproj/midia/logo-exemplo.png`, `/${token}/..%5cmarcas/cliente/logo.png`]) {
+      for (const caminho of [`/${token}/~marcas/../proj/midia/logo-teste.png`, `/${token}/~marcas/teste/..%5c..%5cproj/midia/logo-teste.png`, `/${token}/..%5cmarcas/teste/logo.png`]) {
         expect([403, 404]).toContain(await bruto(s.origem, caminho));
       }
       expect((await fetch(`${s.origem}/outro-token/fontes/Teste-Bold.ttf`)).status).toBe(404);

@@ -12,9 +12,9 @@ import type {ServidorMidia} from './servidor-midia';
 
 type Lidar = <A extends unknown[], R>(canal: string, f: (...a: A) => R | Promise<R>) => void;
 
-export const registrarIpcMarcas = (o: {lidar: Lidar; janela: () => BrowserWindow | null; memoria: Memoria; midia: ServidorMidia; exigirProjeto: () => Projeto; exemplo: string}) => {
+export const registrarIpcMarcas = (o: {lidar: Lidar; janela: () => BrowserWindow | null; memoria: Memoria; midia: ServidorMidia; exigirProjeto: () => Projeto}) => {
   const pasta = () => o.memoria.prefs().pasta_marcas;
-  const marcas = new PastaMarcas({pasta, exemplo: o.exemplo});
+  const marcas = new PastaMarcas({pasta});
   definirPastaMarcas(pasta);
   o.midia.servirMarcas(pasta);
   try {

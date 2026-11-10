@@ -98,11 +98,11 @@ describe('MCP estudio', () => {
   it('aplica um kit de marca a um vídeo de cenas novo', async () => {
     const criado = await chamar('criar_documento', {modulo: 'video', titulo: 'Com marca', formato: 'reels'});
     expect(criado.erro).toBe(false);
-    const r = await chamar('aplicar_marca', {id: 'cliente', documento: criado.dado.id});
+    const r = await chamar('aplicar_marca', {id: 'bkm', documento: criado.dado.id});
     expect(r.erro).toBe(false);
-    expect(r.dado).toMatchObject({ok: true, documento: criado.dado.id, marca: 'cliente', nome: 'Cliente Advogados'});
+    expect(r.dado).toMatchObject({ok: true, documento: criado.dado.id, marca: 'bkm', nome: 'BKM Advogados'});
     const doc = await chamar('ler_documento', {documento: criado.dado.id, caminho: '/tema'});
-    expect(doc.dado.conteudo).toMatchObject({marca: 'cliente', fundo: '#171A19', destaque: '#C88155', fonte: 'Archivo'});
+    expect(doc.dado.conteudo).toMatchObject({marca: 'bkm', fundo: '#101826', destaque: '#C9A961', fonte: 'Inter'});
     const naoHa = await chamar('aplicar_marca', {id: 'inexistente', documento: criado.dado.id});
     expect(naoHa.erro).toBe(true);
     expect(String(naoHa.dado)).toContain('não achado');

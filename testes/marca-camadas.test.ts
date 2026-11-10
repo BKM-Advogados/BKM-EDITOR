@@ -14,7 +14,8 @@ import {amostrasDaMarca, avisoDeContraste, contraste, ehReferenciaCor, ehReferen
 import {gravarPlano, novoDocImagem, planoDoProjeto} from '../src/nucleo/criar-projeto';
 import type {CamadaImagem, DocImagem, OperacaoPatch} from '../src/nucleo/documentos';
 import {lerEixoDePeso} from '../src/nucleo/fonte-variavel';
-import {inferirFonte, MARCA_BKM, MARCA_CLIENTE, MARCA_NEUTRO, marcaDoDocumento, marcaDoKit, patchDaMarca, type Marca} from '../src/nucleo/marca';
+import {inferirFonte, MARCA_BKM, MARCA_NEUTRO, marcaDoDocumento, marcaDoKit, patchDaMarca, type Marca} from '../src/nucleo/marca';
+import {KIT_TESTE} from './fixtures/kit-teste';
 import {PastaMarcas} from '../src/nucleo/pasta-marcas';
 import {Projeto} from '../src/nucleo/projeto';
 import {deFonteArquivo} from '../src/composicoes/fontes';
@@ -36,21 +37,21 @@ describe('cor por referência ao kit', () => {
     expect(resolverCor('@destaque+100', bkm)).toBe('#FFFFFF');
     expect(resolverCor('@texto-100', bkm)).toBe('#000000');
     expect(resolverCor('@fundo:destaque:25', bkm)).toBe('#3E3C35'); // 25% do caminho do fundo ao destaque
-    expect(resolverCor('@cobreProfundo', marcaDoKit(MARCA_CLIENTE))).toBe('#795033');
-    expect(resolverCor('@cobreprofundo', marcaDoKit(MARCA_CLIENTE))).toBe('#795033');
+    expect(resolverCor('@terracotaEscura', marcaDoKit(KIT_TESTE))).toBe('#795033');
+    expect(resolverCor('@terracotaescura', marcaDoKit(KIT_TESTE))).toBe('#795033');
     expect(resolverCor('@naoExiste', bkm)).toBe('#808080');
     expect(resolverCor('@destaque', undefined)).toBe(MARCA_NEUTRO.cores.destaque); // sem kit, o neutro
   });
 
   it('a fonte do texto também lê o kit: "@titulo", "@texto" e "@mono" (sem mono, a de texto)', () => {
-    const ks = marcaDoKit(MARCA_CLIENTE);
+    const kit = marcaDoKit(KIT_TESTE);
     expect(ehReferenciaFonte('@titulo')).toBe(true);
     expect(ehReferenciaFonte('Archivo')).toBe(false);
-    expect(resolverFonte('@titulo', ks)).toBe('Archivo');
-    expect(resolverFonte('@texto', ks)).toBe('IBM Plex Sans');
-    expect(resolverFonte('@mono', ks)).toBe('IBM Plex Mono');
+    expect(resolverFonte('@titulo', kit)).toBe('Archivo');
+    expect(resolverFonte('@texto', kit)).toBe('IBM Plex Sans');
+    expect(resolverFonte('@mono', kit)).toBe('IBM Plex Mono');
     expect(resolverFonte('@mono', bkm)).toBe('Inter');
-    expect(resolverFonte('Impact', ks)).toBe('Impact');
+    expect(resolverFonte('Impact', kit)).toBe('Impact');
     expect(resolverFonte('@titulo', undefined)).toBe(MARCA_NEUTRO.fontes.titulo);
   });
 
@@ -92,20 +93,20 @@ describe('cor por referência ao kit', () => {
   });
 
   it('as amostras são as cores do kit com nome, as quatro de sempre primeiro, e o nome volta pela cor ou pela referência', () => {
-    const ks = marcaDoKit(MARCA_CLIENTE);
-    const a = amostrasDaMarca(ks);
+    const kit = marcaDoKit(KIT_TESTE);
+    const a = amostrasDaMarca(kit);
     expect(a.slice(0, 4).map((x) => x.nome)).toEqual(['fundo', 'texto', 'destaque', 'suave']);
-    expect(a.find((x) => x.nome === 'cobreProfundo')).toEqual({nome: 'cobreProfundo', rotulo: 'Cobre profundo', valor: '#795033', referencia: '@cobreProfundo'});
-    expect(a).toHaveLength(Object.keys(MARCA_CLIENTE.cores).length);
-    expect(nomeDaCor('#c88155', ks)).toBe('Destaque');
-    expect(nomeDaCor('@suave', ks)).toBe('Suave');
-    expect(nomeDaCor('@destaque+35', ks)).toBe('Destaque (variação)');
-    expect(nomeDaCor('#010203', ks)).toBeNull();
+    expect(a.find((x) => x.nome === 'terracotaEscura')).toEqual({nome: 'terracotaEscura', rotulo: 'Terracota escura', valor: '#795033', referencia: '@terracotaEscura'});
+    expect(a).toHaveLength(Object.keys(KIT_TESTE.cores).length);
+    expect(nomeDaCor('#c88155', kit)).toBe('Destaque');
+    expect(nomeDaCor('@suave', kit)).toBe('Suave');
+    expect(nomeDaCor('@destaque+35', kit)).toBe('Destaque (variação)');
+    expect(nomeDaCor('#010203', kit)).toBeNull();
   });
 });
 
 describe('imagem-D8: camada nova nasce na marca da peça', () => {
-  it('texto e forma novos usam a fonte do kit e as referências; sem kit, o neutro (nunca o cobre nem o Archivo da Cliente)', () => {
+  it('texto e forma novos usam a fonte do kit e as referências; sem kit, o neutro (nunca as cores nem o Archivo de outro kit)', () => {
     const doc = {...novoDocImagem(1080, 1350), marca: marcaDoKit(MARCA_BKM)};
     expect(textoNovo(doc)).toMatchObject({fonte: '@titulo', cor: '@texto', peso: 700, x: 108});
     expect(textoNovo(doc, {x: 500, y: 600})).toMatchObject({x: 500, y: 600});
@@ -114,10 +115,10 @@ describe('imagem-D8: camada nova nasce na marca da peça', () => {
     expect(perto.x + perto.largura).toBeLessThanOrEqual(doc.largura);
     expect(perto.largura).toBeGreaterThanOrEqual(Math.round(doc.largura * 0.2));
     expect(formaNova(doc)).toMatchObject({preenchimento: '@destaque', largura: 324, altura: 324});
-    // a fonte e a cor se leem do kit da imagem na hora de pintar: BKM em Inter, Cliente em Archivo, sem kit o neutro
+    // a fonte e a cor se leem do kit da imagem na hora de pintar: BKM em Inter, o de teste em Archivo, sem kit o neutro
     const lida = (marca?: Marca) => resolverMarcaNoDoc({...novoDocImagem(1080, 1350), ...(marca ? {marca: marcaDoKit(marca)} : {}), camadas: [{id: 't', ...textoNovo(doc)} as CamadaImagem]}).camadas[0];
     expect(lida(MARCA_BKM)).toMatchObject({fonte: 'Inter', cor: '#F2EEE6'});
-    expect(lida(MARCA_CLIENTE)).toMatchObject({fonte: 'Archivo', cor: '#F4F0EA'});
+    expect(lida(KIT_TESTE)).toMatchObject({fonte: 'Archivo', cor: '#F4F0EA'});
     expect(lida()).toMatchObject({fonte: MARCA_NEUTRO.fontes.titulo, cor: MARCA_NEUTRO.cores.texto});
   });
 
@@ -130,10 +131,10 @@ describe('imagem-D8: camada nova nasce na marca da peça', () => {
     expect(porId(bkm, 0, 'faixa').preenchimento).toBe('@destaque');
     expect(porId(bkm, 0, 'subtitulo').cor).toBe('@suave');
     expect(bkm.fundo).toBe('@fundo');
-    const ks = resolverMarcaNoDoc(docCarrossel({largura: 1080, altura: 1350, paginas: 3, marca: marcaDoKit(MARCA_CLIENTE)}));
-    expect(porId(ks, 0, 'titulo').fonte).toBe('Archivo');
-    expect(porId(ks, 1, 'pagina').fonte).toBe('IBM Plex Mono');
-    expect(porId(ks, 1, 'texto').fonte).toBe('IBM Plex Sans');
+    const kit = resolverMarcaNoDoc(docCarrossel({largura: 1080, altura: 1350, paginas: 3, marca: marcaDoKit(KIT_TESTE)}));
+    expect(porId(kit, 0, 'titulo').fonte).toBe('Archivo');
+    expect(porId(kit, 1, 'pagina').fonte).toBe('IBM Plex Mono');
+    expect(porId(kit, 1, 'texto').fonte).toBe('IBM Plex Sans');
     const neutro = docCarrossel({largura: 1080, altura: 1350, paginas: 2});
     expect(neutro.marca!.id).toBe('neutro');
     expect(textos(resolverMarcaNoDoc(neutro)).every((c) => c.fonte === 'Inter')).toBe(true);
@@ -141,19 +142,19 @@ describe('imagem-D8: camada nova nasce na marca da peça', () => {
 });
 
 describe('imagem-N2, imagem-D1 e imagem-D9: trocar de kit', () => {
-  const ks = docCarrossel({largura: 1080, altura: 1350, paginas: 3, marca: marcaDoKit(MARCA_CLIENTE)});
+  const kit = docCarrossel({largura: 1080, altura: 1350, paginas: 3, marca: marcaDoKit(KIT_TESTE)});
 
   it('a imagem guarda o kit que recebeu, e o painel e o MCP sabem qual é', () => {
     const doc = aplicar(novoDocImagem(1080, 1080), patchDaMarca(novoDocImagem(1080, 1080), MARCA_BKM));
     expect(doc.marca).toEqual(marcaDoKit(MARCA_BKM));
     expect(marcaDoDocumento(doc)).toBe('bkm');
-    const outro = aplicar(doc, patchDaMarca(doc, MARCA_CLIENTE));
-    expect(marcaDoDocumento(outro)).toBe('cliente');
-    expect(outro.marca!.cores.cobre).toBe('#C88155');
+    const outro = aplicar(doc, patchDaMarca(doc, KIT_TESTE));
+    expect(marcaDoDocumento(outro)).toBe('teste');
+    expect(outro.marca!.cores.terracota).toBe('#C88155');
   });
 
   it('com referências, o kit novo muda a peça toda sem tocar nas camadas', () => {
-    const bkm = aplicar(ks, patchDaMarca(ks, MARCA_BKM));
+    const bkm = aplicar(kit, patchDaMarca(kit, MARCA_BKM));
     expect(bkm.marca!.id).toBe('bkm');
     expect(porId(bkm, 0, 'faixa').preenchimento).toBe('@destaque'); // a referência fica
     expect(resolverMarcaNoDoc(bkm).paginas![0].camadas[0].preenchimento).toBe('#C9A961');
@@ -175,8 +176,8 @@ describe('imagem-N2, imagem-D1 e imagem-D9: trocar de kit', () => {
     const c = (id: string) => r.camadas.find((x) => x.id === id)!;
     expect(r.fundo).toBe('#101826');
     expect(c('faixa').preenchimento).toBe('#C9A961');
-    expect(c('faixa').degrade!.paradas[0].cor).toBe('#C9A961'); // o degradê que o "Da marca" da Cliente deixou
-    expect(c('faixa').degrade!.paradas[1].cor).toBe('#E4B492'); // cobre claro: a BKM não tem par, fica
+    expect(c('faixa').degrade!.paradas[0].cor).toBe('#C9A961'); // o degradê que o "Da marca" do kit de teste deixou
+    expect(c('faixa').degrade!.paradas[1].cor).toBe('#E4B492'); // terracota clara: a BKM não tem par, fica
     expect(c('titulo')).toMatchObject({fonte: 'Inter', cor: '#F2EEE6', contorno: {cor: '#C9A961'}});
     expect(c('sub')).toMatchObject({fonte: 'Inter', cor: '#A5ADBA'}); // cada texto na sua cor: o subtítulo não vira cor de título
     expect(c('num')).toMatchObject({fonte: 'Inter', cor: '#C9A961'}); // o numeral mono segue o destaque
@@ -185,13 +186,24 @@ describe('imagem-N2, imagem-D1 e imagem-D9: trocar de kit', () => {
     expect(r.marca!.id).toBe('bkm');
   });
 
+  it('imagem de antes do campo `marca`, na paleta escura do kit de fábrica que saiu, troca de kit pelo papel de cada cor e fonte', () => {
+    const antiga: DocImagem = {...novoDocImagem(1080, 1350), fundo: '#171A19', camadas: [
+      {id: 'f', nome: 'Faixa', tipo: 'forma', x: 0, y: 0, largura: 10, altura: 10, preenchimento: '#C88155'},
+      {id: 't', nome: 'Título', tipo: 'texto', x: 0, y: 0, largura: 10, altura: 10, texto: 'Oi', fonte: 'Archivo', peso: 800, cor: '#F4F0EA'},
+      {id: 'n', nome: 'Numeral', tipo: 'texto', x: 0, y: 0, largura: 10, altura: 10, texto: '1/3', fonte: 'IBM Plex Mono', cor: '#A09F9B'},
+    ]};
+    const bkm = aplicar(antiga, patchDaMarca(antiga, MARCA_BKM));
+    expect(bkm.fundo).toBe('#101826');
+    expect(bkm.camadas.map((c) => (c.tipo === 'forma' ? c.preenchimento : [c.fonte, c.cor]))).toEqual(['#C9A961', ['Inter', '#F2EEE6'], ['Inter', '#A5ADBA']]);
+  });
+
   it('o numeral mono continua mono quando o kit novo tem mono, e o subtítulo continua suave na ida e na volta', () => {
     const kitMono: Marca = {...MARCA_NEUTRO, id: 'mono', nome: 'Mono', fontes: {titulo: 'Archivo', texto: 'IBM Plex Sans', mono: 'IBM Plex Mono', arquivos: []}};
     const doc = docCarrossel({largura: 1080, altura: 1350, paginas: 3});
     const lida = (d: DocImagem, p: number, id: string) => porId(resolverMarcaNoDoc(d), p, id);
-    const idaCliente = aplicar(doc, patchDaMarca(doc, MARCA_CLIENTE));
-    expect(lida(idaCliente, 1, 'pagina')).toMatchObject({fonte: 'IBM Plex Mono', cor: '#A09F9B'}); // o neutro não tinha mono: o papel ficou na referência
-    const volta = aplicar(idaCliente, patchDaMarca(idaCliente, kitMono));
+    const idaKit = aplicar(doc, patchDaMarca(doc, KIT_TESTE));
+    expect(lida(idaKit, 1, 'pagina')).toMatchObject({fonte: 'IBM Plex Mono', cor: '#A09F9B'}); // o neutro não tinha mono: o papel ficou na referência
+    const volta = aplicar(idaKit, patchDaMarca(idaKit, kitMono));
     expect(lida(volta, 1, 'pagina')).toMatchObject({fonte: 'IBM Plex Mono'});
     expect(lida(volta, 1, 'titulo').fonte).toBe('Archivo');
     expect(lida(volta, 1, 'texto').fonte).toBe('IBM Plex Sans');
@@ -211,9 +223,9 @@ describe('imagem-N2, imagem-D1 e imagem-D9: trocar de kit', () => {
   });
 
   it('reaplicar o mesmo kit não mexe nas camadas e atualiza só o que o kit mudou', () => {
-    const uma = aplicar(ks, patchDaMarca(ks, MARCA_CLIENTE));
-    expect(uma.paginas).toEqual(ks.paginas);
-    const kitEditado: Marca = {...MARCA_CLIENTE, cores: {...MARCA_CLIENTE.cores, destaque: '#AA5500'}};
+    const uma = aplicar(kit, patchDaMarca(kit, KIT_TESTE));
+    expect(uma.paginas).toEqual(kit.paginas);
+    const kitEditado: Marca = {...KIT_TESTE, cores: {...KIT_TESTE.cores, destaque: '#AA5500'}};
     const hex: DocImagem = {...uma, camadas: [{id: 'f', nome: 'F', tipo: 'forma', x: 0, y: 0, largura: 1, altura: 1, preenchimento: '#C88155'}]};
     const depois = aplicar(hex, patchDaMarca(hex, kitEditado));
     expect(depois.camadas[0].preenchimento).toBe('#AA5500');
@@ -222,23 +234,23 @@ describe('imagem-N2, imagem-D1 e imagem-D9: trocar de kit', () => {
 });
 
 describe('imagem-D16: o "Da marca" lê o kit certo', () => {
-  const kits = [MARCA_CLIENTE, MARCA_BKM, MARCA_NEUTRO];
+  const kits = [KIT_TESTE, MARCA_BKM, MARCA_NEUTRO];
   it('a imagem aponta o kit pelo id; antes do campo, vale o do fundo; o kit saído da pasta cai no do fundo', () => {
     expect(kitDaImagem({fundo: '#FFFFFF', marca: marcaDoKit(MARCA_BKM)}, kits)?.id).toBe('bkm');
-    expect(kitDaImagem({fundo: '#171A19'}, kits)?.id).toBe('cliente');
+    expect(kitDaImagem({fundo: '#171A19'}, kits)?.id).toBe('teste');
     expect(kitDaImagem({fundo: '#101826'}, kits)?.id).toBe('bkm');
-    expect(kitDaImagem({fundo: '#000000', marca: {...marcaDoKit(MARCA_BKM), id: 'sumiu'}}, kits)?.id).toBe('cliente'); // sem par: o primeiro
+    expect(kitDaImagem({fundo: '#000000', marca: {...marcaDoKit(MARCA_BKM), id: 'sumiu'}}, kits)?.id).toBe('teste'); // sem par: o primeiro
   });
 
   it('com a imagem guardando o kit, "Da marca" grava referência e acompanha o kit; sem ele, o hexadecimal', () => {
-    expect(contornoDaMarca(MARCA_CLIENTE, {tipo: 'forma'}, true)).toEqual({cor: '@destaque', espessura: 6, posicao: 'fora'});
-    expect(contornoDaMarca(MARCA_CLIENTE, {tipo: 'forma'})).toEqual({cor: '#C88155', espessura: 6, posicao: 'fora'});
-    expect(degradeDaMarca(MARCA_CLIENTE, 'camada', true).paradas.map((p) => p.cor)).toEqual(['@destaque', '@destaque+35']);
-    expect(degradeDaMarca(MARCA_CLIENTE, 'fundo', true).paradas.map((p) => p.cor)).toEqual(['@fundo', '@fundo:destaque:25']);
+    expect(contornoDaMarca(KIT_TESTE, {tipo: 'forma'}, true)).toEqual({cor: '@destaque', espessura: 6, posicao: 'fora'});
+    expect(contornoDaMarca(KIT_TESTE, {tipo: 'forma'})).toEqual({cor: '#C88155', espessura: 6, posicao: 'fora'});
+    expect(degradeDaMarca(KIT_TESTE, 'camada', true).paradas.map((p) => p.cor)).toEqual(['@destaque', '@destaque+35']);
+    expect(degradeDaMarca(KIT_TESTE, 'fundo', true).paradas.map((p) => p.cor)).toEqual(['@fundo', '@fundo:destaque:25']);
     // a referência dá o mesmo pixel que o hexadecimal de antes
-    const sol = marcaDoKit(MARCA_CLIENTE);
-    expect(degradeDaMarca(MARCA_CLIENTE, 'camada', true).paradas.map((p) => resolverCor(p.cor, sol))).toEqual(degradeDaMarca(MARCA_CLIENTE).paradas.map((p) => p.cor));
-    expect(degradeDaMarca(MARCA_CLIENTE, 'fundo', true).paradas.map((p) => resolverCor(p.cor, sol))).toEqual(degradeDaMarca(MARCA_CLIENTE, 'fundo').paradas.map((p) => p.cor));
+    const sol = marcaDoKit(KIT_TESTE);
+    expect(degradeDaMarca(KIT_TESTE, 'camada', true).paradas.map((p) => resolverCor(p.cor, sol))).toEqual(degradeDaMarca(KIT_TESTE).paradas.map((p) => p.cor));
+    expect(degradeDaMarca(KIT_TESTE, 'fundo', true).paradas.map((p) => resolverCor(p.cor, sol))).toEqual(degradeDaMarca(KIT_TESTE, 'fundo').paradas.map((p) => p.cor));
   });
 });
 

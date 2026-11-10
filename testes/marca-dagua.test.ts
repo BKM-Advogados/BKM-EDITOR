@@ -11,14 +11,15 @@ import {
   type ConfigMarcaDagua,
 } from '../src/nucleo/exportacao';
 import {FORMATOS_VIDEO} from '../src/nucleo/formatos';
-import {MARCA_CLIENTE, temaDaMarca} from '../src/nucleo/marca';
+import {temaDaMarca} from '../src/nucleo/marca';
+import {KIT_TESTE} from './fixtures/kit-teste';
 import {Projeto} from '../src/nucleo/projeto';
 import {conjuntoDe, livreDasZonas, posicaoSegura, zonasDaMarca, type CantoMarca} from '../src/nucleo/zonas-seguras';
 
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'estudio-marca-dagua-'));
 afterAll(() => rmSync(tmp, {recursive: true, force: true}));
 
-const FONTES = {logo: 'midia/logo-exemplo.png', assinatura: '@escritorioexemplo', fonte: 'Archivo'};
+const FONTES = {logo: 'midia/logo-teste.png', assinatura: '@escritorio.teste', fonte: 'Archivo'};
 const ligada = (canto: CantoMarca, extra: Partial<ConfigMarcaDagua> = {}): ConfigMarcaDagua => ({ligada: true, conteudo: 'logo', canto, tamanho: 0.06, opacidade: 0.85, ...extra});
 
 describe("marca d'água", () => {
@@ -85,16 +86,16 @@ describe("marca d'água", () => {
     expect(largo.largura / estreito.largura).toBeCloseTo(4);
     expect(largo.altura * 1920).toBeCloseTo(0.06 * 1080, 0);
     const texto = marcaDaguaDoDestino(ligada('sup-esq', {conteudo: 'assinatura'}), f, FONTES)!;
-    expect(texto.texto).toBe('@escritorioexemplo');
+    expect(texto.texto).toBe('@escritorio.teste');
     expect(texto.largura).toBeGreaterThan(texto.altura * (1920 / 1080));
   });
 
   it('o logo e a assinatura vêm do tema do vídeo de cenas ou, no carrossel narrado, do logo e do Instagram', () => {
-    const doc = {...novoDocCenas({largura: 1080, altura: 1920, fps: 30}), tema: temaDaMarca(MARCA_CLIENTE, {logo: 'midia/logo-exemplo.png', fontes_arquivos: []})};
+    const doc = {...novoDocCenas({largura: 1080, altura: 1920, fps: 30}), tema: temaDaMarca(KIT_TESTE, {logo: 'midia/logo-teste.png', fontes_arquivos: []})};
     const {props} = resolverCenas(doc);
-    expect(fontesDaMarcaDagua(props as unknown as Record<string, unknown>)).toEqual({logo: 'midia/logo-exemplo.png', assinatura: '@escritorioexemplo', fonte: 'Archivo'});
-    expect(fontesDaMarcaDagua({composicao: 'CarrosselTema', logo: 'logo-exemplo.png', marca: {nome: 'Cliente', site: 'ks.adv.br', insta: '@escritorioexemplo'}}))
-      .toEqual({logo: 'logo-exemplo.png', assinatura: '@escritorioexemplo', fonte: MARCA_CLIENTE.fontes.texto});
+    expect(fontesDaMarcaDagua(props as unknown as Record<string, unknown>)).toEqual({logo: 'midia/logo-teste.png', assinatura: '@escritorio.teste', fonte: 'Archivo'});
+    expect(fontesDaMarcaDagua({composicao: 'CarrosselTema', logo: 'logo-teste.png', marca: {nome: 'Kit de Teste', site: 'teste.adv.br', insta: '@escritorio.teste'}}))
+      .toEqual({logo: 'logo-teste.png', assinatura: '@escritorio.teste', fonte: KIT_TESTE.fontes.texto});
     // vídeo sem kit: nada para pôr
     expect(fontesDaMarcaDagua(resolverCenas(novoDocCenas({largura: 1080, altura: 1920, fps: 30})).props as unknown as Record<string, unknown>))
       .toEqual({logo: undefined, assinatura: undefined, fonte: 'Inter'});

@@ -6,7 +6,7 @@ import {CANTOS_MARCA, configPadraoMarca, marcaDaguaDoDestino, normalizarConfigMa
 import {FORMATOS_VIDEO} from '../src/nucleo/formatos';
 import {conjuntoDe, livreDasZonas, zonasDaMarca, type CantoMarca} from '../src/nucleo/zonas-seguras';
 
-const FONTES = {logo: 'midia/logo-exemplo.png', assinatura: '@escritorioexemplo', fonte: 'Archivo'};
+const FONTES = {logo: 'midia/logo-teste.png', assinatura: '@escritorio.teste', fonte: 'Archivo'};
 const ligada = (canto: CantoMarca, extra: Partial<ConfigMarcaDagua> = {}): ConfigMarcaDagua => ({ligada: true, conteudo: 'logo', canto, tamanho: 0.06, opacidade: 0.85, ...extra});
 const REELS = {largura: 1080, altura: 1920};
 
@@ -51,7 +51,7 @@ describe('largura da assinatura medida', () => {
   it('com a proporção medida na fonte do kit, a caixa tem a largura dela; sem, a estimativa pelas letras', () => {
     const conteudo = 0.06 * 1080;
     const estimada = marcaDaguaDoDestino(ligada('sup-esq', {conteudo: 'assinatura'}), REELS, FONTES)!;
-    expect(estimada.largura * 1080).toBeCloseTo('@escritorioexemplo'.length * conteudo * 0.8 * 0.6, -1); // 0,6 da letra por caractere
+    expect(estimada.largura * 1080).toBeCloseTo('@escritorio.teste'.length * conteudo * 0.8 * 0.6, -1); // 0,6 da letra por caractere
     // uma fonte estreita: a assinatura inteira mede 5,1 alturas (a estimativa dava 7,2)
     const medida = marcaDaguaDoDestino(ligada('sup-esq', {conteudo: 'assinatura'}), REELS, FONTES, undefined, null, 5.1)!;
     expect(medida.largura * 1080).toBeCloseTo(conteudo * 5.1, 0);

@@ -10,7 +10,7 @@ import {FORMATOS_VIDEO} from '../src/nucleo/formatos';
 import {areaDaLegenda, PREDEFINICOES_LEGENDA, type IdEstiloLegenda, type LegendasP, type PosicaoLegenda} from '../src/nucleo/legendas';
 import {conjuntoDe, livreDasZonas, zonasDaMarca, type CantoMarca, type Ret} from '../src/nucleo/zonas-seguras';
 
-const FONTES = {logo: 'midia/logo-exemplo.png', assinatura: '@escritorioexemplo', fonte: 'Archivo'};
+const FONTES = {logo: 'midia/logo-teste.png', assinatura: '@escritorio.teste', fonte: 'Archivo'};
 const QUADRADO = {largura: 1080, altura: 1080};
 const FEED = {largura: 1080, altura: 1350};
 const REELS = {largura: 1080, altura: 1920};

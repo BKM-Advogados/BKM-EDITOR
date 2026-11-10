@@ -6,7 +6,8 @@ import {docCarrossel} from '../src/nucleo/carrossel';
 import {resolverMarcaNoDoc} from '../src/nucleo/cor-marca';
 import {novoDocImagem} from '../src/nucleo/criar-projeto';
 import type {DocImagem, OperacaoPatch} from '../src/nucleo/documentos';
-import {MARCA_BKM, MARCA_CLIENTE, marcaDoKit, patchDaMarca} from '../src/nucleo/marca';
+import {MARCA_BKM, marcaDoKit, patchDaMarca} from '../src/nucleo/marca';
+import {KIT_TESTE} from './fixtures/kit-teste';
 import {descreverMarca, patchCorDaMarca, patchFonteDaMarca, referenciaDeCor} from '../src/nucleo/mcp-marca';
 import {novoDocCenas} from '../src/nucleo/cenas';
 
@@ -46,8 +47,8 @@ describe('MCP da marca: cor_da_marca', () => {
     expect(() => patchCorDaMarca(doc, '/paginas/0/camadas/0', 'preenchimento', 'cobre')).toThrow(/o kit não tem a cor "cobre": fundo, texto, destaque, suave/);
     expect(() => patchCorDaMarca(doc, 'ghost', 'cor', 'texto')).toThrow(/não achada/);
     expect(() => patchCorDaMarca(doc, 'faixa', 'preenchimento', 'destaque')).toThrow(/está em 3 camadas/); // a faixa está em todas as páginas
-    expect(() => referenciaDeCor('azul ceu', MARCA_CLIENTE)).toThrow(/não é uma cor do kit/);
-    expect(referenciaDeCor('cobreProfundo', MARCA_CLIENTE)).toBe('@cobreProfundo');
+    expect(() => referenciaDeCor('azul ceu', KIT_TESTE)).toThrow(/não é uma cor do kit/);
+    expect(referenciaDeCor('terracotaEscura', KIT_TESTE)).toBe('@terracotaEscura');
   });
 
   it('sem kit na imagem, usa o neutro e avisa', () => {
@@ -64,8 +65,8 @@ describe('MCP da marca: fonte_da_marca e ver_marca', () => {
     const r = patchFonteDaMarca(doc, '/paginas/0/camadas/1', 'mono');
     expect(r.patch).toEqual([{op: 'replace', path: '/paginas/0/camadas/1/fonte', value: '@mono'}]);
     expect(r.fonte).toBe('Inter'); // a BKM provisória não tem mono: a de texto
-    const ks = aplicar(doc, patchDaMarca(doc, MARCA_CLIENTE));
-    expect(resolverMarcaNoDoc(aplicar(ks, patchFonteDaMarca(ks, '/paginas/0/camadas/1', 'mono').patch)).paginas![0].camadas[1].fonte).toBe('IBM Plex Mono');
+    const kit = aplicar(doc, patchDaMarca(doc, KIT_TESTE));
+    expect(resolverMarcaNoDoc(aplicar(kit, patchFonteDaMarca(kit, '/paginas/0/camadas/1', 'mono').patch)).paginas![0].camadas[1].fonte).toBe('IBM Plex Mono');
     expect(() => patchFonteDaMarca(doc, '/paginas/0/camadas/0', 'titulo')).toThrow(/é forma/);
   });
 

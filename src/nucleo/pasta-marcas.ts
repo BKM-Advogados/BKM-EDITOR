@@ -41,7 +41,7 @@ export const fonteDoArquivo = (arquivo: string): Omit<FonteArquivo, 'arquivo'> =
 const ORDEM = new Map(MARCAS_INICIAIS.map((m, i) => [m.id, i]));
 
 export class PastaMarcas {
-  constructor(private readonly opcoes: {pasta?: () => string; exemplo?: string} = {}) {}
+  constructor(private readonly opcoes: {pasta?: () => string} = {}) {}
 
   get pasta() {
     return this.opcoes.pasta?.() || pastaMarcas();
@@ -51,14 +51,11 @@ export class PastaMarcas {
     return path.join(this.pasta, id);
   }
 
-  /** Os kits de fábrica que faltarem: ks (com o logo do exemplo, quando ele está ao alcance), bkm e neutro. */
+  /** Os kits de fábrica que faltarem (bkm e neutro). Kit que já está na pasta, de fábrica ou não, fica como está. */
   garantir() {
     for (const m of MARCAS_INICIAIS) {
       if (existsSync(path.join(this.pastaDe(m.id), ARQUIVO_MARCA))) continue;
-      const logoExemplo = m.id === 'cliente' && this.opcoes.exemplo ? path.join(this.opcoes.exemplo, 'midia', 'logo-exemplo.png') : null;
-      const comLogo = Boolean(logoExemplo && existsSync(logoExemplo));
-      this.gravar(comLogo ? m : {...m, logo: undefined});
-      if (comLogo) copyFileSync(logoExemplo!, path.join(this.pastaDe(m.id), m.logo!));
+      this.gravar(m);
     }
   }
 

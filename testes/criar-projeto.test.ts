@@ -116,7 +116,7 @@ describe('criar projeto', () => {
     expect(m.nome).toBe('C3 · Teste');
     expect(m.documentos.map((d) => d.id)).toEqual(['carrossel', 'capa', 'cena3d']);
     expect(existsSync(path.join(destino, 'video', 'palavras.json'))).toBe(true);
-    // o CLAUDE.md do projeto tem a seção "Pesquisa" (o caso de uso principal: carrossel narrado da Cliente), uma vez só
+    // o CLAUDE.md do projeto tem a seção "Pesquisa" (o caso de uso principal: o carrossel narrado), uma vez só
     const md = readFileSync(path.join(destino, 'CLAUDE.md'), 'utf-8');
     expect(md).toContain('## Como trabalhar');
     expect(md.match(/## Pesquisa/g)).toHaveLength(1);

@@ -1,14 +1,14 @@
 // Seções do inspector para o acabamento da camada (sombra, contorno, degradê) e o editor de degradê que o fundo da
 // prancheta também usa. Cada campo grava um patch no caminho dele (ex.: /camadas/2/sombra/desfoque); o controle que
 // desliza mostra o valor pela prévia ao vivo antes. As predefinições de um clique (sombra suave, contorno e degradê da
-// marca) saem do kit cuja cor de fundo é a da imagem, ou do primeiro kit (acabamento.ts, kitDaImagem).
+// marca) saem do kit cuja cor de fundo é a da imagem, ou, sem nenhum, do neutro (acabamento.ts, kitDaImagem).
 import React from 'react';
 import {Plus, Minus} from 'lucide-react';
 import type {CamadaImagem, Degrade, DocImagem} from '../../../nucleo/documentos';
 import {
   CONTORNO_PADRAO, ESTILOS_TRACO, JUNCOES_TRACO, POSICOES_CONTORNO, PONTAS_TRACO, SOMBRA_PADRAO, SOMBRA_SUAVE, contornoDaMarca, degradeDaMarca, degradeDe, ehVetorial, kitDaImagem,
 } from '../../../nucleo/acabamento';
-import {MARCAS_INICIAIS, type Marca} from '../../../nucleo/marca';
+import {MARCA_NEUTRO, type Marca} from '../../../nucleo/marca';
 import {avisar, trocar} from '../../estado/loja';
 import {usarKits} from '../../estado/kits';
 import {CampoCor, CampoDeslizante, CampoNumero, CampoSelecao, Secao} from '../../componentes/Campos';
@@ -17,7 +17,7 @@ import {definirPrevia} from './comum';
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
 /** O kit das predefinições desta imagem. */
-export const usarKitDaImagem = (doc: Pick<DocImagem, 'fundo' | 'marca'>) => kitDaImagem(doc, usarKits()) ?? MARCAS_INICIAIS[0];
+export const usarKitDaImagem = (doc: Pick<DocImagem, 'fundo' | 'marca'>) => kitDaImagem(doc, usarKits()) ?? MARCA_NEUTRO;
 
 type Gravar = (campo: string, valor: unknown, rotulo?: string) => void;
 type Ver = (campo: string) => (valor: unknown) => void;

@@ -1,14 +1,13 @@
 // Kit de marca: as cores, as fontes, o logo e a assinatura de um escritório, guardados fora dos projetos (pasta
 // `marcas/<id>/` da pessoa, com `marca.json`, `logo.*` e `fontes/*.ttf|otf|woff|woff2`) e aplicados ao `tema` que o
-// documento já tem. A Cliente sai do código por aqui: o CarrosselNarrado lê a paleta e as fontes de MARCA_CLIENTE, com os mesmos
-// valores de sempre. Só dados e regras (sem disco): a interface e as composições importam deste arquivo; quem lê e
+// documento já tem. Só dados e regras (sem disco): a interface e as composições importam deste arquivo; quem lê e
 // grava a pasta é pasta-marcas.ts.
 import {hex} from './acabamento';
 import {nomeDeFonteVariavel} from './fonte-variavel';
 import {ehDocCenas, TEMA_NEUTRO, type TemaCenas} from './cenas';
 import type {CamadaImagem, Degrade, DocImagem, MarcaDoDocumento, OperacaoPatch} from './documentos';
 
-/** As quatro cores que todo tema usa e, por nome, as de apoio da paleta (cobre, grafite, osso…). */
+/** As quatro cores que todo tema usa e, por nome, as de apoio da paleta (terracota, grafite, areia…). */
 export type CoresMarca = {fundo: string; texto: string; destaque: string; suave: string} & Record<string, string>;
 /** Fonte de arquivo. `arquivo` é relativo à pasta do kit ("fontes/Archivo-Bold.ttf") ou, depois de copiada, à do projeto.
  *  Fonte variável leva a faixa do eixo de peso: `peso` (o menor) e `peso_max`, e serve a todos os pesos entre os dois. */
@@ -21,7 +20,7 @@ export type Marca = {
   cores: CoresMarca;
   fontes: FontesMarca;
   logo?: string; // arquivo na pasta do kit ("logo.png")
-  assinatura?: string; // o que vai no rodapé: "@escritorioexemplo", o site, o nome por extenso
+  assinatura?: string; // o que vai no rodapé: o @ ("@escritorio"), o site, o nome por extenso
   notas?: string;
 };
 
@@ -33,22 +32,6 @@ export const ARQUIVO_MARCA = 'marca.json';
 export const PASTA_FONTES = 'fontes';
 export const EXTENSOES_FONTE = ['.ttf', '.otf', '.woff', '.woff2'];
 export const EXTENSOES_LOGO = ['.png', '.svg', '.jpg', '.jpeg', '.webp'];
-
-// Paleta do manual da Cliente (04/11/2026), pelos valores RGB: Cobre Cliente 200·129·85, Grafite 46·51·49, Osso 244·240·234,
-// Grafite Profundo 23·26·25; apoio Cobre Profundo, Cobre Claro, Grafite Névoa e Aço. Sem laranja. O "suave" é o osso
-// a 62% sobre o grafite profundo, o texto de apoio das cenas escuras do carrossel.
-export const MARCA_CLIENTE: Marca = {
-  formato: 1,
-  id: 'cliente',
-  nome: 'Cliente Advogados',
-  cores: {fundo: '#171A19', texto: '#F4F0EA', destaque: '#C88155', suave: '#A09F9B',
-    cobre: '#C88155', cobreProfundo: '#795033', cobreClaro: '#E4B492', grafite: '#2E3331', grafiteProfundo: '#171A19', nevoa: '#3D4142', osso: '#F4F0EA', aco: '#37556A'},
-  fontes: {titulo: 'Archivo', texto: 'IBM Plex Sans', mono: 'IBM Plex Mono', arquivos: []},
-  logo: 'logo.png',
-  assinatura: '@escritorioexemplo',
-  notas: 'Manual de marca da Cliente (04/11/2026): Archivo 700 nos títulos, IBM Plex Sans no texto, IBM Plex Mono em rótulos e numerais. '
-    + '55% osso, 30% grafite, 15% cobre; sem laranja. O logo nunca gira nem leva efeito.',
-};
 
 // A BKM ainda não tem manual no repositório: cores sóbrias de espera, para trocar no painel Marca.
 export const MARCA_BKM: Marca = {
@@ -72,9 +55,9 @@ export const MARCA_NEUTRO: Marca = {
 };
 
 /** Os kits de fábrica, criados na primeira abertura se não existirem. */
-export const MARCAS_INICIAIS: Marca[] = [MARCA_CLIENTE, MARCA_BKM, MARCA_NEUTRO];
+export const MARCAS_INICIAIS: Marca[] = [MARCA_BKM, MARCA_NEUTRO];
 
-/** "Cliente Advogados" → "ks-advogados": o nome da pasta. */
+/** "Escritório Exemplo" → "escritorio-exemplo": o nome da pasta. */
 export const idDeMarca = (nome: string) =>
   nome.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'marca';
 
@@ -201,10 +184,14 @@ export const marcaDoKit = (m: Pick<Marca, 'id' | 'nome' | 'cores' | 'fontes'>): 
 // do campo), vale o primeiro kit de fábrica que tenha aquele valor. Cor ou fonte que não é de nenhum kit é escolha da
 // pessoa e fica como está; cor por referência ("@destaque") nem entra: ela já lê o kit novo.
 const PAPEIS_PRINCIPAIS = ['destaque', 'texto', 'suave', 'fundo'];
-// o modelo de carrossel de antes do campo `marca`: o neutro com o cobre da Cliente e um cinza-azulado de apoio
+// o modelo de carrossel de antes do campo `marca`: o neutro com um cobre de destaque e um cinza-azulado de apoio
 const CARROSSEL_ANTIGO = {fundo: '#111418', texto: '#F2F2F2', destaque: '#C88155', suave: '#B8BEC7'};
-const PALETAS_DE_FABRICA: Record<string, string>[] = [MARCA_CLIENTE.cores, MARCA_BKM.cores, MARCA_NEUTRO.cores, CARROSSEL_ANTIGO];
-const FONTES_DE_FABRICA = [MARCA_CLIENTE.fontes, MARCA_BKM.fontes, MARCA_NEUTRO.fontes];
+// a paleta escura e as fontes de um kit de fábrica que saiu do app: as imagens de antes do campo `marca` que nasceram
+// nele continuam trocando de kit pelo papel de cada cor e fonte
+const PALETA_ANTIGA = {fundo: '#171A19', texto: '#F4F0EA', destaque: '#C88155', suave: '#A09F9B'};
+const FONTES_ANTIGAS: FontesMarca = {titulo: 'Archivo', texto: 'IBM Plex Sans', mono: 'IBM Plex Mono', arquivos: []};
+const PALETAS_DE_FABRICA: Record<string, string>[] = [MARCA_BKM.cores, MARCA_NEUTRO.cores, PALETA_ANTIGA, CARROSSEL_ANTIGO];
+const FONTES_DE_FABRICA = [MARCA_BKM.fontes, MARCA_NEUTRO.fontes, FONTES_ANTIGAS];
 const GENERICAS = new Set(['system-ui', 'sans-serif', 'serif', 'monospace']);
 
 const canais = (cor: string) => {
