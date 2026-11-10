@@ -1,24 +1,31 @@
 // Monitor da imagem: prévia em DOM do documento (fundo, camadas e pilha de efeitos) sobre o entorno cinza, com xadrez
 // onde o fundo é transparente e o rótulo "Capa C2 · 1080 × 1350" acima da peça. À esquerda, o trilho: V mover, H mão,
-// Z zoom | T texto, U forma, inserir imagem | M comentário (as teclas valem neste monitor). Clicar seleciona a camada de
-// cima sob o cursor; a caixa de seleção arrasta (x, y) e a alça redimensiona (largura, altura; Shift mantém a
-// proporção), com um patch só ao soltar. Com a ferramenta de comentário (M), clicar abre um balão ancorado na camada e
+// Z zoom | T texto, U forma, inserir imagem | M comentário (as teclas valem neste monitor). Apertar numa camada já a
+// escolhe e arrastar a move, mesmo sem estar selecionada (o gesto do Canva); Shift+clique põe ou tira da seleção,
+// arrastar no vazio faz o laço, Ctrl+A escolhe a página toda e Esc solta. Várias selecionadas andam juntas e a barra
+// de cima alinha e distribui (BarraSelecao.tsx). Grupo (Ctrl+G, Ctrl+Shift+G): o clique escolhe o grupo inteiro e o
+// duplo clique uma camada dele. Camada travada (Ctrl+Shift+L) se escolhe mas não anda nem muda de tamanho. No arrasto,
+// a caixa encaixa nas bordas e centros da prancheta e das outras camadas, na margem segura e na grade (5 px de tela; Alt
+// solta), com as guias e a distância até o vizinho à vista; réguas, grade e margem ligam no menu Guias (Guias.tsx). A alça redimensiona uma camada (Shift mantém a proporção; girada, o
+// canto oposto fica parado), com um patch só ao soltar. Com a ferramenta de comentário (M), clicar abre um balão ancorado na camada e
 // no ponto da imagem; os pinos mostram os comentários do documento. Num carrossel, o monitor mostra a página ativa (a
 // barra de páginas fica entre a peça e o transporte, PaginasImagem.tsx) e os caminhos das camadas levam a página.
 // Foto recortada por máscara: o clique escolhe a máscara e arrastá-la leva a foto junto; o duplo clique escolhe a foto,
 // que então anda e muda de tamanho dentro da máscara sem mexer nela.
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
-import {Check, ChevronDown, Download, Hand, ImagePlus, MessageSquarePlus, MousePointer2, MoveUpRight, Shapes, Square, Type, X, ZoomIn} from 'lucide-react';
-import type {CamadaImagem, Comentario, DocImagem, OperacaoPatch} from '../../../nucleo/documentos';
-import {paginaDoCaminho, temPaginas} from '../../../nucleo/carrossel';
+import {Check, ChevronDown, Download, Hand, ImagePlus, Lock, Magnet, MessageSquarePlus, MousePointer2, MoveUpRight, Shapes, Square, Type, X, ZoomIn} from 'lucide-react';
+import type {CamadaImagem, Comentario, DocImagem} from '../../../nucleo/documentos';
+import {caminhoDoAlvo, paginaDoAlvo, paginaDoCaminho, temPaginas} from '../../../nucleo/carrossel';
+import {caixaDe, caixaDeVarias, comAcompanhantes, membrosDoGrupo, patchMover, redimensionarGirada, tocadasPor, travada, type Caixa} from '../../../nucleo/layout-imagem';
 import {mascarasEmUso} from '../../../nucleo/acabamento';
 import {resolverCamada, resolverCor, resolverDegrade} from '../../../nucleo/cor-marca';
+import {alvosDeEncaixe, distancias, encaixar, margemSegura, passoDaGrade, TOLERANCIA_TELA, type Alvos, type Distancia, type Guia} from '../../../nucleo/encaixe-imagem';
 import {CamadaEfeitos} from '../../../composicoes/efeitos/CamadaEfeitos';
-import {aplicar, comentar, loja, patchTrocar, selecionar, useLoja} from '../../estado/loja';
+import {aplicar, caminhosDaSelecao, comentar, loja, patchTrocar, selecionar, selecionarVarias, useLoja} from '../../estado/loja';
 import {SemDocumento} from '../../componentes/SemDocumento';
 import {BotaoMenu, usarFora} from '../../componentes/Menu';
 import {Trilho, teclaLivre} from '../../componentes/Trilho';
-import {comValor, definirPrevia, docValido, indiceDe, irParaPagina, rotuloCamada, usarDocumentoImagem, usarPaginaAtiva, usarPrevia, visivel} from './comum';
+import {comValor, definirPrevia, docValido, indiceDe, irParaPagina, paginaAtivaDe, rotuloCamada, usarDocumentoImagem, usarPaginaAtiva, usarPrevia, visivel} from './comum';
 import {novaForma, novaImagem, novoTexto} from './acoes';
 import {exportarPng} from './exportarPng';
 import {exportarPagina} from './exportarPaginas';
@@ -26,14 +33,25 @@ import {BuscaIcones} from './BuscaIcones';
 import {InserirLinha} from './InserirLinha';
 import {PaginasImagem} from './PaginasImagem';
 import {CamadasDaPagina, FundoPintado} from './Prancheta';
+import {BarraSelecao, type VistaAlvo} from './BarraSelecao';
+import {agruparSelecao, alternarTravaSelecao, desagruparSelecao} from './acoesSelecao';
+import {AjudaDoArrasto, Grade, Margem, Reguas, ROTULOS_GUIAS, usarOpcoesGuias} from './Guias';
 
 type Geometria = {x: number; y: number; largura: number; altura: number};
-// `junto`: a foto que a máscara arrastada leva (mesmo deslocamento)
-type Gesto = Geometria & {i: number; id: string; junto?: {i: number; id: string; x: number; y: number}};
-type Arrasto = {x0: number; y0: number; modo: 'mover' | 'redimensionar'; base: Gesto; rot: number; alvo: Gesto | null};
+// uma camada no gesto: índice, id (para o test do patch) e a geometria
+type Peca = Geometria & {i: number; id: string};
+// mover: as selecionadas (mais a foto de cada máscara) com o mesmo deslocamento; redimensionar: uma só, com o giro dela
+// no mover, `encaixe` traz onde encaixar e as caixas das outras camadas (para as distâncias), calculados no apertar
+type Arrasto = {x0: number; y0: number; modo: 'mover' | 'redimensionar'; pecas: Peca[]; rot: number; alvo: Peca[] | null;
+  // no clique sem arrasto, recolher à camada de cima (dentro de uma seleção) ou manter a seleção que o apertar acabou de
+  // fazer (grupo escolhido de novo): o clique numa camada de grupo escolhe o grupo inteiro, não uma só (docs/imagem.md)
+  colapsar: boolean; encaixe?: {alvos: Alvos; outras: Caixa[]}};
+// laço: retângulo arrastado no vazio, em px do documento; `somar` é a seleção de antes (com Shift)
+type Laco = {x0: number; y0: number; x1: number; y1: number; somar: string[]};
 type Ferramenta = 'mover' | 'mao' | 'zoom' | 'texto' | 'forma';
 
 const CAMPOS = ['x', 'y', 'largura', 'altura'] as const;
+const pecaDe = (c: CamadaImagem, i: number): Peca => ({i, id: c.id, x: c.x, y: c.y, largura: c.largura, altura: c.altura});
 const POR_TECLA: Record<string, Ferramenta> = {v: 'mover', h: 'mao', z: 'zoom', t: 'texto', u: 'forma'};
 const MARGEM = 32; // por lado; em cima sobra lugar para o rótulo da peça
 
@@ -95,7 +113,12 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
   const [inserindo, setInserindo] = useState(false);
   const [buscandoIcone, setBuscandoIcone] = useState(false); // frente Marca: busca de ícones do Lucide
   const [inserindoLinha, setInserindoLinha] = useState(false); // frente Marca: linha e seta
-  const [gesto, setGesto] = useState<Gesto | null>(null);
+  const [gesto, setGesto] = useState<Peca[] | null>(null);
+  const [laco, setLaco] = useState<Laco | null>(null);
+  const lacoAtual = useRef<Laco | null>(null); // o laço em curso (o estado só desenha; os eventos leem daqui)
+  const [vistaAlvo, setVistaAlvo] = useState<VistaAlvo>(null);
+  const [opcoesGuias, alternarGuia] = usarOpcoesGuias();
+  const [ajuda, setAjuda] = useState<{guias: Guia[]; distancias: Distancia[]} | null>(null);
   const [nova, setNova] = useState<Geometria | null>(null); // forma sendo desenhada
   const [hover, setHover] = useState<string | null>(null);
   const [balao, setBalao] = useState<{x: number; y: number; caminho?: string} | null>(null);
@@ -115,15 +138,16 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
     return camadasPag.map((c, i) => {
       let r = c;
       if (p && Number(p[1]) === i) r = comValor(r, p[2], previa!.valor);
-      if (gesto && gesto.i === i && gesto.id === c.id) r = {...r, x: gesto.x, y: gesto.y, largura: gesto.largura, altura: gesto.altura};
-      const j = gesto?.junto;
-      if (j && j.i === i && j.id === c.id) r = {...r, x: j.x + gesto!.x - camadasPag[gesto!.i].x, y: j.y + gesto!.y - camadasPag[gesto!.i].y};
+      const g = gesto?.find((x) => x.i === i && x.id === c.id);
+      if (g) r = {...r, x: g.x, y: g.y, largura: g.largura, altura: g.altura};
       return resolverCamada(r, doc?.marca); // marca: cor "@destaque" lida do kit da imagem
     });
   }, [camadasPag, base, previa, gesto, documento, doc?.marca]);
   // pinos da página ativa (e os sem camada, que são do documento)
-  const pinos = useMemo(() => comentarios.filter((c) => c.documento === documento && c.alvo.ponto && (!c.alvo.objeto || !docValido(doc) || !temPaginas(doc) || paginaDoCaminho(doc, c.alvo.objeto) === (ativa?.p ?? 0))),
-    [comentarios, documento, doc, ativa?.p]);
+  // num carrossel, o pino fica na página do comentário pelo id dela (imagem-D5), não pelo caminho gravado
+  const pinos = useMemo(() => comentarios.filter((c) => c.documento === documento && c.alvo.ponto
+    && (!(c.alvo.objeto || c.alvo.pagina_id) || !docValido(doc) || !temPaginas(doc) || paginaDoAlvo(doc, c.alvo) === (ativa?.p ?? 0))),
+  [comentarios, documento, doc, ativa?.p]);
   // a prévia vale até o documento mudar (o patch dela chegou, ou outra mão mexeu)
   useEffect(() => definirPrevia(null), [doc]);
   // seleção numa camada de outra página (pelo painel de comentários, pelo pino): a página dela vem para a frente
@@ -132,6 +156,16 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
     const p = paginaDoCaminho(doc, selecao.caminho);
     if (p >= 0 && p !== ativa.p) irParaPagina(documento, doc, p);
   }, [selecao, documento, doc, ativa]);
+  // comentário aberto pelo painel (que escolhe o caminho gravado): a camada é achada de novo pela página e pelo id dela,
+  // que não mudam quando as páginas mudam de lugar (imagem-D5)
+  useEffect(() => {
+    const c = comentarios.find((x) => x.id === comentarioAberto);
+    if (!c || !documento || c.documento !== documento || !docValido(doc) || !temPaginas(doc) || !c.alvo.pagina_id) return;
+    const caminho = caminhoDoAlvo(doc, c.alvo);
+    const atual = loja.get().selecao;
+    if (caminho && !(atual?.documento === documento && atual.caminho === caminho)) selecionar({documento, caminho});
+    else if (!caminho && paginaDoAlvo(doc, c.alvo) >= 0) irParaPagina(documento, doc, paginaDoAlvo(doc, c.alvo));
+  }, [comentarioAberto]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const valido = docValido(doc);
   const W = valido ? Math.max(1, doc.largura) : 1;
@@ -182,6 +216,26 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
         setZoom(e.key === '0' ? null : 1);
         return;
       }
+      // Ctrl+A escolhe todas as camadas visíveis da página; Esc solta a seleção (fora de campo de texto e do terminal)
+      const alvoTecla = e.target as HTMLElement;
+      const livreDeCampo = !(/INPUT|TEXTAREA|SELECT/.test(alvoTecla.tagName) || alvoTecla.isContentEditable || alvoTecla.closest?.('.xterm'));
+      if (editavel && livreDeCampo && loja.get().area === 'imagem' && documento) {
+        const d = loja.get().docs[documento]?.doc as DocImagem | undefined;
+        const pg = d && docValido(d) ? paginaAtivaDe(loja.get(), documento, d) : null;
+        if (pg && (e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'a') {
+          e.preventDefault();
+          selecionarVarias(documento, pg.camadas.flatMap((c, i) => (visivel(c) ? [`${pg.base}/${i}`] : [])));
+          return;
+        }
+        if (e.key === 'Escape' && !e.ctrlKey && loja.get().selecao?.documento === documento) return void selecionar(null);
+        // Ctrl+G agrupa, Ctrl+Shift+G desagrupa, Ctrl+Shift+L trava ou destrava (com seleção nesta imagem)
+        const tecla = e.key.toLowerCase();
+        if ((e.ctrlKey || e.metaKey) && !e.altKey && (tecla === 'g' || (tecla === 'l' && e.shiftKey)) && loja.get().selecao?.documento === documento) {
+          e.preventDefault();
+          void (tecla === 'l' ? alternarTravaSelecao() : e.shiftKey ? desagruparSelecao() : agruparSelecao());
+          return;
+        }
+      }
       if (!teclaLivre(e) || e.shiftKey) return;
       const f = POR_TECLA[e.key.toLowerCase()];
       if (!f || (!editavel && (f === 'texto' || f === 'forma'))) return;
@@ -190,7 +244,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
     };
     window.addEventListener('keydown', tecla);
     return () => window.removeEventListener('keydown', tecla);
-  }, [editavel]);
+  }, [editavel, documento]);
 
   if (!documento) return <SemDocumento modulo="imagem" />;
   if (!doc) return <div className="vazio">carregando…</div>;
@@ -199,9 +253,17 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
   const fundo = resolverCor(previa && previa.documento === documento && previa.caminho === '/fundo' ? String(previa.valor) : doc.fundo, doc.marca);
   const fundoDegrade = resolverDegrade(previa && previa.documento === documento && previa.caminho.startsWith('/fundo_degrade/')
     ? comValor(doc.fundo_degrade, previa.caminho.slice('/fundo_degrade/'.length), previa.valor) : doc.fundo_degrade, doc.marca);
-  const iSel = editavel && selecao?.documento === documento ? indiceDe(selecao.caminho, base) : -1;
+  // a seleção na página ativa: todas (`idxSel`) e, com uma só, a que ganha a alça (`sel`)
+  const caminhosSel = editavel ? caminhosDaSelecao(selecao, documento) : [];
+  const idxSel = caminhosSel.map((c) => indiceDe(c, base)).filter((i) => i >= 0 && camadas[i]);
+  const iSel = idxSel.length === 1 ? idxSel[0] : -1;
   const sel = iSel >= 0 ? camadas[iSel] : undefined;
-  const iHover = hover && hover !== selecao?.caminho ? indiceDe(hover, base) : -1;
+  const caixaSel = idxSel.length > 1 ? idxSel.map((i) => caixaDe(camadas[i])).reduce((a, k) => {
+    const x = Math.min(a.x, k.x);
+    const y = Math.min(a.y, k.y);
+    return {x, y, w: Math.max(a.x + a.w, k.x + k.w) - x, h: Math.max(a.y + a.h, k.y + k.h) - y};
+  }) : null;
+  const iHover = hover && !caminhosSel.includes(hover) ? indiceDe(hover, base) : -1;
   const sobre = iHover >= 0 ? camadas[iHover] : undefined;
   const ferr: Ferramenta = modoComentario ? 'mover' : ferramenta;
   const variasPaginas = ativa.paginas.length > 1;
@@ -231,9 +293,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
       void novoTexto(documento, doc, pontoDoc(ev.clientX, ev.clientY)).then((ok) => ok && setFerramenta('mover'));
       return;
     }
-    if (ferr !== 'mover') return;
-    const caminho = caminhoSob(ev.clientX, ev.clientY);
-    if (editavel) selecionar(caminho ? {documento, caminho} : null);
+    // com a ferramenta mover, quem escolhe é o apertar (comecarMover) e o soltar (soltar)
   };
 
   // duplo clique numa foto recortada: escolhe a foto (para mover e escalar dentro da máscara)
@@ -243,6 +303,10 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
       const foto = ((el as HTMLElement).closest?.('[data-foto]') as HTMLElement | null)?.dataset.foto;
       if (foto && palco.current?.contains(el)) return selecionar({documento, caminho: foto});
     }
+    // dentro de um grupo: só a camada sob o cursor
+    const caminho = caminhoSob(ev.clientX, ev.clientY);
+    const i = caminho ? indiceDe(caminho, base) : -1;
+    if (caminho && i >= 0 && camadasPag[i]?.grupo) selecionar({documento, caminho});
   };
 
   const mover = (ev: React.MouseEvent) => {
@@ -304,65 +368,136 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
     void novaForma(documento, doc, caixa).then((ok) => ok && setFerramenta('mover'));
   };
 
-  const iniciar = (ev: React.PointerEvent, modo: Arrasto['modo']) => {
-    const c = camadasPag[iSel];
-    if (!c || ev.button !== 0 || ferr !== 'mover') return;
-    ev.stopPropagation();
+  // o ponto está dentro da seleção (a caixa dela ou o contorno de uma das selecionadas)?
+  const naSelecao = (x: number, y: number) => document.elementsFromPoint(x, y).some((el) => (el as HTMLElement).dataset?.sel !== undefined && palco.current?.contains(el));
+
+  const comecarArrasto = (ev: React.PointerEvent, modo: Arrasto['modo'], indices: number[], colapsar = true) => {
+    // camada travada fica (o resto da seleção anda)
+    const pecas = (modo === 'mover' ? comAcompanhantes(camadasPag, indices) : indices).filter((i) => !travada(camadasPag[i])).map((i) => pecaDe(camadasPag[i], i));
+    if (!pecas.length) return;
     ev.currentTarget.setPointerCapture(ev.pointerId);
-    // a máscara de uma foto recortada leva a foto quando anda (não quando muda de tamanho: isso recorta outro pedaço)
-    const iFoto = modo === 'mover' ? mascarasEmUso(camadasPag).get(iSel) : undefined;
-    const foto = iFoto !== undefined ? camadasPag[iFoto] : undefined;
-    arrasto.current = {x0: ev.clientX, y0: ev.clientY, modo, rot: c.rotacao ?? 0, alvo: null,
-      base: {i: iSel, id: c.id, x: c.x, y: c.y, largura: c.largura, altura: c.altura, ...(foto ? {junto: {i: iFoto!, id: foto.id, x: foto.x, y: foto.y}} : {})}};
+    const andando = new Set(pecas.map((p) => p.i));
+    const encaixe = modo === 'mover' ? {
+      alvos: alvosDeEncaixe(camadasPag, andando, {largura: W, altura: H}, opcoesGuias.margem ? margemSegura(W, H) : undefined),
+      outras: camadasPag.flatMap((c, i) => (!c || andando.has(i) || c.visivel === false ? [] : [caixaDe(c)])),
+    } : undefined;
+    arrasto.current = {x0: ev.clientX, y0: ev.clientY, modo, pecas, rot: modo === 'redimensionar' ? (camadasPag[indices[0]].rotacao ?? 0) : 0, alvo: null, colapsar, encaixe};
+  };
+
+  // mover (V): apertar numa camada a escolhe e já arrasta (D2); dentro da seleção arrasta todas; Shift põe ou tira; no
+  // vazio começa o laço. A alça tem o seu (redimensionar) e não chega aqui.
+  const comecarMover = (ev: React.PointerEvent) => {
+    if (ferr !== 'mover' || !editavel || modoComentario || ev.button !== 0) return;
+    if ((ev.target as HTMLElement).closest?.('.pino, .balao')) return;
+    const caminho = caminhoSob(ev.clientX, ev.clientY);
+    const i = caminho ? indiceDe(caminho, base) : -1;
+    // camada de grupo vem com o grupo inteiro (a que se apertou fica como principal)
+    const grupo = i >= 0 ? membrosDoGrupo(camadasPag, i) : [];
+    if (ev.shiftKey && caminho) {
+      const todos = grupo.map((k) => `${base}/${k}`);
+      const dentro = caminhosSel.includes(caminho);
+      return selecionarVarias(documento, dentro ? caminhosSel.filter((c) => !todos.includes(c)) : [...caminhosSel, ...todos.filter((c) => c !== caminho), caminho]);
+    }
+    if (!ev.shiftKey && (naSelecao(ev.clientX, ev.clientY) || idxSel.includes(i)) && idxSel.length) return comecarArrasto(ev, 'mover', idxSel);
+    if (caminho && i >= 0) {
+      selecionarVarias(documento, [...grupo.filter((k) => k !== i).map((k) => `${base}/${k}`), caminho]);
+      return comecarArrasto(ev, 'mover', grupo, false); // escolha nova (grupo inteiro): não recolhe no soltar
+    }
+    // vazio: o laço (com Shift, soma à seleção de agora)
+    if (!ev.shiftKey) selecionar(null);
+    ev.currentTarget.setPointerCapture(ev.pointerId);
+    const p = pontoDoc(ev.clientX, ev.clientY);
+    lacoAtual.current = {x0: p.x, y0: p.y, x1: p.x, y1: p.y, somar: ev.shiftKey ? caminhosSel : []};
+    setLaco(lacoAtual.current);
+  };
+
+  const iniciarRedimensionar = (ev: React.PointerEvent) => {
+    if (iSel < 0 || ev.button !== 0 || ferr !== 'mover') return;
+    ev.stopPropagation();
+    comecarArrasto(ev, 'redimensionar', [iSel]);
   };
 
   const durante = (ev: React.PointerEvent) => {
+    const l = lacoAtual.current;
+    if (l) {
+      const p = pontoDoc(ev.clientX, ev.clientY);
+      lacoAtual.current = {...l, x1: p.x, y1: p.y};
+      setLaco(lacoAtual.current);
+      return;
+    }
     const a = arrasto.current;
     if (!a) return;
     const tx = ev.clientX - a.x0;
     const ty = ev.clientY - a.y0;
     if (!a.alvo && Math.hypot(tx, ty) < 3) return;
-    const dx = tx / escala;
-    const dy = ty / escala;
-    const b = a.base;
-    if (a.modo === 'mover') a.alvo = {...b, x: Math.round(b.x + dx), y: Math.round(b.y + dy)};
+    let dx = tx / escala;
+    let dy = ty / escala;
+    if (a.modo === 'mover') {
+      // encaixe: a caixa do que anda encosta no alvo mais perto a 5 px de tela; Alt solta
+      // a caixa que encaixa é a do que se vê: a foto que anda com a máscara fica de fora (o que aparece é a máscara)
+      const fotos = new Set(mascarasEmUso(camadasPag).values());
+      const vistas = a.pecas.filter((b) => !fotos.has(b.i));
+      const base0 = caixaDeVarias((vistas.length ? vistas : a.pecas).map((b) => ({...b, rotacao: camadasPag[b.i]?.rotacao})))!;
+      if (a.encaixe && opcoesGuias.encaixe && !ev.altKey) {
+        const e = encaixar({...base0, x: base0.x + dx, y: base0.y + dy}, a.encaixe.alvos, TOLERANCIA_TELA / escala, opcoesGuias.grade ? passoDaGrade(W) : undefined);
+        dx += e.dx;
+        dy += e.dy;
+        setAjuda({guias: e.guias, distancias: distancias({...base0, x: base0.x + dx, y: base0.y + dy}, a.encaixe.outras, {largura: W, altura: H})});
+      } else setAjuda(a.encaixe ? {guias: [], distancias: distancias({...base0, x: base0.x + dx, y: base0.y + dy}, a.encaixe.outras, {largura: W, altura: H})} : null);
+      a.alvo = a.pecas.map((b) => ({...b, x: Math.round(b.x + dx), y: Math.round(b.y + dy)}));
+    }
     else {
-      // camada girada: o arrasto é projetado nos eixos dela
+      // camada girada: o arrasto é projetado nos eixos dela, e o canto de cima à esquerda fica parado (D15)
+      const b = a.pecas[0];
       const t = (-a.rot * Math.PI) / 180;
       const largura = Math.max(4, Math.round(b.largura + dx * Math.cos(t) - dy * Math.sin(t)));
       const altura = ev.shiftKey ? Math.max(4, Math.round((largura * b.altura) / b.largura)) : Math.max(4, Math.round(b.altura + dx * Math.sin(t) + dy * Math.cos(t)));
-      a.alvo = {...b, largura, altura};
+      a.alvo = [{...b, ...redimensionarGirada({...b, rotacao: a.rot}, largura, altura)}];
     }
     setGesto(a.alvo);
   };
 
   const soltar = async (ev: React.PointerEvent) => {
+    const l = lacoAtual.current;
+    if (l) {
+      const r = {x: Math.min(l.x0, l.x1), y: Math.min(l.y0, l.y1), w: Math.abs(l.x1 - l.x0), h: Math.abs(l.y1 - l.y0)};
+      lacoAtual.current = null;
+      setLaco(null);
+      if (r.w * escala < 3 && r.h * escala < 3) return; // clique no vazio: a seleção já saiu no apertar
+      selecionarVarias(documento, [...l.somar, ...tocadasPor(camadasPag, r).map((i) => `${base}/${i}`)]);
+      return;
+    }
     const a = arrasto.current;
     arrasto.current = null;
     if (!a) return;
     if (!a.alvo) {
-      // clique sem arrasto: escolhe a camada de cima naquele ponto (pode ser outra, menor, por cima da selecionada)
-      const caminho = caminhoSob(ev.clientX, ev.clientY);
-      if (caminho) selecionar({documento, caminho});
+      // clique sem arrasto: dentro de uma seleção, escolhe a camada de cima naquele ponto (pode ser outra, menor, por
+      // cima da selecionada); uma escolha nova (grupo inteiro) fica como o apertar deixou
+      const caminho = a.modo === 'mover' ? caminhoSob(ev.clientX, ev.clientY) : null;
+      if (a.colapsar && caminho && !(idxSel.length === 1 && caminho === caminhosSel[0])) selecionar({documento, caminho});
       return;
     }
-    const g = a.alvo;
     const atual = loja.get().docs[documento]?.doc;
-    const caminho = `${base}/${g.i}`;
-    const mudancas = CAMPOS.flatMap((k) => (g[k] !== a.base[k] ? patchTrocar(atual, `${caminho}/${k}`, g[k]) : []));
-    const j = g.junto;
-    const daFoto = j && mudancas.length ? [{op: 'test', path: `${base}/${j.i}/id`, value: j.id} as OperacaoPatch,
-      ...patchTrocar(atual, `${base}/${j.i}/x`, j.x + g.x - a.base.x), ...patchTrocar(atual, `${base}/${j.i}/y`, j.y + g.y - a.base.y)] : [];
-    if (mudancas.length) {
-      const patch: OperacaoPatch[] = [{op: 'test', path: `${caminho}/id`, value: g.id}, ...mudancas, ...daFoto];
-      await aplicar(documento, patch, a.modo === 'mover' ? `mover camada ${g.id}` : `tamanho da camada ${g.id}`);
+    if (a.modo === 'mover') {
+      const d = {dx: a.alvo[0].x - a.pecas[0].x, dy: a.alvo[0].y - a.pecas[0].y};
+      const patch = patchMover(camadasPag, base, a.pecas.map((p) => p.i), a.pecas.map(() => d));
+      if (patch.length) await aplicar(documento, patch, a.pecas.length > 1 ? `mover ${a.pecas.length} camadas` : `mover camada ${a.pecas[0].id}`);
+    } else {
+      const g = a.alvo[0];
+      const caminho = `${base}/${g.i}`;
+      const mudancas = CAMPOS.flatMap((k) => (g[k] !== a.pecas[0][k] ? patchTrocar(atual, `${caminho}/${k}`, g[k]) : []));
+      if (mudancas.length) await aplicar(documento, [{op: 'test', path: `${caminho}/id`, value: g.id}, ...mudancas], `tamanho da camada ${g.id}`);
     }
     setGesto(null);
+    setAjuda(null);
   };
 
   const cancelar = () => {
     arrasto.current = null;
     setGesto(null);
+    setAjuda(null);
+    lacoAtual.current = null;
+    setLaco(null);
   };
 
   const salvarComentario = async () => {
@@ -372,6 +507,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
     await comentar(documento, textoBalao.trim(), {
       objeto: c ? balao.caminho : undefined, objeto_id: c?.id, contexto: c ? contextoDe(c) : undefined,
       ponto: {x: +(balao.x / b.width).toFixed(4), y: +(balao.y / b.height).toFixed(4)},
+      ...(temPaginas(doc) ? {pagina_id: ativa.pagina.id} : {}), // a página pelo id: o caminho muda quando as páginas mudam (imagem-D5)
     });
     setBalao(null);
     loja.definir({modoComentario: false});
@@ -380,8 +516,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
   const abrirPino = (c: Comentario) => {
     loja.definir({comentarioAberto: c.id});
     if (!editavel) return;
-    const porId = c.alvo.objeto_id ? camadasPag.findIndex((x) => x.id === c.alvo.objeto_id) : -1;
-    const caminho = porId >= 0 ? `${base}/${porId}` : c.alvo.objeto;
+    const caminho = caminhoDoAlvo(doc, c.alvo) ?? (c.alvo.pagina_id ? undefined : c.alvo.objeto);
     if (caminho) selecionar({documento, caminho});
   };
 
@@ -424,7 +559,11 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
               setHover(null);
               if (coords.current) coords.current.textContent = '';
             }}
-            onPointerDown={comecarForma} onPointerMove={duranteForma} onPointerUp={() => desenho.current && setTimeout(soltarForma, 0)}>
+            onPointerDown={(e) => (comecarForma(e), comecarMover(e))} onPointerMove={(e) => (duranteForma(e), durante(e))} onPointerCancel={cancelar}
+            onPointerUp={(e) => {
+              if (desenho.current) setTimeout(soltarForma, 0);
+              void soltar(e);
+            }}>
             <span className="rotulo-peca" title="Propriedades da imagem" onClick={(e) => {
               e.stopPropagation();
               if (editavel) selecionar(null);
@@ -441,13 +580,29 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
               {sobre && <div className="caixa-hover" style={caixaCss(sobre, escala)} />}
               {nova && <div className="caixa-nova" style={{left: nova.x * escala, top: nova.y * escala, width: nova.largura * escala, height: nova.altura * escala}} />}
               {sel && (
-                <div className="caixa-sel" style={{...caixaCss(sel, escala), pointerEvents: modoComentario || ferr !== 'mover' ? 'none' : undefined, borderStyle: visivel(sel) ? undefined : 'dashed'}}
-                  onPointerDown={(e) => iniciar(e, 'mover')} onPointerMove={durante} onPointerUp={(e) => void soltar(e)} onPointerCancel={cancelar}
+                <div className="caixa-sel" data-sel="" style={{...caixaCss(sel, escala), pointerEvents: modoComentario || ferr !== 'mover' ? 'none' : undefined,
+                  borderStyle: visivel(sel) && !travada(sel) ? undefined : 'dashed', cursor: travada(sel) ? 'not-allowed' : undefined}} title={travada(sel) ? 'Travada: Ctrl+Shift+L destrava' : undefined}
                   onClick={(e) => e.stopPropagation()}>
-                  {!sel.rotacao && sel.y * escala > 20 && <span className="etiqueta-sel">{rotuloCamada(sel)}</span>}
-                  <div className="alca" onPointerDown={(e) => iniciar(e, 'redimensionar')} title="Redimensionar (Shift mantém a proporção)" />
+                  {!sel.rotacao && sel.y * escala > 20 && <span className="etiqueta-sel">{travada(sel) && <Lock className="i12" style={{marginRight: 3}} />}{rotuloCamada(sel)}</span>}
+                  {!travada(sel) && <div className="alca" onPointerDown={iniciarRedimensionar} title="Redimensionar (Shift mantém a proporção)" />}
                 </div>
               )}
+              {caixaSel && (
+                <>
+                  {idxSel.map((i) => <div key={i} className="caixa-multi" data-sel="" style={caixaCss(camadas[i], escala)} />)}
+                  <div className="caixa-grupo" data-sel="" title={`${idxSel.length} camadas: arraste para mover juntas`}
+                    style={{left: caixaSel.x * escala, top: caixaSel.y * escala, width: caixaSel.w * escala, height: caixaSel.h * escala,
+                      pointerEvents: modoComentario || ferr !== 'mover' ? 'none' : undefined}} onClick={(e) => e.stopPropagation()} />
+                </>
+              )}
+              {laco && <div className="laco" style={{left: Math.min(laco.x0, laco.x1) * escala, top: Math.min(laco.y0, laco.y1) * escala,
+                width: Math.abs(laco.x1 - laco.x0) * escala, height: Math.abs(laco.y1 - laco.y0) * escala}} />}
+              {opcoesGuias.grade && <Grade escala={escala} largura={W} altura={H} passo={passoDaGrade(W)} />}
+              {opcoesGuias.margem && <Margem escala={escala} areas={margemSegura(W, H)} />}
+              {opcoesGuias.reguas && <Reguas escala={escala} largura={W} altura={H} />}
+              {ajuda && gesto && <AjudaDoArrasto escala={escala} largura={W} altura={H} guias={ajuda.guias} distancias={ajuda.distancias} />}
+              {vistaAlvo?.alvo && <div className="alvo-alinhar" style={{left: vistaAlvo.alvo.x * escala, top: vistaAlvo.alvo.y * escala, width: vistaAlvo.alvo.w * escala, height: vistaAlvo.alvo.h * escala}} />}
+              {vistaAlvo?.fantasmas.map((f, k) => <div key={k} className="fantasma-alvo" style={{left: f.x * escala, top: f.y * escala, width: f.w * escala, height: f.h * escala}} />)}
               {pinos.map((c) => (
                 <div key={c.id} className={`pino${c.estado === 'resolvido' ? ' resolvido' : ''}`} title={c.texto}
                   style={{left: `${c.alvo.ponto!.x * 100}%`, top: `${c.alvo.ponto!.y * 100}%`, outline: c.id === comentarioAberto ? '2px solid var(--acento)' : undefined}}
@@ -487,6 +642,9 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
               {rotulo: '100%', tecla: 'Ctrl+1', acao: () => setZoom(1)},
               {rotulo: '200%', acao: () => setZoom(2)},
             ]} />
+          <BotaoMenu className="bt mini" lado="esquerda" acima titulo="Guias: encaixe, réguas, grade e margem segura" icone={<Magnet className="i14" />}
+            rotulo={<span className="largo">Guias</span>}
+            itens={ROTULOS_GUIAS.map(([k, nome]) => ({rotulo: `${opcoesGuias[k] ? '✓ ' : '   '}${nome}`, acao: () => alternarGuia(k)}))} />
           <span className="coords largo" ref={coords} />
           <button className="bt fantasma" style={{marginLeft: 'auto'}} disabled={exportando} onClick={exportar}
             title={variasPaginas ? 'Exportar só esta página em PNG, com os efeitos (o carrossel inteiro sai pela barra de páginas)' : 'Exportar PNG em resolução cheia, com os efeitos'}>
@@ -497,6 +655,9 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
       {inserindo && editavel && <InserirImagem documento={documento} doc={doc} fechar={() => setInserindo(false)} />}
       {buscandoIcone && editavel && <BuscaIcones documento={documento} doc={doc} fechar={() => setBuscandoIcone(false)} />}
       {inserindoLinha && editavel && <InserirLinha documento={documento} doc={doc} fechar={() => setInserindoLinha(false)} />}
+      {editavel && idxSel.length > 0 && !gesto && (
+        <BarraSelecao documento={documento} base={base} camadas={camadasPag} indices={idxSel} prancheta={{largura: W, altura: H}} aoVer={setVistaAlvo} />
+      )}
     </div>
   );
 };

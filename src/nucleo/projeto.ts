@@ -9,6 +9,7 @@ import jsonpatch, {type Operation} from 'fast-json-patch';
 import type {ArquivoComentarios, Comentario, EntradaDiario, EntradaDocumento, EstadoEditor, Manifesto, OperacaoPatch} from './documentos';
 import {gravarAtomico} from './gravar-seguro';
 import {ARQUIVO_PESQUISA, caminhoTextoFonte, lerPesquisa, pesquisaVazia, type Pesquisa} from './pesquisa';
+import {motivoDaTrava} from './travas-imagem';
 
 export const PASTA_INTERNA = '.estudio';
 
@@ -122,6 +123,8 @@ export class Projeto {
     }
     const erro = jsonpatch.validate(entrada.patch as Operation[], doc);
     if (erro) throw new ErroProjeto(`patch inválido: ${erro.name} em ${erro.operation?.path ?? '?'}: ${erro.message.split('\n')[0]}`);
+    const trava = motivoDaTrava(doc, entrada.patch, entrada.autor); // camada travada na imagem (rodada 3, B2)
+    if (trava) throw new ErroProjeto(trava, 'patch');
     let depois: unknown;
     try {
       depois = jsonpatch.applyPatch(doc, entrada.patch as Operation[], true, false).newDocument;

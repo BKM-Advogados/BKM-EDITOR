@@ -183,3 +183,157 @@ medir: o modelo em `testes/saida/modelos/modnet/model.onnx` e `npx tsx scripts/c
 - Canvas da prévia até 4096 px por lado: num zoom muito alto, a camada com acabamento perde nitidez antes do resto.
 - Fundo em degradê só no documento inteiro (todas as páginas).
 - Na área Efeitos, a pilha de efeitos vale por cima do acabamento, como de qualquer camada.
+
+## Seleção múltipla, alinhar e distribuir (rodada 3)
+
+Versão de 08/11/2026, frente B2 da rodada 3. Código: `src/nucleo/layout-imagem.ts` (contas, puro),
+`src/renderer/estado/loja.ts` (a seleção), `MonitorImagem.tsx` (os gestos), `BarraSelecao.tsx` (alinhar e distribuir),
+`CamadasImagem.tsx` (a lista) e `src/nucleo/mcp-imagem.ts` (ferramentas). Testes em `testes/layout-imagem.test.ts`.
+
+**A seleção na loja (contrato para as outras frentes).** `selecao` continua `{documento, caminho}`: quem lê uma seleção
+só lê `caminho`, que é a camada principal (a última escolhida). A seleção múltipla soma `outros?: string[]`, os demais
+caminhos do mesmo documento. Para ler todas: `caminhosDaSelecao(selecao, documento?)` (o principal primeiro). Para
+escrever: `selecionar(...)` como sempre (solta as outras), `selecionarVarias(documento, caminhos)` (o principal é o
+último) e `alternarNaSelecao(documento, caminho)` (Shift+clique). O `.estudio/estado.json` ganhou `selecao_varias`
+(todos os caminhos, só quando há mais de um), que o `estado_do_editor` do MCP devolve.
+
+**Gestos no monitor (V, mover).** Apertar numa camada já a escolhe e arrastar a move, mesmo sem estar selecionada
+(imagem-D2, o gesto do Canva). Apertar dentro da seleção arrasta todas juntas (um patch só; a foto recortada vai com a
+máscara). Shift+clique põe ou tira da seleção. Arrastar no vazio desenha o laço: entram as camadas tocadas por ele
+(sem as ocultas e sem a foto recortada, que aparece pela máscara); com Shift, somam à seleção. Ctrl+A escolhe todas as
+camadas visíveis da página; Esc solta. Clique sem arrasto dentro da seleção escolhe a camada de cima naquele ponto. Na
+lista de camadas, Shift ou Ctrl+clique põe ou tira; as selecionadas ficam acesas e os botões de subir, descer e excluir
+ficam na principal.
+
+**Alinhar e distribuir.** Com seleção, a barra aparece em cima do monitor: seis alinhamentos (esquerda, centro e direita
+na horizontal; topo, meio e base na vertical) e dois distribuir (horizontal e vertical, com três ou mais). Com uma
+camada, o alvo é a prancheta; com várias, a caixa delas. Passar o mouse num botão mostra o alvo (tracejado do acento) e
+onde cada camada vai cair (caixas fantasmas), antes do clique; o clique é um patch só, desfazível. As contas usam a
+caixa da camada girada (a que contém os quatro cantos), sem sombra nem contorno. Distribuir deixa a primeira e a última
+no lugar e o mesmo espaço entre as caixas.
+
+**Redimensionar camada girada (imagem-D15).** A alça fica no canto de baixo à direita; numa camada girada, o canto de
+cima à esquerda agora fica parado na página enquanto o tamanho muda (`redimensionarGirada`). Antes, o centro ficava e o
+canto escorregava.
+
+**Ferramentas do MCP** (`src/nucleo/mcp-imagem.ts`, chamada por uma linha no fim de `registrarFerramentas`):
+
+| Ferramenta | Entrada | O que faz | Classe |
+|---|---|---|---|
+| `selecionar_camadas` | `documento`, `camadas` (ids ou caminhos; vazia limpa) | Grava `.estudio/selecao.json`; a tela lê, traz a área, o documento e a página para a frente e seleciona. Não muda o documento. | livre |
+| `alinhar_camadas` | `documento`, `camadas`, `como` (esquerda, centro, direita, topo, meio, base), `alvo?` (selecao, prancheta) | Um patch com test dos ids, no diário. | livre |
+| `distribuir_camadas` | `documento`, `camadas` (3 ou mais), `eixo` (horizontal, vertical) | Um patch com test dos ids, no diário. | livre |
+
+As camadas vêm por id (único no documento: página duplicada repete ids, e aí a ferramenta recusa e lista os caminhos)
+ou por caminho, todas da mesma página. Esquemas só com texto, listas e enumerações, sem união solta: valem para qualquer
+provedor.
+
+**Ida e volta entre módulos.** A seleção mora na loja, comum a todas as áreas: ao ir para Efeitos e voltar, ou ao
+chegar pela conversa, ela continua. `selecionar_camadas` traz a área Imagem, o documento e a página para a frente
+vindo de qualquer área.
+
+### Para o guia da IA
+
+- A imagem tem seleção múltipla: `estado_do_editor` traz `selecao` (a principal) e, com mais de uma, `selecao_varias`.
+- Para mostrar à pessoa do que você fala: `selecionar_camadas` com ids ou caminhos.
+- Para alinhar ou distribuir, prefira `alinhar_camadas` e `distribuir_camadas` a calcular x e y à mão: elas usam a
+  caixa da camada girada e levam a foto recortada com a máscara.
+
+## Grupos e camadas travadas (rodada 3)
+
+Código: `src/nucleo/layout-imagem.ts` (grupo, alinhar por unidade), `src/nucleo/travas-imagem.ts` (a trava no núcleo),
+`acoesSelecao.ts` (as ações da tela) e `src/nucleo/mcp-imagem.ts`. Testes em `testes/grupos-travas.test.ts`.
+
+**Formato.** Dois campos opcionais no fim da camada: `grupo` (id do grupo, ex.: `grupo-1`) e `travada` (`true`).
+
+**Grupo.** Ctrl+G (ou o botão da barra) dá o mesmo `grupo` às camadas escolhidas e as deixa vizinhas na pilha, onde
+estava a de cima, na mesma ordem entre elas: um patch só, desfazível. No monitor, o clique numa camada do grupo escolhe
+o grupo inteiro (a apertada fica como principal) e o arrasto leva todas; o duplo clique escolhe só aquela camada; o
+laço traz o grupo inteiro; Shift+clique põe ou tira o grupo todo. Alinhar e distribuir contam cada grupo como uma
+unidade (anda inteiro, pela caixa dele); um grupo sozinho alinha à prancheta. Ctrl+Shift+G desagrupa (tira o grupo de
+todas as camadas dele). Na lista, a camada de grupo mostra o ícone do grupo.
+
+**Trava.** Ctrl+Shift+L, o botão da barra ou o cadeado da lista travam e destravam. Camada travada se escolhe (para ver e
+destravar), mas não anda, não muda de tamanho (sem alça; a caixa fica tracejada e a etiqueta mostra o cadeado), fica
+fora do laço e não anda no alinhar (grupo com camada travada fica parado). Num arrasto de várias, as travadas ficam e
+as outras andam.
+
+**A trava vale para a IA no núcleo.** `Projeto.aplicarPatch` pergunta a `motivoDaTrava` antes de gravar um patch que
+não é da pessoa: o patch é aplicado numa cópia e cada camada travada tem de sair igual (mesma página, mesmo id, mesmo
+conteúdo). Mexer, apagar ou trocar a lista que a contém é recusado, com o motivo ("a camada logo está travada pela
+pessoa: nada foi gravado…"); mudar a ordem da pilha passa (a camada não muda); travar passa. Destravar pela IA só pela
+ferramenta `destravar_camadas`, de classe cartão. Vale para toda ferramenta que grava documento (`aplicar_patch`,
+`alinhar_camadas`, `remover_fundo`, `aplicar_marca`…), dentro e fora do app. A pessoa (autor `pessoa`: a tela, o
+desfazer) não passa por essa trava.
+
+**Comentário no carrossel (imagem-D5 e imagem-N1).** O comentário criado numa página do carrossel guarda
+`pagina_id` (o id da página, campo novo do alvo). A página do pino, a camada que ele abre e o ponto da lista e da
+miniatura saem de `paginaDoAlvo` e `caminhoDoAlvo` (`carrossel.ts`): a página pelo id dela e a camada pelo id dentro
+dela. Página inserida antes, ou a pilha que mudou, não levam mais o comentário para outra página, e o ponto da lista
+acende só na camada da página do comentário (antes acendia na camada de mesmo id em todas). Comentário antigo, sem
+`pagina_id`, continua pelo caminho gravado. O painel de comentários escolhe o caminho gravado; o monitor corrige para
+o de agora pela página e pelo id.
+
+**remover_fundo na página gêmea (imagem-N6).** Depois do modelo, a camada é procurada de novo na página de antes pelo id
+da página (não pelo caminho), no mesmo lugar da pilha, com o mesmo id; página duplicada e reordenada no meio não leva
+mais o recorte para a gêmea.
+
+**Ferramentas do MCP** (em `src/nucleo/mcp-imagem.ts`):
+
+| Ferramenta | Entrada | O que faz | Classe |
+|---|---|---|---|
+| `agrupar_camadas` | `documento`, `camadas` (2 ou mais) | Mesmo grupo e vizinhas na pilha; devolve o grupo e os caminhos novos. | livre |
+| `desagrupar_camadas` | `documento`, `camadas` | Tira o grupo de todas as camadas dos grupos pedidos. | livre |
+| `travar_camadas` | `documento`, `camadas` | Trava. | livre |
+| `destravar_camadas` | `documento`, `camadas` | Destrava o que a pessoa travou. | cartão |
+
+### Para o guia da IA
+
+- Camada com `travada: true` foi travada pela pessoa: o patch que mexe nela é recusado. Não tente contornar; para
+  destravar, peça o ok dela e use `destravar_camadas`.
+- Camadas com o mesmo `grupo` andam juntas: para mover ou alinhar o grupo, passe todas (ou use `alinhar_camadas`, que
+  trata o grupo como um). `agrupar_camadas` e `desagrupar_camadas` fazem e desfazem.
+- Comentário de carrossel traz `pagina_id`: ache a camada pela página com esse id e pelo `objeto_id` dentro dela; o
+  caminho gravado pode estar velho.
+
+## Texto que cabe, guias e encaixe, PDF do A4 e exportação em partes (rodada 3)
+
+**Texto que cabe na caixa.** Campo opcional `caber: true` no texto: o tamanho passa a ser o maior, em px inteiros, em
+que as linhas cabem na altura da caixa e nenhum pedaço de palavra passa da largura (nada parte por letra); o `tamanho`
+fica de lado enquanto `caber` está ligado. A conta é `tamanhoQueCabe` em `pintura.ts`, com o mesmo `measureText` da
+pintura, e o texto com `caber` vai pelo canvas também na prévia: prévia, PNG e PDF dão o mesmo tamanho. Na tela: o
+botão "Caber na caixa" da barra de seleção, com um texto escolhido. Medido em 08/11/2026 com
+`scripts/comparar-imagem.mjs` (monitor em 50% contra o PNG em 0,5): diferença média 0,01 de 255 na página com o texto
+que cabe e o texto com hífen.
+
+**Quebra depois do hífen (imagem-D6).** A quebra de linha do canvas (`quebrarLinhas`) quebra também depois do hífen e
+dos travessões seguidos de letra, como o CSS da prévia: "Rescisão com pré-aviso indenizado" deixa "pré-" no fim da
+linha nos dois. Número com traço ("2026-11", "-10") não quebra. Antes, o PNG descia a palavra inteira e ganhava uma
+linha que a tela não tinha.
+
+**Guias e encaixe.** No arrasto (mover), a caixa do que anda (sem a foto recortada, que aparece pela máscara) encosta,
+a 5 px de tela, nas bordas e no centro da prancheta, nas bordas e centros das outras camadas visíveis, nas bordas da
+margem segura (com ela ligada) e nas linhas da grade (com ela ligada). As guias acesas aparecem em linha inteira
+(tracejada na grade), e a distância até o vizinho de cada lado (a camada mais perto cuja faixa cruza a da caixa, ou a
+borda da prancheta) aparece com o número em px. Alt segura o encaixe durante o arrasto. O menu **Guias** do transporte
+liga e desliga o encaixe (ligado por padrão), as réguas (por dentro das bordas de cima e da esquerda, com marcas a pelo
+menos 60 px de tela), a grade (doze colunas: 90 px num post de 1080) e a margem segura (as zonas da rede no feed 4:5,
+no story 9:16 e na miniatura do YouTube: coberta em vermelho translúcido, contorno tracejado; nos outros tamanhos, 5%
+de cada lado). A escolha fica por pessoa, no navegador; nada disso sai no PNG. Código: `src/nucleo/encaixe-imagem.ts`
+(puro) e `Guias.tsx`. Sem ferramenta do MCP: o encaixe é do gesto na tela; a IA alinha com `alinhar_camadas`.
+
+**PDF do A4 (imagem-D12).** O PDF do carrossel em A4 a 300 dpi (2480 × 3508, em pé ou deitado) sai com 72/300 pt por px:
+página de 21 × 29,7 cm (lido de volta no teste), e não de 87 × 124 cm. As imagens de rede continuam com 1 px = 1 pt,
+o que o LinkedIn espera (`pontosPorPixel` em `carrossel.ts`).
+
+**Exportação em partes (imagem-D19).** "Exportar carrossel" desenha, manda e solta uma página por vez:
+`exportarPaginasEmPartes.abrir` reserva a pasta, `parte` grava o PNG no disco assim que chega e `fechar` monta o PDF
+lendo os PNG de lá, na ordem. Antes, todos os PNG ficavam em base64 na memória e iam num pedido só. Os canais novos
+(`estudio:exportar-paginas-abrir`, `-parte`, `-fechar`) se registram dentro de `registrarExportarPaginas`. A página
+sozinha ("Exportar página") continua pelo pedido de sempre.
+
+### Para o guia da IA
+
+- Texto com `caber: true` ganha o maior tamanho que cabe na caixa; para mudar o tamanho da letra, mude a caixa
+  (`largura`, `altura`) ou tire o `caber` e use `tamanho`.
+- Para quebrar uma linha num ponto certo, use `\n` no texto; o hífen também é ponto de quebra.

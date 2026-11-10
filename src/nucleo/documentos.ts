@@ -57,6 +57,10 @@ export type CamadaImagem = {
   lista?: 'marcadores' | 'numerada';
   lista_marcador?: string; // o marcador da lista com marcadores (padrão "•"); até 4 letras
   lista_recuo?: number; // onde o texto dos itens começa, em px (padrão: o maior marcador mais 40% do tamanho da letra)
+  // seleção e layout (rodada 3, B2: src/nucleo/layout-imagem.ts e travas-imagem.ts)
+  grupo?: string; // id do grupo: as camadas com o mesmo grupo são escolhidas e andam juntas (Ctrl+G)
+  travada?: boolean; // não anda nem muda de tamanho na tela; patch da IA nela é recusado
+  caber?: boolean; // texto: o maior tamanho que cabe na caixa (o `tamanho` fica de lado), igual na prévia, no PNG e no PDF
 };
 
 /** Sombra projetada, na direção da página (não gira com a camada). Desfoque e deslocamento em px do documento. */
@@ -146,6 +150,7 @@ export type AlvoComentario = {
   tempo_ms?: number; // vídeo: ms de saída
   ponto?: {x: number; y: number}; // 0 a 1, relativo ao quadro
   contexto?: string; // texto do objeto ou palavras da narração em volta, para reancorar
+  pagina_id?: string; // imagem com várias páginas: id da página do objeto (o caminho muda quando as páginas mudam; B2, rodada 3)
 };
 
 export type Comentario = {
@@ -187,4 +192,5 @@ export type EstadoEditor = {
   tempo_ms?: number;
   pagina?: string; // imagem com várias páginas: caminho da página ativa, ex.: /paginas/2
   atualizado_em: string;
+  selecao_varias?: string[]; // imagem (B2, rodada 3): todos os caminhos da seleção múltipla, o principal primeiro
 };

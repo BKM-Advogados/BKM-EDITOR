@@ -45,10 +45,10 @@ describe('MCP estudio', () => {
   it('lista as ferramentas', async () => {
     const {tools} = await cliente.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
-      'anotar_fonte', 'aplicar_marca', 'aplicar_patch', 'buscar_icone', 'checar_texto', 'cor_da_marca', 'criar_comentario', 'criar_documento', 'desfazer', 'editar_legenda', 'estado_do_editor', 'exportar_legendas',
-      'fazer_lista', 'fonte_da_marca', 'guia_do_projeto', 'importar_legendas', 'inserir_icone', 'inserir_linha', 'ler_comentario', 'ler_documento', 'ler_fonte', 'ler_legendas', 'listar_comentarios', 'listar_midia',
-      'listar_mudancas', 'listar_pesquisa', 'marca_dagua', 'marcar_midia', 'medir_contraste_marca', 'projeto_info', 'reabrir_comentario', 'registrar_fato', 'remover_fundo', 'renomear_projeto', 'resolver_comentario', 'responder_comentario',
-      'reverter', 'texto_da_fonte', 'transcrever', 'ver_marca',
+      'agrupar_camadas', 'alinhar_camadas', 'anotar_fonte', 'aplicar_marca', 'aplicar_patch', 'buscar_icone', 'checar_texto', 'cor_da_marca', 'criar_comentario', 'criar_documento', 'desagrupar_camadas', 'desfazer',
+      'destravar_camadas', 'distribuir_camadas', 'editar_legenda', 'estado_do_editor', 'exportar_legendas', 'fazer_lista', 'fonte_da_marca', 'guia_do_projeto', 'importar_legendas', 'inserir_icone', 'inserir_linha', 'ler_comentario',
+      'ler_documento', 'ler_fonte', 'ler_legendas', 'listar_comentarios', 'listar_midia', 'listar_mudancas', 'listar_pesquisa', 'marca_dagua', 'marcar_midia', 'medir_contraste_marca', 'projeto_info', 'reabrir_comentario',
+      'registrar_fato', 'remover_fundo', 'renomear_projeto', 'resolver_comentario', 'responder_comentario', 'reverter', 'selecionar_camadas', 'texto_da_fonte', 'transcrever', 'travar_camadas', 'ver_marca',
     ]);
   });
 

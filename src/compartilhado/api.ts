@@ -133,6 +133,10 @@ export const CANAL = {
   iaGuardar: 'estudio:ia-guardar',
   iaGuardadas: 'estudio:ia-guardadas',
   iaApagarGuardada: 'estudio:ia-apagar-guardada',
+  // carrossel exportado em partes (rodada 3, B2, imagem-D19): src/main/exportar-paginas.ts
+  exportarPaginasAbrir: 'estudio:exportar-paginas-abrir',
+  exportarPaginasParte: 'estudio:exportar-paginas-parte',
+  exportarPaginasFechar: 'estudio:exportar-paginas-fechar',
 } as const;
 
 /** O projeto aberto. `estado` é o último que a pessoa viu (área, documento, seleção), para reabrir onde parou; `git`
@@ -366,6 +370,12 @@ export type ApiEstudio = {
     guardar: (id: number, c: {titulo: string; itens: unknown[]; uso?: unknown}) => Promise<string | null>;
     guardadas: () => Promise<ConversaGuardadaTela[]>;
     apagarGuardada: (sessao: string) => Promise<void>;
+  };
+  // carrossel em partes (rodada 3, B2, imagem-D19): uma página por vez, cada PNG vai ao disco ao chegar e o PDF sai no fechar
+  exportarPaginasEmPartes: {
+    abrir: (o: {documento: string; pdf: boolean}) => Promise<{sessao: string}>;
+    parte: (sessao: string, pagina: {png: string; numero: number}) => Promise<boolean>;
+    fechar: (sessao: string) => Promise<ResultadoExportarPaginas>;
   };
 };
 

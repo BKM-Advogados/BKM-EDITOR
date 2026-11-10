@@ -447,6 +447,27 @@ const api: ApiEstudio = {
     guardadas: async () => [],
     apagarGuardada: async () => undefined,
   },
+  // carrossel em partes (rodada 3, B2): conta as páginas desenhadas, uma por vez; gravar não funciona aqui
+  exportarPaginasEmPartes: (() => {
+    const partes = new Map<string, {pdf: boolean; n: number}>();
+    return {
+      abrir: async (o: {documento: string; pdf: boolean}) => {
+        const sessao = `previa-${partes.size + 1}`;
+        partes.set(sessao, {pdf: o.pdf, n: 0});
+        return {sessao};
+      },
+      parte: async (sessao: string) => {
+        const s = partes.get(sessao);
+        if (s) s.n++;
+        return Boolean(s);
+      },
+      fechar: async (sessao: string) => {
+        const s = partes.get(sessao);
+        partes.delete(sessao);
+        return {ok: false, mensagem: `exportar não funciona na prévia web (${s?.n ?? 0} página(s) desenhada(s), uma por vez${s?.pdf ? ', e o PDF' : ''})`};
+      },
+    };
+  })(),
 };
 
 (window as unknown as {estudio: ApiEstudio}).estudio = api;
