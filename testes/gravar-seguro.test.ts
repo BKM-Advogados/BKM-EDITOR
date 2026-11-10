@@ -1,5 +1,5 @@
 // Gravação que aguenta arquivo preso (transversal-D8): rename com EPERM/EBUSY tenta de novo e não deixa .tmp para trás.
-import {existsSync, mkdtempSync, readdirSync, readFileSync, rmSync} from 'node:fs';
+import {existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, type writeFileSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {afterAll, describe, expect, it} from 'vitest';
@@ -68,6 +68,18 @@ describe('gravarAtomico', () => {
     expect(() => gravarAtomico(abs, 'x', s)).toThrow(/em uso por outro programa/);
     expect(existsSync(abs)).toBe(false);
     expect(readdirSync(tmp).filter((n) => n.endsWith('.tmp'))).toEqual([]);
+  });
+
+  it('pasta sem permissão de escrita: avisa permissão, não "em uso", e não tenta de novo', () => {
+    const abs = path.join(tmp, 'sem-permissao.json');
+    const s = falso([]);
+    const negar = (() => {
+      throw erro('EACCES');
+    }) as unknown as typeof writeFileSync;
+    expect(() => gravarAtomico(abs, 'x', s, negar)).toThrow(/sem permissão para gravar/);
+    expect(s.chamadas()).toBe(0);
+    expect(s.esperas).toEqual([]);
+    expect(existsSync(abs)).toBe(false);
   });
 
   it('Projeto.gravarTexto grava por ele', () => {

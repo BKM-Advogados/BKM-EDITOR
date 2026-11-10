@@ -36,14 +36,19 @@ export const renomearComRetry = (tmp: string, destino: string, sistema: Sistema 
 /** Escreve em `abs.<pid>.tmp` e troca pelo destino; se não der, o temporário não fica na pasta do projeto. */
 export const gravarAtomico = (abs: string, texto: string, sistema: Sistema = SISTEMA, escrever: typeof writeFileSync = writeFileSync): void => {
   const tmp = `${abs}.${process.pid}.tmp`;
+  let criado = false; // criar o temporário falhar por permissão é pasta sem escrita, não arquivo preso por outro programa
   try {
     escrever(tmp, texto, 'utf-8');
+    criado = true;
     renomearComRetry(tmp, abs, sistema);
   } catch (e) {
     try {
       rmSync(tmp, {force: true});
     } catch {
       /* o temporário também está preso: o .tmp está no .gitignore e o próximo salvamento o troca */
+    }
+    if (!criado && preso(e)) {
+      throw new Error(`sem permissão para gravar na pasta de ${abs}. Confira se a pasta do projeto permite escrita`);
     }
     if (preso(e)) {
       throw new Error(`o arquivo está em uso por outro programa (OneDrive ou antivírus?) e não deu para gravar: ${abs}. Tente de novo em instantes`);
