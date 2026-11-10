@@ -141,6 +141,9 @@ export const CANAL = {
   iaGuardar: 'estudio:ia-guardar',
   iaGuardadas: 'estudio:ia-guardadas',
   iaApagarGuardada: 'estudio:ia-apagar-guardada',
+  // frente IDE: projetos prontos para IDE de agentes (src/main/ide.ts, docs/ide.md)
+  ideEstado: 'estudio:ide-estado',
+  ideAbrirNoT3: 'estudio:ide-abrir-no-t3',
   // carrossel exportado em partes (rodada 3, B2, imagem-D19): src/main/exportar-paginas.ts
   exportarPaginasAbrir: 'estudio:exportar-paginas-abrir',
   exportarPaginasParte: 'estudio:exportar-paginas-parte',
@@ -179,7 +182,8 @@ export type Recente = {raiz: string; nome: string; aberto_em: string; existe: bo
 
 export type Preferencias = {pasta_projetos: string; ao_iniciar: 'inicio' | 'ultimo'; formato_video: string; formato_imagem: string; boas_vindas_vista: boolean;
   pasta_trilhas: string; // biblioteca de músicas e efeitos da pessoa (padrão: Estudio/trilhas)
-  pasta_marcas: string};
+  pasta_marcas: string;
+  projetos_ide?: boolean}; // frente IDE: .mcp.json, .claude/settings.local.json e t3.json em cada projeto (padrão: ligado)
 
 /** `marca` é o id do kit de marca que entra no tema do documento novo (sem ele, o tema neutro). */
 export type NovoProjeto = {nome?: string; modelo: IdModelo; formato?: Formato | {largura: number; altura: number}; pasta?: string; formato_id?: string; marca?: string};
@@ -423,6 +427,11 @@ export type ApiEstudio = {
     /** Uma frase curta na voz da configuração (guardada neste PC: a mesma amostra não é paga duas vezes). */
     amostra: (config: ConfigNarracao) => Promise<{wav: ArrayBuffer; do_cache: boolean; custo_usd?: number}>;
   };
+  /** frente IDE: o que foi escrito no projeto aberto e se o CLI do T3 Code está no PATH; registrar o projeto no T3. */
+  ide: {
+    estado: () => Promise<EstadoIde>;
+    abrirNoT3: () => Promise<{ok: boolean; mensagem: string}>;
+  };
   // carrossel em partes (rodada 3, B2, imagem-D19): uma página por vez, cada PNG vai ao disco ao chegar e o PDF sai no fechar
   exportarPaginasEmPartes: {
     abrir: (o: {documento: string; pdf: boolean}) => Promise<{sessao: string}>;
@@ -498,6 +507,8 @@ export type ResultadoReverter = {ok: true; seq: number; rotulo: string} | {ok: f
 export type EstadoAppsDeFora = {ligado: boolean; porta: number; ouvindo: boolean; erro?: string; apps: {id: string; nome: string; criado_em: string}[]};
 /** A configuração pronta para colar no app de fora, por HTTP e por stdio (com a ponte do próprio Estúdio). */
 export type ConfigsDoApp = {http: string; stdio: string};
+/** Projetos prontos para IDE: a opção, o comando t3 (null fora do PATH) e o que a última abertura escreveu neste projeto. */
+export type EstadoIde = {ligado: boolean; t3: string | null; raiz?: string; gravados?: string[]; avisos?: string[]};
 /** Conversa guardada no projeto (.estudio/conversas/): o que a tela desenha e de quem é. */
 export type ConversaGuardadaTela = {sessao: string; provedor: string; titulo: string; modelo?: string; criada_em: string; atualizada_em: string;
   itens: unknown[]; uso?: unknown};

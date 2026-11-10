@@ -480,6 +480,10 @@ const api: ApiEstudio = {
     guardadas: async () => [],
     apagarGuardada: async () => undefined,
   },
+  ide: {
+    estado: async () => ({ligado: prefs.projetos_ide !== false, t3: null, ...(aberto ? {raiz: 'C:\\Users\\pessoa\\Estudio\\Projeto', gravados: [], avisos: []} : {})}),
+    abrirNoT3: async () => ({ok: false, mensagem: 'Na prévia web não há T3 Code: no app, o botão roda t3 project add com a pasta do projeto.'}),
+  },
   // carrossel em partes (rodada 3, B2): conta as páginas desenhadas, uma por vez; gravar não funciona aqui
   exportarPaginasEmPartes: (() => {
     const partes = new Map<string, {pdf: boolean; n: number}>();

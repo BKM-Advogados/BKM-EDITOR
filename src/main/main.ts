@@ -41,6 +41,10 @@ import {criarSessoesIA, fecharAppsDeFora, iniciarAppsDeFora, perguntarAPessoa, r
 import {registrarIpcNarracao} from './ipc-narracao'; // narração por IA (docs/narracao.md)
 import {aoAbrirMusica, registrarIpcMusica} from './ipc-musica'; // frente Música
 import {criarPonteJanela} from './ponte-janela';
+import {definirServicoPrevia} from '../nucleo/mcp-previa'; // frente IDE: prévias do MCP
+import {criarServicoPrevia} from './previa'; // frente IDE
+import {criarIde} from './ide'; // frente IDE: projetos prontos para IDE de agentes
+import {scriptDoMcp} from '../nucleo/ide'; // frente IDE
 
 // o mesmo id do instalador (electron-builder.yml): a barra de tarefas agrupa a janela com o atalho
 app.setAppUserModelId('br.com.bkmadvogados.estudio');
@@ -87,6 +91,9 @@ const conversas = criarSessoesIA({evento: (id, e) => enviar(CANAL.conversaEvento
     ...(claudeFalso ? {prefixo: [claudeFalso], ambienteExtra: {ELECTRON_RUN_AS_NODE: '1'}} : {})}});
 
 const recursos = (rel: string) => (app.isPackaged ? path.join(process.resourcesPath, rel) : path.join(app.getAppPath(), rel));
+// frente IDE (docs/ide.md): .mcp.json, .claude/settings.local.json e t3.json em cada projeto, com o MCP por stdio deste app
+const ide = criarIde({executavel: process.execPath, script: scriptDoMcp({empacotado: app.isPackaged, recursos: process.resourcesPath, raizApp: app.getAppPath()}),
+  ligado: () => memoria.prefs().projetos_ide !== false});
 const pastaDoExemplo = () => recursos(path.join('exemplos', 'exemplo'));
 
 const confiavel = (e: IpcMainInvokeEvent | Electron.IpcMainEvent) => {
@@ -170,6 +177,7 @@ const abrirProjeto = async (raiz: string) => {
   });
   midia.servir(raiz);
   regerarClaudeMd(raiz); // o Claude conhece os campos desta versão também nos projetos criados antes dela
+  ide.preparar(raiz); // frente IDE: os arquivos da IDE antes do primeiro commit do projeto novo
   sessao.projeto.adicionarAjuste(somAcompanhaCenas); // frente Som: a narração presa às cenas (som-com-cenas.ts)
   apagarLimposSemUso(sessao.projeto); // frente Som: as versões limpas da voz que nem documento nem diário citam (limpeza-voz.ts)
   aoAbrirMusica(sessao.projeto); // frente Música: renders que faltam (pasta clonada) e os que sobraram (ipc-musica.ts)
@@ -303,7 +311,16 @@ lidar(CANAL.ambiente, async () => ({perfil: PERFIL, git: await gitInstalado, cla
 lidar(CANAL.recentes, () => memoria.recentes());
 lidar(CANAL.esquecerRecente, (raiz: string) => memoria.esquecer(raiz));
 lidar(CANAL.preferencias, () => memoria.prefs());
-lidar(CANAL.gravarPreferencias, (p: Partial<Preferencias>) => memoria.gravarPrefs(p));
+lidar(CANAL.gravarPreferencias, (p: Partial<Preferencias>) => {
+  const r = memoria.gravarPrefs(p);
+  if (p.projetos_ide === true && sessao) ide.preparar(sessao.projeto.raiz); // frente IDE: ligar vale já para o projeto aberto
+  return r;
+});
+lidar(CANAL.ideEstado, () => ide.estado(sessao?.projeto.raiz)); // frente IDE
+lidar(CANAL.ideAbrirNoT3, () => {
+  const p = exigirProjeto();
+  return ide.abrirNoT3(p.raiz, p.manifesto().nome);
+});
 lidar(CANAL.escolherPasta, async (titulo?: string) => {
   const r = await dialog.showOpenDialog(janela!, {properties: ['openDirectory', 'createDirectory'], title: titulo ?? 'Escolher pasta'});
   return r.canceled || !r.filePaths[0] ? null : r.filePaths[0];
@@ -509,6 +526,8 @@ const marcas = registrarIpcMarcas({lidar, janela: () => janela, memoria, midia, 
 
 registrarPrefsExportacao(lidar, exigirProjeto); // marca d'água por destino, lembrada no projeto (frente C)
 registrarContrasteMarca(lidar, exigirProjeto, (documento) => (exigirProjeto(), sessao!.propsVideo(documento, midia.base)), (aviso) => prepararRender({raizApp: app.getAppPath(), empacotado: app.isPackaged, aviso})); // contraste 3:1 da marca (frente C)
+// frente IDE: ver_quadro, ver_cenas e ver_trecho pelo MCP do app, com o render da exportação e a mídia do servidor local
+definirServicoPrevia(criarServicoPrevia({preparar: (aviso) => prepararRender({raizApp: app.getAppPath(), empacotado: app.isPackaged, aviso}), comMidia: (_raiz, f) => f(midia.base)}));
 // frente Som (rodada 2): limpeza de voz (limpeza-voz.ts) e medidor de loudness da mistura (loudness.ts)
 registrarIpcLimpeza(lidar, exigirProjeto, enviar);
 registrarIpcLoudness(lidar, exigirProjeto, (documento) => (exigirProjeto(), sessao!.propsVideo(documento, midia.base)));

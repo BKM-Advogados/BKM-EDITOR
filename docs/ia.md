@@ -115,6 +115,8 @@ Envolve o `registerTool`: toda ferramenta registrada depois dele passa por ele, 
     pelo app, com diário e portão, e não pelo MCP de arquivo.
 - Se um dia a fuse `RunAsNode` do Electron for desligada, a ponte stdio para de funcionar. A configuração HTTP
   continua.
+- **IDE de agentes** (T3 Code, Claude Code, Cursor): cada projeto leva um `.mcp.json` com o MCP por stdio, sem token e sem
+  o app aberto, e o agente vê o vídeo por `ver_quadro`, `ver_cenas` e `ver_trecho`. Detalhes em `docs/ide.md`.
 
 ## Ferramentas MCP da frente (`src/nucleo/mcp-ia.ts`)
 

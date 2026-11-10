@@ -167,6 +167,10 @@ const api: ApiEstudio = {
     aoAndamento: (cb) => ouvir<[AndamentoNarracao]>(CANAL.narracaoAndamento, cb),
     amostra: (config) => ipcRenderer.invoke(CANAL.narracaoAmostra, config),
   },
+  ide: {
+    estado: () => ipcRenderer.invoke(CANAL.ideEstado),
+    abrirNoT3: () => ipcRenderer.invoke(CANAL.ideAbrirNoT3),
+  },
   // carrossel em partes (rodada 3, B2)
   exportarPaginasEmPartes: {
     abrir: (o) => ipcRenderer.invoke(CANAL.exportarPaginasAbrir, o),

@@ -119,33 +119,39 @@ export class SessaoProjeto {
     }
   }
 
-  /** Props da composição do vídeo (VideoCenas ou CarrosselTema) para a prévia e a exportação, com a mídia em `base`. */
+  /** Props da composição do vídeo para a prévia e a exportação, com a mídia em `base` (propsDoVideo, abaixo). */
   propsVideo(documento: string, base: string): PropsVideo {
-    try {
-      const rel = this.projeto.arquivoDoDocumento(documento);
-      const {doc} = this.projeto.lerJson<DocVideo>(rel);
-      if (ehDocAnimacao(doc)) {
-        const {props, avisos} = resolverAnimacao(doc, `${base}/midia`);
-        return {props, avisos};
-      }
-      if (ehDocCenas(doc)) {
-        // os envelopes medidos (midia/*.envelope.json) entram nas props: prévia e exportação veem o mesmo ducking
-        const {props, avisos} = resolverCenas(doc, {envelopes: lerEnvelopes(this.projeto, doc)});
-        return {props: {...props, base_midia: base}, avisos};
-      }
-      // o carrossel da Cliente: 1080×1920 a 30 qps até a animação dele aceitar outro formato
-      const r = doc as Roteiro & DocVideo;
-      if (typeof r.palavras !== 'string') return {erro: 'este vídeo não tem "tipo" nem narração (palavras); não sei montá-lo'};
-      const lido = this.projeto.lerJson<unknown>(r.palavras).doc;
-      const palavras = (Array.isArray(lido) ? lido : (lido as {palavras?: unknown} | null)?.palavras) as Palavra[]; // frente Fala: a transcrição na versão 2 traz a lista em `palavras`
-      if (!Array.isArray(palavras) || !palavras.length) return {erro: `a transcrição da narração (${r.palavras}) está vazia`};
-      const {props, trechos, avisos} = resolverRoteiro(r, palavras);
-      return {
-        props: {...props, ...FORMATO_PADRAO, base_midia: `${base}/midia`, narracao: {src: `${base}/${r.fonte}`, trechos}, efeitos: r.efeitos ?? []},
-        avisos,
-      };
-    } catch (e) {
-      return {erro: e instanceof ErroRoteiro ? e.message : `não deu para montar o vídeo: ${(e as Error).message}`};
-    }
+    return propsDoVideo(this.projeto, documento, base);
   }
 }
+
+/** Props da composição do vídeo (VideoCenas, CarrosselTema ou Animacao) para a prévia e a exportação, com a mídia em `base`.
+ *  Solta da sessão: as prévias do MCP por stdio (src/main/previa.ts) montam as mesmas props sem o app aberto. */
+export const propsDoVideo = (projeto: Projeto, documento: string, base: string): PropsVideo => {
+  try {
+    const rel = projeto.arquivoDoDocumento(documento);
+    const {doc} = projeto.lerJson<DocVideo>(rel);
+    if (ehDocAnimacao(doc)) {
+      const {props, avisos} = resolverAnimacao(doc, `${base}/midia`);
+      return {props, avisos};
+    }
+    if (ehDocCenas(doc)) {
+      // os envelopes medidos (midia/*.envelope.json) entram nas props: prévia e exportação veem o mesmo ducking
+      const {props, avisos} = resolverCenas(doc, {envelopes: lerEnvelopes(projeto, doc)});
+      return {props: {...props, base_midia: base}, avisos};
+    }
+    // o carrossel da Cliente: 1080×1920 a 30 qps até a animação dele aceitar outro formato
+    const r = doc as Roteiro & DocVideo;
+    if (typeof r.palavras !== 'string') return {erro: 'este vídeo não tem "tipo" nem narração (palavras); não sei montá-lo'};
+    const lido = projeto.lerJson<unknown>(r.palavras).doc;
+    const palavras = (Array.isArray(lido) ? lido : (lido as {palavras?: unknown} | null)?.palavras) as Palavra[]; // frente Fala: a transcrição na versão 2 traz a lista em `palavras`
+    if (!Array.isArray(palavras) || !palavras.length) return {erro: `a transcrição da narração (${r.palavras}) está vazia`};
+    const {props, trechos, avisos} = resolverRoteiro(r, palavras);
+    return {
+      props: {...props, ...FORMATO_PADRAO, base_midia: `${base}/midia`, narracao: {src: `${base}/${r.fonte}`, trechos}, efeitos: r.efeitos ?? []},
+      avisos,
+    };
+  } catch (e) {
+    return {erro: e instanceof ErroRoteiro ? e.message : `não deu para montar o vídeo: ${(e as Error).message}`};
+  }
+};

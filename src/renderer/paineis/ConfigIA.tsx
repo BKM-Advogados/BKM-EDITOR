@@ -8,6 +8,7 @@ import type {ConfigsDoApp, EstadoAppsDeFora, EstadoNarracaoIA, EstadoProvedor, U
 import {copiar} from '../componentes/Campos';
 import {avisar} from '../estado/loja';
 import {estadoConversas, fecharConfigIA, lerProvedores, responderAvulso} from './conversas';
+import {SecaoProjetosIde} from './ConfigIde'; // frente IDE
 import './config-ia.css';
 import './conversa.css'; // o cartão de permissão solto usa o mesmo estilo do da conversa
 
@@ -272,6 +273,7 @@ const DialogoConfigIA: React.FC = () => {
         </div>
         <SecaoNarracao foco={cfg.foco === 'narracao'} abrirGemini={() => setAberto('gemini')} />
         <SecaoAppsDeFora />
+        <SecaoProjetosIde />
         <div className="ia-uso">
           <div className="ia-uso-titulo">Uso deste mês neste PC</div>
           {linhasUso.length ? (
