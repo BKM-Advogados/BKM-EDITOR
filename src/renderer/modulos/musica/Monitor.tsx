@@ -137,7 +137,7 @@ const Transporte: React.FC<{doc: DocMusica}> = ({doc}) => {
     <div className="musica-transporte">
       <button className="bti" title={tocando ? 'Pausar (Espaço)' : 'Tocar (Espaço)'} onClick={tocarOuPausar}>{tocando ? <Pause size={16} /> : <Play size={16} />}</button>
       <button className="bti" title="Parar e voltar ao começo" onClick={parar}><Square size={14} /></button>
-      <span className="pos" title="Compasso.tempo · minutos:segundos">{posicaoEmCompasso(batida, m.compasso)}<small>{tempoTexto(cabeca)} / {tempoTexto(m.duracao_s)}</small></span>
+      <span className="pos" title="Compasso.tempo · minutos:segundos">{posicaoEmCompasso(batida, m.compasso).split('+')[0]}<small>{tempoTexto(cabeca)} / {tempoTexto(m.duracao_s)}</small></span>
       <span className="sep" />
       <label title="Batidas por minuto">BPM <input className="campo bpm" value={bpm} onChange={(e) => setBpm(e.target.value)}
         onBlur={() => {
@@ -162,7 +162,7 @@ const Transporte: React.FC<{doc: DocMusica}> = ({doc}) => {
             <Clapperboard size={15} /></button>
         </>
       )}
-      <span className="estado">{renderizando ? 'atualizando a trilha no vídeo…' : motor.ultimoRender_ms ? `som em ${motor.ultimoRender_ms} ms` : ''}</span>
+      <span className="estado" title="Quanto o som levou para ser refeito depois da última mudança">{renderizando ? 'atualizando a trilha no vídeo…' : motor.ultimoRender_ms ? `refeito em ${motor.ultimoRender_ms} ms` : ''}</span>
     </div>
   );
 };
@@ -273,7 +273,7 @@ const Medidor: React.FC<{faixa?: string}> = ({faixa}) => {
   const db = tocando ? motor.nivelEm(cabeca, faixa) : null;
   const pct = db === null ? 0 : Math.max(0, Math.min(100, ((db + 48) / 48) * 100));
   return (
-    <div className="medidor" title={db === null ? 'toque para ver o nível' : `pico ${numeroBr(db, 1)} dBFS`}>
+    <div className="nivel-vivo" title={db === null ? 'toque para ver o nível' : `pico ${numeroBr(db, 1)} dBFS`}>
       <span className={db !== null && db > -3 ? 'alto' : ''} style={{width: `${pct}%`}} />
     </div>
   );

@@ -2,11 +2,11 @@
    (estilo.css): a música usa o verde do áudio; o agente, o lilás de sempre. */
 .musica-monitor { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--fundo-1); }
 .musica-transporte { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--borda); flex-wrap: wrap; }
-.musica-transporte .pos { font-family: var(--fonte-mono); font-size: 12px; min-width: 128px; color: var(--texto); }
+.musica-transporte .pos { font-family: var(--fonte-mono); font-size: 12px; width: 156px; flex: none; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--texto); }
 .musica-transporte .pos small { color: var(--texto-2); margin-left: 6px; }
 .musica-transporte .bpm { width: 56px; }
 .musica-transporte .sep { width: 1px; height: 18px; background: var(--borda); margin: 0 2px; }
-.musica-transporte .estado { margin-left: auto; font-size: 11px; color: var(--texto-2); }
+.musica-transporte .estado { margin-left: auto; white-space: nowrap; font-size: 11px; color: var(--texto-2); }
 .musica-abas { display: flex; gap: 2px; padding: 4px 8px 0; border-bottom: 1px solid var(--borda); }
 .musica-abas button { background: none; border: 0; color: var(--texto-2); padding: 4px 10px; border-bottom: 2px solid transparent; cursor: pointer; font: inherit; }
 .musica-abas button.ativa { color: var(--texto); border-bottom-color: var(--trilha-audio); }
@@ -35,9 +35,9 @@
 .tira input[type=range] { width: 100%; }
 .tira .botoes { display: flex; gap: 4px; }
 .tira .botoes .bti { width: 24px; height: 22px; font-size: 11px; font-weight: 700; }
-.medidor { height: 6px; background: var(--fundo-1); border-radius: 3px; overflow: hidden; }
-.medidor > span { display: block; height: 100%; background: var(--ok); transition: width 60ms linear; }
-.medidor > span.alto { background: var(--aviso); }
+.nivel-vivo { height: 6px; background: var(--fundo-1); border-radius: 3px; overflow: hidden; }
+.nivel-vivo > span { display: block; height: 100%; background: var(--ok); transition: width 60ms linear; }
+.nivel-vivo > span.alto { background: var(--aviso); }
 
 /* arranjo */
 .arranjo { display: grid; grid-template-columns: 150px 1fr; height: 100%; min-height: 0; background: var(--fundo-1); font-size: 11px; }
