@@ -4,13 +4,16 @@ import os from 'node:os';
 import path from 'node:path';
 import {afterAll, describe, expect, it} from 'vitest';
 import {comIdsNovos, ehDocCenas, idLivre, novoDocCenas, resolverCenas, type DocCenas} from '../src/nucleo/cenas';
-import {claudeMd, dentroDoOneDrive, documentoNovo, gravarPlano, nomeDePasta, nomePadrao, pastaLivre, planoDoProjeto} from '../src/nucleo/criar-projeto';
+import {claudeMd, dentroDoOneDrive, documentoNovo, gravarPlano, nomeDePasta, nomePadrao, pastaLivre, planoDoExemplo, planoDoProjeto} from '../src/nucleo/criar-projeto';
+import {EXEMPLO as EXEMPLO_DO_APP} from '../src/nucleo/exemplo';
+import {MODELOS} from '../src/nucleo/modelos';
 import {FORMATO_PADRAO, formatoDoVideo, proporcaoDe, rotuloFormato} from '../src/nucleo/formatos';
 import {Projeto} from '../src/nucleo/projeto';
 
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'estudio-criar-'));
 afterAll(() => rmSync(tmp, {recursive: true, force: true}));
-const EXEMPLO = path.join(__dirname, '..', 'exemplos', 'exemplo');
+// um projeto pronto no papel do exemplo empacotado (src/nucleo/exemplo.ts)
+const EXEMPLO = path.join(__dirname, 'fixtures', 'projeto');
 
 describe('formatos', () => {
   it('rotula pelo destino e cai no carrossel quando falta', () => {
@@ -110,10 +113,10 @@ describe('criar projeto', () => {
     expect(() => gravarPlano(destino, planoDoProjeto({nome: 'De novo', modelo: 'video-branco'}))).toThrow(/já existe/);
   });
 
-  it('modelo da Cliente copia o exemplo com o nome novo', () => {
-    const destino = gravarPlano(path.join(tmp, 'cliente'), planoDoProjeto({nome: 'C3 · Teste', modelo: 'modelo-carrossel'}), EXEMPLO);
+  it('o exemplo é copiado inteiro com o nome novo', () => {
+    const destino = gravarPlano(path.join(tmp, 'exemplo'), planoDoExemplo('Exemplo · Teste'), EXEMPLO);
     const m = new Projeto(destino).manifesto();
-    expect(m.nome).toBe('C3 · Teste');
+    expect(m.nome).toBe('Exemplo · Teste');
     expect(m.documentos.map((d) => d.id)).toEqual(['carrossel', 'capa', 'cena3d']);
     expect(existsSync(path.join(destino, 'video', 'palavras.json'))).toBe(true);
     // o CLAUDE.md do projeto tem a seção "Pesquisa" (o caso de uso principal: o carrossel narrado), uma vez só
@@ -124,12 +127,15 @@ describe('criar projeto', () => {
     expect(readFileSync(path.join(destino, '.gitignore'), 'utf-8')).toContain('pesquisa/fontes/');
     // o próprio exemplo já traz a seção igual à que o app gera e a linha do .gitignore: mudou a seção, muda o exemplo
     const doExemplo = readFileSync(path.join(EXEMPLO, 'CLAUDE.md'), 'utf-8').replace(/\r\n/g, '\n');
-    expect(doExemplo).toContain(planoDoProjeto({nome: 'x', modelo: 'modelo-carrossel'}).acrescentarAoClaudeMd);
+    expect(doExemplo).toContain(planoDoExemplo('x').acrescentarAoClaudeMd);
     expect(readFileSync(path.join(EXEMPLO, '.gitignore'), 'utf-8')).toContain('pesquisa/fontes/');
-    const capa = gravarPlano(path.join(tmp, 'capa'), planoDoProjeto({nome: 'Capa', modelo: 'modelo-capa'}), EXEMPLO);
-    expect(new Projeto(capa).manifesto().documentos).toHaveLength(1);
-    expect(existsSync(path.join(capa, 'midia', 'logo-exemplo.png'))).toBe(true);
-    expect(readFileSync(path.join(capa, 'CLAUDE.md'), 'utf-8')).toContain('## Pesquisa');
+    // sem a pasta do exemplo, gravar avisa em vez de criar um projeto vazio
+    expect(() => gravarPlano(path.join(tmp, 'sem-exemplo'), planoDoExemplo('Sem'))).toThrow(/exemplo/);
+  });
+
+  it('o exemplo não é modelo, e o nome da pasta dele fica numa constante', () => {
+    expect(MODELOS.map((m) => m.id)).toEqual(['video-branco', 'imagem-branco', '3d-branco', 'animacao-branco', 'animacao-9x16', 'animacao-logo-pixel']);
+    expect(EXEMPLO_DO_APP.pasta).toMatch(/^[a-z0-9-]+$/);
   });
 
   it('documento novo não colide e entra no manifesto', () => {

@@ -12,6 +12,7 @@ const ouvir = <A extends unknown[]>(canal: string, cb: (...a: A) => void) => {
 const api: ApiEstudio = {
   abrirPasta: () => ipcRenderer.invoke(CANAL.abrirPasta),
   abrirExemplo: () => ipcRenderer.invoke(CANAL.abrirExemplo),
+  temExemplo: () => ipcRenderer.invoke(CANAL.temExemplo),
   abrirProjeto: (raiz) => ipcRenderer.invoke(CANAL.abrirProjeto, raiz),
   projetoAtual: () => ipcRenderer.invoke(CANAL.projetoAtual),
   criarProjeto: (o) => ipcRenderer.invoke(CANAL.criarProjeto, o),

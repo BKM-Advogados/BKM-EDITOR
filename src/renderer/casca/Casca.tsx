@@ -5,6 +5,7 @@
 // que abre o diálogo de exportação do documento da área (componentes/DialogoExportar.tsx). No grupo do inspetor, ao lado
 // de Comentários e Histórico, fica o painel Pesquisa (só leitura: fontes e fatos de pesquisa/pesquisa.json).
 import React, {Suspense, useCallback, useEffect, useRef, useState} from 'react';
+import {usarTemExemplo} from '../estado/exemplo';
 import {DockviewReact, type DockviewApi, type DockviewReadyEvent, type DockviewTheme, type IDockviewPanelHeaderProps, type IDockviewPanelProps} from 'dockview-react';
 import 'dockview-react/dist/styles/dockview.css';
 import {Blend, BookOpen, Box, Check, Copy, Download, Film, FilePlus2, FolderOpen, FolderSearch, History, Home, Image as ImageIcon, Images, LayoutPanelLeft, ListTree,
@@ -258,6 +259,7 @@ const NomeProjeto: React.FC<{nome: string; raiz?: string}> = ({nome, raiz}) => {
 };
 
 export const Casca: React.FC = () => {
+  const temExemplo = usarTemExemplo();
   const area = useLoja((e) => e.area);
   const info = useLoja((e) => e.info);
   const modoComentario = useLoja((e) => e.modoComentario);
@@ -476,7 +478,7 @@ export const Casca: React.FC = () => {
             <button onClick={item(() => void duplicar())}><Copy size={14} />Duplicar projeto…</button>
             <button onClick={item(() => window.estudio.mostrarNaPasta())}><FolderSearch size={14} />Mostrar na pasta</button>
             <button onClick={item(() => void marcarVersao())}><Check size={14} />Marcar ponto de restauração<kbd>Ctrl+S</kbd></button>
-            <button onClick={item(() => void window.estudio.abrirExemplo().then(abrirProjeto).catch((e: Error) => avisar(mensagemDe(e), 'erro')))}><BookOpen size={14} />Ver um pronto (exemplo Cliente)</button>
+            {temExemplo && <button onClick={item(() => void window.estudio.abrirExemplo().then(abrirProjeto).catch((e: Error) => avisar(mensagemDe(e), 'erro')))}><BookOpen size={14} />Ver um pronto</button>}
             <hr />
             <button onClick={item(abrirMidia)}><Images size={14} />Mídia do projeto</button>
             <button onClick={item(() => setMarca(true))}><Palette size={14} />Marca…</button>

@@ -10,7 +10,7 @@ Esta pasta é um projeto do Estúdio, aberto no app. A pessoa edita na interface
   carrossel tem `paginas[]` (cada uma com `id`, `nome` e as suas `camadas`; a raiz fica com `camadas: []`) e as camadas
   se endereçam por `/paginas/P/camadas/N`; `estado_do_editor` diz a página ativa. Exporta PNG por página e PDF.
 - Kit de marca: `aplicar_marca` põe num documento as cores, a fonte, o logo (`midia/logo-<id>.*`) e as fontes próprias
-  (`fontes/`) de um kit (ks, bkm, neutro ou outro criado no app). No vídeo de cenas isso fica no `tema`: `marca` é o id do
+  (`fontes/`) de um kit (bkm, neutro ou outro criado no app). No vídeo de cenas isso fica no `tema`: `marca` é o id do
   kit, e `logo`, `assinatura` e `fontes_arquivos` (cada uma com `familia`, `arquivo` e `peso`) acompanham as cores. Na
   imagem muda o fundo e a fonte e a cor dos textos. `fonte` aceita Inter, Archivo, IBM Plex Sans, IBM Plex Mono ou a
   `familia` de uma fonte própria. Fique nas cores do kit; para outra marca, troque o kit em vez de inventar cores.

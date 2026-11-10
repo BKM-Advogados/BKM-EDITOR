@@ -11,8 +11,8 @@ export const hashDaLinha = (linha: string): string => {
   return h.toString(16).padStart(8, '0');
 };
 
-/** Linhas antigas do app que citavam um cliente pelo nome, guardadas só pelo hash. */
-export const HASHES_DO_TEXTO_ANTIGO: ReadonlySet<string> = new Set(['3fa38a35', '1ab7f9bf']);
+/** Linhas antigas do app que citavam um cliente pelo nome (ou o kit dele), guardadas só pelo hash. */
+export const HASHES_DO_TEXTO_ANTIGO: ReadonlySet<string> = new Set(['3fa38a35', '1ab7f9bf', '19b1d28a']);
 
 /** A linha foi o app quem escreveu (0.2.0 e 0.3.0)? */
 export const linhaDoTextoAntigo = (linha: string) => LINHAS_DO_TEXTO_ANTIGO.has(linha) || HASHES_DO_TEXTO_ANTIGO.has(hashDaLinha(linha));
@@ -49,7 +49,7 @@ export const LINHAS_DO_TEXTO_ANTIGO: ReadonlySet<string> = new Set([
   '  `clipes[]` com `id`, `arquivo` (em `midia/`), `em` (ms na linha do tempo), `duracao_ms`, `corte_ms`, `volume`,',
   '  `fade_in_ms`, `fade_out_ms` e `mudo`. O que ficar fora do vídeo vira aviso, não erro (detalhe em docs/audio.md do app).',
   '- Kit de marca: `aplicar_marca` põe num documento as cores, a fonte, o logo (`midia/logo-<id>.*`) e as fontes próprias',
-  '  (`fontes/`) de um kit (ks, bkm, neutro ou outro criado no app). No vídeo de cenas isso fica no `tema`: `marca` é o id do',
+  '  (`fontes/`) de um kit (bkm, neutro ou outro criado no app). No vídeo de cenas isso fica no `tema`: `marca` é o id do', // a versão antiga, com o id do kit de fábrica que saiu, vai pelo hash
   '  kit, e `logo`, `assinatura` e `fontes_arquivos` (cada uma com `familia`, `arquivo` e `peso`) acompanham as cores. Na',
   '  imagem muda o fundo e a fonte e a cor dos textos. `fonte` aceita Inter, Archivo, IBM Plex Sans, IBM Plex Mono ou a',
   '  `familia` de uma fonte própria. Fique nas cores do kit; para outra marca, troque o kit em vez de inventar cores.',

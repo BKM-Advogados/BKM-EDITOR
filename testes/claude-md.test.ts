@@ -1,16 +1,16 @@
 // CLAUDE.md do projeto refeito ao abrir (integração da rodada 2, 07/11/2026): a parte do app fica entre marcas e acompanha
-// a versão instalada; o que a pessoa escreveu fora delas e o CLAUDE.md escrito à mão do carrossel da Cliente ficam como estão.
+// a versão instalada; o que a pessoa escreveu fora delas e o CLAUDE.md escrito à mão (o do exemplo) ficam como estão.
 import {mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {afterAll, describe, expect, it} from 'vitest';
-import {MARCA_CLAUDE_FIM, MARCA_CLAUDE_INICIO, MARCA_IMAGEM_INICIO, claudeMd, claudeMdAtualizado, gravarPlano, planoDoProjeto, regerarClaudeMd} from '../src/nucleo/criar-projeto';
+import {MARCA_CLAUDE_FIM, MARCA_CLAUDE_INICIO, MARCA_IMAGEM_INICIO, claudeMd, claudeMdAtualizado, gravarPlano, planoDoExemplo, planoDoProjeto, regerarClaudeMd} from '../src/nucleo/criar-projeto';
 import {EFEITOS} from '../src/nucleo/efeitos';
 import {HASHES_DO_TEXTO_ANTIGO, hashDaLinha, linhaDoTextoAntigo} from '../src/nucleo/claude-md-antigo';
 
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'estudio-claude-md-'));
 afterAll(() => rmSync(tmp, {recursive: true, force: true}));
-const EXEMPLO = path.join(__dirname, 'fixtures', 'projeto');
+const EXEMPLO = path.join(__dirname, 'fixtures', 'projeto'); // no papel do exemplo empacotado (src/nucleo/exemplo.ts)
 
 // o texto que a 0.3.0 gravava, tal como o `claudeMd` do commit 580050c o gerava (sem as marcas), por módulo
 const texto030 = (modulo: 'video' | 'imagem') => readFileSync(path.join(__dirname, 'fixtures', `claude-md-030-${modulo}.md`), 'utf-8');
@@ -105,7 +105,7 @@ describe('CLAUDE.md do projeto', () => {
     expect(claudeMdAtualizado(novo, ['imagem'])).toBeNull();
   });
 
-  it('não mexe no CLAUDE.md escrito à mão do carrossel da Cliente nem num da pessoa', () => {
+  it('não mexe no CLAUDE.md escrito à mão do exemplo nem num da pessoa', () => {
     const doExemplo = readFileSync(path.join(EXEMPLO, 'CLAUDE.md'), 'utf-8');
     expect(claudeMdAtualizado(doExemplo, ['video', 'imagem'])).toBeNull();
     expect(claudeMdAtualizado('# Meu projeto\n\nRegras minhas.\n', ['video'])).toBeNull();
@@ -114,7 +114,7 @@ describe('CLAUDE.md do projeto', () => {
   it('as linhas antigas guardadas só pelo hash contam como do app (FNV-1a de 32 bits)', () => {
     expect(hashDaLinha('abc')).toBe('1a47e90b');
     expect(hashDaLinha('')).toBe('811c9dc5');
-    expect(HASHES_DO_TEXTO_ANTIGO.size).toBe(2);
+    expect(HASHES_DO_TEXTO_ANTIGO.size).toBe(3);
     expect(linhaDoTextoAntigo('# Projeto do Estúdio')).toBe(true);
     expect(linhaDoTextoAntigo('- `midia/ana.jpg`: use sempre a foto da Ana nas capas.')).toBe(false);
   });
@@ -144,11 +144,11 @@ describe('CLAUDE.md do projeto', () => {
     expect(claudeMdAtualizado(novo, ['imagem'])).toBeNull();
   });
 
-  it('o CLAUDE.md do modelo da Cliente também lê a parte da imagem (imagem-N3)', () => {
+  it('o CLAUDE.md escrito à mão do exemplo também lê a parte da imagem (imagem-N3)', () => {
     const doExemplo = readFileSync(path.join(EXEMPLO, 'CLAUDE.md'), 'utf-8');
     for (const campo of ['`mascara`', '`sombra`', '`degrade`', '`paginas[]`']) expect(doExemplo).toContain(campo);
     expect(claudeMdAtualizado(doExemplo, ['video', 'imagem', '3d'])).toBeNull(); // o exemplo já vem em dia
-    // projeto da Cliente criado antes, sem o bloco: ganha no fim, e o texto à mão fica como está
+    // projeto criado do exemplo antes, sem o bloco: ganha no fim, e o texto à mão fica como está
     const semBloco = `${doExemplo.slice(0, doExemplo.indexOf(MARCA_IMAGEM_INICIO)).trimEnd()}\n`;
     expect(semBloco).not.toContain('`mascara`');
     const novo = claudeMdAtualizado(semBloco, ['video', 'imagem'])!;
@@ -166,8 +166,8 @@ describe('CLAUDE.md do projeto', () => {
     expect(claudeMdAtualizado('# Meu projeto\n\nRegras minhas.\n', ['imagem'])).toBeNull();
   });
 
-  it('o modelo "Carrossel narrado Cliente" nasce com a parte da imagem no CLAUDE.md', () => {
-    const destino = gravarPlano(path.join(tmp, 'cliente'), planoDoProjeto({nome: 'Cliente', modelo: 'modelo-carrossel'}), EXEMPLO);
+  it('o projeto criado do exemplo nasce com a parte da imagem no CLAUDE.md', () => {
+    const destino = gravarPlano(path.join(tmp, 'exemplo'), planoDoExemplo('Exemplo'), EXEMPLO);
     const md = readFileSync(path.join(destino, 'CLAUDE.md'), 'utf-8');
     expect(md).toContain(MARCA_IMAGEM_INICIO);
     expect(md).toContain('`mascara`');

@@ -1,10 +1,10 @@
 // Criar projeto e documento. `planoDoProjeto` é puro (devolve os arquivos a gravar) e serve à tela inicial, ao MCP e aos
 // testes; `gravarPlano` escreve. A estrutura é a do exemplo: estudio.json, video/, imagem/, 3d/, midia/, saidas/, um
-// .gitignore e um CLAUDE.md que ensina ao Claude o formato dos documentos daquele projeto. Os modelos da Cliente copiam do
-// exemplo empacotado (exemplos/exemplo), sempre em cópia nova. A lista de modelos fica em modelos.ts (sem disco), que a
+// .gitignore e um CLAUDE.md que ensina ao Claude o formato dos documentos daquele projeto. O projeto de exemplo
+// (exemplo.ts) é copiado inteiro, sempre em cópia nova (planoDoExemplo). A lista de modelos fica em modelos.ts (sem disco), que a
 // tela inicial também importa. Um kit de marca entra depois, por aplicarMarcaAoPlano: tema do documento, logo em
 // midia/ e fontes em fontes/. Projeto com vídeo ou imagem ganha no CLAUDE.md a seção "Pesquisa" (pesquisa/, docs/pesquisa.md);
-// no modelo modelo-carrossel, que copia o CLAUDE.md do exemplo, a seção já vem no exemplo (e é acrescentada se faltar).
+// no exemplo, que traz o CLAUDE.md dele, a seção é acrescentada se faltar.
 import {copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import jsonpatch, {type Operation} from 'fast-json-patch';
@@ -180,7 +180,7 @@ const secaoEfeitos = () => {
 };
 
 /** O item "Imagem" da lista de arquivos do CLAUDE.md: camadas, páginas do carrossel, sombra, contorno, degradê, máscara e
- *  remover fundo. Também vai, entre as marcas da imagem (abaixo), no CLAUDE.md escrito à mão do modelo da Cliente (imagem-N3). */
+ *  remover fundo. Também vai, entre as marcas da imagem (abaixo), num CLAUDE.md escrito à mão (imagem-N3). */
 export const linhasDaImagem = (): string[] => [
   '- Imagem: `largura`, `altura`, `fundo`, `camadas` (`imagem`, `texto`, `forma`) de baixo para cima e `efeitos`. Um',
   '  carrossel tem `paginas[]` (cada uma com `id`, `nome` e as suas `camadas`; a raiz fica com `camadas: []`) e as camadas',
@@ -266,7 +266,7 @@ export const claudeMd = (modulos: Modulo[]) => {
   if (tem('video') || tem('imagem')) {
     linhas.push(
       '- Kit de marca: `aplicar_marca` põe num documento as cores, a fonte, o logo (`midia/logo-<id>.*`) e as fontes próprias',
-      '  (`fontes/`) de um kit (ks, bkm, neutro ou outro criado no app). No vídeo de cenas isso fica no `tema`: `marca` é o id do',
+      '  (`fontes/`) de um kit (bkm, neutro ou outro criado no app). No vídeo de cenas isso fica no `tema`: `marca` é o id do',
       '  kit, e `logo`, `assinatura` e `fontes_arquivos` (cada uma com `familia`, `arquivo` e `peso`) acompanham as cores. Na',
       '  imagem muda o fundo e a fonte e a cor dos textos. `fonte` aceita Inter, Archivo, IBM Plex Sans, IBM Plex Mono ou a',
       '  `familia` de uma fonte própria. Fique nas cores do kit; para outra marca, troque o kit em vez de inventar cores.',
@@ -312,14 +312,14 @@ const TITULO = '# Projeto do Estúdio';
 const FRASE_DO_APP = 'Esta pasta é um projeto do Estúdio, aberto no app. A pessoa edita na interface; você edita pelas ferramentas do MCP';
 const FIM_DO_TEXTO = 'Tudo o que você faz cai nos documentos, e a pessoa edita depois. Não grave fora da pasta do projeto.';
 
-// O CLAUDE.md escrito à mão do modelo "Carrossel narrado Cliente" (exemplos/exemplo) não leva o texto do app, mas leva a parte da
+// Um CLAUDE.md escrito à mão (o dos projetos criados do exemplo antigo, por exemplo) não leva o texto do app, mas leva a parte da
 // imagem entre estas marcas, refeita ao abrir: o Claude daquele modelo também lê `mascara`, `sombra`, `degrade` e `paginas`
 // (imagem-N3). O resto do arquivo é da pessoa e fica como está.
 export const MARCA_IMAGEM_INICIO = '<!-- estudio:imagem:inicio · parte do app, refeita ao abrir o projeto; escreva fora destas marcas -->';
 export const MARCA_IMAGEM_FIM = '<!-- estudio:imagem:fim -->';
-const FRASE_DO_EXEMPLO_CLIENTE = 'A pessoa edita na interface; você edita pelo terminal.';
+const FRASE_DO_TEXTO_A_MAO = 'A pessoa edita na interface; você edita pelo terminal.';
 
-/** O bloco da imagem com as marcas, para o fim do CLAUDE.md do modelo da Cliente. */
+/** O bloco da imagem com as marcas, para o fim de um CLAUDE.md escrito à mão. */
 export const blocoDaImagem = (): string => [MARCA_IMAGEM_INICIO, '## Imagem e carrossel', '', ...linhasDaImagem(), MARCA_IMAGEM_FIM, ''].join('\n');
 
 /** O que a pessoa (ou o Claude) escreveu dentro do texto antigo do app (imagem-N5): as linhas que o app nunca escreveu.
@@ -332,7 +332,7 @@ export const anotacoesDoTextoAntigo = (textoAntigo: string): string => {
 
 /** O CLAUDE.md novo a partir do atual, ou null se nada muda. Sem arquivo: o texto gerado. Com as marcas: troca só o que
  *  está entre elas. Texto antigo do app, sem marcas: troca pelo gerado e guarda depois dele o que a pessoa escreveu antes
- *  ou depois. Outro texto (o CLAUDE.md escrito à mão do carrossel narrado, ou um da pessoa): não mexe. */
+ *  ou depois. Outro texto (um CLAUDE.md escrito à mão, como o do exemplo, ou um da pessoa): não mexe. */
 export const claudeMdAtualizado = (atual: string | null, modulos: Modulo[]): string | null => {
   const gerado = claudeMd(modulos);
   if (atual === null) return gerado;
@@ -349,11 +349,11 @@ export const claudeMdAtualizado = (atual: string | null, modulos: Modulo[]): str
     const depois = texto.slice(fim).trim();
     novo = `${[gerado.trimEnd(), anotacoesDoTextoAntigo(texto.slice(ini, fim)), antes, depois].filter(Boolean).join('\n\n')}\n`;
   } else if (modulos.includes('imagem')) {
-    // o modelo da Cliente: texto à mão, e só a parte da imagem é do app (imagem-N3)
+    // texto à mão com a frase do exemplo: só a parte da imagem é do app (imagem-N3)
     const ii = texto.indexOf(MARCA_IMAGEM_INICIO);
     const fi = ii >= 0 ? texto.indexOf(MARCA_IMAGEM_FIM, ii) : -1;
     if (ii >= 0 && fi > ii) novo = texto.slice(0, ii) + blocoDaImagem().trimEnd() + texto.slice(fi + MARCA_IMAGEM_FIM.length);
-    else if (texto.includes(FRASE_DO_EXEMPLO_CLIENTE)) novo = `${texto.trimEnd()}\n\n${blocoDaImagem()}`;
+    else if (texto.includes(FRASE_DO_TEXTO_A_MAO)) novo = `${texto.trimEnd()}\n\n${blocoDaImagem()}`;
   }
   return novo === null || novo === texto ? null : novo;
 };
@@ -381,26 +381,21 @@ export type OpcoesProjeto = {nome: string; modelo: IdModelo; formato?: Formato |
 export type Plano = {manifesto: Manifesto; arquivos: Record<string, string>; pastas: string[]; copiarDoExemplo?: string[]; copiar?: {de: string; para: string}[];
   acrescentarAoClaudeMd?: string};
 
-/** Arquivos de um projeto novo (sem gravar nada). Modelos da Cliente listam o que copiar do exemplo em `copiarDoExemplo`. */
+/** O projeto de exemplo inteiro (exemplo.ts) com o nome novo; `gravarPlano` copia a pasta dele. */
+export const planoDoExemplo = (nome: string): Plano => ({
+  manifesto: {formato: 1, nome: nome.trim() || 'Sem título', documentos: []},
+  arquivos: {'.gitignore': GITIGNORE},
+  pastas: ['midia', 'saidas', '.estudio'],
+  copiarDoExemplo: ['.'],
+  acrescentarAoClaudeMd: secaoPesquisa().join('\n'),
+});
+
+/** Arquivos de um projeto novo (sem gravar nada). */
 export const planoDoProjeto = (o: OpcoesProjeto): Plano => {
   const modelo = MODELOS.find((m) => m.id === o.modelo);
   if (!modelo) throw new Error(`modelo desconhecido: ${o.modelo}`);
   const nome = o.nome.trim() || 'Sem título';
   const pastas = ['midia', 'saidas', '.estudio'];
-  if (o.modelo === 'modelo-carrossel') {
-    // o exemplo inteiro, com o nome novo
-    return {manifesto: {formato: 1, nome, documentos: []}, arquivos: {'.gitignore': GITIGNORE}, pastas, copiarDoExemplo: ['.'],
-      acrescentarAoClaudeMd: secaoPesquisa().join('\n')};
-  }
-  if (o.modelo === 'modelo-capa') {
-    const manifesto: Manifesto = {formato: 1, nome, documentos: [{id: 'capa', modulo: 'imagem', caminho: 'imagem/capa.json', titulo: 'Capa'}]};
-    return {
-      manifesto,
-      arquivos: {'estudio.json': serializar(manifesto), '.gitignore': GITIGNORE, 'CLAUDE.md': claudeMd(['imagem'])},
-      pastas,
-      copiarDoExemplo: ['imagem/capa.json', 'midia/Cidade Exemplo.jpg', 'midia/logo-exemplo.png'],
-    };
-  }
   if (o.modelo === 'animacao-logo-pixel') {
     const entrada: EntradaDocumento = {id: 'animacao', modulo: 'animacao', caminho: 'animacao/animacao.json', titulo: 'Logo em pixels'};
     const manifesto: Manifesto = {formato: 1, nome, documentos: [entrada]};
@@ -440,7 +435,7 @@ export const aplicarMarcaAoPlano = (plano: Plano, marca: MarcaLida, existe: (p: 
   return plano;
 };
 
-/** Grava o plano numa pasta nova. `exemplo` é a pasta do exemplo empacotado (só para os modelos da Cliente). */
+/** Grava o plano numa pasta nova. `exemplo` é a pasta do exemplo empacotado (só para o planoDoExemplo). */
 export const gravarPlano = (destino: string, plano: Plano, exemplo?: string) => {
   if (existsSync(path.join(destino, 'estudio.json'))) throw new Error(`já existe um projeto em ${destino}`);
   mkdirSync(destino, {recursive: true});

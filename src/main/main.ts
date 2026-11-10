@@ -7,7 +7,8 @@ import os from 'node:os';
 import {CANAL, type InfoProjeto, type Metricas, type NovoProjeto, type Perfil, type Preferencias, type Progresso, type ResultadoExportacao, type Retangulo} from '../compartilhado/api';
 import {contaClaude} from './conversa';
 import type {Comentario, EstadoEditor, Manifesto, Modulo, OperacaoPatch} from '../nucleo/documentos';
-import {aplicarMarcaAoPlano, dentroDoOneDrive, documentoNovo, gravarPlano, nomeDePasta, nomePadrao, pastaLivre, planoDoProjeto, regerarClaudeMd} from '../nucleo/criar-projeto';
+import {aplicarMarcaAoPlano, dentroDoOneDrive, documentoNovo, gravarPlano, nomeDePasta, nomePadrao, pastaLivre, planoDoExemplo, planoDoProjeto, regerarClaudeMd} from '../nucleo/criar-projeto';
+import {EXEMPLO} from '../nucleo/exemplo';
 import {MODELOS} from '../nucleo/modelos';
 import {FORMATO_PADRAO, type Formato} from '../nucleo/formatos';
 import {argumentosDoRender, destinoDoFormato, fontesDaMarcaDagua, FORMATOS_IMAGEM_SAIDA, legendasDasProps, marcaDaguaDoDestino, nomesDosArquivos, type OpcoesExportarImagem,
@@ -86,7 +87,8 @@ const conversas = criarSessoesIA({evento: (id, e) => enviar(CANAL.conversaEvento
     ...(claudeFalso ? {prefixo: [claudeFalso], ambienteExtra: {ELECTRON_RUN_AS_NODE: '1'}} : {})}});
 
 const recursos = (rel: string) => (app.isPackaged ? path.join(process.resourcesPath, rel) : path.join(app.getAppPath(), rel));
-const pastaDoExemplo = () => recursos(path.join('exemplos', 'exemplo'));
+const pastaDoExemplo = () => recursos(path.join('exemplos', EXEMPLO.pasta));
+const temExemplo = () => existsSync(path.join(pastaDoExemplo(), 'estudio.json'));
 
 const confiavel = (e: IpcMainInvokeEvent | Electron.IpcMainEvent) => {
   if (!janela || e.sender.id !== janela.webContents.id) throw new Error('chamada de IPC de origem desconhecida');
@@ -187,7 +189,7 @@ const criarProjeto = async (o: NovoProjeto) => {
   const destino = pastaLivre(o.pasta || prefs.pasta_projetos, nome);
   const plano = planoDoProjeto({nome, modelo: o.modelo, formato: o.formato});
   if (o.marca) aplicarMarcaAoPlano(plano, marcas.ler(o.marca));
-  gravarPlano(destino, plano, pastaDoExemplo());
+  gravarPlano(destino, plano);
   const modulo = MODELOS.find((m) => m.id === o.modelo)?.modulo;
   if (o.formato_id && modulo === 'video') memoria.gravarPrefs({formato_video: o.formato_id});
   if (o.formato_id && modulo === 'imagem') memoria.gravarPrefs({formato_imagem: o.formato_id});
@@ -269,7 +271,13 @@ lidar(CANAL.abrirPasta, async () => {
   return r.canceled || !r.filePaths[0] ? null : abrirProjeto(r.filePaths[0]);
 });
 // o exemplo sempre em cópia nova: editar não estraga o "ver um pronto" da próxima vez
-lidar(CANAL.abrirExemplo, () => criarProjeto({modelo: 'modelo-carrossel', nome: 'Exemplo · Cliente C2'}));
+lidar(CANAL.temExemplo, () => temExemplo());
+lidar(CANAL.abrirExemplo, () => {
+  if (!temExemplo()) throw new Error('Esta instalação não traz um projeto de exemplo.');
+  const destino = pastaLivre(memoria.prefs().pasta_projetos, EXEMPLO.nome);
+  gravarPlano(destino, planoDoExemplo(EXEMPLO.nome), pastaDoExemplo());
+  return abrirProjeto(destino);
+});
 lidar(CANAL.abrirProjeto, (raiz: string) => abrirProjeto(raiz));
 lidar(CANAL.projetoAtual, () => info());
 lidar(CANAL.criarProjeto, (o: NovoProjeto) => criarProjeto(o));

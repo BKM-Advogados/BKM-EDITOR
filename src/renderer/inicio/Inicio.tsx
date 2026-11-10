@@ -4,6 +4,7 @@
 // cria; Enter cria com o que está marcado. Nada pergunta fps, codec ou pasta: tudo tem padrão e fica em "Mais opções".
 // Esta tela não carrega o editor (Remotion, Player, dockview): a casca vem depois, com React.lazy.
 import React, {useEffect, useMemo, useState} from 'react';
+import {usarTemExemplo} from '../estado/exemplo';
 import {ArrowUp, BookOpen, Box, Check, ChevronDown, ChevronRight, Copy, Film, FolderOpen, FolderSearch, Image as ImageIcon, MoreHorizontal, Music, Sparkle, Sparkles, Trash2,
   TriangleAlert, X} from 'lucide-react';
 import type {Ambiente, ContaClaude, MarcaInfo, NovoProjeto, Preferencias, Recente} from '../../compartilhado/api';
@@ -121,6 +122,7 @@ const CartaoRecente: React.FC<{r: Recente; grande?: boolean; aoAbrir: () => void
 export const Inicio: React.FC = () => {
   const aviso = useLoja((e) => e.aviso);
   const [aba, setAba] = useState<Modulo>('video');
+  const temExemplo = usarTemExemplo();
   const [prefs, setPrefs] = useState<Preferencias | null>(null);
   const [ambiente, setAmbiente] = useState<Ambiente | null>(null);
   const [conta, setConta] = useState<ContaClaude | null>(null);
@@ -155,7 +157,7 @@ export const Inicio: React.FC = () => {
   const preset = aba === '3d' || aba === 'musica' ? null : lista.find((f) => f.id === idFormato) ?? lista[0];
   const tamanho = idFormato === PERSONALIZADO ? livre : preset ? {largura: preset.largura, altura: preset.altura, fps: livre.fps} : undefined;
   const modelos = MODELOS.filter((m) => m.modulo === aba);
-  const branco = modelos.find((m) => !m.exemplo)!.id;
+  const branco = modelos[0]?.id;
   const kit = aba !== '3d' ? marcas.find((m) => m.id === marca) : undefined;
   const chip = aba === '3d' ? 'Cena 3D · Em branco' : `${idFormato === PERSONALIZADO ? `${livre.largura}×${livre.altura}` : preset?.proporcao}${kit ? ` · ${kit.nome}` : ''} · Em branco`;
   const claudePronto = Boolean(ambiente?.claude && conta?.instalado);
@@ -165,7 +167,7 @@ export const Inicio: React.FC = () => {
     setOcupado(true);
     try {
       const o: NovoProjeto = {modelo, nome: nome.trim() || undefined, pasta: pasta || undefined,
-        ...(aba !== '3d' && tamanho && !MODELOS.find((m) => m.id === modelo)?.exemplo ? {formato: tamanho, formato_id: idFormato, marca: kit?.id} : {})};
+        ...(aba !== '3d' && tamanho ? {formato: tamanho, formato_id: idFormato, marca: kit?.id} : {})};
       const info = await window.estudio.criarProjeto(o);
       if (pedidoClaude) loja.definir({pedidoClaude});
       await abrirProjeto(info);
@@ -269,7 +271,7 @@ export const Inicio: React.FC = () => {
               </ul>
               <div className="fp-botoes">
                 <button className="bt principal" onClick={async () => setPrefs(await window.estudio.gravarPreferencias({boas_vindas_vista: true}))}>Pronto</button>
-                <button className="bt fantasma" onClick={() => void verExemplo()}><BookOpen size={14} />Ver um pronto</button>
+                {temExemplo && <button className="bt fantasma" onClick={() => void verExemplo()}><BookOpen size={14} />Ver um pronto</button>}
               </div>
             </section>
           )}
@@ -303,14 +305,14 @@ export const Inicio: React.FC = () => {
             <div className="rotulo-secao">Modelo</div>
             <div className="grade-modelos">
               {modelos.map((m) => (
-                <button key={m.id} className={`cartao-modelo${m.exemplo ? '' : ' principal'}`} disabled={ocupado} onClick={() => void criar(m.id)}>
-                  <span className="cm-poster">{m.exemplo ? <span className="cm-cliente">Cliente</span> : ICONE_MODULO[m.modulo]}</span>
+                <button key={m.id} className="cartao-modelo principal" disabled={ocupado} onClick={() => void criar(m.id)}>
+                  <span className="cm-poster">{ICONE_MODULO[m.modulo]}</span>
                   <span className="cm-texto">
-                    <span className="cm-nome">{m.nome}{!m.exemplo && !m.formato_fixo && aba !== '3d' && <span className="cm-chip">{chip.replace(' · Em branco', '')}</span>}
+                    <span className="cm-nome">{m.nome}{!m.formato_fixo && aba !== '3d' && <span className="cm-chip">{chip.replace(' · Em branco', '')}</span>}
                       {m.formato_fixo && <span className="cm-chip">{FORMATOS_VIDEO.find((f) => f.id === m.formato_fixo)?.proporcao ?? m.formato_fixo}</span>}</span>
                     <span className="cm-desc">{m.descricao}</span>
                   </span>
-                  {!m.exemplo && <kbd>Enter</kbd>}
+                  <kbd>Enter</kbd>
                 </button>
               ))}
             </div>
@@ -381,8 +383,9 @@ export const Inicio: React.FC = () => {
           {recentes === null ? <div className="vazio">carregando os recentes…</div> : !continuar ? (
             <section className="sem-recentes">
               <div className="sr-titulo">Nenhum projeto ainda</div>
-              <div className="sr-texto">Escolha um formato e um modelo ao lado, ou veja um vídeo pronto para entender como o Estúdio funciona.</div>
-              <button className="bt" onClick={() => void verExemplo()}><BookOpen size={14} />Ver um pronto (carrossel narrado)</button>
+              <div className="sr-texto">{temExemplo ? 'Escolha um formato e um modelo ao lado, ou veja um projeto pronto para entender como o Estúdio funciona.'
+                : 'Escolha um formato e um modelo ao lado.'}</div>
+              {temExemplo && <button className="bt" onClick={() => void verExemplo()}><BookOpen size={14} />Ver um pronto</button>}
             </section>
           ) : (
             <>
@@ -399,7 +402,7 @@ export const Inicio: React.FC = () => {
           )}
           <div className="inicio-acoes">
             <button className="bt fantasma" onClick={() => void abrirPasta()}><FolderOpen size={14} />Abrir pasta…<kbd>Ctrl+O</kbd></button>
-            <button className="bt fantasma" onClick={() => void verExemplo()}><BookOpen size={14} />Ver um pronto</button>
+            {temExemplo && <button className="bt fantasma" onClick={() => void verExemplo()}><BookOpen size={14} />Ver um pronto</button>}
           </div>
         </div>
       </main>

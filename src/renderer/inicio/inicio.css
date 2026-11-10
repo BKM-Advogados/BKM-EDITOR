@@ -60,7 +60,6 @@
 .cartao-modelo kbd { margin-left: auto; flex: none; }
 .cm-poster { flex: none; width: 46px; height: 46px; border-radius: 6px; background: var(--fundo-0); display: grid; place-items: center; color: var(--texto-2); }
 .cartao-modelo.principal .cm-poster { color: var(--acento); }
-.cm-cliente { font: 700 13px var(--fonte); color: #c88155; letter-spacing: 0.04em; }
 .cm-texto { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .cm-nome { font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .cm-desc { color: var(--texto-2); line-height: 1.35; }

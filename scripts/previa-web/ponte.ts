@@ -67,7 +67,7 @@ const nomearClipes = (doc: unknown) => {
   };
   andar(doc);
 };
-// kits de marca em memória: os três de fábrica, sem logo (não há servidor de mídia aqui), e um quarto com uma fonte de
+// kits de marca em memória: os de fábrica, sem logo (não há servidor de mídia aqui), e um quarto com uma fonte de
 // arquivo de verdade: o woff2 do JetBrains Mono que o Vite já serve de node_modules, para ver a fonte própria chegar à
 // prévia pelo mesmo caminho do app (tema.fontes_arquivos → registro → @remotion/fonts). Vai como URL completa porque o
 // Vite não entende o "@" codificado que o midia() produziria no caminho.
@@ -87,9 +87,9 @@ const aplicarMarca = (p: Proj, idMarca: string, documento: string) => {
   return {versao: String(p.versao), marca: m.id, nome: m.nome, copiados: [], atualizados: []};
 };
 const recentes: Recente[] = new URLSearchParams(location.search).has('vazio') ? [] : [
-  {raiz: 'C:\\Users\\pessoa\\Estudio\\Cliente C2', nome: 'Cliente · C2 · Transferência de cidade', aberto_em: new Date(Date.now() - 3 * 3600e3).toISOString(), existe: true, modulos: ['video', 'imagem', '3d']},
+  {raiz: 'C:\\Users\\pessoa\\Estudio\\Documentos em ordem', nome: 'Documentos em ordem', aberto_em: new Date(Date.now() - 3 * 3600e3).toISOString(), existe: true, modulos: ['video', 'imagem', '3d']},
   {raiz: 'C:\\Users\\pessoa\\Estudio\\Ferias', nome: 'Férias proporcionais', aberto_em: new Date(Date.now() - 26 * 3600e3).toISOString(), existe: true, modulos: ['video']},
-  {raiz: 'C:\\Users\\pessoa\\Estudio\\Capa', nome: 'Capa do C3', aberto_em: new Date(Date.now() - 5 * 86400e3).toISOString(), existe: false, modulos: ['imagem']},
+  {raiz: 'C:\\Users\\pessoa\\Estudio\\Capa', nome: 'Capa do carrossel', aberto_em: new Date(Date.now() - 5 * 86400e3).toISOString(), existe: false, modulos: ['imagem']},
 ];
 // ---------- pesquisa de exemplo ----------
 // Duas fontes e três fatos, à mão (pesquisa.ts usa node:crypto e não roda aqui): um fato que confere, um com número
@@ -147,7 +147,7 @@ const progresso = (p: Progresso) => ouvintesProgresso.forEach((f) => f(p));
 const esperar = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
 const pastaSaidas = () => `${aberto!.raiz}\\saidas`;
 
-const info = (): InfoProjeto | null => aberto && {raiz: aberto.raiz, manifesto: structuredClone(aberto.manifesto), base_midia: `${location.origin}/exemplos/exemplo`, claude: true, git: true,
+const info = (): InfoProjeto | null => aberto && {raiz: aberto.raiz, manifesto: structuredClone(aberto.manifesto), base_midia: `${location.origin}/testes/fixtures/projeto`, claude: true, git: true,
   perfil: {nome: 'padrao', sessoes_claude: 4, escala_previa: 0.75, pixel_ratio: 1.5}, estado: null};
 
 const docImagem = (l: number, a: number) => ({formato: 1, largura: l, altura: a, fundo: '#111418', camadas: [{id: 'titulo', nome: 'Título', tipo: 'texto',
@@ -178,7 +178,6 @@ const novoDocumento = (p: Proj, modulo: Modulo, f?: {largura: number; altura: nu
 
 const criar = (o: NovoProjeto): InfoProjeto => {
   const modelo = MODELOS.find((m) => m.id === o.modelo)!;
-  if (modelo.exemplo) throw new Error('Na prévia web os modelos da Cliente não abrem (precisam do exemplo empacotado).');
   const nome = o.nome || 'Sem título · 05/11 14:32';
   const p: Proj = {raiz: `${prefs.pasta_projetos}\\${nome}`, manifesto: {formato: 1, nome, documentos: []}, docs: {}, versao: 1};
   const doc = novoDocumento(p, modelo.modulo, o.formato as never);
@@ -193,8 +192,9 @@ const nada = () => undefined;
 const api: ApiEstudio = {
   abrirPasta: async () => null,
   abrirExemplo: async () => {
-    throw new Error('Na prévia web o exemplo da Cliente não abre (precisa do exemplo empacotado).');
+    throw new Error('Na prévia web o exemplo não abre (precisa do exemplo empacotado).');
   },
+  temExemplo: async () => false,
   abrirProjeto: async (raiz) => {
     const p = projetos.get(raiz);
     if (!p) throw new Error(`Na prévia web só abrem os projetos criados nesta sessão: ${raiz}`);
@@ -603,7 +603,7 @@ const lerJsonSemFala = api.lerJson;
 api.lerJson = (async (caminho: string) => (palavrasSimuladas.has(caminho) ? structuredClone(palavrasSimuladas.get(caminho)) : lerJsonSemFala(caminho))) as ApiEstudio['lerJson'];
 // ---------- vídeo curto (frente C): fotos e logo de mentira ----------
 // "Escolher imagem" devolve uma de três fotos sintéticas (SVG em data URL, com céu, sol, morros e uma grade fina para
-// o Ken Burns ficar visível); o kit da Cliente aplicado ganha um logo de exemplo no tema, para a marca d'água ter o que pôr.
+// o Ken Burns ficar visível); o kit bkm aplicado ganha um logo de exemplo no tema, para a marca d'água ter o que pôr.
 const svg = (s: string) => `data:image/svg+xml;utf8,${encodeURIComponent(s)}`;
 const FOTOS = [['#3E6FA8', '#F2C46B', '#2E5E3A'], ['#7A4E8C', '#F28C6B', '#3D3A5E'], ['#1F7A8C', '#F5E6A8', '#5E4A2E']].map(([ceu, sol, morro], i) => svg(
   `<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000"><defs><linearGradient id="c" x1="0" y1="0" x2="0" y2="1">`
@@ -613,9 +613,8 @@ const FOTOS = [['#3E6FA8', '#F2C46B', '#2E5E3A'], ['#7A4E8C', '#F28C6B', '#3D3A5
   + Array.from({length: 15}, (_, k) => `<path d="M${(k + 1) * 100} 0V1000" stroke="#fff" stroke-opacity="0.12"/>`).join('')
   + Array.from({length: 9}, (_, k) => `<path d="M0 ${(k + 1) * 100}H1600" stroke="#fff" stroke-opacity="0.12"/>`).join('')
   + `<text x="60" y="110" font-family="sans-serif" font-size="64" font-weight="700" fill="#fff">Foto ${i + 1}</text></svg>`));
-const LOGO_EXEMPLO = svg('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="200" viewBox="0 0 600 200"><rect width="600" height="200" rx="24" fill="#C88155"/>'
-  + '<text x="40" y="138" font-family="sans-serif" font-size="110" font-weight="800" fill="#F4F0EA">Cliente</text>'
-  + '<text x="230" y="125" font-family="sans-serif" font-size="46" font-weight="600" fill="#F4F0EA">ADVOGADOS</text></svg>');
+const LOGO_EXEMPLO = svg('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="200" viewBox="0 0 600 200"><rect width="600" height="200" rx="24" fill="#4A90D9"/>'
+  + '<text x="40" y="128" font-family="sans-serif" font-size="80" font-weight="800" fill="#F3F4F6">EXEMPLO</text></svg>');
 const prefsExportacao = new Map<string, PrefsExportacao>();
 let vezFoto = 0;
 const escolherMidiaOriginal = api.escolherMidia;
@@ -624,7 +623,7 @@ const aplicarOriginal = api.marcas.aplicar;
 api.marcas.aplicar = async (id, documento) => {
   const r = await aplicarOriginal(id, documento);
   const tema = (aberto!.docs[documento] as {tema?: Record<string, unknown>}).tema;
-  if (id === 'cliente' && tema) tema.logo = LOGO_EXEMPLO;
+  if (id === 'bkm' && tema) tema.logo = LOGO_EXEMPLO;
   return r;
 };
 // ---------- frente Som (rodada 2): limpeza de voz e medidor de loudness, com o mesmo núcleo do app ----------
@@ -734,23 +733,23 @@ const fundoNaPrevia = (() => {
 })();
 
 // ---------- frente Casca: painel de mídia (docs/casca.md) ----------
-// Os seis arquivos reais do exemplo da Cliente (o Vite os serve em /exemplos/exemplo/midia, e a base de mídia da prévia aponta para lá,
-// então as miniaturas e a prévia tocam de verdade) e alguns de mentira com derivados e subpasta, para ver o agrupamento, as
-// pastas, a busca e a marcação das tomadas. As marcas ficam em memória, como no resto da ponte.
+// Os dois arquivos reais do projeto de teste (o Vite os serve em /testes/fixtures/projeto/midia, e a base de mídia da prévia
+// aponta para lá, então as miniaturas aparecem de verdade) e alguns de mentira com derivados e subpasta, para ver o
+// agrupamento, as pastas, a busca e a marcação das tomadas. As marcas ficam em memória, como no resto da ponte.
 const MB = 1024 * 1024;
 const midiaNaPrevia = (() => {
   const hoje = Date.now();
   const arquivos: ArquivoBruto[] = [
-    {rel: 'midia/video-exemplo.mp4', tamanho: 9_316_651, modificado_ms: hoje - 3 * 3600e3, duracao_ms: 38_000},
-    {rel: 'midia/Cidade Exemplo.jpg', tamanho: 709_144, modificado_ms: hoje - 26 * 3600e3},
-    {rel: 'midia/logo-exemplo.png', tamanho: 49_252, modificado_ms: hoje - 48 * 3600e3, largura: 512, altura: 512},
+    {rel: 'midia/foto.jpg', tamanho: 15_059, modificado_ms: hoje - 26 * 3600e3, largura: 1080, altura: 760},
+    {rel: 'midia/logo.png', tamanho: 1_235, modificado_ms: hoje - 48 * 3600e3, largura: 600, altura: 180},
+    // de mentira: sem o arquivo por trás, só para o agrupamento
+    {rel: 'midia/narracao.mp4', tamanho: 9 * MB, modificado_ms: hoje - 3 * 3600e3, duracao_ms: 77_000},
     {rel: 'midia/sfx/carimbo_0.wav', tamanho: 42_284, modificado_ms: hoje - 72 * 3600e3, duracao_ms: 960},
     {rel: 'midia/sfx/impacto_grave.wav', tamanho: 211_244, modificado_ms: hoje - 72 * 3600e3, duracao_ms: 2400},
     {rel: 'midia/sfx/papel_desliza_0.wav', tamanho: 53_804, modificado_ms: hoje - 72 * 3600e3, duracao_ms: 1220},
     {rel: 'midia/sfx/pop.wav', tamanho: 34_604, modificado_ms: hoje - 72 * 3600e3, duracao_ms: 780},
     {rel: 'midia/sfx/swell.wav', tamanho: 163_244, modificado_ms: hoje - 72 * 3600e3, duracao_ms: 3700},
     {rel: 'midia/sfx/whoosh.wav', tamanho: 105_644, modificado_ms: hoje - 72 * 3600e3, duracao_ms: 2400},
-    // de mentira: sem o arquivo por trás, só para o agrupamento
     {rel: 'midia/narracao.wav', tamanho: 5 * MB, modificado_ms: hoje - 600e3, duracao_ms: 61_000},
     {rel: 'midia/narracao.wav.palavras.json', tamanho: 18_000, modificado_ms: hoje - 590e3},
     {rel: 'midia/narracao.wav.envelope.json', tamanho: 9_000, modificado_ms: hoje - 590e3},

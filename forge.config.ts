@@ -180,8 +180,9 @@ const config = {
         ? "{node_modules/@remotion/compositor-*,node_modules/@lydell/**,remotion-browser}"
         : "{node_modules/@remotion/compositor-*,node_modules/@lydell/**}",
     },
-    // o servidor MCP (rodado pelo Claude com o próprio Electron em modo Node) e o projeto de exemplo
-    extraResource: ["dist-mcp", "exemplos"],
+    // o servidor MCP (rodado pelo Claude com o próprio Electron em modo Node) e, quando o repositório traz, a pasta
+    // exemplos/ com o projeto do "Ver um pronto" (src/nucleo/exemplo.ts); sem ela o app não oferece o exemplo
+    extraResource: ["dist-mcp", ...(existsSync("exemplos") ? ["exemplos"] : [])],
     osxUniversal: {
       // These compositor binaries are already architecture-specific and should not be
       // merged with lipo during universal packaging.

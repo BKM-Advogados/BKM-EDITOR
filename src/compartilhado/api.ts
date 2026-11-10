@@ -19,6 +19,7 @@ import type {PedidoExportarMusica, ResultadoExportarMusica} from '../nucleo/musi
 export const CANAL = {
   abrirPasta: 'estudio:abrir-pasta',
   abrirExemplo: 'estudio:abrir-exemplo',
+  temExemplo: 'estudio:tem-exemplo',
   abrirProjeto: 'estudio:abrir-projeto',
   projetoAtual: 'estudio:projeto-atual',
   criarProjeto: 'estudio:criar-projeto',
@@ -218,6 +219,8 @@ export type EventoConversa =
 export type ApiEstudio = {
   abrirPasta: () => Promise<InfoProjeto | null>;
   abrirExemplo: () => Promise<InfoProjeto>;
+  /** Se esta instalação traz o projeto de exemplo (src/nucleo/exemplo.ts); sem ele, a interface não mostra "Ver um pronto". */
+  temExemplo: () => Promise<boolean>;
   abrirProjeto: (raiz: string) => Promise<InfoProjeto>;
   projetoAtual: () => Promise<InfoProjeto | null>;
   criarProjeto: (o: NovoProjeto) => Promise<InfoProjeto>;
