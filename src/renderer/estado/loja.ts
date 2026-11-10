@@ -10,7 +10,7 @@ import {indicePagina, paginasDe} from '../../nucleo/carrossel';
 import {EstadoDeGravacao, FilaPorChave, JANELA_EDICAO_PROPRIA_MS, mensagemDeFalhaNaEdicao, validadeDoAviso, type Gravacao} from './gravacao'; // frente Casca
 export {VALIDADE_AVISO_MS} from './gravacao';
 
-export type Area = 'video' | 'imagem' | '3d' | 'efeitos' | 'animacao';
+export type Area = 'video' | 'imagem' | '3d' | 'efeitos' | 'musica' | 'animacao';
 export type Lido = {doc: any; versao: string};
 // `caminho` é a camada (ou objeto) principal, a última escolhida; `outros` são as demais da seleção múltipla da imagem
 // (B2, rodada 3), no mesmo documento. Quem só conhece uma seleção lê `caminho` como sempre; caminhosDaSelecao dá todas.
@@ -151,7 +151,7 @@ export const quandoTrocarProjeto = (f: () => void) => {
   };
 };
 
-const AREAS_VALIDAS = new Set<Area>(['video', 'imagem', '3d', 'efeitos', 'animacao']);
+const AREAS_VALIDAS = new Set<Area>(['video', 'imagem', '3d', 'efeitos', 'musica', 'animacao']);
 
 export const abrirProjeto = async (info: InfoProjeto) => {
   const mesmo = estado.info?.raiz === info.raiz;

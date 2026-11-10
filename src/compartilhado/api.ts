@@ -13,6 +13,8 @@ import type {Pesquisa} from '../nucleo/pesquisa';
 import type {EstadoDaTomada, IndiceDaMidia, MarcaDeMidia} from '../nucleo/midia'; // frente Casca
 import type {EstadoModeloFundo} from '../nucleo/remover-fundo';
 import type {EstadoDaFala} from '../nucleo/legendas'; // frente Fala
+import type {PedidoLevar, ResultadoConcluir, ResultadoLevar, ResultadoVolta} from '../nucleo/transicoes'; // frente Música
+import type {PedidoExportarMusica, ResultadoExportarMusica} from '../nucleo/musica-projeto'; // frente Música
 
 export const CANAL = {
   abrirPasta: 'estudio:abrir-pasta',
@@ -141,6 +143,16 @@ export const CANAL = {
   exportarPaginasAbrir: 'estudio:exportar-paginas-abrir',
   exportarPaginasParte: 'estudio:exportar-paginas-parte',
   exportarPaginasFechar: 'estudio:exportar-paginas-fechar',
+  // frente Música: ida e volta com o vídeo e o render ligado (src/main/ipc-musica.ts, docs/musica.md)
+  musicaLevar: 'estudio:musica-levar',
+  musicaConcluir: 'estudio:musica-concluir',
+  musicaCancelar: 'estudio:musica-cancelar',
+  musicaDepoisDeMudar: 'estudio:musica-depois-de-mudar',
+  musicaPorNoVideo: 'estudio:musica-por-no-video',
+  musicaExportar: 'estudio:musica-exportar', // frente Música: a música em arquivo (item 23)
+  // ponte com a janela (05 §0.1, src/main/ponte-janela.ts): o processo principal pede uma ação à janela e espera
+  mcpPedido: 'estudio:mcp-pedido',
+  mcpResposta: 'estudio:mcp-resposta',
 } as const;
 
 /** O projeto aberto. `estado` é o último que a pessoa viu (área, documento, seleção), para reabrir onde parou; `git`
@@ -387,7 +399,26 @@ export type ApiEstudio = {
     parte: (sessao: string, pagina: {png: string; numero: number}) => Promise<boolean>;
     fechar: (sessao: string) => Promise<ResultadoExportarPaginas>;
   };
+  // frente Música (docs/musica.md): as mesmas funções das ferramentas levar_para, concluir_transicao, cancelar_transicao
+  // e por_no_video, com autor "pessoa"; depoisDeMudar leva o render aos clipes do vídeo ligados à música
+  musica: {
+    levar: (p: PedidoLevar) => Promise<ResultadoLevar>;
+    concluir: (transicao: string) => Promise<ResultadoConcluir>;
+    cancelar: (transicao: string, descartar?: boolean) => Promise<{transicao: string; revertidas: number; volta: ResultadoVolta; avisos: string[]}>;
+    depoisDeMudar: (documento: string) => Promise<{trocados: {video: string; clipe: string}[]; renderizado: boolean; aviso?: string}>;
+    porNoVideo: (o: {musica: string; video?: string; faixa?: string; em_ms?: number; substituir?: string}) => Promise<{documento: string; caminho: string}>;
+    /** A mesma conta de exportar_musica: grava em saidas/ (WAV, M4A, Opus ou MIDI, stems em WAV). */
+    exportar: (documento: string, pedido: PedidoExportarMusica) => Promise<ResultadoExportarMusica>;
+  };
+  // ponte com a janela (05 §0.1): pedidos do processo principal ({id, acao, dados}); a janela responde pelo id
+  janela: {
+    aoPedido: (cb: (id: string, acao: string, dados: unknown) => void) => () => void;
+    responder: (id: string, r: RespostaJanela) => void;
+  };
 };
+
+/** Resposta da janela a um pedido do processo principal (ponte com a janela). */
+export type RespostaJanela = {ok: boolean; dados?: unknown; mensagem?: string};
 
 // ---------- frente Fala ----------
 /** Pedido de transcrição: um arquivo do projeto (normalmente midia/…), o trecho opcional e o modelo. */

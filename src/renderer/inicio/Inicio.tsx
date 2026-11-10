@@ -4,7 +4,7 @@
 // cria; Enter cria com o que está marcado. Nada pergunta fps, codec ou pasta: tudo tem padrão e fica em "Mais opções".
 // Esta tela não carrega o editor (Remotion, Player, dockview): a casca vem depois, com React.lazy.
 import React, {useEffect, useMemo, useState} from 'react';
-import {ArrowUp, BookOpen, Box, Check, ChevronDown, ChevronRight, Copy, Film, FolderOpen, FolderSearch, Image as ImageIcon, MoreHorizontal, Sparkle, Sparkles, Trash2,
+import {ArrowUp, BookOpen, Box, Check, ChevronDown, ChevronRight, Copy, Film, FolderOpen, FolderSearch, Image as ImageIcon, MoreHorizontal, Music, Sparkle, Sparkles, Trash2,
   TriangleAlert, X} from 'lucide-react';
 import type {Ambiente, ContaClaude, MarcaInfo, NovoProjeto, Preferencias, Recente} from '../../compartilhado/api';
 import type {Modulo} from '../../nucleo/documentos';
@@ -28,6 +28,7 @@ const ICONE_MODULO: Record<Modulo, React.ReactNode> = {
   imagem: <ImageIcon size={18} />,
   animacao: <Sparkles size={18} />,
   '3d': <Box size={18} />,
+  musica: <Music size={18} />, // frente Música
 };
 const PERSONALIZADO = 'personalizado';
 
@@ -150,8 +151,8 @@ export const Inicio: React.FC = () => {
   }, []);
 
   const lista = aba === 'imagem' ? FORMATOS_IMAGEM : FORMATOS_VIDEO;
-  const idFormato = aba === '3d' ? '' : formato[aba];
-  const preset = aba === '3d' ? null : lista.find((f) => f.id === idFormato) ?? lista[0];
+  const idFormato = aba === '3d' || aba === 'musica' ? '' : formato[aba]; // frente Música: a música não tem formato
+  const preset = aba === '3d' || aba === 'musica' ? null : lista.find((f) => f.id === idFormato) ?? lista[0];
   const tamanho = idFormato === PERSONALIZADO ? livre : preset ? {largura: preset.largura, altura: preset.altura, fps: livre.fps} : undefined;
   const modelos = MODELOS.filter((m) => m.modulo === aba);
   const branco = modelos.find((m) => !m.exemplo)!.id;

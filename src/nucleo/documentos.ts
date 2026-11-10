@@ -4,8 +4,9 @@ import type {DocCenas} from './cenas';
 import type {Efeito} from './efeitos';
 import type {Roteiro} from './roteiro/resolver';
 import type {DocAnimacao} from './animacao';
+import type {DocMusica} from './musica'; // frente Música
 
-export type Modulo = 'video' | 'imagem' | '3d' | 'animacao';
+export type Modulo = 'video' | 'imagem' | '3d' | 'musica' | 'animacao';
 
 export type EntradaDocumento = {id: string; modulo: Modulo; caminho: string; titulo: string};
 
@@ -142,7 +143,7 @@ export type DocCena3D = {
   objetos: Objeto3D[];
 };
 
-export type Documento = DocVideo | DocImagem | DocCena3D | DocAnimacao;
+export type Documento = DocVideo | DocImagem | DocCena3D | DocMusica | DocAnimacao;
 
 // ---------- comentários ----------
 export type AlvoComentario = {
@@ -183,11 +184,12 @@ export type EntradaDiario = {
   patch: OperacaoPatch[];
   inverso: OperacaoPatch[];
   desfaz?: number; // frente IA (rodada 3): esta entrada reverteu a de seq indicado (Ctrl+Z, Reverter do cartão ou do Histórico)
+  transicao?: string; // frente Música: feita durante a transição (levar_para), para o histórico agrupar e "Reverter tudo"
 };
 
 /** Estado do editor que o agente pode consultar (o app grava em .estudio/estado.json). */
 export type EstadoEditor = {
-  area: 'video' | 'imagem' | '3d' | 'efeitos' | 'animacao';
+  area: 'video' | 'imagem' | '3d' | 'efeitos' | 'musica' | 'animacao';
   documento?: string;
   selecao?: string; // caminho do objeto selecionado
   tempo_ms?: number;

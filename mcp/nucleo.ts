@@ -9,6 +9,8 @@ import {Projeto} from '../src/nucleo/projeto';
 import {criarRede, registrarFerramentas} from '../src/nucleo/ferramentas-mcp';
 import {INSTRUCOES_MCP} from '../src/nucleo/mcp-ia';
 import {Transcritor} from '../src/main/transcricao';
+import {definirServicoMusica} from '../src/nucleo/musica-projeto';
+import {servicoDeRender} from '../src/main/musica-render';
 
 const arg = (nome: string) => {
   const i = process.argv.indexOf(nome);
@@ -16,6 +18,8 @@ const arg = (nome: string) => {
 };
 
 const servidor = new McpServer({name: 'estudio', version: '0.1.0'}, {instructions: INSTRUCOES_MCP});
+// frente Música: o render da música para o vídeo (o ffmpeg do node_modules, como a transcrição)
+definirServicoMusica(servicoDeRender());
 // a transcrição local acha o ffmpeg no node_modules do repositório (dist-mcp/ fica na raiz)
 registrarFerramentas(servidor, new Projeto(path.resolve(arg('--projeto') ?? process.cwd())), arg('--autor') ?? 'agente', 'mcp', criarRede(),
   new Transcritor({raizApp: path.resolve(__dirname, '..')}));

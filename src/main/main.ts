@@ -38,6 +38,8 @@ import {avisoDeQuedaEmLaco, decidirRecarga, garantirInstanciaUnica, trazerParaFr
 import {registrarIpcMidia} from './ipc-midia'; // frente Casca: painel de mídia
 import {lojaDeSenhasLinux} from './loja-de-senhas'; // frente IA
 import {criarSessoesIA, fecharAppsDeFora, iniciarAppsDeFora, perguntarAPessoa, registrarIpcIa, retomadaDe} from './ipc-ia'; // frente IA
+import {aoAbrirMusica, registrarIpcMusica} from './ipc-musica'; // frente Música
+import {criarPonteJanela} from './ponte-janela';
 
 // o mesmo id do instalador (electron-builder.yml): a barra de tarefas agrupa a janela com o atalho
 app.setAppUserModelId('br.com.bkmadvogados.estudio');
@@ -169,6 +171,7 @@ const abrirProjeto = async (raiz: string) => {
   regerarClaudeMd(raiz); // o Claude conhece os campos desta versão também nos projetos criados antes dela
   sessao.projeto.adicionarAjuste(somAcompanhaCenas); // frente Som: a narração presa às cenas (som-com-cenas.ts)
   apagarLimposSemUso(sessao.projeto); // frente Som: as versões limpas da voz que nem documento nem diário citam (limpeza-voz.ts)
+  aoAbrirMusica(sessao.projeto); // frente Música: renders que faltam (pasta clonada) e os que sobraram (ipc-musica.ts)
   await sessao.abrir();
   memoria.lembrar(raiz, manifesto.nome);
   tituloDaJanela(manifesto.nome);
@@ -519,6 +522,9 @@ registrarIpcIa({lidar, claudeInstalado: () => claude, pasta: path.join(app.getPa
     portaoPedido: CANAL.iaPortaoPedido, portaoResposta: CANAL.iaPortaoResposta, portaoCancelado: CANAL.iaPortaoCancelado, reverter: CANAL.iaReverter,
     apps: CANAL.iaApps, appsLigar: CANAL.iaAppsLigar, appsNovo: CANAL.iaAppsNovo, appsConfigs: CANAL.iaAppsConfigs, appsRevogar: CANAL.iaAppsRevogar,
     guardar: CANAL.iaGuardar, guardadas: CANAL.iaGuardadas, apagarGuardada: CANAL.iaApagarGuardada}});
+// frente Música: ida e volta com o vídeo e o render ligado, feito no Web Worker da janela pela ponte com a janela
+registrarIpcMusica(lidar, exigirProjeto, criarPonteJanela({enviar, temJanela: () => Boolean(janela && !janela.isDestroyed()),
+  ouvir: (canal, f) => ipcMain.on(canal, (e, ...a) => (confiavel(e), f(...(a as never[]))))}));
 
 app.on('ready', async () => {
   if (!primeiraInstancia) return; // a segunda instância já pediu para sair (garantirInstanciaUnica)

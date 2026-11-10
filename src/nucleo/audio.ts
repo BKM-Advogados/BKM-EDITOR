@@ -27,6 +27,10 @@ export type ClipeAudio = {
   fade_in_curva?: CurvaFade; // frente Som (rodada 3): a forma do fade de entrada (padrão linear)
   fade_out_curva?: CurvaFade; // e a do fade de saída
   cortes_fala?: CortesFalaClipe; // frente Fala: o clipe toca a narração sem os silêncios e o "ãh" (cortes-fala.ts); aqui o de antes, para voltar
+  // frente Música (src/nucleo/musica-video.ts): o clipe toca o render do documento de música `musica`, refeito quando a
+  // música muda; `musica_original` guarda o áudio de antes do "Editar em Música", para "Voltar ao original"
+  musica?: string;
+  musica_original?: {arquivo: string; corte_ms?: number; duracao_ms: number};
 };
 
 /** Forma do fade. `linear`: o ganho sobe em linha reta (dois clipes iguais somam o mesmo nível; música diferente cai 3 dB

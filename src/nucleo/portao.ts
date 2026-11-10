@@ -20,6 +20,10 @@ export const CLASSES: Record<string, {classe: Classe; motivo: string}> = {
   transcrever: {classe: 'cartao', motivo: 'transcrever o áudio neste PC (na primeira vez baixa o modelo de voz, uns 200 MB)'},
   remover_fundo: {classe: 'cartao', motivo: 'recortar o fundo da imagem neste PC (na primeira vez baixa o modelo, uns 26 MB)'},
   exportar_legendas: {classe: 'cartao', motivo: 'gravar arquivos de legenda em saidas/'},
+  // integração da rodada 3: as que as outras frentes declararam "cartao" nos docs
+  destravar_camadas: {classe: 'cartao', motivo: 'destravar camadas que você travou na imagem'},
+  exportar_musica: {classe: 'cartao', motivo: 'gravar a música em arquivo em saidas/'},
+  importar_midi: {classe: 'cartao', motivo: 'trazer um arquivo MIDI para o projeto'},
 };
 
 type Anotacoes = {openWorldHint?: boolean; destructiveHint?: boolean};

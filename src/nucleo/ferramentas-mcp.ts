@@ -32,6 +32,10 @@ import {instalarPortao, type Portao} from './portao'; // frente IA: portão de p
 import {registrarIa} from './mcp-ia'; // frente IA: desfazer, reverter, guia, comentários
 import {registrarImagem} from './mcp-imagem';
 import {medidasDoVideo, registrarSom} from './mcp-som'; // frente Som (rodada 3)
+import {registrarMusica} from './mcp-musica'; // frente Música
+import {musicaDoModelo, type ModeloMusica} from './musica-modelos'; // frente Música (item 27)
+import type {DocMusica} from './musica'; // frente Música (item 27)
+import {ARQUIVO_TRANSICOES, lerRegistro, transicaoEmCurso} from './transicoes'; // frente Música
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x, null, 2)}]});
 const erro = (e: unknown) => ({
@@ -144,14 +148,17 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   }));
 
   servidor.registerTool('estado_do_editor', {
-    description: 'O que a pessoa está vendo agora no app: área (video, imagem, 3d, efeitos), documento, objeto selecionado (caminho JSON Pointer) e tempo do vídeo.',
+    description: 'O que a pessoa está vendo agora no app: área (video, imagem, 3d, efeitos, musica), documento, objeto selecionado (caminho JSON Pointer), tempo do vídeo e a transição em curso (levar_para).',
     inputSchema: {},
   }, seguro(() => {
     const e = projeto.estado();
     if (!e) return 'o app ainda não gravou estado (projeto fechado ou recém-aberto)';
-    if (!e.documento || !e.selecao) return e;
+    // frente Música: a ida e volta em curso (levar_para), para a IA saber que a pessoa está dentro dela
+    const t = projeto.existe(ARQUIVO_TRANSICOES) ? transicaoEmCurso(lerRegistro(projeto.lerJson<unknown>(ARQUIVO_TRANSICOES).doc)) : undefined;
+    const transicao = t ? {transicao: {id: t.id, intencao: t.intencao, de: `${t.origem.documento}${t.origem.caminho}`, para: t.destino.documento}} : {};
+    if (!e.documento || !e.selecao) return {...e, ...transicao};
     const {doc} = projeto.lerJson(projeto.arquivoDoDocumento(e.documento));
-    return {...e, objeto_selecionado: valorEm(doc, e.selecao)};
+    return {...e, objeto_selecionado: valorEm(doc, e.selecao), ...transicao};
   }));
 
   servidor.registerTool('ler_documento', {
@@ -185,21 +192,23 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   }));
 
   servidor.registerTool('criar_documento', {
-    description: `Cria um documento novo no projeto (vídeo de cenas, imagem ou cena 3D) e o põe no manifesto; a tela abre sozinha. Formatos de vídeo: ${FORMATOS_VIDEO.map((f) => `${f.id} (${f.proporcao}, ${f.largura}x${f.altura})`).join(', ')}. De imagem: ${FORMATOS_IMAGEM.map((f) => `${f.id} (${f.largura}x${f.altura})`).join(', ')}. Ou largura e altura livres.`,
+    description: `Cria um documento novo no projeto (vídeo de cenas, imagem, cena 3D ou música) e o põe no manifesto; a tela abre sozinha. Formatos de vídeo: ${FORMATOS_VIDEO.map((f) => `${f.id} (${f.proporcao}, ${f.largura}x${f.altura})`).join(', ')}. De imagem: ${FORMATOS_IMAGEM.map((f) => `${f.id} (${f.largura}x${f.altura})`).join(', ')}. Ou largura e altura livres.`,
     inputSchema: {
-      modulo: z.enum(['video', 'imagem', '3d', 'animacao']),
+      modulo: z.enum(['video', 'imagem', '3d', 'musica', 'animacao']),
       titulo: z.string().optional(),
       formato: z.string().optional().describe('id do formato da lista'),
       largura: z.number().int().min(16).max(7680).optional(),
       altura: z.number().int().min(16).max(7680).optional(),
       fps: z.number().min(1).max(120).optional(),
+      modelo: z.enum(['vazio', 'batida', 'trilha_video', 'efeito_sonoro']).optional().describe('música: modelo com som gerado'), // frente Música (item 27)
     },
-  }, seguro(({modulo, titulo, formato, largura, altura, fps}: {modulo: Modulo; titulo?: string; formato?: string; largura?: number; altura?: number; fps?: number}) => {
+  }, seguro(({modulo, titulo, formato, largura, altura, fps, modelo}: {modulo: Modulo; titulo?: string; formato?: string; largura?: number; altura?: number; fps?: number;
+    modelo?: ModeloMusica}) => {
     const preset = (modulo === 'imagem' ? FORMATOS_IMAGEM : FORMATOS_VIDEO).find((f) => f.id === formato);
     if (formato && !preset) throw new ErroProjeto(`formato desconhecido: ${formato}`, 'nao_achado');
     const tam = largura && altura ? {largura, altura} : preset ? {largura: preset.largura, altura: preset.altura} : undefined;
     const {entrada, conteudo} = documentoNovo(projeto.manifesto(), modulo, {titulo, formato: tam ? {...tam, fps: fps ?? 30} : undefined});
-    projeto.adicionarDocumento(entrada, conteudo);
+    projeto.adicionarDocumento(entrada, modulo === 'musica' && modelo ? musicaDoModelo(modelo, conteudo as DocMusica) : conteudo); // frente Música: modelo
     return {ok: true, ...entrada};
   }));
 
@@ -278,6 +287,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   registrarIa(servidor, projeto, autor, origem, portao); // frente IA (rodada 3): desfazer, reverter, guia, comentários
   registrarImagem(servidor, projeto, autor, origem); // seleção e layout da imagem (rodada 3, B2): src/nucleo/mcp-imagem.ts
   registrarSom(servidor, projeto, autor, origem); // frente Som (rodada 3): dividir, copiar e crossfade de clipe de áudio
+  registrarMusica(servidor, projeto, autor, origem); // frente Música: música e ida e volta entre módulos (docs/musica.md)
 };
 
 // ---------- pesquisa: fontes e fatos (src/nucleo/pesquisa.ts, docs/pesquisa.md) ----------

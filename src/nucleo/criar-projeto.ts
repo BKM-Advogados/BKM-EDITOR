@@ -12,6 +12,7 @@ import type {DocImagem, EntradaDocumento, Manifesto, Modulo} from './documentos'
 import {novoDoc3d} from './cena3d';
 import {novoDocCenas} from './cenas';
 import {novaAnimacao, modeloAnimacaoLogoPixel} from './animacao';
+import {novaMusica} from './musica'; // frente Música
 import {EFEITOS} from './efeitos';
 import {MODELOS, type IdModelo} from './modelos';
 import {FORMATOS_IMAGEM, FORMATOS_VIDEO, limitarTamanho, type Formato} from './formatos';
@@ -71,9 +72,9 @@ export const novoDocImagem = (largura: number, altura: number): DocImagem => {
 
 export {novoDoc3d} from './cena3d'; // a cena 3D nova mora em cena3d.ts (pura), para a prévia web usar a mesma (frente C)
 
-const PASTA_DO_MODULO: Record<Modulo, string> = {video: 'video', imagem: 'imagem', '3d': '3d', animacao: 'animacao'};
-const TITULO_DO_MODULO: Record<Modulo, string> = {video: 'Vídeo', imagem: 'Imagem', '3d': 'Cena 3D', animacao: 'Animação'};
-const ID_DO_MODULO: Record<Modulo, string> = {video: 'video', imagem: 'imagem', '3d': 'cena3d', animacao: 'animacao'};
+const PASTA_DO_MODULO: Record<Modulo, string> = {video: 'video', imagem: 'imagem', '3d': '3d', musica: 'musica', animacao: 'animacao'};
+const TITULO_DO_MODULO: Record<Modulo, string> = {video: 'Vídeo', imagem: 'Imagem', '3d': 'Cena 3D', musica: 'Música', animacao: 'Animação'};
+const ID_DO_MODULO: Record<Modulo, string> = {video: 'video', imagem: 'imagem', '3d': 'cena3d', musica: 'musica', animacao: 'animacao'};
 
 export const conteudoNovo = (modulo: Modulo, formato?: {largura: number; altura: number; fps?: number}) => {
   if (modulo === 'video') {
@@ -88,6 +89,7 @@ export const conteudoNovo = (modulo: Modulo, formato?: {largura: number; altura:
     const f = formato ?? {largura: FORMATOS_VIDEO.find((x) => x.id === 'youtube')!.largura, altura: FORMATOS_VIDEO.find((x) => x.id === 'youtube')!.altura};
     return novaAnimacao(f.largura, f.altura, formato?.fps ?? 30);
   }
+  if (modulo === 'musica') return novaMusica(); // frente Música
   return novoDoc3d();
 };
 

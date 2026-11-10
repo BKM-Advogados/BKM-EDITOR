@@ -6,7 +6,7 @@
 // Som: "escolher arquivo de áudio" devolve um WAV sintético (uma narração, depois uma música, alternando), como URL de
 // blob que o <audio> e o Web Audio tocam de verdade; o envelope medido fica em memória e entra nas props como no app.
 import jsonpatch, {type Operation} from 'fast-json-patch';
-import type {ApiEstudio, EstadoProvedor, InfoProjeto, PedidoPortaoTela, MarcaInfo, Mudanca, NovoProjeto, Preferencias, Progresso, ProgressoTranscricao, Recente, ResultadoLimpezaVoz, Trilha} from '../../src/compartilhado/api';
+import type {ApiEstudio, EstadoProvedor, InfoProjeto, PedidoPortaoTela, MarcaInfo, Mudanca, NovoProjeto, Preferencias, Progresso, ProgressoTranscricao, Recente, ResultadoLimpezaVoz, Trilha, RespostaJanela} from '../../src/compartilhado/api';
 import type {EntradaDocumento, Manifesto, Modulo} from '../../src/nucleo/documentos';
 import type {Envelope, IntensidadeLimpeza} from '../../src/nucleo/audio';
 import {LimpezaCancelada, limparVoz} from '../../src/nucleo/limpeza-voz';
@@ -22,6 +22,16 @@ import {caminhoSemFundo, MODELO_FUNDO} from '../../src/nucleo/remover-fundo';
 import {comMarca, marcasVazias, montarIndice, pastasDaMidia, type ArquivoBruto, type MarcasDeMidia} from '../../src/nucleo/midia'; // frente Casca
 import {textoDeLegenda} from '../../src/nucleo/legendas'; // frente Fala: legenda em ANSI
 import {arquivoCortado, palavrasDepoisDosCortes} from '../../src/nucleo/cortes-fala'; // frente Fala: cortes pela fala
+import {ehDocMusica, novaMusica, type DocMusica} from '../../src/nucleo/musica'; // frente Música
+import {renderizarMusica, TAXA_MUSICA} from '../../src/nucleo/musica-som';
+import {patchAtualizarLigados, patchClipeNovo, renderDaMusica} from '../../src/nucleo/musica-video';
+import {musicaParaMidi} from '../../src/nucleo/musica-midi'; // frente Música, marco 4
+import {licencasDaMusica, textoDosCreditos} from '../../src/nucleo/musica-licencas'; // frente Música, marco 5
+import type {EntregaEmBytes} from '../../src/nucleo/musica-entrega';
+import type {PedidoExportarMusica, ResultadoExportarMusica} from '../../src/nucleo/musica-projeto';
+import {cancelarTransicao, concluirTransicao, levarPara, registroVazio, type BaseProjeto, type RegistroTransicoes} from '../../src/nucleo/transicoes';
+import {envelopeDeAmostras, type Envelope as EnvelopeMusica} from '../../src/nucleo/audio';
+import type {EntradaDiario, OperacaoPatch} from '../../src/nucleo/documentos';
 
 type Proj = {raiz: string; manifesto: Manifesto; docs: Record<string, unknown>; versao: number};
 const projetos = new Map<string, Proj>();
@@ -153,14 +163,14 @@ const docVideo = (f?: {largura: number; altura: number; fps?: number}) => {
   return d;
 };
 const conteudo = (m: Modulo, f?: {largura: number; altura: number; fps?: number}) =>
-  m === 'video' ? docVideo(f) : m === 'imagem' ? docImagem(f?.largura ?? 1080, f?.altura ?? 1350) : doc3d();
+  m === 'video' ? docVideo(f) : m === 'imagem' ? docImagem(f?.largura ?? 1080, f?.altura ?? 1350) : m === 'musica' ? novaMusica() : doc3d();
 
 const novoDocumento = (p: Proj, modulo: Modulo, f?: {largura: number; altura: number; fps?: number}, titulo?: string): EntradaDocumento => {
   const base = modulo === '3d' ? 'cena3d' : modulo;
   let n = 1;
   while (p.manifesto.documentos.some((d) => d.id === (n === 1 ? base : `${base}-${n}`))) n++;
   const id = n === 1 ? base : `${base}-${n}`;
-  const e: EntradaDocumento = {id, modulo, caminho: `${modulo}/${id}.json`, titulo: titulo || (({video: 'Vídeo', imagem: 'Imagem', '3d': 'Cena 3D', animacao: 'Animação'} as Record<Modulo, string>)[modulo] + (n > 1 ? ` ${n}` : ''))};
+  const e: EntradaDocumento = {id, modulo, caminho: `${modulo}/${id}.json`, titulo: titulo || (({video: 'Vídeo', imagem: 'Imagem', '3d': 'Cena 3D', musica: 'Música', animacao: 'Animação'} as Record<Modulo, string>)[modulo] + (n > 1 ? ` ${n}` : ''))};
   p.manifesto.documentos.push(e);
   p.docs[id] = conteudo(modulo, f);
   return e;
@@ -228,10 +238,14 @@ const api: ApiEstudio = {
   marcarVersao: async () => ({ok: true, mensagem: 'Ponto de restauração criado'}),
   escolherMidia: async (tipo) => (tipo === 'audio' ? proximoAudio() : null),
   aoPedirMiniatura: () => nada,
-  lerDocumento: async <T,>(id: string) => ({doc: structuredClone(aberto!.docs[id]) as T, versao: String(aberto!.versao)}),
-  lerJson: async <T,>() => [] as T,
-  aplicarPatch: async ({documento, patch}) => {
+  // frente Música: o render da música fica num blob; a tela vê a URL dele, o documento guarda o caminho (paraTela/doDisco)
+  lerDocumento: async <T,>(id: string) => ({doc: musicaPrevia.paraTela(structuredClone(aberto!.docs[id])) as T, versao: String(aberto!.versao)}),
+  lerJson: async <T,>(caminho: string) => (caminho === '.estudio/transicoes.json' ? structuredClone(musicaPrevia.registro()) : []) as T,
+  aplicarPatch: async ({documento, patch: patchDaTela, rotulo}) => {
+    const patch = musicaPrevia.doDisco(patchDaTela);
+    const antesDaTela = aberto!.docs[documento];
     const r = jsonpatch.applyPatch(structuredClone(aberto!.docs[documento]), patch as Operation[], true, false);
+    musicaPrevia.anotar(documento, antesDaTela, r.newDocument, rotulo);
     nomearClipes(r.newDocument);
     aberto!.docs[documento] = r.newDocument;
     aberto!.versao++;
@@ -241,7 +255,7 @@ const api: ApiEstudio = {
   propsVideo: async (id) => {
     const d = aberto!.docs[id] as DocCenas;
     const {props, avisos} = resolverCenas(d, {envelopes});
-    return {props: props as never, avisos};
+    return {props: musicaPrevia.paraTela(props) as never, avisos};
   },
   comentarios: async () => [],
   novoComentario: async () => {
@@ -482,6 +496,23 @@ const api: ApiEstudio = {
       },
     };
   })(),
+  // ponte com a janela (05 §0.1): o "processo principal" da prévia pede à janela pelo mesmo caminho do app
+  janela: {
+    aoPedido: (cb) => {
+      ponteDaJanela.ouvintes.add(cb);
+      return () => ponteDaJanela.ouvintes.delete(cb);
+    },
+    responder: (id, r) => ponteDaJanela.responder(id, r),
+  },
+  // frente Música: as mesmas funções do núcleo, sobre o projeto em memória (simulação no fim do arquivo)
+  musica: {
+    levar: async (p) => musicaPrevia.levar(p),
+    concluir: async (t) => musicaPrevia.concluir(t),
+    cancelar: async (t, descartar) => musicaPrevia.cancelar(t, descartar),
+    depoisDeMudar: (documento) => musicaPrevia.depoisDeMudar(documento),
+    porNoVideo: (o) => musicaPrevia.porNoVideo(o),
+    exportar: (documento, pedido) => musicaPrevia.exportar(documento, pedido),
+  },
 };
 
 (window as unknown as {estudio: ApiEstudio}).estudio = api;
@@ -791,3 +822,199 @@ const iaNaPrevia = {
 (window as unknown as {__portaoNaPrevia: (p: Partial<PedidoPortaoTela>) => void}).__portaoNaPrevia = (p) =>
   iaNaPrevia.portao.forEach((f) => f({id: `previa-${Date.now()}`, origem: 'Claude 1', ferramenta: 'ler_fonte', motivo: 'abrir uma página da internet',
     entrada: {url: 'https://www.planalto.gov.br/ccivil_03/decreto-lei/del5452.htm'}, ...p}));
+// ---------- frente Música: ida e volta e render ligado, em memória (docs/musica.md) ----------
+// levar_para, concluir_transicao e cancelar_transicao são as do núcleo, sobre uma BaseProjeto em memória com um diário
+// (seq, inverso, transição), então o "Cancelar e desfazer" desfaz como no app. O render é o mesmo renderizarMusica do
+// app; o WAV vai para um blob, e a tela recebe a URL dele no lugar do caminho midia/musica/... (paraTela), que volta a
+// ser caminho quando a tela manda um patch (doDisco).
+const ponteDaJanela = (() => {
+  const ouvintes = new Set<(id: string, acao: string, dados: unknown) => void>();
+  const esperando = new Map<string, (r: RespostaJanela) => void>();
+  let n = 0;
+  return {
+    ouvintes,
+    responder: (id: string, r: RespostaJanela) => {
+      esperando.get(id)?.(r);
+      esperando.delete(id);
+    },
+    pedir: (acao: string, dados: unknown) => new Promise<RespostaJanela>((ok) => {
+      if (!ouvintes.size) return ok({ok: false, mensagem: 'sem janela'});
+      const id = `p${++n}`;
+      esperando.set(id, ok);
+      ouvintes.forEach((f) => f(id, acao, dados));
+    }),
+  };
+})();
+let renderFeitoPor = '';
+/** Para conferir na prévia: quem fez o último render para o vídeo ("janela" = o Web Worker). */
+(window as unknown as {renderDaMusicaFeitoPor: () => string}).renderDaMusicaFeitoPor = () => renderFeitoPor;
+
+const exportadas = new Map<string, {bytes: number; lufs?: number | null; pico_dbtp?: number | null}>();
+(window as unknown as {exportacoesDaMusica: () => unknown}).exportacoesDaMusica = () => Object.fromEntries(exportadas);
+
+const musicaPrevia = (() => {
+  let registro: RegistroTransicoes = registroVazio();
+  const diario: EntradaDiario[] = [];
+  const blobDe = new Map<string, string>(); // caminho do render → URL do blob
+  const caminhoDe = new Map<string, string>(); // URL do blob → caminho
+  const trocar = <T,>(x: T, mapa: Map<string, string>): T => {
+    if (!mapa.size) return x;
+    const andar = (v: unknown): unknown => {
+      if (typeof v === 'string') return mapa.get(v) ?? v;
+      if (Array.isArray(v)) return v.map(andar);
+      if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, w]) => [k, andar(w)]));
+      return v;
+    };
+    return andar(x) as T;
+  };
+  // a janela decodifica pelo endereço que a tela usa (a URL do blob), não pelo caminho do disco
+  const paraTelaDoc = (d: DocMusica) => trocar(d, blobDe);
+  const entrada = (documento: string) => {
+    const e = aberto!.manifesto.documentos.find((d) => d.id === documento || d.caminho === documento);
+    if (!e) throw new Error(`documento não achado: ${documento}`);
+    return e;
+  };
+  const anotar = (caminho: string, antes: unknown, depois: unknown, quem: {autor: string; origem: string; rotulo: string; transicao?: string; patch?: OperacaoPatch[]}) => {
+    const aberta = registro.transicoes.filter((t) => t.estado === 'aberta' && t.destino.arquivo === caminho).pop()?.id;
+    const seq = (diario[diario.length - 1]?.seq ?? 0) + 1;
+    const transicao = quem.transicao ?? aberta;
+    diario.push({seq, em: new Date().toISOString(), documento: caminho, autor: quem.autor, origem: quem.origem, rotulo: quem.rotulo, versao_antes: '', versao_depois: '',
+      patch: quem.patch ?? (jsonpatch.compare(antes as object, depois as object) as OperacaoPatch[]), inverso: jsonpatch.compare(depois as object, antes as object) as OperacaoPatch[],
+      ...(transicao ? {transicao} : {})});
+    return seq;
+  };
+  const base = (autor: string): BaseProjeto => ({
+    autor,
+    manifesto: () => aberto!.manifesto,
+    ler: <T,>(documento: string) => {
+      const e = entrada(documento);
+      return {doc: structuredClone(aberto!.docs[e.id]) as T, versao: String(aberto!.versao), arquivo: e.caminho};
+    },
+    aplicar: (x) => {
+      const e = entrada(x.documento);
+      const antes = aberto!.docs[e.id];
+      const depois = jsonpatch.applyPatch(structuredClone(antes), x.patch as Operation[], true, false).newDocument;
+      aberto!.docs[e.id] = depois;
+      aberto!.versao++;
+      const seq = anotar(e.caminho, antes, depois, {autor: x.autor ?? autor, origem: 'previa', rotulo: x.rotulo, transicao: x.transicao, patch: x.patch.filter((o) => o.op !== 'test')});
+      mudou(e.caminho);
+      return {versao: String(aberto!.versao), seq};
+    },
+    adicionarDocumento: (e, c) => {
+      aberto!.manifesto.documentos.push(e);
+      aberto!.docs[e.id] = c;
+      mudou('estudio.json');
+    },
+    registro: () => structuredClone(registro),
+    gravarRegistro: (r) => {
+      registro = structuredClone(r);
+      mudou('.estudio/transicoes.json');
+    },
+    estado: () => null,
+    diario: () => diario,
+  });
+  const renderizar = async (id: string) => {
+    const doc = aberto!.docs[id] as DocMusica;
+    const r = renderDaMusica(id, doc);
+    if (blobDe.has(r.arquivo)) return r;
+    const fontes: Record<string, {canais: Float32Array[]; taxa: number} | undefined> = {};
+    for (const c of doc.arranjo.clipes) {
+      if (!c.audio || c.audio in fontes) continue;
+      try {
+        fontes[c.audio] = await amostrasDe(blobDe.get(c.audio) ?? c.audio);
+      } catch {
+        fontes[c.audio] = undefined;
+      }
+    }
+    // como no app: a janela faz no Web Worker dela; sem quem atenda, a conta é feita aqui
+    const daJanela = await ponteDaJanela.pedir('musica:render', {doc: paraTelaDoc(doc)});
+    const feito = daJanela.ok ? (daJanela.dados as {wav?: Uint8Array<ArrayBuffer>; envelope?: EnvelopeMusica}) : null;
+    let wav: Uint8Array<ArrayBuffer>;
+    if (feito?.wav && feito.envelope) {
+      wav = feito.wav;
+      envelopes[r.arquivo] = feito.envelope;
+    } else {
+      const som = renderizarMusica(doc, fontes, {taxa: TAXA_MUSICA});
+      wav = codificarWav(som.canais, TAXA_MUSICA);
+      envelopes[r.arquivo] = envelopeDeAmostras(som.canais, TAXA_MUSICA);
+    }
+    const url = URL.createObjectURL(new Blob([wav], {type: 'audio/wav'}));
+    blobDe.set(r.arquivo, url);
+    caminhoDe.set(url, r.arquivo);
+    audios.set(url, {url, nome: `${id}.wav`});
+    renderFeitoPor = feito ? 'janela' : 'ponte';
+    return r;
+  };
+  const depoisDeMudar = async (id: string) => {
+    if (!aberto || !ehDocMusica(aberto.docs[id])) return {trocados: [], renderizado: false};
+    const r = await renderizar(id);
+    const trocados: {video: string; clipe: string}[] = [];
+    for (const d of aberto.manifesto.documentos.filter((x) => x.modulo === 'video')) {
+      const v = aberto.docs[d.id] as DocCenas;
+      const {patch, clipes} = patchAtualizarLigados(v, id, r, () => undefined);
+      if (!patch.length) continue;
+      base('sistema').aplicar({documento: d.id, patch, rotulo: `trilha atualizada (${id})`});
+      trocados.push(...clipes.map((clipe) => ({video: d.id, clipe})));
+    }
+    return {trocados, renderizado: true};
+  };
+  return {
+    paraTela: <T,>(x: T) => trocar(x, blobDe),
+    doDisco: <T,>(x: T) => trocar(x, caminhoDe),
+    registro: () => registro,
+    levar: (p: Parameters<typeof levarPara>[1]) => levarPara(base('pessoa'), p),
+    concluir: async (t: string) => {
+      const r = concluirTransicao(base('pessoa'), {transicao: t});
+      if (r.musica) await depoisDeMudar(r.musica);
+      return r;
+    },
+    cancelar: (t: string, descartar?: boolean) => cancelarTransicao(base('pessoa'), {transicao: t, descartar}),
+    depoisDeMudar,
+    porNoVideo: async (o: {musica: string; video?: string; faixa?: string; em_ms?: number}) => {
+      const doc = aberto!.docs[o.musica] as DocMusica;
+      const video = o.video ?? doc.video?.documento ?? aberto!.manifesto.documentos.find((d) => d.modulo === 'video')?.id;
+      if (!video) throw new Error('o projeto não tem vídeo');
+      if (!doc.video) base('pessoa').aplicar({documento: o.musica, patch: [{op: 'add', path: '/video', value: {documento: video, em_ms: Math.round(o.em_ms ?? 0), voz_guia: true}}],
+        rotulo: `música ligada ao vídeo ${video}`}); // como o porNoVideo do núcleo (marco 4)
+      const r = renderDaMusica(o.musica, aberto!.docs[o.musica] as DocMusica);
+      const novo = patchClipeNovo(aberto!.docs[video] as DocCenas, {idMusica: o.musica, faixa: o.faixa, em_ms: o.em_ms ?? doc.video?.em_ms ?? 0, render: r,
+        nome: aberto!.manifesto.documentos.find((d) => d.id === o.musica)?.titulo});
+      base('pessoa').aplicar({documento: video, patch: novo.patch, rotulo: `música ${o.musica} no vídeo`});
+      await depoisDeMudar(o.musica);
+      return {documento: video, caminho: novo.caminho};
+    },
+    /** Exportar (item 23): a conta é a do worker da janela, como no app; os bytes ficam em memória (sem ffmpeg na prévia,
+     *  o M4A e o Opus ficam no WAV) e window.exportacoesDaMusica() mostra o que saiu. */
+    exportar: async (documento: string, pedido: PedidoExportarMusica): Promise<ResultadoExportarMusica> => {
+      const doc = aberto!.docs[documento] as DocMusica;
+      const titulo = (pedido.nome?.trim() || aberto!.manifesto.documentos.find((d) => d.id === documento)?.titulo || doc.titulo || documento).replace(/[\\/:*?"<>|]+/g, '-');
+      const base = `saidas/${titulo}`;
+      if (pedido.formato === 'mid') {
+        const r = musicaParaMidi(doc);
+        exportadas.set(`${base}.mid`, {bytes: r.bytes.length});
+        return {arquivos: [`${base}.mid`], avisos: r.avisos, feito_por: 'janela', trilhas: r.trilhas, notas: r.notas};
+      }
+      const daJanela = await ponteDaJanela.pedir('musica:exportar', {doc: paraTelaDoc(doc), pedido: {stems: pedido.stems, alvo_lufs: pedido.alvo_lufs, folga_db: pedido.formato === 'wav' ? 0 : 0.5}});
+      if (!daJanela.ok) throw new Error(daJanela.mensagem);
+      const e = daJanela.dados as EntregaEmBytes;
+      const arquivos = [`${base}.${pedido.formato}`, ...(e.stems ?? []).map((x) => `${base} - stems/${x.nome}.wav`)];
+      exportadas.set(arquivos[0], {bytes: e.mistura.length, lufs: e.medida.lufs, pico_dbtp: e.medida.pico_dbtp});
+      (e.stems ?? []).forEach((x, i) => exportadas.set(arquivos[i + 1], {bytes: x.wav.length}));
+      // créditos e comprovante (marco 5), como no processo principal (sem o SHA-256: a prévia não lê o disco)
+      const lic = licencasDaMusica(doc);
+      exportadas.set(`${base}.licencas.json`, {bytes: JSON.stringify(lic).length});
+      arquivos.push(`${base}.licencas.json`);
+      if (lic.creditos.length) {
+        exportadas.set(`${base} - créditos.txt`, {bytes: textoDosCreditos(titulo, lic).length});
+        arquivos.push(`${base} - créditos.txt`);
+      }
+      return {arquivos, avisos: [...e.avisos, ...lic.impede.map((x) => `antes de publicar: ${x}`), ...(pedido.formato === 'wav' ? [] : ['na prévia web não há ffmpeg: o arquivo ficou em WAV'])],
+        feito_por: 'janela', duracao_s: e.duracao_s, medida: e.medida, pode_publicar: lic.pode_publicar, creditos: lic.creditos};
+    },
+    /** O que a tela grava (pelo aplicarPatch da ponte) também vai para o diário, com a transição aberta. */
+    anotar: (documento: string, antes: unknown, depois: unknown, rotulo?: string) => {
+      const e = aberto?.manifesto.documentos.find((d) => d.id === documento);
+      if (e) anotar(e.caminho, antes, depois, {autor: 'pessoa', origem: 'interface', rotulo: rotulo ?? 'mudança'});
+    },
+  };
+})();
