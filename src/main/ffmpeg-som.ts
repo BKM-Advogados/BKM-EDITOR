@@ -26,14 +26,17 @@ export const pastaDoFfmpeg = (binariesDirectory?: string | null) => {
 
 const executavel = () => (process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
 
+/** As bibliotecas do ffmpeg ficam ao lado dele, e no Mac ele as pede pelo nome curto ("libavcodec.dylib", sem @rpath):
+ *  o carregador precisa saber a pasta (no Linux e no Mac). Com o app assinado no Mac, o DYLD_LIBRARY_PATH só vale porque
+ *  o ffmpeg leva o entitlement allow-dyld-environment-variables (build/entitlements.filhos.plist). */
+export const ambienteDoFfmpeg = (pasta: string, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv => ({...base, LD_LIBRARY_PATH: pasta, DYLD_LIBRARY_PATH: pasta});
+
 export type Parar = {cancelSignal?: CancelSignal; cancelado?: () => boolean};
 
 /** Roda o ffmpeg e devolve a saída padrão (bytes) e a de erro (texto, onde o loudnorm escreve a medida). */
 export const rodarFfmpeg = (args: string[], o: Parar & {binarios?: string | null} = {}) => new Promise<{saida: Buffer; erro: string}>((ok, falha) => {
   const pasta = pastaDoFfmpeg(o.binarios);
-  // as bibliotecas do ffmpeg ficam ao lado dele (no Linux e no Mac o carregador precisa saber onde)
-  const env = {...process.env, LD_LIBRARY_PATH: pasta, DYLD_LIBRARY_PATH: pasta};
-  const filho = spawn(path.join(pasta, executavel()), ['-hide_banner', '-nostdin', ...args], {cwd: pasta, env, windowsHide: true});
+  const filho = spawn(path.join(pasta, executavel()), ['-hide_banner', '-nostdin', ...args], {cwd: pasta, env: ambienteDoFfmpeg(pasta), windowsHide: true});
   const saida: Buffer[] = [];
   const erro: string[] = [];
   let parado = false;
