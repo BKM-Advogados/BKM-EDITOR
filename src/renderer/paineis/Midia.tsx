@@ -79,6 +79,16 @@ const Detalhe: React.FC<{e: EntradaMidia; raiz: string; aoFechar: () => void}> =
         <button className="bt mini" title="Mostrar na pasta" onClick={() => window.estudio.mostrarArquivo(caminhoAbsoluto(raiz, e.caminho))}><FolderOpen size={13} /></button>
         <button className="bt mini" title="Fechar os detalhes" onClick={aoFechar}><X size={13} /></button>
       </div>
+      <div className="midia-marcar" role="group" aria-label="Marcar a tomada">
+        <button className={`bt mini${estado === 'boa' ? ' ligado' : ''}`} aria-pressed={estado === 'boa'} onClick={() => marcar(estado === 'boa' ? null : 'boa')} title="Tomada boa (B)"><Check size={13} />Boa</button>
+        <button className={`bt mini${estado === 'descartada' ? ' ligado' : ''}`} aria-pressed={estado === 'descartada'} onClick={() => marcar(estado === 'descartada' ? null : 'descartada')} title="Tomada descartada (X)"><X size={13} />Descartar</button>
+        <span className="esp" />
+        {itens.length ? (
+          <BotaoMenu titulo="Leva o arquivo para o vídeo ou a imagem aberta" icone={<Plus size={13} />} rotulo="Usar em…" itens={itens} className="bt mini" lado="esquerda" />
+        ) : (
+          <button className="bt mini" disabled title={porque}><Plus size={13} />Usar em…</button>
+        )}
+      </div>
       <div className="midia-previa">
         {e.tipo === 'imagem' && <img src={url} alt={e.nome} />}
         {e.tipo === 'video' && <video src={url} controls preload="metadata" playsInline />}
@@ -87,16 +97,6 @@ const Detalhe: React.FC<{e: EntradaMidia; raiz: string; aoFechar: () => void}> =
       <div className="rotulo midia-meta">
         {[NOME_TIPO[e.tipo], e.duracao_ms !== undefined ? duracaoCurta(e.duracao_ms) : '', e.largura ? `${e.largura}×${e.altura}` : '', tamanhoCurto(e.tamanho),
           new Date(e.modificado_ms).toLocaleString('pt-BR', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'})].filter(Boolean).join(' · ')}
-      </div>
-      <div className="midia-marcar" role="group" aria-label="Marcar a tomada">
-        <button className={`bt mini${estado === 'boa' ? ' ligado' : ''}`} aria-pressed={estado === 'boa'} onClick={() => marcar(estado === 'boa' ? null : 'boa')} title="Tomada boa (B)"><Check size={13} />Boa</button>
-        <button className={`bt mini${estado === 'descartada' ? ' ligado' : ''}`} aria-pressed={estado === 'descartada'} onClick={() => marcar(estado === 'descartada' ? null : 'descartada')} title="Tomada descartada (X)"><X size={13} />Descartar</button>
-        <span className="esp" />
-        {itens.length ? (
-          <BotaoMenu titulo="Leva o arquivo para o vídeo ou a imagem aberta" icone={<Plus size={13} />} rotulo="Usar em…" itens={itens} className="bt mini" acima />
-        ) : (
-          <button className="bt mini" disabled title={porque}><Plus size={13} />Usar em…</button>
-        )}
       </div>
       <textarea className="campo midia-nota" rows={2} placeholder="Nota sobre a tomada (o Claude também lê)" value={nota} maxLength={500}
         onChange={(ev) => setNota(ev.target.value)} onBlur={salvarNota}
