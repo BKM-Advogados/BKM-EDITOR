@@ -1,7 +1,7 @@
 # Estúdio — Stack Tecnológica
 
 > Projeto: **Estúdio** · app de edição de vídeo, imagem, 3D, efeitos/motion, áudio e música.
-> Versão: **0.3.0** · Migração Windows → Linux (Omarchy/Arch) em 09/11/2026.
+> Versão: **1.0.0** (10/11/2026) · Migração Windows → Linux (Omarchy/Arch) em 09/11/2026.
 > Local no Linux: `~/Projects/estudio` (original: `C:\Users\usuario\projetos\estudio`)
 
 ---
@@ -135,7 +135,7 @@
 
 | Ferramenta | Versão | Uso |
 |---|---|---|
-| **Vitest** | 3.2.7 | Testes unitários (131 testes, 13 arquivos) |
+| **Vitest** | 3.2.7 | Testes unitários (888 testes, 82 arquivos) |
 | **Playwright** | 1.64.1 | Testes E2E |
 | **tsx** | 4.23.15 | Execução de scripts TS |
 
@@ -193,7 +193,7 @@ bash scripts/instalar-linux.sh
 | Compilação (Vite main/preload/renderer) | ✅ |
 | `npm run typecheck` | ✅ zero erros |
 | `npm run mcp:build` | ✅ |
-| `npm test` (Vitest) | ✅ **131/131** |
+| `npm test` (Vitest) | ✅ **888** (3 pulados), na 1.0 |
 | Electron abre janela no Hyprland | ✅ (sem `ELECTRON_RUN_AS_NODE`) |
 | Bloqueadores de código Windows-específico | ✅ **0** |
 | Empacotamento Linux | ✅ pacote + `scripts/instalar-linux.sh` (deb/rpm não servem ao Arch) |

@@ -1,11 +1,33 @@
-# Estúdio (V2)
+# Estúdio 1.0
 
 App desktop que une edição de **vídeo**, **imagem**, **3D**, **efeitos** e **animação** (2D e arte em pixel) num lugar só. Tudo é JSON na pasta do
 projeto: a pessoa edita na tela, o Claude edita conversando (com a conta da própria pessoa), e as duas mãos passam pelo
 mesmo JSON Patch com versão, diário e desfazer. A tela acompanha o arquivo; o agente vê o que a pessoa mudou.
 
 Nome provisório. Pasta: `C:\Users\usuario\projetos\estudio` (fora do OneDrive, por causa do `node_modules`).
-Repositório: `BKM-Advogados/BKM-EDITOR` (privado). V1 = tag `v1.0.0`.
+Repositório: `BKM-Advogados/BKM-EDITOR` (privado). A tag `v1.0.0` é a V1 antiga (pacote 0.1.0); esta é a
+versão 1.0.0 do pacote. No Linux a pasta é `~/Projects/estudio`.
+
+## Novidades da 1.0 (10/11/2026)
+
+- **Linux (Omarchy/Hyprland):** roda e se instala no lançador de aplicativos com `bash scripts/instalar-linux.sh`; em
+  gerenciador em mosaico a janela vem sem os botões sobrepostos. Detalhes em `STACKS.md`.
+- **Música (área 5, `docs/musica.md`):** bateria e sintetizadores da casa, passos e piano roll, arranjo com seções e
+  acordes, mixer com delay, reverb, limitador e presets, sidechain, automação de volume desenhada no arranjo, pintar
+  clipes, exportar WAV, M4A, Opus, MIDI e stems no alvo de loudness, e ida e volta com o vídeo de cenas.
+- **Animação (área 6, `docs/animacao.md`):** formas, texto, imagem e camada de pixel com quadros-chave e curvas (a cor
+  interpola em OKLab), revelações do pixel (aleatório, decodificar, varredura, do meio, chuva), editor de pixel,
+  exportação MP4 e ferramentas para o Claude; modelo "Logo em pixels".
+- **Rodada 3 integrada:** painel Mídia, instância única e gravação segura (Casca); três vias de conversa, cofre de chaves
+  no chaveiro do sistema e portão de permissão (IA); seleção múltipla, grupos, travas, guias, texto que cabe, PDF A4 e
+  carrossel em partes (Imagem); kit por referência, fontes sem internet, ícones, setas e listas (Marca); dividir,
+  crossfade, gravar narração e biblioteca de músicas (Som); detector de voz, cortes pela fala e legendas por destino
+  (Fala); exportar por destino, marca d'água por rede e limite de erro por painel (Vídeo).
+- 888 testes. Conferido no app, área por área, no Linux.
+- **Ainda não conferido:** a transcrição de verdade (falta o `whisper-cli` nesta máquina; o painel diz como compilar),
+  uma conversa real com o Claude e o cartão de permissão de `destravar_camadas` no app, e o som ouvido de ouvido
+  (medido pelos medidores e pelos arquivos).
+
 
 ## Instalar e rodar
 

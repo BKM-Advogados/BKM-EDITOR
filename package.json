@@ -1,7 +1,7 @@
 {
   "name": "estudio",
   "productName": "Estudio",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "Estúdio criativo desktop: vídeo, imagem, 3D e efeitos, editáveis à mão ou pelo terminal com o Claude",
   "author": "BKM Advogados",
   "private": true,
