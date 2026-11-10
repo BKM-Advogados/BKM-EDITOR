@@ -82,6 +82,8 @@ máquina real confirma · ❌ não funciona ou falta · ➖ não se aplica.
 | `Info.plist` do `.app` | lido com `plistlib` | ✅ `br.com.bkmadvogados.estudio`, `NSMicrophoneUsageDescription`, `CFBundleDocumentTypes` (pasta), categoria vídeo, macOS mínimo 12.0 |
 | `build/icone.icns` | estrutura conferida (10 blocos PNG, 16 a 1024) | ✅; não aberto no Finder |
 | `.github/workflows/build.yml` | YAML conferido no Linux | ✅ sintaxe; **nunca rodou** (sem push) |
+| `npm run package` (Linux) com o forge.config novo | Linux | ✅ `out/pacote/Estudio-linux-x64` (647 MB), só com os nativos do Linux mesmo com os de Windows e Mac no `node_modules` |
+| App do Linux empacotado, com HOME isolado: pasta de projeto como argumento, Ctrl+W, Meta+W | Linux (Hyprland), pela porta de depuração | ✅ o projeto do argumento abre direto no editor; Ctrl+W fecha e volta ao início; Meta+W não faz nada no Linux; barra igual à da V3 |
 | App aberto, render, gravação, transcrição, terminal, cofre, MCP | Windows e Mac | ❌ **não testado**: lista da seção 9 |
 
 ---
