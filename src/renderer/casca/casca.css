@@ -28,8 +28,8 @@
 .barra .acoes { flex: 1 1 0; justify-content: flex-end; display: flex; align-items: center; gap: 2px; white-space: nowrap; }
 .barra .acoes .bt { height: 26px; }
 .barra .acoes kbd { font: 600 10px var(--fonte-mono); color: var(--texto-2); background: var(--fundo-3); border-radius: 3px; padding: 0 4px; margin-left: 2px; }
-/* janela estreita: áreas e "Comentar" só com o ícone (o nome continua na dica) */
-@media (max-width: 1000px) {
+/* janela estreita: áreas e "Comentar" só com o ícone (o nome continua na dica). Com as seis áreas, o nome inteiro pede cerca de 1170 px: 1240 deixa folga para o nome do projeto */
+@media (max-width: 1240px) {
   .barra .areas button { font-size: 0; gap: 0; padding: 0 9px; }
   .barra .acoes .bt.fantasma { font-size: 0; gap: 0; }
   .barra .acoes kbd { display: none; }
