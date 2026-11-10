@@ -38,6 +38,7 @@ import {avisoDeQuedaEmLaco, decidirRecarga, garantirInstanciaUnica, trazerParaFr
 import {registrarIpcMidia} from './ipc-midia'; // frente Casca: painel de mídia
 import {lojaDeSenhasLinux} from './loja-de-senhas'; // frente IA
 import {criarSessoesIA, fecharAppsDeFora, iniciarAppsDeFora, perguntarAPessoa, registrarIpcIa, retomadaDe} from './ipc-ia'; // frente IA
+import {registrarIpcNarracao} from './ipc-narracao'; // narração por IA (docs/narracao.md)
 import {aoAbrirMusica, registrarIpcMusica} from './ipc-musica'; // frente Música
 import {criarPonteJanela} from './ponte-janela';
 
@@ -523,6 +524,11 @@ registrarIpcIa({lidar, claudeInstalado: () => claude, pasta: path.join(app.getPa
     portaoPedido: CANAL.iaPortaoPedido, portaoResposta: CANAL.iaPortaoResposta, portaoCancelado: CANAL.iaPortaoCancelado, reverter: CANAL.iaReverter,
     apps: CANAL.iaApps, appsLigar: CANAL.iaAppsLigar, appsNovo: CANAL.iaAppsNovo, appsConfigs: CANAL.iaAppsConfigs, appsRevogar: CANAL.iaAppsRevogar,
     guardar: CANAL.iaGuardar, guardadas: CANAL.iaGuardadas, apagarGuardada: CANAL.iaApagarGuardada}});
+// narração por IA (docs/narracao.md): Gemini TTS e Google Cloud TTS com a chave do cofre (depois do registrarIpcIa, que monta o cofre)
+registrarIpcNarracao({lidar, enviar, projeto: exigirProjeto, pasta: path.join(app.getPath('userData'), 'ia'), buscar: (u, i) => net.fetch(String(u), i),
+  ouvir: (canal, f) => ipcMain.on(canal, (e, ...a) => (confiavel(e), f(...a))),
+  canais: {estado: CANAL.narracaoEstado, gravarChave: CANAL.narracaoGravarChave, apagarChave: CANAL.narracaoApagarChave, vozes: CANAL.narracaoVozes,
+    previa: CANAL.narracaoPrevia, gerar: CANAL.narracaoGerar, cancelar: CANAL.narracaoCancelar, andamento: CANAL.narracaoAndamento, amostra: CANAL.narracaoAmostra}});
 // frente Música: ida e volta com o vídeo e o render ligado, feito no Web Worker da janela pela ponte com a janela
 registrarIpcMusica(lidar, exigirProjeto, criarPonteJanela({enviar, temJanela: () => Boolean(janela && !janela.isDestroyed()),
   ouvir: (canal, f) => ipcMain.on(canal, (e, ...a) => (confiavel(e), f(...(a as never[]))))}));

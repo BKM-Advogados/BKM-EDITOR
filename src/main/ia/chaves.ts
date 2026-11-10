@@ -30,6 +30,7 @@ const VARIAVEIS: Record<string, string[]> = {
   mistral: ['MISTRAL_API_KEY'],
   xai: ['XAI_API_KEY'],
   groq: ['GROQ_API_KEY'],
+  'google-tts': ['GOOGLE_TTS_API_KEY'], // narração por IA: Google Cloud TTS (Chirp 3: HD); o Gemini TTS usa a chave do gemini
 };
 
 export type OrigemChave = 'cofre' | 'ambiente' | 'nenhuma';

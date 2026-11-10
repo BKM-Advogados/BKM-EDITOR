@@ -22,6 +22,8 @@ import {duplicarSelecao, excluirSelecao} from './acoes';
 import {andamentoLimpeza, assinarLimpeza, cancelarLimpeza, crossfadeComSeguinte, dividirSelecaoAudio, duplicarSelecaoAudio, excluirSelecaoAudio, ICONES_PAPEL, limparVozDoClipe, partesAudio, trocarArquivoDoClipe,
   voltarAoOriginal} from './acoes-audio';
 import {CamposMovimento} from './CamposMovimento';
+import {abrirNarracaoIA, gerarFalas, narracaoTela, trocarTextoDaCena} from './acoes-narracao'; // narração por IA (docs/narracao.md)
+import {itensDaNarracao, ROTULO_ESTADO} from '../../../nucleo/narracao-cenas';
 import {lufsTexto, MedidorLoudness, useMedidasLoudness} from './MedidorLoudness';
 
 const CURVAS_OPCOES: [CurvaFade, string][] = [['linear', 'Linear'], ['suave', 'Suave'], ['potencia', 'Potência igual']]; // frente Som: forma do fade
@@ -135,6 +137,26 @@ const FatosCitados: React.FC<{documento: string; caminho: string; refs?: string[
   );
 };
 
+/** A fala da cena (narração por IA): o roteiro falado, o estado dela e "Gerar esta cena"; o resto fica no painel Narração por IA. */
+const FalaDaCena: React.FC<{documento: string; n: number}> = ({documento, n}) => {
+  const doc = useLoja((e) => e.docs[documento]?.doc) as DocCenas | undefined;
+  const andamento = useSyncExternalStore(narracaoTela.assinar, () => narracaoTela.ler().andamento);
+  const it = doc ? itensDaNarracao(doc)[n - 1] : undefined;
+  if (!doc || !it) return null;
+  return (
+    <Secao titulo={`Fala (narração por IA) · ${ROTULO_ESTADO[it.estado]}`} chave="cenas:fala">
+      <CampoTexto rotulo="Texto falado" multilinha dica="O que a voz fala nesta cena; o texto da tela pode ser outro. [pausa] e [pausa longa] fazem pausa."
+        valor={doc.cenas[n - 1]?.narracao?.texto ?? ''} aoMudar={(v) => void trocarTextoDaCena(documento, n - 1, v)} />
+      {it.clipe && <CampoLeitura rotulo="Fala gerada">{numeroBr(it.clipe.duracao_ms / 1000, 1)} s{it.clipe.em + it.clipe.duracao_ms > it.t_out + 1 ? ' · passa do fim da cena' : ''}</CampoLeitura>}
+      <div style={{padding: '2px 10px 6px 18px', display: 'flex', gap: 6}}>
+        {it.estado !== 'sem_texto' && <button className="bt mini" disabled={Boolean(andamento)} onClick={() => void gerarFalas(documento, {cenas: [it.cena], refazer: it.estado === 'gerada'})}
+          title={it.estado === 'gerada' ? 'Pede outra tomada ao Google (tem custo; Ctrl+Z volta à anterior)' : undefined}>{it.estado === 'gerada' ? 'Outra tomada' : 'Gerar esta cena'}</button>}
+        <button className="bt mini fantasma" onClick={() => abrirNarracaoIA(documento)}>Narração por IA…</button>
+      </div>
+    </Secao>
+  );
+};
+
 const PropsCena: React.FC<{documento: string; caminho: string; c: CenaCenas; n: number; menu: ItemMenu[]}> = ({documento, caminho, c, n, menu}) => (
   <div className="painel">
     <CabecalhoInspector icone={<Clapperboard />} nome={c.nome || `Cena ${n}`} sub={`Cena ${n} · ${numeroBr((c.duracao_ms ?? 0) / 1000, 1)} s`} dica={caminho} menu={menu} />
@@ -151,6 +173,7 @@ const PropsCena: React.FC<{documento: string; caminho: string; c: CenaCenas; n: 
           </div>
         )}{/* video-D15 (frente C) */}
       </Secao>
+      <FalaDaCena documento={documento} n={n} />
       {c.refs?.length ? <FatosCitados documento={documento} caminho={caminho} refs={c.refs} nome="da cena" /> : null}
       <div className="vazio">Arraste a ponta azul da cena na linha do tempo para mudar a duração.</div>
     </div>

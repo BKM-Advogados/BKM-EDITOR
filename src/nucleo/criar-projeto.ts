@@ -233,6 +233,14 @@ export const claudeMd = (modulos: Modulo[]) => {
       '  escreva `texto`, `palavras`, `em` ou `sai` de legenda por `aplicar_patch`. O `estilo` muda por patch: `predefinicao`',
       '  (`classica`, `caixa`, `karaoke`, `faixa`, `discreta`), `posicao` (`baixo`, `meio`, `cima`), `tam`, `maiusculas`,',
       '  `falante`, `cor`, `cor_destaque`, `fundo` e `fonte` (padrão: os do `tema`). Gere com `transcrever`.',
+      '  Narração por IA (opcional): `cenas[i].narracao` {`texto`} é o roteiro falado da cena, diferente do texto da tela;',
+      '  `[pausa]` e `[pausa longa]` fazem pausa. `narracao`, na raiz, é a configuração: `provedor` (`gemini` = Gemini TTS,',
+      '  com a chave do Gemini; `google-tts` = Google Cloud TTS, vozes Chirp 3: HD), `modelo` (só gemini:',
+      '  `gemini-3.8-flash-tts` ou `gemini-3.8-flash-lite-tts`), `voz` (`vozes_narracao`), `estilo` (só gemini: como falar,',
+      '  em linguagem natural), `velocidade` (só google-tts, 0,25 a 2), `folga_ms` (a fala entra depois do começo da cena;',
+      '  padrão 300), `margem_ms` (padrão 500) e `pronuncias` [{de, para}], o dicionário aplicado antes da voz (ex.: RH →',
+      '  erre agá). A fala gerada é um WAV em `midia/narracao/<hash>.wav` num clipe de voz com `narracao_ia` {cena, hash}:',
+      '  não escreva `narracao_ia` nem esses clipes à mão; use `narrar`.',
     );
   }
   if (tem('imagem')) linhas.push(...linhasDaImagem());
@@ -293,6 +301,7 @@ export const claudeMd = (modulos: Modulo[]) => {
   if (tem('video') || tem('imagem')) passos.push('`aplicar_marca` troca o kit de marca (cores, fonte, logo e fontes próprias) de um documento.');
   if (tem('video')) {
     passos.push('`transcrever` transcreve a fala no próprio PC: grava `<arquivo>.palavras.json` e, no vídeo de cenas, gera as\n   legendas que faltam. `ler_legendas` mostra as legendas nos tempos da tela e `editar_legenda` corrige texto e tempo.\n   `exportar_legendas` grava SRT e VTT em `saidas/`; `importar_legendas` lê um SRT ou VTT do projeto.');
+    passos.push('Narração por IA: escreva `cenas[i].narracao.texto`, ajuste a voz com `configurar_narracao` e as pronúncias com\n   `pronuncias_narracao`; mostre à pessoa `narrar` com `previa: true` (texto final e custo, sem gastar) e depois\n   gere com `narrar` (cache: só a cena que mudou vai ao Google). `ajustar_cenas_a_fala` faz a cena durar a fala;\n   `transcrever`, depois, cria as legendas.');
   }
   if (tem('imagem')) passos.push('`remover_fundo` tira o fundo de uma foto de pessoa com o modelo local; com `voltar: true`, volta ao original.');
   if (tem('animacao')) passos.push('`criar_animacao`, `adicionar_camada_animacao`, `animar`, `pixelizar_imagem`, `efeito_pixel` e `ver_animacao` montam e animam a animação (docs/animacao.md).');

@@ -15,7 +15,7 @@ export type PedidoPortao = {ferramenta: string; entrada: Record<string, unknown>
 /** Quem pergunta à pessoa (o app); sem ele (MCP por stdio, fora do app), nada pergunta. Devolve se pode rodar. */
 export type Portao = {perguntar: (p: PedidoPortao) => Promise<boolean>};
 
-export const CLASSES: Record<string, {classe: Classe; motivo: string}> = {
+export const CLASSES: Record<string, {classe: Classe; motivo: string; livreSe?: (entrada: Record<string, unknown>) => boolean}> = {
   ler_fonte: {classe: 'cartao', motivo: 'abrir uma página da internet'},
   transcrever: {classe: 'cartao', motivo: 'transcrever o áudio neste PC (na primeira vez baixa o modelo de voz, uns 200 MB)'},
   remover_fundo: {classe: 'cartao', motivo: 'recortar o fundo da imagem neste PC (na primeira vez baixa o modelo, uns 26 MB)'},
@@ -24,6 +24,9 @@ export const CLASSES: Record<string, {classe: Classe; motivo: string}> = {
   destravar_camadas: {classe: 'cartao', motivo: 'destravar camadas que você travou na imagem'},
   exportar_musica: {classe: 'cartao', motivo: 'gravar a música em arquivo em saidas/'},
   importar_midi: {classe: 'cartao', motivo: 'trazer um arquivo MIDI para o projeto'},
+  // narração por IA (docs/narracao.md): vai ao Google com a chave da pessoa; a prévia (previa: true) não sai do PC
+  narrar: {classe: 'cartao', motivo: 'gerar a narração com a IA do Google (sai do PC, usa a sua chave e pode ter custo)', livreSe: (e) => e.previa === true},
+  vozes_narracao: {classe: 'cartao', motivo: 'listar as vozes de narração do Google (usa a sua chave, sem custo)'},
 };
 
 type Anotacoes = {openWorldHint?: boolean; destructiveHint?: boolean};
@@ -46,7 +49,7 @@ export const instalarPortao = (servidor: McpServer, o: {projeto: DiarioDoPortao;
       // com inputSchema o SDK chama (args, extra); sem ele, só (extra)
       const entrada = (config.inputSchema ? a[0] : {}) as Record<string, unknown>;
       const extra = (config.inputSchema ? a[1] : a[0]) as {signal?: AbortSignal} | undefined;
-      if (o.portao && classeDe(nome, config.annotations) === 'cartao') {
+      if (o.portao && classeDe(nome, config.annotations) === 'cartao' && !CLASSES[nome]?.livreSe?.(entrada ?? {})) {
         const ok = await o.portao.perguntar({ferramenta: nome, entrada: entrada ?? {}, motivo: motivoDe(nome, config.annotations), sinal: extra?.signal});
         if (!ok) return {isError: true, content: [{type: 'text', text: NEGADO}]};
       }

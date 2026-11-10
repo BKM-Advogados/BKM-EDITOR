@@ -31,6 +31,7 @@ export type ClipeAudio = {
   // música muda; `musica_original` guarda o áudio de antes do "Editar em Música", para "Voltar ao original"
   musica?: string;
   musica_original?: {arquivo: string; corte_ms?: number; duracao_ms: number};
+  narracao_ia?: {cena: string; hash: string}; // narração por IA (narracao.ts): a fala de qual cena e o hash do pedido (texto, provedor, voz…)
 };
 
 /** Forma do fade. `linear`: o ganho sobe em linha reta (dois clipes iguais somam o mesmo nível; música diferente cai 3 dB

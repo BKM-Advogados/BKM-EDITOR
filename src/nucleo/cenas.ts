@@ -9,6 +9,7 @@ import {efeitosValidos, problemasDosEfeitos, type Efeito} from './efeitos';
 import {formatoDoVideo, type Formato} from './formatos';
 import type {Teleprompter} from './gravacao';
 import {resolverLegendas, type LegendasCenas, type LegendasP} from './legendas'; // frente Fala: legendas (docs/legendas.md)
+import {problemasDaNarracao, type ConfigNarracao, type NarracaoCena} from './narracao'; // narração por IA (docs/narracao.md)
 
 export type TipoBlocoCenas = 'titulo' | 'texto' | 'lista' | 'numero' | 'imagem';
 
@@ -45,13 +46,16 @@ export type BlocoCenas = {
  *  `intensidade` é quanto a imagem cresce (0,05 a 0,4; padrão 0,15); `suave` (padrão sim) começa e termina devagar. */
 export type MovimentoImagem = {tipo: 'aproximar' | 'afastar' | 'esquerda' | 'direita' | 'cima' | 'baixo'; intensidade?: number; suave?: boolean};
 
-export type CenaCenas = {id: string; nome?: string; duracao_ms: number; fundo?: string; blocos: BlocoCenas[]; refs?: string[]};
+export type CenaCenas = {id: string; nome?: string; duracao_ms: number; fundo?: string; blocos: BlocoCenas[]; refs?: string[];
+  narracao?: NarracaoCena; // narração por IA: o roteiro falado da cena, diferente do texto da tela (narracao.ts)
+};
 
 export type TemaCenas = {fundo: string; texto: string; destaque: string; suave: string; fonte: string};
 
 export type DocCenas = {tipo: 'cenas'; formato: Formato; tema: TemaCenas; cenas: CenaCenas[]; efeitos?: Efeito[]; audio?: AudioCenas;
   legendas?: LegendasCenas; // frente Fala: segmentos com tempo, palavras e falante, e o estilo (legendas.ts)
   teleprompter?: Teleprompter; // frente Som (rodada 3): o texto que a pessoa lê ao gravar a narração (gravacao.ts)
+  narracao?: ConfigNarracao; // narração por IA: provedor, modelo, voz, estilo, velocidade, folga, margem e o dicionário de pronúncia (narracao.ts)
 };
 
 export const TEMA_NEUTRO: TemaCenas = {fundo: '#111418', texto: '#F2F2F2', destaque: '#70B8FF', suave: '#A3ABB5', fonte: 'Inter'};
@@ -176,6 +180,7 @@ export const resolverCenas = (doc: DocCenas, opcoes: OpcoesResolver = {}): {prop
   const som = resolverAudio(doc.audio, duracao_ms, opcoes.envelopes);
   avisos.push(...som.avisos);
   avisos.push(...problemasDosEfeitos(doc.efeitos).map((p) => `Efeitos: ${p}`)); // frente C (tres-efeitos-D1, D2)
+  avisos.push(...problemasDaNarracao(doc)); // narração por IA: campo fora do lugar vira aviso
   const legendas = resolverLegendas(doc.legendas, {audio: som.audio, largura: formato.largura, altura: formato.altura, tema, duracao_ms, fala: doc.audio}, avisos); // frente Fala
   return {
     props: {composicao: 'VideoCenas', duracao_ms, largura: formato.largura, altura: formato.altura, fps: formato.fps, tema, cenas,

@@ -36,6 +36,8 @@ import {registrarMusica} from './mcp-musica'; // frente Música
 import {musicaDoModelo, type ModeloMusica} from './musica-modelos'; // frente Música (item 27)
 import type {DocMusica} from './musica'; // frente Música (item 27)
 import {ARQUIVO_TRANSICOES, lerRegistro, transicaoEmCurso} from './transicoes'; // frente Música
+import {registrarNarracao} from './mcp-narracao'; // narração por IA (docs/narracao.md)
+import type {ServicoNarracao} from './narracao-servico';
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x, null, 2)}]});
 const erro = (e: unknown) => ({
@@ -122,7 +124,8 @@ export const criarRede = (buscar: Buscar = (url, init) => fetch(url, init), opco
 
 // ---------- ferramentas ----------
 
-export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, autor: string, origem: string, rede?: Rede, transcritor?: TranscritorMcp, portao?: Portao) => {
+export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, autor: string, origem: string, rede?: Rede, transcritor?: TranscritorMcp, portao?: Portao,
+  narrador?: ServicoNarracao) => {
   // frente IA: tudo o que for registrado daqui em diante passa pelo portão (permissão e mudanças do diário no resultado)
   instalarPortao(servidor, {projeto, origem, portao});
   // frente Animação: depois do portão, como as outras
@@ -288,6 +291,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   registrarImagem(servidor, projeto, autor, origem); // seleção e layout da imagem (rodada 3, B2): src/nucleo/mcp-imagem.ts
   registrarSom(servidor, projeto, autor, origem); // frente Som (rodada 3): dividir, copiar e crossfade de clipe de áudio
   registrarMusica(servidor, projeto, autor, origem); // frente Música: música e ida e volta entre módulos (docs/musica.md)
+  registrarNarracao(servidor, projeto, autor, origem, narrador); // narração por IA (docs/narracao.md): vozes, narrar, pronúncias, ajustar cenas à fala
 };
 
 // ---------- pesquisa: fontes e fatos (src/nucleo/pesquisa.ts, docs/pesquisa.md) ----------

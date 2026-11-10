@@ -6,7 +6,7 @@
 // duração dela. Abaixo dos blocos, o vídeo de cenas tem as faixas de áudio (FaixasAudio.tsx), e a barra ganha o
 // "+ Áudio" (narração, música, efeito ou música da biblioteca).
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore} from 'react';
-import {Maximize2, Mic, Music, Plus, Volume2, ZoomIn, ZoomOut} from 'lucide-react';
+import {AudioLines, Maximize2, Mic, Music, Plus, Volume2, ZoomIn, ZoomOut} from 'lucide-react';
 import type {AudioP} from '../../../nucleo/audio';
 import type {LegendasP} from '../../../nucleo/legendas'; // frente Fala
 import type {Palavra, TrechoNarracao} from '../../../nucleo/roteiro/resolver';
@@ -17,6 +17,8 @@ import {ancoraPerto} from './ancoras';
 import {adicionarClipeAudio} from './acoes-audio';
 import {BibliotecaTrilhas} from './BibliotecaTrilhas';
 import {GravadorNarracao} from './GravadorNarracao'; // frente Som (rodada 3)
+import {NarracaoIA} from './NarracaoIA'; // narração por IA (docs/narracao.md)
+import {abrirNarracaoIA, fecharNarracaoIA, narracaoTela} from './acoes-narracao';
 import {medirPendentes} from './envelope';
 import {FaixasAudio} from './FaixasAudio';
 import {FaixaLegendas} from './FaixaLegendas'; // frente Fala
@@ -73,6 +75,7 @@ export const AcoesLinhaDoTempo: React.FC<{noCabecalho?: boolean}> = ({noCabecalh
   }, [cab]);
   const [biblioteca, setBiblioteca] = useState(false);
   const [gravador, setGravador] = useState(false);
+  const narracaoAberta = useSyncExternalStore(narracaoTela.assinar, () => narracaoTela.ler().aberto);
   if (!m) return null;
   const minimo = Math.min(m.ajuste, 2);
   const pxs = zoom ?? m.ajuste;
@@ -86,6 +89,7 @@ export const AcoesLinhaDoTempo: React.FC<{noCabecalho?: boolean}> = ({noCabecalh
             itens={[
               {rotulo: 'Narração…', icone: <Mic className="i14" />, acao: () => void adicionarClipeAudio(documento, 'voz')},
               {rotulo: 'Gravar narração…', icone: <Mic className="i14" />, acao: () => setGravador(true)},
+              {rotulo: 'Narração por IA…', icone: <AudioLines className="i14" />, acao: () => abrirNarracaoIA(documento)},
               {rotulo: 'Música…', icone: <Music className="i14" />, acao: () => void adicionarClipeAudio(documento, 'musica')},
               {rotulo: 'Efeito sonoro…', icone: <Volume2 className="i14" />, acao: () => void adicionarClipeAudio(documento, 'efeitos')},
               'sep',
@@ -93,6 +97,7 @@ export const AcoesLinhaDoTempo: React.FC<{noCabecalho?: boolean}> = ({noCabecalh
             ]} />
           {biblioteca && <BibliotecaTrilhas documento={documento} aoFechar={() => setBiblioteca(false)} />}
           {gravador && <GravadorNarracao documento={documento} aoFechar={() => setGravador(false)} />}
+          {narracaoAberta === documento && <NarracaoIA documento={documento} aoFechar={fecharNarracaoIA} />}
         </span>
       )}
       <button className={`bti${zoom === null ? ' ligado' : ''}`} onClick={() => m.zoom(null)} title="Ajustar à janela  Shift+Z"><Maximize2 /></button>

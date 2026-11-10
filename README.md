@@ -24,6 +24,11 @@ V3 = `v3.0.0` (pacote 1.0.0). No Linux a pasta é `~/Projects/estudio`.
   crossfade, gravar narração e biblioteca de músicas (Som); detector de voz, cortes pela fala e legendas por destino
   (Fala); exportar por destino, marca d'água por rede e limite de erro por painel (Vídeo).
 - 888 testes. Conferido no app, área por área, no Linux.
+- **Narração por IA (frente `frente/narracao-ia`, `docs/narracao.md`):** a fala de cada cena (`cenas[i].narracao.texto`) vira
+  voz pelo Gemini TTS (a chave do Gemini das conversas) ou pelo Google Cloud TTS (Chirp 3: HD, chave própria no cofre). Tem
+  dicionário de pronúncia, cache por cena em `midia/narracao/`, custo estimado antes de gerar, ducking da música e "ajustar
+  as cenas à fala". As ferramentas MCP são `vozes_narracao`, `configurar_narracao`, `pronuncias_narracao`, `narrar` e
+  `ajustar_cenas_a_fala`. Testado com HTTP falso; o teste ao vivo é `scripts/narracao-ao-vivo.mjs`.
 - **Ainda não conferido:** a transcrição de verdade (falta o `whisper-cli` nesta máquina; o painel diz como compilar),
   uma conversa real com o Claude e o cartão de permissão de `destravar_camadas` no app, e o som ouvido de ouvido
   (medido pelos medidores e pelos arquivos).

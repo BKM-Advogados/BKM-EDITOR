@@ -41,3 +41,31 @@ export const custoEstimado = (provedor: string, modelo: string, u: UsoTokens, qu
   const usd = ((semCache * f.entrada + u.entrada_cache * (f.cache ?? f.entrada) + u.saida * f.saida) * fator) / 1_000_000;
   return {usd, pico: fator === 2, tabela: DATA_DA_TABELA, fonte: linha.fonte};
 };
+
+// ---------- narração por IA (docs/narracao.md) ----------
+// Conferida em 10/11/2026 em aistudio.google.com/docs/pricing (Gemini TTS) e cloud.google.com/text-to-speech/pricing (Chirp 3: HD).
+// Gemini: texto de entrada e áudio de saída por milhão de tokens; o áudio conta 25 tokens por segundo. Os dois preços dobram
+// em 01/01/2027. Cloud TTS: por milhão de caracteres, com 1 milhão grátis por mês (a estimativa não desconta a parte grátis,
+// porque o app não sabe quanto a pessoa já usou no mês).
+export const DATA_DA_TABELA_NARRACAO = '10/11/2026';
+
+type FaixaTts = {ate?: string; entrada?: number; saida?: number; caracteres?: number};
+const TABELA_TTS: {provedor: 'gemini' | 'google-tts'; modelo: RegExp; faixas: FaixaTts[]; fonte: string; nota?: string}[] = [
+  {provedor: 'gemini', modelo: /^gemini-3\.8-flash-lite-tts/, fonte: 'aistudio.google.com/docs/pricing',
+    faixas: [{ate: '2026-12-31', entrada: 0.5, saida: 6}, {entrada: 1, saida: 12}]},
+  {provedor: 'gemini', modelo: /^gemini-3\.8-flash-tts/, fonte: 'aistudio.google.com/docs/pricing',
+    faixas: [{ate: '2026-12-31', entrada: 0.5, saida: 9}, {entrada: 1, saida: 18}]},
+  {provedor: 'gemini', modelo: /^gemini-3\.1-flash-tts/, fonte: 'aistudio.google.com/docs/pricing', faixas: [{entrada: 1, saida: 20}]},
+  {provedor: 'google-tts', modelo: /^chirp3-hd$/, fonte: 'cloud.google.com/text-to-speech/pricing', faixas: [{caracteres: 30}],
+    nota: 'o Google dá 1 milhão de caracteres grátis por mês nas vozes Chirp 3: HD; a estimativa não desconta'},
+];
+
+/** Custo estimado de uma narração: tokens de texto e de áudio no Gemini, caracteres no Cloud TTS. Modelo fora da tabela: undefined. */
+export const custoNarracao = (provedor: string, modelo: string, m: {tokens_entrada: number; tokens_saida: number; caracteres: number}, quando = new Date()) => {
+  const linha = TABELA_TTS.find((l) => l.provedor === provedor && l.modelo.test(modelo));
+  if (!linha) return undefined;
+  const dia = quando.toISOString().slice(0, 10);
+  const f = linha.faixas.find((x) => !x.ate || dia <= x.ate) ?? linha.faixas[linha.faixas.length - 1];
+  const usd = ((f.entrada ?? 0) * m.tokens_entrada + (f.saida ?? 0) * m.tokens_saida + (f.caracteres ?? 0) * m.caracteres) / 1_000_000;
+  return {usd, tabela: DATA_DA_TABELA_NARRACAO, fonte: linha.fonte, ...(linha.nota ? {nota: linha.nota} : {})};
+};

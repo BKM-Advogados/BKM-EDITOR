@@ -596,3 +596,26 @@ input[type="range"]:focus-visible { outline: none; }
 .gravador .nivel { flex: 1; min-width: 80px; height: 8px; border-radius: 4px; background: var(--fundo-4); overflow: hidden; }
 .gravador .nivel > span { display: block; height: 100%; background: var(--trilha-audio); transition: width 0.08s; }
 .gravador .nivel.cortou > span { background: var(--erro); }
+
+/* narração por IA (docs/narracao.md): o painel ao lado do gravador, com a fala de cada cena */
+.narracao-ia { width: min(560px, calc(100vw - 32px)); }
+.narracao-ia .topo .meta { display: inline-flex; align-items: center; gap: 4px; }
+.narracao-ia .espaco { flex: 1; }
+.narracao-config { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: flex-end; }
+.narracao-config > label { display: flex; flex-direction: column; gap: 2px; flex: 1 1 140px; min-width: 0; }
+.narracao-config > label.largo { flex: 3 1 220px; }
+.narracao-config > label.curto { flex: 0 0 auto; }
+.narracao-config .par { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.narracao-config .par > .campo { flex: 1; min-width: 0; }
+.narracao-config select.campo { width: 100%; min-width: 0; }
+.narracao-cenas { display: flex; flex-direction: column; gap: 6px; max-height: 40vh; overflow: auto; padding-right: 2px; }
+.narracao-cena { display: flex; flex-direction: column; gap: 4px; padding: 6px; border-radius: var(--raio); background: var(--fundo-3); }
+.narracao-cena textarea.campo { width: 100%; resize: vertical; min-height: 40px; font-size: 12px; }
+.narracao-cena .meta.passa { color: var(--erro); }
+.estado-fala.gerada { color: var(--ok, #6cc28a); }
+.estado-fala.pendente { color: var(--acento, #70b8ff); }
+.estado-fala.velha { color: var(--aviso, #e0a84a); }
+.estado-fala.sem { color: var(--texto-3); }
+.narracao-dicionario summary { cursor: pointer; display: flex; align-items: center; gap: 6px; color: var(--texto-2); }
+.narracao-dicionario .linha-gravador { margin-top: 4px; }
+.narracao-dicionario input.campo { flex: 1; min-width: 100px; }

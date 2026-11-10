@@ -87,6 +87,9 @@
 
 > O MCP roda de duas formas: HTTP no processo principal do Electron (Streamable HTTP)
 > e stdio via `dist-mcp/nucleo.cjs` (compilado com esbuild).
+>
+> Narração por IA (`docs/narracao.md`): Gemini TTS (Gemini API) e Google Cloud Text-to-Speech (Chirp 3: HD) por REST com
+> `fetch`, sem SDK nem dependência nova.
 
 ---
 
