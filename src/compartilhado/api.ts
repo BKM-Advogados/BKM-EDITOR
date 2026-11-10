@@ -380,7 +380,7 @@ export type RespostaFundo = {ok: boolean; png?: string; ms?: number; mensagem?: 
 export type EstadoProvedor = {id: string; nome: string; via: 'claude-cli' | 'openai' | 'acp'; servidor: string; experimental?: boolean; modelo?: string;
   base?: string; paginaChave?: string; chave: 'exigida' | 'opcional' | 'nenhuma'; pronto: boolean; falta?: string;
   chave_origem?: 'cofre' | 'ambiente' | 'nenhuma'; chave_final?: string; chave_variavel?: string; local?: boolean; padrao?: boolean;
-  cofre_persistente?: boolean};
+  cofre_persistente?: boolean; cofre_texto?: string}; // cofre_texto: onde a chave fica (ou por que só vale na sessão) neste sistema
 /** Resultado de gravar uma chave: testada na lista de modelos do provedor (não gasta token). */
 export type ResultadoChave = {ok: boolean; mensagem: string; persistente?: boolean; modelos?: string[]};
 export type ResultadoModelos = {ok: true; modelos: string[]} | {ok: false; status?: number; rede?: boolean; mensagem: string};

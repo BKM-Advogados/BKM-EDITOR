@@ -8,6 +8,7 @@ import type {Projeto} from '../nucleo/projeto';
 import type {McpHttp, Perguntador} from './mcp-http';
 import {acharChave, CofreMemoria, finalDaChave, type Cofre} from './ia/chaves';
 import {CofreArquivo, type Cifra} from './ia/cofre-arquivo';
+import {textoDoCofre} from './loja-de-senhas';
 import {AppsDeFora} from './ia/apps-de-fora';
 import {apagarGuardada, guardarConversa, lerGuardada, listarGuardadas} from './ia/guardadas';
 import {ConfiguracaoIA} from './ia/config';
@@ -47,13 +48,14 @@ export const estadoDosProvedores = async (o: {claudeInstalado: boolean; acharExe
   const achar = o.acharExe ?? ((n: string) => acharExecutavel(n, ambienteAgente()));
   const cfg = configuracao?.ler() ?? {provedores: {}};
   const persistente = cofre instanceof CofreArquivo ? cofre.persistente() : false;
+  const cofre_texto = textoDoCofre({persistente, plataforma: process.platform, loja: cofre instanceof CofreArquivo ? cofre.loja() : undefined});
   const r: EstadoProvedor[] = [];
   for (const p of PROVEDORES) {
     const c = cfg.provedores[p.id] ?? {};
     const modelo = c.modelo ?? p.modelo;
     const base = c.base ?? p.base;
     const comum = {id: p.id, nome: p.nome, via: p.via, servidor: p.servidor, experimental: p.experimental, local: p.local, modelo, base,
-      paginaChave: p.paginaChave, chave: p.chave, padrao: (cfg.padrao ?? 'claude') === p.id, cofre_persistente: persistente};
+      paginaChave: p.paginaChave, chave: p.chave, padrao: (cfg.padrao ?? 'claude') === p.id, cofre_persistente: persistente, cofre_texto};
     if (p.via === 'claude-cli') {
       r.push({...comum, pronto: o.claudeInstalado, falta: o.claudeInstalado ? undefined : 'instalar o Claude Code'});
     } else if (p.via === 'acp') {
@@ -84,7 +86,7 @@ export const gravarChave = async (id: string, chave: string, f?: typeof fetch): 
   if (!r.ok && (r.status === 401 || r.status === 403)) return {ok: false, mensagem: r.mensagem};
   cofre.gravar(id, limpa);
   const persistente = cofre instanceof CofreArquivo ? cofre.persistente() : false;
-  const onde = persistente ? 'guardada cifrada neste PC' : 'válida só enquanto o app estiver aberto (o Windows não ofereceu a cifra)';
+  const onde = textoDoCofre({persistente, plataforma: process.platform, loja: cofre instanceof CofreArquivo ? cofre.loja() : undefined});
   if (!r.ok) return {ok: true, persistente, mensagem: `chave ${onde}, mas não deu para testar agora: ${r.mensagem}`};
   return {ok: true, persistente, mensagem: `chave aceita e ${onde}`, modelos: r.modelos};
 };

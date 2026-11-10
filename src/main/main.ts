@@ -29,6 +29,7 @@ import {registrarPrefsExportacao} from './ipc-exportacao';
 import {apagarLimposSemUso, registrarIpcLimpeza} from './limpeza-voz';
 import {registrarIpcLoudness} from './loudness';
 import {registrarRemoverFundo} from './remover-fundo';
+import {lojaDeSenhasLinux} from './loja-de-senhas'; // frente IA
 import {criarSessoesIA, fecharAppsDeFora, iniciarAppsDeFora, perguntarAPessoa, registrarIpcIa, retomadaDe} from './ipc-ia'; // frente IA
 
 // o mesmo id do instalador (electron-builder.yml): a barra de tarefas agrupa a janela com o atalho
@@ -36,6 +37,10 @@ app.setAppUserModelId('br.com.bkmadvogados.estudio');
 
 // teste de ponta a ponta: o script de e2e se conecta à janela pelo protocolo de depuração do Chromium
 if (process.env.ESTUDIO_DEPURAR_PORTA) app.commandLine.appendSwitch('remote-debugging-port', process.env.ESTUDIO_DEPURAR_PORTA);
+
+// Linux: o chaveiro do safeStorage (cofre das chaves de IA) precisa ser escolhido antes do app abrir; ver loja-de-senhas.ts
+const LOJA_DE_SENHAS = process.platform === 'linux' ? lojaDeSenhasLinux(process.env, process.argv) : undefined;
+if (LOJA_DE_SENHAS) app.commandLine.appendSwitch('password-store', LOJA_DE_SENHAS);
 
 // Linux com gerenciador em mosaico: as janelas vêm sem moldura e sem minimizar, e se fecham pelo teclado (Super+W)
 const MOSAICO = process.platform === 'linux'
@@ -469,7 +474,8 @@ registrarIpcLoudness(lidar, exigirProjeto, (documento) => (exigirProjeto(), sess
 registrarIpcIa({lidar, claudeInstalado: () => claude, pasta: path.join(app.getPath('userData'), 'ia'), conversas: () => conversas,
   enviar, ouvir: (canal, f) => ipcMain.on(canal, (e, ...a) => (confiavel(e), f(...a))), projeto: exigirProjeto,
   mcp: () => mcpHttp, ponte: () => ({exe: process.execPath, script: recursos(path.join('dist-mcp', 'ponte.cjs'))}),
-  cifra: {disponivel: () => safeStorage.isEncryptionAvailable(), cifrar: (t) => safeStorage.encryptString(t), decifrar: (b) => safeStorage.decryptString(b)},
+  cifra: {disponivel: () => safeStorage.isEncryptionAvailable(), cifrar: (t) => safeStorage.encryptString(t), decifrar: (b) => safeStorage.decryptString(b),
+    loja: () => (process.platform === 'linux' ? safeStorage.getSelectedStorageBackend() : undefined)},
   canais: {provedores: CANAL.iaProvedores, gravarChave: CANAL.iaGravarChave, apagarChave: CANAL.iaApagarChave, modelos: CANAL.iaModelos,
     configurar: CANAL.iaConfigurar, padrao: CANAL.iaPadrao, usoDoMes: CANAL.iaUsoDoMes, conversaModelo: CANAL.conversaModelo,
     portaoPedido: CANAL.iaPortaoPedido, portaoResposta: CANAL.iaPortaoResposta, portaoCancelado: CANAL.iaPortaoCancelado, reverter: CANAL.iaReverter,

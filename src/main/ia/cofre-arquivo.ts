@@ -1,11 +1,12 @@
-// Cofre das chaves de IA num arquivo do perfil do Windows (%APPDATA%\Estudio\ia\chaves.json), cifrado pelo
-// safeStorage do Electron (DPAPI no Windows: só abre na mesma conta do Windows). Fora do projeto, do git e do OneDrive.
-// Sem cifra disponível, a chave vale só enquanto o app estiver aberto (fica em memória e nada é gravado).
+// Cofre das chaves de IA num arquivo do perfil da pessoa (userData/ia/chaves.json: %APPDATA%\Estudio no Windows,
+// ~/.config/estudio no Linux), cifrado pelo safeStorage do Electron (DPAPI no Windows, chaveiro do sistema no Linux).
+// Fora do projeto, do git e do OneDrive. Sem cifra disponível (no Linux, sem chaveiro ativo), a chave vale só enquanto o
+// app estiver aberto: fica em memória e nada é gravado, nem em texto puro.
 import {existsSync, mkdirSync, readFileSync, renameSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import type {Cofre} from './chaves';
 
-export type Cifra = {disponivel: () => boolean; cifrar: (texto: string) => Buffer; decifrar: (dado: Buffer) => string};
+export type Cifra = {disponivel: () => boolean; cifrar: (texto: string) => Buffer; decifrar: (dado: Buffer) => string; loja?: () => string | undefined};
 type Arquivo = {versao: 1; chaves: Record<string, {dado: string; em: string}>};
 
 export class CofreArquivo implements Cofre {
@@ -22,6 +23,15 @@ export class CofreArquivo implements Cofre {
     }
   }
 
+  /** Qual chaveiro está em uso (no Linux: gnome_libsecret, kwallet6, basic_text...). */
+  loja() {
+    try {
+      return this.cifra.loja?.();
+    } catch {
+      return undefined;
+    }
+  }
+
   ler(provedor: string) {
     const s = this.soNestaSessao.get(provedor);
     if (s) return s;
@@ -30,7 +40,7 @@ export class CofreArquivo implements Cofre {
     try {
       return this.cifra.decifrar(Buffer.from(e.dado, 'base64'));
     } catch {
-      return undefined; // outra conta do Windows, ou o arquivo veio de outro PC
+      return undefined; // outra conta do sistema, outro chaveiro, ou o arquivo veio de outro PC
     }
   }
 

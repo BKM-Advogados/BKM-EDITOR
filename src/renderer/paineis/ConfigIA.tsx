@@ -77,7 +77,7 @@ const LinhaProvedor: React.FC<{p: EstadoProvedor; aberto: boolean; abrir: () => 
           {p.via === 'openai' && p.chave !== 'nenhuma' && (
             <div className="ia-linha">
               <KeyRound size={13} />
-              {p.chave_final ? <span>chave …{p.chave_final} {p.chave_origem === 'ambiente' ? `(da variável ${p.chave_variavel ?? 'do Windows'})` : '(neste PC)'}</span>
+              {p.chave_final ? <span>chave …{p.chave_final} {p.chave_origem === 'ambiente' ? `(da variável ${p.chave_variavel ?? 'de ambiente'})` : '(neste PC)'}</span>
                 : <span className="fraco">sem chave</span>}
               <input className="campo" type="password" placeholder={p.chave_final ? 'trocar a chave' : 'cole a chave aqui'} value={chave} autoComplete="off"
                 onChange={(e) => setChave(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && chave.trim() && void gravarChave()} />
@@ -189,6 +189,7 @@ const DialogoConfigIA: React.FC = () => {
   }, [cfg]);
   if (!cfg) return null;
   const persistente = provedores.some((p) => p.cofre_persistente);
+  const cofreTexto = provedores.find((p) => p.cofre_texto)?.cofre_texto;
   const linhasUso = Object.entries(uso);
   return (
     <div className="dialogo-fundo" onPointerDown={(e) => e.target === e.currentTarget && fecharConfigIA()} onKeyDown={(e) => e.key === 'Escape' && fecharConfigIA()}>
@@ -196,8 +197,7 @@ const DialogoConfigIA: React.FC = () => {
         <div className="dialogo-titulo">IA: provedores e chaves<button className="bti fechar" onClick={fecharConfigIA} title="Fechar"><X size={14} /></button></div>
         <div className="dialogo-texto">
           Escolha com qual IA conversar. Todas editam pelo mesmo MCP do Estúdio, com o mesmo histórico e o mesmo Reverter.
-          {persistente ? ' A chave fica cifrada neste PC, na sua conta do Windows, fora do projeto e do OneDrive.'
-            : ' Neste PC a chave vale só enquanto o app estiver aberto.'}
+          {cofreTexto ? ` Chave ${cofreTexto}.` : persistente ? ' A chave fica cifrada neste PC.' : ' Neste PC a chave vale só enquanto o app estiver aberto.'}
         </div>
         <div className="ia-lista">
           {provedores.map((p) => <LinhaProvedor key={p.id} p={p} aberto={aberto === p.id} abrir={() => setAberto((a) => (a === p.id ? undefined : p.id))} />)}
