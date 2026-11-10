@@ -166,6 +166,14 @@ const Transcricao: React.FC<{documento: string; doc: DocCenas}> = ({documento, d
       vivo = false;
     };
   }, [chave, modelo, andamento === null, doc]); // eslint-disable-line react-hooks/exhaustive-deps
+  // sem o whisper-cli (Linux), a pessoa compila no terminal e volta: a janela que ganha o foco confere de novo
+  const semPlataforma = estado?.plataforma === false;
+  useEffect(() => {
+    if (!semPlataforma) return;
+    const conferir = () => void window.estudio.fala.estado(modelo).then(setEstado).catch(() => undefined);
+    window.addEventListener('focus', conferir);
+    return () => window.removeEventListener('focus', conferir);
+  }, [semPlataforma, modelo]);
   const comLegenda = new Set((doc.legendas?.segmentos ?? []).map((s) => s?.clipe));
   const emDia = (a: string) => falas[a] === 'em_dia';
   const algum = arquivos.some(emDia);
@@ -219,7 +227,7 @@ const Transcricao: React.FC<{documento: string; doc: DocCenas}> = ({documento, d
       <CampoSelecao rotulo="Modelo" valor={modelo} opcoes={[['small', 'Small · erra pouco (190 MB)'], ['base', 'Base · 2× mais rápido (60 MB)']]} aoMudar={setModelo} />
       {estado && (
         <div className="nota-fala">
-          {!estado.plataforma ? (estado.aviso ? `A transcrição local ${estado.aviso}.` : 'A transcrição local por enquanto só roda no Windows x64.')
+          {!estado.plataforma ? (estado.aviso ? `${estado.aviso[0].toUpperCase()}${estado.aviso.slice(1)}.` : 'A transcrição local por enquanto só roda no Windows x64.')
             : !estado.ffmpeg ? 'Não achei o ffmpeg do compositor do Remotion: reinstale o app.'
             : estado.falta.length ? <>Na primeira vez baixa <b>{estado.falta.join(' e ')}</b> para {estado.pasta}, com o SHA-256 conferido. Leva perto de metade da duração da fala.</>
             : <>Tudo instalado em {estado.pasta}. Leva perto de metade da duração da fala.</>}
