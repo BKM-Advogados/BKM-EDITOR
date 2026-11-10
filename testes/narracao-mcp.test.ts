@@ -68,7 +68,8 @@ describe('gerar com cache', () => {
       const env = JSON.parse(readFileSync(path.join(pasta, `${x.arquivo}.envelope.json`), 'utf-8'));
       expect(ehEnvelope(env)).toBe(true);
       expect(env.fonte.sha256).toMatch(/^[0-9a-f]{64}$/);
-      expect(JSON.parse(readFileSync(path.join(pasta, x.arquivo.replace(/\.wav$/, '.json')), 'utf-8'))).toMatchObject({provedor: 'gemini', voz: 'Charon'});
+      expect(JSON.parse(readFileSync(path.join(pasta, '.estudio', 'narracao', `${path.basename(x.arquivo, '.wav')}.json`), 'utf-8'))).toMatchObject({provedor: 'gemini', voz: 'Charon',
+        texto: expect.any(String)});
     }
     const doc = lerVideo();
     expect(itensDaNarracao(doc).map((i) => i.estado)).toEqual(['gerada', 'gerada', 'sem_texto']);

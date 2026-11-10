@@ -12,7 +12,7 @@ import {itensDaNarracao, ROTULO_ESTADO, type EstadoFala} from '../../../nucleo/n
 import type {Previa} from '../../../nucleo/narracao-servico';
 import type {EstadoNarracaoIA} from '../../../compartilhado/api';
 import {useLoja} from '../../estado/loja';
-import {abrirConfigIA} from '../../paineis/conversas';
+import {abrirConfigIA, estadoConversas} from '../../paineis/conversas';
 import {ajustarCenas, cancelarFalas, carregarVozes, configurar, gerarFalas, narracaoTela, ouvirAmostra, textoCusto, trocarPronuncias, trocarTextoDaCena} from './acoes-narracao';
 import {transcreverEGerar} from './acoes-legendas';
 
@@ -65,6 +65,7 @@ export const NarracaoIA: React.FC<{documento: string; aoFechar: () => void}> = (
   const lido = useLoja((e) => e.docs[documento]);
   const doc = lido?.doc as DocCenas | undefined;
   const tela = useSyncExternalStore(narracaoTela.assinar, narracaoTela.ler);
+  const configAberta = useSyncExternalStore(estadoConversas.assinar, estadoConversas.configIA); // a chave pode ter mudado lá
   const [chaves, setChaves] = useState<EstadoNarracaoIA | null>(null);
   const [previa, setPrevia] = useState<Previa | null>(null);
   const [estilo, setEstilo] = useState('');
@@ -76,7 +77,7 @@ export const NarracaoIA: React.FC<{documento: string; aoFechar: () => void}> = (
   useEffect(() => setEstilo(cfg.estilo), [cfg.estilo]);
   useEffect(() => {
     void window.estudio.narracao.estado().then(setChaves).catch(() => setChaves(null));
-  }, [cfg.provedor]);
+  }, [cfg.provedor, configAberta]);
   useEffect(() => {
     void carregarVozes(cfg.provedor);
   }, [cfg.provedor, chaves?.[cfg.provedor].final]);

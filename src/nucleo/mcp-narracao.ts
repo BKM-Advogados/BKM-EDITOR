@@ -5,7 +5,7 @@
 // das variáveis de ambiente no MCP por stdio (mcp/nucleo.ts). Registrado com uma linha no fim de registrarFerramentas.
 import type {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {z} from 'zod';
-import {aplicarPronuncias, configDaNarracao, MODELOS_GEMINI_TTS, NOMES_PROVEDOR, PROVEDORES_NARRACAO, pronunciasValidas, VELOCIDADE_MAX, VELOCIDADE_MIN, vozDoProvedor,
+import {aplicarPronuncias, configDaNarracao, MODELOS_GEMINI_TTS, NOMES_PROVEDOR, pronunciasValidas, VELOCIDADE_MAX, VELOCIDADE_MIN, vozDoProvedor,
   type ConfigNarracao, type Pronuncia, type ProvedorNarracao} from './narracao';
 import {ajustarCenasAFala, itensDaNarracao, ROTULO_ESTADO} from './narracao-cenas';
 import {gerarNarracao, listarVozes, previaDaNarracao, videoDeCenasDe, type ServicoNarracao} from './narracao-servico';
@@ -164,5 +164,3 @@ export const registrarNarracao = (servidor: McpServer, projeto: Projeto, autor: 
       ...(r.avisos.length ? {avisos: r.avisos} : {}), nota: 'Reverter desfaz'};
   }));
 };
-
-export {PROVEDORES_NARRACAO};

@@ -86,6 +86,7 @@ describe('Gemini TTS: o pedido e a resposta', () => {
     expect(lerWav16(r.wav)).toMatchObject({taxa: 24000, canais: 1});
     expect(r.duracao_ms).toBeGreaterThan(300);
     expect(r.uso).toEqual({entrada: 20, saida: 100});
+    expect(r.formato).toBe('doc-3.8');
   });
 
   it('sem estilo, a parte vai só com o texto; o PCM cru dos modelos anteriores vira WAV', async () => {
@@ -103,7 +104,8 @@ describe('Gemini TTS: o pedido e a resposta', () => {
       primeira = false;
       return new Response(JSON.stringify({error: {code: 400, message: 'Invalid JSON payload received. Unknown name "voice" at \'generation_config.speech_config.voice_config\'', status: 'INVALID_ARGUMENT'}}), {status: 400});
     }]});
-    await sintetizarGemini({chave: CHAVE_GEMINI, modelo: 'gemini-3.8-flash-tts', voz: 'Kore', texto: 'Oi', estilo: 'animado', fetch: g.fetch});
+    const r = await sintetizarGemini({chave: CHAVE_GEMINI, modelo: 'gemini-3.8-flash-tts', voz: 'Kore', texto: 'Oi', estilo: 'animado', fetch: g.fetch});
+    expect(r.formato).toBe('anterior');
     expect(g.pedidos).toHaveLength(2);
     expect(g.pedidos[1].corpo).toEqual(corpoGemini({voz: 'Kore', texto: 'Oi', estilo: 'animado'}, true));
     expect(g.pedidos[1].corpo.generationConfig.speechConfig.voiceConfig).toEqual({prebuiltVoiceConfig: {voiceName: 'Kore'}});

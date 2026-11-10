@@ -14,7 +14,8 @@ export const BASE_GEMINI = 'https://generativelanguage.googleapis.com/v1beta';
 const TEMPO_MS = 120_000;
 
 export type PedidoGemini = {chave: string; modelo: string; voz: string; texto: string; estilo?: string; fetch?: typeof fetch; sinal?: AbortSignal; base?: string};
-export type SomGerado = {wav: Uint8Array; taxa: number; canais: number; duracao_ms: number; uso?: {entrada: number; saida: number}};
+/** `formato`: no Gemini, se o pedido que valeu foi o da doc do 3.8 ou o anterior (o teste ao vivo mostra qual). */
+export type SomGerado = {wav: Uint8Array; taxa: number; canais: number; duracao_ms: number; uso?: {entrada: number; saida: number}; formato?: 'doc-3.8' | 'anterior'};
 
 /** O corpo do pedido no formato da doc do Gemini 3.8 (ou no anterior, `legado`). */
 export const corpoGemini = (o: Pick<PedidoGemini, 'voz' | 'texto' | 'estilo'>, legado = false) => {
@@ -49,9 +50,11 @@ export const sintetizarGemini = async (o: PedidoGemini): Promise<SomGerado> => {
     }
   };
   let r = await pedir(false);
+  let legado = false;
   if (r.status === 400) {
     const corpo = await r.text().catch(() => '');
     if (!/Unknown name|Cannot find field|Invalid JSON payload/i.test(corpo)) throw erroDoGoogle(400, corpo, {provedor: 'gemini', voz: o.voz, modelo: o.modelo, chave: o.chave});
+    legado = true;
     r = await pedir(true);
   }
   if (!r.ok) throw erroDoGoogle(r.status, await r.text().catch(() => ''), {provedor: 'gemini', voz: o.voz, modelo: o.modelo, chave: o.chave});
@@ -70,7 +73,7 @@ export const sintetizarGemini = async (o: PedidoGemini): Promise<SomGerado> => {
   const som = wavDaResposta(bytesDeBase64(audio.data), audio.mimeType);
   if (som.duracao_ms < 50) throw new ErroNarracao('o Gemini devolveu um áudio vazio', 'sem_audio');
   const u = j.usageMetadata;
-  return {...som, ...(u ? {uso: {entrada: u.promptTokenCount ?? 0, saida: u.candidatesTokenCount ?? 0}} : {})};
+  return {...som, formato: legado ? 'anterior' : 'doc-3.8', ...(u ? {uso: {entrada: u.promptTokenCount ?? 0, saida: u.candidatesTokenCount ?? 0}} : {})};
 };
 
 type RespostaVozes = {voices?: {id?: string; name?: string; display_name?: string; displayName?: string; language_code?: string; languageCode?: string; gender?: string;

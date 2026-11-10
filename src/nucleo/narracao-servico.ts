@@ -6,13 +6,13 @@
 // Cache: midia/narracao/<hash>.wav, em que o hash é o do pedido (texto já com as pronúncias + provedor + modelo + voz +
 // parâmetros). Mudou só a cena 3: só a cena 3 vai ao Google. Ao lado de cada WAV ficam o envelope de loudness
 // (<hash>.wav.envelope.json, medido aqui mesmo, das amostras, para o ducking valer na hora, também fora do app) e uma
-// ficha (<hash>.json) com o texto, a voz e a data.
+// ficha (.estudio/narracao/<hash>.json, fora de midia/ para não aparecer no painel Mídia) com o texto, a voz e a data.
 import {mkdirSync, readFileSync, renameSync, statSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import {envelopeDeAmostras} from './audio';
 import {ehDocCenas, type DocCenas} from './cenas';
-import {amostrasDoWav16, arquivoDaNarracao, configDaNarracao, ErroNarracao, FRASE_AMOSTRA, hashDaFala, lerWav16, medirFala, NOMES_PROVEDOR, textoFalado,
-  VOZES_CHIRP, VOZES_GEMINI, type ConfigNarracao, type ConfigNarracaoN, type CustoNarracao, type MedidaFala, type ProvedorNarracao, type VozNarracao} from './narracao';
+import {amostrasDoWav16, configDaNarracao, ErroNarracao, FRASE_AMOSTRA, hashDaFala, lerWav16, medirFala, NOMES_PROVEDOR, textoFalado,
+  VOZES_CHIRP, type ConfigNarracao, type ConfigNarracaoN, type CustoNarracao, type MedidaFala, type ProvedorNarracao, type VozNarracao} from './narracao';
 import {escolherCenas, itensDaNarracao, patchDasFalas, type ItemNarracao} from './narracao-cenas';
 import {sintetizarCloudTts, vozesCloudTts} from './narracao-cloud-tts';
 import {sintetizarGemini, vozesGemini, type SomGerado} from './narracao-gemini';
@@ -56,8 +56,6 @@ export const listarVozes = async (servico: ServicoNarracao, p: ProvedorNarracao,
   if (!chave) return {provedor: p, vozes: VOZES_CHIRP, aviso: `sem a chave, o catálogo das 30 vozes Chirp 3: HD (${ONDE_PADRAO[p]})`};
   return {provedor: p, ...(await vozesCloudTts({chave, fetch: servico.fetch, sinal}))};
 };
-
-export {VOZES_GEMINI, VOZES_CHIRP};
 
 // ---------- disco ----------
 
@@ -209,8 +207,8 @@ export const gerarNarracao = async (projeto: Projeto, servico: ServicoNarracao, 
       const som = await sintetizar(servico, cfg, item.texto_final, o.sinal);
       gravarBytes(projeto, arquivo, som.wav);
       gravarEnvelopeDaFala(projeto, arquivo, som.wav);
-      projeto.gravarTexto(arquivo.replace(/\.wav$/, '.json'), `${JSON.stringify({provedor: cfg.provedor, modelo: cfg.modelo, voz: cfg.voz,
-        ...(cfg.provedor === 'gemini' ? {estilo: cfg.estilo} : {velocidade: cfg.velocidade}), texto: item.texto_final, cena: item.cena, duracao_ms: som.duracao_ms,
+      projeto.gravarTexto(fichaDaNarracao(item.hash!), `${JSON.stringify({provedor: cfg.provedor, modelo: cfg.modelo, voz: cfg.voz,
+        ...(cfg.provedor === 'gemini' ? {estilo: cfg.estilo, formato_pedido: som.formato} : {velocidade: cfg.velocidade}), texto: item.texto_final, cena: item.cena, duracao_ms: som.duracao_ms,
         taxa: som.taxa, criado_em: new Date().toISOString()}, null, 2)}\n`);
       const m = item.medida!;
       const real: MedidaFala = som.uso ? {...m, tokens_entrada: som.uso.entrada, tokens_saida: som.uso.saida} : {...m, segundos: som.duracao_ms / 1000, tokens_saida: Math.ceil((som.duracao_ms / 1000) * 25)};
@@ -262,4 +260,5 @@ export const amostraDeVoz = async (servico: ServicoNarracao, config: ConfigNarra
   return {hash, texto, gerar: () => sintetizar(servico, cfg, texto, sinal), medida: medirFala(texto, cfg), cfg};
 };
 
-export {arquivoDaNarracao};
+/** A ficha do WAV gerado: o texto, o provedor, a voz e a data (para saber de onde veio cada arquivo do cache). */
+export const fichaDaNarracao = (hash: string) => `.estudio/narracao/${hash}.json`;

@@ -87,7 +87,9 @@ console.log('\nCenas depois do ajuste:', doc.cenas.map((c) => `${c.id} ${c.durac
 for (const g of r?.geradas ?? []) {
   const b = readFileSync(path.join(pasta, g.arquivo));
   const v = new DataView(b.buffer, b.byteOffset);
-  console.log(`  ${g.arquivo}: ${String.fromCharCode(...b.subarray(0, 4))}, ${v.getUint32(24, true)} Hz, ${v.getUint16(34, true)} bits, ${(g.duracao_ms / 1000).toFixed(1)} s`);
+  const ficha = JSON.parse(readFileSync(path.join(pasta, '.estudio', 'narracao', `${path.basename(g.arquivo, '.wav')}.json`), 'utf-8'));
+  console.log(`  ${g.arquivo}: ${String.fromCharCode(...b.subarray(0, 4))}, ${v.getUint32(24, true)} Hz, ${v.getUint16(34, true)} bits, ${(g.duracao_ms / 1000).toFixed(1)} s`
+    + `${ficha.formato_pedido ? ` · pedido no formato ${ficha.formato_pedido}` : ''}\n    "${ficha.texto}"`);
 }
 console.log(`\nOuça os WAVs em ${path.join(pasta, 'midia', 'narracao')} (ou abra a pasta no Estúdio: ESTUDIO_PROJETO=${pasta} npm run dev).`);
 await cliente.close();
