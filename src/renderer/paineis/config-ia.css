@@ -39,3 +39,8 @@
 .ia-configs { display: flex; flex-direction: column; gap: 4px; }
 .ia-config { display: flex; align-items: center; gap: 8px; }
 .ia-configs pre { max-height: 140px; overflow: auto; font-size: 11px; white-space: pre; }
+/* narração por IA (docs/narracao.md): o Gemini TTS pela chave do Gemini e a chave própria do Google Cloud TTS */
+.ia-narracao .ia-uso-titulo { display: flex; align-items: center; gap: 6px; }
+.ia-narracao.foco { outline: 1px solid var(--acento); outline-offset: 2px; border-radius: var(--raio); }
+.ia-narracao .link { border: 0; background: none; padding: 0; font: inherit; color: var(--acento); cursor: pointer; }
+.ia-narracao .link:hover { text-decoration: underline; }
