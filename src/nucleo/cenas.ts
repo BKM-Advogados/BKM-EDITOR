@@ -7,6 +7,7 @@
 import {resolverAudio, type AudioCenas, type AudioP, type Envelope} from './audio';
 import {efeitosValidos, problemasDosEfeitos, type Efeito} from './efeitos';
 import {formatoDoVideo, type Formato} from './formatos';
+import type {Teleprompter} from './gravacao';
 import {resolverLegendas, type LegendasCenas, type LegendasP} from './legendas'; // frente Fala: legendas (docs/legendas.md)
 
 export type TipoBlocoCenas = 'titulo' | 'texto' | 'lista' | 'numero' | 'imagem';
@@ -50,6 +51,7 @@ export type TemaCenas = {fundo: string; texto: string; destaque: string; suave: 
 
 export type DocCenas = {tipo: 'cenas'; formato: Formato; tema: TemaCenas; cenas: CenaCenas[]; efeitos?: Efeito[]; audio?: AudioCenas;
   legendas?: LegendasCenas; // frente Fala: segmentos com tempo, palavras e falante, e o estilo (legendas.ts)
+  teleprompter?: Teleprompter; // frente Som (rodada 3): o texto que a pessoa lê ao gravar a narração (gravacao.ts)
 };
 
 export const TEMA_NEUTRO: TemaCenas = {fundo: '#111418', texto: '#F2F2F2', destaque: '#70B8FF', suave: '#A3ABB5', fonte: 'Inter'};

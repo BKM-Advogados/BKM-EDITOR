@@ -22,6 +22,22 @@ export type ClipeAudio = {
   mudo?: boolean;
   original?: string; // voz limpa: o arquivo da pessoa, intacto ("Voltar ao original" põe de volta em `arquivo`)
   limpeza?: LimpezaClipe; // o que a limpeza de voz fez e mediu (limpeza-voz.ts)
+  fade_in_curva?: CurvaFade; // frente Som (rodada 3): a forma do fade de entrada (padrão linear)
+  fade_out_curva?: CurvaFade; // e a do fade de saída
+};
+
+/** Forma do fade. `linear`: o ganho sobe em linha reta (dois clipes iguais somam o mesmo nível; música diferente cai 3 dB
+ *  no meio). `potencia`: seno/cosseno, a potência soma constante (o crossfade de música: no meio, o nível fica o de antes).
+ *  `suave`: coseno levantado, o ganho começa e termina devagar (a soma dos ganhos é 1, como a linear). */
+export type CurvaFade = 'linear' | 'suave' | 'potencia';
+export const CURVAS_FADE: CurvaFade[] = ['linear', 'suave', 'potencia'];
+export const ehCurvaFade = (x: unknown): x is CurvaFade => typeof x === 'string' && (CURVAS_FADE as string[]).includes(x);
+/** Ganho (0 a 1) da curva depois de `u` (0 a 1) do fade andado; a de saída usa o que falta (1 − andado). */
+export const ganhoDaCurva = (curva: CurvaFade | undefined, u: number) => {
+  const x = Math.min(1, Math.max(0, u));
+  if (curva === 'potencia') return Math.sin((x * Math.PI) / 2);
+  if (curva === 'suave') return 0.5 - 0.5 * Math.cos(x * Math.PI);
+  return x;
 };
 
 /** Limpeza de voz gravada no clipe: a intensidade usada e o ruído nas pausas e a voz antes e depois, em dB (ponderação K). */
@@ -31,7 +47,9 @@ export type IntensidadeLimpeza = 'leve' | 'media' | 'forte';
 export type FaixaAudio = {id: string; nome: string; papel?: PapelFaixa; volume?: number; mudo?: boolean; ducking?: Ducking; clipes: ClipeAudio[]};
 
 /** `alvo_lufs` e `pico_dbtp`: o loudness integrado e o pico verdadeiro máximo do arquivo exportado (padrão −14 e −1). */
-export type AudioCenas = {faixas: FaixaAudio[]; alvo_lufs?: number; pico_dbtp?: number};
+export type AudioCenas = {faixas: FaixaAudio[]; alvo_lufs?: number; pico_dbtp?: number;
+  acompanha_cenas?: boolean; // frente Som (rodada 3): false desliga o som que anda com as cenas (som-com-cenas.ts); padrão: acompanha
+};
 
 /** Loudness por janela do arquivo, em dB com ponderação K (o mesmo número do LUFS, por janela). `db` tem uma entrada
  *  por `janela_ms`; SILENCIO_DB é "nada". Gravado em midia/<arquivo>.envelope.json pelo processo principal, com `fonte`:
@@ -48,7 +66,7 @@ const PORTA_ABSOLUTA_DB = -70; // abaixo disto é silêncio, como a porta absolu
 const PORTA_RELATIVA_LU = 10; // janelas 10 LU abaixo da média não contam no nível (porta relativa do BS.1770)
 const PORTA_VOZ_LU = 18; // há voz na janela quando ela está a menos de 18 LU da referência da narração
 const MUSICA_SEM_MEDIDA_DB = -14; // música sem envelope ainda: nível típico de música masterizada para streaming
-const VOZ_SEM_MEDIDA_DB = -20; // narração sem envelope ainda: nível típico de voz gravada e normalizada
+export const VOZ_SEM_MEDIDA_DB = -20; // narração sem envelope ainda: nível típico de voz gravada e normalizada
 
 export const DUCKING_PADRAO = {alvo_lu: 20, ataque_ms: 80, soltura_ms: 500} as const; // a casa mixa música de 18 a 23 LU abaixo da voz
 export const ALVO_LU_MIN = 6;
@@ -264,7 +282,10 @@ export const calcularDucking = (o: {
   const sobe = janela / ataque;
   const desce = janela / soltura;
   for (let k = 0; k < n; k++) {
-    const alvoP = reducao_db > 0 && haVozEm(o.musica.em + k * janela + janela / 2) ? 1 : 0;
+    // som-D6: a música começa a cair `ataque` ms ANTES de a voz entrar (a voz já está lá ou entra dentro do ataque), para chegar
+    // ao fundo quando a primeira sílaba sai; a soltura continua depois que a voz acaba (olhar à frente só vale para o começo)
+    const t = o.musica.em + k * janela + janela / 2;
+    const alvoP = reducao_db > 0 && (haVozEm(t) || haVozEm(t + ataque)) ? 1 : 0;
     p = alvoP > p ? Math.min(alvoP, p + sobe) : Math.max(alvoP, p - desce);
     ganho[k] = reducao_db > 0 ? Math.round(ganhoDeDb(-p * reducao_db) * 1000) / 1000 : 1;
   }
@@ -284,6 +305,8 @@ export type ClipeAudioP = {
   volume: number;
   fade_in_ms: number;
   fade_out_ms: number;
+  fade_in_curva?: CurvaFade; // só vem quando não é linear
+  fade_out_curva?: CurvaFade;
   mudo: boolean;
   fora: boolean; // começa depois do fim do vídeo: não toca
   envelope?: Envelope;
@@ -332,6 +355,8 @@ export const resolverAudio = (audio: AudioCenas | undefined, duracao_video: numb
       const fade_out_ms = limitar(numero(c.fade_out_ms, 0), 0, duracao_ms);
       return {
         origem, id: c.id, arquivo: c.arquivo, nome: nomeClipe, em, duracao_ms, corte_ms, volume: volumeClipe, fade_in_ms, fade_out_ms, mudo: Boolean(c.mudo), fora,
+        ...(ehCurvaFade(c.fade_in_curva) && c.fade_in_curva !== 'linear' ? {fade_in_curva: c.fade_in_curva} : {}),
+        ...(ehCurvaFade(c.fade_out_curva) && c.fade_out_curva !== 'linear' ? {fade_out_curva: c.fade_out_curva} : {}),
         envelope: env, nivel_db: env ? nivelDeReferencia(env, corte_ms, corte_ms + duracao_ms) ?? undefined : undefined,
       };
     });
@@ -356,6 +381,19 @@ export const resolverAudio = (audio: AudioCenas | undefined, duracao_video: numb
       if (!c.envelope) avisos.push(`a música "${c.nome}" ainda não foi medida; o ducking supõe ${MUSICA_SEM_MEDIDA_DB} dB até a interface medir`);
     }
   }
+  // música sobre música (som-D7): dois clipes da mesma faixa de música que tocam juntos sem um crossfade que cubra a sobreposição
+  for (const f of faixas) {
+    if (f.papel !== 'musica') continue;
+    const ordem = f.clipes.filter((c) => !c.mudo && !c.fora).sort((a, b) => a.em - b.em);
+    for (let i = 0; i + 1 < ordem.length; i++) {
+      const a = ordem[i];
+      const b = ordem[i + 1];
+      const sobra = a.em + a.duracao_ms - b.em;
+      if (sobra > DURACAO_CLIPE_MIN && !(a.fade_out_ms >= sobra - 1 && b.fade_in_ms >= sobra - 1)) {
+        avisos.push(`a música "${a.nome}" e a "${b.nome}" tocam juntas por ${seg(Math.min(sobra, b.duracao_ms))} s, de ${seg(b.em)} s a ${seg(Math.min(a.em + a.duracao_ms, b.em + b.duracao_ms))} s: faça um crossfade entre elas, ou silencie uma`);
+      }
+    }
+  }
   if (semEnvelopeVoz) avisos.push(`${semEnvelopeVoz === 1 ? 'um clipe de narração ainda não foi medido' : `${semEnvelopeVoz} clipes de narração ainda não foram medidos`}; a música cai o tempo todo sob ${semEnvelopeVoz === 1 ? 'ele' : 'eles'}`);
   // o alvo do arquivo exportado (loudness.ts mede o arquivo final e corrige o ganho até ele)
   const alvo_lufs = limitar(numero(audio.alvo_lufs, ALVO_LUFS_PADRAO), ALVO_LUFS_MIN, ALVO_LUFS_MAX);
@@ -366,9 +404,9 @@ export const resolverAudio = (audio: AudioCenas | undefined, duracao_video: numb
 };
 
 /** Fator dos fades em `t_ms` desde o começo do clipe (0 a 1). */
-export const fatorFades = (c: {duracao_ms: number; fade_in_ms: number; fade_out_ms: number}, t_ms: number) => {
-  const entrada = c.fade_in_ms > 0 ? limitar(t_ms / c.fade_in_ms, 0, 1) : 1;
-  const saida = c.fade_out_ms > 0 ? limitar((c.duracao_ms - t_ms) / c.fade_out_ms, 0, 1) : 1;
+export const fatorFades = (c: {duracao_ms: number; fade_in_ms: number; fade_out_ms: number; fade_in_curva?: CurvaFade; fade_out_curva?: CurvaFade}, t_ms: number) => {
+  const entrada = c.fade_in_ms > 0 ? ganhoDaCurva(c.fade_in_curva, t_ms / c.fade_in_ms) : 1;
+  const saida = c.fade_out_ms > 0 ? ganhoDaCurva(c.fade_out_curva, (c.duracao_ms - t_ms) / c.fade_out_ms) : 1;
   return entrada * saida;
 };
 
@@ -379,3 +417,94 @@ export const volumeDoClipe = (f: {volume: number; mudo: boolean}, c: ClipeAudioP
   const duck = c.ducking ? c.ducking.ganho[limitar(Math.floor(t_ms / c.ducking.janela_ms), 0, c.ducking.ganho.length - 1)] ?? 1 : 1;
   return limitar(f.volume * c.volume * fatorFades(c, t_ms) * duck, 0, 1);
 };
+
+// ---------- etiquetas de áudio do Player (som-D10) ----------
+export const ETIQUETAS_AUDIO_MIN = 12; // o Player da prévia monta um pool de <audio> compartilhado; o padrão dele é 5
+export const ETIQUETAS_AUDIO_MAX = 48;
+
+/** Quantos clipes tocam ao mesmo tempo no pico, contando os mesmos que o VideoCenas monta (faixa e clipe não mudos, dentro do vídeo). */
+export const picoDeClipesSimultaneos = (audio: AudioP | undefined): number => {
+  const eventos: [number, number][] = [];
+  for (const f of audio?.faixas ?? []) {
+    if (f.mudo) continue;
+    for (const c of f.clipes) {
+      if (c.mudo || c.fora) continue;
+      eventos.push([c.em, 1], [c.em + c.duracao_ms, -1]);
+    }
+  }
+  eventos.sort((a, b) => a[0] - b[0] || a[1] - b[1]); // no mesmo instante, o que acaba sai antes de o outro entrar
+  let agora = 0;
+  let pico = 0;
+  for (const [, d] of eventos) {
+    agora += d;
+    if (agora > pico) pico = agora;
+  }
+  return pico;
+};
+
+/** O pool de <audio> da prévia para o pico do vídeo: o mínimo de 12, e em degraus (12, 24, 48) para o Player não ser remontado
+ *  a cada clipe novo. Com mais de 48 clipes juntos, o resto fica sem som na prévia (o render não tem esse limite). */
+export const etiquetasDeAudio = (audio: AudioP | undefined) => {
+  const pico = picoDeClipesSimultaneos(audio) + 1; // uma de folga para a troca de clipe no mesmo quadro
+  return pico <= ETIQUETAS_AUDIO_MIN ? ETIQUETAS_AUDIO_MIN : pico <= 24 ? 24 : ETIQUETAS_AUDIO_MAX;
+};
+
+// ---------- envelope em pedaços (som-D8) ----------
+type EstadoBiquad = {x1: number; x2: number; y1: number; y2: number};
+const passoBiquad = (f: Biquad, s: EstadoBiquad, x0: number) => {
+  const y0 = f.b0 * x0 + f.b1 * s.x1 + f.b2 * s.x2 - f.a1 * s.y1 - f.a2 * s.y2;
+  s.x2 = s.x1;
+  s.x1 = x0;
+  s.y2 = s.y1;
+  s.y1 = y0;
+  return y0;
+};
+
+/** O mesmo envelope de `envelopeDeAmostras`, mas alimentado aos pedaços: um arquivo de uma hora não precisa estar inteiro na
+ *  memória (som-D8: a interface decodificava tudo, mais de 3 GB, para medir). Guarda só o estado dos filtros e a energia de cada
+ *  janela de 50 ms. A conta é a mesma (ponderação K em Float32 entre as duas etapas), então o resultado é igual ao de uma vez só. */
+export class ConstrutorDeEnvelope {
+  private readonly prateleira: Biquad;
+  private readonly altas: Biquad;
+  private readonly estados: {a: EstadoBiquad; b: EstadoBiquad}[];
+  private readonly porJanela: number;
+  private soma: number[] = [];
+  private n = 0;
+
+  constructor(private readonly taxa: number, canais: number, private readonly janela_ms = JANELA_MS) {
+    [this.prateleira, this.altas] = coeficientesK(taxa);
+    this.estados = Array.from({length: Math.max(1, canais)}, () => ({a: {x1: 0, x2: 0, y1: 0, y2: 0}, b: {x1: 0, x2: 0, y1: 0, y2: 0}}));
+    this.porJanela = Math.max(1, Math.round((taxa * janela_ms) / 1000));
+  }
+
+  /** Um pedaço: um vetor por canal, todos do mesmo tamanho. */
+  alimentar(canais: Float32Array[]) {
+    const len = canais[0]?.length ?? 0;
+    for (let c = 0; c < this.estados.length; c++) {
+      const x = canais[c];
+      if (!x) continue;
+      const e = this.estados[c];
+      for (let i = 0; i < len; i++) {
+        const k = Math.fround(passoBiquad(this.altas, e.b, Math.fround(passoBiquad(this.prateleira, e.a, x[i]))));
+        const j = Math.floor((this.n + i) / this.porJanela);
+        this.soma[j] = (this.soma[j] ?? 0) + k * k;
+      }
+    }
+    this.n += len;
+  }
+
+  get amostras() {
+    return this.n;
+  }
+
+  resultado(): Envelope {
+    const janelas = Math.ceil(this.n / this.porJanela);
+    const db = new Array<number>(janelas);
+    for (let j = 0; j < janelas; j++) {
+      const amostras = Math.min(this.porJanela, this.n - j * this.porJanela);
+      const potencia = (this.soma[j] ?? 0) / Math.max(1, amostras);
+      db[j] = potencia > 0 ? Math.max(SILENCIO_DB, Math.round((-0.691 + 10 * Math.log10(potencia)) * 10) / 10) : SILENCIO_DB;
+    }
+    return {versao: VERSAO_ENVELOPE, janela_ms: this.janela_ms, duracao_ms: Math.round((this.n / this.taxa) * 1000), db};
+  }
+}

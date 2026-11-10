@@ -4,6 +4,7 @@ import type {Comentario, EntradaDiario, EntradaDocumento, EstadoEditor, Manifest
 import type {IdModelo} from '../nucleo/modelos';
 import type {Formato} from '../nucleo/formatos';
 import type {Envelope, IntensidadeLimpeza, LimpezaClipe} from '../nucleo/audio';
+import type {FichaFaixa} from '../nucleo/biblioteca-musicas';
 import type {MedidasLoudness} from '../nucleo/loudness';
 import type {FonteArquivo, Marca} from '../nucleo/marca';
 import type {OpcoesExportarImagem, OpcoesExportarVideo, PrefsExportacao} from '../nucleo/exportacao';
@@ -75,6 +76,8 @@ export const CANAL = {
   audioLimpezaCancelar: 'estudio:audio-limpeza-cancelar',
   audioLimpezaProgresso: 'estudio:audio-limpeza-progresso',
   audioMedirLoudness: 'estudio:audio-medir-loudness',
+  audioMedirEnvelope: 'estudio:audio-medir-envelope', // frente Som (rodada 3): arquivo grande medido no processo principal, em pedaços
+  audioSalvarTomada: 'estudio:audio-salvar-tomada', // frente Som (rodada 3): a narração gravada na interface
   marcasListar: 'estudio:marcas-listar',
   marcasGravar: 'estudio:marcas-gravar',
   marcasCriar: 'estudio:marcas-criar',
@@ -275,6 +278,10 @@ export type ApiEstudio = {
     aoProgressoLimpeza: (cb: (p: {arquivo: string; progresso: number}) => void) => () => void;
     /** Loudness da mistura, da narração e de cada faixa do vídeo, como o render vai soar (BS.1770). */
     medirLoudness: (documento: string) => Promise<MedidasLoudness | {erro: string}>;
+    /** Mede o envelope de um arquivo grande no processo principal, sem decodificá-lo inteiro, e o grava ao lado (carimbado); devolve-o. */
+    medirEnvelope: (arquivo: string) => Promise<Envelope>;
+    /** Grava a tomada que a interface capturou (WAV PCM 48 kHz) em midia/; devolve o caminho no projeto. */
+    salvarTomada: (wav: ArrayBuffer) => Promise<string>;
   };
   // kits de marca (pasta marcas/ das preferências) e as fontes próprias do projeto aberto (pasta fontes/)
   marcas: {
@@ -389,7 +396,8 @@ export type EstadoTranscricao = {pasta: string; modelo: string; modelos: {id: st
   ffmpeg: boolean; ocupado?: string; plataforma: boolean};
 
 /** Um arquivo da pasta de trilhas: nome sem extensão, caminho absoluto, subpasta e tamanho. */
-export type Trilha = {nome: string; caminho: string; pasta: string; tamanho_kb: number};
+/** `ficha`: a licença conferida da faixa (biblioteca-musicas.ts); `recusa`: a ficha existe mas não serve (NC, ND, sem crédito…). */
+export type Trilha = {nome: string; caminho: string; pasta: string; tamanho_kb: number; ficha?: FichaFaixa; recusa?: string};
 
 /** Voz limpa: o arquivo gravado (caminho no projeto), o que foi medido antes e depois e a duração; ou a pessoa cancelou. */
 export type ResultadoLimpezaVoz = {arquivo: string; medidas: LimpezaClipe; duracao_ms: number} | {cancelado: true};

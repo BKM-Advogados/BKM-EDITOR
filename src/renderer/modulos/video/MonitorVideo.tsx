@@ -10,6 +10,7 @@ import React, {useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExt
 import {Player, type PlayerRef} from '@remotion/player';
 import {ChevronDown, Frame, MessageSquarePlus, MousePointer2, Pause, Play, Plus, Repeat2, SkipBack, SkipForward, StepBack, StepForward} from 'lucide-react';
 import {COMPOSICOES, composicaoDe} from '../../../composicoes/registro';
+import {etiquetasDeAudio, type AudioP} from '../../../nucleo/audio';
 import {FORMATO_PADRAO} from '../../../nucleo/formatos';
 import {classeDoQuadro, conjuntoDaClasse, CONJUNTO_QUADRADO, ZONAS_SEGURAS, type ClasseDoQuadro} from '../../../nucleo/zonas-seguras';
 import {aplicar, comentar, loja, patchTrocar, selecionar, useLoja, valorEm} from '../../estado/loja';
@@ -127,6 +128,7 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
   const Componente = COMPOSICOES[composicaoDe(props)];
   const duracaoMs = props?.duracao_ms ?? 0;
   const duracao = props ? Math.max(1, Math.ceil((props.duracao_ms / 1000) * FPS)) : 1;
+  const etiquetas = etiquetasDeAudio((props as {audio?: AudioP} | null)?.audio); // som-D10: o pool de <audio> cobre o pico de clipes
   const previa = useLoja((e) => (e.previaEfeitos && e.previaEfeitos.documento === documento ? e.previaEfeitos.efeitos : undefined));
   const inputProps = useMemo(() => (props ? (previa ? {...props, efeitos: previa} : props) : {}), [props, previa]);
 
@@ -333,10 +335,10 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
           {props && (
             <div className="palco" ref={palco} style={{width: W * escala, height: H * escala, cursor: modoComentario ? 'crosshair' : 'default'}}
               onClick={clicar} onMouseMove={mover} onMouseLeave={() => setHover(null)}>
-              <Player key={`${composicaoDe(props)}:${W}x${H}@${FPS}`} ref={playerRef} component={Componente} inputProps={inputProps}
+              <Player key={`${composicaoDe(props)}:${W}x${H}@${FPS}:${etiquetas}`} ref={playerRef} component={Componente} inputProps={inputProps}
                 durationInFrames={duracao} fps={FPS} compositionWidth={W} compositionHeight={H} playbackRate={controle.taxa} loop={controle.repetir}
                 style={{width: W * escala, height: H * escala}} clickToPlay={false} spaceKeyToPlayOrPause={false}
-                doubleClickToFullscreen={false} numberOfSharedAudioTags={12} />
+                doubleClickToFullscreen={false} numberOfSharedAudioTags={etiquetas} />
               <div className="sobreposicao">
                 {cenasRel && !(props.cenas as unknown[]).length && (
                   <div className="sem-cenas" onClick={(e) => e.stopPropagation()}>

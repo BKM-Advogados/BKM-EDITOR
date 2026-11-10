@@ -34,6 +34,19 @@ export const medirArquivo = async (arquivo: string): Promise<Envelope> => {
   return {...envelopeDeAmostras(canais, buffer.sampleRate), fonte: {tamanho, ...(sha256 ? {sha256} : {})}};
 };
 
+// som-D8: acima disto o arquivo não é baixado e decodificado inteiro pela janela (uma hora de áudio passa de 3 GB); o processo
+// principal mede em pedaços e grava o envelope. Abaixo, a medida de sempre (Web Audio), que não precisa de ffmpeg.
+const LIMITE_WEB_BYTES = 48 * 1024 * 1024;
+const medirNoPrincipal = async (arquivo: string): Promise<Envelope | null> => {
+  try {
+    const r = await fetch(urlDaMidia(arquivo), {method: 'HEAD', cache: 'no-store'});
+    if (!(Number(r.headers.get('content-length')) > LIMITE_WEB_BYTES)) return null;
+  } catch {
+    return null; // sem o tamanho, a medida de sempre
+  }
+  return window.estudio.audio.medirEnvelope(arquivo);
+};
+
 const emAndamento = new Map<string, Promise<Envelope>>();
 const falhados = new Set<string>();
 quandoTrocarProjeto(() => {
@@ -65,7 +78,9 @@ export const garantirEnvelope = (arquivo: string): Promise<Envelope> => {
   ouvirMudancas();
   let p = emAndamento.get(arquivo);
   if (!p) {
-    const esta: Promise<Envelope> = medirArquivo(arquivo).then(async (env) => {
+    const esta: Promise<Envelope> = medirNoPrincipal(arquivo).then(async (grande) => {
+      if (grande) return grande; // já gravado pelo processo principal
+      const env = await medirArquivo(arquivo);
       await window.estudio.audio.gravarEnvelope(arquivo, env);
       return env;
     });

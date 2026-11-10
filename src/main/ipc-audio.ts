@@ -3,31 +3,18 @@
 // composição (sessao-projeto.ts), para a prévia e a exportação verem o mesmo ducking. Registrado no main.ts com uma linha.
 // O envelope leva o carimbo do arquivo medido (tamanho, data e sha256): a tomada nova gravada com o mesmo nome, ou o
 // envelope de outra versão da conta, conta como não medido, e a linha do tempo mede de novo.
-import {createHash} from 'node:crypto';
-import {closeSync, copyFileSync, existsSync, mkdirSync, openSync, readdirSync, readSync, statSync, type Stats} from 'node:fs';
-import path from 'node:path';
-import {CANAL, type Preferencias, type Trilha} from '../compartilhado/api';
-import {conferirEnvelope, ehEnvelope, type Envelope} from '../nucleo/audio';
+import {statSync, type Stats} from 'node:fs';
+import {CANAL, type Preferencias} from '../compartilhado/api';
+import {conferirEnvelope, ConstrutorDeEnvelope, ehEnvelope, type Envelope} from '../nucleo/audio';
 import type {DocCenas} from '../nucleo/cenas';
+import {EXTENSOES_AUDIO, importarTrilha, listarTrilhas, sha256DoArquivo} from '../nucleo/pasta-trilhas';
 import {ErroProjeto, type Projeto} from '../nucleo/projeto';
-
-export const EXTENSOES_AUDIO = ['wav', 'mp3', 'm4a', 'ogg', 'aac'];
-const MAX_TRILHAS = 500;
+import {decodificarEmPedacos, type Parar} from './ffmpeg-som';
 
 export const arquivoDoEnvelope = (arquivo: string) => `${arquivo}.envelope.json`;
 
-/** sha256 de um arquivo, lido em pedaços de 1 MB (a narração inteira não precisa caber na memória). */
-export const sha256DoArquivo = (abs: string) => {
-  const h = createHash('sha256');
-  const fd = openSync(abs, 'r');
-  try {
-    const buf = Buffer.allocUnsafe(1 << 20);
-    for (let n = readSync(fd, buf, 0, buf.length, null); n > 0; n = readSync(fd, buf, 0, buf.length, null)) h.update(buf.subarray(0, n));
-  } finally {
-    closeSync(fd);
-  }
-  return h.digest('hex');
-};
+// sha256DoArquivo, listarTrilhas e importarTrilha moraram aqui; foram para src/nucleo/pasta-trilhas.ts (o MCP também os usa)
+export {EXTENSOES_AUDIO, importarTrilha, listarTrilhas, sha256DoArquivo};
 
 // por caminho + tamanho + data: o arquivo de mesmo tamanho e outra data (cópia, git clone) é lido uma vez por sessão
 const shas = new Map<string, string>();
@@ -75,6 +62,23 @@ export const gravarEnvelope = (p: Projeto, arquivo: string, envelope: Envelope, 
   return rel;
 };
 
+/** Mede o envelope de um arquivo de áudio do projeto no processo principal, em pedaços (o ffmpeg decodifica e o construtor soma as
+ *  janelas): a memória fica nos poucos MB de um pedaço, qualquer que seja a duração (som-D8). Grava ao lado, carimbado, e devolve. */
+export const medirEnvelopeDoArquivo = async (p: Projeto, arquivo: string, o: Parar & {binarios?: string | null} = {}): Promise<Envelope> => {
+  if (typeof arquivo !== 'string' || !p.existe(arquivo)) throw new ErroProjeto(`o arquivo de áudio não está no projeto: ${String(arquivo)}`, 'nao_achado');
+  const tamanho = statSync(p.caminho(arquivo)).size;
+  let construtor: ConstrutorDeEnvelope | null = null;
+  await decodificarEmPedacos(p.caminho(arquivo), (canais, taxa) => {
+    construtor ??= new ConstrutorDeEnvelope(taxa, canais.length);
+    construtor.alimentar(canais);
+  }, o);
+  if (!construtor) throw new ErroProjeto(`${arquivo} não tem som para medir`);
+  const env = (construtor as ConstrutorDeEnvelope).resultado();
+  // o tamanho de antes da medida: se o arquivo mudou no meio, o gravarEnvelope recusa
+  gravarEnvelope(p, arquivo, {...env, fonte: {tamanho}});
+  return lerEnvelope(p, arquivo) ?? env;
+};
+
 /** Envelopes de todos os clipes do documento, por arquivo (o resolvedor recebe isto em `opcoes.envelopes`). */
 export const lerEnvelopes = (p: Projeto, doc: DocCenas): Record<string, Envelope | undefined> => {
   const out: Record<string, Envelope | undefined> = {};
@@ -86,61 +90,6 @@ export const lerEnvelopes = (p: Projeto, doc: DocCenas): Record<string, Envelope
   return out;
 };
 
-/** Arquivos de áudio da pasta de trilhas (até dois níveis), em ordem de nome; cria a pasta se não existir. */
-export const listarTrilhas = (pasta: string, profundidade = 2): Trilha[] => {
-  mkdirSync(pasta, {recursive: true});
-  const out: Trilha[] = [];
-  const andar = (dir: string, nivel: number) => {
-    let entradas: string[];
-    try {
-      entradas = readdirSync(dir).sort((a, b) => a.localeCompare(b, 'pt-BR'));
-    } catch {
-      return;
-    }
-    for (const nome of entradas) {
-      if (out.length >= MAX_TRILHAS) return;
-      const abs = path.join(dir, nome);
-      let st;
-      try {
-        st = statSync(abs);
-      } catch {
-        continue;
-      }
-      if (st.isDirectory()) {
-        if (nivel < profundidade && !nome.startsWith('.')) andar(abs, nivel + 1);
-      } else if (EXTENSOES_AUDIO.includes(path.extname(nome).slice(1).toLowerCase())) {
-        out.push({nome: path.basename(nome, path.extname(nome)), caminho: abs, pasta: path.relative(pasta, dir).split(path.sep).join('/'), tamanho_kb: Math.round(st.size / 1024)});
-      }
-    }
-  };
-  andar(pasta, 0);
-  return out;
-};
-
-/** Arquivo que ainda não existe em `pasta`: "Nome.mp3", "Nome (2).mp3"... */
-const arquivoLivre = (pasta: string, base: string, ext: string) => {
-  let p = path.join(pasta, `${base}.${ext}`);
-  for (let n = 2; existsSync(p); n++) p = path.join(pasta, `${base} (${n}).${ext}`);
-  return p;
-};
-
-const dentroDe = (pasta: string, arquivo: string) => {
-  const rel = path.relative(path.resolve(pasta), path.resolve(arquivo));
-  return Boolean(rel) && !rel.startsWith('..') && !path.isAbsolute(rel);
-};
-
-/** Copia uma trilha da biblioteca para midia/ do projeto; devolve o caminho no projeto ("midia/trilha.mp3"). */
-export const importarTrilha = (p: Projeto, pastaTrilhas: string, caminho: string) => {
-  if (!dentroDe(pastaTrilhas, caminho)) throw new ErroProjeto('só entram arquivos da pasta de trilhas das preferências', 'caminho');
-  const ext = path.extname(caminho).slice(1).toLowerCase();
-  if (!EXTENSOES_AUDIO.includes(ext)) throw new ErroProjeto(`formato não tocável: .${ext} (vale ${EXTENSOES_AUDIO.join(', ')})`, 'caminho');
-  if (!existsSync(caminho)) throw new ErroProjeto(`a trilha não existe mais: ${caminho}`, 'nao_achado');
-  const destino = arquivoLivre(p.caminho('midia'), path.basename(caminho, path.extname(caminho)), ext);
-  mkdirSync(path.dirname(destino), {recursive: true});
-  copyFileSync(caminho, destino);
-  return path.relative(p.raiz, destino).split(path.sep).join('/');
-};
-
 type Lidar = <A extends unknown[], R>(canal: string, f: (...a: A) => R | Promise<R>) => void;
 
 export const registrarIpcAudio = (lidar: Lidar, projeto: () => Projeto, prefs: () => Preferencias) => {
@@ -149,9 +98,11 @@ export const registrarIpcAudio = (lidar: Lidar, projeto: () => Projeto, prefs: (
     const p = projeto();
     if (typeof arquivo !== 'string' || !p.existe(arquivo)) throw new ErroProjeto(`o arquivo de áudio não está no projeto: ${String(arquivo)}`, 'nao_achado');
     if (!ehEnvelope(envelope) || envelope.db.length > 2_000_000 || !envelope.db.every((v) => typeof v === 'number' && Number.isFinite(v))) throw new ErroProjeto('envelope inválido');
-    p.gravarTexto(arquivoDoEnvelope(arquivo), `${JSON.stringify(envelope)}\n`);
-    return arquivoDoEnvelope(arquivo);
+    // som-N8: pelo gravarEnvelope, como a limpeza: carimba tamanho, data e sha256 do arquivo como está e recusa se ele mudou
+    // no meio da medida. Sem a data, todo envelope da tela caía em 'conferir' e cada sessão lia o áudio inteiro para o sha256.
+    return gravarEnvelope(p, arquivo, envelope);
   });
+  lidar(CANAL.audioMedirEnvelope, (arquivo: string) => medirEnvelopeDoArquivo(projeto(), arquivo));
   lidar(CANAL.audioListarTrilhas, () => ({pasta: prefs().pasta_trilhas, trilhas: listarTrilhas(prefs().pasta_trilhas)}));
   lidar(CANAL.audioImportarTrilha, (caminho: string) => importarTrilha(projeto(), prefs().pasta_trilhas, caminho));
 };

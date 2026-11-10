@@ -9,7 +9,7 @@ import {Volume2, VolumeX} from 'lucide-react';
 import {SILENCIO_DB, volumeDoClipe, type AudioP, type ClipeAudioP, type Envelope, type FaixaAudioP} from '../../../nucleo/audio';
 import {loja, selecionar, trocar, useLoja} from '../../estado/loja';
 import {irPara} from './tocador';
-import {duplicarSelecaoAudio, ehSelecaoAudio, excluirSelecaoAudio, ICONES_PAPEL, moverClipe} from './acoes-audio';
+import {dividirSelecaoAudio, duplicarSelecaoAudio, ehSelecaoAudio, excluirSelecaoAudio, ICONES_PAPEL, moverClipe} from './acoes-audio';
 
 type Arrasto = {origem: string; modo: 'mover' | 'ini' | 'fim'; x0: number; dms: number};
 export const ALTURA_FAIXA = 36;
@@ -23,7 +23,8 @@ const comArrasto = (c: ClipeAudioP, a: Arrasto | null, duracaoVideo: number) => 
   const maxDur = c.envelope ? c.envelope.duracao_ms - c.corte_ms : Infinity;
   if (a.modo === 'mover') return {em: lim(c.em + a.dms, 0, Math.max(0, duracaoVideo - 100)), duracao_ms: c.duracao_ms, corte_ms: c.corte_ms};
   if (a.modo === 'ini') {
-    const d = lim(a.dms, -c.corte_ms, c.duracao_ms - 100);
+    // som-D1: a alça não passa do zero do vídeo nem do começo do arquivo; sem isto o começo ia para o zero e o corte seguia, atrasando o som
+    const d = lim(a.dms, -Math.min(c.corte_ms, c.em), c.duracao_ms - 100);
     return {em: c.em + d, duracao_ms: c.duracao_ms - d, corte_ms: c.corte_ms + d};
   }
   return {em: c.em, duracao_ms: lim(c.duracao_ms + a.dms, 100, maxDur), corte_ms: c.corte_ms};
@@ -117,12 +118,13 @@ export const FaixasAudio: React.FC<{documento: string; audio: AudioP; x: (ms: nu
       const tecla = (e: KeyboardEvent) => {
         if (loja.get().area !== 'video' || !ehSelecaoAudio(documento)) return;
         const comCtrlD = e.ctrlKey && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'd';
-        if (e.key !== 'Delete' && !comCtrlD) return;
+        const comCtrlK = e.ctrlKey && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k'; // dividir na cabeça (frente Som)
+        if (e.key !== 'Delete' && !comCtrlD && !comCtrlK) return;
         const alvo = e.target as HTMLElement;
         if (/INPUT|TEXTAREA|SELECT/.test(alvo.tagName) || alvo.isContentEditable || alvo.closest?.('.xterm')) return;
         e.preventDefault();
         e.stopImmediatePropagation();
-        void (comCtrlD ? duplicarSelecaoAudio(documento) : excluirSelecaoAudio(documento));
+        void (comCtrlK ? dividirSelecaoAudio(documento) : comCtrlD ? duplicarSelecaoAudio(documento) : excluirSelecaoAudio(documento));
       };
       window.addEventListener('keydown', tecla, true);
       return () => window.removeEventListener('keydown', tecla, true);

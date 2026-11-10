@@ -97,8 +97,15 @@ export const corrigirArquivo = async (arquivo: string, o: Parar & {binarios?: st
   }
 };
 
-/** A chamada do exportar.ts depois do render: só o vídeo de cenas com som tem alvo (o carrossel da Cliente fica como sai). */
+/** A chamada do exportar.ts depois do render. O vídeo de cenas com som sai no alvo do documento; o carrossel narrado da Cliente
+ *  (composição CarrosselTema, narração em `props.audio`) sai no alvo padrão da casa, −14 LUFS e −1 dBTP (som-D5: antes saía como a
+ *  narração foi gravada, a −26 LUFS, por exemplo). O ganho é um só para o arquivo inteiro, então a narração e os efeitos
+ *  mantêm a diferença entre eles; os efeitos do carrossel têm volume fixo, pensado para uma narração perto de −20 LUFS. */
 export const igualarLoudness = async (o: {arquivo: string; props: Record<string, unknown>; binarios?: string | null; cancelSignal?: CancelSignal; aviso?: (p: Progresso) => void}) => {
+  if (o.props.composicao === 'CarrosselTema') {
+    if (typeof o.props.audio !== 'string' || !o.props.audio) return null;
+    return corrigirArquivo(o.arquivo, {binarios: o.binarios, cancelSignal: o.cancelSignal, aviso: o.aviso});
+  }
   const audio = o.props.audio as AudioP | undefined;
   if (o.props.composicao !== 'VideoCenas' || !audio?.faixas?.some((f) => !f.mudo && f.clipes.some((c) => !c.mudo && !c.fora))) return null;
   return corrigirArquivo(o.arquivo, {binarios: o.binarios, cancelSignal: o.cancelSignal, aviso: o.aviso, alvo_lufs: audio.alvo_lufs, pico_dbtp: audio.pico_dbtp});

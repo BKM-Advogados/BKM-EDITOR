@@ -1,17 +1,19 @@
 // Som do vídeo de cenas: envelope com ponderação K, ducking medido, resolução das faixas (fades, limites, avisos) e o
 // IPC de áudio (envelope ao lado do arquivo, biblioteca de trilhas).
-import {mkdirSync, mkdtempSync, rmSync, statSync, utimesSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {afterAll, describe, expect, it} from 'vitest';
 import {
-  calcularDucking, conferirEnvelope, DUCKING_PADRAO, ehEnvelope, envelopeDeAmostras, fatorFades, ganhoDeDb, JANELA_MS, nivelDeReferencia, novaFaixaAudio, novoAudioCenas, papelDe, referenciaDeJanelas,
+  calcularDucking, conferirEnvelope, ConstrutorDeEnvelope, DUCKING_PADRAO, ehEnvelope, envelopeDeAmostras, fatorFades, ganhoDeDb, JANELA_MS, nivelDeReferencia, novaFaixaAudio, novoAudioCenas, papelDe, referenciaDeJanelas,
   resolverAudio, SILENCIO_DB, volumeDoClipe, type Envelope,
 } from '../src/nucleo/audio';
 import {novoDocCenas, resolverCenas, type DocCenas} from '../src/nucleo/cenas';
 import {gravarPlano, planoDoProjeto} from '../src/nucleo/criar-projeto';
 import {Projeto} from '../src/nucleo/projeto';
-import {arquivoDoEnvelope, gravarEnvelope, importarTrilha, lerEnvelope, lerEnvelopes, listarTrilhas, sha256DoArquivo} from '../src/main/ipc-audio';
+import {arquivoDoEnvelope, gravarEnvelope, importarTrilha, lerEnvelope, lerEnvelopes, listarTrilhas, medirEnvelopeDoArquivo, registrarIpcAudio, sha256DoArquivo} from '../src/main/ipc-audio';
+import {codificarWavPcm} from '../src/nucleo/gravacao';
+import {CANAL} from '../src/compartilhado/api';
 
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'estudio-audio-'));
 afterAll(() => rmSync(tmp, {recursive: true, force: true}));
@@ -75,8 +77,11 @@ describe('ducking', () => {
     expect(r.reducao_db).toBe(26); // −14 − (−20 − 20)
     expect(r.ganho).toHaveLength(100);
     expect(r.ganho[10]).toBe(1); // 0,5 s: sem voz
-    expect(r.ganho[20]).toBeCloseTo(ganhoDeDb(-13), 2); // primeira janela com voz: meio do ataque de 100 ms
-    expect(r.ganho[21]).toBeCloseTo(ganhoDeDb(-26), 3); // ataque completo
+    // som-D6: o ataque de 100 ms começa 100 ms ANTES da voz (que entra na janela 20) e chega ao fundo antes da primeira sílaba
+    expect(r.ganho[17]).toBe(1);
+    expect(r.ganho[18]).toBeCloseTo(ganhoDeDb(-13), 2); // meio do ataque
+    expect(r.ganho[19]).toBeCloseTo(ganhoDeDb(-26), 3); // ataque completo, na janela anterior à voz
+    expect(r.ganho[20]).toBeCloseTo(ganhoDeDb(-26), 3); // primeira janela com voz: já no fundo
     expect(r.ganho[50]).toBeCloseTo(ganhoDeDb(-26), 3); // 2,5 s: sob a voz
     expect(r.ganho[65]).toBeCloseTo(ganhoDeDb(-26 * 0.4), 2); // 3,25 s: metade da soltura de 500 ms, mais ou menos
     expect(r.ganho[75]).toBe(1); // 3,75 s: soltou
@@ -260,6 +265,29 @@ describe('ipc de áudio', () => {
     expect(lerEnvelope(p, 'midia/narracao.wav')?.duracao_ms).toBe(40000);
   });
 
+  it('som-N8: o canal que a tela usa grava pelo gravarEnvelope: carimba a data e recusa o arquivo que mudou no meio da medida', () => {
+    const raiz = gravarPlano(path.join(tmp, 'proj-ipc'), planoDoProjeto({nome: 'IPC', modelo: 'video-branco'}));
+    const p = new Projeto(raiz);
+    const abs = path.join(raiz, 'midia', 'voz.wav');
+    writeFileSync(abs, 'tomada do ipc');
+    const canais = new Map<string, (...a: any[]) => unknown>();
+    registrarIpcAudio((canal, f) => void canais.set(canal, f as (...a: any[]) => unknown), () => p, () => ({pasta_trilhas: path.join(tmp, 'trilhas-ipc')} as never));
+    const gravar = canais.get(CANAL.audioGravarEnvelope)!;
+    // a tela manda o que mediu: tamanho e sha256 dos bytes (como medirArquivo, no envelope.ts)
+    gravar('midia/voz.wav', {...envelope(1000, -20), fonte: {tamanho: 13, sha256: sha256DoArquivo(abs)}});
+    const gravado = JSON.parse(readFileSync(path.join(raiz, 'midia', 'voz.wav.envelope.json'), 'utf-8'));
+    expect(gravado.fonte).toEqual({tamanho: 13, modificado_ms: statSync(abs).mtimeMs, sha256: sha256DoArquivo(abs)}); // a data entra
+    // com a data, a próxima sessão confere sem ler o áudio: em_dia, sem sha256
+    expect(conferirEnvelope(gravado, {tamanho: 13, modificado_ms: statSync(abs).mtimeMs})).toBe('em_dia');
+    // a tomada foi regravada enquanto a tela media: recusa, e o envelope de antes não é trocado
+    writeFileSync(abs, 'outra tomada, maior');
+    expect(() => gravar('midia/voz.wav', {...envelope(1000, -10), fonte: {tamanho: 13, sha256: gravado.fonte.sha256}})).toThrow(/mudou enquanto era medido/);
+    expect(JSON.parse(readFileSync(path.join(raiz, 'midia', 'voz.wav.envelope.json'), 'utf-8')).db[0]).toBe(-20);
+    // envelope inválido e arquivo que não existe continuam recusados
+    expect(() => gravar('midia/voz.wav', {versao: 2})).toThrow(/inválido/);
+    expect(() => gravar('midia/nada.wav', envelope(1000, -20))).toThrow(/não está no projeto/);
+  });
+
   it('confere o envelope pelo carimbo: tamanho, depois data, depois o sha256', () => {
     const env = envelope(1000, -20);
     const agora = {tamanho: 100, modificado_ms: 1_700_000_000_000.25};
@@ -283,8 +311,57 @@ describe('ipc de áudio', () => {
     const raiz = gravarPlano(path.join(tmp, 'proj2'), planoDoProjeto({nome: 'Som 2', modelo: 'video-branco'}));
     const p = new Projeto(raiz);
     expect(importarTrilha(p, pasta, lista[2].caminho)).toBe('midia/piano.ogg');
-    expect(importarTrilha(p, pasta, lista[2].caminho)).toBe('midia/piano (2).ogg');
+    expect(importarTrilha(p, pasta, lista[2].caminho)).toBe('midia/piano.ogg'); // som-D12: a mesma trilha não vira outra cópia
+    writeFileSync(path.join(pasta, 'b.mp3'), 'outro b');
+    mkdirSync(path.join(p.raiz, 'midia'), {recursive: true});
+    writeFileSync(path.join(p.raiz, 'midia', 'b.mp3'), 'b de outro projeto');
+    expect(importarTrilha(p, pasta, path.join(pasta, 'b.mp3'))).toBe('midia/b (2).mp3'); // bytes diferentes com o mesmo nome: cópia nova
     expect(() => importarTrilha(p, pasta, path.join(tmp, 'proj', 'midia', 'voz.wav'))).toThrow(/pasta de trilhas/);
     expect(() => importarTrilha(p, pasta, path.join(pasta, 'capa.jpg'))).toThrow(/formato/);
   });
+});
+
+describe('som-D8: arquivo longo medido em pedaços', () => {
+  const ruidoDeterministico = (n: number, semente: number, amp = 0.3) => {
+    let x = semente >>> 0;
+    const out = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      x = (x * 1664525 + 1013904223) >>> 0;
+      out[i] = (x / 0xffffffff - 0.5) * 2 * amp * (0.5 + 0.5 * Math.sin(i / 9000));
+    }
+    return out;
+  };
+
+  it('alimentado aos pedaços, em qualquer tamanho, o envelope é o mesmo de uma vez só (estéreo, 44,1 kHz, pedaços que não casam com a janela)', () => {
+    const taxa = 44100;
+    const canais = [ruidoDeterministico(taxa * 3 + 123, 1), ruidoDeterministico(taxa * 3 + 123, 2, 0.1)];
+    const inteiro = envelopeDeAmostras(canais, taxa);
+    for (const tamanho of [1, 997, 2205, 4096, 100000]) {
+      const c = new ConstrutorDeEnvelope(taxa, 2);
+      for (let i = 0; i < canais[0].length; i += tamanho) c.alimentar(canais.map((x) => x.subarray(i, i + tamanho)));
+      const em = c.resultado();
+      expect(em.duracao_ms).toBe(inteiro.duracao_ms);
+      expect(em.db).toEqual(inteiro.db);
+    }
+  });
+
+  it('medirEnvelopeDoArquivo: o ffmpeg entrega em pedaços, o envelope sai igual ao da decodificação inteira e fica gravado com o carimbo', async () => {
+    const FFMPEG = path.join('node_modules', '@remotion', `compositor-${process.platform}-${process.arch}${process.platform === 'win32' ? '-msvc' : ''}`, process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
+    if (!existsSync(FFMPEG)) return;
+    const raiz = gravarPlano(path.join(tmp, 'proj-d8'), planoDoProjeto({nome: 'D8', modelo: 'video-branco'}));
+    const p = new Projeto(raiz);
+    const x = ruidoDeterministico(48000 * 8, 7);
+    writeFileSync(path.join(raiz, 'midia', 'longa.wav'), codificarWavPcm([x, ruidoDeterministico(48000 * 8, 8, 0.2)], 48000, 24));
+    let pedacos = 0;
+    const {decodificarEmPedacos, decodificarAudio} = await import('../src/main/ffmpeg-som');
+    await decodificarEmPedacos(path.join(raiz, 'midia', 'longa.wav'), () => void pedacos++);
+    expect(pedacos).toBeGreaterThan(5); // 8 s de WAV estéreo de 24 bits: dezenas de pedaços, nunca o arquivo inteiro de uma vez
+    const env = await medirEnvelopeDoArquivo(p, 'midia/longa.wav');
+    const inteiro = await decodificarAudio(path.join(raiz, 'midia', 'longa.wav'));
+    const esperado = envelopeDeAmostras(inteiro.canais, inteiro.taxa);
+    expect(env.duracao_ms).toBe(esperado.duracao_ms);
+    expect(env.db).toEqual(esperado.db);
+    expect(lerEnvelope(p, 'midia/longa.wav')?.fonte).toMatchObject({tamanho: statSync(path.join(raiz, 'midia', 'longa.wav')).size, sha256: expect.any(String)});
+    await expect(medirEnvelopeDoArquivo(p, 'midia/nao-existe.wav')).rejects.toThrow(/não está no projeto/);
+  }, 60_000);
 });

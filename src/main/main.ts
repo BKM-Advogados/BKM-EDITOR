@@ -23,6 +23,9 @@ import {ServidorMidia} from './servidor-midia';
 import {SessaoProjeto} from './sessao-projeto';
 import {Terminais} from './terminais';
 import {registrarIpcAudio} from './ipc-audio';
+import {registrarIpcGravacao} from './ipc-gravacao'; // frente Som (rodada 3)
+import {definirPastaTrilhas} from '../nucleo/pasta-trilhas';
+import {somAcompanhaCenas} from '../nucleo/som-com-cenas';
 import {registrarIpcFala} from './ipc-fala'; // frente Fala
 import {legendasNoDestino, type LegendasP} from '../nucleo/legendas'; // frente Fala: legendas no tamanho de cada destino
 import {registrarPrefsExportacao} from './ipc-exportacao';
@@ -162,6 +165,7 @@ const abrirProjeto = async (raiz: string) => {
   });
   midia.servir(raiz);
   regerarClaudeMd(raiz); // o Claude conhece os campos desta versão também nos projetos criados antes dela
+  sessao.projeto.adicionarAjuste(somAcompanhaCenas); // frente Som: a narração presa às cenas (som-com-cenas.ts)
   apagarLimposSemUso(sessao.projeto); // frente Som: as versões limpas da voz que nem documento nem diário citam (limpeza-voz.ts)
   await sessao.abrir();
   memoria.lembrar(raiz, manifesto.nome);
@@ -451,6 +455,8 @@ lidar(CANAL.metricas, (): Metricas => {
 registrarExportarPaginas(lidar, CANAL.exportarPaginas, {projeto: exigirProjeto, mostrar: (arquivo) => shell.showItemInFolder(arquivo)});
 
 registrarIpcAudio(lidar, exigirProjeto, () => memoria.prefs()); // som do vídeo de cenas
+registrarIpcGravacao(lidar, exigirProjeto); // frente Som (rodada 3): salvar a narração gravada
+definirPastaTrilhas(() => memoria.prefs().pasta_trilhas); // frente Som (rodada 3): o MCP lê a pasta de trilhas das preferências
 // acabamento da imagem (rodada 2, B2): remover fundo, com o modelo em ~/Estudio/modelos e o pedido do MCP à janela
 registrarRemoverFundo(lidar, {enviar, projeto: exigirProjeto, pasta: path.join(app.getPath('home'), 'Estudio', 'modelos'), buscar: (u, i) => net.fetch(u, i),
   ouvir: (canal, f) => ipcMain.on(canal, (e, ...a) => (confiavel(e), f(...(a as never[]))))});

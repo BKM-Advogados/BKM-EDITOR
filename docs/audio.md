@@ -63,8 +63,9 @@ ITU-R BS.1770 e tira a potência média por janela de 50 ms) e pede ao processo 
 
 `db` é o loudness de cada janela, no mesmo número do LUFS; `-100` é silêncio. O arquivo é pequeno (20 números por
 segundo) e entra no git do projeto. Quem lê é o processo principal (`sessao-projeto.ts` passa os envelopes ao
-`resolverCenas`), então a prévia, a exportação e o Claude (pelo `ler_documento`) veem a mesma forma de onda e o mesmo
-ducking. Um clipe cujo arquivo ainda não tem envelope (projeto vindo de outro PC, arquivo trocado à mão) é medido em
+`resolverCenas`), então a prévia, a exportação e o Claude veem o mesmo ducking: o `ler_documento` do vídeo de cenas traz, além
+do JSON, os avisos do resolvedor e o `som` medido (nível e ducking de cada clipe: redução, voz, música e se foi medido), para o
+Claude decidir com os números (som-D11); com `caminho`, devolve só o trecho. Um clipe cujo arquivo ainda não tem envelope (projeto vindo de outro PC, arquivo trocado à mão) é medido em
 segundo plano assim que o vídeo abre; até lá o ducking usa níveis típicos (narração a −20, música a −14) e avisa.
 
 **Versão e carimbo.** `fonte` é o arquivo de áudio como estava quando foi medido: o processo principal carimba o tamanho,
@@ -226,21 +227,185 @@ são as do BS.1770, na forma em que o libebur128 (MIT) as escreve.
   clipe (arquivo, trocar arquivo, nome, começa em, duração, corte, volume, fades, mudo, a redução sob a voz e, na voz, a
   limpeza). Sem nada selecionado, o resumo do vídeo traz a seção "Loudness" (alvo, pico máximo e os medidores).
 
+## Dividir, copiar e crossfade (rodada 3)
+
+A conta é de `src/nucleo/clipes-audio.ts`: a interface (`acoes-audio.ts`) e o MCP (`mcp-som.ts`) chamam as mesmas
+funções, então a pessoa e a IA obtêm o mesmo documento. Tudo sai como JSON Patch (diário, Ctrl+Z, "Ver" e "Reverter").
+
+**Dividir na cabeça** (clipe selecionado + Ctrl+K, o botão "Dividir na cabeça" do inspetor ou `dividir_clipe`). O corte
+cai num **número inteiro de quadros contado do começo do clipe**: o Remotion põe o clipe no quadro mais perto de `em` e
+pula `corte_ms` em quadros, e só com o corte em quadros inteiros as duas metades tocam, juntas, exatamente o que o clipe
+inteiro tocava (a cabeça do monitor anda em quadros e o corte pode ficar até meio quadro de onde ela estava). A
+segunda metade nasce com id novo (`n1` → `n1-1`) e leva o resto do clipe: arquivo, volume, mudo, nome e a voz limpa
+(`original` e `limpeza`). O fade de entrada fica na primeira metade e o de saída na segunda; fade mais longo que a
+metade em que está avisa e fica só nessa metade. Cada metade tem pelo menos 100 ms.
+
+**Legendas.** O segmento que fica inteiro de um lado vai com aquele clipe; o que o corte atravessa é partido na
+primeira palavra depois do corte (`dividirSegmento`), e o clipe novo ganha a `origem` do clipe de onde veio. Assim a
+tela mostra as mesmas palavras nos mesmos tempos, e mover a segunda metade leva só as legendas dela.
+Duplicar (Ctrl+D, `copiar_clipe`) faz o mesmo: a cópia traz as legendas, deslocadas para onde a cópia começa, e anda
+com ela. Duplicar a *faixa* inteira ainda não leva as legendas dos clipes.
+
+**Crossfade** (inspetor → "Crossfade com o seguinte", ou `crossfade`). O fim do primeiro clipe desce e o começo do
+segundo sobe durante `duracao_ms`, com os dois tocando juntos. A forma vem de `fade_in_curva` e `fade_out_curva` no clipe:
+
+| curva | ganho depois de `u` do fade | quando usar |
+|---|---|---|
+| `linear` | `u` | a mesma tomada dos dois lados (voz): a soma dos ganhos é 1 |
+| `suave` | `(1 − cos πu) / 2` | começa e termina devagar; soma dos ganhos 1 |
+| `potencia` | `sin(πu/2)` | músicas e efeitos diferentes: a soma das potências é 1, e **no meio o nível fica o de antes** (a linear cairia 3 dB) |
+
+O padrão é `potencia` em faixa de música e efeitos, e `linear` em voz. Para os dois se sobreporem por `duracao_ms`
+há dois modos: `estender` usa o som que sobra nos arquivos (primeiro a cauda do primeiro clipe, depois o começo do
+segundo; nada muda de lugar, então a narração presa a eles segue no tempo) e `sobrepor` puxa o segundo clipe para trás
+(ele acaba antes). `auto` (padrão) estende o que der e sobrepõe o resto, dizendo o que fez. Se os dois já se
+sobrepõem mais do que o pedido, o primeiro encurta.
+
+**Medido** (`MEDIR=1 npx vitest run testes/clipes-audio.test.ts`, mistura simulada com o posicionamento por quadro do
+`VideoCenas`, 48 kHz): metades somadas menos o clipe inteiro = −222 dB (zero, no limite do ponto flutuante; o critério
+é −60 dB), contra +1,7 dB com o corte em milissegundos fora da grade. Crossfade de potência igual entre dois ruídos
+diferentes, com 2 s: +0,01, +0,07 e +0,08 dB em relação ao nível de antes a 25, 50 e 75 % da sobreposição; o linear cai
+2,9 dB no meio. **Não medido:** o render real do Remotion (a mistura é a simulação, não o MP4) e o ducking de uma
+música dividida (cada metade calcula a redução pela mediana do seu trecho).
+
+## Efeito sonoro na medida da casa (som-D4)
+
+Um efeito novo (Efeito sonoro…) entra com o volume do clipe calculado para a mediana dele ficar **20 LU abaixo da voz**
+(a casa mixa de 18 a 23): `volumeDoEfeito` usa a mediana da voz medida, com o volume de faixa e de clipe (`nivelDaVoz`);
+sem voz medida, a voz típica de −20 dB. Um efeito que já é mais baixo que o alvo fica a 100 %: não se sobe o volume.
+Medido: whoosh a −3 dB sobre voz a −22,9 dB entra a 1 % e fica 20,08 LU abaixo dela.
+
+## Música sobre música (som-D7)
+
+Escolher uma segunda música quando a faixa já vai até o fim do vídeo não a põe mais no zero por cima da primeira: ela
+entra na cabeça (se a cabeça está a mais de 0,5 s do começo e a 1 s do fim), e a que toca ali desce em crossfade de 1,5 s;
+sem lugar na cabeça, vai para uma faixa de música nova ("Música 2"), com aviso. Em qualquer caso, duas músicas da
+mesma faixa que tocam juntas sem um crossfade que cubra a sobreposição geram o aviso "tocam juntas por N s" no
+resolvedor (e o Claude o vê nos avisos do documento).
+
+## Ferramentas MCP do som (`src/nucleo/mcp-som.ts`)
+
+| ferramenta | o que faz | classe |
+|---|---|---|
+| `dividir_clipe` | divide o clipe em `em_ms` (ou onde está a cabeça) na grade de quadros, levando as legendas | livre |
+| `copiar_clipe` | copia o clipe na mesma faixa (depois do original ou em `em_ms`), com as legendas | livre |
+| `crossfade` | crossfade entre dois clipes da mesma faixa: `duracao_ms`, `curva`, `modo` | livre |
+| `preparar_teleprompter` | grava o texto (ou o das cenas) em `teleprompter`, com a velocidade, e estima a duração da leitura; quem grava é a pessoa | livre |
+| `adicionar_clipe_audio` | põe um arquivo de áudio do projeto numa faixa (narração, música ou efeito), com o volume do efeito na medida da casa | livre |
+
+Classe **livre**: grava no diário como o agente e tem Reverter. Nenhuma lê a web, baixa modelo ou toca em arquivo de
+fora do projeto. Como chegar vindo de outro módulo: a seleção de um clipe de áudio (`estado_do_editor`) diz o `clipe`; o
+`em_ms` omitido usa a cabeça gravada em `estado.json`. Como voltar: `listar_mudancas` + Reverter, ou Ctrl+Z na tela.
+
+## Gravar a narração com teleprompter (rodada 3)
+
+"+ Áudio" › "Gravar narração…" abre o gravador (`GravadorNarracao.tsx`). **Texto:** vem do campo `teleprompter` do vídeo
+(`{texto, palavras_por_minuto?, tamanho?, espelhar?}`, que a IA também escreve) ou do botão "Texto das cenas" (títulos, textos
+e listas, uma cena por parágrafo). **Teleprompter:** depois de uma contagem de 3 s o texto rola na velocidade pedida
+(padrão 150 palavras por minuto, de 60 a 260), com a palavra da vez em destaque e as lidas esmaecidas; a conta de tempo é de
+`src/nucleo/gravacao.ts`: 60 000/ppm ms por palavra, mais 250 ms depois de vírgula, 500 ms depois de ponto e 600 ms por
+parágrafo. "Espelhar" inverte o texto para um espelho de teleprompter. **Monitoramento:** "Ouvir a mim mesmo (fones)" liga um
+ganho à parte do microfone para o destino; vem desligado, porque sem fones o microfone pega o alto-falante. **Medidor:** pico em
+dBFS ao vivo; passou de −0,5 dB a barra fica vermelha e, ao parar, a tomada avisa que pode ter cortado.
+
+**Captura.** `getUserMedia` com `echoCancellation`, `noiseSuppression` e `autoGainControl` **desligados**, mono, 48 kHz; o
+`AudioContext` abre a 48 kHz e, se o sistema não conceder, a gravação não começa. As amostras vêm de um `ScriptProcessorNode`
+(o `AudioWorklet` pediria um módulo que o `script-src 'self'` da janela só aceita empacotado). Ao parar, o WAV é PCM de
+**24 bits**, 48 kHz (`codificarWavPcm`), o processo principal confere o cabeçalho (`salvarTomada`, canal `audio:salvar-tomada`) e grava
+`midia/narracao-gravada.wav` (`-2`, `-3`… sem nunca sobrescrever), e `adicionarClipeAudio` põe o clipe na narração **medindo o
+envelope** na hora. A limpeza de voz é um passo à parte, a pedido, e o original fica.
+
+**Medido (testes):** o WAV de 24 bits volta com erro < 1e-6; o ffmpeg do Remotion o decodifica (erro < 1e-5) e o envelope de um
+seno de 0,5 a 300 Hz sai a −9,7 dB. **Não medido:** o microfone de verdade, a latência do monitoramento e a rolagem do
+teleprompter na tela (o Electron não roda neste PC; a prévia web não tem microfone). Se o Windows bloquear o microfone, a
+mensagem manda para Configurações › Privacidade › Microfone.
+
+## Correções de som da rodada 3 (D5, D6, D8, D10, D11, D12, N8)
+
+- **som-D5, carrossel narrado da Cliente:** `igualarLoudness` agora também acerta o MP4 do `CarrosselTema` (narração em `props.audio`) para
+  −14 LUFS e −1 dBTP, o alvo padrão da casa. Medido num MP4 só de áudio com um tom baixo: **−29,9 → −14,1 LUFS, pico −10,2 dBTP**.
+  **Não feito:** os efeitos do carrossel continuam com os volumes fixos de `roteiro/resolver.ts` (pensados para uma narração perto de
+  −20 LUFS); como o ganho é um só para o arquivo, a diferença entre narração e efeitos fica a de antes, e numa narração gravada
+  muito baixa os efeitos saem relativamente mais altos. Escalar `sons[].vol` pelo nível da narração pede medi-la antes do render
+  (a pasta pública fica no pacote da exportação), o que toca `exportar.ts` (frente Vídeo).
+- **som-D6, ducking:** a música começa a cair `ataque_ms` antes de a voz entrar (olha à frente só para o começo; a soltura não
+  antecipa). Medido: na janela da primeira sílaba o ganho já está a −26,0 dB, o alvo da redução.
+- **som-D8, arquivo longo:** acima de 48 MB a interface não baixa nem decodifica o arquivo: o canal `audio:medir-envelope` mede no
+  processo principal, em pedaços (`decodificarEmPedacos` lê o WAV de 24 bits do ffmpeg no pipe e `ConstrutorDeEnvelope` soma as
+  janelas), e grava o envelope carimbado. O resultado é **igual** ao de uma vez só (testado com pedaços de 1 a 100 000 amostras).
+  **Medido** com 10 min de WAV estéreo de 48 kHz: pico de memória do processo **94 MB em pedaços contra 845 MB inteiro**
+  (decodificar inteiro cresce com a duração: uma hora passa de 5 GB; em pedaços fica nos mesmos ~100 MB). **Não feito:** a
+  limpeza de voz e o medidor de loudness da mistura ainda decodificam o arquivo do clipe inteiro; uma live de uma hora usada para
+  tirar um corte ainda pesa nesses dois (o corte só mede o trecho, mas decodifica tudo).
+- **som-D10, prévia:** `numberOfSharedAudioTags` do Player acompanha o pico de clipes juntos (`etiquetasDeAudio`: 12, 24 ou 48),
+  e não mais 12 fixo.
+- **som-D11:** `ler_documento` do vídeo de cenas traz `som` (nível e ducking medidos de cada clipe) e `avisos` do resolvedor.
+- **som-D12:** a mesma trilha da biblioteca não vira uma cópia nova em `midia/` a cada uso (os mesmos bytes reaproveitam a cópia).
+- **som-N8:** o canal do envelope grava pelo `gravarEnvelope` (carimba a data).
+
+## Músicas livres com curadoria (rodada 3)
+
+`src/nucleo/biblioteca-musicas.ts`: cada faixa tem uma **ficha** ao lado do arquivo (`<arquivo>.ficha.json`: `id`, `titulo`, `autor`,
+`url_pagina` em que a licença foi conferida, `licenca`, `url_licenca`, `conferido_em`, `atribuicao` e, opcionais, `sha256`,
+`duracao_s`, `humor`, `genero`, `risco_content_id`). Só entra a faixa **CC0, domínio público (PDM) ou CC BY 3.0/4.0**; a ficha
+com licença NC (não comercial), ND (sem derivações), SA (compartilha igual) ou que o validador não reconhece é **recusada com o
+motivo**: aparece na lista como "licença recusada", não pode ser escolhida e `escolher_trilha` se nega a usá-la. CC BY exige a
+`atribuicao`. A faixa sem ficha (o arquivo que a pessoa pôs na pasta de trilhas) continua valendo, e a licença é dela. Ao escolher,
+a ficha é copiada para `midia/` junto com a trilha, e `creditos_das_musicas` junta os créditos que o vídeo precisa pôr na descrição.
+
+| ferramenta | o que faz | classe |
+|---|---|---|
+| `listar_trilhas` | as trilhas da pasta (licença, autor, humor, duração; "sem ficha" ou "recusada") | livre |
+| `escolher_trilha` | copia para `midia/` (uma vez só) e põe o clipe na música ou nos efeitos, com a ficha | **cartão** (traz arquivo de fora do projeto) |
+| `creditos_das_musicas` | os créditos CC BY das músicas do vídeo, prontos para a descrição, e as sem ficha | livre |
+
+**Lista proposta:** `docs/musicas-livres.md` (e `.json`) traz 30 faixas com a licença conferida na página em 08/11/2026 (21 CC BY 4.0
+e 9 CC0; Scott Buckley, Audionautix, Lee Rosevere, HoliznaCC0, Open Goldberg Variations e Chopin pelo Musopen). **Nenhuma foi
+baixada**: a escolha é do responsável. Depois do ok, baixar só as escolhidas para a pasta de trilhas, gravar a ficha ao lado com o
+`sha256` e conferir. O validador roda o arquivo da proposta inteiro nos testes.
+
+## A narração presa às cenas (video-D3)
+
+Inserir, duplicar, excluir ou mudar a duração de uma cena **empurra o som que vem depois**, e as legendas que seguem esses clipes vão
+junto (`src/nucleo/som-com-cenas.ts`). É um ajuste que o `Projeto` soma ao patch na **mesma gravação** (`projeto.adicionarAjuste`,
+registrado no `main.ts` e em `registrarSom`): o diário tem uma entrada só, e Ctrl+Z, "Ver" e "Reverter" desfazem o conjunto. Vale
+igual para a pessoa (inspetor, linha do tempo, Ctrl+K…) e para a IA (`aplicar_patch` em `/cenas`).
+
+- **Cena mais longa, nova ou duplicada** (em N ms): abre um vazio de N ms no fim dela. O clipe que atravessa esse ponto é dividido ali
+  (`dividirClipe`, com as legendas e a grade de quadros) e tudo o que começa depois anda N ms para a frente.
+- **Cena mais curta ou excluída**: tira esse trecho do som. Os clipes inteiros dentro dele saem (com as legendas e os efeitos), os que o
+  atravessam são cortados, e o que vem depois anda para trás.
+- **Dividir a cena** (Ctrl+K): a metade de baixo é uma cena nova logo depois da antiga, o total é o mesmo e o som não muda.
+- **Não age:** quando o patch já mexe em `/audio` ou `/legendas` (quem o fez cuida do som, e é o que faz o Ctrl+Z não somar duas
+  vezes); quando a ordem das cenas muda; quando nenhuma cena de antes sobra (todas trocadas por ids novos: não há como saber para onde
+  o som vai); e com `audio.acompanha_cenas: false` (campo opcional, padrão: acompanha).
+- **Limites:** o corte cai na grade de quadros do clipe (até meio quadro de diferença); um clipe com menos de 100 ms de um dos lados do
+  ponto conta como inteiro do lado onde está a maior parte; cena de duração fora de 300 ms a 10 min é lida com o limite, como no
+  resolvedor. **Medido** nos testes (`testes/som-com-cenas.test.ts`): alongar a cena 2 em 1 s move 1 s as legendas e o efeito da cena 3 e
+  deixa as das cenas 1 e 2; excluir a cena 2 tira 4 s do som, das legendas e dos efeitos e a cena 3 sobe; a legenda atravessada pelo corte
+  é partida na palavra do corte; o inverso do diário devolve o documento de antes. **Não verificado** na interface (arrastar a duração
+  na linha do tempo).
+
 ## Pasta de trilhas
 
 Preferência `pasta_trilhas` (padrão `%USERPROFILE%\Estudio\trilhas`). "Música da biblioteca…" lista os mp3, wav,
 m4a, ogg e aac dela (até dois níveis de subpasta), com filtro, "Abrir" no Explorador e "Trocar pasta…". Escolher uma
-trilha copia para `midia/` e cria o clipe na faixa de música. A curadoria de músicas livres com licença conferida fica
-para depois: por ora a pasta é da pessoa.
+trilha copia para `midia/` (uma vez só) e cria o clipe na faixa de música. A curadoria de músicas livres com licença conferida
+está na seção acima; a pasta continua sendo da pessoa.
 
 ## Onde está
 
 - `src/nucleo/audio.ts`: tipos, envelope (ponderação K), referência por mediana, `calcularDucking`, `resolverAudio`,
   `volumeDoClipe`. Puro, sem disco.
 - `src/nucleo/cenas.ts`: `audio` no documento e nas props; `resolverCenas(doc, {envelopes})`.
+- `src/nucleo/gravacao.ts`: WAV PCM, medidor e teleprompter. `src/main/ipc-gravacao.ts`: salva a tomada. `src/renderer/modulos/video/gravador.ts` e `GravadorNarracao.tsx`: a captura e o painel.
+- `src/nucleo/som-com-cenas.ts`: o som que acompanha as cenas (`somAcompanhaCenas`, o ajuste do `Projeto`).
+- `src/nucleo/clipes-audio.ts`: `dividirClipe`, `copiarClipe`, `crossfadeEntre`, `volumeDoEfeito` (puros, em JSON Patch).
+  `src/nucleo/mcp-som.ts`: as ferramentas MCP do som (`registrarSom`, uma linha em `ferramentas-mcp.ts`).
 - `src/composicoes/cenas/VideoCenas.tsx`: `<Som>` com um `<Html5Audio>` por clipe.
 - `src/nucleo/loudness.ts`: medidor BS.1770 aos pedaços e `medirMistura`. `src/nucleo/limpeza-voz.ts`: a limpeza.
-- `src/main/ipc-audio.ts`: grava o envelope com o carimbo (`gravarEnvelope`), lista a pasta de trilhas, importa trilha;
+- `src/main/ipc-audio.ts`: grava o envelope com o carimbo (`gravarEnvelope`), mede arquivo grande em pedaços (`medirEnvelopeDoArquivo`);
+  `src/nucleo/pasta-trilhas.ts` lista a pasta de trilhas com as fichas e importa a trilha; `src/nucleo/biblioteca-musicas.ts` valida a ficha;
   `lerEnvelopes` para as props (só o envelope em dia).
 - `src/main/ffmpeg-som.ts`: acha e roda o ffmpeg do Remotion, decodifica para amostras, lê e grava WAV.
 - `src/main/limpeza-voz.ts` (IPC `audio:limpar-voz`, `audio:limpeza-cancelar`, evento `audio:limpeza-progresso`; as
@@ -249,7 +414,7 @@ para depois: por ora a pasta é da pessoa.
 - `src/renderer/modulos/video/`: `envelope.ts` (mede com Web Audio), `acoes-audio.ts` (patches, limpar e voltar ao
   original), `FaixasAudio.tsx` (linha do tempo), `BibliotecaTrilhas.tsx`, `MedidorLoudness.tsx`, e as partes de áudio em
   `LinhaDoTempo.tsx` e `InspectorCenas.tsx`.
-- `testes/audio.test.ts`, `testes/loudness.test.ts`, `testes/limpeza-voz.test.ts`; `scripts/audio-sintetico.ts` (WAV de
+- `testes/audio.test.ts`, `testes/loudness.test.ts`, `testes/limpeza-voz.test.ts`, `testes/clipes-audio.test.ts`, `testes/mcp-som.test.ts`, `testes/gravacao.test.ts`, `testes/biblioteca-musicas.test.ts`, `testes/som-com-cenas.test.ts`; `scripts/audio-sintetico.ts` (WAV de
   teste da prévia web e do script de exportação), `scripts/limpeza-teste.mjs` e `scripts/exportar-teste-som.mjs`.
 - Prévia web: a ponte limpa e mede de verdade (o mesmo núcleo) sobre os WAV sintéticos.
 
@@ -260,3 +425,17 @@ limpo, trocar `arquivo` à mão deixa `original` e `limpeza` desatualizados (apa
 Os `*.limpo*.wav` ficam fora do git (estão no `.gitignore`) e se refazem do original; não os versione. Gravar uma tomada
 nova por cima de um áudio de `midia/` é seguro: o envelope dele deixa de valer e a interface mede de novo.
 A limpeza de voz e a medição são da interface (precisam do ffmpeg do processo principal); o Claude não as dispara pelo MCP.
+
+Dividir, copiar e fazer crossfade de clipes tem ferramenta própria (`dividir_clipe`, `copiar_clipe`, `crossfade`): use-as
+no lugar de montar o patch, porque elas cuidam da grade de quadros, do fade, da voz limpa e das legendas do clipe. Para
+um efeito sonoro novo por `aplicar_patch`, ponha `volume` no clipe para a mediana dele ficar 20 LU abaixo da voz (a
+interface faz essa conta; um efeito a 100 % passa por cima da narração). Duas músicas na mesma faixa só se sobrepõem
+com `fade_out_ms` e `fade_in_ms` iguais ao tempo da sobreposição (e `fade_*_curva: "potencia"`): senão o documento avisa
+que tocam juntas.
+
+Para a pessoa gravar a narração: `preparar_teleprompter` (ou o campo `teleprompter` por patch) deixa o texto pronto; peça a ela para abrir
+"+ Áudio" › "Gravar narração…" (o microfone é dela). Depois da gravação, o clipe já está na faixa de narração; `adicionar_clipe_audio`
+serve para pôr outro arquivo de `midia/` (a tomada de outra pessoa, uma música, um efeito).
+
+Ao mudar a duração ou a ordem das cenas por `aplicar_patch`, o som e as legendas dos clipes acompanham sozinhos (o `audio.acompanha_cenas: false` desliga). Se o seu
+patch já mexe em `/audio`, o som é por sua conta: o ajuste não soma nada por cima.

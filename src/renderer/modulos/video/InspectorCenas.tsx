@@ -6,9 +6,9 @@
 // clicar leva ao fato no painel Pesquisa e o × tira um da lista. O som tem ainda o loudness (o alvo do arquivo exportado
 // e os medidores da narração e da mistura no resumo do vídeo; o da faixa no inspetor dela) e, no clipe de voz, a limpeza.
 import React, {useState, useSyncExternalStore} from 'react';
-import {Clapperboard, CopyPlus, Film, FileAudio, FileJson, ImagePlus, Link, Quote, Sparkles, Trash2, Undo2, X} from 'lucide-react';
+import {Clapperboard, CopyPlus, Film, FileAudio, FileJson, ImagePlus, Link, Quote, Scissors, Shuffle, Sparkles, Trash2, Undo2, X} from 'lucide-react';
 import {ALVO_LU_MAX, ALVO_LU_MIN, ALVO_LUFS_MAX, ALVO_LUFS_MIN, ALVO_LUFS_PADRAO, DUCKING_PADRAO, PAPEIS, PICO_DBTP_MAX, PICO_DBTP_MIN, PICO_DBTP_PADRAO, type AudioP,
-  type ClipeAudio, type ClipeAudioP, type FaixaAudio, type FaixaAudioP, type IntensidadeLimpeza, type PapelFaixa} from '../../../nucleo/audio';
+  type ClipeAudio, type ClipeAudioP, type CurvaFade, type FaixaAudio, type FaixaAudioP, type IntensidadeLimpeza, type PapelFaixa} from '../../../nucleo/audio';
 import {INTENSIDADE_PADRAO, INTENSIDADES} from '../../../nucleo/limpeza-voz';
 import {TIPOS_BLOCO_CENAS, type BlocoCenas, type CenaCenas, type DocCenas, type PropsCenas} from '../../../nucleo/cenas';
 import {FORMATOS_VIDEO, formatoDoVideo, rotuloFormato} from '../../../nucleo/formatos';
@@ -18,11 +18,12 @@ import type {ItemMenu} from '../../componentes/Menu';
 import {formatarTempo} from './tocador';
 import {resumoBloco, tipoDe} from './tipos';
 import {duplicarSelecao, excluirSelecao} from './acoes';
-import {andamentoLimpeza, assinarLimpeza, cancelarLimpeza, duplicarSelecaoAudio, excluirSelecaoAudio, ICONES_PAPEL, limparVozDoClipe, partesAudio, trocarArquivoDoClipe,
+import {andamentoLimpeza, assinarLimpeza, cancelarLimpeza, crossfadeComSeguinte, dividirSelecaoAudio, duplicarSelecaoAudio, excluirSelecaoAudio, ICONES_PAPEL, limparVozDoClipe, partesAudio, trocarArquivoDoClipe,
   voltarAoOriginal} from './acoes-audio';
 import {CamposMovimento} from './CamposMovimento';
 import {lufsTexto, MedidorLoudness, useMedidasLoudness} from './MedidorLoudness';
 
+const CURVAS_OPCOES: [CurvaFade, string][] = [['linear', 'Linear'], ['suave', 'Suave'], ['potencia', 'Potência igual']]; // frente Som: forma do fade
 const pct = (v: number | undefined, padrao: number) => Math.round((v ?? padrao) * 1000) / 10;
 const ALINHAR: [NonNullable<BlocoCenas['alinhar']>, string][] = [['esquerda', 'Esquerda'], ['centro', 'Centro'], ['direita', 'Direita']];
 const PESOS: [string, string][] = [['400', 'Normal'], ['500', 'Médio'], ['600', 'Seminegrito'], ['700', 'Negrito'], ['800', 'Extranegrito']];
@@ -368,14 +369,20 @@ const PropsClipe: React.FC<{documento: string; caminho: string; c: ClipeAudio; c
             <CampoNumero rotulo="Corte no arquivo" unidade="s" passo={0.1} valor={(c.corte_ms ?? 0) / 1000} padrao={0} dica="Quanto do começo do arquivo fica de fora"
               aoRedefinir={c.corte_ms ? () => campo('corte_ms', 'corte')(undefined) : undefined}
               aoMudar={(v) => campo('corte_ms', 'corte')(v > 0 ? Math.round(v * 1000) : undefined)} />
+            <div className="limpeza-botoes" style={{padding: '2px 8px 6px'}}>
+              <button className="bt" onClick={() => void dividirSelecaoAudio(documento)} title="Divide o clipe onde está a cabeça (Ctrl+K): as duas metades tocam o mesmo som, com as legendas"><Scissors size={14} />Dividir na cabeça</button>
+              <button className="bt" onClick={() => void crossfadeComSeguinte(documento)} title="Os dois clipes se sobrepõem e um desce enquanto o outro sobe"><Shuffle size={14} />Crossfade com o seguinte</button>
+            </div>
           </Secao>
           <Secao titulo="Volume" chave="audio:volume">
             <CampoDeslizante rotulo="Volume" min={0} max={100} passo={1} valor={pctDe(c.volume)} padrao={100} formatar={(v) => `${v} %`}
               aoMudar={(v) => campo('volume', 'volume')(v === 100 ? undefined : Math.round(v) / 100)} />
             <CampoNumero rotulo="Fade de entrada" unidade="s" passo={0.1} valor={(c.fade_in_ms ?? 0) / 1000} padrao={0}
               aoMudar={(v) => campo('fade_in_ms', 'fade de entrada')(v > 0 ? Math.round(v * 1000) : undefined)} />
+            {(c.fade_in_ms ?? 0) > 0 && <CampoSelecao rotulo="Curva da entrada" valor={c.fade_in_curva ?? 'linear'} opcoes={CURVAS_OPCOES} aoMudar={(v) => campo('fade_in_curva', 'curva da entrada')(v === 'linear' ? undefined : v)} />}
             <CampoNumero rotulo="Fade de saída" unidade="s" passo={0.1} valor={(c.fade_out_ms ?? 0) / 1000} padrao={0}
               aoMudar={(v) => campo('fade_out_ms', 'fade de saída')(v > 0 ? Math.round(v * 1000) : undefined)} />
+            {(c.fade_out_ms ?? 0) > 0 && <CampoSelecao rotulo="Curva da saída" valor={c.fade_out_curva ?? 'linear'} opcoes={CURVAS_OPCOES} aoMudar={(v) => campo('fade_out_curva', 'curva da saída')(v === 'linear' ? undefined : v)} />}
             <CampoInterruptor rotulo="Mudo" valor={Boolean(c.mudo)} aoMudar={(v) => campo('mudo', 'mudo')(v || undefined)} texto={c.mudo ? 'não toca' : 'toca'} />
             {cp?.ducking && (
               <CampoLeitura rotulo="Ducking" dica="Vem da faixa de música: a redução sob a voz, medida">
@@ -404,6 +411,10 @@ export const InspectorCenas: React.FC<{documento: string}> = ({documento}) => {
     const fp = (props as PropsCenas | null)?.audio?.faixas.find((f) => f.origem === `/audio/faixas/${pa.faixa}`);
     const menuAudio: ItemMenu[] = [
       {rotulo: 'Duplicar', icone: <CopyPlus className="i14" />, tecla: 'Ctrl+D', acao: () => void duplicarSelecaoAudio(documento)},
+      ...(pa.clipe !== null ? [
+        {rotulo: 'Dividir na cabeça', icone: <Scissors className="i14" />, tecla: 'Ctrl+K', acao: () => void dividirSelecaoAudio(documento)},
+        {rotulo: 'Crossfade com o seguinte', icone: <Shuffle className="i14" />, acao: () => void crossfadeComSeguinte(documento)},
+      ] : []),
       {rotulo: 'Excluir', icone: <Trash2 className="i14" />, tecla: 'Delete', acao: () => void excluirSelecaoAudio(documento)},
       'sep',
       {rotulo: 'Copiar caminho', icone: <Link className="i14" />, acao: () => copiar(caminho, `Caminho ${caminho} copiado`)},

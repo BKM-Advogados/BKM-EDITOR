@@ -147,3 +147,88 @@ export const decodificarAudio = async (arquivo: string, o: Parar & {binarios?: s
   const entrada = lerEntrada(erro);
   return {...wav, pacote: entrada ? (amostrasPorPacote(entrada) * wav.taxa) / entrada.taxa : undefined};
 };
+
+/** Decodifica um áudio (ou o som de um vídeo) em pedaços, sem juntar o arquivo inteiro: `aoPedaco` recebe um vetor por canal, na
+ *  taxa e nos canais que o arquivo tem (som-D8: uma live de uma hora não cabe decodificada na memória). O ffmpeg escreve um WAV
+ *  de 24 bits no pipe; o cabeçalho é lido à medida que chega e o resto são amostras. Devolve a taxa, os canais e o total. */
+export const decodificarEmPedacos = (arquivo: string, aoPedaco: (canais: Float32Array[], taxa: number) => void, o: Parar & {binarios?: string | null} = {}) =>
+  new Promise<{taxa: number; canais: number; amostras: number}>((ok, falha) => {
+    const pasta = pastaDoFfmpeg(o.binarios);
+    const env = {...process.env, LD_LIBRARY_PATH: pasta, DYLD_LIBRARY_PATH: pasta};
+    const filho = spawn(path.join(pasta, executavel()), ['-hide_banner', '-nostdin', '-i', arquivo, '-vn', '-map', '0:a:0', '-c:a', 'pcm_s24le', '-f', 'wav', 'pipe:1'],
+      {cwd: pasta, env, windowsHide: true});
+    let pendente: Buffer = Buffer.alloc(0);
+    let formato: {nc: number; taxa: number} | null = null;
+    let amostras = 0;
+    let parado = false;
+    let falhou: Error | null = null;
+    const erro: string[] = [];
+    const parar = () => {
+      parado = true;
+      filho.kill();
+    };
+    o.cancelSignal?.(parar);
+    const relogio = o.cancelado ? setInterval(() => o.cancelado!() && parar(), 100) : null;
+    const lerCabecalho = (): boolean => {
+      // RIFF/WAVE e os blocos até o "data"; o tamanho do data pode vir como 0xFFFFFFFF (pipe), e só o que vem depois importa
+      if (pendente.length < 12) return false;
+      let p = 12;
+      let fmt: {nc: number; taxa: number; bits: number} | null = null;
+      for (;;) {
+        if (pendente.length < p + 8) return false;
+        const id = pendente.toString('latin1', p, p + 4);
+        const tam = pendente.readUInt32LE(p + 4);
+        if (id === 'data') {
+          if (!fmt) throw new Error('WAV sem bloco "fmt "');
+          if (fmt.bits !== 24) throw new Error(`o ffmpeg devolveu ${fmt.bits} bits em vez de 24`);
+          formato = {nc: fmt.nc, taxa: fmt.taxa};
+          pendente = pendente.subarray(p + 8);
+          return true;
+        }
+        if (pendente.length < p + 8 + tam) return false;
+        if (id === 'fmt ') fmt = {nc: pendente.readUInt16LE(p + 10), taxa: pendente.readUInt32LE(p + 12), bits: pendente.readUInt16LE(p + 22)};
+        p += 8 + tam + (tam % 2);
+      }
+    };
+    const processar = () => {
+      if (!formato) return;
+      const quadro = formato.nc * 3;
+      const quadros = Math.floor(pendente.length / quadro);
+      if (!quadros) return;
+      const canais = Array.from({length: formato.nc}, () => new Float32Array(quadros));
+      for (let i = 0; i < quadros; i++) {
+        for (let c = 0; c < formato.nc; c++) {
+          const b = i * quadro + c * 3;
+          canais[c][i] = (((pendente[b] | (pendente[b + 1] << 8) | (pendente[b + 2] << 16)) << 8) >> 8) / 8388608;
+        }
+      }
+      pendente = pendente.subarray(quadros * quadro);
+      amostras += quadros;
+      aoPedaco(canais, formato.taxa);
+    };
+    filho.stdout.on('data', (d: Buffer) => {
+      if (falhou || parado) return;
+      try {
+        pendente = pendente.length ? Buffer.concat([pendente, d]) : d;
+        if (!formato && !lerCabecalho()) return;
+        processar();
+      } catch (e) {
+        falhou = e as Error;
+        parar();
+      }
+    });
+    filho.stderr.on('data', (d: Buffer) => erro.push(d.toString('utf-8')));
+    filho.on('error', (e) => {
+      if (relogio) clearInterval(relogio);
+      falha(e);
+    });
+    filho.on('close', (codigo) => {
+      if (relogio) clearInterval(relogio);
+      if (falhou) return falha(falhou);
+      if (parado) return falha(new Error('cancelado'));
+      if (codigo !== 0) return falha(new Error(`o ffmpeg falhou (${codigo}): ${erro.join('').trim().split('\n').slice(-3).join(' | ')}`));
+      const f = formato as {nc: number; taxa: number} | null;
+      if (!f) return falha(new Error('o ffmpeg não devolveu áudio'));
+      ok({taxa: f.taxa, canais: f.nc, amostras});
+    });
+  });
