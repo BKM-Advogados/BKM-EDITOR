@@ -84,7 +84,7 @@ const Detalhe: React.FC<{e: EntradaMidia; raiz: string; aoFechar: () => void}> =
         <button className={`bt mini${estado === 'descartada' ? ' ligado' : ''}`} aria-pressed={estado === 'descartada'} onClick={() => marcar(estado === 'descartada' ? null : 'descartada')} title="Tomada descartada (X)"><X size={13} />Descartar</button>
         <span className="esp" />
         {itens.length ? (
-          <BotaoMenu titulo="Leva o arquivo para o vídeo ou a imagem aberta" icone={<Plus size={13} />} rotulo="Usar em…" itens={itens} className="bt mini" lado="esquerda" />
+          <BotaoMenu titulo="Leva o arquivo para o vídeo ou a imagem aberta" icone={<Plus size={13} />} rotulo="Usar em…" itens={itens} className="bt mini" lado="direita" />
         ) : (
           <button className="bt mini" disabled title={porque}><Plus size={13} />Usar em…</button>
         )}
