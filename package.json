@@ -18,7 +18,16 @@
     "studio": "remotion studio src/composicoes/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "e2e": "tsx scripts/e2e.mjs"
+    "e2e": "tsx scripts/e2e.mjs",
+    "nativos:win": "node scripts/nativos-alvo.mjs win32 x64",
+    "nativos:mac": "node scripts/nativos-alvo.mjs darwin arm64 && node scripts/nativos-alvo.mjs darwin x64",
+    "pacote:win": "npm run mcp:build && electron-forge package --platform win32 --arch x64",
+    "pacote:mac": "npm run pacote:mac-arm64 && npm run pacote:mac-x64",
+    "pacote:mac-arm64": "npm run mcp:build && electron-forge package --platform darwin --arch arm64 && electron-forge make --skip-package --platform darwin --arch arm64 --targets @electron-forge/maker-zip",
+    "pacote:mac-x64": "npm run mcp:build && electron-forge package --platform darwin --arch x64 && electron-forge make --skip-package --platform darwin --arch x64 --targets @electron-forge/maker-zip",
+    "portatil:win": "electron-forge make --skip-package --platform win32 --arch x64 --targets @electron-forge/maker-zip",
+    "instalador:win": "npm run pacote:win && electron-builder --prepackaged out/pacote/Estudio-win32-x64 --win nsis --x64 --publish never && node scripts/copiar-instalador.mjs",
+    "instalador:mac": "node scripts/instalador-mac.mjs"
   },
   "dependencies": {
     "@fontsource-variable/inter": "5.3.0",
