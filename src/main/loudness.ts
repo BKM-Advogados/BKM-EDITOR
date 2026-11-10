@@ -97,7 +97,7 @@ export const corrigirArquivo = async (arquivo: string, o: Parar & {binarios?: st
   }
 };
 
-/** A chamada do exportar.ts depois do render. O vídeo de cenas com som sai no alvo do documento; o carrossel narrado da Cliente
+/** A chamada do exportar.ts depois do render. O vídeo de cenas com som sai no alvo do documento; o carrossel narrado
  *  (composição CarrosselTema, narração em `props.audio`) sai no alvo padrão da casa, −14 LUFS e −1 dBTP (som-D5: antes saía como a
  *  narração foi gravada, a −26 LUFS, por exemplo). O ganho é um só para o arquivo inteiro, então a narração e os efeitos
  *  mantêm a diferença entre eles; os efeitos do carrossel têm volume fixo, pensado para uma narração perto de −20 LUFS. */

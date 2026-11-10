@@ -382,7 +382,7 @@ export const Inicio: React.FC = () => {
             <section className="sem-recentes">
               <div className="sr-titulo">Nenhum projeto ainda</div>
               <div className="sr-texto">Escolha um formato e um modelo ao lado, ou veja um vídeo pronto para entender como o Estúdio funciona.</div>
-              <button className="bt" onClick={() => void verExemplo()}><BookOpen size={14} />Ver um pronto (carrossel da Cliente)</button>
+              <button className="bt" onClick={() => void verExemplo()}><BookOpen size={14} />Ver um pronto (carrossel narrado)</button>
             </section>
           ) : (
             <>

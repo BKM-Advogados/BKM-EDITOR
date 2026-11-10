@@ -6,11 +6,15 @@
 // Âncora "palavra@ms": a primeira palavra que começa com `palavra` a partir de `ms` do vídeo-fonte (sem diferença de
 // acento, caixa ou pontuação), com deslocamento opcional ("multa@16000+120") e "$" para ancorar no fim da palavra.
 
+import {temaDoCarrossel} from './tema';
+
 export const ABERTURA_MS = 1600; // vinheta do logo antes da narração
 export const FINAL_MS = 3500; // cartão final parado depois da narração
 export const PAUSA_GANCHO = 1200; // transição depois do gancho
 export const PAUSA_PARTE = 500;
-export const CREDITO_FOTO = 'Foto: Paulo JC Nogueira · CC BY-SA 3.0 · Wikimedia Commons';
+export const MARCA_VAZIA = {nome: '', site: '', insta: ''};
+export const FINAL_PADRAO = {titulo: 'SALVE E COMPARTILHE COM QUEM PRECISA', aviso: 'Conteúdo informativo. Não substitui a análise de cada caso.'};
+export const DUVIDA_PADRAO = {pergunta: 'Ficou com alguma dúvida?', resposta: 'Procure um advogado trabalhista.'};
 
 const ANCORA = /^(?<w>[^@]+?)(?<fim>\$)?@(?<ms>\d+)(?<d>[+-]\d+)?$/;
 const PONTUACAO = '.,;:!?"\'“”()…';
@@ -28,18 +32,41 @@ export type CenaRoteiro = {
   blocos?: BlocoRoteiro[];
   [k: string]: unknown;
 };
+export type FotoRoteiro = {src: string; credito?: string};
 export type Roteiro = {
-  tema: string;
+  tema?: string; // nome do tema do carrossel (roteiro/tema.ts); o "c2" dos roteiros antigos vale o neutro
   fonte: string; // vídeo-fonte da narração (caminho no projeto)
   palavras: string; // transcrição com tempo por palavra (caminho no projeto)
   rotulo_partes: string;
   cenas: CenaRoteiro[];
   pausas?: {depois_de: string; ms: number}[];
   decisao?: {titulo: string; linha: string};
+  marca?: {nome?: string; site?: string; insta?: string}; // quem assina: rodapé, vinheta sem logo e cartão final
+  logo?: string; // arquivo em midia/ (sem "midia/")
+  foto?: FotoRoteiro; // a foto dos blocos foto sem src, arquivo em midia/
+  final?: {titulo?: string; aviso?: string};
   [k: string]: unknown;
 };
 
+/** O que o roteiro não diz e o projeto pode suprir: o logo e a foto padrão que estão em midia/ (ver sessao-projeto.ts). */
+export type PadroesRoteiro = {logo?: string; foto?: FotoRoteiro};
+
 export class ErroRoteiro extends Error {}
+
+const IMAGEM = /\.(png|jpe?g|webp|svg)$/i;
+/** O logo e a foto padrão pelos arquivos da raiz de midia/: o logo é o primeiro "logo*" (o kit de marca copia como
+ *  logo-<kit>.png); a foto, a primeira outra imagem. Sem crédito: quem quiser crédito põe `foto` no roteiro. */
+export const padroesDaMidia = (arquivos: string[]): PadroesRoteiro => {
+  const imagens = arquivos.filter((a) => IMAGEM.test(a) && !a.startsWith('.')).sort((x, y) => x.localeCompare(y));
+  const logo = imagens.find((a) => /^logo/i.test(a));
+  const foto = imagens.find((a) => !/^logo/i.test(a) && !a.endsWith('.svg'));
+  return {...(logo ? {logo} : {}), ...(foto ? {foto: {src: foto}} : {})};
+};
+
+const texto = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+/** Só os campos de texto preenchidos de um objeto do roteiro (marca, final): o resto fica no padrão. */
+const textos = (o: unknown): Record<string, string> =>
+  Object.fromEntries(Object.entries(o && typeof o === 'object' ? o : {}).filter(([, v]) => texto(v)).map(([k, v]) => [k, (v as string).trim()]));
 
 // round() do Python arredonda .5 para o par; o preparar_carrossel.py depende disso nos cortes.
 export const arredondar = (x: number): number => {
@@ -157,8 +184,8 @@ export type Resolvido = {
   avisos: string[];
 };
 
-/** Resolve o roteiro. `fonte` e `midia` dizem onde a composição acha o vídeo-fonte e os arquivos (logo, efeitos, foto). */
-export const resolverRoteiro = (r: Roteiro, palavras: Palavra[]): Resolvido => {
+/** Resolve o roteiro. `padroes` traz o logo e a foto que o projeto tem, para o roteiro que não os cita. */
+export const resolverRoteiro = (r: Roteiro, palavras: Palavra[], padroes: PadroesRoteiro = {}): Resolvido => {
   const avisos: string[] = [];
   const n = new Narracao(palavras);
   const cenasR = r.cenas;
@@ -261,7 +288,7 @@ export const resolverRoteiro = (r: Roteiro, palavras: Palavra[]): Resolvido => {
         sons.push(S('papel_desliza_0.wav', b.em, 0.35));
         if (b.carimbo) sons.push(S('carimbo_0.wav', b.carimbo.em + 120, 0.5));
       } else if (tp === 'foto') {
-        if (!b.src) usaFoto = true; // foto própria do bloco (src e credito) dispensa a de Cidade Exemplo (video-D7)
+        if (!b.src) usaFoto = true; // foto própria do bloco (src e credito) dispensa a padrão (video-D7)
         sons.push(S('papel_desliza_0.wav', b.em + 60, 0.5));
       }
     }
@@ -277,13 +304,16 @@ export const resolverRoteiro = (r: Roteiro, palavras: Palavra[]): Resolvido => {
     cenas,
     total_partes: parte,
     rotulo_partes: r.rotulo_partes,
-    marca: {nome: 'Escritório Exemplo', site: 'escritorioexemplo.com.br', insta: '@escritorioexemplo'},
+    tema_carrossel: temaDoCarrossel(r.tema).id,
+    marca: {...MARCA_VAZIA, ...textos(r.marca)},
     decisao: r.decisao ?? {titulo: 'Decisão de 1º grau · cabe recurso', linha: ''},
-    final: {titulo: 'SALVE E MANDE PARA O SEU COLEGA DE TURNO', aviso: 'Conteúdo informativo. Não substitui a análise de cada caso.'},
-    duvida: {pergunta: 'Ficou com alguma dúvida?', resposta: 'Procure um advogado trabalhista.'},
+    final: {...FINAL_PADRAO, ...textos(r.final)},
+    duvida: DUVIDA_PADRAO,
     sons,
-    logo: 'logo-exemplo.png',
   };
-  if (usaFoto) props.foto = {src: 'Cidade Exemplo.jpg', credito: CREDITO_FOTO};
+  const logo = texto(r.logo) ?? padroes.logo;
+  if (logo) props.logo = logo;
+  const foto = r.foto && texto(r.foto.src) ? r.foto : padroes.foto;
+  if (usaFoto && foto) props.foto = {src: foto.src, credito: foto.credito ?? ''};
   return {props, trechos, avisos};
 };

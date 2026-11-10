@@ -331,7 +331,7 @@ const avisoDoTexto = (texto: string): string | undefined => {
 };
 
 // Campos que aparecem na tela, em qualquer documento (roteiro do carrossel, imagem): o checar_texto olha só eles. No
-// roteiro da Cliente as linhas do gancho ficam em cenas[].linhas[].t e as etiquetas em cenas[].tag e rotulo_partes.
+// roteiro do carrossel narrado as linhas do gancho ficam em cenas[].linhas[].t e as etiquetas em cenas[].tag e rotulo_partes.
 const CAMPOS_DE_TEXTO = new Set(['texto', 'itens', 'rotulo', 'titulo', 'legenda', 'fala', 'falas', 'linhas', 'prefixo', 'sufixo', 't', 'tag', 'rotulo_partes']);
 const textosDoJson = (x: unknown, onde = '', campo = ''): {onde: string; texto: string}[] => {
   if (typeof x === 'string') return CAMPOS_DE_TEXTO.has(campo) && x.trim() ? [{onde, texto: x}] : [];
@@ -340,7 +340,7 @@ const textosDoJson = (x: unknown, onde = '', campo = ''): {onde: string; texto: 
   return [];
 };
 
-/** A narração do roteiro da Cliente: o documento aponta para a transcrição palavra por palavra ("palavras":
+/** A narração do roteiro do carrossel narrado: o documento aponta para a transcrição palavra por palavra ("palavras":
  *  "video/palavras.json", com {w} por palavra). Sem o arquivo, não há narração para olhar. */
 const narracaoDe = (projeto: Projeto, doc: unknown): string | undefined => {
   const rel = (doc as {palavras?: unknown} | null)?.palavras;
@@ -528,7 +528,7 @@ const registrarPesquisa = (servidor: McpServer, projeto: Projeto, autor: string,
   }));
 
   servidor.registerTool('checar_texto', {
-    description: 'Avisos das regras da Cliente sobre o texto do vídeo: termos que o Provimento 205/2021 da OAB veda ou pede cuidado, nomes de empresa e de pessoa, e números que não estão em nenhum fato da pesquisa. Passe "texto" ou um "documento" (todos os textos dele, inclusive a narração do roteiro da Cliente e as legendas do vídeo de cenas); no vídeo de cenas vem também a lista dos blocos com número e sem refs, e no documento, se o último texto (ou a narração) termina com a frase de fecho das regras. Só informa: nada é bloqueado.',
+    description: 'Avisos das regras da Cliente sobre o texto do vídeo: termos que o Provimento 205/2021 da OAB veda ou pede cuidado, nomes de empresa e de pessoa, e números que não estão em nenhum fato da pesquisa. Passe "texto" ou um "documento" (todos os textos dele, inclusive a narração do roteiro do carrossel narrado e as legendas do vídeo de cenas); no vídeo de cenas vem também a lista dos blocos com número e sem refs, e no documento, se o último texto (ou a narração) termina com a frase de fecho das regras. Só informa: nada é bloqueado.',
     inputSchema: {documento: z.string().optional().describe('id do documento no manifesto'), texto: z.string().optional()},
   }, seguro(({documento, texto: t}: {documento?: string; texto?: string}) => {
     if (!documento && t === undefined) throw new ErroProjeto('passe "texto" ou "documento"', 'patch');
@@ -589,7 +589,7 @@ const docCenasDe = (projeto: Projeto, documento?: string) => {
   if (!alvo) throw new ErroProjeto('o projeto não tem vídeo de cenas', 'nao_achado');
   const rel = projeto.arquivoDoDocumento(alvo);
   const lido = projeto.lerJson<unknown>(rel);
-  if (!ehDocCenas(lido.doc)) throw new ErroProjeto(`${alvo} não é um vídeo de cenas: para o carrossel da Cliente, transcreva o "arquivo" da narração`, 'patch');
+  if (!ehDocCenas(lido.doc)) throw new ErroProjeto(`${alvo} não é um vídeo de cenas: para o carrossel narrado, transcreva o "arquivo" da narração`, 'patch');
   return {alvo, rel, doc: lido.doc, versao: lido.versao};
 };
 
@@ -604,7 +604,7 @@ const seguroComSinal = <A,>(f: (a: A, sinal?: AbortSignal) => unknown) => async 
 
 const registrarFala = (servidor: McpServer, projeto: Projeto, autor: string, origem: string, transcritor: TranscritorMcp | undefined) => {
   servidor.registerTool('transcrever', {
-    description: 'Transcreve a fala no próprio PC (whisper.cpp, nada sai da máquina) e grava <arquivo>.palavras.json com o tempo de cada palavra ({w, s, e, p} em ms do arquivo), o formato que o carrossel da Cliente e as legendas leem. Dois usos: (1) "arquivo" (qualquer áudio ou vídeo do projeto, como a narração de um roteiro ou uma gravação para a pesquisa): devolve o texto; com "destino", grava em outro caminho (ex.: video/palavras.json do roteiro). (2) Vídeo de cenas: "clipe" ou "faixa" (ids de audio.faixas), ou nada para todas as faixas de voz; transcreve a fala que ainda não tem transcrição ou cuja tomada mudou depois dela (a do clipe de voz limpa é a do original) e, com legendas (padrão), gera as legendas dos clipes que ainda não têm (segmentos por pausa, pontuação e largura, com o falante pelo nome do clipe ou da faixa). Clipe que já tem legendas fica como está: para refazer, pergunte à pessoa e use refazer_legendas. Na primeira vez baixa o modelo (small, 190 MB) e, no Windows x64, o whisper.cpp (9 MB) para ~/Estudio/modelos/whisper; no Linux o whisper-cli precisa estar compilado (na pasta bin/ dela ou no PATH), e o erro diz como. Leva perto de metade da duração do áudio.',
+    description: 'Transcreve a fala no próprio PC (whisper.cpp, nada sai da máquina) e grava <arquivo>.palavras.json com o tempo de cada palavra ({w, s, e, p} em ms do arquivo), o formato que o carrossel narrado e as legendas leem. Dois usos: (1) "arquivo" (qualquer áudio ou vídeo do projeto, como a narração de um roteiro ou uma gravação para a pesquisa): devolve o texto; com "destino", grava em outro caminho (ex.: video/palavras.json do roteiro). (2) Vídeo de cenas: "clipe" ou "faixa" (ids de audio.faixas), ou nada para todas as faixas de voz; transcreve a fala que ainda não tem transcrição ou cuja tomada mudou depois dela (a do clipe de voz limpa é a do original) e, com legendas (padrão), gera as legendas dos clipes que ainda não têm (segmentos por pausa, pontuação e largura, com o falante pelo nome do clipe ou da faixa). Clipe que já tem legendas fica como está: para refazer, pergunte à pessoa e use refazer_legendas. Na primeira vez baixa o modelo (small, 190 MB) e, no Windows x64, o whisper.cpp (9 MB) para ~/Estudio/modelos/whisper; no Linux o whisper-cli precisa estar compilado (na pasta bin/ dela ou no PATH), e o erro diz como. Leva perto de metade da duração do áudio.',
     inputSchema: {
       arquivo: z.string().optional().describe('caminho no projeto, ex.: midia/narracao.wav ou midia/video-exemplo.mp4'),
       destino: z.string().optional().describe('só com "arquivo": onde gravar a lista de palavras, um .json próprio como video/palavras.json (padrão: <arquivo>.palavras.json). Nunca o manifesto, um documento, comentarios.json, a pesquisa ou .estudio/'),

@@ -332,7 +332,7 @@ export const anotacoesDoTextoAntigo = (textoAntigo: string): string => {
 
 /** O CLAUDE.md novo a partir do atual, ou null se nada muda. Sem arquivo: o texto gerado. Com as marcas: troca só o que
  *  está entre elas. Texto antigo do app, sem marcas: troca pelo gerado e guarda depois dele o que a pessoa escreveu antes
- *  ou depois. Outro texto (o CLAUDE.md escrito à mão do carrossel da Cliente, ou um da pessoa): não mexe. */
+ *  ou depois. Outro texto (o CLAUDE.md escrito à mão do carrossel narrado, ou um da pessoa): não mexe. */
 export const claudeMdAtualizado = (atual: string | null, modulos: Modulo[]): string | null => {
   const gerado = claudeMd(modulos);
   if (atual === null) return gerado;

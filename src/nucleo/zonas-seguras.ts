@@ -75,7 +75,7 @@ export const zonaSugerida = (largura: number, altura: number): IdZonaSegura => {
   return altura / largura > 1.3 ? 'vertical' : 'feed';
 };
 
-/** Onde acaba (y, em px de 1080×1920) a legenda palavra a palavra do carrossel da Cliente: 16 px acima da faixa que a rede cobre
+/** Onde acaba (y, em px de 1080×1920) a legenda palavra a palavra do carrossel narrado: 16 px acima da faixa que a rede cobre
  *  embaixo (484 px, a do 9:16). A legenda gruda nessa linha e cresce para cima; antes começava em 1480, dentro da faixa
  *  (que começa em 1436) (video-D17). */
 export const baseDaLegendaCarrossel = (respiro = 16): number => {

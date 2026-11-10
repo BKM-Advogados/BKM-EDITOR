@@ -2,12 +2,12 @@
 // e monta as props do vídeo para a prévia. A pesquisa (pesquisa/pesquisa.json e os textos em pesquisa/fontes/) passa
 // pelo mesmo aviso: a interface relê a pesquisa quando o arquivo mudado começa com "pesquisa/".
 import {execFile} from 'node:child_process';
-import {existsSync} from 'node:fs';
+import {existsSync, readdirSync} from 'node:fs';
 import path from 'node:path';
 import {promisify} from 'node:util';
 import chokidar, {type FSWatcher} from 'chokidar';
 import {PASTA_INTERNA, Projeto} from '../nucleo/projeto';
-import {ErroRoteiro, resolverRoteiro, type Palavra, type Roteiro} from '../nucleo/roteiro/resolver';
+import {ErroRoteiro, padroesDaMidia, resolverRoteiro, type Palavra, type Roteiro} from '../nucleo/roteiro/resolver';
 import {ehDocCenas, resolverCenas} from '../nucleo/cenas';
 import {ehDocAnimacao, resolverAnimacao} from '../nucleo/animacao';
 import {FORMATO_PADRAO} from '../nucleo/formatos';
@@ -119,6 +119,15 @@ export class SessaoProjeto {
     }
   }
 
+  /** Os arquivos da raiz de midia/ (o logo e a foto padrão do carrossel narrado saem daí). */
+  private arquivosDaMidia(): string[] {
+    try {
+      return readdirSync(path.join(this.projeto.raiz, 'midia'), {withFileTypes: true}).filter((d) => d.isFile()).map((d) => d.name);
+    } catch {
+      return [];
+    }
+  }
+
   /** Props da composição do vídeo (VideoCenas ou CarrosselTema) para a prévia e a exportação, com a mídia em `base`. */
   propsVideo(documento: string, base: string): PropsVideo {
     try {
@@ -133,13 +142,13 @@ export class SessaoProjeto {
         const {props, avisos} = resolverCenas(doc, {envelopes: lerEnvelopes(this.projeto, doc)});
         return {props: {...props, base_midia: base}, avisos};
       }
-      // o carrossel da Cliente: 1080×1920 a 30 qps até a animação dele aceitar outro formato
+      // o carrossel narrado: 1080×1920 a 30 qps até a animação dele aceitar outro formato
       const r = doc as Roteiro & DocVideo;
       if (typeof r.palavras !== 'string') return {erro: 'este vídeo não tem "tipo" nem narração (palavras); não sei montá-lo'};
       const lido = this.projeto.lerJson<unknown>(r.palavras).doc;
       const palavras = (Array.isArray(lido) ? lido : (lido as {palavras?: unknown} | null)?.palavras) as Palavra[]; // frente Fala: a transcrição na versão 2 traz a lista em `palavras`
       if (!Array.isArray(palavras) || !palavras.length) return {erro: `a transcrição da narração (${r.palavras}) está vazia`};
-      const {props, trechos, avisos} = resolverRoteiro(r, palavras);
+      const {props, trechos, avisos} = resolverRoteiro(r, palavras, padroesDaMidia(this.arquivosDaMidia()));
       return {
         props: {...props, ...FORMATO_PADRAO, base_midia: `${base}/midia`, narracao: {src: `${base}/${r.fonte}`, trechos}, efeitos: r.efeitos ?? []},
         avisos,

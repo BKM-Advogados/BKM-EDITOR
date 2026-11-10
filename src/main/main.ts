@@ -385,7 +385,7 @@ lidar(CANAL.conversaEnviar, (id: number, texto: string) => conversas.enviar(id, 
 lidar(CANAL.conversaHibernar, (id: number) => conversas.hibernar(id));
 // ---------- exportação: um ou mais arquivos em saidas/, com andamento na interface e na barra de tarefas, e Cancelar ----------
 // Sem opções (chamada antiga), sai o MP4 H.264 no formato do documento. Com elas, um arquivo por destino: o vídeo de cenas
-// é relativo ao quadro, então basta trocar largura e altura nas props; o carrossel da Cliente é fixo em 1080×1920 e só
+// é relativo ao quadro, então basta trocar largura e altura nas props; o carrossel narrado é fixo em 1080×1920 e só
 // aceita escala. O diálogo mostra os arquivos e "Mostrar na pasta" ao fim, então a pasta não abre sozinha.
 let cancelarExportacao: (() => void) | null = null;
 lidar(CANAL.exportar, async (documento: string, opcoes?: OpcoesExportarVideo): Promise<ResultadoExportacao> => {

@@ -3,7 +3,7 @@
 // o Remotion: `argumentosDoRender` só traduz as opções para o que o renderMedia recebe. No fim, a marca d'água por
 // destino: o que o diálogo guarda (ConfigMarcaDagua) e o que a composição desenha (MarcaDaguaP, já posicionada).
 import {FORMATOS_VIDEO, proporcaoDe, type Formato} from './formatos';
-import {MARCA_CLIENTE} from './marca';
+import {TEMA_CARROSSEL_NEUTRO} from './roteiro/tema';
 import {PLACAS, type CorDaPlaca} from './contraste';
 import {areaDaLegenda, type LegendasP} from './legendas';
 import {CANTO_PADRAO, posicaoSegura, zonasDaMarca, zonaSugerida, type CantoMarca, type Ret} from './zonas-seguras';
@@ -197,7 +197,7 @@ export const estimarExportacao = (o: OpcoesExportarVideo, formato: Formato, dura
 
 // ---------- marca d'água por destino ----------
 // O logo ou a assinatura do kit de marca (tema.logo e tema.assinatura no vídeo de cenas; logo e marca.insta no carrossel
-// da Cliente), por cima da composição, só na exportação. Cada destino tem a sua escolha, lembrada por projeto em
+// narrado), por cima da composição, só na exportação. Cada destino tem a sua escolha, lembrada por projeto em
 // .estudio/exportacao.json; o canto padrão e a posição fina saem das zonas seguras da rede (posicaoSegura).
 export type ConteudoMarca = 'logo' | 'assinatura';
 /** `tamanho`: altura da marca, fração do lado menor do quadro; `opacidade` de 0,2 a 1. */
@@ -226,11 +226,11 @@ const limitar = (v: unknown, faixa: {min: number; max: number; padrao: number}) 
   typeof v === 'number' && Number.isFinite(v) ? Math.min(faixa.max, Math.max(faixa.min, v)) : faixa.padrao;
 const textoDe = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
 
-/** Logo, assinatura e fonte que as props do vídeo oferecem; o carrossel da Cliente escreve na IBM Plex Sans do manual. */
+/** Logo, assinatura e fonte que as props do vídeo oferecem; o carrossel narrado escreve na fonte de texto do tema dele. */
 export const fontesDaMarcaDagua = (props: Record<string, unknown> | null | undefined): FontesMarcaDagua => {
   const tema = (props?.tema ?? {}) as Record<string, unknown>;
   const marca = (props?.marca ?? {}) as Record<string, unknown>;
-  const fonte = textoDe(tema.fonte) ?? (props && props.composicao !== 'VideoCenas' ? MARCA_CLIENTE.fontes.texto : undefined);
+  const fonte = textoDe(tema.fonte) ?? (props && props.composicao !== 'VideoCenas' ? TEMA_CARROSSEL_NEUTRO.fontes.texto : undefined);
   return {logo: textoDe(tema.logo) ?? textoDe(props?.logo), assinatura: textoDe(tema.assinatura) ?? textoDe(marca.insta) ?? textoDe(marca.site), ...(fonte ? {fonte} : {})};
 };
 

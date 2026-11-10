@@ -34,7 +34,7 @@ export const avaliarContraste = (medidas: MedidaContraste[], minimo = CONTRASTE_
   return {contraste: pior.contraste, ok: pior.contraste >= minimo, quadro_ms: pior.quadro_ms, fundo: pior.fundo, marca: pior.marca, medidas};
 };
 
-export const PLACAS = {escura: '#171A19', clara: '#F4F0EA'} as const; // o grafite e o osso do manual da Cliente
+export const PLACAS = {escura: '#171A19', clara: '#F4F0EA'} as const; // um grafite quase preto e um branco quente
 export type CorDaPlaca = keyof typeof PLACAS;
 
 const hexParaRgb = (h: string): RGB => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];

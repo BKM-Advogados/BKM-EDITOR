@@ -11,7 +11,7 @@ import {numeroBr} from '../../componentes/Campos';
 import {BotaoMenu} from '../../componentes/Menu';
 import {formatarCurto, irPara} from './tocador';
 import {resumoBloco, tipoDe} from './tipos';
-import {adicionarBloco, adicionarCena, dividirNaCabeca, duplicarSelecao, excluirSelecao, movimentoEmTodas, TIPOS_CLIENTE} from './acoes';
+import {adicionarBloco, adicionarCena, dividirNaCabeca, duplicarSelecao, excluirSelecao, movimentoEmTodas, TIPOS_ROTEIRO} from './acoes';
 
 type Cena = {tipo?: string; nome?: string; tag?: string; titulo?: string; linhas?: {t: string}[]; blocos?: {tipo: string; texto?: string; id?: string}[]};
 type CenaP = {origem?: string; tipo: string; n?: number; t_in: number; t_out: number; blocos?: {origem?: string; em: number}[]};
@@ -31,7 +31,7 @@ export const CenasVideo: React.FC = () => {
   const deCenas = ehDocCenas(doc);
   const tiposBloco = deCenas
     ? (Object.keys(TIPOS_BLOCO_CENAS) as TipoBlocoCenas[]).map((t) => ({tipo: t, nome: TIPOS_BLOCO_CENAS[t].nome}))
-    : TIPOS_CLIENTE.map(({tipo, nome}) => ({tipo, nome}));
+    : TIPOS_ROTEIRO.map(({tipo, nome}) => ({tipo, nome}));
   const temSelecao = selecao?.documento === documento && /^\/cenas\/\d+/.test(selecao.caminho);
   const imagens = deCenas ? doc.cenas.flatMap((c) => c.blocos ?? []).filter((b) => b.tipo === 'imagem') : [];
 

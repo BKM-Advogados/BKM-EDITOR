@@ -303,7 +303,7 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
   const props = montado && 'props' in montado ? montado.props : null;
   const formato: Formato = {largura: Number(props?.largura) || FORMATO_PADRAO.largura, altura: Number(props?.altura) || FORMATO_PADRAO.altura, fps: Number(props?.fps) || FORMATO_PADRAO.fps};
   const duracaoMs = Number(props?.duracao_ms) || 0;
-  const fixo = Boolean(props) && props!.composicao !== 'VideoCenas'; // o carrossel da Cliente só sai em 1080×1920
+  const fixo = Boolean(props) && props!.composicao !== 'VideoCenas'; // o carrossel narrado só sai em 1080×1920
   const comAudio = fixo || Boolean(props && ['audio', 'trilha', 'narracao', 'sons'].some((k) => (Array.isArray(props[k]) ? (props[k] as unknown[]).length > 0 : Boolean(props[k]))));
   const doDocumento = destinoDoFormato(formato);
 
@@ -421,7 +421,7 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
     }
   };
   const emEdicao = destinos.find((d) => d.id === editando) ?? destinos[0];
-  // o carrossel da Cliente só sai no tamanho dele; o vídeo de cenas, no do destino
+  // o carrossel narrado só sai no tamanho dele; o vídeo de cenas, no do destino
   const medidaDe = (d: Destino) => (fixo ? {largura: formato.largura, altura: formato.altura} : d);
   // a legenda de cada destino na área livre dele: a marca se afasta dela, e a miniatura a desenha ali
   const legendas = useMemo(() => legendasDasProps(props), [props]);
@@ -477,7 +477,7 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
             const desligado = fixo && (f.largura !== formato.largura || f.altura !== formato.altura);
             return (
               <label key={f.id} className={`${marcado(f.id) ? 'marcado' : ''}${desligado ? ' desligado' : ''}`}
-                title={desligado ? 'O carrossel narrado da Cliente é fixo em 1080×1920: só sai em 9:16' : `${f.destino}${f.id === doDocumento.id ? ' · o formato deste vídeo' : ''}`}>
+                title={desligado ? 'O carrossel narrado é fixo em 1080×1920: só sai em 9:16' : `${f.destino}${f.id === doDocumento.id ? ' · o formato deste vídeo' : ''}`}>
                 <input type="checkbox" checked={marcado(f.id)} disabled={desligado} onChange={() => alternar(d)} />
                 <span>{f.nome} <span className="medida">{f.proporcao}</span>
                   {temMarca && marcado(f.id) && configMarca(d).ligada && <span className="md-ico" title="Com marca d'água"><Stamp size={11} /></span>}</span>
@@ -486,7 +486,7 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
               </label>
             );
           })}
-          <label className={`${marcado('personalizado') ? 'marcado' : ''}${fixo ? ' desligado' : ''}`} title={fixo ? 'O carrossel narrado da Cliente é fixo em 1080×1920' : 'Outro tamanho, em pixels'}>
+          <label className={`${marcado('personalizado') ? 'marcado' : ''}${fixo ? ' desligado' : ''}`} title={fixo ? 'O carrossel narrado é fixo em 1080×1920' : 'Outro tamanho, em pixels'}>
             <input type="checkbox" checked={marcado('personalizado')} disabled={fixo} onChange={() => alternar({id: 'personalizado', ...personalizado})} />
             <span>Personalizado{doDocumento.id === 'personalizado' ? <span className="medida"> · o formato deste vídeo</span> : null}</span>
             <span className="pers" onClick={(e) => e.preventDefault()}>

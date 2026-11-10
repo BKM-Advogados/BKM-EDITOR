@@ -1,6 +1,6 @@
 // Criar, duplicar e excluir cena e bloco do vídeo pela interface, como JSON Patch (o mesmo caminho das outras edições:
 // diário, desfazer, o Claude vê). Cada patch confere o id do que vai mexer, para não pisar no que o agente mudou por
-// baixo. No vídeo de cenas vale tudo; no carrossel narrado da Cliente, cena nova precisa de uma palavra da narração, então só
+// baixo. No vídeo de cenas vale tudo; no carrossel narrado, cena nova precisa de uma palavra da narração, então só
 // partes podem sair e blocos podem entrar (o resolvedor põe o bloco 300 ms depois do começo da cena). A lâmina (Ctrl+K)
 // divide a cena na cabeça pelo núcleo (cenas-dividir.ts); "Movimento em todas as imagens" põe o Ken Burns de uma vez
 // (composicoes/cenas/movimento.ts).
@@ -14,7 +14,7 @@ import {irPara, msAtual} from './tocador';
 type Cena = {id?: string; tipo?: string; blocos?: {id?: string; tipo?: string}[]};
 type CenaP = {origem?: string; t_in: number; t_out: number};
 
-export const TIPOS_CLIENTE: {tipo: string; nome: string; modelo: Record<string, unknown>}[] = [
+export const TIPOS_ROTEIRO: {tipo: string; nome: string; modelo: Record<string, unknown>}[] = [
   {tipo: 'frase', nome: 'Frase', modelo: {texto: 'NOVA FRASE', y: 700}},
   {tipo: 'nota', nome: 'Nota', modelo: {texto: 'Texto da nota', y: 900}},
   {tipo: 'cartao', nome: 'Cartão', modelo: {texto: 'Texto do cartão com **destaque**', y: 800}},
@@ -79,13 +79,13 @@ export const adicionarBloco = async (documento: string, tipo: string) => {
     const ys = (cena.blocos ?? []).map((b) => (b as {y?: number}).y).filter((y): y is number => typeof y === 'number');
     if (ys.length) bloco.y = Math.min(0.78, Math.round((Math.max(...ys) + 0.16) * 100) / 100);
   } else {
-    const modelo = TIPOS_CLIENTE.find((t) => t.tipo === tipo);
+    const modelo = TIPOS_ROTEIRO.find((t) => t.tipo === tipo);
     if (!modelo) return;
     bloco = {id: idLivre(d, `${cena.id ?? `cena${i + 1}`}-${tipo}`), tipo, ...structuredClone(modelo.modelo)};
   }
   const patch: OperacaoPatch[] = [...testeId(`/cenas/${i}`, cena.id), cena.blocos ? {op: 'add', path: `/cenas/${i}/blocos/${j}`, value: bloco}
     : {op: 'add', path: `/cenas/${i}/blocos`, value: [bloco]}];
-  const nome = ehDocCenas(d) ? TIPOS_BLOCO_CENAS[tipo as TipoBlocoCenas]?.nome : TIPOS_CLIENTE.find((t) => t.tipo === tipo)?.nome;
+  const nome = ehDocCenas(d) ? TIPOS_BLOCO_CENAS[tipo as TipoBlocoCenas]?.nome : TIPOS_ROTEIRO.find((t) => t.tipo === tipo)?.nome;
   if (await aplicar(documento, patch, `novo bloco ${nome ?? tipo} na cena ${i + 1}`)) selecionar({documento, caminho: `/cenas/${i}/blocos/${j}`});
 };
 

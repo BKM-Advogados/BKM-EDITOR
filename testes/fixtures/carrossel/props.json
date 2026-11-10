@@ -1,0 +1,1745 @@
+{
+ "composicao": "CarrosselTema",
+ "duracao_ms": 88920,
+ "audio": "narracao.wav",
+ "legendas": [
+  {
+   "s": 1600,
+   "e": 3220,
+   "palavras": [
+    {
+     "w": "Perdeu",
+     "s": 1600,
+     "e": 2020
+    },
+    {
+     "w": "um",
+     "s": 2020,
+     "e": 2240
+    },
+    {
+     "w": "papel",
+     "s": 2240,
+     "e": 2560
+    },
+    {
+     "w": "importante",
+     "s": 2560,
+     "e": 3220
+    }
+   ]
+  },
+  {
+   "s": 3220,
+   "e": 4180,
+   "palavras": [
+    {
+     "w": "bem",
+     "s": 3220,
+     "e": 3520
+    },
+    {
+     "w": "na",
+     "s": 3520,
+     "e": 3680
+    },
+    {
+     "w": "hora",
+     "s": 3680,
+     "e": 4020
+    },
+    {
+     "w": "de",
+     "s": 4020,
+     "e": 4180
+    }
+   ]
+  },
+  {
+   "s": 4180,
+   "e": 4460,
+   "palavras": [
+    {
+     "w": "usar?",
+     "s": 4180,
+     "e": 4460
+    }
+   ]
+  },
+  {
+   "s": 4980,
+   "e": 6560,
+   "palavras": [
+    {
+     "w": "Antes",
+     "s": 4980,
+     "e": 5400
+    },
+    {
+     "w": "de",
+     "s": 5400,
+     "e": 5580
+    },
+    {
+     "w": "sair",
+     "s": 5580,
+     "e": 5940
+    },
+    {
+     "w": "procurando,",
+     "s": 5940,
+     "e": 6560
+    }
+   ]
+  },
+  {
+   "s": 6840,
+   "e": 8320,
+   "palavras": [
+    {
+     "w": "aprenda",
+     "s": 6840,
+     "e": 7360
+    },
+    {
+     "w": "a",
+     "s": 7360,
+     "e": 7500
+    },
+    {
+     "w": "organizar",
+     "s": 7500,
+     "e": 8080
+    },
+    {
+     "w": "os",
+     "s": 8080,
+     "e": 8320
+    }
+   ]
+  },
+  {
+   "s": 8320,
+   "e": 9300,
+   "palavras": [
+    {
+     "w": "seus",
+     "s": 8320,
+     "e": 8680
+    },
+    {
+     "w": "documentos.",
+     "s": 8680,
+     "e": 9300
+    }
+   ]
+  },
+  {
+   "s": 10260,
+   "e": 11700,
+   "palavras": [
+    {
+     "w": "Com",
+     "s": 10260,
+     "e": 10480
+    },
+    {
+     "w": "uma",
+     "s": 10480,
+     "e": 10780
+    },
+    {
+     "w": "pasta",
+     "s": 10780,
+     "e": 11200
+    },
+    {
+     "w": "simples",
+     "s": 11200,
+     "e": 11700
+    }
+   ]
+  },
+  {
+   "s": 11700,
+   "e": 12860,
+   "palavras": [
+    {
+     "w": "e",
+     "s": 11700,
+     "e": 11840
+    },
+    {
+     "w": "dez",
+     "s": 11840,
+     "e": 12140
+    },
+    {
+     "w": "minutos",
+     "s": 12140,
+     "e": 12620
+    },
+    {
+     "w": "por",
+     "s": 12620,
+     "e": 12860
+    }
+   ]
+  },
+  {
+   "s": 12860,
+   "e": 13100,
+   "palavras": [
+    {
+     "w": "mês,",
+     "s": 12860,
+     "e": 13100
+    }
+   ]
+  },
+  {
+   "s": 13420,
+   "e": 14680,
+   "palavras": [
+    {
+     "w": "quase",
+     "s": 13420,
+     "e": 13840
+    },
+    {
+     "w": "nada",
+     "s": 13840,
+     "e": 14160
+    },
+    {
+     "w": "se",
+     "s": 14160,
+     "e": 14360
+    },
+    {
+     "w": "perde",
+     "s": 14360,
+     "e": 14680
+    }
+   ]
+  },
+  {
+   "s": 14680,
+   "e": 15160,
+   "palavras": [
+    {
+     "w": "de",
+     "s": 14680,
+     "e": 14860
+    },
+    {
+     "w": "novo.",
+     "s": 14860,
+     "e": 15160
+    }
+   ]
+  },
+  {
+   "s": 16940,
+   "e": 17800,
+   "palavras": [
+    {
+     "w": "Primeira",
+     "s": 16940,
+     "e": 17440
+    },
+    {
+     "w": "dica,",
+     "s": 17440,
+     "e": 17800
+    }
+   ]
+  },
+  {
+   "s": 18120,
+   "e": 19600,
+   "palavras": [
+    {
+     "w": "separe",
+     "s": 18120,
+     "e": 18540
+    },
+    {
+     "w": "tudo",
+     "s": 18540,
+     "e": 18900
+    },
+    {
+     "w": "por",
+     "s": 18900,
+     "e": 19120
+    },
+    {
+     "w": "assunto.",
+     "s": 19120,
+     "e": 19600
+    }
+   ]
+  },
+  {
+   "s": 20120,
+   "e": 20620,
+   "palavras": [
+    {
+     "w": "Contrato,",
+     "s": 20120,
+     "e": 20620
+    }
+   ]
+  },
+  {
+   "s": 20960,
+   "e": 21560,
+   "palavras": [
+    {
+     "w": "holerites,",
+     "s": 20960,
+     "e": 21560
+    }
+   ]
+  },
+  {
+   "s": 21880,
+   "e": 23440,
+   "palavras": [
+    {
+     "w": "recibos",
+     "s": 21880,
+     "e": 22320
+    },
+    {
+     "w": "e",
+     "s": 22320,
+     "e": 22460
+    },
+    {
+     "w": "extratos",
+     "s": 22460,
+     "e": 23040
+    },
+    {
+     "w": "ficam",
+     "s": 23040,
+     "e": 23440
+    }
+   ]
+  },
+  {
+   "s": 23440,
+   "e": 24760,
+   "palavras": [
+    {
+     "w": "em",
+     "s": 23440,
+     "e": 23620
+    },
+    {
+     "w": "lugares",
+     "s": 23620,
+     "e": 24080
+    },
+    {
+     "w": "diferentes.",
+     "s": 24080,
+     "e": 24760
+    }
+   ]
+  },
+  {
+   "s": 25340,
+   "e": 26460,
+   "palavras": [
+    {
+     "w": "Use",
+     "s": 25340,
+     "e": 25560
+    },
+    {
+     "w": "quatro",
+     "s": 25560,
+     "e": 26000
+    },
+    {
+     "w": "pastas,",
+     "s": 26000,
+     "e": 26460
+    }
+   ]
+  },
+  {
+   "s": 26760,
+   "e": 28020,
+   "palavras": [
+    {
+     "w": "uma",
+     "s": 26760,
+     "e": 27040
+    },
+    {
+     "w": "para",
+     "s": 27040,
+     "e": 27380
+    },
+    {
+     "w": "cada",
+     "s": 27380,
+     "e": 27720
+    },
+    {
+     "w": "tipo",
+     "s": 27720,
+     "e": 28020
+    }
+   ]
+  },
+  {
+   "s": 28020,
+   "e": 28560,
+   "palavras": [
+    {
+     "w": "de",
+     "s": 28020,
+     "e": 28200
+    },
+    {
+     "w": "papel.",
+     "s": 28200,
+     "e": 28560
+    }
+   ]
+  },
+  {
+   "s": 29080,
+   "e": 30780,
+   "palavras": [
+    {
+     "w": "Coloque",
+     "s": 29080,
+     "e": 29580
+    },
+    {
+     "w": "uma",
+     "s": 29580,
+     "e": 29840
+    },
+    {
+     "w": "etiqueta",
+     "s": 29840,
+     "e": 30340
+    },
+    {
+     "w": "grande",
+     "s": 30340,
+     "e": 30780
+    }
+   ]
+  },
+  {
+   "s": 30780,
+   "e": 31980,
+   "palavras": [
+    {
+     "w": "na",
+     "s": 30780,
+     "e": 31020
+    },
+    {
+     "w": "frente",
+     "s": 31020,
+     "e": 31420
+    },
+    {
+     "w": "de",
+     "s": 31420,
+     "e": 31640
+    },
+    {
+     "w": "cada",
+     "s": 31640,
+     "e": 31980
+    }
+   ]
+  },
+  {
+   "s": 31980,
+   "e": 32360,
+   "palavras": [
+    {
+     "w": "pasta,",
+     "s": 31980,
+     "e": 32360
+    }
+   ]
+  },
+  {
+   "s": 32700,
+   "e": 34000,
+   "palavras": [
+    {
+     "w": "para",
+     "s": 32700,
+     "e": 33040
+    },
+    {
+     "w": "achar",
+     "s": 33040,
+     "e": 33400
+    },
+    {
+     "w": "sem",
+     "s": 33400,
+     "e": 33640
+    },
+    {
+     "w": "abrir",
+     "s": 33640,
+     "e": 34000
+    }
+   ]
+  },
+  {
+   "s": 34000,
+   "e": 34360,
+   "palavras": [
+    {
+     "w": "todas.",
+     "s": 34000,
+     "e": 34360
+    }
+   ]
+  },
+  {
+   "s": 35380,
+   "e": 36180,
+   "palavras": [
+    {
+     "w": "Segunda",
+     "s": 35380,
+     "e": 35820
+    },
+    {
+     "w": "dica,",
+     "s": 35820,
+     "e": 36180
+    }
+   ]
+  },
+  {
+   "s": 36500,
+   "e": 38020,
+   "palavras": [
+    {
+     "w": "guarde",
+     "s": 36500,
+     "e": 36960
+    },
+    {
+     "w": "pelo",
+     "s": 36960,
+     "e": 37240
+    },
+    {
+     "w": "tempo",
+     "s": 37240,
+     "e": 37660
+    },
+    {
+     "w": "certo.",
+     "s": 37660,
+     "e": 38020
+    }
+   ]
+  },
+  {
+   "s": 38580,
+   "e": 40040,
+   "palavras": [
+    {
+     "w": "Holerites",
+     "s": 38580,
+     "e": 39220
+    },
+    {
+     "w": "e",
+     "s": 39220,
+     "e": 39380
+    },
+    {
+     "w": "recibos",
+     "s": 39380,
+     "e": 39820
+    },
+    {
+     "w": "de",
+     "s": 39820,
+     "e": 40040
+    }
+   ]
+  },
+  {
+   "s": 40040,
+   "e": 41740,
+   "palavras": [
+    {
+     "w": "férias",
+     "s": 40040,
+     "e": 40480
+    },
+    {
+     "w": "devem",
+     "s": 40480,
+     "e": 40820
+    },
+    {
+     "w": "ficar",
+     "s": 40820,
+     "e": 41140
+    },
+    {
+     "w": "guardados",
+     "s": 41140,
+     "e": 41740
+    }
+   ]
+  },
+  {
+   "s": 41740,
+   "e": 42800,
+   "palavras": [
+    {
+     "w": "por",
+     "s": 41740,
+     "e": 41980
+    },
+    {
+     "w": "pelo",
+     "s": 41980,
+     "e": 42280
+    },
+    {
+     "w": "menos",
+     "s": 42280,
+     "e": 42620
+    },
+    {
+     "w": "5",
+     "s": 42620,
+     "e": 42800
+    }
+   ]
+  },
+  {
+   "s": 42800,
+   "e": 43080,
+   "palavras": [
+    {
+     "w": "anos.",
+     "s": 42800,
+     "e": 43080
+    }
+   ]
+  },
+  {
+   "s": 43680,
+   "e": 44840,
+   "palavras": [
+    {
+     "w": "O",
+     "s": 43680,
+     "e": 43820
+    },
+    {
+     "w": "extrato",
+     "s": 43820,
+     "e": 44300
+    },
+    {
+     "w": "do",
+     "s": 44300,
+     "e": 44540
+    },
+    {
+     "w": "FGTS",
+     "s": 44540,
+     "e": 44840
+    }
+   ]
+  },
+  {
+   "s": 44840,
+   "e": 46220,
+   "palavras": [
+    {
+     "w": "pode",
+     "s": 44840,
+     "e": 45140
+    },
+    {
+     "w": "ser",
+     "s": 45140,
+     "e": 45380
+    },
+    {
+     "w": "conferido",
+     "s": 45380,
+     "e": 46020
+    },
+    {
+     "w": "no",
+     "s": 46020,
+     "e": 46220
+    }
+   ]
+  },
+  {
+   "s": 46220,
+   "e": 46840,
+   "palavras": [
+    {
+     "w": "aplicativo,",
+     "s": 46220,
+     "e": 46840
+    }
+   ]
+  },
+  {
+   "s": 47180,
+   "e": 48500,
+   "palavras": [
+    {
+     "w": "mas",
+     "s": 47180,
+     "e": 47440
+    },
+    {
+     "w": "vale",
+     "s": 47440,
+     "e": 47800
+    },
+    {
+     "w": "salvar",
+     "s": 47800,
+     "e": 48240
+    },
+    {
+     "w": "uma",
+     "s": 48240,
+     "e": 48500
+    }
+   ]
+  },
+  {
+   "s": 48500,
+   "e": 49580,
+   "palavras": [
+    {
+     "w": "cópia",
+     "s": 48500,
+     "e": 48860
+    },
+    {
+     "w": "em",
+     "s": 48860,
+     "e": 49040
+    },
+    {
+     "w": "PDF",
+     "s": 49040,
+     "e": 49280
+    },
+    {
+     "w": "todo",
+     "s": 49280,
+     "e": 49580
+    }
+   ]
+  },
+  {
+   "s": 49580,
+   "e": 49880,
+   "palavras": [
+    {
+     "w": "mês.",
+     "s": 49580,
+     "e": 49880
+    }
+   ]
+  },
+  {
+   "s": 50460,
+   "e": 51620,
+   "palavras": [
+    {
+     "w": "Papel",
+     "s": 50460,
+     "e": 50820
+    },
+    {
+     "w": "com",
+     "s": 50820,
+     "e": 51040
+    },
+    {
+     "w": "mancha",
+     "s": 51040,
+     "e": 51440
+    },
+    {
+     "w": "ou",
+     "s": 51440,
+     "e": 51620
+    }
+   ]
+  },
+  {
+   "s": 51620,
+   "e": 53160,
+   "palavras": [
+    {
+     "w": "rasgado",
+     "s": 51620,
+     "e": 52100
+    },
+    {
+     "w": "continua",
+     "s": 52100,
+     "e": 52660
+    },
+    {
+     "w": "valendo,",
+     "s": 52660,
+     "e": 53160
+    }
+   ]
+  },
+  {
+   "s": 53460,
+   "e": 54760,
+   "palavras": [
+    {
+     "w": "então",
+     "s": 53460,
+     "e": 53820
+    },
+    {
+     "w": "não",
+     "s": 53820,
+     "e": 54040
+    },
+    {
+     "w": "jogue",
+     "s": 54040,
+     "e": 54460
+    },
+    {
+     "w": "fora.",
+     "s": 54460,
+     "e": 54760
+    }
+   ]
+  },
+  {
+   "s": 55820,
+   "e": 56620,
+   "palavras": [
+    {
+     "w": "Terceira",
+     "s": 55820,
+     "e": 56340
+    },
+    {
+     "w": "dica,",
+     "s": 56340,
+     "e": 56620
+    }
+   ]
+  },
+  {
+   "s": 56900,
+   "e": 58260,
+   "palavras": [
+    {
+     "w": "digitalize",
+     "s": 56900,
+     "e": 57600
+    },
+    {
+     "w": "o",
+     "s": 57600,
+     "e": 57760
+    },
+    {
+     "w": "que",
+     "s": 57760,
+     "e": 58000
+    },
+    {
+     "w": "for",
+     "s": 58000,
+     "e": 58260
+    }
+   ]
+  },
+  {
+   "s": 58260,
+   "e": 58920,
+   "palavras": [
+    {
+     "w": "importante.",
+     "s": 58260,
+     "e": 58920
+    }
+   ]
+  },
+  {
+   "s": 59520,
+   "e": 60760,
+   "palavras": [
+    {
+     "w": "Uma",
+     "s": 59520,
+     "e": 59780
+    },
+    {
+     "w": "foto",
+     "s": 59780,
+     "e": 60140
+    },
+    {
+     "w": "bem",
+     "s": 60140,
+     "e": 60380
+    },
+    {
+     "w": "feita",
+     "s": 60380,
+     "e": 60760
+    }
+   ]
+  },
+  {
+   "s": 60760,
+   "e": 62400,
+   "palavras": [
+    {
+     "w": "resolve",
+     "s": 60760,
+     "e": 61280
+    },
+    {
+     "w": "90%",
+     "s": 61280,
+     "e": 61700
+    },
+    {
+     "w": "dos",
+     "s": 61700,
+     "e": 62000
+    },
+    {
+     "w": "casos.",
+     "s": 62000,
+     "e": 62400
+    }
+   ]
+  },
+  {
+   "s": 63000,
+   "e": 64260,
+   "palavras": [
+    {
+     "w": "Dê",
+     "s": 63000,
+     "e": 63160
+    },
+    {
+     "w": "nomes",
+     "s": 63160,
+     "e": 63520
+    },
+    {
+     "w": "claros",
+     "s": 63520,
+     "e": 63960
+    },
+    {
+     "w": "aos",
+     "s": 63960,
+     "e": 64260
+    }
+   ]
+  },
+  {
+   "s": 64260,
+   "e": 64800,
+   "palavras": [
+    {
+     "w": "arquivos,",
+     "s": 64260,
+     "e": 64800
+    }
+   ]
+  },
+  {
+   "s": 65080,
+   "e": 65980,
+   "palavras": [
+    {
+     "w": "com",
+     "s": 65080,
+     "e": 65380
+    },
+    {
+     "w": "a",
+     "s": 65380,
+     "e": 65500
+    },
+    {
+     "w": "data",
+     "s": 65500,
+     "e": 65820
+    },
+    {
+     "w": "na",
+     "s": 65820,
+     "e": 65980
+    }
+   ]
+  },
+  {
+   "s": 65980,
+   "e": 66440,
+   "palavras": [
+    {
+     "w": "frente,",
+     "s": 65980,
+     "e": 66440
+    }
+   ]
+  },
+  {
+   "s": 66720,
+   "e": 68120,
+   "palavras": [
+    {
+     "w": "e",
+     "s": 66720,
+     "e": 66880
+    },
+    {
+     "w": "mantenha",
+     "s": 66880,
+     "e": 67460
+    },
+    {
+     "w": "uma",
+     "s": 67460,
+     "e": 67720
+    },
+    {
+     "w": "cópia",
+     "s": 67720,
+     "e": 68120
+    }
+   ]
+  },
+  {
+   "s": 68120,
+   "e": 69320,
+   "palavras": [
+    {
+     "w": "na",
+     "s": 68120,
+     "e": 68360
+    },
+    {
+     "w": "nuvem",
+     "s": 68360,
+     "e": 68760
+    },
+    {
+     "w": "e",
+     "s": 68760,
+     "e": 68940
+    },
+    {
+     "w": "outra",
+     "s": 68940,
+     "e": 69320
+    }
+   ]
+  },
+  {
+   "s": 69320,
+   "e": 70220,
+   "palavras": [
+    {
+     "w": "no",
+     "s": 69320,
+     "e": 69540
+    },
+    {
+     "w": "computador.",
+     "s": 69540,
+     "e": 70220
+    }
+   ]
+  },
+  {
+   "s": 70780,
+   "e": 71900,
+   "palavras": [
+    {
+     "w": "Se",
+     "s": 70780,
+     "e": 70940
+    },
+    {
+     "w": "um",
+     "s": 70940,
+     "e": 71160
+    },
+    {
+     "w": "dia",
+     "s": 71160,
+     "e": 71400
+    },
+    {
+     "w": "precisar",
+     "s": 71400,
+     "e": 71900
+    }
+   ]
+  },
+  {
+   "s": 71900,
+   "e": 73480,
+   "palavras": [
+    {
+     "w": "pedir",
+     "s": 71900,
+     "e": 72280
+    },
+    {
+     "w": "o",
+     "s": 72280,
+     "e": 72420
+    },
+    {
+     "w": "seguro-desemprego,",
+     "s": 72420,
+     "e": 73480
+    }
+   ]
+  },
+  {
+   "s": 73820,
+   "e": 75120,
+   "palavras": [
+    {
+     "w": "os",
+     "s": 73820,
+     "e": 74000
+    },
+    {
+     "w": "papéis",
+     "s": 74000,
+     "e": 74400
+    },
+    {
+     "w": "já",
+     "s": 74400,
+     "e": 74640
+    },
+    {
+     "w": "estarão",
+     "s": 74640,
+     "e": 75120
+    }
+   ]
+  },
+  {
+   "s": 75120,
+   "e": 75500,
+   "palavras": [
+    {
+     "w": "à",
+     "s": 75120,
+     "e": 75240
+    },
+    {
+     "w": "mão.",
+     "s": 75240,
+     "e": 75500
+    }
+   ]
+  },
+  {
+   "s": 76060,
+   "e": 77280,
+   "palavras": [
+    {
+     "w": "Revise",
+     "s": 76060,
+     "e": 76440
+    },
+    {
+     "w": "as",
+     "s": 76440,
+     "e": 76680
+    },
+    {
+     "w": "pastas",
+     "s": 76680,
+     "e": 77120
+    },
+    {
+     "w": "a",
+     "s": 77120,
+     "e": 77280
+    }
+   ]
+  },
+  {
+   "s": 77280,
+   "e": 78440,
+   "palavras": [
+    {
+     "w": "cada",
+     "s": 77280,
+     "e": 77640
+    },
+    {
+     "w": "três",
+     "s": 77640,
+     "e": 78000
+    },
+    {
+     "w": "meses",
+     "s": 78000,
+     "e": 78320
+    },
+    {
+     "w": "e",
+     "s": 78320,
+     "e": 78440
+    }
+   ]
+  },
+  {
+   "s": 78440,
+   "e": 79560,
+   "palavras": [
+    {
+     "w": "descarte",
+     "s": 78440,
+     "e": 78980
+    },
+    {
+     "w": "só",
+     "s": 78980,
+     "e": 79140
+    },
+    {
+     "w": "o",
+     "s": 79140,
+     "e": 79280
+    },
+    {
+     "w": "que",
+     "s": 79280,
+     "e": 79560
+    }
+   ]
+  },
+  {
+   "s": 79560,
+   "e": 80000,
+   "palavras": [
+    {
+     "w": "venceu.",
+     "s": 79560,
+     "e": 80000
+    }
+   ]
+  },
+  {
+   "s": 81100,
+   "e": 82580,
+   "palavras": [
+    {
+     "w": "Ficou",
+     "s": 81100,
+     "e": 81500
+    },
+    {
+     "w": "com",
+     "s": 81500,
+     "e": 81760
+    },
+    {
+     "w": "alguma",
+     "s": 81760,
+     "e": 82180
+    },
+    {
+     "w": "dúvida?",
+     "s": 82180,
+     "e": 82580
+    }
+   ]
+  },
+  {
+   "s": 83100,
+   "e": 84920,
+   "palavras": [
+    {
+     "w": "Procure",
+     "s": 83100,
+     "e": 83580
+    },
+    {
+     "w": "um",
+     "s": 83580,
+     "e": 83740
+    },
+    {
+     "w": "advogado",
+     "s": 83740,
+     "e": 84240
+    },
+    {
+     "w": "trabalhista.",
+     "s": 84240,
+     "e": 84920
+    }
+   ]
+  }
+ ],
+ "cenas": [
+  {
+   "tipo": "abertura",
+   "t_in": 0,
+   "t_out": 1600,
+   "ev": {}
+  },
+  {
+   "tipo": "gancho",
+   "tag": "Organização",
+   "linhas": [
+    {
+     "t": "Perdeu um papel",
+     "em": 1600
+    },
+    {
+     "t": "importante",
+     "em": 2560
+    },
+    {
+     "t": "na hora de usar?",
+     "em": 3680,
+     "cor": "destaque"
+    }
+   ],
+   "blocos": [
+    {
+     "tipo": "frase",
+     "y": 560,
+     "tam": 50,
+     "texto": "Antes de procurar, **organize os seus documentos.**",
+     "em": 4980,
+     "id": "gancho-frase-1",
+     "origem": "/cenas/0/blocos/0"
+    },
+    {
+     "tipo": "foto",
+     "y": 760,
+     "em": 10780,
+     "id": "gancho-foto-1",
+     "origem": "/cenas/0/blocos/1"
+    }
+   ],
+   "id": "gancho",
+   "t_in": 1600,
+   "t_out": 16650,
+   "ev": {},
+   "origem": "/cenas/0"
+  },
+  {
+   "tipo": "parte",
+   "tag": "Primeira dica",
+   "titulo": "Separe tudo por assunto",
+   "blocos": [
+    {
+     "tipo": "itens",
+     "y": 570,
+     "tam": 44,
+     "marcador": "numero",
+     "itens": [
+      {
+       "texto": "Contrato",
+       "em": 20120,
+       "id": "parte1-itens-1-item-1"
+      },
+      {
+       "texto": "Holerites",
+       "em": 20960,
+       "id": "parte1-itens-1-item-2"
+      },
+      {
+       "texto": "Recibos",
+       "em": 21880,
+       "id": "parte1-itens-1-item-3"
+      },
+      {
+       "texto": "Extratos",
+       "em": 22460,
+       "id": "parte1-itens-1-item-4"
+      }
+     ],
+     "sai": 25410,
+     "id": "parte1-itens-1",
+     "origem": "/cenas/1/blocos/0",
+     "em": 20120
+    },
+    {
+     "tipo": "grande",
+     "y": 640,
+     "texto": "4 PASTAS",
+     "rotulo": "uma para cada tipo",
+     "em": 25560,
+     "id": "parte1-grande-1",
+     "origem": "/cenas/1/blocos/1"
+    },
+    {
+     "tipo": "cartao",
+     "y": 1150,
+     "tam": 33,
+     "texto": "Uma **etiqueta grande** na frente de cada pasta.",
+     "em": 29840,
+     "id": "parte1-cartao-1",
+     "origem": "/cenas/1/blocos/2"
+    }
+   ],
+   "id": "parte1",
+   "t_in": 16650,
+   "t_out": 35120,
+   "ev": {},
+   "origem": "/cenas/1",
+   "n": 1
+  },
+  {
+   "tipo": "parte",
+   "tag": "Segunda dica",
+   "titulo": "Guarde pelo tempo certo",
+   "blocos": [
+    {
+     "tipo": "frase",
+     "y": 570,
+     "tam": 56,
+     "texto": "Holerites e recibos de **férias**",
+     "em": 38580,
+     "id": "parte2-frase-1",
+     "origem": "/cenas/2/blocos/0"
+    },
+    {
+     "tipo": "numero",
+     "y": 720,
+     "de": 0,
+     "ate": 5,
+     "tam": 210,
+     "rotulo": "anos, pelo menos",
+     "em": 42620,
+     "sai": 43670,
+     "id": "parte2-numero-1",
+     "origem": "/cenas/2/blocos/1"
+    },
+    {
+     "tipo": "documento",
+     "y": 700,
+     "tam": 420,
+     "largura": 760,
+     "texto": "EXTRATO DO FGTS",
+     "nota": "CÓPIA EM PDF · TODO MÊS",
+     "em": 43820,
+     "carimbo": {
+      "texto": "SALVO",
+      "em": 49040
+     },
+     "sai": 50310,
+     "id": "parte2-documento-1",
+     "origem": "/cenas/2/blocos/2"
+    },
+    {
+     "tipo": "carimbo",
+     "y": 900,
+     "texto": "CONTINUA VALENDO",
+     "em": 52100,
+     "id": "parte2-carimbo-1",
+     "origem": "/cenas/2/blocos/3"
+    }
+   ],
+   "id": "parte2",
+   "t_in": 35120,
+   "t_out": 55540,
+   "ev": {},
+   "origem": "/cenas/2",
+   "n": 2
+  },
+  {
+   "tipo": "parte",
+   "tag": "Terceira dica",
+   "titulo": "Digitalize o que importa",
+   "blocos": [
+    {
+     "tipo": "comparacao",
+     "y": 600,
+     "unidade": "%",
+     "barras": [
+      {
+       "rotulo": "resolvido com uma foto",
+       "valor": 90,
+       "em": 61280,
+       "destaque": true
+      },
+      {
+       "rotulo": "precisa do papel",
+       "valor": 10,
+       "em": 62000
+      }
+     ],
+     "sai": 63010,
+     "id": "parte3-comparacao-1",
+     "origem": "/cenas/3/blocos/0",
+     "em": 61280
+    },
+    {
+     "tipo": "itens",
+     "y": 600,
+     "tam": 42,
+     "itens": [
+      {
+       "texto": "Nomes claros",
+       "em": 63160,
+       "id": "parte3-itens-1-item-1"
+      },
+      {
+       "texto": "A data na frente",
+       "em": 65500,
+       "id": "parte3-itens-1-item-2"
+      },
+      {
+       "texto": "Uma cópia na **nuvem**",
+       "em": 68360,
+       "id": "parte3-itens-1-item-3"
+      }
+     ],
+     "id": "parte3-itens-1",
+     "origem": "/cenas/3/blocos/1",
+     "em": 63160
+    },
+    {
+     "tipo": "regua",
+     "y": 980,
+     "escala": [
+      0,
+      12
+     ],
+     "marcas": [
+      {
+       "v": 0,
+       "rotulo": "HOJE",
+       "em": 76060
+      },
+      {
+       "v": 3,
+       "rotulo": "3 MESES",
+       "em": 77640
+      }
+     ],
+     "faixas": [
+      {
+       "de": 0,
+       "ate": 3,
+       "rotulo": "revisão",
+       "em": 78000,
+       "tom": "destaque"
+      }
+     ],
+     "id": "parte3-regua-1",
+     "origem": "/cenas/3/blocos/2",
+     "em": 76060
+    }
+   ],
+   "id": "parte3",
+   "t_in": 55540,
+   "t_out": 80800,
+   "ev": {},
+   "origem": "/cenas/3",
+   "n": 3
+  },
+  {
+   "tipo": "duvida",
+   "id": "duvida",
+   "t_in": 80800,
+   "t_out": 85420,
+   "ev": {
+    "duvida": 81100,
+    "advogado": 83100
+   },
+   "origem": "/cenas/4"
+  },
+  {
+   "tipo": "final",
+   "t_in": 85420,
+   "t_out": 88920,
+   "ev": {}
+  }
+ ],
+ "total_partes": 3,
+ "rotulo_partes": "DOCUMENTOS EM ORDEM",
+ "tema_carrossel": "neutro",
+ "marca": {
+  "nome": "Escritório Exemplo",
+  "site": "exemplo.com.br",
+  "insta": "@escritorio.exemplo"
+ },
+ "decisao": {
+  "titulo": "Decisão de 1º grau · cabe recurso",
+  "linha": ""
+ },
+ "final": {
+  "titulo": "SALVE E COMPARTILHE COM QUEM PRECISA",
+  "aviso": "Conteúdo informativo. Não substitui a análise de cada caso."
+ },
+ "duvida": {
+  "pergunta": "Ficou com alguma dúvida?",
+  "resposta": "Procure um advogado trabalhista."
+ },
+ "sons": [
+  {
+   "src": "sfx/whoosh.wav",
+   "t": 120,
+   "vol": 0.55
+  },
+  {
+   "src": "sfx/impacto_grave.wav",
+   "t": 380,
+   "vol": 0.28
+  },
+  {
+   "src": "sfx/papel_desliza_0.wav",
+   "t": 10840,
+   "vol": 0.5
+  },
+  {
+   "src": "sfx/swell.wav",
+   "t": 15350,
+   "vol": 0.45
+  },
+  {
+   "src": "sfx/whoosh.wav",
+   "t": 16400,
+   "vol": 0.45
+  },
+  {
+   "src": "sfx/pop.wav",
+   "t": 20120,
+   "vol": 0.3
+  },
+  {
+   "src": "sfx/pop.wav",
+   "t": 20960,
+   "vol": 0.3
+  },
+  {
+   "src": "sfx/pop.wav",
+   "t": 21880,
+   "vol": 0.3
+  },
+  {
+   "src": "sfx/pop.wav",
+   "t": 22460,
+   "vol": 0.3
+  },
+  {
+   "src": "sfx/pop.wav",
+   "t": 25560,
+   "vol": 0.3
+  },
+  {
+   "src": "sfx/whoosh.wav",
+   "t": 34920,
+   "vol": 0.22
+  },
+  {
+   "src": "sfx/pop.wav",
+   "t": 42620,
+   "vol": 0.3
+  },
+  {
+   "src": "sfx/papel_desliza_0.wav",
+   "t": 43820,
+   "vol": 0.35
+  },
+  {
+   "src": "sfx/carimbo_0.wav",
+   "t": 49160,
+   "vol": 0.5
+  },
+  {
+   "src": "sfx/carimbo_0.wav",
+   "t": 52220,
+   "vol": 0.5
+  },
+  {
+   "src": "sfx/whoosh.wav",
+   "t": 55340,
+   "vol": 0.22
+  },
+  {
+   "src": "sfx/pop.wav",
+   "t": 61280,
+   "vol": 0.3
+  },
+  {
+   "src": "sfx/pop.wav",
+   "t": 62000,
+   "vol": 0.3
+  },
+  {
+   "src": "sfx/pop.wav",
+   "t": 63160,
+   "vol": 0.3
+  },
+  {
+   "src": "sfx/pop.wav",
+   "t": 65500,
+   "vol": 0.3
+  },
+  {
+   "src": "sfx/pop.wav",
+   "t": 68360,
+   "vol": 0.3
+  },
+  {
+   "src": "sfx/whoosh.wav",
+   "t": 80600,
+   "vol": 0.22
+  },
+  {
+   "src": "sfx/swell.wav",
+   "t": 85220,
+   "vol": 0.4
+  }
+ ],
+ "foto": {
+  "src": "foto.jpg",
+  "credito": "Foto ilustrativa"
+ }
+}

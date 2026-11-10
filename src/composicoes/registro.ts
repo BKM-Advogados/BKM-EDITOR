@@ -7,7 +7,7 @@ import React from 'react';
 import type {FonteArquivo} from '../nucleo/marca';
 import {VideoCenas} from './cenas/VideoCenas';
 import {deFonteArquivo, registrarFontesDeArquivo} from './fontes';
-import {CarrosselTema} from './cliente/CarrosselTema';
+import {CarrosselTema} from './carrossel/CarrosselTema';
 import {definirBaseMidia, midia} from './midia';
 import {Animacao} from './animacao/Animacao';
 import type {MarcaDaguaP} from '../nucleo/exportacao';
@@ -38,6 +38,6 @@ export const COMPOSICOES: Record<IdComposicao, React.FC<Record<string, unknown>>
   Animacao: Animacao as unknown as React.FC<Record<string, unknown>>,
 };
 
-/** Id da composição pelas props; o que não for reconhecido é o carrossel da Cliente (documento antigo). */
+/** Id da composição pelas props; o que não for reconhecido é o carrossel narrado (roteiro.json). */
 export const composicaoDe = (props: Record<string, unknown> | null | undefined): IdComposicao =>
   props?.composicao === 'VideoCenas' ? 'VideoCenas' : props?.composicao === 'Animacao' ? 'Animacao' : 'CarrosselTema';

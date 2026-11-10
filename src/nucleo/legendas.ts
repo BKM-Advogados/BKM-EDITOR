@@ -78,7 +78,7 @@ export const PREDEFINICOES_LEGENDA: Record<IdEstiloLegenda, Predefinicao> = {
     tam: 0.042, peso: 600, maiusculas: false, caixa: 'linha', destaque: 'cor', apagadas: false, sombra: false, linhas: 2, pista: 'fundo'},
   caixa: {id: 'caixa', nome: 'Palavra em caixa', descricao: 'Grande, em maiúsculas, poucas palavras por vez e a palavra falada dentro de uma caixa', posicao: 'meio',
     tam: 0.068, peso: 800, maiusculas: true, caixa: 'nenhuma', destaque: 'caixa', apagadas: false, sombra: true, linhas: 2, max_palavras: 3},
-  karaoke: {id: 'karaoke', nome: 'Karaokê', descricao: 'As palavras acendem conforme são ditas, como no carrossel da Cliente', posicao: 'baixo', tam: 0.056, peso: 700,
+  karaoke: {id: 'karaoke', nome: 'Karaokê', descricao: 'As palavras acendem conforme são ditas, como no carrossel narrado', posicao: 'baixo', tam: 0.056, peso: 700,
     maiusculas: false, caixa: 'nenhuma', destaque: 'cor', apagadas: true, sombra: true, linhas: 2, max_palavras: 4},
   faixa: {id: 'faixa', nome: 'Faixa da marca', descricao: 'Faixa na cor de destaque da marca, de lado a lado, com a palavra falada sublinhada', posicao: 'baixo', tam: 0.04,
     peso: 600, maiusculas: false, caixa: 'faixa', destaque: 'sublinhado', apagadas: false, sombra: false, linhas: 2},
@@ -385,7 +385,7 @@ export const arquivoDaFala = (c: {arquivo: string; original?: string}) => (typeo
 
 /** O palavras.json ao lado do áudio, na versão 2: as palavras com o carimbo do áudio transcrito (tamanho, data e sha256,
  *  como o envelope do som), para transcrever de novo quando a tomada é regravada com o mesmo nome. A versão 1 era só a
- *  lista de palavras (é o que o `destino` do roteiro da Cliente continua recebendo) e conta como sem carimbo. */
+ *  lista de palavras (é o que o `destino` do roteiro do carrossel narrado continua recebendo) e conta como sem carimbo. */
 export const VERSAO_PALAVRAS = 2;
 export type FonteDaFala = {tamanho: number; modificado_ms?: number; sha256?: string};
 export type PalavrasGravadas = {versao: typeof VERSAO_PALAVRAS; fonte: FonteDaFala; modelo?: string; trecho?: {de_ms?: number; dur_ms?: number};
@@ -405,7 +405,7 @@ const chaveDoCaminho = (c: string) => {
   return out.join('/').toLowerCase();
 };
 
-/** Por que o `destino` das palavras (o transcrever de um arquivo, para o roteiro da Cliente) não serve, ou null se serve. A
+/** Por que o `destino` das palavras (o transcrever de um arquivo, para o roteiro do carrossel narrado) não serve, ou null se serve. A
  *  transcrição grava por cima, fora do diário: o destino é um .json que não é do app (manifesto, documento, comentários,
  *  pesquisa, .estudio/) e, se já existe, uma lista de palavras. `atual`: o que está no destino, se ele existe (doc
  *  undefined quando não deu para ler). */

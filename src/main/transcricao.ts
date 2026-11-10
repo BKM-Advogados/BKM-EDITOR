@@ -4,7 +4,7 @@
 // (bin/ da pasta ou o PATH, acharWhisperCli) e os modelos baixam do mesmo jeito. O áudio do clipe sai em WAV 16 kHz mono pelo ffmpeg do compositor do Remotion (o mesmo da
 // exportação), o whisper-cli devolve JSON com o tempo de cada pedaço de palavra, e o resultado vira
 // midia/<arquivo>.palavras.json: {versao: 2, fonte, palavras: [{w, s, e, p}] em ms}, com o carimbo do áudio (tamanho, data
-// e sha256) para transcrever de novo quando a tomada é regravada. Com `destino` (o roteiro da Cliente) grava só a lista, o
+// e sha256) para transcrever de novo quando a tomada é regravada. Com `destino` (o roteiro do carrossel narrado) grava só a lista, o
 // formato que o resolvedor do roteiro lê.
 //
 // Este arquivo não importa o Electron: o MCP por stdio (mcp/nucleo.ts) e os testes usam o mesmo Transcritor. O IPC

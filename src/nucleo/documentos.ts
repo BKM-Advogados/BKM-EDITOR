@@ -18,7 +18,7 @@ export type Manifesto = {
 };
 
 // ---------- vídeo ----------
-// dois tipos: o vídeo de cenas ("tipo": "cenas", o que se começa do zero) e o carrossel narrado da Cliente (sem "tipo")
+// dois tipos: o vídeo de cenas ("tipo": "cenas", o que se começa do zero) e o carrossel narrado (sem "tipo")
 export type DocVideo = (Roteiro | DocCenas) & {efeitos?: Efeito[]};
 
 // ---------- imagem ----------

@@ -2,7 +2,7 @@
 // lista, número, imagem) que entram e saem em ms contados do começo da cena. Posição e tamanho são frações do quadro
 // (0 a 1), e a letra é uma fração do lado menor: trocar 9:16 por 16:9 não desmonta o layout. O som é opcional: `audio`
 // traz faixas (narração, música, efeitos) com clipes em ms da linha do tempo (audio.ts); a transcrição da narração fica
-// para a Onda B. O carrossel narrado da Cliente continua no resolvedor de roteiro. `refs` (opcional, no bloco e na cena) cita
+// para a Onda B. O carrossel narrado continua no resolvedor de roteiro. `refs` (opcional, no bloco e na cena) cita
 // os fatos da pesquisa (`F3`, em pesquisa/pesquisa.json) que sustentam o que está escrito; o resolvedor só repassa.
 import {resolverAudio, type AudioCenas, type AudioP, type Envelope} from './audio';
 import {efeitosValidos, problemasDosEfeitos, type Efeito} from './efeitos';
@@ -140,7 +140,7 @@ export type PropsCenas = {
   efeitos: Efeito[];
   audio?: AudioP;
   base_midia?: string;
-  legendas_cenas?: LegendasP; // frente Fala (o nome não é "legendas" porque a linha do tempo lê esse do carrossel da Cliente)
+  legendas_cenas?: LegendasP; // frente Fala (o nome não é "legendas" porque a linha do tempo lê esse do carrossel narrado)
 };
 
 /** O que o resolvedor recebe de fora do documento: os envelopes já medidos, por arquivo (midia/x.wav). */

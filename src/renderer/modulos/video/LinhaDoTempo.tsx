@@ -171,7 +171,7 @@ export const LinhaDoTempo: React.FC = () => {
     return out;
   }, [props]);
   const nBlocos = faixas.reduce((n, f) => n + f.length, 0);
-  // só o vídeo de cenas tem faixas de áudio; nos roteiros (Cliente, tema) `audio` é o nome do arquivo da narração
+  // só o vídeo de cenas tem faixas de áudio; no roteiro do carrossel narrado `audio` é o nome do arquivo da narração
   const audioFaixas = props && typeof props.audio === 'object' && Array.isArray(props.audio.faixas) ? props.audio : undefined;
   const nClipes = audioFaixas?.faixas.reduce((n, f) => n + f.clipes.length, 0) ?? 0;
   // clipe sem envelope (arquivo trocado à mão, projeto de outro PC): mede em segundo plano e as props voltam com a onda
