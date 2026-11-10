@@ -418,6 +418,13 @@ cada passo, console e log do processo principal). ✔ medido, ◐ inferido.
 - ✔ **Licenças**: CC BY no áudio da cama saiu no `- créditos.txt` e no `.licencas.json` da exportação.
 - ✔ Reabrir o projeto: a música, a ligação, as seções e o render continuam.
 
+Para repetir: com o app de desenvolvimento aberto pela porta de depuração (`ESTUDIO_DEPURAR_PORTA=9484`, ver CLAUDE.md),
+`scripts/preparar-roteiro.ts` monta o projeto do roteiro (vídeo de 3 cenas com narração e música sintéticas),
+`scripts/abrir.mjs` e `scripts/novo-projeto.mjs` abrem e criam projetos, `scripts/rc.mjs` clica, arrasta, aperta teclas e
+tira foto (coordenadas da foto), `scripts/latencia.mjs` mede o Espaço até o medidor, `scripts/som-check.mjs` amostra o motor e
+`scripts/mcp-externo.mjs` faz de "outro app" pelo MCP por stdio. O som que chega ao PipeWire se mede com `parec -d
+<sink>.monitor` e `ffmpeg -af volumedetect`.
+
 ### O que ainda não foi verificado
 
 - ◐ Os kits de terceiros (onda 2) não existem: o kit.json de cada kit vai dar o `spdx` e o crédito; o teste usa um kit CC BY
@@ -433,6 +440,9 @@ cada passo, console e log do processo principal). ✔ medido, ◐ inferido.
 - ? M4A e Opus no app **empacotado** (a exportação rodou no app de desenvolvimento, com o ffmpeg do `node_modules`).
 - ? Áudio que não é WAV a 48 kHz no render para o vídeo passa pelo ffmpeg do Remotion; o teste usa WAV a 48 kHz.
 - ? O modo "só o padrão" (tocar o padrão em loop fora do arranjo) não entrou: o L no clipe selecionado faz a mesma coisa.
+- ◐ Ao "Cancelar e desfazer" (ou Ctrl+Z) uma troca de render, o clipe do vídeo aponta por um instante para o render velho,
+  que a limpeza já tinha apagado: há um 404 no console e o clipe fica mudo até o render voltar (uns segundos; o arquivo
+  volta pelo mesmo código).
 - ? Cada abertura da Música num projeto sem `.estudio/transicoes.json` deixa uma linha de erro no log do processo principal
   (o `ler-json` do registro responde "arquivo não achado"; a tela trata e segue). É só ruído de log.
 
