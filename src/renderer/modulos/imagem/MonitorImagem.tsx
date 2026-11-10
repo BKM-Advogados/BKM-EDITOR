@@ -39,7 +39,10 @@ type Geometria = {x: number; y: number; largura: number; altura: number};
 type Peca = Geometria & {i: number; id: string};
 // mover: as selecionadas (mais a foto de cada máscara) com o mesmo deslocamento; redimensionar: uma só, com o giro dela
 // no mover, `encaixe` traz onde encaixar e as caixas das outras camadas (para as distâncias), calculados no apertar
-type Arrasto = {x0: number; y0: number; modo: 'mover' | 'redimensionar'; pecas: Peca[]; rot: number; alvo: Peca[] | null; encaixe?: {alvos: Alvos; outras: Caixa[]}};
+type Arrasto = {x0: number; y0: number; modo: 'mover' | 'redimensionar'; pecas: Peca[]; rot: number; alvo: Peca[] | null;
+  // no clique sem arrasto, recolher à camada de cima (dentro de uma seleção) ou manter a seleção que o apertar acabou de
+  // fazer (grupo escolhido de novo): o clique numa camada de grupo escolhe o grupo inteiro, não uma só (docs/imagem.md)
+  colapsar: boolean; encaixe?: {alvos: Alvos; outras: Caixa[]}};
 // laço: retângulo arrastado no vazio, em px do documento; `somar` é a seleção de antes (com Shift)
 type Laco = {x0: number; y0: number; x1: number; y1: number; somar: string[]};
 type Ferramenta = 'mover' | 'mao' | 'zoom' | 'texto' | 'forma';
@@ -363,7 +366,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
   // o ponto está dentro da seleção (a caixa dela ou o contorno de uma das selecionadas)?
   const naSelecao = (x: number, y: number) => document.elementsFromPoint(x, y).some((el) => (el as HTMLElement).dataset?.sel !== undefined && palco.current?.contains(el));
 
-  const comecarArrasto = (ev: React.PointerEvent, modo: Arrasto['modo'], indices: number[]) => {
+  const comecarArrasto = (ev: React.PointerEvent, modo: Arrasto['modo'], indices: number[], colapsar = true) => {
     // camada travada fica (o resto da seleção anda)
     const pecas = (modo === 'mover' ? comAcompanhantes(camadasPag, indices) : indices).filter((i) => !travada(camadasPag[i])).map((i) => pecaDe(camadasPag[i], i));
     if (!pecas.length) return;
@@ -373,7 +376,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
       alvos: alvosDeEncaixe(camadasPag, andando, {largura: W, altura: H}, opcoesGuias.margem ? margemSegura(W, H) : undefined),
       outras: camadasPag.flatMap((c, i) => (!c || andando.has(i) || c.visivel === false ? [] : [caixaDe(c)])),
     } : undefined;
-    arrasto.current = {x0: ev.clientX, y0: ev.clientY, modo, pecas, rot: modo === 'redimensionar' ? (camadasPag[indices[0]].rotacao ?? 0) : 0, alvo: null, encaixe};
+    arrasto.current = {x0: ev.clientX, y0: ev.clientY, modo, pecas, rot: modo === 'redimensionar' ? (camadasPag[indices[0]].rotacao ?? 0) : 0, alvo: null, colapsar, encaixe};
   };
 
   // mover (V): apertar numa camada a escolhe e já arrasta (D2); dentro da seleção arrasta todas; Shift põe ou tira; no
@@ -393,7 +396,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
     if (!ev.shiftKey && (naSelecao(ev.clientX, ev.clientY) || idxSel.includes(i)) && idxSel.length) return comecarArrasto(ev, 'mover', idxSel);
     if (caminho && i >= 0) {
       selecionarVarias(documento, [...grupo.filter((k) => k !== i).map((k) => `${base}/${k}`), caminho]);
-      return comecarArrasto(ev, 'mover', grupo);
+      return comecarArrasto(ev, 'mover', grupo, false); // escolha nova (grupo inteiro): não recolhe no soltar
     }
     // vazio: o laço (com Shift, soma à seleção de agora)
     if (!ev.shiftKey) selecionar(null);
@@ -463,9 +466,10 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
     arrasto.current = null;
     if (!a) return;
     if (!a.alvo) {
-      // clique sem arrasto: escolhe a camada de cima naquele ponto (pode ser outra, menor, por cima da selecionada)
+      // clique sem arrasto: dentro de uma seleção, escolhe a camada de cima naquele ponto (pode ser outra, menor, por
+      // cima da selecionada); uma escolha nova (grupo inteiro) fica como o apertar deixou
       const caminho = a.modo === 'mover' ? caminhoSob(ev.clientX, ev.clientY) : null;
-      if (caminho && !(idxSel.length === 1 && caminho === caminhosSel[0])) selecionar({documento, caminho});
+      if (a.colapsar && caminho && !(idxSel.length === 1 && caminho === caminhosSel[0])) selecionar({documento, caminho});
       return;
     }
     const atual = loja.get().docs[documento]?.doc;
