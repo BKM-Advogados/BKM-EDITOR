@@ -7,6 +7,8 @@ import type {Comentario, DocImagem, EntradaDiario, Modulo, OperacaoPatch} from '
 import type {Efeito} from '../../nucleo/efeitos';
 import type {Pesquisa} from '../../nucleo/pesquisa'; // só o tipo: pesquisa.ts usa node:crypto
 import {indicePagina, paginasDe} from '../../nucleo/carrossel';
+import {EstadoDeGravacao, FilaPorChave, JANELA_EDICAO_PROPRIA_MS, mensagemDeFalhaNaEdicao, validadeDoAviso, type Gravacao} from './gravacao'; // frente Casca
+export {VALIDADE_AVISO_MS} from './gravacao';
 
 export type Area = 'video' | 'imagem' | '3d' | 'efeitos';
 export type Lido = {doc: any; versao: string};
@@ -31,6 +33,7 @@ export type Estado = {
   erroPesquisa?: string; // pesquisa/pesquisa.json não pôde ser lido: o painel mostra o motivo em vez de "carregando"
   fatoAberto?: string; // fato pedido de fora do painel Pesquisa (etiqueta do inspetor): o painel vem à frente e mostra
   aviso?: Aviso;
+  gravacao: Gravacao; // selo "Salvo" da barra: gravando, salvo ou a última gravação que falhou (gravacao.ts)
   zoomLinha: number | null; // pixels por segundo da linha do tempo; null = ajustar à janela (vale no Vídeo e em Efeitos)
   ultimaMudancaAgente?: number; // seq da última mudança do agente vista
   previaEfeitos?: {documento: string; efeitos: Efeito[]}; // controle deslizante sendo arrastado, antes do patch
@@ -39,7 +42,7 @@ export type Estado = {
   paginaAtiva: Partial<Record<string, string>>; // imagem com várias páginas: id da página ativa, por documento
 };
 
-const INICIAL: Estado = {info: null, area: 'video', ativo: {}, docs: {}, props: {}, selecao: null, tempo_ms: 0, comentarios: [], diario: [], modoComentario: false, zoomLinha: null,
+const INICIAL: Estado = {info: null, area: 'video', ativo: {}, docs: {}, props: {}, selecao: null, tempo_ms: 0, comentarios: [], diario: [], modoComentario: false, gravacao: {estado: 'salvo'}, zoomLinha: null,
   paginaAtiva: {}, pesquisa: null, erroPesquisa: undefined, fatoAberto: undefined}; // os opcionais da pesquisa ficam aqui para a troca de projeto zerá-los
 let estado: Estado = INICIAL;
 const ouvintes = new Set<() => void>();
@@ -80,14 +83,14 @@ export const useLoja = <T,>(sel: (e: Estado) => T): T => {
   return useSyncExternalStore(loja.assinar, ler);
 };
 
-// o aviso fica 4 s no rodapé (no lugar das dicas de tecla) e some; erro fica 9 s; o seguinte reinicia a contagem
-export const VALIDADE_AVISO_MS = 4000;
+// o aviso fica 4 s no rodapé (no lugar das dicas de tecla) e some; erro fica 9 s, no rodapé também (gravacao.ts:
+// validadeDoAviso, o mesmo prazo para a loja e para o Rodape); o seguinte reinicia a contagem
 let validadeAviso: ReturnType<typeof setTimeout> | undefined;
 export const avisar = (texto: string, tipo: TipoAviso = 'info') => {
   const aviso = {texto, tipo, em: Date.now()};
   loja.definir({aviso});
   clearTimeout(validadeAviso);
-  validadeAviso = setTimeout(() => loja.get().aviso === aviso && loja.definir({aviso: undefined}), tipo === 'erro' ? 9000 : VALIDADE_AVISO_MS);
+  validadeAviso = setTimeout(() => loja.get().aviso === aviso && loja.definir({aviso: undefined}), validadeDoAviso(tipo));
 };
 
 const entradaDe = (id: string) => estado.info?.manifesto.documentos.find((d) => d.id === id);
@@ -236,19 +239,37 @@ export const patchTrocar = (doc: unknown, caminho: string, valor: unknown): Oper
   return [{op: 'test', path: caminho, value: antigo}, {op: 'replace', path: caminho, value: valor}];
 };
 
-export const aplicar = async (documento: string, patch: OperacaoPatch[], rotulo?: string) => {
-  if (!patch.length) return true;
+// Frente Casca: as edições da pessoa saem uma por vez em cada documento (transversal-D16). Antes, duas seguidas (Alt+seta
+// segurado, editar a legenda e clicar em Juntar) levavam a mesma versão_base, a segunda conflitava com a primeira e o
+// aviso culpava o agente. Agora cada uma lê a versão que a anterior deixou; se ainda assim a edição não entrar, o aviso diz
+// "duas edições seguidas" quando a causa foi a pessoa mesma. O selo "Salvo" acompanha (transversal-D11).
+const gravacao = new EstadoDeGravacao();
+const filaDeEdicoes = new FilaPorChave();
+const fimDaEdicaoPropria = new Map<string, number>(); // documento → quando a última edição da pessoa terminou
+
+export const aplicar = (documento: string, patch: OperacaoPatch[], rotulo?: string): Promise<boolean> => {
+  if (!patch.length) return Promise.resolve(true);
+  loja.definir({gravacao: gravacao.comecar()});
+  return filaDeEdicoes.enfileirar(documento, (esperou) => aplicarNaVez(documento, patch, rotulo, esperou));
+};
+
+const aplicarNaVez = async (documento: string, patch: OperacaoPatch[], rotulo: string | undefined, esperou: boolean): Promise<boolean> => {
   const lido = estado.docs[documento];
   try {
     const r = await window.estudio.aplicarPatch({documento, versao_base: lido?.versao, patch, rotulo});
     await carregarDoc(documento);
     void carregarDiario();
+    loja.definir({gravacao: gravacao.terminar()});
     return Boolean(r);
   } catch (e) {
-    const msg = mensagemDe(e);
-    avisar(msg.includes('mudou') ? 'O documento mudou por outra mão (agente?). Recarreguei; refaça a edição.' : msg, 'erro');
+    const propria = esperou || Date.now() - (fimDaEdicaoPropria.get(documento) ?? 0) < JANELA_EDICAO_PROPRIA_MS;
+    const msg = mensagemDeFalhaNaEdicao(mensagemDe(e), propria);
+    avisar(msg, 'erro');
+    loja.definir({gravacao: gravacao.terminar(msg)});
     await carregarDoc(documento);
     return false;
+  } finally {
+    fimDaEdicaoPropria.set(documento, Date.now());
   }
 };
 

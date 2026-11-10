@@ -13,13 +13,17 @@ import {novoDoc3d} from './cena3d';
 import {novoDocCenas} from './cenas';
 import {EFEITOS} from './efeitos';
 import {MODELOS, type IdModelo} from './modelos';
-import {FORMATOS_IMAGEM, FORMATOS_VIDEO, type Formato} from './formatos';
+import {FORMATOS_IMAGEM, FORMATOS_VIDEO, limitarTamanho, type Formato} from './formatos';
 import {arquivosDaMarca, patchDaMarca, temaDaMarca} from './marca';
+import {LINHAS_DO_TEXTO_ANTIGO} from './claude-md-antigo';
+import {REGRAS_MIDIA_PESADA} from './midia-git';
 import type {MarcaLida} from './pasta-marcas';
 import {serializar} from './projeto';
 
 // o texto baixado de cada fonte (pesquisa/fontes/<id>.txt) fica fora do git: é grande e se baixa de novo pela url
-export const GITIGNORE = 'saidas/\n.estudio/estado.json\n.estudio/miniatura.jpg\n.estudio/mcp*\n*.tmp\npesquisa/fontes/\n';
+// vídeo e áudio sem perda em midia/ também ficam de fora (transversal-D7, midia-git.ts); o que passa de 25 MB entra na regra
+// pelo caminho exato antes de cada commit
+export const GITIGNORE = `saidas/\n.estudio/estado.json\n.estudio/miniatura.jpg\n.estudio/mcp*\n*.tmp\npesquisa/fontes/\n${REGRAS_MIDIA_PESADA.join('\n')}\n`;
 
 const DOIS = (n: number) => String(n).padStart(2, '0');
 
@@ -73,11 +77,11 @@ const ID_DO_MODULO: Record<Modulo, string> = {video: 'video', imagem: 'imagem', 
 export const conteudoNovo = (modulo: Modulo, formato?: {largura: number; altura: number; fps?: number}) => {
   if (modulo === 'video') {
     const f = formato ?? FORMATOS_VIDEO[0];
-    return novoDocCenas({largura: f.largura, altura: f.altura, fps: formato?.fps ?? 30});
+    return novoDocCenas({largura: limitarTamanho(f.largura), altura: limitarTamanho(f.altura), fps: formato?.fps ?? 30});
   }
   if (modulo === 'imagem') {
     const f = formato ?? FORMATOS_IMAGEM[0];
-    return novoDocImagem(f.largura, f.altura);
+    return novoDocImagem(limitarTamanho(f.largura), limitarTamanho(f.altura));
   }
   return novoDoc3d();
 };
@@ -168,6 +172,20 @@ const secaoEfeitos = () => {
   ];
 };
 
+/** O item "Imagem" da lista de arquivos do CLAUDE.md: camadas, páginas do carrossel, sombra, contorno, degradê, máscara e
+ *  remover fundo. Também vai, entre as marcas da imagem (abaixo), no CLAUDE.md escrito à mão do modelo da Cliente (imagem-N3). */
+export const linhasDaImagem = (): string[] => [
+  '- Imagem: `largura`, `altura`, `fundo`, `camadas` (`imagem`, `texto`, `forma`) de baixo para cima e `efeitos`. Um',
+  '  carrossel tem `paginas[]` (cada uma com `id`, `nome` e as suas `camadas`; a raiz fica com `camadas: []`) e as camadas',
+  '  se endereçam por `/paginas/P/camadas/N`; `estado_do_editor` diz a página ativa.',
+  '  Acabamento por camada: `sombra` {cor, opacidade, desfoque, x, y}; `contorno` {cor, espessura, posicao: `fora`,',
+  '  `centro` ou `dentro`}; `degrade` {`tipo` (`linear` ou `radial`), `angulo` (180 = de cima para baixo), `centro` {x, y},',
+  '  `paradas` [{cor, posicao de 0 a 1, opacidade}]}, no lugar da cor em texto e forma. `fundo_degrade`, na raiz do',
+  '  documento, vai por cima do `fundo` em todas as páginas. Foto dentro de forma ou texto: na camada de imagem, `mascara`',
+  '  é o id da forma ou do texto logo acima dela. `remover_fundo` troca o `src` pelo recorte e guarda o original em',
+  '  `src_original`. A pessoa exporta PNG por página e PDF pelo app; o MCP não exporta.',
+];
+
 export const claudeMd = (modulos: Modulo[]) => {
   const tem = (m: Modulo) => modulos.includes(m);
   const linhas = [
@@ -210,19 +228,7 @@ export const claudeMd = (modulos: Modulo[]) => {
       '  `falante`, `cor`, `cor_destaque`, `fundo` e `fonte` (padrão: os do `tema`). Gere com `transcrever`.',
     );
   }
-  if (tem('imagem')) {
-    linhas.push(
-      '- Imagem: `largura`, `altura`, `fundo`, `camadas` (`imagem`, `texto`, `forma`) de baixo para cima e `efeitos`. Um',
-      '  carrossel tem `paginas[]` (cada uma com `id`, `nome` e as suas `camadas`; a raiz fica com `camadas: []`) e as camadas',
-      '  se endereçam por `/paginas/P/camadas/N`; `estado_do_editor` diz a página ativa.',
-      '  Acabamento por camada: `sombra` {cor, opacidade, desfoque, x, y}; `contorno` {cor, espessura, posicao: `fora`,',
-      '  `centro` ou `dentro`}; `degrade` {`tipo` (`linear` ou `radial`), `angulo` (180 = de cima para baixo), `centro` {x, y},',
-      '  `paradas` [{cor, posicao de 0 a 1, opacidade}]}, no lugar da cor em texto e forma. `fundo_degrade`, na raiz do',
-      '  documento, vai por cima do `fundo` em todas as páginas. Foto dentro de forma ou texto: na camada de imagem, `mascara`',
-      '  é o id da forma ou do texto logo acima dela. `remover_fundo` troca o `src` pelo recorte e guarda o original em',
-      '  `src_original`. A pessoa exporta PNG por página e PDF pelo app; o MCP não exporta.',
-    );
-  }
+  if (tem('imagem')) linhas.push(...linhasDaImagem());
   if (tem('3d')) {
     linhas.push(
       '- Cena 3D: `fundo` (cor), `camera`, `luzes` e `objetos`. Vetores são listas `[x, y, z]`, com y para cima e o chão em',
@@ -283,6 +289,24 @@ const TITULO = '# Projeto do Estúdio';
 const FRASE_DO_APP = 'Esta pasta é um projeto do Estúdio, aberto no app. A pessoa edita na interface; você edita pelas ferramentas do MCP';
 const FIM_DO_TEXTO = 'Tudo o que você faz cai nos documentos, e a pessoa edita depois. Não grave fora da pasta do projeto.';
 
+// O CLAUDE.md escrito à mão do modelo "Carrossel narrado Cliente" (exemplos/exemplo) não leva o texto do app, mas leva a parte da
+// imagem entre estas marcas, refeita ao abrir: o Claude daquele modelo também lê `mascara`, `sombra`, `degrade` e `paginas`
+// (imagem-N3). O resto do arquivo é da pessoa e fica como está.
+export const MARCA_IMAGEM_INICIO = '<!-- estudio:imagem:inicio · parte do app, refeita ao abrir o projeto; escreva fora destas marcas -->';
+export const MARCA_IMAGEM_FIM = '<!-- estudio:imagem:fim -->';
+const FRASE_DO_EXEMPLO_CLIENTE = 'A pessoa edita na interface; você edita pelo terminal.';
+
+/** O bloco da imagem com as marcas, para o fim do CLAUDE.md do modelo da Cliente. */
+export const blocoDaImagem = (): string => [MARCA_IMAGEM_INICIO, '## Imagem e carrossel', '', ...linhasDaImagem(), MARCA_IMAGEM_FIM, ''].join('\n');
+
+/** O que a pessoa (ou o Claude) escreveu dentro do texto antigo do app (imagem-N5): as linhas que o app nunca escreveu.
+ *  Vai para uma seção própria em vez de sumir com o resto do texto antigo. Vazio se não houver nenhuma. */
+export const anotacoesDoTextoAntigo = (textoAntigo: string): string => {
+  const minhas = textoAntigo.split('\n').map((l) => l.trimEnd()).filter((l) => l.trim() && !LINHAS_DO_TEXTO_ANTIGO.has(l));
+  if (!minhas.length) return '';
+  return ['## Anotações do texto anterior', '', 'O Estúdio refez a parte dele acima. Estas linhas estavam dentro do texto antigo e não eram do app:', '', ...minhas].join('\n');
+};
+
 /** O CLAUDE.md novo a partir do atual, ou null se nada muda. Sem arquivo: o texto gerado. Com as marcas: troca só o que
  *  está entre elas. Texto antigo do app, sem marcas: troca pelo gerado e guarda depois dele o que a pessoa escreveu antes
  *  ou depois. Outro texto (o CLAUDE.md escrito à mão do carrossel da Cliente, ou um da pessoa): não mexe. */
@@ -296,9 +320,17 @@ export const claudeMdAtualizado = (atual: string | null, modulos: Modulo[]): str
   if (i >= 0 && f > i) {
     novo = texto.slice(0, i) + gerado.trimEnd() + texto.slice(f + MARCA_CLAUDE_FIM.length);
   } else if (texto.includes(FRASE_DO_APP) && texto.includes(FIM_DO_TEXTO)) {
-    const antes = texto.slice(0, Math.max(0, texto.indexOf(TITULO))).trim();
-    const depois = texto.slice(texto.indexOf(FIM_DO_TEXTO) + FIM_DO_TEXTO.length).trim();
-    novo = `${[gerado.trimEnd(), antes, depois].filter(Boolean).join('\n\n')}\n`;
+    const ini = Math.max(0, texto.indexOf(TITULO));
+    const fim = texto.indexOf(FIM_DO_TEXTO) + FIM_DO_TEXTO.length;
+    const antes = texto.slice(0, ini).trim();
+    const depois = texto.slice(fim).trim();
+    novo = `${[gerado.trimEnd(), anotacoesDoTextoAntigo(texto.slice(ini, fim)), antes, depois].filter(Boolean).join('\n\n')}\n`;
+  } else if (modulos.includes('imagem')) {
+    // o modelo da Cliente: texto à mão, e só a parte da imagem é do app (imagem-N3)
+    const ii = texto.indexOf(MARCA_IMAGEM_INICIO);
+    const fi = ii >= 0 ? texto.indexOf(MARCA_IMAGEM_FIM, ii) : -1;
+    if (ii >= 0 && fi > ii) novo = texto.slice(0, ii) + blocoDaImagem().trimEnd() + texto.slice(fi + MARCA_IMAGEM_FIM.length);
+    else if (texto.includes(FRASE_DO_EXEMPLO_CLIENTE)) novo = `${texto.trimEnd()}\n\n${blocoDaImagem()}`;
   }
   return novo === null || novo === texto ? null : novo;
 };

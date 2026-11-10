@@ -2,11 +2,12 @@
 // Toda escrita em documento passa por aplicarPatch: confere a versão (lock otimista), aplica o JSON Patch de forma
 // atômica (os "test" falham antes de qualquer mudança), grava, e registra a mudança com o patch inverso no diário.
 import {createHash} from 'node:crypto';
-import {existsSync, mkdirSync, readFileSync, renameSync, writeFileSync, appendFileSync} from 'node:fs';
+import {existsSync, mkdirSync, readFileSync, renameSync, appendFileSync} from 'node:fs';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import jsonpatch, {type Operation} from 'fast-json-patch';
 import type {ArquivoComentarios, Comentario, EntradaDiario, EntradaDocumento, EstadoEditor, Manifesto, OperacaoPatch} from './documentos';
+import {gravarAtomico} from './gravar-seguro';
 import {ARQUIVO_PESQUISA, caminhoTextoFonte, lerPesquisa, pesquisaVazia, type Pesquisa} from './pesquisa';
 
 export const PASTA_INTERNA = '.estudio';
@@ -55,9 +56,7 @@ export class Projeto {
   gravarTexto(rel: string, texto: string) {
     const abs = this.caminho(rel);
     mkdirSync(path.dirname(abs), {recursive: true});
-    const tmp = `${abs}.${process.pid}.tmp`;
-    writeFileSync(tmp, texto, 'utf-8');
-    renameSync(tmp, abs);
+    gravarAtomico(abs, texto); // arquivo preso (OneDrive, antivírus) tem nova tentativa curta: gravar-seguro.ts
   }
 
   manifesto(): Manifesto {

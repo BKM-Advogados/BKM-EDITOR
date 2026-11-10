@@ -7,13 +7,16 @@
 import React, {Suspense, useCallback, useEffect, useRef, useState} from 'react';
 import {DockviewReact, type DockviewApi, type DockviewReadyEvent, type DockviewTheme, type IDockviewPanelHeaderProps, type IDockviewPanelProps} from 'dockview-react';
 import 'dockview-react/dist/styles/dockview.css';
-import {Blend, BookOpen, Box, Check, Copy, Download, Film, FilePlus2, FolderOpen, FolderSearch, History, Home, Image as ImageIcon, LayoutPanelLeft, ListTree,
+import {Blend, BookOpen, Box, Check, Copy, Download, Film, FilePlus2, FolderOpen, FolderSearch, History, Home, Image as ImageIcon, Images, LayoutPanelLeft, ListTree,
   MessageSquare, MessageSquarePlus, MonitorPlay, Palette, Plus, Quote, Rows3, Settings, SlidersHorizontal, Sparkle, Undo2, X} from 'lucide-react';
 import type {Preferencias, Recente} from '../../compartilhado/api';
 import type {Modulo} from '../../nucleo/documentos';
 import {FORMATOS_IMAGEM, FORMATOS_VIDEO} from '../../nucleo/formatos';
 import {abrirProjeto, avisar, criarDocumento, desfazer, fecharProjeto, loja, mensagemDe, quandoVerFato, useLoja, type Area} from '../estado/loja';
 import {pedirTexto} from '../componentes/Dialogo';
+import {acaoDeArquivo} from './atalhos';
+import {SeloSalvo} from './SeloSalvo';
+import {Midia} from '../paineis/Midia'; // frente Casca (rodada 3): painel de mídia
 import type {PaineisDoModulo} from './contrato';
 import {PaineisVideo} from '../modulos/video/paineis';
 import {PaineisImagem} from '../modulos/imagem/paineis';
@@ -64,7 +67,7 @@ const PorArea: React.FC<{parte: 'Lista' | 'Monitor' | 'Inspector' | 'Linha'}> = 
 // sustentam a área não têm ×; os outros mostram o × ao passar o mouse.
 const ICONES_ABA: Record<string, React.ReactNode> = {
   monitor: <MonitorPlay size={14} />, linha: <Rows3 size={14} />, lista: <ListTree size={14} />, inspector: <SlidersHorizontal size={14} />,
-  comentarios: <MessageSquare size={14} />, historico: <History size={14} />, pesquisa: <Quote size={14} />, terminal: <Sparkle size={14} />,
+  comentarios: <MessageSquare size={14} />, historico: <History size={14} />, pesquisa: <Quote size={14} />, midia: <Images size={14} />, terminal: <Sparkle size={14} />,
 };
 const ESSENCIAIS = new Set(['monitor', 'linha', 'lista', 'inspector', 'terminal']);
 const AbaDoPainel: React.FC<IDockviewPanelHeaderProps> = ({api}) => {
@@ -95,16 +98,17 @@ const componentes: Record<string, React.FC<IDockviewPanelProps>> = {
   comentarios: () => <Comentarios />,
   historico: () => <Historico />,
   pesquisa: () => <Pesquisa />,
+  midia: () => <Midia />,
   terminal: () => <Suspense fallback={<Carregando />}><Terminal /></Suspense>,
 };
 
 // faixas de layout de docs/tela.md: C (compacta) abaixo de 1600x800, P (padrão) acima; cada área x faixa guarda o seu.
 // No Vídeo, o arranjo depende também do formato: vertical (V) quer o monitor em coluna, horizontal (H) quer largura.
-// A versão na chave sobe quando entra painel novo no arranjo padrão (v6: Pesquisa), para os layouts gravados o verem.
+// A versão na chave sobe quando entra painel novo no arranjo padrão (v6: Pesquisa, v7: Mídia), para os layouts gravados o verem.
 type Faixa = 'C' | 'P';
 type Orientacao = 'V' | 'H';
 const faixaAtual = (): Faixa => (window.innerWidth < 1600 || window.innerHeight < 800 ? 'C' : 'P');
-const CHAVE = (area: Area, faixa: Faixa, o: Orientacao) => `estudio:layout:v6:${area}:${faixa}${area === 'video' ? `:${o}` : ''}`;
+const CHAVE = (area: Area, faixa: Faixa, o: Orientacao) => `estudio:layout:v7:${area}:${faixa}${area === 'video' ? `:${o}` : ''}`;
 const lerLayout = (area: Area, faixa: Faixa, o: Orientacao) => {
   try {
     const t = localStorage.getItem(CHAVE(area, faixa, o));
@@ -154,6 +158,11 @@ const layoutPadrao = (api: DockviewApi, area: Area, faixa: Faixa, o: Orientacao)
     api.addPanel({id: 'inspector', component: 'inspector', title: 'Propriedades', position: {referencePanel: 'lista', direction: 'right'}});
     abasDoInspector(false);
   }
+  // frente Casca (rodada 3): o painel de mídia é uma aba ao lado da Lista (nas três disposições a Lista existe); a aba que estava
+  // à frente continua à frente
+  api.addPanel({id: 'midia', component: 'midia', title: 'Mídia', position: {referencePanel: 'lista', direction: 'within'}});
+  api.getPanel('lista')?.api.setActive();
+  api.getPanel('inspector')?.api.setActive();
 };
 
 const TITULOS: Record<Area, string> = {video: 'Cenas e blocos', imagem: 'Camadas', '3d': 'Objetos', efeitos: 'Pilha de efeitos'};
@@ -306,6 +315,15 @@ export const Casca: React.FC = () => {
     p.api.setActive();
   }), []);
 
+  // o painel de mídia fechado volta pelo menu do projeto, ao lado da Lista (ou do inspetor, se a Lista não estiver)
+  const abrirMidia = () => {
+    const d = api.current;
+    if (!d) return;
+    const ref = d.getPanel('lista') ? 'lista' : 'inspector';
+    const p = d.getPanel('midia') ?? d.addPanel({id: 'midia', component: 'midia', title: 'Mídia', ...(d.getPanel(ref) ? {position: {referencePanel: ref, direction: 'within' as const}} : {})});
+    p.api.setActive();
+  };
+
   const marcarVersao = async () => {
     const r = await window.estudio.marcarVersao();
     avisar(r.mensagem, r.ok ? 'ok' : 'info');
@@ -330,7 +348,9 @@ export const Casca: React.FC = () => {
       const digitando = /INPUT|TEXTAREA|SELECT/.test(alvo.tagName) || alvo.isContentEditable || alvo.closest('.xterm');
       if (document.querySelector('.dialogo-fundo')) return;
       const k = ev.key.toLowerCase();
-      // Alt+1 a 4, Ctrl+' e os Ctrl de arquivo valem até com o terminal em foco (escuta na captura, antes do xterm)
+      // Alt+1 a 4, Ctrl+' e Ctrl+S valem até com o terminal em foco (escuta na captura, antes do xterm). Ctrl+O, N e W são
+      // de arquivo só fora do terminal, onde o Ctrl+W apaga uma palavra (transversal-D4, atalhos.ts)
+      const arquivo = acaoDeArquivo(ev, Boolean(alvo.closest('.xterm')));
       if (ev.altKey && !ev.ctrlKey && /^Digit[1-4]$/.test(ev.code)) {
         ev.preventDefault();
         ev.stopPropagation();
@@ -340,13 +360,13 @@ export const Casca: React.FC = () => {
         ev.stopPropagation();
         api.current?.getPanel('terminal')?.api.setActive();
         (document.querySelector('.conversa .caixa-pedido textarea, .terminal-corpo textarea') as HTMLTextAreaElement | null)?.focus();
-      } else if (ev.ctrlKey && !ev.altKey && !ev.shiftKey && k === 'o') {
+      } else if (arquivo === 'abrir') {
         ev.preventDefault();
         void abrirRef.current();
-      } else if (ev.ctrlKey && !ev.altKey && !ev.shiftKey && k === 'n') {
+      } else if (arquivo === 'novo') {
         ev.preventDefault();
         novoProjeto();
-      } else if (ev.ctrlKey && !ev.altKey && !ev.shiftKey && k === 'w') {
+      } else if (arquivo === 'fechar') {
         ev.preventDefault();
         voltarAoInicio();
       } else if (ev.ctrlKey && !ev.altKey && !ev.shiftKey && k === 's') {
@@ -445,6 +465,7 @@ export const Casca: React.FC = () => {
             <button onClick={item(() => void marcarVersao())}><Check size={14} />Marcar ponto de restauração<kbd>Ctrl+S</kbd></button>
             <button onClick={item(() => void window.estudio.abrirExemplo().then(abrirProjeto).catch((e: Error) => avisar(mensagemDe(e), 'erro')))}><BookOpen size={14} />Ver um pronto (exemplo Cliente)</button>
             <hr />
+            <button onClick={item(abrirMidia)}><Images size={14} />Mídia do projeto</button>
             <button onClick={item(() => setMarca(true))}><Palette size={14} />Marca…</button>
             <button onClick={item(() => setPreferencias(true))}><Settings size={14} />Preferências…</button>
             <button onClick={item(() => montar(area, true))}><LayoutPanelLeft size={14} />Redefinir os painéis desta área</button>
@@ -456,9 +477,7 @@ export const Casca: React.FC = () => {
           <span className="sep">/</span>
           <NomeProjeto nome={info?.manifesto.nome ?? 'Sem nome'} raiz={info?.raiz} />
           {docAtivo && <><span className="sep">›</span><span className="doc">{docAtivo.titulo}</span></>}
-          <span className="salvo" title={info?.git ? 'Cada edição grava na hora. Ctrl+S marca um ponto de restauração.' : 'Cada edição grava na hora. Sem o Git, não há pontos de restauração.'}>
-            <Check size={12} />Salvo
-          </span>
+          <SeloSalvo git={Boolean(info?.git)} />
         </span>
         <nav className="areas">
           {AREAS.map((a) => (

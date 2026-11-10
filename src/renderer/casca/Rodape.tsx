@@ -1,8 +1,9 @@
-// Rodapé: as teclas que valem na área atual e, por 4 s, o último aviso no lugar delas; à direita, os comentários
+// Rodapé: as teclas que valem na área atual e, por 4 s (erro: 9 s, o prazo da loja), o último aviso no lugar delas; à direita, os comentários
 // abertos e a memória do app (medida, não estimada). "Claude não encontrado" só aparece quando falta.
 import React, {useEffect, useState} from 'react';
 import {CircleAlert, CircleCheck, Info} from 'lucide-react';
 import {useLoja, type Area} from '../estado/loja';
+import {avisoVivo as vivoEm, restaDoAviso} from '../estado/gravacao';
 
 const DICAS: Record<Area, [string[], string][]> = {
   video: [[['V'], 'seleção'], [['M'], 'comentar'], [['Espaço'], 'tocar'], [['←', '→'], 'quadro'], [['J', 'K', 'L'], 'velocidade']],
@@ -10,7 +11,6 @@ const DICAS: Record<Area, [string[], string][]> = {
   '3d': [[['Q'], 'seleção'], [['W'], 'mover'], [['E'], 'girar'], [['R'], 'escala'], [['M'], 'comentar']],
   efeitos: [[['Espaço'], 'tocar'], [['M'], 'comentar'], [['Ctrl', 'Z'], 'desfazer']],
 };
-const AVISO_MS = 4000;
 
 export const Rodape: React.FC = () => {
   const aviso = useLoja((e) => e.aviso);
@@ -28,12 +28,12 @@ export const Rodape: React.FC = () => {
   // redesenha quando o aviso vence, para as dicas voltarem
   useEffect(() => {
     if (!aviso) return;
-    const resta = AVISO_MS - (Date.now() - aviso.em);
+    const resta = restaDoAviso(aviso, Date.now());
     if (resta <= 0) return;
     const t = setTimeout(() => tique((x) => x + 1), resta + 20);
     return () => clearTimeout(t);
   }, [aviso]);
-  const avisoVivo = aviso && Date.now() - aviso.em < AVISO_MS ? aviso : null;
+  const avisoVivo = vivoEm(aviso, Date.now());
   const icone = avisoVivo?.tipo === 'erro' ? <CircleAlert /> : avisoVivo?.tipo === 'ok' ? <CircleCheck /> : <Info />;
   return (
     <footer className="rodape">

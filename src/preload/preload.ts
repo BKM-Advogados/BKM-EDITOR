@@ -123,6 +123,11 @@ const api: ApiEstudio = {
     aoPedido: (cb) => ouvir<[string, string]>(CANAL.removerFundoPedido, cb),
     responder: (id, r) => ipcRenderer.send(CANAL.removerFundoResposta, id, r),
   },
+  // frente Casca (rodada 3): painel de mídia
+  midia: {
+    indice: () => ipcRenderer.invoke(CANAL.midia),
+    marcar: (caminho, mudanca) => ipcRenderer.invoke(CANAL.midiaMarcar, caminho, mudanca),
+  },
 };
 
 contextBridge.exposeInMainWorld('estudio', api);

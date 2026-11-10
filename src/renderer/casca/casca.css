@@ -118,6 +118,9 @@
 .barra input.nome-projeto { width: 240px; height: 24px; background: var(--fundo-2); border-color: var(--acento); cursor: text; }
 .barra .salvo { display: inline-flex; align-items: center; gap: 3px; margin-left: 4px; color: var(--texto-3); font-weight: 400; font-size: 11px; }
 .barra .salvo svg { color: var(--ok); }
+.barra .salvo.gravando svg { color: var(--texto-3); animation: girar-salvo 1s linear infinite; }
+.barra .salvo.falhou, .barra .salvo.falhou svg { color: var(--erro); }
+@keyframes girar-salvo { to { transform: rotate(360deg); } }
 .barra .acoes .bt.exportar { background: var(--fundo-3); color: var(--texto); margin-left: 6px; padding: 0 10px; }
 .barra .acoes .bt.exportar:hover { background: var(--fundo-4); }
 .barra .acoes .bt.exportar:disabled { opacity: 0.45; }

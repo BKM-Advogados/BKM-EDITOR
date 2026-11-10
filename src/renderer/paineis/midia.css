@@ -1,0 +1,57 @@
+/* Painel Mídia: busca e filtros em cima, grade de cartões com miniatura no meio e os detalhes da tomada embaixo. Usa os
+   tokens do :root (estilo.css) e os cartões do molde dos Comentários e da Pesquisa. A cor só informa: verde na tomada boa,
+   cinza apagado na descartada; não há vermelho de erro. */
+/* a classe do painel não é `.midia`: ela já é do bloco de mídia da linha do tempo e do ícone da família */
+.painel-midia { position: relative; }
+.midia-busca { gap: 6px; }
+.midia-busca svg { flex: none; color: var(--texto-3); }
+.midia-busca .campo { flex: 1; min-width: 0; }
+
+.midia-filtros { display: flex; flex-direction: column; gap: 3px; padding: 4px 8px; border-bottom: 1px solid var(--borda); flex: none; }
+.midia-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.midia-chip { font: var(--tam-1) var(--fonte); color: var(--texto-2); background: var(--fundo-3); border: 1px solid transparent; border-radius: 10px; padding: 0 7px; cursor: pointer; white-space: nowrap; }
+.midia-chip:hover { border-color: var(--borda-forte); color: var(--texto); }
+.midia-chip.ligado { background: var(--acento-fundo); color: var(--texto); border-color: var(--acento); }
+.midia-ordem { margin-left: auto; width: auto; padding: 0 4px; height: 20px; font-size: var(--tam-1); }
+
+.midia-corpo { padding: 8px; }
+.midia-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 6px; }
+
+.midia-cartao { display: flex; flex-direction: column; gap: 2px; padding: 4px; text-align: left; position: relative; cursor: pointer;
+  background: var(--fundo-2); border: 1px solid var(--borda); border-radius: var(--raio-2); color: var(--texto);
+  content-visibility: auto; contain-intrinsic-size: 132px 118px; }
+.midia-cartao:hover { border-color: var(--borda-forte); background: var(--fundo-3); }
+.midia-cartao.sel { border-color: var(--acento); background: var(--acento-fundo); }
+.midia-cartao.descartada { opacity: 0.55; }
+.midia-cartao.descartada .midia-nome { text-decoration: line-through; }
+.midia-nome { font-size: var(--tam-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.midia-sub { font-size: var(--tam-1); color: var(--texto-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.midia-mini { position: relative; aspect-ratio: 16 / 10; border-radius: var(--raio); overflow: hidden; background: var(--fundo-1); display: flex; align-items: center; justify-content: center; }
+.midia-mini img, .midia-mini video { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.midia-mini.imagem img { background: var(--xadrez); }
+.midia-icone-grande { color: var(--icone-inativo); }
+.midia-mini.audio { background: linear-gradient(135deg, var(--trilha-midia-fundo), var(--fundo-1)); }
+.midia-mini.audio .midia-icone-grande { color: var(--trilha-audio); }
+.midia-tipo, .midia-duracao { position: absolute; background: rgba(0, 0, 0, 0.62); color: var(--texto); border-radius: 3px; font: var(--tam-1) var(--fonte-mono); padding: 0 4px; line-height: 16px; }
+.midia-tipo { left: 3px; top: 3px; display: inline-flex; align-items: center; }
+.midia-duracao { right: 3px; bottom: 3px; }
+.midia-marca { position: absolute; right: 8px; top: 8px; width: 16px; height: 16px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
+.midia-marca.boa { background: var(--ok); color: var(--sobre-acento); }
+.midia-marca.descartada { background: var(--fundo-4); color: var(--texto-2); border: 1px solid var(--borda-forte); }
+
+/* Boa, Descartar e "Usar em…" ficam logo abaixo do título: num painel baixo, o que fica no fim do detalhe some atrás da rolagem */
+.midia-detalhe { flex: none; max-height: 46%; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 8px; border-top: 1px solid var(--borda-forte); background: var(--fundo-1); }
+.midia-detalhe-topo { display: flex; align-items: center; gap: 4px; }
+.midia-detalhe-topo b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.midia-detalhe .esp, .midia-marcar .esp { flex: 1; }
+.midia-previa img, .midia-previa video { width: 100%; max-height: 96px; object-fit: contain; background: var(--entorno); border-radius: var(--raio); display: block; }
+.midia-previa img { background: var(--xadrez); }
+.midia-previa audio { width: 100%; }
+.midia-meta { text-transform: none; }
+.midia-marcar { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.midia-marcar .bt.ligado { background: var(--acento-fundo); border-color: var(--acento); }
+.midia-nota { width: 100%; resize: vertical; min-height: 36px; font-size: var(--tam-2); }
+.midia-derivados { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.midia-derivados li { display: flex; justify-content: space-between; gap: 8px; padding: 1px 6px; border-left: 2px solid var(--borda-forte); font-size: var(--tam-1); color: var(--texto-2); }
+.midia-uso { text-transform: none; }

@@ -37,9 +37,18 @@ export type Aviso = {tipo: TipoAviso; termo: string; onde: string; nota?: string
 // conferir_capa.py:_norm: NFKD e fora tudo o que não é ASCII, em minúsculas
 const norm = (s: string): string => s.normalize('NFKD').replace(/[^\x00-\x7f]/g, '').toLowerCase();
 
-// conferir_capa.py:_acha: palavra inteira (sem letra, dígito, _ ou $ antes; sem letra, dígito ou _ depois)
-const acha = (textoNorm: string, termo: string): boolean =>
-  new RegExp(`(?<![\\w$])${norm(termo).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?!\\w)`).test(textoNorm);
+// conferir_capa.py:_acha: palavra inteira (sem letra, dígito, _ ou $ antes; sem letra, dígito ou _ depois). Termo que termina
+// em símbolo ("r$", "100%") não pede fronteira depois: "R$500" tem dígito colado no "r$" e é o mesmo aviso de "R$ 500"
+// (transversal-D19).
+const acha = (textoNorm: string, termo: string): boolean => {
+  const t = norm(termo);
+  const depois = /\w$/.test(t) ? '(?!\\w)' : '';
+  return new RegExp(`(?<![\\w$])${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}${depois}`).test(textoNorm);
+};
+
+/** Texto sem acento, minúsculo e com os espaços e quebras de linha contados como um espaço só: legenda com "\n" no meio
+ *  de "consulta\ngratuita" continua sendo "consulta gratuita". */
+const normalizado = (s: string): string => norm(s).replace(/\s+/g, ' ').trim();
 
 // Palavras com maiúscula que não são nome de pessoa: começo de frase comum, instituição, lugar, norma.
 const NAO_E_NOME = new Set(norm(
@@ -76,7 +85,11 @@ const suspeitasDeNome = (texto: string): string[] => {
  * do texto que não aparece em nenhuma afirmação de fato vira aviso 'numero_sem_fato'. Só informa. */
 export const checarTexto = (texto: string, regras: Regras = REGRAS_CLIENTE, opcoes: {onde?: string; fatos?: Fato[]} = {}): {avisos: Aviso[]} => {
   const onde = opcoes.onde ?? 'texto';
-  const t = norm(texto);
+  // a frase de fecho que as próprias regras pedem ("Procure um advogado trabalhista.") não é aviso da OAB: sem tirá-la, todo
+  // vídeo que fecha certo recebia o aviso de 'advogado' (transversal-D18). Sem o ponto final também vale.
+  const fecho = normalizado(regras.texto.ultima_frase).replace(/[.!?\s]+$/, '');
+  const base = normalizado(texto);
+  const t = fecho ? base.split(fecho).join(' ') : base;
   const avisos: Aviso[] = [];
   for (const termo of regras.empresas.reprova) if (acha(t, termo)) avisos.push({tipo: 'empresa', termo, onde});
   for (const termo of regras.empresas.revisar) {

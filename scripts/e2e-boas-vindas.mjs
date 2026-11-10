@@ -1,4 +1,4 @@
-// O caminho de quem abre o app pela primeira vez: tela de boas-vindas → "Abrir o exemplo" → área de vídeo com o C2.
+// O caminho de quem abre o app pela primeira vez: tela de boas-vindas → "Ver um pronto" → área de vídeo com o C2.
 // Uso: com o app aberto sem ESTUDIO_PROJETO e com ESTUDIO_DEPURAR_PORTA (o exemplo vai para %USERPROFILE%\Estudio\exemplo).
 import {chromium} from 'playwright';
 
@@ -8,7 +8,8 @@ const erros = [];
 p.on('pageerror', (e) => erros.push(e.message));
 p.on('console', (m) => m.type() === 'error' && erros.push(m.text().slice(0, 200)));
 
-await p.locator('button', {hasText: 'Abrir o exemplo'}).click();
+// o botão aparece em mais de um lugar da tela inicial (transversal-D21: antes se chamava "Abrir o exemplo"): vale o primeiro
+await p.locator('button', {hasText: 'Ver um pronto'}).first().click();
 await p.locator('.areas').waitFor({timeout: 20000});
 await p.waitForTimeout(5000);
 // o quadro 0 é a abertura, ainda sem blocos na prévia: a linha do tempo mostra se o roteiro carregou
