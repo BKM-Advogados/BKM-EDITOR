@@ -74,7 +74,8 @@ export const EditorPixel: React.FC<{
   }, [grade, colunas, linhas, indices]);
 
   const aplicarNovaGrade = useCallback((nova: GradePixel) => {
-    aplicar(documento, [{op: "replace", path: `${origem}/grade`, value: nova}], "editar arte em pixel");
+    // "add" e não "replace": a camada pixel nova ainda não tem o campo `grade` (replace falha em campo que não existe)
+    aplicar(documento, [{op: "add", path: `${origem}/grade`, value: nova}], "editar arte em pixel");
   }, [documento, origem]);
 
   const pintarCelula = (c: number, l: number) => {
