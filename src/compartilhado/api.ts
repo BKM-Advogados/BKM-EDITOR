@@ -15,6 +15,8 @@ import type {EstadoModeloFundo} from '../nucleo/remover-fundo';
 import type {EstadoDaFala} from '../nucleo/legendas'; // frente Fala
 import type {PedidoLevar, ResultadoConcluir, ResultadoLevar, ResultadoVolta} from '../nucleo/transicoes'; // frente Música
 import type {PedidoExportarMusica, ResultadoExportarMusica} from '../nucleo/musica-projeto'; // frente Música
+import type {ConfigNarracao, ProvedorNarracao, VozNarracao} from '../nucleo/narracao'; // narração por IA
+import type {AndamentoNarracao, Previa, ResultadoNarracao} from '../nucleo/narracao-servico'; // só os tipos
 
 export const CANAL = {
   abrirPasta: 'estudio:abrir-pasta',
@@ -153,6 +155,16 @@ export const CANAL = {
   // ponte com a janela (05 §0.1, src/main/ponte-janela.ts): o processo principal pede uma ação à janela e espera
   mcpPedido: 'estudio:mcp-pedido',
   mcpResposta: 'estudio:mcp-resposta',
+  // narração por IA (src/main/ipc-narracao.ts, docs/narracao.md): a chave fica no processo principal
+  narracaoEstado: 'estudio:narracao-estado',
+  narracaoGravarChave: 'estudio:narracao-gravar-chave',
+  narracaoApagarChave: 'estudio:narracao-apagar-chave',
+  narracaoVozes: 'estudio:narracao-vozes',
+  narracaoPrevia: 'estudio:narracao-previa',
+  narracaoGerar: 'estudio:narracao-gerar',
+  narracaoCancelar: 'estudio:narracao-cancelar',
+  narracaoAndamento: 'estudio:narracao-andamento',
+  narracaoAmostra: 'estudio:narracao-amostra',
 } as const;
 
 /** O projeto aberto. `estado` é o último que a pessoa viu (área, documento, seleção), para reabrir onde parou; `git`
@@ -393,6 +405,24 @@ export type ApiEstudio = {
     guardadas: () => Promise<ConversaGuardadaTela[]>;
     apagarGuardada: (sessao: string) => Promise<void>;
   };
+  // narração por IA (docs/narracao.md): Gemini TTS (a chave do Gemini das conversas) e Google Cloud TTS (chave própria)
+  narracao: {
+    /** Se cada provedor tem chave (só a origem e os 4 últimos caracteres) e onde o cofre guarda. */
+    estado: () => Promise<EstadoNarracaoIA>;
+    /** A chave do Google Cloud TTS: testada na lista de vozes (sem custo) antes de gravar; recusada não grava. */
+    gravarChave: (chave: string) => Promise<ResultadoChave>;
+    apagarChave: () => Promise<void>;
+    /** As vozes do provedor (da API, guardadas na sessão; `atualizar` busca de novo). */
+    vozes: (provedor: ProvedorNarracao, atualizar?: boolean) => Promise<{provedor: ProvedorNarracao; vozes: VozNarracao[]; aviso?: string}>;
+    /** O que vai ser gerado: o texto final de cada cena (com as pronúncias), caracteres, duração e custo estimados. Sem rede. */
+    previa: (documento: string, o?: {cenas?: string[]; refazer?: boolean}) => Promise<Previa>;
+    /** Gera as falas (uma geração por vez) e põe no vídeo como edição da pessoa (Ctrl+Z desfaz). O andamento sai em aoAndamento. */
+    gerar: (documento: string, o?: {cenas?: string[]; refazer?: boolean}) => Promise<ResultadoNarracao>;
+    cancelar: () => void;
+    aoAndamento: (cb: (a: AndamentoNarracao) => void) => () => void;
+    /** Uma frase curta na voz da configuração (guardada neste PC: a mesma amostra não é paga duas vezes). */
+    amostra: (config: ConfigNarracao) => Promise<{wav: ArrayBuffer; do_cache: boolean; custo_usd?: number}>;
+  };
   // carrossel em partes (rodada 3, B2, imagem-D19): uma página por vez, cada PNG vai ao disco ao chegar e o PDF sai no fechar
   exportarPaginasEmPartes: {
     abrir: (o: {documento: string; pdf: boolean}) => Promise<{sessao: string}>;
@@ -471,6 +501,9 @@ export type ConfigsDoApp = {http: string; stdio: string};
 /** Conversa guardada no projeto (.estudio/conversas/): o que a tela desenha e de quem é. */
 export type ConversaGuardadaTela = {sessao: string; provedor: string; titulo: string; modelo?: string; criada_em: string; atualizada_em: string;
   itens: unknown[]; uso?: unknown};
+/** A chave de um provedor da narração por IA, como a tela pode saber (nunca o texto). */
+export type ChaveNarracaoTela = {pronto: boolean; origem: 'cofre' | 'ambiente' | 'nenhuma'; final?: string; variavel?: string};
+export type EstadoNarracaoIA = {gemini: ChaveNarracaoTela; 'google-tts': ChaveNarracaoTela; cofre_persistente: boolean; cofre_texto: string};
 /** Soma do mês por provedor, no PC: tokens e custo estimado pela tabela de preços. */
 export type UsoDoMes = Record<string, {entrada: number; cache: number; saida: number; custo_usd: number; turnos: number}>;
 

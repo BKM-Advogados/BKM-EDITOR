@@ -32,6 +32,10 @@ import type {PedidoExportarMusica, ResultadoExportarMusica} from '../../src/nucl
 import {cancelarTransicao, concluirTransicao, levarPara, registroVazio, type BaseProjeto, type RegistroTransicoes} from '../../src/nucleo/transicoes';
 import {envelopeDeAmostras, type Envelope as EnvelopeMusica} from '../../src/nucleo/audio';
 import type {EntradaDiario, OperacaoPatch} from '../../src/nucleo/documentos';
+import {configDaNarracao, NOMES_PROVEDOR, VOZES_CHIRP, VOZES_GEMINI, type ProvedorNarracao} from '../../src/nucleo/narracao'; // narração por IA
+import {escolherCenas, itensDaNarracao, patchDasFalas} from '../../src/nucleo/narracao-cenas';
+import type {AndamentoNarracao, Previa, ResultadoNarracao} from '../../src/nucleo/narracao-servico';
+import {custoNarracao} from '../../src/main/ia/precos';
 
 type Proj = {raiz: string; manifesto: Manifesto; docs: Record<string, unknown>; versao: number};
 const projetos = new Map<string, Proj>();
@@ -401,6 +405,7 @@ const api: ApiEstudio = {
     return true;
   },
   fala: falaSimulada(), // frente Fala: transcrição simulada (no fim do arquivo)
+  narracao: narracaoSimulada(), // narração por IA: vozes do catálogo e falas sintéticas (no fim do arquivo)
   // exportação (frente C): a marca d'água por destino fica em memória, por projeto, como o .estudio/exportacao.json
   prefsExportacao: async () => structuredClone(prefsExportacao.get(aberto?.raiz ?? '') ?? {}),
   gravarPrefsExportacao: async (p) => {
@@ -1018,3 +1023,86 @@ const musicaPrevia = (() => {
     },
   };
 })();
+
+// ---------- narração por IA (docs/narracao.md): sem rede, sem chave de verdade ----------
+// A chave do Gemini aparece como vinda do cofre; a do Cloud TTS, que começa com "AIza", é aceita. "Gerar" faz uma narração
+// sintética do tamanho do texto (60 ms por caractere), como blob, e põe na faixa de voz pela mesma conta do app.
+function narracaoSimulada(): ApiEstudio['narracao'] {
+  const ouvintes = new Set<(a: AndamentoNarracao) => void>();
+  let chaveTts: string | null = null;
+  let cancelar = false;
+  const chaves = () => ({gemini: {pronto: true, origem: 'cofre' as const, final: 'k9Qe'},
+    'google-tts': chaveTts ? {pronto: true, origem: 'cofre' as const, final: chaveTts.slice(-4)} : {pronto: false, origem: 'nenhuma' as const}});
+  const blobDeFala = (ms: number) => {
+    const amostras = narracaoSintetica(Math.max(0.5, ms / 1000));
+    const wav = codificarWav([amostras], TAXA);
+    const url = URL.createObjectURL(new Blob([wav], {type: 'audio/wav'}));
+    audios.set(url, {url, nome: 'fala gerada.wav'});
+    envelopes[url] = envelopeDeAmostras([amostras], TAXA);
+    return {url, wav, duracao_ms: Math.round((amostras.length / TAXA) * 1000)};
+  };
+  const previa = (documento: string, o: {cenas?: string[]; refazer?: boolean} = {}): Previa => {
+    const doc = aberto!.docs[documento] as DocCenas;
+    const cfg = configDaNarracao(doc.narracao);
+    const itens = itensDaNarracao(doc);
+    const ids = escolherCenas(doc, o.cenas).ids;
+    const alvo = itens.filter((i) => ids.includes(i.cena) && i.estado !== 'sem_texto' && (o.refazer || o.cenas?.length || i.estado !== 'gerada'));
+    const custo = (i: (typeof itens)[number]) => custoNarracao(cfg.provedor, cfg.modelo, i.medida!)?.usd ?? 0;
+    return {documento, provedor: cfg.provedor, modelo: cfg.modelo, voz: cfg.voz, tem_chave: chaves()[cfg.provedor].pronto,
+      itens: alvo.map((i) => ({cena: i.cena, n: i.n, estado: i.estado, texto_final: i.texto_final, hash: i.hash, arquivo: i.arquivo, caracteres: i.medida!.caracteres,
+        segundos_estimados: i.medida!.segundos, em_cache: false, vai_a_api: true, custo_usd: custo(i)})),
+      total: {cenas: itens.length, a_gerar: alvo.length, vao_a_api: alvo.length, caracteres: alvo.reduce((s, i) => s + i.medida!.caracteres, 0),
+        segundos_estimados: Math.round(alvo.reduce((s, i) => s + i.medida!.segundos, 0) * 10) / 10, custo_usd: alvo.reduce((s, i) => s + custo(i), 0), tabela: '10/11/2026',
+        fonte: 'prévia web'},
+      sem_texto: itens.filter((i) => ids.includes(i.cena) && i.estado === 'sem_texto').map((i) => i.n)};
+  };
+  return {
+    estado: async () => ({...chaves(), cofre_persistente: true, cofre_texto: 'guardada cifrada neste PC (prévia web: em memória)'}),
+    gravarChave: async (chave) => {
+      if (!/^AIza/.test(chave)) return {ok: false, mensagem: 'a chave do Google Cloud TTS foi recusada pelo Google (400): API key not valid.'};
+      chaveTts = chave;
+      return {ok: true, persistente: true, mensagem: `chave aceita (${VOZES_CHIRP.length} vozes Chirp 3: HD em português) e guardada (prévia web)`};
+    },
+    apagarChave: async () => void (chaveTts = null),
+    vozes: async (provedor: ProvedorNarracao) => ({provedor, vozes: provedor === 'gemini' ? VOZES_GEMINI : VOZES_CHIRP,
+      aviso: `prévia web: o catálogo de ${NOMES_PROVEDOR[provedor]}, sem a lista da API`}),
+    previa: async (documento, o) => previa(documento, o),
+    gerar: async (documento, o = {}) => {
+      cancelar = false;
+      const p = previa(documento, o);
+      const r: ResultadoNarracao = {ok: true, documento, provedor: p.provedor, modelo: p.modelo, voz: p.voz, geradas: [], avisos: [], sem_texto: p.sem_texto};
+      if (!p.tem_chave) throw new Error(`falta a chave do ${NOMES_PROVEDOR[p.provedor]}: ponha em Configurações › IA`);
+      const feitas: {cena: string; arquivo: string; duracao_ms: number; hash: string}[] = [];
+      for (const [k, i] of p.itens.entries()) {
+        if (cancelar) {
+          r.ok = false;
+          r.cancelado = true;
+          r.erro = `cancelado depois de ${k} de ${p.itens.length}`;
+          break;
+        }
+        ouvintes.forEach((f) => f({documento, feitas: k, total: p.itens.length, cena: i.cena, n: i.n, fase: 'gerando'}));
+        await new Promise((ok) => setTimeout(ok, 500));
+        const b = blobDeFala(i.caracteres * 60);
+        feitas.push({cena: i.cena, arquivo: b.url, duracao_ms: b.duracao_ms, hash: i.hash!});
+        r.geradas.push({cena: i.cena, n: i.n, arquivo: b.url, duracao_ms: b.duracao_ms, do_cache: false});
+      }
+      if (feitas.length) {
+        const x = patchDasFalas(aberto!.docs[documento] as DocCenas, feitas);
+        r.avisos.push(...x.avisos);
+        await api.aplicarPatch({documento, patch: x.patch, rotulo: `narração por IA: ${feitas.length} cenas`});
+        mudou(aberto!.manifesto.documentos.find((d) => d.id === documento)?.caminho ?? documento);
+      }
+      ouvintes.forEach((f) => f({documento, feitas: feitas.length, total: p.itens.length, fase: 'pronto'}));
+      return r;
+    },
+    cancelar: () => void (cancelar = true),
+    aoAndamento: (cb) => {
+      ouvintes.add(cb);
+      return () => ouvintes.delete(cb);
+    },
+    amostra: async () => {
+      const b = blobDeFala(3000);
+      return {wav: b.wav.buffer.slice(0) as ArrayBuffer, do_cache: false, custo_usd: 0.0007};
+    },
+  };
+}
