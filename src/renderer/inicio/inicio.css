@@ -1,7 +1,9 @@
 /* Tela inicial: duas colunas (começar | continuar) sobre o grafite, com os tokens "grafite e sinal". O azul marca o que
    está escolhido; o violeta é só do Claude. Em janela estreita as colunas empilham. */
 .inicio-janela { height: 100%; display: flex; flex-direction: column; background: var(--fundo-0); color: var(--texto); }
-.inicio-barra { height: 36px; flex: none; display: flex; align-items: center; padding: 0 14px; -webkit-app-region: drag; user-select: none; }
+.inicio-barra { height: 36px; flex: none; display: flex; align-items: center; padding: 0 14px; -webkit-app-region: drag; user-select: none;
+  /* os semáforos do Mac ficam à esquerda (Window Controls Overlay, plataforma.ts) */
+  padding-left: calc(env(titlebar-area-x, 0px) + 14px); }
 .inicio-marca { display: inline-flex; align-items: center; gap: 8px; font: 600 13px var(--fonte); }
 
 .inicio { flex: 1; min-height: 0; overflow: auto; display: grid; grid-template-columns: minmax(520px, 1.15fr) minmax(360px, 1fr); gap: 28px;

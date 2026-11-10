@@ -5,7 +5,9 @@
 .casca { grid-template-rows: 36px 1fr var(--rodape, 22px); }
 .barra { position: relative; height: 36px; display: flex; align-items: center; gap: 10px; padding: 0 0 0 10px; background: var(--fundo-0);
   border-bottom: 0; -webkit-app-region: drag; user-select: none;
-  padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 8px); }
+  padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 8px);
+  /* no Mac os semáforos ficam à esquerda: a Window Controls Overlay diz onde a barra começa (titlebar-area-x) */
+  padding-left: calc(env(titlebar-area-x, 0px) + 10px); }
 .barra > * { -webkit-app-region: no-drag; }
 .barra .marca { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 8px; border: 0; border-radius: 4px; background: none;
   color: var(--texto); font: 600 13px var(--fonte); letter-spacing: 0; cursor: default; }

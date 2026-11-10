@@ -5,6 +5,7 @@
 // mantém, não precisa de arquivo nenhum. O monitoramento (ouvir a si mesmo nos fones) é um ganho à parte, desligado por
 // padrão: sem fones, o microfone pega o som do alto-falante.
 import {codificarWavPcm, juntarPedacos, niveisDoPedaco, PICO_CORTADO_DB, RESTRICOES_MICROFONE, TAXA_GRAVACAO} from '../../../nucleo/gravacao';
+import {avisoDoMicrofone, ehRecusaDoMicrofone, sistemaDoNavegador} from '../../../compartilhado/microfone';
 
 export type NivelGravacao = {pico_db: number; rms_db: number; cortou: boolean};
 export type Tomada = {wav: Uint8Array; duracao_ms: number; pico_db: number; cortou: boolean};
@@ -26,7 +27,12 @@ export const listarMicrofones = async (): Promise<{id: string; nome: string}[]> 
 };
 
 export const iniciarGravacao = async (o: {dispositivo?: string; monitor: boolean; aoNivel: (n: NivelGravacao) => void}): Promise<SessaoGravacao> => {
-  const stream = await navigator.mediaDevices.getUserMedia({audio: {...RESTRICOES_MICROFONE, ...(o.dispositivo ? {deviceId: {exact: o.dispositivo}} : {})}});
+  // recusado pelo sistema (no Mac, o pedido de Privacidade › Microfone; no Windows, a chave dos apps da área de trabalho):
+  // a mensagem diz onde liberar
+  const stream = await navigator.mediaDevices.getUserMedia({audio: {...RESTRICOES_MICROFONE, ...(o.dispositivo ? {deviceId: {exact: o.dispositivo}} : {})}})
+    .catch((e: unknown) => {
+      throw ehRecusaDoMicrofone(e) ? new Error(avisoDoMicrofone(sistemaDoNavegador(navigator.platform))) : e;
+    });
   const ctx = new AudioContext({sampleRate: TAXA_GRAVACAO});
   if (ctx.sampleRate !== TAXA_GRAVACAO) {
     stream.getTracks().forEach((t) => t.stop());
