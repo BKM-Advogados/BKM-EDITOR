@@ -6,6 +6,7 @@ import path from 'node:path';
 import {afterAll, describe, expect, it} from 'vitest';
 import {MARCA_CLAUDE_FIM, MARCA_CLAUDE_INICIO, MARCA_IMAGEM_INICIO, claudeMd, claudeMdAtualizado, gravarPlano, planoDoProjeto, regerarClaudeMd} from '../src/nucleo/criar-projeto';
 import {EFEITOS} from '../src/nucleo/efeitos';
+import {HASHES_DO_TEXTO_ANTIGO, hashDaLinha, linhaDoTextoAntigo} from '../src/nucleo/claude-md-antigo';
 
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'estudio-claude-md-'));
 afterAll(() => rmSync(tmp, {recursive: true, force: true}));
@@ -108,6 +109,14 @@ describe('CLAUDE.md do projeto', () => {
     const doExemplo = readFileSync(path.join(EXEMPLO, 'CLAUDE.md'), 'utf-8');
     expect(claudeMdAtualizado(doExemplo, ['video', 'imagem'])).toBeNull();
     expect(claudeMdAtualizado('# Meu projeto\n\nRegras minhas.\n', ['video'])).toBeNull();
+  });
+
+  it('as linhas antigas guardadas só pelo hash contam como do app (FNV-1a de 32 bits)', () => {
+    expect(hashDaLinha('abc')).toBe('1a47e90b');
+    expect(hashDaLinha('')).toBe('811c9dc5');
+    expect(HASHES_DO_TEXTO_ANTIGO.size).toBe(2);
+    expect(linhaDoTextoAntigo('# Projeto do Estúdio')).toBe(true);
+    expect(linhaDoTextoAntigo('- `midia/ana.jpg`: use sempre a foto da Ana nas capas.')).toBe(false);
   });
 
   it('ao abrir, um projeto criado na 0.3.0 ganha o texto novo, e o manifesto decide as seções', () => {

@@ -17,7 +17,7 @@ import {EFEITOS} from './efeitos';
 import {MODELOS, type IdModelo} from './modelos';
 import {FORMATOS_IMAGEM, FORMATOS_VIDEO, limitarTamanho, type Formato} from './formatos';
 import {arquivosDaMarca, patchDaMarca, temaDaMarca} from './marca';
-import {LINHAS_DO_TEXTO_ANTIGO} from './claude-md-antigo';
+import {linhaDoTextoAntigo} from './claude-md-antigo';
 import {REGRAS_MIDIA_PESADA} from './midia-git';
 import type {MarcaLida} from './pasta-marcas';
 import {serializar} from './projeto';
@@ -144,8 +144,8 @@ const secaoPesquisa = () => [
   '6. **Blocos citam fatos.** Todo bloco (ou cena) que afirma regra, número ou prazo leva `refs` com os ids dos fatos',
   '   (`"refs": ["F3", "F7"]`). `listar_pesquisa` devolve fontes e fatos; `checar_texto` {documento? ou texto?} avisa nome',
   '   de empresa ou pessoa, termo da OAB e bloco com número sem `refs`.',
-  '7. **Regras da Cliente** (são avisos; a pessoa decide): nunca o nome da empresa empregadora nem de trabalhador no texto do',
-  '   vídeo ("a usina localizada em Cidade Exemplo", "operador de alto-forno"); nada de honorários, grátis, resultado',
+  '7. **Regras do conteúdo** (são avisos; a pessoa decide): nunca o nome da empresa empregadora nem de trabalhador no',
+  '   texto do vídeo ("a fábrica da região", "operador de máquinas"); nada de honorários, grátis, resultado',
   '   garantido, "entre na Justiça", "contrate"; nada de valor a receber ou chance de ganhar; decisão de 1º grau é',
   '   "sujeita a recurso"; sem travessão; última frase fixa: "Ficou com alguma dúvida? Procure um advogado trabalhista."',
   '8. **Fato é fato.** A pesquisa registra o que a fonte diz: ninguém aprova nem reprova, e nada bloqueia a exportação.',
@@ -325,7 +325,7 @@ export const blocoDaImagem = (): string => [MARCA_IMAGEM_INICIO, '## Imagem e ca
 /** O que a pessoa (ou o Claude) escreveu dentro do texto antigo do app (imagem-N5): as linhas que o app nunca escreveu.
  *  Vai para uma seção própria em vez de sumir com o resto do texto antigo. Vazio se não houver nenhuma. */
 export const anotacoesDoTextoAntigo = (textoAntigo: string): string => {
-  const minhas = textoAntigo.split('\n').map((l) => l.trimEnd()).filter((l) => l.trim() && !LINHAS_DO_TEXTO_ANTIGO.has(l));
+  const minhas = textoAntigo.split('\n').map((l) => l.trimEnd()).filter((l) => l.trim() && !linhaDoTextoAntigo(l));
   if (!minhas.length) return '';
   return ['## Anotações do texto anterior', '', 'O Estúdio refez a parte dele acima. Estas linhas estavam dentro do texto antigo e não eram do app:', '', ...minhas].join('\n');
 };

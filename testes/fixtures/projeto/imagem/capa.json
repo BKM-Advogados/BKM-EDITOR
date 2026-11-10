@@ -1,0 +1,73 @@
+{
+  "formato": 1,
+  "largura": 1080,
+  "altura": 1350,
+  "fundo": "#111418",
+  "camadas": [
+    {
+      "id": "foto",
+      "nome": "Foto",
+      "tipo": "imagem",
+      "src": "midia/foto.jpg",
+      "ajuste": "cobrir",
+      "x": 0,
+      "y": 0,
+      "largura": 1080,
+      "altura": 760,
+      "opacidade": 0.9
+    },
+    {
+      "id": "faixa",
+      "nome": "Faixa",
+      "tipo": "forma",
+      "forma": "retangulo",
+      "preenchimento": "#4A90D9",
+      "x": 70,
+      "y": 700,
+      "largura": 940,
+      "altura": 16
+    },
+    {
+      "id": "titulo",
+      "nome": "Título",
+      "tipo": "texto",
+      "texto": "DOCUMENTOS\nEM ORDEM",
+      "fonte": "Archivo",
+      "peso": 800,
+      "tamanho": 68,
+      "cor": "#F3F4F6",
+      "alinhar": "esquerda",
+      "x": 70,
+      "y": 770,
+      "largura": 940,
+      "altura": 170
+    },
+    {
+      "id": "subtitulo",
+      "nome": "Subtítulo",
+      "tipo": "texto",
+      "texto": "Três dicas para não perder nenhum papel",
+      "fonte": "IBM Plex Sans",
+      "peso": 400,
+      "tamanho": 40,
+      "cor": "#9CC8F5",
+      "alinhar": "esquerda",
+      "x": 70,
+      "y": 960,
+      "largura": 940,
+      "altura": 60
+    },
+    {
+      "id": "logo",
+      "nome": "Logo",
+      "tipo": "imagem",
+      "src": "midia/logo.png",
+      "ajuste": "conter",
+      "x": 70,
+      "y": 1170,
+      "largura": 360,
+      "altura": 110
+    }
+  ],
+  "efeitos": []
+}

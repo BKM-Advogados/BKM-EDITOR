@@ -1,0 +1,24 @@
+{
+  "formato": 1,
+  "nome": "Projeto de teste · Documentos em ordem",
+  "documentos": [
+    {
+      "id": "carrossel",
+      "modulo": "video",
+      "caminho": "video/roteiro.json",
+      "titulo": "Carrossel narrado"
+    },
+    {
+      "id": "capa",
+      "modulo": "imagem",
+      "caminho": "imagem/capa.json",
+      "titulo": "Capa"
+    },
+    {
+      "id": "cena3d",
+      "modulo": "3d",
+      "caminho": "3d/cena.json",
+      "titulo": "Anel 3D"
+    }
+  ]
+}

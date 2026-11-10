@@ -1,0 +1,144 @@
+{
+  "formato": 1,
+  "fundo": "#111418",
+  "camera": {
+    "posicao": [
+      4,
+      3,
+      6
+    ],
+    "alvo": [
+      0,
+      0.6,
+      0
+    ],
+    "fov": 40
+  },
+  "luzes": [
+    {
+      "id": "ambiente",
+      "tipo": "ambiente",
+      "cor": "#F3F4F6",
+      "intensidade": 0.35
+    },
+    {
+      "id": "sol",
+      "tipo": "direcional",
+      "cor": "#FFFFFF",
+      "intensidade": 2.2,
+      "posicao": [
+        5,
+        8,
+        4
+      ]
+    },
+    {
+      "id": "destaque",
+      "tipo": "ponto",
+      "cor": "#9CC8F5",
+      "intensidade": 18,
+      "posicao": [
+        -3,
+        2,
+        2
+      ]
+    }
+  ],
+  "objetos": [
+    {
+      "id": "anel",
+      "nome": "Anel",
+      "tipo": "toro",
+      "posicao": [
+        0,
+        1.2,
+        0
+      ],
+      "rotacao": [
+        90,
+        0,
+        0
+      ],
+      "escala": [
+        1,
+        1,
+        1
+      ],
+      "cor": "#4A90D9",
+      "metalico": 0.9,
+      "rugosidade": 0.25,
+      "gira": [
+        0,
+        0,
+        30
+      ]
+    },
+    {
+      "id": "pedestal",
+      "nome": "Pedestal",
+      "tipo": "cilindro",
+      "posicao": [
+        0,
+        0.15,
+        0
+      ],
+      "rotacao": [
+        0,
+        0,
+        0
+      ],
+      "escala": [
+        1.6,
+        0.3,
+        1.6
+      ],
+      "cor": "#262C33",
+      "metalico": 0.2,
+      "rugosidade": 0.6
+    },
+    {
+      "id": "chao",
+      "nome": "Chão",
+      "tipo": "plano",
+      "posicao": [
+        0,
+        0,
+        0
+      ],
+      "rotacao": [
+        -90,
+        0,
+        0
+      ],
+      "escala": [
+        12,
+        12,
+        1
+      ],
+      "cor": "#1B2026",
+      "rugosidade": 0.9
+    },
+    {
+      "id": "esfera",
+      "nome": "Esfera clara",
+      "tipo": "esfera",
+      "posicao": [
+        1.8,
+        0.5,
+        0.8
+      ],
+      "rotacao": [
+        0,
+        0,
+        0
+      ],
+      "escala": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "cor": "#F3F4F6",
+      "rugosidade": 0.4
+    }
+  ]
+}

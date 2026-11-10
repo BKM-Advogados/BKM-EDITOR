@@ -58,8 +58,8 @@ Todo fato jurídico, número, prazo ou decisão que entrar numa cena precisa de 
 6. **Blocos citam fatos.** Todo bloco (ou cena) que afirma regra, número ou prazo leva `refs` com os ids dos fatos
    (`"refs": ["F3", "F7"]`). `listar_pesquisa` devolve fontes e fatos; `checar_texto` {documento? ou texto?} avisa nome
    de empresa ou pessoa, termo da OAB e bloco com número sem `refs`.
-7. **Regras da Cliente** (são avisos; a pessoa decide): nunca o nome da empresa empregadora nem de trabalhador no texto do
-   vídeo ("a usina localizada em Cidade Exemplo", "operador de alto-forno"); nada de honorários, grátis, resultado
+7. **Regras do conteúdo** (são avisos; a pessoa decide): nunca o nome da empresa empregadora nem de trabalhador no
+   texto do vídeo ("a fábrica da região", "operador de máquinas"); nada de honorários, grátis, resultado
    garantido, "entre na Justiça", "contrate"; nada de valor a receber ou chance de ganhar; decisão de 1º grau é
    "sujeita a recurso"; sem travessão; última frase fixa: "Ficou com alguma dúvida? Procure um advogado trabalhista."
 8. **Fato é fato.** A pesquisa registra o que a fonte diz: ninguém aprova nem reprova, e nada bloqueia a exportação.

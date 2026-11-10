@@ -3,6 +3,20 @@
 // pessoa (ou o Claude) quem escreveu dentro do texto do app, e vai para a seção de anotações em vez de sumir.
 // Gerado com o `claudeMd` dos commits c0407e5 (0.2.0), 63416c0 e 580050c (0.3.0), nos módulos video, imagem, 3d e juntos;
 // o texto de hoje não entra aqui: ele tem as marcas. Linhas em branco não contam.
+
+/** FNV-1a de 32 bits do texto da linha, em hexadecimal: reconhece uma linha antiga sem guardar o texto dela. */
+export const hashDaLinha = (linha: string): string => {
+  let h = 0x811c9dc5;
+  for (const b of new TextEncoder().encode(linha)) h = Math.imul(h ^ b, 0x01000193) >>> 0;
+  return h.toString(16).padStart(8, '0');
+};
+
+/** Linhas antigas do app que citavam um cliente pelo nome, guardadas só pelo hash. */
+export const HASHES_DO_TEXTO_ANTIGO: ReadonlySet<string> = new Set(['3fa38a35', '1ab7f9bf']);
+
+/** A linha foi o app quem escreveu (0.2.0 e 0.3.0)? */
+export const linhaDoTextoAntigo = (linha: string) => LINHAS_DO_TEXTO_ANTIGO.has(linha) || HASHES_DO_TEXTO_ANTIGO.has(hashDaLinha(linha));
+
 export const LINHAS_DO_TEXTO_ANTIGO: ReadonlySet<string> = new Set([
   '# Projeto do Estúdio',
   'Esta pasta é um projeto do Estúdio, aberto no app. A pessoa edita na interface; você edita pelas ferramentas do MCP',
@@ -71,8 +85,10 @@ export const LINHAS_DO_TEXTO_ANTIGO: ReadonlySet<string> = new Set([
   '6. **Blocos citam fatos.** Todo bloco (ou cena) que afirma regra, número ou prazo leva `refs` com os ids dos fatos',
   '   (`"refs": ["F3", "F7"]`). `listar_pesquisa` devolve fontes e fatos; `checar_texto` {documento? ou texto?} avisa nome',
   '   de empresa ou pessoa, termo da OAB e bloco com número sem `refs`.',
-  '7. **Regras da Cliente** (são avisos; a pessoa decide): nunca o nome da empresa empregadora nem de trabalhador no texto do',
-  '   vídeo ("a usina localizada em Cidade Exemplo", "operador de alto-forno"); nada de honorários, grátis, resultado',
+  // as duas primeiras linhas da regra 7 citavam um cliente pelo nome e ficam só pelo hash (HASHES_DO_TEXTO_ANTIGO);
+  // estas são as mesmas linhas sem o nome, como estão nas fixtures de teste
+  '7. **Regras do conteúdo** (são avisos; a pessoa decide): nunca o nome da empresa empregadora nem de trabalhador no',
+  '   texto do vídeo ("a fábrica da região", "operador de máquinas"); nada de honorários, grátis, resultado',
   '   garantido, "entre na Justiça", "contrate"; nada de valor a receber ou chance de ganhar; decisão de 1º grau é',
   '   "sujeita a recurso"; sem travessão; última frase fixa: "Ficou com alguma dúvida? Procure um advogado trabalhista."',
   '8. **Fato é fato.** A pesquisa registra o que a fonte diz: ninguém aprova nem reprova, e nada bloqueia a exportação.',
