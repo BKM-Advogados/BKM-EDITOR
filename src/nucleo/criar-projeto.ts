@@ -10,6 +10,7 @@ import path from 'node:path';
 import jsonpatch, {type Operation} from 'fast-json-patch';
 import type {DocCena3D, DocImagem, EntradaDocumento, Manifesto, Modulo} from './documentos';
 import {novoDocCenas} from './cenas';
+import {novaAnimacao, modeloAnimacaoLogoPixel} from './animacao';
 import {EFEITOS} from './efeitos';
 import {MODELOS, type IdModelo} from './modelos';
 import {FORMATOS_IMAGEM, FORMATOS_VIDEO, type Formato} from './formatos';
@@ -77,9 +78,9 @@ export const novoDoc3d = (): DocCena3D => ({
   ],
 });
 
-const PASTA_DO_MODULO: Record<Modulo, string> = {video: 'video', imagem: 'imagem', '3d': '3d'};
-const TITULO_DO_MODULO: Record<Modulo, string> = {video: 'Vídeo', imagem: 'Imagem', '3d': 'Cena 3D'};
-const ID_DO_MODULO: Record<Modulo, string> = {video: 'video', imagem: 'imagem', '3d': 'cena3d'};
+const PASTA_DO_MODULO: Record<Modulo, string> = {video: 'video', imagem: 'imagem', '3d': '3d', animacao: 'animacao'};
+const TITULO_DO_MODULO: Record<Modulo, string> = {video: 'Vídeo', imagem: 'Imagem', '3d': 'Cena 3D', animacao: 'Animação'};
+const ID_DO_MODULO: Record<Modulo, string> = {video: 'video', imagem: 'imagem', '3d': 'cena3d', animacao: 'animacao'};
 
 export const conteudoNovo = (modulo: Modulo, formato?: {largura: number; altura: number; fps?: number}) => {
   if (modulo === 'video') {
@@ -89,6 +90,10 @@ export const conteudoNovo = (modulo: Modulo, formato?: {largura: number; altura:
   if (modulo === 'imagem') {
     const f = formato ?? FORMATOS_IMAGEM[0];
     return novoDocImagem(f.largura, f.altura);
+  }
+  if (modulo === 'animacao') {
+    const f = formato ?? {largura: FORMATOS_VIDEO.find((x) => x.id === 'youtube')!.largura, altura: FORMATOS_VIDEO.find((x) => x.id === 'youtube')!.altura};
+    return novaAnimacao(f.largura, f.altura, formato?.fps ?? 30);
   }
   return novoDoc3d();
 };
@@ -245,6 +250,21 @@ export const claudeMd = (modulos: Modulo[]) => {
       '  {`posicao` [x, y, z], `alvo` [x, y, z], `fov` em graus, padrão 40}. Outro tipo ou campo não aparece: não invente.',
     );
   }
+  if (tem('animacao')) {
+    linhas.push(
+      '- Animação: `largura`, `altura`, `fps`, `duracao_ms`, `fundo` e `camadas` de baixo para cima. `tema` (opcional) traz',
+      '  as cores do kit de marca; `fundo` e `cor` aceitam `#rrggbb` ou a referência `@fundo`, `@texto`, `@destaque` ou',
+      '  `@suave`. Cada camada tem `id`, `nome`, `tipo` (`forma`, `texto`, `imagem` ou `pixel`), `visivel`, `travada` e as',
+      '  propriedades base `x`, `y`, `largura`, `altura`, `escala`, `rotacao`, `opacidade`, `cor`; no texto, `texto`,',
+      '  `fonte`, `tamanho`, `peso` e `alinhar`; na forma, `forma` e `raio`; na imagem, `src` e `ajuste`. As propriedades',
+      '  animáveis são `x`, `y`, `escala`, `rotacao`, `opacidade`, `cor` (em OKLab), `tamanho` (texto), `tamanho_pixel` e',
+      '  `progresso` (pixel), por `trilhas` {propriedade: [{t_ms, valor, curva}]} com as curvas `linear`, `suave`,',
+      '  `entrada`, `saida`, `mola` e `degrau`. A camada `pixel` tem `grade` {colunas, linhas, paleta, celulas},',
+      '  `tamanho_pixel`, `progresso` (0 a 1), `efeito` (`aleatorio`, `decodificar`, `varredura`, `varredura-baixo`, `meio`',
+      '  ou `chuva`) e `semente`. Use `criar_animacao`, `adicionar_camada_animacao`, `animar`, `pixelizar_imagem` e',
+      '  `efeito_pixel` (docs/animacao.md) em vez de montar à mão.',
+    );
+  }
   if (tem('video') || tem('imagem')) linhas.push(...secaoEfeitos());
   if (tem('video') || tem('imagem')) {
     linhas.push(
@@ -278,6 +298,7 @@ export const claudeMd = (modulos: Modulo[]) => {
     passos.push('`transcrever` transcreve a fala no próprio PC: grava `<arquivo>.palavras.json` e, no vídeo de cenas, gera as\n   legendas que faltam. `ler_legendas` mostra as legendas nos tempos da tela e `editar_legenda` corrige texto e tempo.\n   `exportar_legendas` grava SRT e VTT em `saidas/`; `importar_legendas` lê um SRT ou VTT do projeto.');
   }
   if (tem('imagem')) passos.push('`remover_fundo` tira o fundo de uma foto de pessoa com o modelo local; com `voltar: true`, volta ao original.');
+  if (tem('animacao')) passos.push('`criar_animacao`, `adicionar_camada_animacao`, `animar`, `pixelizar_imagem`, `efeito_pixel` e `ver_animacao` montam e animam a animação (docs/animacao.md).');
   linhas.push('', '## Como trabalhar', '', ...passos.map((t, i) => `${i + 1}. ${t}`));
   if (tem('video') || tem('imagem')) linhas.push(...secaoPesquisa());
   linhas.push('', FIM_DO_TEXTO);
@@ -357,8 +378,19 @@ export const planoDoProjeto = (o: OpcoesProjeto): Plano => {
       copiarDoExemplo: ['imagem/capa.json', 'midia/Cidade Exemplo.jpg', 'midia/logo-exemplo.png'],
     };
   }
+  if (o.modelo === 'animacao-logo-pixel') {
+    const entrada: EntradaDocumento = {id: 'animacao', modulo: 'animacao', caminho: 'animacao/animacao.json', titulo: 'Logo em pixels'};
+    const manifesto: Manifesto = {formato: 1, nome, documentos: [entrada]};
+    const conteudo = modeloAnimacaoLogoPixel();
+    return {
+      manifesto,
+      arquivos: {'estudio.json': serializar(manifesto), [entrada.caminho]: serializar(conteudo), '.gitignore': GITIGNORE, 'CLAUDE.md': claudeMd(['animacao'])},
+      pastas,
+    };
+  }
   const vazio: Manifesto = {formato: 1, nome, documentos: []};
-  const {entrada, conteudo} = documentoNovo(vazio, modelo.modulo, {formato: o.formato});
+  const formatoResolvido = o.modelo === 'animacao-9x16' ? {largura: 1080, altura: 1920, fps: 30} : o.modelo === 'animacao-branco' ? {largura: 1920, altura: 1080, fps: 30} : o.formato;
+  const {entrada, conteudo} = documentoNovo(vazio, modelo.modulo, {formato: formatoResolvido});
   const manifesto: Manifesto = {...vazio, documentos: [entrada]};
   return {
     manifesto,

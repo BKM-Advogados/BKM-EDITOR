@@ -362,4 +362,102 @@ export const novaCamadaAnimacao = (tipo: TipoCamadaAnimacao, id: string): Camada
   }
 };
 
+
+export const ehDocAnimacao = (doc: unknown): doc is DocAnimacao => {
+  const d = doc as Record<string, unknown> | null;
+  return Boolean(d && typeof d === "object" && Array.isArray(d.camadas) && typeof d.fps === "number" && typeof d.duracao_ms === "number");
+};
+
+/** Modelo de exemplo: logo em pixels revelado com decodificar e texto que entra suave */
+export const modeloAnimacaoLogoPixel = (): DocAnimacao => {
+  const paleta = ["#70B8FF", "#388BFD", "#FFFFFF", "#1D2530"];
+  const matriz: number[][] = [
+    [-1, -1, -1, -1, -1, -1, -1,  2,  2, -1, -1, -1, -1, -1, -1, -1],
+    [-1, -1, -1, -1, -1, -1,  2,  0,  0,  2, -1, -1, -1, -1, -1, -1],
+    [-1, -1, -1, -1, -1,  2,  0,  0,  0,  0,  2, -1, -1, -1, -1, -1],
+    [-1, -1, -1, -1,  2,  0,  2,  0,  0,  1,  1,  2, -1, -1, -1, -1],
+    [-1, -1, -1,  2,  0,  2,  2,  0,  0,  1,  1,  1,  2, -1, -1, -1],
+    [-1, -1,  2,  0,  0,  2,  0,  0,  0,  0,  1,  1,  1,  2, -1, -1],
+    [-1,  2,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  2, -1],
+    [ 2,  0,  0,  0,  0,  0,  0,  2,  0,  0,  0,  0,  1,  1,  1,  2],
+    [ 2,  0,  0,  0,  0,  0,  2,  2,  0,  0,  0,  0,  1,  1,  1,  2],
+    [-1,  2,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  2, -1],
+    [-1, -1,  2,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  2, -1, -1],
+    [-1, -1, -1,  2,  0,  0,  0,  0,  1,  1,  1,  1,  2, -1, -1, -1],
+    [-1, -1, -1, -1,  2,  0,  0,  1,  1,  1,  1,  2, -1, -1, -1, -1],
+    [-1, -1, -1, -1, -1,  2,  1,  1,  1,  1,  2, -1, -1, -1, -1, -1],
+    [-1, -1, -1, -1, -1, -1,  2,  1,  1,  2, -1, -1, -1, -1, -1, -1],
+    [-1, -1, -1, -1, -1, -1, -1,  2,  2, -1, -1, -1, -1, -1, -1, -1],
+  ];
+  const indices = matriz.flat();
+  const tamanhoPixel = 18;
+  const gradeLargura = 16 * tamanhoPixel;
+  const gradeAltura = 16 * tamanhoPixel;
+  const gradeX = Math.round((1080 - gradeLargura) / 2);
+  const gradeY = 240;
+
+  return {
+    formato: 1,
+    largura: 1080,
+    altura: 1080,
+    fps: 30,
+    duracao_ms: 4000,
+    fundo: "#111418",
+    camadas: [
+      {
+        id: "logo-pixel-1",
+        nome: "Logo em pixels",
+        tipo: "pixel",
+        x: gradeX,
+        y: gradeY,
+        largura: gradeLargura,
+        altura: gradeAltura,
+        tamanho_pixel: tamanhoPixel,
+        progresso: 1,
+        efeito: "decodificar",
+        semente: 42,
+        grade: {
+          colunas: 16,
+          linhas: 16,
+          paleta,
+          celulas: indices.map((i) => (i < 0 ? "." : String(i))).join(""),
+        },
+        trilhas: {
+          progresso: [
+            {t_ms: 200, valor: 0, curva: "linear"},
+            {t_ms: 2000, valor: 1, curva: "suave"},
+          ],
+        },
+      },
+      {
+        id: "titulo-1",
+        nome: "Texto",
+        tipo: "texto",
+        x: 0,
+        y: 600,
+        largura: 1080,
+        altura: 90,
+        texto: "ESTÚDIO",
+        fonte: "Inter",
+        tamanho: 56,
+        peso: 700,
+        cor: "@destaque",
+        alinhar: "centro",
+        opacidade: 1,
+        trilhas: {
+          opacidade: [
+            {t_ms: 1600, valor: 0, curva: "linear"},
+            {t_ms: 2600, valor: 1, curva: "suave"},
+          ],
+          y: [
+            {t_ms: 1600, valor: 650, curva: "linear"},
+            {t_ms: 2600, valor: 600, curva: "suave"},
+          ],
+        },
+      },
+    ],
+  };
+};
+
 export type {EfeitoPixel};
+

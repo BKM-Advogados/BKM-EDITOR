@@ -8,7 +8,7 @@ import type {Efeito} from '../../nucleo/efeitos';
 import type {Pesquisa} from '../../nucleo/pesquisa'; // só o tipo: pesquisa.ts usa node:crypto
 import {indicePagina, paginasDe} from '../../nucleo/carrossel';
 
-export type Area = 'video' | 'imagem' | '3d' | 'efeitos';
+export type Area = 'video' | 'imagem' | '3d' | 'efeitos' | 'animacao';
 export type Lido = {doc: any; versao: string};
 export type Selecao = {documento: string; caminho: string} | null;
 export type TipoAviso = 'ok' | 'erro' | 'info' | 'agente';
@@ -97,7 +97,8 @@ export const documentosDe = (m: Modulo) => estado.info?.manifesto.documentos.fil
 export const carregarDoc = async (id: string) => {
   const lido = await window.estudio.lerDocumento(id);
   loja.definir((e) => ({docs: {...e.docs, [id]: lido}}));
-  if (entradaDe(id)?.modulo === 'video') {
+  const mod = entradaDe(id)?.modulo;
+  if (mod === 'video' || mod === 'animacao') {
     const p = await window.estudio.propsVideo(id);
     loja.definir((e) => ({props: {...e.props, [id]: p}}));
   }
@@ -145,7 +146,7 @@ export const quandoTrocarProjeto = (f: () => void) => {
   };
 };
 
-const AREAS_VALIDAS = new Set<Area>(['video', 'imagem', '3d', 'efeitos']);
+const AREAS_VALIDAS = new Set<Area>(['video', 'imagem', '3d', 'efeitos', 'animacao']);
 
 export const abrirProjeto = async (info: InfoProjeto) => {
   const mesmo = estado.info?.raiz === info.raiz;

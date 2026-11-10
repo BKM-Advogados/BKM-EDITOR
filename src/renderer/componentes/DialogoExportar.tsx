@@ -466,7 +466,7 @@ export const RaizDialogoExportar: React.FC = () => {
   const modulo = useLoja((e) => (documento ? e.info?.manifesto.documentos.find((d) => d.id === documento)?.modulo : undefined));
   if (!documento || !modulo) return null;
   const fechar = () => mudar(null);
-  if (modulo === 'video') return <ExportarVideo key={documento} documento={documento} fechar={fechar} />;
+  if (modulo === 'video' || modulo === 'animacao') return <ExportarVideo key={documento} documento={documento} fechar={fechar} />;
   if (modulo === 'imagem') return <ExportarImagem key={documento} documento={documento} fechar={fechar} />;
   return null;
 };

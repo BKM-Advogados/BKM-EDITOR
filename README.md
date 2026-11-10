@@ -1,6 +1,6 @@
 # Estúdio (V2)
 
-App desktop que une edição de **vídeo**, **imagem**, **3D** e **efeitos** num lugar só. Tudo é JSON na pasta do
+App desktop que une edição de **vídeo**, **imagem**, **3D**, **efeitos** e **animação** (2D e arte em pixel) num lugar só. Tudo é JSON na pasta do
 projeto: a pessoa edita na tela, o Claude edita conversando (com a conta da própria pessoa), e as duas mãos passam pelo
 mesmo JSON Patch com versão, diário e desfazer. A tela acompanha o arquivo; o agente vê o que a pessoa mudou.
 

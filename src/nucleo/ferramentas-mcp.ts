@@ -8,6 +8,7 @@ import {z} from 'zod';
 import {ErroProjeto, valorEm, type Projeto} from './projeto';
 import type {DocImagem, Modulo, OperacaoPatch} from './documentos';
 import {documentoNovo} from './criar-projeto';
+import {registrarFerramentasAnimacao} from './ferramentas-animacao';
 import {FORMATOS_IMAGEM, FORMATOS_VIDEO, formatoDoVideo} from './formatos';
 import {MARCAS_INICIAIS} from './marca';
 import {PastaMarcas} from './pasta-marcas';
@@ -108,6 +109,7 @@ export const criarRede = (buscar: Buscar = (url, init) => fetch(url, init), opco
 // ---------- ferramentas ----------
 
 export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, autor: string, origem: string, rede?: Rede, transcritor?: TranscritorMcp) => {
+  registrarFerramentasAnimacao(servidor, projeto, autor as any, origem as any);
   servidor.registerTool('projeto_info', {
     description: 'Nome do projeto, documentos (id, módulo, caminho), quantos comentários estão abertos e quantas fontes e fatos a pesquisa tem.',
     inputSchema: {},
@@ -164,7 +166,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   servidor.registerTool('criar_documento', {
     description: `Cria um documento novo no projeto (vídeo de cenas, imagem ou cena 3D) e o põe no manifesto; a tela abre sozinha. Formatos de vídeo: ${FORMATOS_VIDEO.map((f) => `${f.id} (${f.proporcao}, ${f.largura}x${f.altura})`).join(', ')}. De imagem: ${FORMATOS_IMAGEM.map((f) => `${f.id} (${f.largura}x${f.altura})`).join(', ')}. Ou largura e altura livres.`,
     inputSchema: {
-      modulo: z.enum(['video', 'imagem', '3d']),
+      modulo: z.enum(['video', 'imagem', '3d', 'animacao']),
       titulo: z.string().optional(),
       formato: z.string().optional().describe('id do formato da lista'),
       largura: z.number().int().min(16).max(7680).optional(),

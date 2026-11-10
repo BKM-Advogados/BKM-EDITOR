@@ -3,8 +3,9 @@
 import type {DocCenas} from './cenas';
 import type {Efeito} from './efeitos';
 import type {Roteiro} from './roteiro/resolver';
+import type {DocAnimacao} from './animacao';
 
-export type Modulo = 'video' | 'imagem' | '3d';
+export type Modulo = 'video' | 'imagem' | '3d' | 'animacao';
 
 export type EntradaDocumento = {id: string; modulo: Modulo; caminho: string; titulo: string};
 
@@ -111,7 +112,7 @@ export type DocCena3D = {
   objetos: Objeto3D[];
 };
 
-export type Documento = DocVideo | DocImagem | DocCena3D;
+export type Documento = DocVideo | DocImagem | DocCena3D | DocAnimacao;
 
 // ---------- comentários ----------
 export type AlvoComentario = {
@@ -154,7 +155,7 @@ export type EntradaDiario = {
 
 /** Estado do editor que o agente pode consultar (o app grava em .estudio/estado.json). */
 export type EstadoEditor = {
-  area: 'video' | 'imagem' | '3d' | 'efeitos';
+  area: 'video' | 'imagem' | '3d' | 'efeitos' | 'animacao';
   documento?: string;
   selecao?: string; // caminho do objeto selecionado
   tempo_ms?: number;

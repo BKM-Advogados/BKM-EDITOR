@@ -370,7 +370,7 @@ lidar(CANAL.exportar, async (documento: string, opcoes?: OpcoesExportarVideo): P
   if ('erro' in montado) return {ok: false, mensagem: montado.erro};
   const props = montado.props;
   const formato: Formato = {largura: Number(props.largura) || FORMATO_PADRAO.largura, altura: Number(props.altura) || FORMATO_PADRAO.altura, fps: Number(props.fps) || FORMATO_PADRAO.fps};
-  const fixo = props.composicao !== 'VideoCenas';
+  const fixo = props.composicao !== 'VideoCenas' && props.composicao !== 'Animacao';
   const o: OpcoesExportarVideo = {codec: 'h264', qualidade: 'alta', escala: 1, ...opcoes, destinos: fixo || !opcoes?.destinos?.length ? [destinoDoFormato(formato)] : opcoes.destinos};
   const pasta = p.caminho('saidas');
   mkdirSync(pasta, {recursive: true});

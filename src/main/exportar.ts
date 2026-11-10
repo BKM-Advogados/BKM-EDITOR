@@ -66,7 +66,7 @@ export type RenderVideo = {
 /** Um arquivo: escolhe a composição pelas props, mede e renderiza. O andamento sai em `aviso` (etapa "renderizando"). */
 export const renderizarVideo = async (p: Preparado, r: RenderVideo, aviso: (x: Progresso) => void) => {
   const {renderMedia, selectComposition} = await import('@remotion/renderer');
-  const id = r.props.composicao === 'VideoCenas' ? 'VideoCenas' : 'CarrosselTema';
+  const id = r.props.composicao === 'VideoCenas' ? 'VideoCenas' : r.props.composicao === 'Animacao' ? 'Animacao' : 'CarrosselTema';
   const composition = await selectComposition({serveUrl: p.serveUrl, id, inputProps: r.props, binariesDirectory: p.binariesDirectory, browserExecutable: p.browserExecutable});
   const quadros = r.quadros ? r.quadros[1] - r.quadros[0] + 1 : composition.durationInFrames;
   aviso({tipo: 'status', mensagem: `Renderizando ${quadros} quadros…`});
