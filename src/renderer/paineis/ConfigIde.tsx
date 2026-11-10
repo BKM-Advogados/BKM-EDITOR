@@ -37,7 +37,8 @@ export const SecaoProjetosIde: React.FC = () => {
       </div>
       {e.raiz && (
         <div className="ia-linha">
-          <span className="fraco">{e.gravados?.length ? `Atualizados agora neste projeto: ${e.gravados.join(', ')}` : e.ligado ? 'Este projeto já está pronto para IDE.' : 'Desligado: este projeto fica como está.'}</span>
+          <span className="fraco">{!e.ligado ? 'Desligado: este projeto fica como está.' : e.gravados?.length ? `Ao abrir este projeto, o app escreveu: ${e.gravados.join(', ')}`
+            : 'Este projeto já está pronto para IDE.'}</span>
           <span className="espaco" />
           <button className="bt mini fantasma" onClick={() => copiar(e.raiz!, 'Caminho copiado')}>Copiar caminho</button>
           <button className="bt mini" disabled={ocupado} title={e.t3 ? `roda ${e.t3} project add` : 'o comando t3 não está no PATH: o botão explica como adicionar à mão'}

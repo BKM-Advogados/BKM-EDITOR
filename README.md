@@ -154,6 +154,10 @@ O agente recebe: `projeto_info`, `estado_do_editor`, `ler_documento`, `aplicar_p
 seção "Pesquisa" (fontes, fatos e `refs`). A parte escrita pelo app fica entre as marcas `estudio:inicio` e `estudio:fim`
 e é refeita ao abrir o projeto, para valer também nos projetos criados antes; o que estiver fora das marcas fica.
 
+**IDE de agentes** (`docs/ide.md`): cada projeto também leva `.mcp.json`, `.claude/settings.local.json` e `t3.json`, e
+abre direto no T3 Code, no Claude Code ou no Cursor com o MCP `estudio` ligado, sem o app aberto. O agente vê o vídeo
+por `ver_quadro`, `ver_cenas` e `ver_trecho`, que gravam em `saidas/previas/`. A opção fica em Configurações › IA.
+
 ## Como é feito
 
 - **Electron 42 + React 19 + TypeScript**, a partir do template oficial de Electron da Remotion (Forge + Vite).
