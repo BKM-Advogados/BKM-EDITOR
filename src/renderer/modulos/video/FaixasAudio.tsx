@@ -4,6 +4,7 @@
 // alças aparam o começo (muda o corte dentro do arquivo, o fim fica no lugar) e o fim; clicar seleciona e o inspector
 // mostra as propriedades. Delete e Ctrl+D valem quando a seleção é um clipe ou uma faixa: ouvidos na fase de captura,
 // antes do monitor, que só conhece cenas e blocos.
+import {comando, teclaDeApagar} from '../../teclas';
 import React, {useEffect, useMemo, useState} from 'react';
 import {Volume2, VolumeX} from 'lucide-react';
 import {SILENCIO_DB, volumeDoClipe, type AudioP, type ClipeAudioP, type Envelope, type FaixaAudioP} from '../../../nucleo/audio';
@@ -117,9 +118,9 @@ export const FaixasAudio: React.FC<{documento: string; audio: AudioP; x: (ms: nu
     useEffect(() => {
       const tecla = (e: KeyboardEvent) => {
         if (loja.get().area !== 'video' || !ehSelecaoAudio(documento)) return;
-        const comCtrlD = e.ctrlKey && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'd';
-        const comCtrlK = e.ctrlKey && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k'; // dividir na cabeça (frente Som)
-        if (e.key !== 'Delete' && !comCtrlD && !comCtrlK) return;
+        const comCtrlD = comando(e) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'd';
+        const comCtrlK = comando(e) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k'; // dividir na cabeça (frente Som)
+        if (!teclaDeApagar(e) && !comCtrlD && !comCtrlK) return;
         const alvo = e.target as HTMLElement;
         if (/INPUT|TEXTAREA|SELECT/.test(alvo.tagName) || alvo.isContentEditable || alvo.closest?.('.xterm')) return;
         e.preventDefault();

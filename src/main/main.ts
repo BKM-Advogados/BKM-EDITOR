@@ -1,6 +1,5 @@
 // Processo principal do Estúdio: uma janela, o projeto aberto, os terminais, o servidor de mídia e a exportação.
-import {app, BrowserWindow, dialog, ipcMain, net, safeStorage, shell, type IpcMainInvokeEvent} from 'electron';
-import {execFile} from 'node:child_process';
+import {app, BrowserWindow, dialog, ipcMain, Menu, net, safeStorage, session, shell, systemPreferences, type IpcMainInvokeEvent} from 'electron';
 import {copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -22,6 +21,9 @@ import {Memoria} from './memoria';
 import {ServidorMidia} from './servidor-midia';
 import {SessaoProjeto} from './sessao-projeto';
 import {Terminais} from './terminais';
+import {decidirPermissao, ehMosaico, opcoesDaBarra, projetoNosArgumentos} from './plataforma'; // portes Windows e Mac
+import {gitDoApp} from './git';
+import {modeloDoMenuDoMac} from './menu-do-app';
 import {registrarIpcAudio} from './ipc-audio';
 import {registrarIpcGravacao} from './ipc-gravacao'; // frente Som (rodada 3)
 import {definirPastaTrilhas} from '../nucleo/pasta-trilhas';
@@ -57,8 +59,7 @@ const LOJA_DE_SENHAS = process.platform === 'linux' ? lojaDeSenhasLinux(process.
 if (LOJA_DE_SENHAS) app.commandLine.appendSwitch('password-store', LOJA_DE_SENHAS);
 
 // Linux com gerenciador em mosaico: as janelas vêm sem moldura e sem minimizar, e se fecham pelo teclado (Super+W)
-const MOSAICO = process.platform === 'linux'
-  && (!!process.env.HYPRLAND_INSTANCE_SIGNATURE || /hyprland|sway|i3|river|niri/i.test(process.env.XDG_CURRENT_DESKTOP ?? ''));
+const MOSAICO = ehMosaico(process.platform, process.env);
 
 const GB = os.totalmem() / 1024 ** 3;
 const PERFIL: Perfil = GB <= 8.5
@@ -68,12 +69,17 @@ const PERFIL: Perfil = GB <= 8.5
 let janela: BrowserWindow | null = null;
 // frente Casca (transversal-D5): um Estúdio só por pasta de dados. A segunda abertura traz a primeira para a frente e sai.
 // ESTUDIO_VARIAS_INSTANCIAS=1 libera uma instância de desenvolvimento ao lado da instalada.
-const primeiraInstancia = process.env.ESTUDIO_VARIAS_INSTANCIAS === '1' || garantirInstanciaUnica(app, () => trazerParaFrente(janela));
+// A segunda abertura com uma pasta de projeto (arrastada no atalho, "Abrir com") abre a pasta na primeira.
+const primeiraInstancia = process.env.ESTUDIO_VARIAS_INSTANCIAS === '1' || garantirInstanciaUnica(app, (argv, cwd) => {
+  trazerParaFrente(janela);
+  const pasta = projetoNosArgumentos(argv, existsSync, cwd);
+  if (pasta) abrirDeFora(pasta);
+});
 let sessao: SessaoProjeto | null = null;
 let avisoAbertura: string | undefined;
 let claude = false;
-// sem Git não há ponto de restauração (commit inicial, Ctrl+S): a tela inicial avisa
-const gitInstalado = new Promise<boolean>((ok) => execFile('git', ['--version'], {windowsHide: true}, (e) => ok(!e)));
+// sem Git não há ponto de restauração (commit inicial, Ctrl+S): a tela inicial avisa (git.ts: no Mac, só o git de verdade)
+const gitInstalado = gitDoApp().then((g) => g !== null);
 const midia = new ServidorMidia();
 // na pasta da pessoa e não em Documentos: com o OneDrive movendo Documentos, a sincronização trava a gravação atômica
 // dos JSON e sobe o .git do projeto
@@ -219,10 +225,10 @@ const criarJanela = () => {
     minWidth: 1100,
     minHeight: 640,
     show: false,
-    // barra de título própria (a casca desenha nome, áreas e ações); os botões da janela continuam os do sistema, menos
-    // nos gerenciadores em mosaico (Hyprland/Omarchy, Sway…), que não têm moldura nem minimizar
-    titleBarStyle: 'hidden',
-    ...(MOSAICO ? {} : {titleBarOverlay: {color: '#0f0f0f', symbolColor: '#b4b4b4', height: 36}}),
+    // barra de título própria (a casca desenha nome, áreas e ações); os botões da janela continuam os do sistema (no Mac,
+    // os semáforos à esquerda), menos nos gerenciadores em mosaico (Hyprland/Omarchy, Sway…), que não têm moldura nem
+    // minimizar (plataforma.ts)
+    ...opcoesDaBarra(process.platform, MOSAICO),
     backgroundColor: '#0f0f0f',
     title: 'Estúdio',
     autoHideMenuBar: true,
@@ -552,8 +558,40 @@ registrarIpcNarracao({lidar, enviar, projeto: exigirProjeto, pasta: path.join(ap
 registrarIpcMusica(lidar, exigirProjeto, criarPonteJanela({enviar, temJanela: () => Boolean(janela && !janela.isDestroyed()),
   ouvir: (canal, f) => ipcMain.on(canal, (e, ...a) => (confiavel(e), f(...(a as never[]))))}));
 
+// ---------- abrir uma pasta de projeto vinda de fora (argumento, segunda abertura, ícone do Dock) ----------
+let pastaDeFora: string | null = null;
+function abrirDeFora(pasta: string) {
+  if (!janela) {
+    pastaDeFora = pasta; // o app ainda está abrindo: vale como o projeto inicial
+    return;
+  }
+  // a tela pode estar no início (sem projeto): recarregar faz ela abrir o projeto, como na partida; terminais e conversas
+  // do projeto anterior já foram fechados pelo abrirProjeto
+  abrirProjeto(pasta).then(() => janela?.webContents.reload(), (e: Error) => {
+    if (janela && !janela.isDestroyed()) void dialog.showMessageBox(janela, {type: 'warning', title: 'Estúdio', message: e.message});
+  });
+}
+// Mac: pasta solta no ícone do Dock ou "Abrir com" (Info.plist, build/mac.ts). Chega antes do ready quando é ela que abre o app.
+app.on('open-file', (e, caminho) => {
+  e.preventDefault();
+  if (existsSync(path.join(caminho, 'estudio.json'))) abrirDeFora(caminho);
+});
+
 app.on('ready', async () => {
   if (!primeiraInstancia) return; // a segunda instância já pediu para sair (garantirInstanciaUnica)
+  // Mac: barra de menu do sistema com Editar (copiar e colar nos campos) e sem Recarregar (menu-do-app.ts)
+  if (process.platform === 'darwin') {
+    app.setAboutPanelOptions({applicationName: 'Estúdio', applicationVersion: app.getVersion(), copyright: 'BKM Advogados'});
+    Menu.setApplicationMenu(Menu.buildFromTemplate(modeloDoMenuDoMac({desenvolvimento: !app.isPackaged})));
+  }
+  // microfone da gravação de narração: no Mac passa pelo pedido do sistema (Ajustes › Privacidade › Microfone); o resto
+  // segue liberado, como no padrão do Electron
+  session.defaultSession.setPermissionRequestHandler((_wc, permissao, responder, detalhes) => {
+    const tipos = 'mediaTypes' in detalhes ? (detalhes.mediaTypes ?? []) : [];
+    if (decidirPermissao(process.platform, permissao, tipos) === 'permitir') return responder(true);
+    if (systemPreferences.getMediaAccessStatus('microphone') === 'granted') return responder(true);
+    systemPreferences.askForMediaAccess('microphone').then(responder, () => responder(false));
+  });
   await midia.iniciar();
   // a rede do ler_fonte no app: net.fetch do Electron (proxy e certificados do sistema), assíncrono, 40 s e 20 MB no máximo
   mcpHttp = new McpHttp(path.join(app.getPath('userData'), 'mcp'), () => sessao?.projeto ?? null, criarRede((url, init) => net.fetch(url, init)),
@@ -562,7 +600,9 @@ app.on('ready', async () => {
   midia.rota((req, res) => mcpHttp!.atender(req, res));
   claude = await terminais.preparar();
   criarJanela();
-  const inicial = process.env.ESTUDIO_PROJETO ? path.resolve(process.env.ESTUDIO_PROJETO) : memoria.prefs().ao_iniciar === 'ultimo' ? memoria.ultimo() : null;
+  // a pasta pedida de fora (variável, argumento, ícone do Dock) vem antes do "abrir o último" das preferências
+  const deFora = process.env.ESTUDIO_PROJETO ? path.resolve(process.env.ESTUDIO_PROJETO) : (pastaDeFora ?? projetoNosArgumentos(process.argv, existsSync));
+  const inicial = deFora ?? (memoria.prefs().ao_iniciar === 'ultimo' ? memoria.ultimo() : null);
   if (inicial) await abrirProjeto(inicial).catch(() => undefined);
 });
 

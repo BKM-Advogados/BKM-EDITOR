@@ -38,6 +38,9 @@ V3 = `v3.0.0` (pacote 1.0.0). No Linux a pasta é `~/Projects/estudio`.
 
 **Instalador:** `npm run instalador` gera `Estudio-Setup-<versão>.exe` na raiz do projeto (NSIS, por usuário, com
 atalho na área de trabalho e no Iniciar). O guia para outro PC está em `INSTALAR.md`.
+**Windows e Mac a partir de qualquer sistema:** `npm run pacote:win` e `npm run pacote:mac` (depois de `npm run
+nativos:win` / `nativos:mac`); o DMG e o NSIS saem num Mac e num Windows, ou no CI (`.github/workflows/build.yml`).
+Auditoria, o que já foi testado em cada sistema e a lista de verificação: `docs/portes.md`.
 
 Desenvolvimento:
 

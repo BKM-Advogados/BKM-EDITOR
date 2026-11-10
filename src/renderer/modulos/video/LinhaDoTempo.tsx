@@ -5,6 +5,7 @@
 // No vídeo de cenas não há narração: arrastar grava ms contados do começo da cena, e a alça da cena selecionada muda a
 // duração dela. Abaixo dos blocos, o vídeo de cenas tem as faixas de áudio (FaixasAudio.tsx), e a barra ganha o
 // "+ Áudio" (narração, música, efeito ou música da biblioteca).
+import {comModificador} from '../../teclas';
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore} from 'react';
 import {AudioLines, Maximize2, Mic, Music, Plus, Volume2, ZoomIn, ZoomOut} from 'lucide-react';
 import type {AudioP} from '../../../nucleo/audio';
@@ -282,7 +283,7 @@ export const LinhaDoTempo: React.FC = () => {
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => {
       const alvo = e.target as HTMLElement;
-      if (/INPUT|TEXTAREA|SELECT/.test(alvo.tagName) || alvo.isContentEditable || alvo.closest?.('.xterm') || e.ctrlKey || e.altKey) return;
+      if (/INPUT|TEXTAREA|SELECT/.test(alvo.tagName) || alvo.isContentEditable || alvo.closest?.('.xterm') || comModificador(e)) return;
       if ((e.shiftKey && e.code === 'KeyZ') || e.code === 'IntlBackslash' || e.code === 'Backslash') {
         e.preventDefault();
         zoomRef.current(null);

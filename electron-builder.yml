@@ -28,3 +28,17 @@ nsis:
   uninstallDisplayName: Estúdio
   artifactName: Estudio-Setup-${version}.${ext}
   language: '1046'
+
+# DMG do Mac, montado sobre o Estudio.app que o Electron Forge empacota (e, com as variáveis da Apple, assina e notariza:
+# build/mac.ts). Só sai num Mac (o hdiutil é da Apple):
+#   npm run instalador:mac            →   out/instalador/Estudio-<versão>-<arch>.dmg
+# O electron-builder não assina de novo (identity: null): o .app já vem assinado, ou sem assinatura, do Forge.
+mac:
+  icon: build/icone.icns
+  category: public.app-category.video
+  identity: null
+  target:
+    - target: dmg
+dmg:
+  title: Estúdio ${version}
+  artifactName: Estudio-${version}-${arch}.${ext}

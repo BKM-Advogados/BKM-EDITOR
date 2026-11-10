@@ -4,6 +4,7 @@
 // Ctrl+D duplica, Q quantiza. O carimbo põe um acorde inteiro com a fundamental onde se clica. Com "Teclado", as teclas
 // A W S E D F T G Y H U J K tocam do Dó ao Dó (Z e X mudam a oitava) e, com "Gravar", escrevem no cursor e andam um passo.
 // Tudo passa pelas edições de src/nucleo/musica-acoes.ts, as mesmas das ferramentas MCP.
+import {comando, comModificador} from '../../teclas';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {Keyboard, Stamp, Circle, Shuffle} from 'lucide-react';
 import {NOME_PRESET, posicaoEmCompasso, resolverMusica, type DocMusica, type NotaMusica} from '../../../nucleo/musica';
@@ -140,7 +141,7 @@ export const PianoRoll: React.FC<{doc: DocMusica; padrao: string; agora_bat: num
       if (/INPUT|TEXTAREA|SELECT/.test(alvo.tagName) || alvo.isContentEditable || alvo.closest?.('.xterm') || document.querySelector('.dialogo-fundo')) return;
       const k = e.key.toLowerCase();
       const feito = () => (e.preventDefault(), e.stopImmediatePropagation());
-      if (teclado && !e.ctrlKey && !e.altKey) {
+      if (teclado && !comModificador(e)) {
         const i = TECLAS.indexOf(k);
         if (k === 'z' || k === 'x') return (feito(), setOitava((o) => Math.min(8, Math.max(1, o + (k === 'x' ? 1 : -1)))));
         if (i >= 0) {
@@ -169,9 +170,9 @@ export const PianoRoll: React.FC<{doc: DocMusica; padrao: string; agora_bat: num
         const em = Math.max(0, n.em + (e.key === 'ArrowRight' ? passo : -passo));
         return void fazer(() => trocarNota(doc, padrao, sel[0], {em})).then((ok) => ok && setSel([{em, nota: n.nota}]));
       }
-      if (e.ctrlKey && k === 'd') return (feito(), void fazer(() => editarNotas(doc, {padrao, acao: 'duplicar', selecao: {notas: sel}})));
-      if (e.ctrlKey && k === 'a') return (feito(), setSel(notas.map(ref)));
-      if (!e.ctrlKey && k === 'q') return (feito(), void fazer(() => editarNotas(doc, {padrao, acao: 'quantizar', selecao: {notas: sel}})));
+      if (comando(e) && k === 'd') return (feito(), void fazer(() => editarNotas(doc, {padrao, acao: 'duplicar', selecao: {notas: sel}})));
+      if (comando(e) && k === 'a') return (feito(), setSel(notas.map(ref)));
+      if (!comModificador(e) && k === 'q') return (feito(), void fazer(() => editarNotas(doc, {padrao, acao: 'quantizar', selecao: {notas: sel}})));
       if (e.key === 'Escape') return setSel([]);
     };
     window.addEventListener('keydown', tecla, true);

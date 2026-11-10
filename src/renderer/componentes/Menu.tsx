@@ -1,5 +1,6 @@
 // Popover simples: abre junto ao botão, fecha com clique fora ou Esc. Usado no menu ⋯ do inspector, no zoom da
 // imagem e no "inserir imagem" do trilho.
+import {rotuloDoAtalho} from '../teclas';
 import React, {useEffect, useRef} from 'react';
 
 export const usarFora = (aberto: boolean, fechar: () => void) => {
@@ -38,7 +39,7 @@ export const BotaoMenu: React.FC<{titulo: string; icone: React.ReactNode; itens:
               setAberto(false);
               it.acao();
             }}>
-              {it.icone}{it.rotulo}{it.tecla && <span className="tecla">{it.tecla}</span>}
+              {it.icone}{it.rotulo}{it.tecla && <span className="tecla">{rotuloDoAtalho(it.tecla)}</span>}
             </button>
           ))}
         </div>

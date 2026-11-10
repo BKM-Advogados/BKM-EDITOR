@@ -7,6 +7,8 @@ import {VitePlugin} from "@electron-forge/plugin-vite";
 import {getCompositorPackage} from "./src/main/compositor-package";
 import {getPackagedBrowserPaths} from "./src/main/packaged-browser";
 import {empacotarComposicoes, PASTA_PACOTE} from "./src/main/exportar";
+import {baixarNavegadorAlvo, entraNoPacote} from "./src/main/navegador-alvo";
+import {assinaturaDoMac, notarizacaoDoMac, opcoesDoMac, WHISPER_EMBUTIDO_ENV} from "./build/mac";
 
 const DARWIN_COMPOSITOR_PACKAGES = [
   "@remotion/compositor-darwin-x64",
@@ -20,8 +22,10 @@ const shouldPackageBrowser = process.env[PACKAGE_BROWSER_ENV_VAR] !== "false";
 const DARWIN_UNIVERSAL_ARCH_FILES =
   "Contents/Resources/app.asar.unpacked/node_modules/@remotion/compositor-darwin-*/**";
 
-// O node-pty dos terminais é nativo e fica fora do pacote do Vite, como o compositor do Remotion.
-const PTY_PACKAGES = (platform: string, arch: string) => ["@lydell/node-pty", `@lydell/node-pty-${platform}-${arch}`];
+// O node-pty dos terminais é nativo e fica fora do pacote do Vite, como o compositor do Remotion. No Mac universal vão os
+// dois (arm64 e x64); o padrão do Estúdio é um pacote por arquitetura (docs/portes.md).
+const PTY_PACKAGES = (platform: string, arch: string) =>
+  ["@lydell/node-pty", ...(arch === "universal" ? ["arm64", "x64"] : [arch]).map((a) => `@lydell/node-pty-${platform}-${a}`)];
 
 function getCompositorPackagesForPackaging({
   arch,
@@ -30,7 +34,8 @@ function getCompositorPackagesForPackaging({
   arch: string;
   platform: string;
 }): string[] {
-  if (platform === "darwin") {
+  // Mac de uma arquitetura só leva o compositor dela (o outro são 20 MB à toa); o universal leva os dois
+  if (platform === "darwin" && arch === "universal") {
     return [...DARWIN_COMPOSITOR_PACKAGES, ...PTY_PACKAGES(platform, arch)];
   }
 
@@ -146,8 +151,16 @@ export async function stageBrowser({
     return;
   }
 
-  await ensureBrowser();
+  // o ensureBrowser só baixa o navegador do sistema em que roda: empacotando outro sistema (Windows ou Mac a partir do
+  // Linux), baixa o do alvo do mesmo endereço que o Remotion usaria lá (src/main/navegador-alvo.ts)
+  if (platform === process.platform && arch === process.arch) {
+    await ensureBrowser();
+  } else {
+    await baixarNavegadorAlvo({platform, arch, raiz: process.cwd(), avisar: (t) => console.log(t)});
+  }
   if (!existsSync(browserPaths.downloadedBrowserFolder)) {
+    // sem o navegador o app ainda exporta, mas baixa o navegador na primeira exportação (precisa de internet)
+    console.warn(`navegador de render de ${platform}-${arch} não encontrado: o pacote sai sem ele`);
     return;
   }
 
@@ -162,8 +175,25 @@ export async function stageBrowser({
   await cp(
     browserPaths.downloadedBrowserFolder,
     browserPaths.packagedBrowserCopyDestination,
-    {recursive: true},
+    {recursive: true, filter: (origem) => entraNoPacote(browserPaths.downloadedBrowserFolder, origem)},
   );
+}
+
+/** whisper-cli compilado à parte (o CI compila o whisper.cpp no Mac): vai para resources/whisper/ do app. */
+async function stageWhisper({buildPath}: {buildPath: string}): Promise<void> {
+  const origem = process.env[WHISPER_EMBUTIDO_ENV];
+  if (!origem) {
+    return;
+  }
+
+  if (!existsSync(origem)) {
+    throw new Error(`${WHISPER_EMBUTIDO_ENV} aponta para ${origem}, que não existe`);
+  }
+
+  // buildPath é a pasta do app (resources/app); o whisper vai ao lado, em resources/whisper
+  const destino = path.join(path.dirname(buildPath), "whisper");
+  await mkdir(destino, {recursive: true});
+  await cp(origem, path.join(destino, path.basename(origem)));
 }
 
 const config = {
@@ -175,6 +205,11 @@ const config = {
     executableName: "Estudio",
     icon: "build/icone",
     win32metadata: {CompanyName: "BKM Advogados", FileDescription: "Estúdio", ProductName: "Estúdio"},
+    // Mac: id, categoria, Info.plist (microfone, pastas arrastadas no ícone) e, só com as variáveis da Apple no
+    // ambiente, assinatura e notarização (build/mac.ts, docs/portes.md)
+    ...opcoesDoMac(),
+    ...assinaturaDoMac(process.env),
+    ...notarizacaoDoMac(process.env),
     asar: {
       unpackDir: shouldPackageBrowser
         ? "{node_modules/@remotion/compositor-*,node_modules/@lydell/**,remotion-browser}"
@@ -190,9 +225,10 @@ const config = {
   },
   // nada para recompilar: o node-pty vem pré-compilado (N-API) e o compositor do Remotion é binário pronto
   rebuildConfig: {onlyModules: []},
-  // o .zip é a versão portátil (descompactar e abrir o Estudio.exe ou o Estudio do Linux); o instalador do Windows é o
-  // NSIS do electron-builder.yml, e no Linux quem instala é scripts/instalar-linux.sh (deb/rpm não servem ao Arch)
-  makers: [new MakerZIP({}, ["win32", "linux"])],
+  // o .zip é a versão portátil (descompactar e abrir o Estudio.exe, o Estudio.app ou o Estudio do Linux); o instalador
+  // do Windows (NSIS) e o DMG do Mac são do electron-builder.yml, e no Linux quem instala é scripts/instalar-linux.sh
+  // (deb/rpm não servem ao Arch)
+  makers: [new MakerZIP({}, ["win32", "linux", "darwin"])],
   hooks: {
     packageAfterCopy: async (
       _forgeConfig: unknown,
@@ -225,6 +261,8 @@ const config = {
         buildPath,
         platform,
       });
+
+      await stageWhisper({buildPath});
     },
   },
   plugins: [

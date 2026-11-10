@@ -15,6 +15,7 @@ import type {DocVideo} from '../nucleo/documentos';
 import type {PropsVideo} from '../compartilhado/api';
 import {lerEnvelopes} from './ipc-audio';
 import {arquivosDaMidia, gitignoreComMidiaPesada} from '../nucleo/midia-git'; // frente Casca (transversal-D7)
+import {gitDoApp} from './git'; // portes: no Mac o git sem as ferramentas do Xcode abre o instalador da Apple
 
 const exec = promisify(execFile);
 const IGNORAR = /(^|[\\/])(\.git|node_modules)([\\/]|$)|\.tmp$|estado\.json$|mcp\.json$/;
@@ -25,6 +26,7 @@ export class SessaoProjeto {
   private pendentes = new Map<string, NodeJS.Timeout>();
   private relogioGit: NodeJS.Timeout | null = null;
   private _temGit = false;
+  private exeGit = 'git';
 
   constructor(raiz: string, private readonly aoMudar: (arquivo: string) => void) {
     this.projeto = new Projeto(raiz);
@@ -76,15 +78,13 @@ export class SessaoProjeto {
   }
 
   private async git(...args: string[]) {
-    return exec('git', args, {cwd: this.projeto.raiz, windowsHide: true});
+    return exec(this.exeGit, args, {cwd: this.projeto.raiz, windowsHide: true});
   }
 
   private async prepararGit(): Promise<boolean> {
-    try {
-      await exec('git', ['--version'], {windowsHide: true});
-    } catch {
-      return false;
-    }
+    const git = await gitDoApp();
+    if (!git) return false;
+    this.exeGit = git;
     if (!existsSync(path.join(this.projeto.raiz, '.git'))) {
       await this.git('init', '-q');
       await this.salvarVersao('estúdio: projeto aberto pela primeira vez');

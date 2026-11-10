@@ -6,12 +6,23 @@ import {execFile} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
 import os from 'node:os';
 import type {IPty} from '@lydell/node-pty';
+import {caminhoDeBusca, comPath, shellPadrao} from './plataforma';
 
 type Saida = {dados: (id: number, d: string) => void; saiu: (id: number, codigo: number) => void};
 type Aba = {pty: IPty; buffer: string; timer: NodeJS.Timeout | null; claude: boolean};
 
-export const PATH_COM_LOCAL = () =>
-  `${process.env.PATH ?? ''}${process.platform === 'win32' ? ';' : ':'}${os.homedir()}${process.platform === 'win32' ? '\\.local\\bin' : '/.local/bin'}`;
+/** O PATH da pessoa com as pastas onde o Claude Code e o Homebrew costumam ficar (plataforma.ts): aberto pelo Finder,
+ *  pelo menu Iniciar ou pelo lançador, o app recebe um PATH curto, sem ~/.local/bin nem /opt/homebrew/bin. */
+export const PATH_COM_LOCAL = () => caminhoDeBusca({plataforma: process.platform, PATH: process.env.PATH, home: os.homedir(), env: process.env});
+
+/** O shell da conta (o de login no Mac e no Linux), quando o SHELL não vem no ambiente. */
+const shellDaConta = () => {
+  try {
+    return os.userInfo().shell;
+  } catch {
+    return null;
+  }
+};
 
 // O app pode ter sido aberto de dentro de outra sessão do Claude Code (app desktop, terminal do VS Code). As marcas
 // daquela sessão não podem vazar para a aba: o Claude dela tem login e sessão próprios (com elas, ele tenta renovar o
@@ -70,7 +81,6 @@ export class Terminais {
   // outrasVivas: conversas do Claude abertas fora do terminal, que contam no mesmo limite do perfil de RAM
   async criar(o: {tipo: 'claude' | 'shell'; colunas: number; linhas: number; cwd: string; arquivoMcp?: string; sessao?: string; limiteClaude: number; outrasVivas?: number}) {
     const pty = await import('@lydell/node-pty');
-    const windows = process.platform === 'win32';
     let arquivo: string;
     let args: string[];
     let sessao: string | undefined;
@@ -82,8 +92,8 @@ export class Terminais {
       // as ferramentas do projeto (MCP estudio) ficam liberadas: só mexem nos JSON do projeto, com diário e desfazer
       args = [...(o.sessao ? ['--resume', sessao] : ['--session-id', sessao]), ...(o.arquivoMcp ? ['--mcp-config', o.arquivoMcp, '--allowedTools', 'mcp__estudio'] : [])];
     } else {
-      arquivo = windows ? 'powershell.exe' : process.env.SHELL || '/bin/sh'; // /bin/sh existe em todo Linux e macOS; zsh não
-      args = windows ? ['-NoLogo'] : ['-l'];
+      // PowerShell no Windows; o shell da pessoa no Mac (zsh) e no Linux, como shell de login (plataforma.ts)
+      ({arquivo, args} = shellPadrao(process.platform, process.env, shellDaConta()));
     }
     // claude.cmd do npm (transversal-D22): pelo cmd.exe, com a linha montada à mão (no Windows o node-pty aceita a linha pronta)
     const viaCmd = o.tipo === 'claude' && ehCmd(arquivo);
@@ -92,7 +102,8 @@ export class Terminais {
       cols: Math.max(20, o.colunas),
       rows: Math.max(5, o.linhas),
       cwd: o.cwd,
-      env: {...ambienteLimpo(), PATH: PATH_COM_LOCAL(), TERM: 'xterm-256color', COLORTERM: 'truecolor', ESTUDIO_PROJETO: o.cwd},
+      // comPath: no Windows a chave é "Path", e um "PATH" ao lado dela deixava o PowerShell com o PATH antigo
+      env: {...comPath(ambienteLimpo(), PATH_COM_LOCAL(), process.platform), TERM: 'xterm-256color', COLORTERM: 'truecolor', ESTUDIO_PROJETO: o.cwd},
     });
     const id = this.proximo++;
     const aba: Aba = {pty: p, buffer: '', timer: null, claude: o.tipo === 'claude'};
