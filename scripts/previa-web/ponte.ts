@@ -6,7 +6,7 @@
 // Som: "escolher arquivo de áudio" devolve um WAV sintético (uma narração, depois uma música, alternando), como URL de
 // blob que o <audio> e o Web Audio tocam de verdade; o envelope medido fica em memória e entra nas props como no app.
 import jsonpatch, {type Operation} from 'fast-json-patch';
-import type {ApiEstudio, InfoProjeto, MarcaInfo, Mudanca, NovoProjeto, Preferencias, Progresso, ProgressoTranscricao, Recente, ResultadoLimpezaVoz, Trilha} from '../../src/compartilhado/api';
+import type {ApiEstudio, EstadoProvedor, InfoProjeto, PedidoPortaoTela, MarcaInfo, Mudanca, NovoProjeto, Preferencias, Progresso, ProgressoTranscricao, Recente, ResultadoLimpezaVoz, Trilha} from '../../src/compartilhado/api';
 import type {EntradaDocumento, Manifesto, Modulo} from '../../src/nucleo/documentos';
 import type {Envelope, IntensidadeLimpeza} from '../../src/nucleo/audio';
 import {LimpezaCancelada, limparVoz} from '../../src/nucleo/limpeza-voz';
@@ -263,7 +263,7 @@ const api: ApiEstudio = {
   terminal: {criar: async () => ({id: 99}), escrever: nada, tamanho: nada, fechar: nada, aoReceber: () => nada, aoSair: () => nada},
   conversa: {
     conta: async () => ({instalado: true, logado: true, metodo: 'claude.ai', email: 'pessoa@exemplo.com.br', chave_api: false}),
-    abrir: async () => ({id: Math.floor(Math.random() * 1000), sessao: 'previa'}),
+    abrir: async (o) => ({id: Math.floor(Math.random() * 1000), sessao: 'previa', provedor: o?.provedor ?? 'claude', rotulo: o?.provedor === 'deepseek' ? 'DeepSeek 1' : 'Claude 1'}),
     enviar: async () => undefined,
     permitir: nada,
     parar: nada,
@@ -407,6 +407,45 @@ const api: ApiEstudio = {
   midia: {
     indice: async () => midiaNaPrevia.indice(),
     marcar: async (caminho, mudanca) => midiaNaPrevia.marcar(caminho, mudanca),
+  },
+  // frente IA: catálogo simulado com estado (chave do DeepSeek no cofre, Gemini sem chave, Ollama sem modelo). Chave
+  // que começa com "sk-" é aceita; outra é recusada como o provedor faria. Nada sai do navegador.
+  ia: {
+    provedores: async () => iaNaPrevia.lista(),
+    gravarChave: async (id, chave) => {
+      if (!/^sk-/.test(chave)) return {ok: false, mensagem: 'a chave foi recusada pelo provedor (401): Invalid API key'};
+      iaNaPrevia.chaves.set(id, chave);
+      return {ok: true, persistente: true, mensagem: 'chave aceita e guardada cifrada neste PC', modelos: iaNaPrevia.modelos[id] ?? []};
+    },
+    apagarChave: async (id) => void iaNaPrevia.chaves.delete(id),
+    modelos: async (id) => ({ok: true as const, modelos: iaNaPrevia.modelos[id] ?? []}),
+    configurar: async (id, c) => {
+      const atual = {...iaNaPrevia.config[id], ...c};
+      iaNaPrevia.config[id] = atual;
+      return atual;
+    },
+    padrao: async (id) => void (iaNaPrevia.padrao = id),
+    usoDoMes: async () => ({deepseek: {entrada: 182000, cache: 120000, saida: 9100, custo_usd: 0.0198, turnos: 14}}),
+    modeloDaConversa: async () => undefined,
+    aoPedidoPortao: (cb) => {
+      iaNaPrevia.portao.add(cb);
+      return () => iaNaPrevia.portao.delete(cb);
+    },
+    aoPortaoCancelado: () => nada,
+    responderPortao: (id, permitir) => console.log(`[prévia] portão ${id}: ${permitir ? 'permitido' : 'negado'}`),
+    reverter: async (seq) => ({ok: true as const, seq: seq + 1000, rotulo: `reverter: #${seq}`}),
+    apps: async () => iaNaPrevia.estadoApps(),
+    appsLigar: async (ligado, porta) => ((iaNaPrevia.appsLigado = ligado), porta && (iaNaPrevia.porta = porta), iaNaPrevia.estadoApps()),
+    appsNovo: async (nome) => {
+      const id = `app${iaNaPrevia.apps.length + 1}`;
+      iaNaPrevia.apps.push({id, nome, criado_em: new Date().toISOString()});
+      return {id, configs: iaNaPrevia.configs(id)};
+    },
+    appsConfigs: async (id) => iaNaPrevia.configs(id),
+    appsRevogar: async (id) => ((iaNaPrevia.apps = iaNaPrevia.apps.filter((x) => x.id !== id)), iaNaPrevia.estadoApps()),
+    guardar: async () => null,
+    guardadas: async () => [],
+    apagarGuardada: async () => undefined,
   },
 };
 
@@ -661,3 +700,50 @@ const midiaNaPrevia = (() => {
   };
   return {indice, marcar};
 })();
+// ---------- frente IA: estado da simulação de Configurações › IA ----------
+const iaNaPrevia = {
+  padrao: 'claude',
+  portao: new Set<(p: PedidoPortaoTela) => void>(),
+  appsLigado: false,
+  porta: 47815,
+  apps: [] as {id: string; nome: string; criado_em: string}[],
+  estadoApps() {
+    return {ligado: this.appsLigado, porta: this.porta, ouvindo: this.appsLigado, apps: this.apps.slice()};
+  },
+  configs(id: string) {
+    const url = `http://127.0.0.1:${this.porta}/mcp`;
+    const token = `token-da-previa-${id}`;
+    return {http: JSON.stringify({mcpServers: {estudio: {type: 'http', url, headers: {Authorization: `Bearer ${token}`}}}}, null, 2),
+      stdio: JSON.stringify({mcpServers: {estudio: {command: String.raw`C:\Users\pessoa\AppData\Local\Programs\Estudio\Estudio.exe`,
+        args: [String.raw`C:\Users\pessoa\AppData\Local\Programs\Estudio\resources\dist-mcp\ponte.cjs`],
+        env: {ELECTRON_RUN_AS_NODE: '1', ESTUDIO_MCP_URL: url, ESTUDIO_MCP_TOKEN: token}}}}, null, 2)};
+  },
+  chaves: new Map<string, string>([['deepseek', 'sk-previa-a1f9']]),
+  config: {} as Record<string, {modelo?: string; base?: string}>,
+  modelos: {deepseek: ['deepseek-flash', 'deepseek-v4-pro'], gemini: ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash'],
+    ollama: ['llama3.2', 'qwen2.5:7b']} as Record<string, string[]>,
+  lista(): EstadoProvedor[] {
+    const base: EstadoProvedor[] = [
+      {id: 'claude', nome: 'Claude (sua conta)', via: 'claude-cli', servidor: 'EUA (Anthropic)', chave: 'nenhuma', pronto: true},
+      {id: 'deepseek', nome: 'DeepSeek', via: 'openai', servidor: 'China', chave: 'exigida', modelo: 'deepseek-flash', base: 'https://api.deepseek.com', pronto: true,
+        paginaChave: 'https://platform.deepseek.com/api_keys'},
+      {id: 'gemini', nome: 'Gemini (chave)', via: 'openai', servidor: 'EUA (Google)', chave: 'exigida', modelo: 'gemini-3.6-flash', pronto: false,
+        base: 'https://generativelanguage.googleapis.com/v1beta/openai', paginaChave: 'https://aistudio.google.com/apikey'},
+      {id: 'ollama', nome: 'Ollama (neste PC)', via: 'openai', servidor: 'neste PC', chave: 'nenhuma', base: 'http://127.0.0.1:11434/v1', pronto: false, local: true},
+      {id: 'compativel', nome: 'Outro endereço compatível com OpenAI', via: 'openai', servidor: 'o do endereço', chave: 'opcional', pronto: false},
+    ];
+    return base.map((p) => {
+      const c = this.config[p.id] ?? {};
+      const k = this.chaves.get(p.id);
+      const modelo = c.modelo ?? p.modelo;
+      const end = c.base ?? p.base;
+      const falta = p.via !== 'openai' ? undefined : !end ? 'endereço' : p.chave === 'exigida' && !k ? 'chave' : !modelo ? 'modelo' : undefined;
+      return {...p, modelo, base: end, pronto: !falta, falta, padrao: this.padrao === p.id, cofre_persistente: true,
+        ...(p.via === 'openai' ? {chave_origem: k ? 'cofre' as const : 'nenhuma' as const, chave_final: k?.slice(-4)} : {})};
+    });
+  },
+};
+// na prévia, um pedido do portão sai pelo console: window.__portaoNaPrevia({origem: 'DeepSeek 1', ferramenta: 'ler_fonte', …})
+(window as unknown as {__portaoNaPrevia: (p: Partial<PedidoPortaoTela>) => void}).__portaoNaPrevia = (p) =>
+  iaNaPrevia.portao.forEach((f) => f({id: `previa-${Date.now()}`, origem: 'Claude 1', ferramenta: 'ler_fonte', motivo: 'abrir uma página da internet',
+    entrada: {url: 'https://www.planalto.gov.br/ccivil_03/decreto-lei/del5452.htm'}, ...p}));

@@ -28,13 +28,22 @@ export const ambienteLimpo = (base: NodeJS.ProcessEnv = process.env): Record<str
   return e;
 };
 
-/** Caminho do executável do Claude Code, ou null se não estiver instalado. */
+/** Caminho do executável do Claude Code, ou null se não estiver instalado. No Windows, prefere o .exe do instalador
+ *  oficial e aceita o claude.cmd que o npm cria (transversal-D22). */
 export const acharClaude = (): Promise<string | null> =>
   new Promise((ok) => {
     execFile(process.platform === 'win32' ? 'where' : 'which', ['claude'], {windowsHide: true, env: {...process.env, PATH: PATH_COM_LOCAL()}}, (e, saida) => {
-      ok(e ? null : saida.split(/\r?\n/).map((l) => l.trim()).find((l) => (process.platform === 'win32' ? /\.exe$/i.test(l) : Boolean(l))) ?? null);
+      if (e) return ok(null);
+      const linhas = saida.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      if (process.platform !== 'win32') return ok(linhas[0] ?? null);
+      ok(linhas.find((l) => /\.exe$/i.test(l)) ?? linhas.find((l) => /\.cmd$/i.test(l)) ?? null);
     });
   });
+
+/** O .cmd do npm só roda pelo cmd.exe. */
+export const ehCmd = (exe: string) => process.platform === 'win32' && /\.(cmd|bat)$/i.test(exe);
+/** Argumento para a linha do cmd.exe: entre aspas quando tem espaço ou caractere especial (caminho com espaço). */
+export const citarCmd = (a: string) => (/[\s&|<>^()"]/.test(a) ? `"${a.replace(/"/g, '')}"` : a);
 
 export class Terminais {
   private abas = new Map<number, Aba>();
@@ -76,7 +85,9 @@ export class Terminais {
       arquivo = windows ? 'powershell.exe' : process.env.SHELL || '/bin/sh'; // /bin/sh existe em todo Linux e macOS; zsh não
       args = windows ? ['-NoLogo'] : ['-l'];
     }
-    const p = pty.spawn(arquivo, args, {
+    // claude.cmd do npm (transversal-D22): pelo cmd.exe, com a linha montada à mão (no Windows o node-pty aceita a linha pronta)
+    const viaCmd = o.tipo === 'claude' && ehCmd(arquivo);
+    const p = pty.spawn(viaCmd ? 'cmd.exe' : arquivo, viaCmd ? `/d /s /c ""${arquivo}" ${args.map(citarCmd).join(' ')}"` : args, {
       name: 'xterm-256color',
       cols: Math.max(20, o.colunas),
       rows: Math.max(5, o.linhas),

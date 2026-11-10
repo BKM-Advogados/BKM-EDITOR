@@ -11,8 +11,12 @@ const segundos = (ms?: number) => (ms === undefined ? '' : `${(ms / 1000).toFixe
 
 const pedirAoClaude = async (c: Comentario) => {
   const {enviarParaAtiva} = await import('./terminais');
-  const ok = enviarParaAtiva(`Resolva o comentário ${c.id} do projeto (use as ferramentas do MCP estudio: ler_comentario, ler_documento, aplicar_patch, responder_comentario e resolver_comentario).`);
-  avisar(ok ? `Pedido do ${c.id} enviado ao Claude; confirme com Enter no terminal.` : 'Abra uma aba do Claude no terminal primeiro.', ok ? 'ok' : 'erro');
+  const {preencher} = await import('./conversas');
+  const pedido = `Resolva o comentário ${c.id} do projeto (use as ferramentas do MCP estudio: ler_comentario, ler_documento, aplicar_patch, responder_comentario e resolver_comentario).`;
+  // transversal-D20: com uma conversa na frente, o pedido vai para a caixa dela (sem terminal); senão, para a aba ativa
+  if (preencher(pedido)) return avisar(`Pedido do ${c.id} na caixa da conversa: confira e mande com Enter.`, 'ok');
+  const ok = enviarParaAtiva(pedido);
+  avisar(ok ? `Pedido do ${c.id} colado no terminal; confirme com Enter.` : 'Abra uma conversa com a IA ou um terminal primeiro.', ok ? 'ok' : 'erro');
 };
 
 const Cartao: React.FC<{c: Comentario; aberto: boolean}> = ({c, aberto}) => {

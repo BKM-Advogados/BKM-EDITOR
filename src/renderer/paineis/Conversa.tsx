@@ -4,18 +4,22 @@
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore} from 'react';
 import {ArrowUp, CircleAlert, CircleCheck, CircleX, LoaderCircle, ShieldQuestion, Sparkle, SquareTerminal, X} from 'lucide-react';
 import type {OperacaoPatch} from '../../nucleo/documentos';
-import {aplicar, avisar, loja, selecionar, useLoja, valorEm} from '../estado/loja';
-import {enviar, estadoConversas, guardarRascunho, lerConta, parar, responderPermissao, type Anexo, type Bloco, type Conversa as TConversa} from './conversas';
+import {FERRAMENTAS_ESTUDIO, normalizarFerramenta} from '../../compartilhado/ferramentas';
+import {mudancasDoResultado} from '../../nucleo/portao';
+import {confirmar} from '../componentes/Dialogo';
+import {avisar, loja, selecionar, useLoja, valorEm} from '../estado/loja';
+import {enviar, estadoConversas, guardarRascunho, lerConta, parar, responderPermissao, trocarModelo, type Anexo, type Bloco, type Conversa as TConversa} from './conversas';
 import './conversa.css';
 
 // ── texto do Claude: markdown pequeno (parágrafos, listas, negrito, itálico, código), sempre escapado ──
-const escapar = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+// transversal-D13: aspas também escapadas, para um endereço com aspas não virar atributo no link
+const escapar = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 const emLinha = (s: string) =>
   escapar(s)
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
     .replace(/(^|[^*])\*([^*\s][^*]*)\*/g, '$1<i>$2</i>')
-    .replace(/\[([^\]]+)\]\((https:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
+    .replace(/\[([^\]]+)\]\((https:\/\/[^)\s&]+(?:&amp;[^)\s&]+)*)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
 const markdown = (t: string) => {
   const partes = t.split(/```[^\n]*\n?([\s\S]*?)```/g);
   return partes.map((p, i) => {
@@ -35,7 +39,7 @@ const markdown = (t: string) => {
 
 // ── ações do Claude em português de quem edita ──
 type Diff = {campo: string; antes?: unknown; depois?: unknown; tipo: 'troca' | 'novo' | 'tira'};
-type Desc = {verbo: string; alvo?: string; extra?: string; codigo?: string; diffs?: Diff[]; ir?: {documento: string; caminho: string}; reverter?: {documento: string; patch: OperacaoPatch[]}};
+type Desc = {verbo: string; alvo?: string; extra?: string; codigo?: string; diffs?: Diff[]; ir?: {documento: string; caminho: string}};
 const nomeArquivo = (p: unknown) => (typeof p === 'string' ? p.split(/[\\/]/).pop() : undefined);
 const curto = (v: unknown) => {
   const s = typeof v === 'string' ? v : JSON.stringify(v);
@@ -49,27 +53,27 @@ const tentarJson = (s?: string): any => {
   }
 };
 
-const descrever = (nome: string, e: Record<string, any>, resultado?: string): Desc => {
-  const mcp = /^mcp__estudio__(.+)$/.exec(nome)?.[1];
+const arquivoDe = (e: Record<string, any>) => nomeArquivo(e.file_path ?? e.absolute_path ?? e.path ?? e.notebook_path);
+
+const descrever = (bruto: string, e: Record<string, any>, resultado?: string): Desc => {
+  // o mesmo cartão para qualquer provedor: o nome chega sem o prefixo de cada agente (compartilhado/ferramentas.ts)
+  const f = normalizarFerramenta(bruto, FERRAMENTAS_ESTUDIO);
+  const mcp = f.servidor === 'estudio' ? f.nome : undefined;
+  const nome = f.nome;
   if (mcp === 'aplicar_patch') {
     const ops = (Array.isArray(e.patch) ? e.patch : []) as OperacaoPatch[];
     const testes = new Map(ops.filter((o) => o.op === 'test').map((o) => [o.path, (o as {value?: unknown}).value]));
     const diffs: Diff[] = [];
-    const inverso: OperacaoPatch[] = [];
     for (const o of ops) {
       const campo = o.path.split('/').pop() ?? o.path;
-      if (o.op === 'replace') {
-        const antes = testes.get(o.path);
-        diffs.push({campo, antes, depois: o.value, tipo: 'troca'});
-        if (testes.has(o.path)) inverso.push({op: 'test', path: o.path, value: o.value} as OperacaoPatch, {op: 'replace', path: o.path, value: antes} as OperacaoPatch);
-      } else if (o.op === 'add') diffs.push({campo, depois: o.value, tipo: 'novo'});
+      if (o.op === 'replace') diffs.push({campo, antes: testes.get(o.path), depois: o.value, tipo: 'troca'});
+      else if (o.op === 'add') diffs.push({campo, depois: o.value, tipo: 'novo'});
       else if (o.op === 'remove') diffs.push({campo, tipo: 'tira'});
     }
     const primeiro = ops.find((o) => o.op !== 'test');
     const pai = primeiro ? primeiro.path.split('/').slice(0, -1).join('/') : '';
-    const completo = inverso.length === diffs.length * 2 && diffs.every((d) => d.tipo === 'troca');
-    return {verbo: 'Mudou', alvo: e.rotulo ?? e.documento, diffs, ir: e.documento && pai ? {documento: e.documento, caminho: pai} : undefined,
-      reverter: completo && e.documento ? {documento: e.documento, patch: inverso} : undefined};
+    // o Reverter sai do diário (CartaoAcao), para qualquer ferramenta que grave
+    return {verbo: 'Mudou', alvo: e.rotulo ?? e.documento, diffs, ir: e.documento && pai ? {documento: e.documento, caminho: pai} : undefined};
   }
   if (mcp === 'ler_comentario') return {verbo: 'Leu o comentário', alvo: e.id, extra: tentarJson(resultado)?.texto};
   if (mcp === 'responder_comentario') return {verbo: 'Respondeu ao comentário', alvo: e.id, extra: e.texto};
@@ -80,29 +84,31 @@ const descrever = (nome: string, e: Record<string, any>, resultado?: string): De
   if (mcp === 'projeto_info') return {verbo: 'Viu o projeto'};
   if (mcp === 'listar_mudancas') return {verbo: 'Viu as últimas mudanças'};
   if (mcp) return {verbo: mcp.replace(/_/g, ' ')};
-  switch (nome) {
-    case 'Read': return {verbo: 'Leu', alvo: nomeArquivo(e.file_path)};
-    case 'Edit': case 'MultiEdit': case 'NotebookEdit': return {verbo: 'Editou', alvo: nomeArquivo(e.file_path ?? e.notebook_path)};
-    case 'Write': return {verbo: 'Escreveu', alvo: nomeArquivo(e.file_path)};
-    case 'Bash': case 'PowerShell': return {verbo: 'Rodou', codigo: String(e.command ?? '')};
-    case 'Glob': case 'Grep': return {verbo: 'Procurou', codigo: String(e.pattern ?? '')};
-    case 'WebFetch': return {verbo: 'Abriu', alvo: String(e.url ?? '')};
-    case 'WebSearch': return {verbo: 'Pesquisou', alvo: String(e.query ?? '')};
-    case 'TodoWrite': return {verbo: 'Atualizou a lista de tarefas'};
-    case 'Task': case 'Agent': return {verbo: 'Pediu a um subagente', alvo: e.description};
-    case 'Skill': return {verbo: 'Usou a skill', alvo: e.skill ?? e.name};
-    default: return {verbo: nome.replace(/^mcp__[^_]+__/, '').replace(/_/g, ' ')};
+  switch (f.servidor === 'interno' ? nome : '') {
+    case 'ler_arquivo': return {verbo: 'Leu', alvo: arquivoDe(e)};
+    case 'editar_arquivo': return {verbo: 'Editou', alvo: arquivoDe(e)};
+    case 'escrever_arquivo': return {verbo: 'Escreveu', alvo: arquivoDe(e)};
+    case 'shell': return {verbo: 'Rodou', codigo: String(e.command ?? '')};
+    case 'procurar': return {verbo: 'Procurou', codigo: String(e.pattern ?? '')};
+    case 'abrir_pagina': return {verbo: 'Abriu', alvo: String(e.url ?? e.prompt ?? '')};
+    case 'buscar_web': return {verbo: 'Pesquisou', alvo: String(e.query ?? '')};
+    case 'lista_de_tarefas': return {verbo: 'Atualizou a lista de tarefas'};
+    case 'subagente': return {verbo: 'Pediu a um subagente', alvo: e.description};
+    case 'skill': return {verbo: 'Usou a skill', alvo: e.skill ?? e.name};
+    default: return {verbo: nome.replace(/_/g, ' ')};
   }
 };
 
-const pedidoEmTexto = (ferramenta: string, e: Record<string, any>): {acao: string; codigo?: string} => {
-  switch (ferramenta) {
-    case 'Bash': case 'PowerShell': return {acao: 'rodar um comando', codigo: String(e.command ?? '')};
-    case 'Edit': case 'MultiEdit': case 'Write': case 'NotebookEdit': return {acao: `editar ${nomeArquivo(e.file_path ?? e.notebook_path) ?? 'um arquivo'}`, codigo: e.file_path};
-    case 'Read': return {acao: `ler ${nomeArquivo(e.file_path) ?? 'um arquivo'}`, codigo: e.file_path};
-    case 'WebFetch': return {acao: 'abrir uma página', codigo: e.url};
-    case 'WebSearch': return {acao: 'pesquisar na web', codigo: e.query};
-    default: return {acao: `usar ${ferramenta.replace(/^mcp__[^_]+__/, '').replace(/_/g, ' ')}`};
+const pedidoEmTexto = (bruto: string, e: Record<string, any>): {acao: string; codigo?: string} => {
+  const f = normalizarFerramenta(bruto, FERRAMENTAS_ESTUDIO);
+  const caminho = e.file_path ?? e.absolute_path ?? e.path ?? e.notebook_path;
+  switch (f.servidor === 'interno' ? f.nome : '') {
+    case 'shell': return {acao: 'rodar um comando', codigo: String(e.command ?? '')};
+    case 'editar_arquivo': case 'escrever_arquivo': return {acao: `editar ${nomeArquivo(caminho) ?? 'um arquivo'}`, codigo: caminho};
+    case 'ler_arquivo': return {acao: `ler ${nomeArquivo(caminho) ?? 'um arquivo'}`, codigo: caminho};
+    case 'abrir_pagina': return {acao: 'abrir uma página', codigo: e.url};
+    case 'buscar_web': return {acao: 'pesquisar na web', codigo: e.query};
+    default: return {acao: `usar ${f.nome.replace(/_/g, ' ')}`};
   }
 };
 
@@ -115,10 +121,63 @@ const irPara = (documento: string, caminho: string) => {
   }
 };
 
+/** O nome da IA da conversa sem o número: "DeepSeek 1" vira "DeepSeek". */
+const nomeIA = (c: TConversa) => c.titulo.split(' · ')[0].replace(/\s+\d+$/, '');
+const milhares = (n: number) => (n >= 1000 ? `${(n / 1000).toLocaleString('pt-BR', {maximumFractionDigits: 1})} mil` : String(n));
+/** Tokens e custo da conversa, com a composição: entrada (parte do cache) e saída. */
+const rodapeUso = (c: TConversa) => {
+  const u = c.uso;
+  if (!u || (!u.entrada && !u.saida && !u.custo_usd)) return nomeIA(c);
+  const tokens = u.entrada || u.saida ? `${milhares(u.entrada)} tokens de entrada${u.cache ? ` (${milhares(u.cache)} do cache)` : ''} · ${milhares(u.saida)} de saída` : '';
+  const custo = u.custo_usd !== undefined ? `≈ US$ ${u.custo_usd.toLocaleString('pt-BR', {maximumFractionDigits: 4})}` : '';
+  return [nomeIA(c), custo, tokens].filter(Boolean).join(' · ');
+};
+
+// ── seletor de modelo (rodada 3, "Seletor de modelo e painel de conexões"): grava o modelo da conversa e vale na próxima
+// mensagem; o rótulo mostra o modelo que a abertura da sessão devolveu. No Claude, os apelidos que o Claude Code aceita;
+// no laço próprio, a lista do próprio endereço; agente ACP usa o modelo da configuração dele.
+const APELIDOS_CLAUDE: [string, string][] = [['', 'padrão da conta'], ['sonnet', 'Sonnet'], ['opus', 'Opus'], ['haiku', 'Haiku']];
+const SeletorModelo: React.FC<{c: TConversa; desligado: boolean}> = ({c, desligado}) => {
+  const [lista, setLista] = useState<string[] | null>(null);
+  const provedor = useSyncExternalStore(estadoConversas.assinar, () => estadoConversas.provedores().find((p) => p.id === c.provedor));
+  if (provedor?.via === 'acp') return <>{c.modelo ?? nomeIA(c)}</>;
+  const opcoes: [string, string][] = c.provedor === 'claude' ? APELIDOS_CLAUDE : (lista ?? []).map((m) => [m, m]);
+  const atual = c.modelo ?? '';
+  if (atual && !opcoes.some(([v]) => v === atual)) opcoes.unshift([atual, atual]);
+  return (
+    <select className="seletor-modelo" value={atual} disabled={desligado} title="Modelo desta conversa: vale a partir da próxima mensagem"
+      onFocus={() => c.provedor !== 'claude' && lista === null && void window.estudio.ia.modelos(c.provedor).then((r) => setLista(r.ok ? r.modelos : []))}
+      onChange={(e) => void trocarModelo(c.id, e.target.value)}>
+      {!opcoes.length && <option value="">{nomeIA(c)}</option>}
+      {opcoes.map(([v, r]) => <option key={v} value={v}>{r}</option>)}
+    </select>
+  );
+};
+
+// Ver e Reverter pelo diário (frente IA, rodada 3): o portão do MCP põe no resultado as mudanças que a ferramenta fez
+// (seq, documento); o Reverter aplica o inverso daquela entrada, com qualquer provedor e qualquer ferramenta que grave.
+// transversal-D12: falhou, o cartão diz por quê e oferece "Reverter mesmo assim" quando o valor mudou depois.
+const reverterSeqs = async (seqs: number[], forcar = false): Promise<{ok: boolean; mudou?: boolean; mensagem?: string}> => {
+  for (const seq of [...seqs].reverse()) {
+    const r = await window.estudio.ia.reverter(seq, forcar);
+    if (!r.ok) return {ok: false, mudou: r.mudou_depois, mensagem: r.mensagem};
+  }
+  return {ok: true};
+};
+
 const CartaoAcao: React.FC<{b: Extract<Bloco, {tipo: 'acao'}>}> = ({b}) => {
   const d = useMemo(() => descrever(b.nome, b.entrada, b.resultado), [b.nome, b.entrada, b.resultado]);
-  const [revertido, setRevertido] = useState(false);
+  const mudancas = useMemo(() => mudancasDoResultado(b.resultado), [b.resultado]);
+  const [estado, setEstado] = useState<'nada' | 'revertido' | 'mudou' | 'falhou'>('nada');
   const icone = b.ok === undefined ? <LoaderCircle size={14} className="girando" /> : b.ok ? <CircleCheck size={14} className="feito" /> : <CircleX size={14} className="falhou" />;
+  const ir = d.ir ?? (mudancas[0] ? {documento: mudancas[0].documento, caminho: ''} : undefined);
+  const reverter = async (forcar = false) => {
+    if (forcar && !(await confirmar({titulo: 'Reverter mesmo assim?', texto: 'O valor mudou depois desta ação. Reverter agora desfaz também o que veio depois nesse ponto.', botao: 'Reverter', perigo: true}))) return;
+    const r = await reverterSeqs(mudancas.map((m) => m.seq), forcar);
+    if (r.ok) return setEstado('revertido');
+    setEstado(r.mudou ? 'mudou' : 'falhou');
+    avisar(r.mensagem ?? 'não deu para reverter', 'erro');
+  };
   return (
     <div className={`acao${b.ok === false ? ' com-erro' : ''}`} title={b.ok === false ? b.resultado : undefined}>
       {icone}
@@ -129,24 +188,30 @@ const CartaoAcao: React.FC<{b: Extract<Bloco, {tipo: 'acao'}>}> = ({b}) => {
       {d.diffs?.slice(0, 3).map((x, i) => (
         <span key={i} className="diff">{x.campo}{x.tipo === 'troca' && <> <s>{curto(x.antes)}</s> → <ins>{curto(x.depois)}</ins></>}{x.tipo === 'novo' && <> + <ins>{curto(x.depois)}</ins></>}{x.tipo === 'tira' && ' removido'}</span>
       ))}
-      {d.ir && b.ok && <button className="link" onClick={() => irPara(d.ir!.documento, d.ir!.caminho)}>Ver</button>}
-      {d.reverter && b.ok && (
-        <button className="link fraco" disabled={revertido} onClick={() => void aplicar(d.reverter!.documento, d.reverter!.patch, 'reverter mudança do Claude').then(() => setRevertido(true)).catch((e: Error) => avisar(e.message, 'erro'))}>
-          {revertido ? 'Revertido' : 'Reverter'}
-        </button>
-      )}
+      {ir && b.ok && <button className="link" onClick={() => irPara(ir.documento, ir.caminho)}>Ver</button>}
+      {mudancas.length > 0 && b.ok && estado === 'nada' && <button className="link fraco" onClick={() => void reverter()}>Reverter</button>}
+      {estado === 'revertido' && <span className="link fraco">Revertido</span>}
+      {estado === 'mudou' && <button className="link fraco" onClick={() => void reverter(true)}>Mudou depois · Reverter mesmo assim</button>}
+      {estado === 'falhou' && <span className="link fraco" title="Veja o motivo no aviso; o Histórico também reverte">Não revertido</span>}
     </div>
   );
 };
 
+// o resumo do que o portão do MCP vai fazer: endereço, arquivo ou documento, nunca o JSON inteiro
+const resumoDoPortao = (e: Record<string, any>) => {
+  const v = e.url ?? e.arquivo ?? e.origem ?? (e.documento ? `documento ${e.documento}` : undefined);
+  return v === undefined ? undefined : String(v);
+};
+
 const CartaoPermissao: React.FC<{c: TConversa; b: Extract<Bloco, {tipo: 'permissao'}>}> = ({c, b}) => {
-  const p = pedidoEmTexto(b.ferramenta, b.entrada);
+  // pedido do portão do MCP (src/nucleo/portao.ts): o motivo vem pronto, em português; senão, o pedido do próprio agente
+  const p = b.pedido.startsWith('portao:') && b.titulo ? {acao: b.titulo, codigo: resumoDoPortao(b.entrada)} : pedidoEmTexto(b.ferramenta, b.entrada);
   return (
     <div className={`permissao${b.decisao ? ' decidida' : ''}`}>
-      <div className="perm-topo"><ShieldQuestion size={15} />O Claude quer {p.acao}</div>
+      <div className="perm-topo"><ShieldQuestion size={15} />{nomeIA(c)} quer {p.acao}</div>
       {p.codigo && <pre className="perm-cmd">{p.codigo}</pre>}
       {b.decisao ? (
-        <div className="perm-decisao">{b.decisao === 'permitida' ? 'Permitido' : b.decisao === 'negada' ? 'Negado' : 'Cancelado pelo Claude'}</div>
+        <div className="perm-decisao">{b.decisao === 'permitida' ? 'Permitido' : b.decisao === 'negada' ? 'Negado' : 'Cancelado'}</div>
       ) : (
         <div className="perm-botoes">
           <button className="bt principal mini" onClick={() => responderPermissao(c.id, b.pedido, 'permitir')}>Permitir</button>
@@ -173,6 +238,8 @@ const rotuloObjeto = (v: any, caminho: string) => {
   return caminho.split('/').slice(-2).join('/');
 };
 
+const NOME_AREA: Record<string, string> = {video: 'Vídeo', imagem: 'Imagem', '3d': '3D', efeitos: 'Efeitos', musica: 'Música'};
+
 const useAnexos = (): Anexo[] => {
   const selecao = useLoja((e) => e.selecao);
   const docs = useLoja((e) => e.docs);
@@ -180,8 +247,14 @@ const useAnexos = (): Anexo[] => {
   const comentarios = useLoja((e) => e.comentarios);
   const area = useLoja((e) => e.area);
   const segundo = useLoja((e) => Math.floor(e.tempo_ms / 1000));
+  const ativo = useLoja((e) => e.ativo);
+  const info = useLoja((e) => e.info);
   return useMemo(() => {
     const r: Anexo[] = [];
+    // frente IA, F6: a IA sempre sabe em que módulo e documento a pessoa está, com qualquer provedor
+    const doc = info?.manifesto.documentos.find((d) => d.id === (ativo as Record<string, string | undefined>)[area === '3d' ? '3d' : area]);
+    r.push({chave: 'modulo', tipo: 'modulo', rotulo: `${NOME_AREA[area] ?? area}${doc ? ` · ${doc.titulo ?? doc.id}` : ''}`,
+      contexto: `módulo ${NOME_AREA[area] ?? area}${doc ? `, documento ${doc.id} ("${doc.titulo ?? doc.id}")` : ''}`});
     if (selecao) {
       const v = valorEm(docs[selecao.documento]?.doc, selecao.caminho);
       const rotulo = rotuloObjeto(v, selecao.caminho);
@@ -194,7 +267,7 @@ const useAnexos = (): Anexo[] => {
       r.push({chave: 'tempo', tipo: 'tempo', rotulo: tc(ms), contexto: `tempo da prévia do vídeo: ${tc(ms)} (${ms} ms)`});
     }
     return r;
-  }, [selecao, docs, aberto, comentarios, area, segundo]);
+  }, [selecao, docs, aberto, comentarios, area, segundo, ativo, info]);
 };
 
 const ChipAnexo: React.FC<{a: Anexo; tirar?: () => void}> = ({a, tirar}) => (
@@ -217,6 +290,7 @@ export const Conversa: React.FC<{c: TConversa; abrirTerminal: () => void; libera
   const [tirados, setTirados] = useState<Set<string>>(new Set());
   const [, tique] = useState(0);
   const conta = useConta();
+  const eClaude = c.provedor === 'claude';
   const sugeridos = useAnexos();
   const anexos = sugeridos.filter((a) => !tirados.has(a.chave));
   const trabalhando = c.estado === 'trabalhando' || c.estado === 'precisa';
@@ -254,7 +328,7 @@ export const Conversa: React.FC<{c: TConversa; abrirTerminal: () => void; libera
         const el = e.currentTarget;
         colado.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
       }}>
-        {conta && (!conta.instalado || !conta.logado) && (
+        {eClaude && conta && (!conta.instalado || !conta.logado) && (
           <div className="faixa-conta">
             <CircleAlert size={15} />
             <div>
@@ -264,11 +338,11 @@ export const Conversa: React.FC<{c: TConversa; abrirTerminal: () => void; libera
             </div>
           </div>
         )}
-        {conta?.chave_api && <div className="faixa-conta aviso"><CircleAlert size={15} /><div>Há uma ANTHROPIC_API_KEY neste PC: nesta conversa o Claude cobra pela API, não pela assinatura.</div></div>}
+        {eClaude && conta?.chave_api && <div className="faixa-conta aviso"><CircleAlert size={15} /><div>Há uma ANTHROPIC_API_KEY neste PC: nesta conversa o Claude cobra pela API, não pela assinatura.</div></div>}
         {!c.itens.length && (
           <div className="vazio-conversa">
             <Sparkle size={22} />
-            <p>Converse com o Claude sobre este projeto. Ele vê o que você seleciona, lê os comentários e muda os documentos; cada mudança aparece aqui e no Histórico, e dá para reverter.</p>
+            <p>Converse com {eClaude ? 'o Claude' : nomeIA(c)} sobre este projeto. A IA vê o que você seleciona, lê os comentários e muda os documentos; cada mudança aparece aqui e no Histórico, e dá para reverter.</p>
             <div className="sugestoes">{SUGESTOES.map((s) => <button key={s} className="anexo" onClick={() => (setTexto(s), caixa.current?.focus())}>{s}</button>)}</div>
           </div>
         )}
@@ -309,7 +383,7 @@ export const Conversa: React.FC<{c: TConversa; abrirTerminal: () => void; libera
       <div className="compositor">
         <div className="caixa-pedido">
           {anexos.length > 0 && <div className="anexos">{anexos.map((a) => <ChipAnexo key={a.chave} a={a} tirar={() => setTirados((s) => new Set(s).add(a.chave))} />)}</div>}
-          <textarea ref={caixa} rows={1} value={texto} placeholder={trabalhando ? 'O Claude está trabalhando… (Esc para parar)' : 'Peça ao Claude…'}
+          <textarea ref={caixa} rows={1} value={texto} placeholder={trabalhando ? `${nomeIA(c)} está trabalhando… (Esc para parar)` : `Peça a ${nomeIA(c)}…`}
             onChange={(e) => (setTexto(e.target.value), guardarRascunho(c.id, e.target.value))}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -321,12 +395,12 @@ export const Conversa: React.FC<{c: TConversa; abrirTerminal: () => void; libera
               }
             }} />
           <div className="baixo">
-            <span className="modelo">{c.modelo ?? 'Claude'}{c.estado === 'hibernada' && ' · hibernada (volta na próxima mensagem)'}</span>
+            <span className="modelo"><SeletorModelo c={c} desligado={trabalhando} />{c.estado === 'hibernada' && ' · hibernada (volta na próxima mensagem)'}</span>
             <button className="enviar" disabled={!texto.trim() || trabalhando} onClick={() => void mandar()} title="Enviar · Enter"><ArrowUp size={15} /></button>
           </div>
         </div>
         <div className="rodape-pedido">
-          <span>{conta?.logado ? `Sua conta Claude${conta.plano ? ` · ${conta.plano}` : conta.email ? ` · ${conta.email}` : ''}` : 'Sua conta Claude'}</span>
+          <span>{eClaude ? (conta?.logado ? `Sua conta Claude${conta.plano ? ` · ${conta.plano}` : conta.email ? ` · ${conta.email}` : ''}` : 'Sua conta Claude') : rodapeUso(c)}</span>
           <span>Enter envia · Shift+Enter quebra a linha</span>
         </div>
       </div>

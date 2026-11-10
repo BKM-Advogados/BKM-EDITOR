@@ -1,5 +1,5 @@
 import {contextBridge, ipcRenderer, type IpcRendererEvent} from 'electron';
-import {CANAL, type ApiEstudio, type EventoConversa, type Mudanca, type Progresso, type ProgressoTranscricao, type Retangulo} from '../compartilhado/api';
+import {CANAL, type ApiEstudio, type EventoConversa, type Mudanca, type PedidoPortaoTela, type Progresso, type ProgressoTranscricao, type Retangulo} from '../compartilhado/api';
 
 const ouvir = <A extends unknown[]>(canal: string, cb: (...a: A) => void) => {
   const h = (_e: IpcRendererEvent, ...a: A) => cb(...a);
@@ -127,6 +127,29 @@ const api: ApiEstudio = {
   midia: {
     indice: () => ipcRenderer.invoke(CANAL.midia),
     marcar: (caminho, mudanca) => ipcRenderer.invoke(CANAL.midiaMarcar, caminho, mudanca),
+  },
+  // frente IA
+  ia: {
+    provedores: () => ipcRenderer.invoke(CANAL.iaProvedores),
+    gravarChave: (p, c) => ipcRenderer.invoke(CANAL.iaGravarChave, p, c),
+    apagarChave: (p) => ipcRenderer.invoke(CANAL.iaApagarChave, p),
+    modelos: (p) => ipcRenderer.invoke(CANAL.iaModelos, p),
+    configurar: (p, c) => ipcRenderer.invoke(CANAL.iaConfigurar, p, c),
+    padrao: (p) => ipcRenderer.invoke(CANAL.iaPadrao, p),
+    usoDoMes: () => ipcRenderer.invoke(CANAL.iaUsoDoMes),
+    modeloDaConversa: (id, m) => ipcRenderer.invoke(CANAL.conversaModelo, id, m),
+    aoPedidoPortao: (cb) => ouvir<[PedidoPortaoTela]>(CANAL.iaPortaoPedido, cb),
+    aoPortaoCancelado: (cb) => ouvir<[string]>(CANAL.iaPortaoCancelado, cb),
+    responderPortao: (id, permitir, sempre) => ipcRenderer.send(CANAL.iaPortaoResposta, id, permitir, sempre),
+    reverter: (seq, forcar) => ipcRenderer.invoke(CANAL.iaReverter, seq, forcar),
+    apps: () => ipcRenderer.invoke(CANAL.iaApps),
+    appsLigar: (l, p) => ipcRenderer.invoke(CANAL.iaAppsLigar, l, p),
+    appsNovo: (n) => ipcRenderer.invoke(CANAL.iaAppsNovo, n),
+    appsConfigs: (id) => ipcRenderer.invoke(CANAL.iaAppsConfigs, id),
+    appsRevogar: (id) => ipcRenderer.invoke(CANAL.iaAppsRevogar, id),
+    guardar: (id, c) => ipcRenderer.invoke(CANAL.iaGuardar, id, c),
+    guardadas: () => ipcRenderer.invoke(CANAL.iaGuardadas),
+    apagarGuardada: (s) => ipcRenderer.invoke(CANAL.iaApagarGuardada, s),
   },
 };
 

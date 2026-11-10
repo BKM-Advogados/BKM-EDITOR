@@ -8,7 +8,8 @@ import {execFile, spawn, type ChildProcessWithoutNullStreams} from 'node:child_p
 import {randomUUID} from 'node:crypto';
 import readline from 'node:readline';
 import type {ContaClaude, EventoConversa} from '../compartilhado/api';
-import {ambienteLimpo, PATH_COM_LOCAL} from './terminais';
+import {ambienteLimpo, citarCmd, ehCmd, PATH_COM_LOCAL} from './terminais';
+import {cortarResultado} from '../compartilhado/ferramentas';
 
 const OCIOSA_MS = 10 * 60 * 1000;
 
@@ -24,6 +25,7 @@ type Conversa = {
   ocioso: NodeJS.Timeout | null;
   pedidos: Map<string, Record<string, unknown>>; // pedidos de permissão esperando a pessoa
   modelo?: string;
+  modeloAtivo?: string; // o --model com que o processo vivo subiu
 };
 
 type Opcoes = {
@@ -56,6 +58,8 @@ export class Conversas {
   enviar(id: number, texto: string, limite: number) {
     const c = this.conversas.get(id);
     if (!c) throw new Error('conversa encerrada');
+    // seletor de modelo (rodada 3): o modelo novo vale na próxima mensagem; o processo volta com --resume e --model
+    if (c.proc && c.modeloAtivo !== c.modelo) this.matar(c);
     if (!c.proc) {
       if (this.vivas() + this.o.vivas() >= limite) throw new Error(`limite de ${limite} sessões do Claude abertas neste PC; hiberne uma para continuar`);
       this.iniciar(c);
@@ -75,6 +79,12 @@ export class Conversas {
       ? {behavior: 'allow', updatedInput: req.input ?? {}, ...(sempre && Array.isArray(req.permission_suggestions) ? {updatedPermissions: req.permission_suggestions} : {})}
       : {behavior: 'deny', message: 'A pessoa negou esta ação no Estúdio.'};
     this.escrever(c, {type: 'control_response', response: {subtype: 'success', request_id: pedido, response: resposta}});
+  }
+
+  /** O seletor de modelo da conversa; vazio volta ao padrão da conta. */
+  definirModelo(id: number, modelo?: string) {
+    const c = this.conversas.get(id);
+    if (c) c.modelo = modelo || undefined;
   }
 
   parar(id: number) {
@@ -112,9 +122,13 @@ export class Conversas {
       // as ferramentas do projeto ficam liberadas: só mexem nos JSON do projeto, com diário e desfazer
       ...(c.arquivoMcp ? ['--mcp-config', c.arquivoMcp, '--allowedTools', 'mcp__estudio'] : []),
       ...(c.modelo ? ['--model', c.modelo] : [])];
-    const proc = spawn(exe, args, {cwd: c.cwd, windowsHide: true, env: {...ambienteLimpo(), PATH: PATH_COM_LOCAL(), ESTUDIO_PROJETO: c.cwd, ...this.o.ambienteExtra}});
+    // claude.cmd do npm (transversal-D22): pelo cmd.exe, com os argumentos entre aspas quando precisam
+    const cmd = ehCmd(exe);
+    const proc = spawn(cmd ? `"${exe}"` : exe, cmd ? args.map(citarCmd) : args,
+      {cwd: c.cwd, windowsHide: true, shell: cmd, env: {...ambienteLimpo(), PATH: PATH_COM_LOCAL(), ESTUDIO_PROJETO: c.cwd, ...this.o.ambienteExtra}});
     c.proc = proc;
     c.iniciada = true;
+    c.modeloAtivo = c.modelo;
     readline.createInterface({input: proc.stdout}).on('line', (l) => this.linha(c, l));
     let erro = '';
     proc.stderr.on('data', (d: Buffer) => {
@@ -196,7 +210,7 @@ export class Conversas {
           if (b.type !== 'tool_result') continue;
           const texto = typeof b.content === 'string' ? b.content
             : Array.isArray(b.content) ? b.content.filter((x: any) => x.type === 'text').map((x: any) => x.text).join('\n') : '';
-          ev({tipo: 'resultado', uso: b.tool_use_id, ok: !b.is_error, texto: texto.slice(0, 4000)});
+          ev({tipo: 'resultado', uso: b.tool_use_id, ok: !b.is_error, texto: cortarResultado(texto)});
         }
         return;
       }

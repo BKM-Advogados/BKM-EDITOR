@@ -1,0 +1,257 @@
+// Configurações › IA (frente IA, rodada 3): a lista de provedores no "padrão Cline". Para cada um: o que falta, onde
+// fica o servidor, a chave (só os 4 últimos caracteres aparecem; ela é testada na lista de modelos antes de gravar),
+// o modelo (da lista do próprio endereço), o endereço (no compatível e nos locais) e o provedor padrão. Embaixo, o
+// uso do mês com a composição: tokens de entrada (parte do cache), de saída e o custo estimado pela tabela.
+import React, {useEffect, useState, useSyncExternalStore} from 'react';
+import {CircleAlert, CircleCheck, ExternalLink, KeyRound, RefreshCw, ShieldQuestion, X} from 'lucide-react';
+import type {ConfigsDoApp, EstadoAppsDeFora, EstadoProvedor, UsoDoMes} from '../../compartilhado/api';
+import {copiar} from '../componentes/Campos';
+import {avisar} from '../estado/loja';
+import {estadoConversas, fecharConfigIA, lerProvedores, responderAvulso} from './conversas';
+import './config-ia.css';
+import './conversa.css'; // o cartão de permissão solto usa o mesmo estilo do da conversa
+
+const mil = (n: number) => (n >= 1000 ? `${(n / 1000).toLocaleString('pt-BR', {maximumFractionDigits: 1})} mil` : String(n));
+const usd = (n: number) => `US$ ${n.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: n < 1 ? 4 : 2})}`;
+
+const LinhaProvedor: React.FC<{p: EstadoProvedor; aberto: boolean; abrir: () => void}> = ({p, aberto, abrir}) => {
+  const [chave, setChave] = useState('');
+  const [msg, setMsg] = useState<{ok: boolean; texto: string} | null>(null);
+  const [modelos, setModelos] = useState<string[]>([]);
+  const [modelo, setModelo] = useState(p.modelo ?? '');
+  const [base, setBase] = useState(p.base ?? '');
+  const [ocupado, setOcupado] = useState(false);
+  useEffect(() => {
+    setModelo(p.modelo ?? '');
+    setBase(p.base ?? '');
+  }, [p.modelo, p.base]);
+
+  const gravarChave = async () => {
+    setOcupado(true);
+    try {
+      const r = await window.estudio.ia.gravarChave(p.id, chave);
+      setMsg({ok: r.ok, texto: r.mensagem});
+      if (r.ok) {
+        setChave('');
+        if (r.modelos?.length) setModelos(r.modelos);
+      }
+      await lerProvedores();
+    } finally {
+      setOcupado(false);
+    }
+  };
+  const buscarModelos = async () => {
+    setOcupado(true);
+    try {
+      const r = await window.estudio.ia.modelos(p.id);
+      if (r.ok) setModelos(r.modelos);
+      setMsg(r.ok ? {ok: true, texto: `${r.modelos.length} modelos neste endereço`} : {ok: false, texto: r.mensagem});
+    } finally {
+      setOcupado(false);
+    }
+  };
+  const configurar = async (c: {modelo?: string; base?: string}) => {
+    try {
+      await window.estudio.ia.configurar(p.id, c);
+      await lerProvedores();
+    } catch (e) {
+      setMsg({ok: false, texto: String((e as Error).message).replace(/^Error invoking remote method '[^']+': (Error: )?/, '')});
+    }
+  };
+
+  const estado = p.pronto ? <span className="ia-estado pronto"><CircleCheck size={12} />pronto</span>
+    : <span className="ia-estado falta"><CircleAlert size={12} />falta {p.falta ?? 'configurar'}</span>;
+  return (
+    <div className={`ia-provedor${aberto ? ' aberto' : ''}`}>
+      <button className="ia-cabeca" onClick={abrir} aria-expanded={aberto}>
+        <span className="ia-nome">{p.nome}</span>
+        {p.experimental && <span className="ia-selo">experimental</span>}
+        {p.padrao && <span className="ia-selo padrao">padrão</span>}
+        <span className="espaco" />
+        {estado}
+      </button>
+      {aberto && (
+        <div className="ia-corpo">
+          <div className="ia-info">Servidor: {p.servidor}{p.via === 'acp' ? ' · agente instalado neste PC, com a configuração e o login dele' : ''}</div>
+          {p.via === 'claude-cli' && <div className="ia-info">O login é o da Anthropic: abra um terminal do Claude e digite /login. O app não vê a sua senha.</div>}
+          {p.via === 'openai' && p.chave !== 'nenhuma' && (
+            <div className="ia-linha">
+              <KeyRound size={13} />
+              {p.chave_final ? <span>chave …{p.chave_final} {p.chave_origem === 'ambiente' ? `(da variável ${p.chave_variavel ?? 'de ambiente'})` : '(neste PC)'}</span>
+                : <span className="fraco">sem chave</span>}
+              <input className="campo" type="password" placeholder={p.chave_final ? 'trocar a chave' : 'cole a chave aqui'} value={chave} autoComplete="off"
+                onChange={(e) => setChave(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && chave.trim() && void gravarChave()} />
+              <button className="bt mini principal" disabled={!chave.trim() || ocupado} onClick={() => void gravarChave()}>Testar e gravar</button>
+              {p.chave_origem === 'cofre' && <button className="bt mini fantasma" onClick={() => void window.estudio.ia.apagarChave(p.id).then(lerProvedores)}>Apagar</button>}
+              {p.paginaChave && <button className="bt mini fantasma" onClick={() => void window.estudio.abrirFonte(p.paginaChave!)}><ExternalLink size={12} />Onde pego a chave?</button>}
+            </div>
+          )}
+          {p.via === 'openai' && (p.id === 'compativel' || p.local) && (
+            <div className="ia-linha">
+              <span className="rot">Endereço</span>
+              <input className="campo" placeholder="http://127.0.0.1:11434/v1" value={base} onChange={(e) => setBase(e.target.value)} />
+              <button className="bt mini" disabled={base === (p.base ?? '')} onClick={() => void configurar({base})}>Gravar</button>
+            </div>
+          )}
+          {p.via === 'openai' && (
+            <div className="ia-linha">
+              <span className="rot">Modelo</span>
+              {modelos.length ? (
+                <select className="campo" value={modelo} onChange={(e) => (setModelo(e.target.value), void configurar({modelo: e.target.value}))}>
+                  {!modelos.includes(modelo) && <option value={modelo}>{modelo || 'escolha'}</option>}
+                  {modelos.map((m) => <option key={m} value={m}>{m}</option>)}
+                </select>
+              ) : (
+                <input className="campo" placeholder="nome do modelo" value={modelo} onChange={(e) => setModelo(e.target.value)}
+                  onBlur={() => modelo !== (p.modelo ?? '') && void configurar({modelo})} />
+              )}
+              <button className="bt mini fantasma" disabled={ocupado || (p.chave === 'exigida' && !p.chave_final)} onClick={() => void buscarModelos()}
+                title="Ler a lista de modelos do próprio endereço"><RefreshCw size={12} />Lista</button>
+            </div>
+          )}
+          {msg && <div className={`ia-msg${msg.ok ? '' : ' erro'}`}>{msg.texto}</div>}
+          {p.pronto && !p.padrao && (
+            <button className="bt mini fantasma" onClick={() => void window.estudio.ia.padrao(p.id).then(lerProvedores).then(() => avisar(`${p.nome} é o padrão das conversas novas`))}>
+              Usar como padrão das conversas novas
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Apps de IA de fora (padrão Screenpipe): ligar a porta só deste PC, criar um app com token próprio, copiar a
+// configuração (HTTP para Cursor, Cline, Windsurf, VS Code; stdio para o Claude Desktop) e revogar. Quem entra por fora
+// passa pelo mesmo portão de permissão e aparece no Histórico com o nome do app.
+const SecaoAppsDeFora: React.FC = () => {
+  const [e, setE] = useState<EstadoAppsDeFora | null>(null);
+  const [nome, setNome] = useState('');
+  const [porta, setPorta] = useState('');
+  const [mostrar, setMostrar] = useState<{nome: string; configs: ConfigsDoApp} | null>(null);
+  const atualizar = (x: EstadoAppsDeFora) => (setE(x), setPorta(String(x.porta)));
+  useEffect(() => {
+    void window.estudio.ia.apps().then(atualizar).catch(() => setE(null));
+  }, []);
+  if (!e) return null;
+  const falhar = (err: unknown) => avisar(String((err as Error).message).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), 'erro');
+  return (
+    <div className="ia-apps">
+      <div className="ia-uso-titulo">Apps de IA de fora (Claude Desktop, Cursor, Cline, Windsurf…)</div>
+      <div className="ia-linha">
+        <label><input type="checkbox" checked={e.ligado} onChange={(ev) => void window.estudio.ia.appsLigar(ev.target.checked, Number(porta)).then(atualizar).catch(falhar)} /> Deixar apps deste PC usarem o projeto aberto</label>
+        <span className="rot">Porta</span>
+        <input className="campo porta" value={porta} onChange={(ev) => setPorta(ev.target.value.replace(/\D/g, ''))}
+          onBlur={() => Number(porta) !== e.porta && void window.estudio.ia.appsLigar(e.ligado, Number(porta)).then(atualizar).catch(falhar)} />
+        {e.ligado && <span className={e.ouvindo ? 'ia-estado pronto' : 'ia-estado falta'}>{e.ouvindo ? 'ouvindo só em 127.0.0.1' : e.erro ?? 'fechada'}</span>}
+      </div>
+      {e.apps.map((a) => (
+        <div key={a.id} className="ia-linha">
+          <span className="ia-nome">{a.nome}</span>
+          <span className="fraco">desde {new Date(a.criado_em).toLocaleDateString('pt-BR')}</span>
+          <span className="espaco" />
+          <button className="bt mini fantasma" onClick={() => void window.estudio.ia.appsConfigs(a.id).then((c) => setMostrar({nome: a.nome, configs: c})).catch(falhar)}>Configuração</button>
+          <button className="bt mini fantasma" onClick={() => void window.estudio.ia.appsRevogar(a.id).then((x) => (atualizar(x), setMostrar(null))).catch(falhar)}>Revogar</button>
+        </div>
+      ))}
+      <div className="ia-linha">
+        <input className="campo" placeholder="nome do app (ex.: Cursor)" value={nome} onChange={(ev) => setNome(ev.target.value)} />
+        <button className="bt mini" disabled={!nome.trim()} onClick={() => void window.estudio.ia.appsNovo(nome).then(async (r) => {
+          setMostrar({nome, configs: r.configs});
+          setNome('');
+          atualizar(await window.estudio.ia.apps());
+        }).catch(falhar)}>Conectar outro app de IA</button>
+      </div>
+      {mostrar && (
+        <div className="ia-configs">
+          <div className="fraco">Cole no arquivo de servidores MCP do {mostrar.nome}. O token é dele: se vazar, revogue e crie outro.</div>
+          <div className="ia-config"><span className="rot">HTTP</span><span className="fraco">Cursor, Cline, Windsurf, VS Code</span>
+            <button className="bt mini fantasma" onClick={() => copiar(mostrar.configs.http, 'Configuração copiada')}>Copiar</button></div>
+          <pre className="perm-cmd">{mostrar.configs.http}</pre>
+          <div className="ia-config"><span className="rot">stdio</span><span className="fraco">Claude Desktop e quem só aceita stdio (usa a ponte do Estúdio)</span>
+            <button className="bt mini fantasma" onClick={() => copiar(mostrar.configs.stdio, 'Configuração copiada')}>Copiar</button></div>
+          <pre className="perm-cmd">{mostrar.configs.stdio}</pre>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const DialogoConfigIA: React.FC = () => {
+  const cfg = useSyncExternalStore(estadoConversas.assinar, estadoConversas.configIA);
+  const provedores = useSyncExternalStore(estadoConversas.assinar, estadoConversas.provedores);
+  const [aberto, setAberto] = useState<string | undefined>(undefined);
+  const [uso, setUso] = useState<UsoDoMes>({});
+  useEffect(() => {
+    if (!cfg) return;
+    setAberto(cfg.foco);
+    void window.estudio.ia.usoDoMes().then(setUso).catch(() => setUso({}));
+  }, [cfg]);
+  if (!cfg) return null;
+  const persistente = provedores.some((p) => p.cofre_persistente);
+  const cofreTexto = provedores.find((p) => p.cofre_texto)?.cofre_texto;
+  const linhasUso = Object.entries(uso);
+  return (
+    <div className="dialogo-fundo" onPointerDown={(e) => e.target === e.currentTarget && fecharConfigIA()} onKeyDown={(e) => e.key === 'Escape' && fecharConfigIA()}>
+      <div className="dialogo config-ia" role="dialog" aria-modal="true" aria-label="Configurações da IA">
+        <div className="dialogo-titulo">IA: provedores e chaves<button className="bti fechar" onClick={fecharConfigIA} title="Fechar"><X size={14} /></button></div>
+        <div className="dialogo-texto">
+          Escolha com qual IA conversar. Todas editam pelo mesmo MCP do Estúdio, com o mesmo histórico e o mesmo Reverter.
+          {cofreTexto ? ` Chave ${cofreTexto}.` : persistente ? ' A chave fica cifrada neste PC.' : ' Neste PC a chave vale só enquanto o app estiver aberto.'}
+        </div>
+        <div className="ia-lista">
+          {provedores.map((p) => <LinhaProvedor key={p.id} p={p} aberto={aberto === p.id} abrir={() => setAberto((a) => (a === p.id ? undefined : p.id))} />)}
+        </div>
+        <SecaoAppsDeFora />
+        <div className="ia-uso">
+          <div className="ia-uso-titulo">Uso deste mês neste PC</div>
+          {linhasUso.length ? (
+            <table>
+              <tbody>
+                {linhasUso.map(([id, u]) => (
+                  <tr key={id}>
+                    <td>{provedores.find((p) => p.id === id)?.nome ?? id}</td>
+                    <td>{u.turnos} respostas</td>
+                    <td>{mil(u.entrada)} tokens de entrada ({mil(u.cache)} do cache) · {mil(u.saida)} de saída</td>
+                    <td className="num">{u.custo_usd ? `≈ ${usd(u.custo_usd)}` : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : <div className="fraco">Nenhuma conversa por chave neste mês.</div>}
+          <div className="fraco">Custo estimado pela tabela de preços do app (08/11/2026); o valor cobrado é o da fatura do provedor. Conversas pela conta do Claude não entram aqui.</div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Pedidos do portão vindos de uma aba sem conversa no painel (o Claude ou outro agente no terminal, um app de IA de
+// fora): o mesmo cartão, solto no canto da tela, com a origem escrita. Sem resposta em 10 min, o servidor nega.
+const PedidosAvulsos: React.FC = () => {
+  const avulsos = useSyncExternalStore(estadoConversas.assinar, estadoConversas.avulsos);
+  if (!avulsos.length) return null;
+  return (
+    <div className="ia-avulsos" role="alertdialog" aria-label="Pedidos de permissão da IA">
+      {avulsos.map((p) => (
+        <div key={p.id} className="permissao ia-avulso">
+          <div className="perm-topo"><ShieldQuestion size={15} />{p.origem} quer {p.motivo}</div>
+          {(p.entrada.url ?? p.entrada.arquivo) !== undefined && <pre className="perm-cmd">{String(p.entrada.url ?? p.entrada.arquivo)}</pre>}
+          <div className="perm-botoes">
+            <button className="bt principal mini" onClick={() => responderAvulso(p.id, true)}>Permitir</button>
+            <button className="bt mini" onClick={() => responderAvulso(p.id, true, true)}>Sempre nesta conversa</button>
+            <button className="bt fantasma mini" onClick={() => responderAvulso(p.id, false)}>Negar</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+/** Montado uma vez no App: o diálogo Configurações › IA e os pedidos de permissão soltos. */
+export const ConfigIA: React.FC = () => (
+  <>
+    <DialogoConfigIA />
+    <PedidosAvulsos />
+  </>
+);

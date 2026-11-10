@@ -2,7 +2,7 @@
 // Toda escrita em documento passa por aplicarPatch: confere a versão (lock otimista), aplica o JSON Patch de forma
 // atômica (os "test" falham antes de qualquer mudança), grava, e registra a mudança com o patch inverso no diário.
 import {createHash} from 'node:crypto';
-import {existsSync, mkdirSync, readFileSync, renameSync, appendFileSync} from 'node:fs';
+import {existsSync, mkdirSync, readFileSync, renameSync, appendFileSync, closeSync, fstatSync, openSync, readSync, statSync} from 'node:fs';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import jsonpatch, {type Operation} from 'fast-json-patch';
@@ -113,6 +113,7 @@ export class Projeto {
     autor: string;
     origem: string;
     rotulo?: string;
+    desfaz?: number; // frente IA: a entrada que esta reverte
   }): {versao: string; entrada: EntradaDiario} {
     const rel = this.arquivoDoDocumento(entrada.documento);
     const {doc, versao} = this.lerJson<unknown>(rel);
@@ -141,6 +142,7 @@ export class Projeto {
       versao_depois: versaoDepois,
       patch: entrada.patch.filter((o) => o.op !== 'test'),
       inverso: jsonpatch.compare(depois as object, doc as object) as OperacaoPatch[],
+      ...(entrada.desfaz !== undefined ? {desfaz: entrada.desfaz} : {}),
     };
     this.registrar(registro);
     return {versao: versaoDepois, entrada: registro};
@@ -150,24 +152,124 @@ export class Projeto {
     return path.join(PASTA_INTERNA, 'diario.jsonl');
   }
 
-  diario(desde = 0): EntradaDiario[] {
+  // Estrito por padrão: uma linha quebrada lança (a faxina do Som conta com isso para, na dúvida, não apagar nada).
+  // transversal-D2: a gravação não passa mais por aqui (ultimaSeq lê o fim do arquivo), e o Histórico e o Reverter leem
+  // com tolerante, que pula a linha quebrada.
+  diario(desde = 0, o: {tolerante?: boolean} = {}): EntradaDiario[] {
     if (!this.existe(this.arquivoDiario())) return [];
-    return this.lerTexto(this.arquivoDiario())
-      .split('\n')
-      .filter(Boolean)
-      .map((l) => JSON.parse(l) as EntradaDiario)
-      .filter((e) => e.seq > desde);
+    const texto = this.lerTexto(this.arquivoDiario());
+    const linhas = o.tolerante ? lerLinhas(texto) : texto.split('\n').filter(Boolean).map((l) => JSON.parse(l) as EntradaDiario);
+    return linhas.filter((e) => e.seq > desde);
   }
 
+  // transversal-D15: o próximo número sai do fim do arquivo, sem reler o diário inteiro a cada edição
   private proximaSeq() {
-    const todas = this.diario();
-    return todas.length ? todas[todas.length - 1].seq + 1 : 1;
+    return this.ultimaSeq() + 1;
+  }
+
+  /** O maior seq do diário, lido do fim do arquivo (0 se não há diário). */
+  ultimaSeq(): number {
+    const abs = this.caminho(this.arquivoDiario());
+    if (!existsSync(abs)) return 0;
+    const fd = openSync(abs, 'r');
+    try {
+      const tamanho = fstatSync(fd).size;
+      for (let janela = 64 * 1024; ; janela *= 4) {
+        const ini = Math.max(0, tamanho - janela);
+        const buf = Buffer.alloc(tamanho - ini);
+        readSync(fd, buf, 0, buf.length, ini);
+        const linhas = lerLinhas(buf.toString('utf-8'), ini > 0);
+        if (linhas.length) return Math.max(...linhas.map((e) => e.seq));
+        if (ini === 0) return 0;
+      }
+    } finally {
+      closeSync(fd);
+    }
+  }
+
+  /** Marca do fim do diário agora (tamanho em bytes): com entradasDesde, lê só o que entrou depois. */
+  marcaDoDiario(): number {
+    const abs = this.caminho(this.arquivoDiario());
+    return existsSync(abs) ? statSync(abs).size : 0;
+  }
+
+  entradasDesde(marca: number): EntradaDiario[] {
+    const abs = this.caminho(this.arquivoDiario());
+    if (!existsSync(abs)) return [];
+    const fd = openSync(abs, 'r');
+    try {
+      const tamanho = fstatSync(fd).size;
+      if (tamanho <= marca) return [];
+      const buf = Buffer.alloc(tamanho - marca);
+      readSync(fd, buf, 0, buf.length, marca);
+      return lerLinhas(buf.toString('utf-8'));
+    } finally {
+      closeSync(fd);
+    }
   }
 
   registrar(e: EntradaDiario) {
     const abs = this.caminho(this.arquivoDiario());
     mkdirSync(path.dirname(abs), {recursive: true});
-    appendFileSync(abs, `${JSON.stringify(e)}\n`, 'utf-8');
+    // se a última gravação parou no meio da linha, a entrada nova começa numa linha própria (transversal-D2)
+    let quebra = '';
+    if (existsSync(abs)) {
+      const t = statSync(abs).size;
+      if (t > 0) {
+        const fd = openSync(abs, 'r');
+        const b = Buffer.alloc(1);
+        readSync(fd, b, 0, 1, t - 1);
+        closeSync(fd);
+        if (b[0] !== 0x0a) quebra = '\n';
+      }
+    }
+    appendFileSync(abs, `${quebra}${JSON.stringify(e)}\n`, 'utf-8');
+  }
+
+  // ---------- reverter e desfazer pelo diário (frente IA, rodada 3) ----------
+  /** As entradas já revertidas: alguma entrada posterior tem desfaz apontando para elas. */
+  revertidas(): Set<number> {
+    return new Set(this.diario(0, {tolerante: true}).filter((e) => e.desfaz !== undefined).map((e) => e.desfaz!));
+  }
+
+  /**
+   * Aplica o inverso de uma entrada. Antes, confere que os valores trocados por ela ainda estão lá (test); se alguém
+   * mudou depois, devolve mudou_depois e não grava, a não ser com forcar. Entrada sem "replace" só reverte sem pergunta
+   * se for a última do documento.
+   */
+  reverter(seq: number, o: {autor: string; origem: string; forcar?: boolean}):
+    {ok: true; seq: number; rotulo: string} | {ok: false; mensagem: string; mudou_depois?: boolean} {
+    const todas = this.diario(0, {tolerante: true});
+    const e = todas.find((x) => x.seq === seq);
+    if (!e) return {ok: false, mensagem: `não há a mudança #${seq} no histórico`};
+    if (todas.some((x) => x.desfaz === seq)) return {ok: false, mensagem: `a mudança #${seq} já foi revertida`};
+    if (!e.inverso?.length) return {ok: false, mensagem: `a mudança #${seq} não tem o que reverter`};
+    const depois = todas.filter((x) => x.seq > seq && x.documento === e.documento);
+    const trocas = e.patch.filter((op) => op.op === 'replace') as {op: 'replace'; path: string; value: unknown}[];
+    const soTrocas = trocas.length === e.patch.length;
+    if (!o.forcar && depois.length && !soTrocas) {
+      return {ok: false, mudou_depois: true, mensagem: `o documento mudou depois da mudança #${seq}; reverter agora pode desfazer o que veio depois`};
+    }
+    const testes: OperacaoPatch[] = o.forcar ? [] : trocas.map((t) => ({op: 'test', path: t.path, value: t.value}) as OperacaoPatch);
+    try {
+      const r = this.aplicarPatch({documento: e.documento, patch: [...testes, ...e.inverso], autor: o.autor, origem: o.origem,
+        rotulo: `reverter: ${e.rotulo}`, desfaz: seq});
+      return {ok: true, seq: r.entrada.seq, rotulo: r.entrada.rotulo};
+    } catch (erro) {
+      if (testes.length && /test/i.test((erro as Error).message)) {
+        return {ok: false, mudou_depois: true, mensagem: `o valor mudou depois da mudança #${seq} (talvez por outra mão)`};
+      }
+      return {ok: false, mensagem: (erro as Error).message};
+    }
+  }
+
+  /** Ctrl+Z: a última entrada desse autor e dessa origem que ainda não foi revertida (transversal-D1: vale depois de reabrir). */
+  desfazerUltima(o: {autor: string; origem: string; como: {autor: string; origem: string}}) {
+    const revertidas = this.revertidas();
+    const minhas = this.diario(0, {tolerante: true}).filter((e) => e.autor === o.autor && e.origem === o.origem && e.desfaz === undefined && !revertidas.has(e.seq));
+    const ultima = minhas[minhas.length - 1];
+    if (!ultima) return {ok: false as const, mensagem: 'nada para desfazer'};
+    return {...this.reverter(ultima.seq, o.como), alvo: ultima};
   }
 
   // ---------- comentários ----------
@@ -316,4 +418,21 @@ const resumirPatch = (patch: OperacaoPatch[]) => {
   if (!ops.length) return 'sem mudança';
   if (ops.length === 1) return `${ops[0].op} ${ops[0].path}`;
   return `${ops.length} mudanças (${ops[0].path}…)`;
+};
+
+/** Entradas do diário num pedaço de texto; pulaPrimeira: o pedaço começa no meio de uma linha. Linha quebrada é pulada. */
+const lerLinhas = (texto: string, pulaPrimeira = false): EntradaDiario[] => {
+  const linhas = texto.split('\n');
+  if (pulaPrimeira) linhas.shift();
+  const r: EntradaDiario[] = [];
+  for (const l of linhas) {
+    if (!l.trim()) continue;
+    try {
+      const e = JSON.parse(l) as EntradaDiario;
+      if (typeof e?.seq === 'number') r.push(e);
+    } catch {
+      /* linha quebrada: fica de fora */
+    }
+  }
+  return r;
 };

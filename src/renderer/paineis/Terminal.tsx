@@ -3,10 +3,14 @@
 // (claude --resume); ao voltar, a conversa fecha o terminal daquela sessão antes de mandar, para as duas não
 // escreverem juntas no mesmo histórico. Carregado sob demanda.
 import React, {useEffect, useLayoutEffect, useRef, useSyncExternalStore} from 'react';
+import {BotaoMenu, type ItemMenu} from '../componentes/Menu';
 import {Moon, Play, Plus, Sparkle, SquareTerminal, Terminal as IconeTerminal, X} from 'lucide-react';
 import {loja, quandoTrocarProjeto, useLoja} from '../estado/loja';
-import {abrirAba, abrirClaudeNaSessao, ajustar, ativar, fecharAba, fecharClaudeDaSessao, hibernar, retomar, terminais} from './terminais';
-import {ativarConversa, avisarNaConversa, conversarCom, estadoConversas, fecharConversa, focarTerminal, hibernarConversa, novaConversa} from './conversas';
+import {abrirAba, abrirClaudeNaSessao, ajustar, ativar, enviarParaAtiva, fecharAba, fecharClaudeDaSessao, hibernar, retomar, terminais} from './terminais';
+import './ia.css'; // frente IA: faixa de contexto do terminal
+import {abrirConfigIA, ativarConversa, avisarNaConversa, conversarCom, estadoConversas, fecharConversa, focarTerminal, hibernarConversa, lerProvedores, novaConversa,
+  restaurarGuardadas} from './conversas';
+import {contextoDaTela} from './contexto';
 import {Conversa} from './Conversa';
 
 let primeiraVez = true;
@@ -38,8 +42,14 @@ export const Terminal: React.FC = () => {
       if (pedido && temClaude) {
         loja.definir({pedidoClaude: undefined});
         void conversarCom(pedido.texto, [{chave: 'projeto-novo', tipo: 'projeto', rotulo: pedido.rotulo, contexto: pedido.contexto}]);
-      } else if (temClaude) void novaConversa();
-      else void abrirAba('shell');
+      } else {
+        // frente IA, F6: as conversas guardadas no projeto voltam primeiro; sem nenhuma, abre uma nova como antes
+        void restaurarGuardadas().then((n) => {
+          if (n) return;
+          if (temClaude) void novaConversa();
+          else void abrirAba('shell');
+        });
+      }
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -76,6 +86,21 @@ export const Terminal: React.FC = () => {
     if (a) avisarNaConversa(conversa.id, 'Esta conversa continuou no terminal. Ao mandar a próxima mensagem aqui, o terminal dela fecha e a conversa segue deste ponto.');
   };
 
+  // frente IA: o menu "+ Conversa" lista os provedores do catálogo; o que falta abre Configurações › IA naquele provedor
+  const provedores = useSyncExternalStore(estadoConversas.assinar, estadoConversas.provedores);
+  useEffect(() => {
+    void lerProvedores();
+  }, [conversas.length]);
+  const itensProvedores: ItemMenu[] = [
+    ...(provedores.length
+      ? provedores.map((p) => ({
+          rotulo: `${p.nome}${p.pronto ? '' : ` · falta ${p.falta ?? 'configurar'}`}${p.experimental ? ' · experimental' : ''}${p.padrao ? ' · padrão' : ''}`,
+          acao: () => (p.pronto ? void novaConversa(undefined, p.id) : abrirConfigIA(p.id)),
+        }))
+      : [{rotulo: temClaude ? 'Claude (sua conta)' : 'Claude Code não instalado', acao: () => temClaude && void novaConversa()}]),
+    'sep',
+    {rotulo: 'Provedores e chaves…', acao: () => abrirConfigIA()},
+  ];
   const entrar = () => {
     focarTerminal();
     void abrirAba('claude');
@@ -100,9 +125,9 @@ export const Terminal: React.FC = () => {
           </div>
         ))}
         <span className="espaco" />
-        <button className="bt fantasma mini" onClick={() => void novaConversa()} disabled={!temClaude} title={temClaude ? 'Nova conversa com o Claude' : 'Claude Code não instalado'}><Plus size={13} /><span className="rot">Claude</span></button>
+        <BotaoMenu titulo="Nova conversa com uma IA" className="bt fantasma mini" icone={<Plus size={13} />} rotulo={<span className="rot">Conversa</span>} itens={itensProvedores} />
         <button className="bt fantasma mini" onClick={() => (focarTerminal(), void abrirAba('shell'))} title={`Novo terminal (${NOME_DO_SHELL})`}><SquareTerminal size={13} /><span className="rot">Terminal</span></button>
-        {conversa && <button className="bt fantasma mini" onClick={() => void verNoTerminal()} title="Ver esta conversa no terminal (o mesmo Claude, em modo texto)"><IconeTerminal size={13} /></button>}
+        {conversa?.provedor === 'claude' && <button className="bt fantasma mini" onClick={() => void verNoTerminal()} title="Ver esta conversa no terminal (o mesmo Claude, em modo texto)"><IconeTerminal size={13} /></button>}
         {conversa && conversa.estado !== 'hibernada' && conversa.estado !== 'nova' && (
           <button className="bt fantasma mini" onClick={() => void hibernarConversa(conversa.id)} title="Hibernar: encerra o processo e libera a memória; a próxima mensagem volta à conversa"><Moon size={13} /></button>
         )}
@@ -114,9 +139,27 @@ export const Terminal: React.FC = () => {
       {conversa ? (
         <Conversa key={conversa.id} c={conversa} abrirTerminal={entrar} liberarSessao={fecharClaudeDaSessao} />
       ) : (
-        <div className="terminal-corpo" ref={corpo} onClick={() => pty?.term.focus()} />
+        <>
+          {pty?.tipo === 'claude' && pty.estado === 'viva' && <FaixaContexto />}
+          <div className="terminal-corpo" ref={corpo} onClick={() => pty?.term.focus()} />
+        </>
       )}
       {!conversa && !pty && <div className="vazio">Abra uma conversa com o Claude ou um terminal.</div>}
+    </div>
+  );
+};
+
+// frente IA, F6: o terminal não recebe o contexto da tela sozinho (sem hook do agente); a faixa mostra o que a pessoa
+// está vendo e cola numa linha só no terminal, como se fosse digitado (bracketed paste), para ela mandar com Enter
+const FaixaContexto: React.FC = () => {
+  const area = useLoja((e) => e.area);
+  const selecao = useLoja((e) => e.selecao);
+  const segundo = useLoja((e) => Math.floor(e.tempo_ms / 1000));
+  const texto = React.useMemo(() => contextoDaTela(), [area, selecao, segundo]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="faixa-contexto" title={texto}>
+      <span className="texto">{texto}</span>
+      <button className="bt mini fantasma" onClick={() => enviarParaAtiva(`Contexto do Estúdio: ${texto}. `)}>Mandar contexto</button>
     </div>
   );
 };

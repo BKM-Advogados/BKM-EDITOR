@@ -6,6 +6,7 @@ import {caminhoPagina, paginasDe} from '../nucleo/carrossel';
 import {abrirProjeto, loja, observarProjeto, useLoja} from './estado/loja';
 import {Inicio} from './inicio/Inicio';
 import {RaizDialogo} from './componentes/Dialogo';
+import {ConfigIA} from './paineis/ConfigIA'; // frente IA: Configurações › IA
 import {registrarFontesDoProjeto} from './casca/fontes-do-projeto';
 
 const Casca = React.lazy(() => import('./casca/Casca').then((m) => ({default: m.Casca})));
@@ -55,6 +56,7 @@ export const App: React.FC = () => {
     <>
       {info ? <Suspense fallback={<div className="vazio" style={{paddingTop: 80}}>abrindo o projeto…</div>}><Casca /></Suspense> : <Inicio />}
       <RaizDialogo />
+      <ConfigIA />
     </>
   );
 };

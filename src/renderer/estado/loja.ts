@@ -135,7 +135,7 @@ export const carregarDiario = async () => {
   const ultimaAgente = [...diario].reverse().find((d) => d.autor === 'agente');
   const anterior = estado.ultimaMudancaAgente;
   loja.definir({diario, ultimaMudancaAgente: ultimaAgente?.seq});
-  if (ultimaAgente && anterior !== undefined && ultimaAgente.seq !== anterior) avisar(`Claude: ${ultimaAgente.rotulo}`, 'agente');
+  if (ultimaAgente && anterior !== undefined && ultimaAgente.seq !== anterior) avisar(`${ultimaAgente.origem || 'IA'}: ${ultimaAgente.rotulo}`, 'agente'); // frente IA: o nome da aba (DeepSeek 1, Claude 2)
 };
 
 // Conversas e terminais vivem fora do React (paineis/conversas.ts, paineis/terminais.ts) e carregam só quando alguém

@@ -113,6 +113,26 @@ export const CANAL = {
   // frente Casca (rodada 3): painel de mídia (src/main/ipc-midia.ts, docs/casca.md)
   midia: 'estudio:midia',
   midiaMarcar: 'estudio:midia-marcar',
+  iaProvedores: 'estudio:ia-provedores', // frente IA
+  iaGravarChave: 'estudio:ia-gravar-chave',
+  iaApagarChave: 'estudio:ia-apagar-chave',
+  iaModelos: 'estudio:ia-modelos',
+  iaConfigurar: 'estudio:ia-configurar',
+  iaPadrao: 'estudio:ia-padrao',
+  iaUsoDoMes: 'estudio:ia-uso-do-mes',
+  conversaModelo: 'estudio:conversa-modelo',
+  iaPortaoPedido: 'estudio:ia-portao-pedido',
+  iaPortaoResposta: 'estudio:ia-portao-resposta',
+  iaPortaoCancelado: 'estudio:ia-portao-cancelado',
+  iaReverter: 'estudio:ia-reverter',
+  iaApps: 'estudio:ia-apps',
+  iaAppsLigar: 'estudio:ia-apps-ligar',
+  iaAppsNovo: 'estudio:ia-apps-novo',
+  iaAppsConfigs: 'estudio:ia-apps-configs',
+  iaAppsRevogar: 'estudio:ia-apps-revogar',
+  iaGuardar: 'estudio:ia-guardar',
+  iaGuardadas: 'estudio:ia-guardadas',
+  iaApagarGuardada: 'estudio:ia-apagar-guardada',
 } as const;
 
 /** O projeto aberto. `estado` é o último que a pessoa viu (área, documento, seleção), para reabrir onde parou; `git`
@@ -169,6 +189,8 @@ export type EventoConversa =
   | {tipo: 'permissao'; pedido: string; ferramenta: string; entrada: Record<string, unknown>; titulo?: string; motivo?: string; pode_sempre: boolean}
   | {tipo: 'permissao-cancelada'; pedido: string}
   | {tipo: 'fim'; erro: boolean; texto?: string; custo_usd?: number; duracao_ms?: number}
+  // tokens do turno (entrada inclui a parte que veio do cache); custo_usd quando o próprio provedor informa
+  | {tipo: 'uso'; entrada: number; entrada_cache: number; saida: number; custo_usd?: number}
   | {tipo: 'hibernou'}
   | {tipo: 'saiu'; codigo: number | null; detalhe?: string}
   | {tipo: 'erro'; mensagem: string};
@@ -221,7 +243,7 @@ export type ApiEstudio = {
   // o Claude como conversa: o mesmo claude da pessoa no modo sem tela; `sessao` retoma uma conversa existente
   conversa: {
     conta: () => Promise<ContaClaude>;
-    abrir: (o?: {sessao?: string}) => Promise<{id: number; sessao: string}>;
+    abrir: (o?: {sessao?: string; provedor?: string; modelo?: string}) => Promise<{id: number; sessao: string; provedor: string; rotulo: string}>;
     enviar: (id: number, texto: string) => Promise<void>;
     permitir: (id: number, pedido: string, decisao: 'permitir' | 'negar', sempre?: boolean) => void;
     parar: (id: number) => void;
@@ -317,6 +339,34 @@ export type ApiEstudio = {
     marcar: (caminho: string, mudanca: {estado?: EstadoDaTomada | null; nota?: string}) =>
       Promise<{seq: number; documento: string; caminho: string; marca: MarcaDeMidia | null}>;
   };
+  // frente IA: o catálogo de provedores com o que falta para usar cada um
+  ia: {
+    provedores: () => Promise<EstadoProvedor[]>;
+    gravarChave: (provedor: string, chave: string) => Promise<ResultadoChave>;
+    apagarChave: (provedor: string) => Promise<void>;
+    modelos: (provedor: string) => Promise<ResultadoModelos>;
+    configurar: (provedor: string, c: {modelo?: string; base?: string}) => Promise<{modelo?: string; base?: string}>;
+    padrao: (provedor: string) => Promise<void>;
+    usoDoMes: () => Promise<UsoDoMes>;
+    /** Seletor de modelo da conversa aberta: vale na próxima mensagem. */
+    modeloDaConversa: (id: number, modelo?: string) => Promise<void>;
+    /** Portão de permissão: pedidos de qualquer IA (conversa, terminal, app de fora) e a resposta da pessoa. */
+    aoPedidoPortao: (cb: (p: PedidoPortaoTela) => void) => () => void;
+    aoPortaoCancelado: (cb: (id: string) => void) => () => void;
+    responderPortao: (id: string, permitir: boolean, sempre?: boolean) => void;
+    /** Reverte uma entrada do diário pelo seq; forcar passa por cima de mudança feita depois. */
+    reverter: (seq: number, forcar?: boolean) => Promise<ResultadoReverter>;
+    /** Apps de IA de fora: ligar a porta, criar um app (devolve a configuração com o token), rever e revogar. */
+    apps: () => Promise<EstadoAppsDeFora>;
+    appsLigar: (ligado: boolean, porta?: number) => Promise<EstadoAppsDeFora>;
+    appsNovo: (nome: string) => Promise<{id: string; configs: ConfigsDoApp}>;
+    appsConfigs: (id: string) => Promise<ConfigsDoApp>;
+    appsRevogar: (id: string) => Promise<EstadoAppsDeFora>;
+    /** Conversas guardadas por projeto (F6): gravar a conversa aberta, listar as guardadas e apagar uma. */
+    guardar: (id: number, c: {titulo: string; itens: unknown[]; uso?: unknown}) => Promise<string | null>;
+    guardadas: () => Promise<ConversaGuardadaTela[]>;
+    apagarGuardada: (sessao: string) => Promise<void>;
+  };
 };
 
 // ---------- frente Fala ----------
@@ -340,6 +390,28 @@ export type ResultadoExportarPaginas = {ok: boolean; pasta?: string; pdf?: strin
 
 /** O PNG sem fundo (data URL) que a interface devolve a um pedido do MCP, com o tempo do modelo. */
 export type RespostaFundo = {ok: boolean; png?: string; ms?: number; mensagem?: string};
+
+// ---------- frente IA ----------
+/** Um provedor do catálogo e o que falta para usar (a chave nunca vem: só a origem e os 4 últimos caracteres). */
+export type EstadoProvedor = {id: string; nome: string; via: 'claude-cli' | 'openai' | 'acp'; servidor: string; experimental?: boolean; modelo?: string;
+  base?: string; paginaChave?: string; chave: 'exigida' | 'opcional' | 'nenhuma'; pronto: boolean; falta?: string;
+  chave_origem?: 'cofre' | 'ambiente' | 'nenhuma'; chave_final?: string; chave_variavel?: string; local?: boolean; padrao?: boolean;
+  cofre_persistente?: boolean; cofre_texto?: string}; // cofre_texto: onde a chave fica (ou por que só vale na sessão) neste sistema
+/** Resultado de gravar uma chave: testada na lista de modelos do provedor (não gasta token). */
+export type ResultadoChave = {ok: boolean; mensagem: string; persistente?: boolean; modelos?: string[]};
+export type ResultadoModelos = {ok: true; modelos: string[]} | {ok: false; status?: number; rede?: boolean; mensagem: string};
+/** Pedido do portão de permissão do MCP (src/nucleo/portao.ts) para a tela: de qual aba, qual ferramenta e por quê. */
+export type PedidoPortaoTela = {id: string; origem: string; ferramenta: string; motivo: string; entrada: Record<string, unknown>};
+export type ResultadoReverter = {ok: true; seq: number; rotulo: string} | {ok: false; mensagem: string; mudou_depois?: boolean};
+/** Apps de IA de fora (padrão Screenpipe): a porta fixa só em 127.0.0.1 e os apps com token próprio. */
+export type EstadoAppsDeFora = {ligado: boolean; porta: number; ouvindo: boolean; erro?: string; apps: {id: string; nome: string; criado_em: string}[]};
+/** A configuração pronta para colar no app de fora, por HTTP e por stdio (com a ponte do próprio Estúdio). */
+export type ConfigsDoApp = {http: string; stdio: string};
+/** Conversa guardada no projeto (.estudio/conversas/): o que a tela desenha e de quem é. */
+export type ConversaGuardadaTela = {sessao: string; provedor: string; titulo: string; modelo?: string; criada_em: string; atualizada_em: string;
+  itens: unknown[]; uso?: unknown};
+/** Soma do mês por provedor, no PC: tokens e custo estimado pela tabela de preços. */
+export type UsoDoMes = Record<string, {entrada: number; cache: number; saida: number; custo_usd: number; turnos: number}>;
 
 declare global {
   interface Window {
