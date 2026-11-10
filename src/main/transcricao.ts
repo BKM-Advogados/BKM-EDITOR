@@ -235,14 +235,16 @@ export const acharWhisperCli = (pasta: string, o: {plataforma?: string; arq?: st
   const plataforma = o.plataforma ?? process.platform;
   const existe = o.existe ?? existsSync;
   const exe = plataforma === 'win32' ? 'whisper-cli.exe' : 'whisper-cli';
-  const proprio = path.join(pasta, 'bin', exe);
+  // os caminhos do sistema pedido, não do que roda o teste (o vitest confere o Mac no Windows e vice-versa)
+  const p = plataforma === 'win32' ? path.win32 : path.posix;
+  const proprio = p.join(pasta, 'bin', exe);
   if (existe(proprio)) return proprio;
   if (baixaBinario(plataforma, o.arq ?? process.arch)) return null;
   for (const e of o.embutidos ?? []) if (existe(e)) return e;
   const sep = plataforma === 'win32' ? ';' : ':';
   const busca = caminhoDeBusca({plataforma, PATH: o.PATH ?? process.env.PATH, home: o.home ?? os.homedir()});
   for (const d of busca.split(sep)) {
-    if (d && existe(path.join(d, exe))) return path.join(d, exe);
+    if (d && existe(p.join(d, exe))) return p.join(d, exe);
   }
   return null;
 };
