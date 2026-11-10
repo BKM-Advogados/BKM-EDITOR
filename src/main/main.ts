@@ -40,6 +40,8 @@ import {lojaDeSenhasLinux} from './loja-de-senhas'; // frente IA
 import {criarSessoesIA, fecharAppsDeFora, iniciarAppsDeFora, perguntarAPessoa, registrarIpcIa, retomadaDe} from './ipc-ia'; // frente IA
 import {aoAbrirMusica, registrarIpcMusica} from './ipc-musica'; // frente Música
 import {criarPonteJanela} from './ponte-janela';
+import {definirServicoPrevia} from '../nucleo/mcp-previa'; // frente IDE: prévias do MCP
+import {criarServicoPrevia} from './previa'; // frente IDE
 
 // o mesmo id do instalador (electron-builder.yml): a barra de tarefas agrupa a janela com o atalho
 app.setAppUserModelId('br.com.bkmadvogados.estudio');
@@ -508,6 +510,8 @@ const marcas = registrarIpcMarcas({lidar, janela: () => janela, memoria, midia, 
 
 registrarPrefsExportacao(lidar, exigirProjeto); // marca d'água por destino, lembrada no projeto (frente C)
 registrarContrasteMarca(lidar, exigirProjeto, (documento) => (exigirProjeto(), sessao!.propsVideo(documento, midia.base)), (aviso) => prepararRender({raizApp: app.getAppPath(), empacotado: app.isPackaged, aviso})); // contraste 3:1 da marca (frente C)
+// frente IDE: ver_quadro, ver_cenas e ver_trecho pelo MCP do app, com o render da exportação e a mídia do servidor local
+definirServicoPrevia(criarServicoPrevia({preparar: (aviso) => prepararRender({raizApp: app.getAppPath(), empacotado: app.isPackaged, aviso}), comMidia: (_raiz, f) => f(midia.base)}));
 // frente Som (rodada 2): limpeza de voz (limpeza-voz.ts) e medidor de loudness da mistura (loudness.ts)
 registrarIpcLimpeza(lidar, exigirProjeto, enviar);
 registrarIpcLoudness(lidar, exigirProjeto, (documento) => (exigirProjeto(), sessao!.propsVideo(documento, midia.base)));

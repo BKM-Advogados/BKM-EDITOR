@@ -36,6 +36,7 @@ import {registrarMusica} from './mcp-musica'; // frente Música
 import {musicaDoModelo, type ModeloMusica} from './musica-modelos'; // frente Música (item 27)
 import type {DocMusica} from './musica'; // frente Música (item 27)
 import {ARQUIVO_TRANSICOES, lerRegistro, transicaoEmCurso} from './transicoes'; // frente Música
+import {registrarPrevia} from './mcp-previa'; // frente IDE: ver_quadro, ver_cenas e ver_trecho (docs/ide.md)
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x, null, 2)}]});
 const erro = (e: unknown) => ({
@@ -288,6 +289,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   registrarImagem(servidor, projeto, autor, origem); // seleção e layout da imagem (rodada 3, B2): src/nucleo/mcp-imagem.ts
   registrarSom(servidor, projeto, autor, origem); // frente Som (rodada 3): dividir, copiar e crossfade de clipe de áudio
   registrarMusica(servidor, projeto, autor, origem); // frente Música: música e ida e volta entre módulos (docs/musica.md)
+  registrarPrevia(servidor, projeto); // frente IDE: prévias do vídeo em saidas/previas/ (src/nucleo/mcp-previa.ts)
 };
 
 // ---------- pesquisa: fontes e fatos (src/nucleo/pesquisa.ts, docs/pesquisa.md) ----------
