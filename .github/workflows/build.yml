@@ -75,11 +75,9 @@ jobs:
       - name: Tipos
         run: npm run typecheck
 
-      # Os testes nasceram no Windows e foram conferidos no Linux (V3); no Windows e no Mac do CI ainda não rodaram. Até a
-      # primeira execução verde lá, a falha aparece no resumo mas não segura o pacote (docs/portes.md, "CI").
+      # A suíte passou inteira nos quatro sistemas em 10/11/2026 (execução 42860394514): teste vermelho segura o pacote.
       - name: Testes
         run: npm test
-        continue-on-error: ${{ matrix.alvo != 'linux' }}
 
       - name: MCP
         run: npm run mcp:build

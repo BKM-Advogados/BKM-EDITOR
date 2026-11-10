@@ -248,9 +248,10 @@ que valida um branch antes do `main`. Não roda em push comum nem em PR. Acompan
 artifact `estudio-<sistema>-<arch>` por 14 dias. No Mac, compila o whisper-cli e assina e notariza **só se os secrets
 existirem**; sem eles, o `.app` sai sem assinatura e o passo de conferência só mostra o `codesign -dv`.
 
-**Testes fora do Linux:** a suíte nunca rodou no Windows nem no Mac do CI. Até a primeira execução verde lá, o passo de
-testes não segura o pacote nesses dois (`continue-on-error`); a falha aparece no resumo. Depois de verde, tirar o
-`continue-on-error`.
+**Testes fora do Linux:** a suíte passou inteira no Windows, no Mac Apple Silicon e no Mac Intel do CI em 10/11/2026
+(execução 42860394514: 1018 a 1020 testes, nenhuma falha), depois de três ajustes de portabilidade nos testes (LF no
+checkout, caminhos pelo sistema pedido, o ffmpeg do Mac com as bibliotecas). Desde então teste vermelho segura o pacote
+em qualquer sistema.
 
 **Quanto custa:** em repositório privado, o minuto do Linux conta 1, o do Windows 2 e o do **Mac 10**. Estimativa por
 execução completa (sem cache quente): Linux ~12 min (12), Windows ~20 min (40), Mac arm64 ~30 min (300), Mac Intel
