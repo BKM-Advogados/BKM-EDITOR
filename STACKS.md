@@ -3,6 +3,7 @@
 > Projeto: **Estúdio** · app de edição de vídeo, imagem, 3D, efeitos/motion, áudio e música.
 > Versão: **V3**, pacote 1.0.0 (10/11/2026) · Migração Windows → Linux (Omarchy/Arch) em 09/11/2026.
 > Local no Linux: `~/Projects/estudio` (original: `C:\Users\usuario\projetos\estudio`)
+> Portes para Windows e macOS (10/11/2026): auditoria, pacotes e o que falta testar em `docs/portes.md`.
 
 ---
 
@@ -106,28 +107,38 @@
 
 | Ferramenta | Versão | Uso |
 |---|---|---|
-| **Electron Forge** | 7.11.1 | Build/dev/package/make |
-| **@electron-forge/maker-zip** | 7.11.1 | Zip portátil (`win32` e `linux`) |
+| **Electron Forge** | 7.11.1 | Build/dev/package/make (pacote de qualquer sistema a partir de qualquer um) |
+| **@electron/packager** (do Forge) | 18.4.4 | Ícone e versão do `.exe` pelo `resedit` (sem Wine); `.app` com Info.plist próprio |
+| **@electron-forge/maker-zip** | 7.11.1 | Zip portátil (`win32`, `linux` e `darwin`) |
 | **@electron-forge/plugin-vite** | 7.11.1 | Integração Vite no Forge |
-| **electron-builder** | 26.17.0 | Instalador NSIS do Windows |
+| **electron-builder** | 26.17.0 | Instalador NSIS do Windows (precisa de Windows ou Wine) e DMG do Mac (precisa de Mac) |
 | **esbuild** | ^0.25.0 | Bundler do MCP (`mcp:build`) |
+| **GitHub Actions** (`.github/workflows/build.yml`) | — | Pacotes e instaladores de Linux, Windows e Mac (arm64 e Intel), só à mão ou por tag `v*` |
 
 ### Scripts (`package.json`)
 
-| Script | Comando | Linux? |
+| Script | Comando | Onde roda |
 |---|---|---|
-| `dev` | `mcp:build` + `electron-forge start` | ✅ |
-| `mcp:build` | `esbuild mcp/nucleo.ts …` | ✅ |
-| `typecheck` | `tsc --noEmit` | ✅ |
-| `test` | `vitest run` | ✅ |
-| `studio` | `remotion studio …` | ✅ |
-| `package` | `electron-forge package` | ✅ gera `out/pacote/Estudio-linux-x64` |
-| `make` | `electron-forge make` | ✅ zip portátil |
-| `instalador` | `electron-builder --win nsis` | ❌ Windows-only |
-| `scripts/instalar-linux.sh` | empacota e instala para o usuário | ✅ `~/.local/opt/Estudio` + atalho no lançador |
+| `dev` | `mcp:build` + `electron-forge start` | Linux ✅ · Windows · Mac |
+| `mcp:build` | `esbuild mcp/nucleo.ts …` | todos |
+| `typecheck` | `tsc --noEmit` | todos |
+| `test` | `vitest run` | Linux ✅ (no Windows e no Mac, a conferir no CI) |
+| `studio` | `remotion studio …` | todos |
+| `package` | `electron-forge package` | o sistema atual: `out/pacote/Estudio-<sistema>-<arch>` |
+| `make` | `electron-forge make` | zip portátil do sistema atual |
+| `nativos:win`, `nativos:mac` | `scripts/nativos-alvo.mjs` | qualquer: baixa o compositor e o node-pty do alvo (integridade do lock) |
+| `pacote:win` | `electron-forge package --platform win32 --arch x64` | qualquer (do Linux ✅, depois de `nativos:win`) |
+| `portatil:win` | `electron-forge make --skip-package … win32` | qualquer: o `.zip` do Windows |
+| `pacote:mac`, `pacote:mac-arm64`, `pacote:mac-x64` | package + zip do `.app` por arquitetura | qualquer (do Linux ✅, depois de `nativos:mac`); sem assinatura fora do Mac |
+| `instalador:win` (e o antigo `instalador`) | pacote + `electron-builder --win nsis` | Windows (ou Linux com Wine) |
+| `instalador:mac` | `scripts/instalador-mac.mjs`: pacote + DMG | só Mac |
+| `scripts/instalar-linux.sh` | empacota e instala para o usuário | Linux ✅ `~/.local/opt/Estudio` + atalho no lançador |
 
 > O `extract-zip` do empacotador usa o `yauzl` 2, que não lê zip no Node 24+ (o processo sai em silêncio no meio do
 > "Finalizing package"). O `package.json` força o `yauzl` 3 em `overrides`.
+
+> Assinatura e notarização do Mac ficam desligadas até haver as variáveis da Apple (`ESTUDIO_MAC_IDENTIDADE`,
+> `APPLE_API_KEY*` ou `APPLE_ID*`, `build/mac.ts`); entitlements em `build/entitlements.*.plist`.
 
 ---
 
@@ -143,12 +154,16 @@
 
 ## 10. Dependências nativas por plataforma
 
-| Pacote | Linux (x64) | Windows | macOS |
-|---|---|---|---|
-| `@remotion/compositor-*` | `-linux-x64-gnu` ✅ | `-win32-x64-msvc` | `-darwin-x64` / `-darwin-arm64` |
-| `@lydell/node-pty-*` | `-linux-x64` ✅ | `-win32-x64` | `-darwin-*` |
-| `@esbuild/linux-x64` | ✅ | `-win32-x64` | `-darwin-*` |
-| `@rollup/rollup-linux-x64-gnu` | ✅ | `-win32-x64-msvc` | `-darwin-*` |
+| Pacote / binário | Linux (x64) | Windows (x64) | macOS (arm64 · x64) | Como entra no app |
+|---|---|---|---|---|
+| `@remotion/compositor-*` (render, ffmpeg, ffprobe) | `-linux-x64-gnu` ✅ | `-win32-x64-msvc` (no pacote ✅) | `-darwin-arm64` · `-darwin-x64` (no pacote ✅) | `forge.config.ts` copia o do alvo para `app.asar.unpacked`; no Mac o ffmpeg acha as dylibs pelo `DYLD_LIBRARY_PATH` |
+| `@lydell/node-pty-*` (terminais) | `-linux-x64` ✅ | `-win32-x64` (conpty, no pacote ✅) | `-darwin-arm64` · `-darwin-x64` (no pacote ✅) | o mesmo, N-API sem recompilar |
+| Chrome Headless Shell (navegador de render) | `linux64` (remotion.media) ✅ | `win64` (remotion.media, no pacote ✅) | `mac-arm64` (remotion.media) · `mac-x64` (Chrome for Testing), no pacote ✅ | `forge.config.ts`: o do sistema pelo `ensureBrowser`, o de outro alvo por `src/main/navegador-alvo.ts` |
+| whisper-cli (transcrição) | compilado pela pessoa | baixado no 1º uso (whisper.cpp b5454, SHA-256) | embutido pelo CI (v1.9.5 estático) ou Homebrew | `ESTUDIO_WHISPER_EMBUTIDO` → `resources/whisper` |
+| `@esbuild/*`, `@rollup/*` | `linux-x64` ✅ | `win32-x64` | `darwin-*` | só no build; o `npm ci` de cada sistema instala |
+
+Empacotar outro sistema a partir do Linux: `npm run nativos:win` / `npm run nativos:mac` antes do `pacote:*`
+(`scripts/nativos-alvo.mjs`, sem mexer no `package.json` nem no lock).
 
 ---
 
