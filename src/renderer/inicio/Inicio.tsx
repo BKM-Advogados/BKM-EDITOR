@@ -306,8 +306,8 @@ export const Inicio: React.FC = () => {
                 <button key={m.id} className={`cartao-modelo${m.exemplo ? '' : ' principal'}`} disabled={ocupado} onClick={() => void criar(m.id)}>
                   <span className="cm-poster">{m.exemplo ? <span className="cm-cliente">Cliente</span> : ICONE_MODULO[m.modulo]}</span>
                   <span className="cm-texto">
-                    <span className="cm-nome">{m.nome}{!m.exemplo && aba !== '3d' && <span className="cm-chip">{chip.replace(' · Em branco', '')}</span>}
-                      {m.formato_fixo && <span className="cm-chip">{m.formato_fixo}</span>}</span>
+                    <span className="cm-nome">{m.nome}{!m.exemplo && !m.formato_fixo && aba !== '3d' && <span className="cm-chip">{chip.replace(' · Em branco', '')}</span>}
+                      {m.formato_fixo && <span className="cm-chip">{FORMATOS_VIDEO.find((f) => f.id === m.formato_fixo)?.proporcao ?? m.formato_fixo}</span>}</span>
                     <span className="cm-desc">{m.descricao}</span>
                   </span>
                   {!m.exemplo && <kbd>Enter</kbd>}
