@@ -190,8 +190,9 @@ const config = {
   },
   // nada para recompilar: o node-pty vem pré-compilado (N-API) e o compositor do Remotion é binário pronto
   rebuildConfig: {onlyModules: []},
-  // o .zip é a versão portátil (descompactar e abrir o Estudio.exe); o instalador .exe é o NSIS do electron-builder.yml
-  makers: [new MakerZIP({}, ["win32"])],
+  // o .zip é a versão portátil (descompactar e abrir o Estudio.exe ou o Estudio do Linux); o instalador do Windows é o
+  // NSIS do electron-builder.yml, e no Linux quem instala é scripts/instalar-linux.sh (deb/rpm não servem ao Arch)
+  makers: [new MakerZIP({}, ["win32", "linux"])],
   hooks: {
     packageAfterCopy: async (
       _forgeConfig: unknown,

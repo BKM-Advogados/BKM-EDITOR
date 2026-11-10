@@ -43,3 +43,17 @@
 - **Cobrança:** se houver uma `ANTHROPIC_API_KEY` configurada no Windows, o Claude cobra pela API, não pela assinatura.
   O app avisa quando isso acontece.
 - **Desinstalar:** Configurações › Aplicativos › Estudio.
+
+## Linux (Omarchy e outros)
+
+Precisa do Node e do npm (no Omarchy já vêm pelo mise) e, para o Claude dentro do app, do Claude Code no PATH. Na pasta
+do código:
+
+```bash
+npm install
+bash scripts/instalar-linux.sh
+```
+
+O script empacota o app, copia para `~/.local/opt/Estudio` e cria o atalho **Estúdio** no lançador de aplicativos
+(Super+Espaço no Omarchy). Não pede root. Para atualizar depois de mudar o código, rode o script de novo. Os projetos
+ficam em `~/Estudio`.

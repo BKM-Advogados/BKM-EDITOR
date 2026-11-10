@@ -4,7 +4,7 @@ import React from 'react';
 import {Camera} from 'lucide-react';
 import type {DocCena3D, Luz3D, Objeto3D, OperacaoPatch, Vetor3} from '../../../nucleo/documentos';
 import {aplicar, patchTrocar, trocar, useLoja} from '../../estado/loja';
-import {CampoDeslizante, CampoNumero, CampoTexto, Secao} from '../../componentes/Campos';
+import {CampoDeslizante, CampoLeitura, CampoNumero, CampoTexto, Secao} from '../../componentes/Campos';
 import {indiceEm, luzesDe, objetosDe, PADRAO_METALICO, PADRAO_RUGOSIDADE, TIPOS, type TipoObjeto} from './comum';
 import {CampoCorAoSoltar, CampoEscolha, CampoVetor} from './CamposTres';
 import {ajustarAoVivo, usarVistaComoCamera} from './vista';
@@ -71,8 +71,8 @@ const InspectorCena: React.FC<{documento: string; doc: DocCena3D}> = ({documento
     <>
       <Secao titulo="Cena">
         <CampoCorAoSoltar rotulo="fundo" valor={doc.fundo ?? ''} aoMudar={(c) => void trocar(documento, '/fundo', c, 'fundo da cena')} />
-        <div className="linha-campo"><span>objetos</span><span>{objetosDe(doc).length}</span></div>
-        <div className="linha-campo"><span>luzes</span><span>{luzesDe(doc).length}</span></div>
+        <CampoLeitura rotulo="objetos">{objetosDe(doc).length}</CampoLeitura>
+        <CampoLeitura rotulo="luzes">{luzesDe(doc).length}</CampoLeitura>
       </Secao>
       <Secao titulo="Câmera">
         <CampoNumero rotulo="fov (°)" valor={camera?.fov} passo={1} aoMudar={(n) => n > 1 && n < 179 && gravarCamera('fov', n)} />
