@@ -137,7 +137,14 @@
 .selo-licenca.livre { color: var(--trilha-audio); }
 .selo-licenca.credito { color: var(--comentario); }
 .selo-licenca.sem_licenca { color: #ff8a65; border-color: #ff8a65; }
-.modelos-musica { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.modelos-musica { display: flex; gap: 8px; flex-wrap: wrap; }
+.musica-vazio .titulo-vazio { font-size: 15px; font-weight: var(--peso-forte); color: var(--texto); }
+.musica-vazio .dica-vazia { font-size: 11px; color: var(--texto-3); max-width: 560px; }
+.cartao-modelo { width: 190px; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; text-align: left; padding: 10px; border-radius: var(--raio); border: 1px solid var(--borda); background: var(--fundo-2); color: var(--texto); cursor: pointer; }
+.cartao-modelo:hover { border-color: var(--acento); background: var(--fundo-3); }
+.cartao-modelo.destaque { border-color: var(--acento); }
+.cartao-modelo b { font-size: 13px; }
+.cartao-modelo span { font-size: 11px; color: var(--texto-2); line-height: 1.35; }
 
 /* automação desenhada no arranjo (item 22) */
 .arranjo .cab-auto { display: flex; flex-direction: column; gap: 4px; padding: 3px 6px; border-bottom: 1px solid var(--borda); background: var(--fundo-2); overflow: hidden; }

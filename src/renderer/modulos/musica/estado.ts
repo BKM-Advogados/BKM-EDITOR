@@ -196,7 +196,7 @@ export const lerTransicoes = async () => {
     if (feitasAqui.has(t.id)) continue;
     const eraAberta = antes.get(t.id) === 'aberta';
     if (t.estado === 'aberta' && !antes.has(t.id)) {
-      feitasAqui.add(t.id);
+      // (sem feitasAqui: quando a IA fecha esta transição, a tela também volta com ela)
       await relerProjeto();
       irParaMusica(t.destino.documento, t.destino.selecao);
       avisar('A IA abriu a Música com o áudio do vídeo', 'agente');
