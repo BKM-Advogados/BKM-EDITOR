@@ -29,7 +29,7 @@ const chamar = async (name: string, args: Record<string, unknown> = {}) => {
 beforeAll(async () => {
   execSync('npm run mcp:build', {cwd: RAIZ, stdio: 'ignore'});
   pasta = mkdtempSync(path.join(tmpdir(), 'estudio-mcp-'));
-  cpSync(path.join(RAIZ, 'exemplos', 'exemplo'), pasta, {recursive: true, filter: (f) => !f.endsWith('.mp4')});
+  cpSync(path.join(RAIZ, 'testes', 'fixtures', 'projeto'), pasta, {recursive: true, filter: (f) => !f.endsWith('.mp4')});
   cliente = new Client({name: 'teste', version: '0'});
   // os kits de marca vão para uma pasta de teste, não para a da pessoa
   const env = Object.fromEntries(Object.entries({...process.env, ESTUDIO_MARCAS: path.join(pasta, '.marcas-teste')}).filter(([, v]) => v !== undefined)) as Record<string, string>;
@@ -57,17 +57,17 @@ describe('MCP estudio', () => {
 
   it('resolve um comentário da pessoa com patch, e a mudança vai para o diário', async () => {
     const p = new Projeto(pasta);
-    const c = p.novoComentario({documento: 'carrossel', autor: 'pessoa', texto: 'o 25% entra cedo demais', alvo: {objeto: '/cenas/2/blocos/1', tempo_ms: 47000}});
+    const c = p.novoComentario({documento: 'carrossel', autor: 'pessoa', texto: 'o 5 entra cedo demais', alvo: {objeto: '/cenas/2/blocos/1', tempo_ms: 42000}});
 
     const lido = await chamar('ler_comentario', {id: c.id});
     expect(lido.dado.objeto_atual.tipo).toBe('numero');
 
     const doc = await chamar('ler_documento', {documento: 'carrossel', caminho: '/cenas/2/blocos/1/em'});
-    expect(doc.dado.conteudo).toBe('adicional@43800');
+    expect(doc.dado.conteudo).toBe('5@36700');
 
     const ok = await chamar('aplicar_patch', {
       documento: 'carrossel', versao_base: doc.dado.versao, rotulo: 'número entra no fim da palavra',
-      patch: [{op: 'test', path: '/cenas/2/blocos/1/em', value: 'adicional@43800'}, {op: 'replace', path: '/cenas/2/blocos/1/em', value: 'adicional$@43800'}],
+      patch: [{op: 'test', path: '/cenas/2/blocos/1/em', value: '5@36700'}, {op: 'replace', path: '/cenas/2/blocos/1/em', value: '5$@38900'}],
     });
     expect(ok.erro).toBe(false);
 
@@ -76,14 +76,14 @@ describe('MCP estudio', () => {
     expect(velho.erro).toBe(true);
     expect(String(velho.dado)).toContain('conflito');
 
-    await chamar('responder_comentario', {id: c.id, texto: 'agora entra no fim de "adicional"'});
-    await chamar('resolver_comentario', {id: c.id, nota: 'em → adicional$@43800'});
+    await chamar('responder_comentario', {id: c.id, texto: 'agora entra no fim do "5"'});
+    await chamar('resolver_comentario', {id: c.id, nota: 'em → 5$@38900'});
     expect(p.comentarios()[0].estado).toBe('resolvido');
 
     const mud = await chamar('listar_mudancas');
     expect(mud.dado).toHaveLength(1);
     expect(mud.dado[0]).toMatchObject({autor: 'agente', origem: 'mcp', rotulo: 'número entra no fim da palavra'});
-    expect(p.diario()[0].inverso).toEqual([{op: 'replace', path: '/cenas/2/blocos/1/em', value: 'adicional@43800'}]);
+    expect(p.diario()[0].inverso).toEqual([{op: 'replace', path: '/cenas/2/blocos/1/em', value: '5@36700'}]);
   });
 
   it('recusa patch cujo test falha, sem gravar', async () => {

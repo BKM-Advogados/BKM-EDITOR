@@ -26,11 +26,11 @@ vi.mock('remotion', async (original) => ({
 }));
 
 const RAIZ = path.join(__dirname, '..');
-const FALA = JSON.parse(readFileSync(path.join(RAIZ, 'exemplos', 'exemplo', 'video', 'palavras.json'), 'utf-8')) as PalavraLegenda[];
+const FALA = JSON.parse(readFileSync(path.join(RAIZ, 'testes', 'fixtures', 'carrossel', 'palavras.json'), 'utf-8')) as PalavraLegenda[];
 const TEMA = novoDocCenas({largura: 1080, altura: 1920, fps: 30}).tema;
 
-/** As legendas da narração do C2 (72 s de fala corrida) num estilo, já resolvidas para a composição. */
-const legendasC2 = (predefinicao: 'classica' | 'caixa' | 'karaoke', largura = 1080, altura = 1920): LegendasP => {
+/** As legendas da narração de teste (77 s de fala corrida) num estilo, já resolvidas para a composição. */
+const legendasDaNarracao = (predefinicao: 'classica' | 'caixa' | 'karaoke', largura = 1080, altura = 1920): LegendasP => {
   const clipe = {id: 'n1', arquivo: 'midia/narracao.wav', em: 0, duracao_ms: 80_000};
   const leg = legendasDaFala([{clipe, faixa: {nome: 'Narração'}, palavras: FALA, caminhoPalavras: 'x'}], {estilo: {predefinicao}, largura, altura});
   return resolverLegendas(leg, {largura, altura, tema: TEMA, duracao_ms: 80_000})!;
@@ -45,8 +45,8 @@ const desenhadas = (legendas: LegendasP, quadro: number) => {
 
 describe('uma legenda por quadro (video-N3)', () => {
   for (const estilo of ['classica', 'caixa', 'karaoke'] as const) {
-    it(`na fala corrida do C2 (${estilo}), nunca duas na tela, e a da hora está inteira`, () => {
-      const leg = legendasC2(estilo);
+    it(`na fala corrida de teste (${estilo}), nunca duas na tela, e a da hora está inteira`, () => {
+      const leg = legendasDaNarracao(estilo);
       const segs = leg.segmentos;
       // o caso do defeito: uma sai no mesmo ms em que a próxima entra
       const coladas = segs.filter((s, i) => segs[i + 1] && s.sai === segs[i + 1].em);
@@ -97,7 +97,7 @@ describe('uma legenda por quadro (video-N3)', () => {
   });
 
   it('a faixa da marca acende com a legenda da hora, sem somar duas', () => {
-    const leg = legendasC2('classica');
+    const leg = legendasDaNarracao('classica');
     const faixa = {...leg, estilo: {...leg.estilo, caixa: 'faixa' as const}};
     const s = leg.segmentos.find((x, i) => leg.segmentos[i + 1]?.em === x.sai)!;
     tela.quadro = Math.round((s.sai / 1000) * tela.fps);
@@ -110,7 +110,7 @@ describe('legenda na área e na quebra de cada destino (video-N1, transversal-N2
   const palavras = (l: LegendasP) => l.segmentos.flatMap((s) => s.palavras.map((p) => `${p.w}@${p.s}`));
 
   it('16:9 exportado em 9:16: a área do 9:16, fora dos 484 px de baixo, e cada legenda cabe em duas linhas', () => {
-    const doc = legendasC2('classica', 1920, 1080);
+    const doc = legendasDaNarracao('classica', 1920, 1080);
     const reels = legendasNoDestino(doc, 1080, 1920, {largura: 1920, altura: 1080});
     expect(reels.area).toEqual(areaDaLegenda(1080, 1920));
     expect(reels.area.base).toBeLessThan(1 - 484 / 1920);
@@ -132,7 +132,7 @@ describe('legenda na área e na quebra de cada destino (video-N1, transversal-N2
   });
 
   it('9:16 exportado em 16:9: desce para a área do 16:9 e não divide nada', () => {
-    const doc = legendasC2('karaoke');
+    const doc = legendasDaNarracao('karaoke');
     const yt = legendasNoDestino(doc, 1920, 1080, {largura: 1080, altura: 1920});
     expect(yt.area).toEqual(areaDaLegenda(1920, 1080));
     expect(yt.area.base).toBeGreaterThan(doc.area.base);
@@ -140,7 +140,7 @@ describe('legenda na área e na quebra de cada destino (video-N1, transversal-N2
   });
 
   it('na mesma proporção do documento sai igual à prévia', () => {
-    const doc = legendasC2('classica');
+    const doc = legendasDaNarracao('classica');
     const menor = legendasNoDestino(doc, 720, 1280, {largura: 1080, altura: 1920});
     expect(menor).toEqual(doc);
   });
@@ -174,7 +174,7 @@ describe('a fala do clipe: original da voz limpa, carimbo do áudio e gerar só 
 
   it('gerar faz só o que falta: o clipe que já tem legendas (corrigidas à mão) fica igual, e o outro ganha as suas', () => {
     const base = legendasDoDocumento(docCom([{id: 'a', arquivo: 'midia/a.wav'}]), lidas({'midia/a.wav.palavras.json': gravadas('sa')}), {largura: 1080, altura: 1920}).legendas;
-    const corrigida = {...base, segmentos: [...base.segmentos.map((s, i) => (i === 0 ? comTexto(s, s.texto.replace('Recebeu', 'RECEBEU')) : s)),
+    const corrigida = {...base, segmentos: [...base.segmentos.map((s, i) => (i === 0 ? comTexto(s, s.texto.replace('Perdeu', 'PERDEU')) : s)),
       {id: 'manual', em: 30_000, sai: 31_000, texto: 'criada à mão'}]};
     const doc = docCom([{id: 'a', arquivo: 'midia/a.wav'}, {id: 'b', arquivo: 'midia/b.wav', em: 22_000}], corrigida);
     const mapa = {'midia/a.wav.palavras.json': gravadas('sa'), 'midia/b.wav.palavras.json': gravadas('sb')};
@@ -194,16 +194,16 @@ describe('a fala do clipe: original da voz limpa, carimbo do áudio e gerar só 
     const doc0 = docCom([{id: 'a', arquivo: 'midia/a.wav'}]);
     const base = legendasDoDocumento(doc0, lidas({'midia/a.wav.palavras.json': gravadas('sa')}), {largura: 1080, altura: 1920}).legendas;
     const s0 = base.segmentos[0];
-    const corrigida = {...base, segmentos: [comTexto(s0, s0.texto.replace('Recebeu', 'RECEBEU')), ...base.segmentos.slice(1)]};
+    const corrigida = {...base, segmentos: [comTexto(s0, s0.texto.replace('Perdeu', 'PERDEU')), ...base.segmentos.slice(1)]};
     // o clipe andou 2 s depois de gerar: a correção acha a palavra pelo tempo do arquivo
     const doc = {...docCom([{id: 'a', arquivo: 'midia/a.wav', em: 2000}]), legendas: corrigida};
     const mesma = legendasDoDocumento(doc, lidas({'midia/a.wav.palavras.json': gravadas('sa')}), {largura: 1080, altura: 1920, refazer: true});
     expect(mesma.corrigidas).toBe(1);
-    expect(mesma.legendas.segmentos[0].texto.startsWith('RECEBEU')).toBe(true);
+    expect(mesma.legendas.segmentos[0].texto.startsWith('PERDEU')).toBe(true);
     expect(mesma.legendas.segmentos[0].em).toBe(s0.em + 2000);
     const outra = legendasDoDocumento(doc, lidas({'midia/a.wav.palavras.json': gravadas('outra-tomada')}), {largura: 1080, altura: 1920, refazer: ['a']});
     expect(outra.corrigidas).toBe(0);
-    expect(outra.legendas.segmentos[0].texto.startsWith('Recebeu')).toBe(true);
+    expect(outra.legendas.segmentos[0].texto.startsWith('Perdeu')).toBe(true);
     // levarCorrecoes sozinho: sem origem do clipe, nada passa
     expect(levarCorrecoes({segmentos: corrigida.segmentos}, 'a', PALAVRAS).n).toBe(0);
   });

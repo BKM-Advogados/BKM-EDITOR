@@ -1,5 +1,5 @@
 // Legendas do vídeo de cenas e a parte pura da transcrição local (docs/legendas.md): tokens do whisper em palavras
-// (com o JSON real do whisper.cpp na narração do C2), quebra em legendas, legendas que andam com o clipe, estilos e área
+// (com um JSON no formato do whisper.cpp), quebra em legendas, legendas que andam com o clipe, estilos e área
 // segura, editar em lote, SRT e VTT de ida e volta, e o zip e o download conferido do transcritor.
 import {mkdtempSync, readFileSync, rmSync, existsSync} from 'node:fs';
 import {tmpdir} from 'node:os';
@@ -17,8 +17,8 @@ import {norm} from '../src/nucleo/roteiro/resolver';
 import {acharWhisperCli, baixaBinario, baixarConferido, comoInstalarWhisper, extrairZip, palavrasDoWhisper, Transcritor} from '../src/main/transcricao';
 
 const RAIZ = path.join(__dirname, '..');
-const REFERENCIA = JSON.parse(readFileSync(path.join(RAIZ, 'exemplos', 'exemplo', 'video', 'palavras.json'), 'utf-8')) as PalavraLegenda[];
-const WHISPER = JSON.parse(readFileSync(path.join(__dirname, 'fixtures', 'fala', 'whisper-c2-small.json'), 'utf-8'));
+const REFERENCIA = JSON.parse(readFileSync(path.join(RAIZ, 'testes', 'fixtures', 'carrossel', 'palavras.json'), 'utf-8')) as PalavraLegenda[];
+const WHISPER = JSON.parse(readFileSync(path.join(__dirname, 'fixtures', 'fala', 'whisper-small.json'), 'utf-8'));
 const temporarias: string[] = [];
 afterAll(() => temporarias.forEach((p) => rmSync(p, {recursive: true, force: true})));
 
@@ -34,11 +34,14 @@ const taxaDeErro = (ref: {w: string}[], hip: {w: string}[]) => {
 describe('tokens do whisper.cpp em palavras', () => {
   const palavras = palavrasDoWhisper(WHISPER);
 
-  it('a narração do C2 (small, guloso, com o vocabulário) sai com menos de 5% de palavras erradas', () => {
-    expect(palavras.length).toBeGreaterThan(185);
-    expect(taxaDeErro(REFERENCIA, palavras)).toBeLessThan(0.05);
-    // o narrador fala "pra": com o vocabulário, o whisper escreve como ouviu
-    expect(palavras.slice(0, 6).map((p) => p.w)).toEqual(['Recebeu', 'proposta', 'pra', 'mudar', 'de', 'cidade?']);
+  // a saída do whisper-cli de testes/fixtures/fala/whisper-small.json é sintética, no formato do -ojf: a narração de
+  // testes/fixtures/carrossel em segmentos por frase, palavras longas em pedaços, a pontuação chegando no fim da pausa,
+  // tempos com folga de até ~100 ms, uma palavra com início e fim iguais e um "para" escrito como "pra"
+  it('a narração de teste sai inteira, na ordem, com as palavras juntadas dos pedaços', () => {
+    expect(palavras).toHaveLength(REFERENCIA.length);
+    expect(taxaDeErro(REFERENCIA, palavras)).toBeLessThan(0.01);
+    expect(palavras.slice(0, 9).map((p) => p.w)).toEqual(['Perdeu', 'um', 'papel', 'importante', 'bem', 'na', 'hora', 'de', 'usar?']);
+    expect(palavras.map((p) => p.w)).toContain('pra');
   });
 
   it('tempos em ordem, sem sobreposição, e a pontuação não estica a palavra por cima da pausa', () => {
@@ -47,8 +50,9 @@ describe('tokens do whisper.cpp em palavras', () => {
       expect(palavras[i - 1].e).toBeLessThanOrEqual(palavras[i].s);
       expect(palavras[i].e).toBeGreaterThan(palavras[i].s);
     }
-    const cidade = palavras.find((p) => p.w === 'cidade?')!;
-    expect(cidade.e).toBeLessThan(2200); // o "?" do whisper vem em 2490 ms, no fim da pausa
+    const usar = palavras.find((p) => p.w === 'usar?')!;
+    expect(usar.e).toBeLessThan(2980); // o "?" do whisper vem em 2980 ms, no fim da pausa
+    for (const p of palavras) expect(p.e - p.s).toBeGreaterThanOrEqual(40);
   });
 
   it('o começo das palavras fica perto do da referência (mediana abaixo de 200 ms)', () => {
@@ -61,7 +65,7 @@ describe('tokens do whisper.cpp em palavras', () => {
       j = k + 1;
     }
     erros.sort((x, y) => x - y);
-    expect(erros.length).toBeGreaterThan(170);
+    expect(erros.length).toBeGreaterThan(185);
     expect(erros[Math.floor(erros.length / 2)]).toBeLessThan(200);
   });
 
@@ -78,7 +82,7 @@ describe('quebrar as palavras em legendas', () => {
   const segs = quebrarEmSegmentos(REFERENCIA, {max_caracteres: 42});
 
   it('cada palavra entra uma vez, na ordem, e nenhuma legenda passa da largura nem invade a próxima', () => {
-    expect(segs.flatMap((s) => s.palavras!.map((p) => p.w)).join(' ')).toBe(REFERENCIA.map((p) => p.w).join(' ').replace(' %', '%'));
+    expect(segs.flatMap((s) => s.palavras!.map((p) => p.w)).join(' ')).toBe(REFERENCIA.map((p) => p.w).join(' ').replace(' %', '%').replace(' -mail', '-mail'));
     for (const [i, s] of segs.entries()) {
       expect(s.texto.length).toBeLessThanOrEqual(42);
       expect(s.sai).toBeGreaterThan(s.em);
@@ -87,23 +91,23 @@ describe('quebrar as palavras em legendas', () => {
   });
 
   it('fecha no fim da frase e na pausa longa', () => {
-    // "Recebeu proposta para mudar de cidade?" termina com "?" e a próxima frase começa depois de 440 ms
-    expect(segs[0].texto).toBe('Recebeu proposta para mudar de cidade?');
+    // "Perdeu um papel importante bem na hora de usar?" passa dos 42 caracteres, se divide e termina com "?"
+    expect(segs.slice(0, 2).map((s) => s.texto)).toEqual(['Perdeu um papel importante', 'bem na hora de usar?']);
     expect(segs.every((s) => !/[.?!]/.test(s.texto.slice(0, -1).replace(/\d[.,]\d/g, '')))).toBe(true);
     const pausa = quebrarEmSegmentos([{w: 'um', s: 0, e: 300}, {w: 'dois', s: 1200, e: 1500}], {max_caracteres: 42});
     expect(pausa.map((s) => s.texto)).toEqual(['um', 'dois']);
   });
 
-  it('pausa curta depois de palavra fraca não fecha a legenda (medido no app: "as regras da | transferência.")', () => {
-    // os tempos do whisper na narração do C2 (small): 580 ms entre "da" e "transferência."
-    const ws = [{w: 'Antes', s: 2780, e: 2820}, {w: 'de', s: 2820, e: 2940}, {w: 'responder,', s: 2940, e: 3520}, {w: 'entenda', s: 3640, e: 4080},
-      {w: 'as', s: 4080, e: 4170}, {w: 'regras', s: 4270, e: 4560}, {w: 'da', s: 4560, e: 4600}, {w: 'transferência.', s: 5180, e: 5510}, {w: 'Com', s: 5990, e: 6100}];
+  it('pausa curta depois de palavra fraca não fecha a legenda (medido no app: "os papéis da | documentação.")', () => {
+    // tempos como os do whisper numa narração real (small): 580 ms entre "da" e "documentação."
+    const ws = [{w: 'Antes', s: 2780, e: 2820}, {w: 'de', s: 2820, e: 2940}, {w: 'arquivar,', s: 2940, e: 3520}, {w: 'separe', s: 3640, e: 4080},
+      {w: 'os', s: 4080, e: 4170}, {w: 'papéis', s: 4270, e: 4560}, {w: 'da', s: 4560, e: 4600}, {w: 'documentação.', s: 5180, e: 5510}, {w: 'Com', s: 5990, e: 6100}];
     const r = quebrarEmSegmentos(ws, {max_caracteres: 84});
-    expect(r[0].texto).toBe('Antes de responder, entenda as regras da transferência.');
+    expect(r[0].texto).toBe('Antes de arquivar, separe os papéis da documentação.');
     expect(r[0].sai - r[0].em).toBeGreaterThanOrEqual(833);
     // sem caber, a palavra fraca vai para a próxima legenda, como no corte por largura
     const estreito = quebrarEmSegmentos(ws, {max_caracteres: 42});
-    expect(estreito.map((s) => s.texto)).toEqual(['Antes de responder, entenda as regras', 'da transferência.', 'Com']);
+    expect(estreito.map((s) => s.texto)).toEqual(['Antes de arquivar, separe os papéis', 'da documentação.', 'Com']);
     // pausa longa (1 s ou mais) fecha como antes
     const longa = quebrarEmSegmentos([{w: 'regras', s: 0, e: 300}, {w: 'da', s: 300, e: 400}, {w: 'casa.', s: 1500, e: 1900}], {max_caracteres: 42});
     expect(longa.map((s) => s.texto)).toEqual(['regras da', 'casa.']);
@@ -117,13 +121,13 @@ describe('quebrar as palavras em legendas', () => {
   });
 
   it('a palavra que sobra no fim da frase não fica sozinha: divide o texto com a legenda anterior', () => {
-    const ws = 'Primeira regra, a mudança de casa depende da sua concordância.'.split(' ').map((w, i) => ({w, s: i * 300, e: i * 300 + 250}));
-    expect(quebrarEmSegmentos(ws, {max_caracteres: 50}).map((s) => s.texto)).toEqual(['Primeira regra, a mudança de casa', 'depende da sua concordância.']);
+    const ws = 'Primeira dica, a pasta de holerites depende da sua organização.'.split(' ').map((w, i) => ({w, s: i * 300, e: i * 300 + 250}));
+    expect(quebrarEmSegmentos(ws, {max_caracteres: 50}).map((s) => s.texto)).toEqual(['Primeira dica, a pasta de holerites', 'depende da sua organização.']);
     // no corte por número de palavras, o artigo ou a preposição passa para a próxima
-    const fraca = 'Com o fim da produção de aço na usina'.split(' ').map((w, i) => ({w, s: i * 300, e: i * 300 + 250}));
-    // ("na usina" sobrou curta e se equilibra com a anterior)
+    const fraca = 'Com o fim da reunião de equipe na sala'.split(' ').map((w, i) => ({w, s: i * 300, e: i * 300 + 250}));
+    // ("na sala" sobrou curta e se equilibra com a anterior)
     const r = quebrarEmSegmentos(fraca, {max_caracteres: 50, max_palavras: 4}).map((s) => s.texto);
-    expect(r).toEqual(['Com o fim', 'da produção', 'de aço na usina']);
+    expect(r).toEqual(['Com o fim', 'da reunião', 'de equipe na sala']);
     // frase que acabou na anterior não se mistura
     const duas = quebrarEmSegmentos([{w: 'Sim.', s: 0, e: 200}, {w: 'Ok.', s: 300, e: 500}], {max_caracteres: 50});
     expect(duas.map((s) => s.texto)).toEqual(['Sim.', 'Ok.']);

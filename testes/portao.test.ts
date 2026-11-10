@@ -26,7 +26,7 @@ let resposta: {permitir: boolean; sempre?: boolean} = {permitir: true};
 
 beforeAll(async () => {
   pasta = mkdtempSync(path.join(tmpdir(), 'estudio-portao-'));
-  cpSync(path.join(__dirname, '..', 'exemplos', 'exemplo'), pasta, {recursive: true, filter: (f) => !f.endsWith('.mp4')});
+  cpSync(path.join(__dirname, 'fixtures', 'projeto'), pasta, {recursive: true, filter: (f) => !f.endsWith('.mp4')});
   const projeto = new Projeto(pasta);
   mcp = new McpHttp(path.join(pasta, '.config-teste'), () => projeto, undefined, async (p) => {
     pedidos.push(p);

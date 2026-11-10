@@ -1,6 +1,6 @@
-// A frente Fala pelo MCP: transcrever (os dois usos: um arquivo qualquer, como no roteiro da Cliente e na pesquisa, e os
+// A frente Fala pelo MCP: transcrever (os dois usos: um arquivo qualquer, como no roteiro do carrossel narrado e na pesquisa, e os
 // clipes de voz do vídeo de cenas, que viram legendas), exportar_legendas e importar_legendas. O transcritor é de mentira
-// (grava as palavras da narração do C2): o whisper de verdade fica em scripts/transcrever-teste.mjs.
+// (grava as palavras de uma narração sintética, testes/fixtures/carrossel): o whisper de verdade fica em scripts/transcrever-teste.mjs.
 import {mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
@@ -12,7 +12,7 @@ import {registrarFerramentas, type TranscritorMcp} from '../src/nucleo/ferrament
 import {novoDocCenas, type DocCenas} from '../src/nucleo/cenas';
 import {Projeto} from '../src/nucleo/projeto';
 
-const REFERENCIA = readFileSync(path.join(__dirname, '..', 'exemplos', 'exemplo', 'video', 'palavras.json'), 'utf-8');
+const REFERENCIA = readFileSync(path.join(__dirname, 'fixtures', 'carrossel', 'palavras.json'), 'utf-8');
 let pasta = '';
 let projeto: Projeto;
 const pedidos: {arquivo: string; destino?: string; modelo?: string}[] = [];
@@ -70,8 +70,8 @@ describe('MCP: transcrever e legendas', () => {
   it('um arquivo qualquer: grava as palavras ao lado (ou no destino) e devolve o texto', async () => {
     const c = await conectar(transcritor);
     const r = await chamar(c, 'transcrever', {arquivo: 'midia/fonte.mp4', destino: 'video/palavras.json', modelo: 'base'});
-    expect(r.json).toMatchObject({ok: true, palavras: 'video/palavras.json', n: 194});
-    expect(r.json.texto.startsWith('Recebeu proposta para mudar de cidade?')).toBe(true);
+    expect(r.json).toMatchObject({ok: true, palavras: 'video/palavras.json', n: 192});
+    expect(r.json.texto.startsWith('Perdeu um papel importante bem na hora de usar?')).toBe(true);
     expect(pedidos.at(-1)).toMatchObject({arquivo: 'midia/fonte.mp4', destino: 'video/palavras.json', modelo: 'base'});
     expect((await chamar(c, 'transcrever', {arquivo: 'midia/fonte.mp4', destino: 'video/palavras.txt'})).erro).toBe(true);
   });
@@ -83,9 +83,10 @@ describe('MCP: transcrever e legendas', () => {
     expect(r.erro).toBe(false);
     expect(pedidos).toEqual([{arquivo: 'midia/narracao.wav', modelo: undefined, vocabulario: undefined, destino: undefined, pela_ia: true}]);
     expect(r.json.legendas).toBeGreaterThan(20);
-    // karaokê: até 4 palavras por legenda, e "de cidade?" não fica sozinha; a primeira palavra da narração começa no zero
+    // karaokê: até 4 palavras por legenda, e "usar?" não fica sozinha; a primeira palavra da narração começa no zero
     // do arquivo, que está em 500 ms
-    expect(r.json.primeiras.slice(0, 2)).toMatchObject([{id: 'leg-1', em: 500, texto: 'Recebeu proposta', falante: 'Narração'}, {texto: 'para mudar de cidade?'}]);
+    expect(r.json.primeiras.slice(0, 3)).toMatchObject([{id: 'leg-1', em: 500, texto: 'Perdeu um papel', falante: 'Narração'}, {texto: 'importante bem'},
+      {texto: 'na hora de usar?'}]);
     const doc = lerVideo();
     expect(doc.legendas?.estilo?.predefinicao).toBe('karaoke');
     expect(doc.legendas?.origens?.[0]).toMatchObject({clipe: 'clipe-1', palavras: 'midia/narracao.wav.palavras.json', em: 500});
@@ -102,19 +103,19 @@ describe('MCP: transcrever e legendas', () => {
     expect(lerVideo().legendas).toEqual(antes);
     // refazer_legendas refaz, no estilo pedido, e a palavra corrigida à mão fica
     const atual = lerVideo();
-    const i = atual.legendas!.segmentos.findIndex((s) => s.texto.includes('cidade?'));
+    const i = atual.legendas!.segmentos.findIndex((s) => s.texto.includes('usar?'));
     const seg = atual.legendas!.segmentos[i];
-    const j = seg.palavras!.findIndex((w) => w.w === 'cidade?');
+    const j = seg.palavras!.findIndex((w) => w.w === 'usar?');
     projeto.aplicarPatch({documento: 'video/video.json', versao_base: projeto.lerJson('video/video.json').versao, autor: 'pessoa', origem: 'interface',
-      patch: [{op: 'replace', path: `/legendas/segmentos/${i}/texto`, value: seg.texto.replace('cidade?', 'Cidade?')},
-        {op: 'replace', path: `/legendas/segmentos/${i}/palavras/${j}/w`, value: 'Cidade?'}]});
+      patch: [{op: 'replace', path: `/legendas/segmentos/${i}/texto`, value: seg.texto.replace('usar?', 'Usar?')},
+        {op: 'replace', path: `/legendas/segmentos/${i}/palavras/${j}/w`, value: 'Usar?'}]});
     const r3 = await chamar(c, 'transcrever', {documento: 'video', estilo: 'classica', refazer_legendas: true});
     expect(r3.json).toMatchObject({corrigidas_a_mao_mantidas: 1});
     expect(r3.json.geradas).toBeGreaterThan(10);
     const refeitas = lerVideo().legendas!;
     expect(refeitas.estilo?.predefinicao).toBe('classica');
-    expect(refeitas.segmentos.some((s) => s.texto.includes('Cidade?'))).toBe(true);
-    expect(refeitas.segmentos.some((s) => s.texto.includes('cidade?'))).toBe(false);
+    expect(refeitas.segmentos.some((s) => s.texto.includes('Usar?'))).toBe(true);
+    expect(refeitas.segmentos.some((s) => s.texto.includes('usar?'))).toBe(false);
   });
 
   it('clipe de voz limpa: a fala é a do original, que já tem transcrição; tomada regravada transcreve de novo sem mexer nas legendas', async () => {

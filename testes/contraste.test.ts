@@ -28,7 +28,7 @@ describe("contraste da marca d'água", () => {
 
   it('a placa que mais contrasta com a marca: escura para marca clara, clara para marca escura', () => {
     expect(placaParaMarca([250, 250, 250])).toBe('escura');
-    expect(placaParaMarca([200, 129, 85])).toBe('escura'); // o cobre da Cliente
+    expect(placaParaMarca([200, 129, 85])).toBe('escura'); // um cobre
     expect(placaParaMarca([20, 20, 20])).toBe('clara');
   });
 

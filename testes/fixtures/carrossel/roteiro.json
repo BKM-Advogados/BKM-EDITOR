@@ -38,13 +38,13 @@
           "y": 560,
           "tam": 50,
           "texto": "Antes de procurar, **organize os seus documentos.**",
-          "em": "Antes@3300",
+          "em": "Antes@3000",
           "id": "gancho-frase-1"
         },
         {
           "tipo": "foto",
           "y": 760,
-          "em": "pasta@8700",
+          "em": "pasta@7900",
           "id": "gancho-foto-1"
         }
       ],
@@ -52,7 +52,7 @@
     },
     {
       "tipo": "parte",
-      "inicio": "Primeira@13700",
+      "inicio": "Primeira@12700",
       "pausa": 1200,
       "tag": "Primeira dica",
       "titulo": "Separe tudo por assunto",
@@ -65,26 +65,26 @@
           "itens": [
             {
               "texto": "Contrato",
-              "em": "Contrato@16900",
+              "em": "Contrato@15800",
               "id": "parte1-itens-1-item-1"
             },
             {
               "texto": "Holerites",
-              "em": "holerites@17700",
+              "em": "holerites@16800",
               "id": "parte1-itens-1-item-2"
             },
             {
               "texto": "Recibos",
-              "em": "recibos@18600",
+              "em": "recibos@17500",
               "id": "parte1-itens-1-item-3"
             },
             {
               "texto": "Extratos",
-              "em": "extratos@19200",
+              "em": "extratos@18200",
               "id": "parte1-itens-1-item-4"
             }
           ],
-          "sai": "quatro@22300-150",
+          "sai": "quatro@21100-150",
           "id": "parte1-itens-1"
         },
         {
@@ -92,7 +92,7 @@
           "y": 640,
           "texto": "4 PASTAS",
           "rotulo": "uma para cada tipo",
-          "em": "quatro@22300",
+          "em": "quatro@21100",
           "id": "parte1-grande-1"
         },
         {
@@ -100,7 +100,7 @@
           "y": 1150,
           "tam": 33,
           "texto": "Uma **etiqueta grande** na frente de cada pasta.",
-          "em": "etiqueta@26600",
+          "em": "etiqueta@25100",
           "id": "parte1-cartao-1"
         }
       ],
@@ -108,7 +108,7 @@
     },
     {
       "tipo": "parte",
-      "inicio": "Segunda@31600",
+      "inicio": "Segunda@29800",
       "tag": "Segunda dica",
       "titulo": "Guarde pelo tempo certo",
       "blocos": [
@@ -117,7 +117,7 @@
           "y": 570,
           "tam": 56,
           "texto": "Holerites e recibos de **férias**",
-          "em": "Holerites@34800",
+          "em": "Holerites@32700",
           "id": "parte2-frase-1"
         },
         {
@@ -127,8 +127,8 @@
           "ate": 5,
           "tam": 210,
           "rotulo": "anos, pelo menos",
-          "em": "5@38900",
-          "sai": "extrato@40100-150",
+          "em": "5@36700",
+          "sai": "extrato@37900-150",
           "id": "parte2-numero-1"
         },
         {
@@ -138,19 +138,19 @@
           "largura": 760,
           "texto": "EXTRATO DO FGTS",
           "nota": "CÓPIA EM PDF · TODO MÊS",
-          "em": "extrato@40100",
+          "em": "extrato@37900",
           "carimbo": {
             "texto": "SALVO",
-            "em": "PDF@45300"
+            "em": "PDF@42700"
           },
-          "sai": "Papel@46700-150",
+          "sai": "Papel@44000-150",
           "id": "parte2-documento-1"
         },
         {
           "tipo": "carimbo",
           "y": 900,
           "texto": "CONTINUA VALENDO",
-          "em": "continua@48400",
+          "em": "continua@45800",
           "id": "parte2-carimbo-1"
         }
       ],
@@ -158,7 +158,7 @@
     },
     {
       "tipo": "parte",
-      "inicio": "Terceira@51600",
+      "inicio": "Terceira@49000",
       "tag": "Terceira dica",
       "titulo": "Digitalize o que importa",
       "blocos": [
@@ -170,16 +170,16 @@
             {
               "rotulo": "resolvido com uma foto",
               "valor": 90,
-              "em": "90@57000",
+              "em": "90@54200",
               "destaque": true
             },
             {
               "rotulo": "precisa do papel",
               "valor": 10,
-              "em": "casos@57800"
+              "em": "casos@54900"
             }
           ],
-          "sai": "nomes@58900-150",
+          "sai": "nomes@56000-150",
           "id": "parte3-comparacao-1"
         },
         {
@@ -189,17 +189,17 @@
           "itens": [
             {
               "texto": "Nomes claros",
-              "em": "nomes@58900",
+              "em": "nomes@56000",
               "id": "parte3-itens-1-item-1"
             },
             {
               "texto": "A data na frente",
-              "em": "data@61300",
+              "em": "data@58300",
               "id": "parte3-itens-1-item-2"
             },
             {
               "texto": "Uma cópia na **nuvem**",
-              "em": "nuvem@64100",
+              "em": "nuvem@61200",
               "id": "parte3-itens-1-item-3"
             }
           ],
@@ -216,12 +216,12 @@
             {
               "v": 0,
               "rotulo": "HOJE",
-              "em": "Revise@71800"
+              "em": "Revise@68500"
             },
             {
               "v": 3,
               "rotulo": "3 MESES",
-              "em": "três@73400"
+              "em": "três@70000"
             }
           ],
           "faixas": [
@@ -229,7 +229,7 @@
               "de": 0,
               "ate": 3,
               "rotulo": "revisão",
-              "em": "meses@73800",
+              "em": "meses@70400",
               "tom": "destaque"
             }
           ],
@@ -240,14 +240,14 @@
     },
     {
       "tipo": "duvida",
-      "inicio": "Ficou@76400",
+      "inicio": "Ficou@72800",
       "pausa": 500,
       "id": "duvida"
     }
   ],
   "pausas": [
     {
-      "depois_de": "documentos@7000",
+      "depois_de": "documentos@6400",
       "ms": 400
     }
   ]

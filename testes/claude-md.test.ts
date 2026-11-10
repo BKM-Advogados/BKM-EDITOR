@@ -10,7 +10,7 @@ import {HASHES_DO_TEXTO_ANTIGO, hashDaLinha, linhaDoTextoAntigo} from '../src/nu
 
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'estudio-claude-md-'));
 afterAll(() => rmSync(tmp, {recursive: true, force: true}));
-const EXEMPLO = path.join(__dirname, '..', 'exemplos', 'exemplo');
+const EXEMPLO = path.join(__dirname, 'fixtures', 'projeto');
 
 // o texto que a 0.3.0 gravava, tal como o `claudeMd` do commit 580050c o gerava (sem as marcas), por módulo
 const texto030 = (modulo: 'video' | 'imagem') => readFileSync(path.join(__dirname, 'fixtures', `claude-md-030-${modulo}.md`), 'utf-8');

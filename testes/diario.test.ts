@@ -11,7 +11,7 @@ import {Projeto} from '../src/nucleo/projeto';
 let pasta = '';
 beforeEach(() => {
   pasta = mkdtempSync(path.join(tmpdir(), 'estudio-diario-'));
-  cpSync(path.join(__dirname, '..', 'exemplos', 'exemplo'), pasta, {recursive: true, filter: (f) => !f.endsWith('.mp4')});
+  cpSync(path.join(__dirname, 'fixtures', 'projeto'), pasta, {recursive: true, filter: (f) => !f.endsWith('.mp4')});
 });
 afterEach(() => rmSync(pasta, {recursive: true, force: true, maxRetries: 10, retryDelay: 100}));
 

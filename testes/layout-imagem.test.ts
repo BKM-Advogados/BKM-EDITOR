@@ -17,7 +17,7 @@ import {
 } from '../src/nucleo/layout-imagem';
 import {alternarNaSelecao, caminhosDaSelecao, loja, selecionarVarias} from '../src/renderer/estado/loja';
 
-const EXEMPLO = path.join(__dirname, '..', 'exemplos', 'exemplo');
+const EXEMPLO = path.join(__dirname, 'fixtures', 'projeto');
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'estudio-layout-'));
 afterAll(() => rmSync(tmp, {recursive: true, force: true}));
 

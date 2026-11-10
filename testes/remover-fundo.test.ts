@@ -21,7 +21,7 @@ import {
 } from '../src/nucleo/remover-fundo';
 import {arquivoDoModelo, baixarModelo, estadoDoModelo, gravarSemFundo, lerModelo, marcarOrigem, origemMarcada} from '../src/main/remover-fundo';
 
-const EXEMPLO = path.join(__dirname, '..', 'exemplos', 'exemplo');
+const EXEMPLO = path.join(__dirname, 'fixtures', 'projeto');
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'estudio-fundo-'));
 afterAll(() => rmSync(tmp, {recursive: true, force: true}));
 afterEach(() => definirRemovedorDeFundo(null));
@@ -204,17 +204,17 @@ describe('ferramenta remover_fundo', () => {
     });
     const r = await m.chamar({documento: 'capa', camada: 'foto'});
     expect(r.erro).toBe(false);
-    expect(r.dado).toMatchObject({ok: true, camada: '/camadas/0', src: caminhoSemFundo('midia/Cidade Exemplo.jpg'), src_original: 'midia/Cidade Exemplo.jpg', modelo: 'modnet', tempo_modelo_ms: 321});
-    expect(pedidos).toEqual(['midia/Cidade Exemplo.jpg']);
-    expect(m.capa().camadas[0]).toMatchObject({src: caminhoSemFundo('midia/Cidade Exemplo.jpg'), src_original: 'midia/Cidade Exemplo.jpg'});
+    expect(r.dado).toMatchObject({ok: true, camada: '/camadas/0', src: caminhoSemFundo('midia/foto.jpg'), src_original: 'midia/foto.jpg', modelo: 'modnet', tempo_modelo_ms: 321});
+    expect(pedidos).toEqual(['midia/foto.jpg']);
+    expect(m.capa().camadas[0]).toMatchObject({src: caminhoSemFundo('midia/foto.jpg'), src_original: 'midia/foto.jpg'});
     // o original ficou intacto
-    expect(readFileSync(path.join(m.pasta, 'midia', 'Cidade Exemplo.jpg'))).toEqual(readFileSync(path.join(EXEMPLO, 'midia', 'Cidade Exemplo.jpg')));
+    expect(readFileSync(path.join(m.pasta, 'midia', 'foto.jpg'))).toEqual(readFileSync(path.join(EXEMPLO, 'midia', 'foto.jpg')));
     expect(m.projeto.diario().at(-1)).toMatchObject({autor: 'agente', rotulo: 'fundo removido de foto'});
     // de novo, pelo caminho: o modelo recebe o original, não o sem fundo
     await m.chamar({documento: 'capa', camada: '/camadas/0'});
-    expect(pedidos.at(-1)).toBe('midia/Cidade Exemplo.jpg');
+    expect(pedidos.at(-1)).toBe('midia/foto.jpg');
     const volta = await m.chamar({documento: 'capa', camada: 'foto', voltar: true});
-    expect(volta.dado).toMatchObject({ok: true, src: 'midia/Cidade Exemplo.jpg'});
+    expect(volta.dado).toMatchObject({ok: true, src: 'midia/foto.jpg'});
     expect(m.capa().camadas[0]).not.toHaveProperty('src_original');
     expect((await m.chamar({documento: 'capa', camada: 'foto', voltar: true})).texto).toMatch(/não guardou o original/);
     expect((await m.chamar({documento: 'capa', camada: 'titulo'})).texto).toMatch(/não é uma camada de imagem/);
@@ -238,8 +238,8 @@ describe('ferramenta remover_fundo', () => {
     expect(r.erro).toBe(false);
     expect(r.dado.camada).toBe('/paginas/1/camadas/0');
     const doc = m.capa();
-    expect(doc.paginas![1].camadas[0]).toMatchObject({src: caminhoSemFundo('midia/Cidade Exemplo.jpg'), src_original: 'midia/Cidade Exemplo.jpg'});
-    expect(doc.paginas![0].camadas[0].src).toBe('midia/Cidade Exemplo.jpg');
+    expect(doc.paginas![1].camadas[0]).toMatchObject({src: caminhoSemFundo('midia/foto.jpg'), src_original: 'midia/foto.jpg'});
+    expect(doc.paginas![0].camadas[0].src).toBe('midia/foto.jpg');
     expect(doc.paginas![0].camadas[0]).not.toHaveProperty('src_original');
     // pelo id, que agora está nas duas páginas: recusa e diz os caminhos
     const ambiguo = await m.chamar({documento: 'capa', camada: 'foto'});
@@ -261,10 +261,10 @@ describe('ferramenta remover_fundo', () => {
     const antes = await m.chamar({documento: 'capa', camada: '/paginas/1/camadas/0'});
     expect(antes.erro).toBe(true);
     expect(antes.texto).toMatch(/saiu de \/paginas\/1\/camadas\/0.*agora ali está nova.*o documento não mudou/);
-    expect(antes.texto).toContain(caminhoSemFundo('midia/Cidade Exemplo.jpg'));
+    expect(antes.texto).toContain(caminhoSemFundo('midia/foto.jpg'));
     const doc = m.capa();
     expect(doc.paginas!.flatMap((p) => p.camadas).every((c) => c.src_original === undefined)).toBe(true);
-    expect(existsSync(path.join(m.pasta, caminhoSemFundo('midia/Cidade Exemplo.jpg')))).toBe(true);
+    expect(existsSync(path.join(m.pasta, caminhoSemFundo('midia/foto.jpg')))).toBe(true);
     await m.fechar();
   }, 30_000);
 });

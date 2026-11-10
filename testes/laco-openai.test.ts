@@ -20,7 +20,7 @@ let base = '';
 
 beforeAll(async () => {
   pasta = mkdtempSync(path.join(tmpdir(), 'estudio-laco-'));
-  cpSync(path.join(__dirname, '..', 'exemplos', 'exemplo'), pasta, {recursive: true, filter: (f) => !f.endsWith('.mp4')});
+  cpSync(path.join(__dirname, 'fixtures', 'projeto'), pasta, {recursive: true, filter: (f) => !f.endsWith('.mp4')});
   const projeto = new Projeto(pasta);
   mcp = new McpHttp(path.join(pasta, '.config-teste'), () => projeto);
   servidor = http.createServer((req, res) => void mcp.atender(req, res).then((ok) => ok || res.writeHead(404).end()));
@@ -52,7 +52,7 @@ const montar = async (origem: string, conexao: {base: string; chave?: string; mo
 
 describe('laço próprio no formato OpenAI', () => {
   it('provedor com chave: lê, aplica o patch com a origem da aba, devolve o raciocínio e soma o uso', async () => {
-    const api = await criarApiFalsa({chave: 'sk-segredo-123', roteiro: roteiroDoAnel('#C88155', '#E4B492')});
+    const api = await criarApiFalsa({chave: 'sk-segredo-123', roteiro: roteiroDoAnel('#4A90D9', '#9CC8F5')});
     const {laco, eventos} = await montar('DeepSeek 1', {base: api.url, chave: 'sk-segredo-123', modelo: 'deepseek-flash'});
     await laco.enviar('Deixe o anel mais claro.');
     await laco.fechar();
@@ -76,7 +76,7 @@ describe('laço próprio no formato OpenAI', () => {
   });
 
   it('modelo local sem chave: lista os modelos e conversa sem cabeçalho de autorização', async () => {
-    const api = await criarApiFalsa({modelos: ['llama3.2', 'qwen2.5'], roteiro: roteiroDoAnel('#E4B492', '#F0D0B8')});
+    const api = await criarApiFalsa({modelos: ['llama3.2', 'qwen2.5'], roteiro: roteiroDoAnel('#9CC8F5', '#C8E0F8')});
     const lista = await (await fetch(`${api.url}/models`)).json();
     expect(lista.data.map((m: {id: string}) => m.id)).toEqual(['llama3.2', 'qwen2.5']);
     const {laco, eventos} = await montar('Ollama 1', {base: api.url, modelo: 'llama3.2'});

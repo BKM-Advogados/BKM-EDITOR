@@ -1,6 +1,6 @@
 // Acabamento da imagem: os valores padrão e a leitura calma da sombra, do contorno e do degradê; a geometria do
 // degradê (a mesma do CSS), a caixa que a pintura ocupa, a máscara de recorte (quem recorta quem, recortar, soltar e
-// subir ou descer com a máscara junto), as predefinições do kit e a capa da Cliente sem acabamento nenhum (abre igual).
+// subir ou descer com a máscara junto), as predefinições do kit e a capa do projeto de teste sem acabamento nenhum (abre igual).
 import {readFileSync} from 'node:fs';
 import path from 'node:path';
 import jsonpatch, {type Operation} from 'fast-json-patch';
@@ -13,7 +13,7 @@ import {acharCamada} from '../src/nucleo/carrossel';
 import type {CamadaImagem, DocImagem, OperacaoPatch} from '../src/nucleo/documentos';
 import {MARCA_BKM, MARCA_CLIENTE, MARCAS_INICIAIS} from '../src/nucleo/marca';
 
-const EXEMPLO = path.join(__dirname, '..', 'exemplos', 'exemplo');
+const EXEMPLO = path.join(__dirname, 'fixtures', 'projeto');
 const capa = (): DocImagem => JSON.parse(readFileSync(path.join(EXEMPLO, 'imagem', 'capa.json'), 'utf-8')) as DocImagem;
 const aplicar = <T,>(doc: T, patch: OperacaoPatch[]): T => jsonpatch.applyPatch(structuredClone(doc), patch as Operation[], true, false).newDocument;
 
@@ -47,7 +47,7 @@ describe('leitura do acabamento', () => {
     expect(temAcabamento(camada('i', 'imagem', {contorno: {espessura: 4}}))).toBe(true);
   });
 
-  it('a capa da Cliente não tem acabamento: abre igual, toda em DOM', () => {
+  it('a capa do projeto de teste não tem acabamento: abre igual, toda em DOM', () => {
     const doc = capa();
     expect(doc.camadas.some(temAcabamento)).toBe(false);
     expect(itensDePintura(doc.camadas).map((x) => x.c.id)).toEqual(doc.camadas.filter((c) => c.visivel !== false).map((c) => c.id));

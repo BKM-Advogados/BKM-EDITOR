@@ -214,7 +214,7 @@ describe('leitura do loudnorm', () => {
   });
 });
 
-describe('loudness do carrossel narrado da Cliente (som-D5)', () => {
+describe('loudness do carrossel narrado (som-D5)', () => {
   const FFMPEG = path.join('node_modules', '@remotion', `compositor-${process.platform}-${process.arch}${process.platform === 'win32' ? '-msvc' : ''}`, process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
   it.skipIf(!existsSync(FFMPEG))('o MP4 do carrossel com narração a −26 LUFS sai em −14 LUFS e pico até −1 dBTP; sem narração, nada muda', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'estudio-d5-'));

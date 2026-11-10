@@ -26,7 +26,7 @@ const chamar = async (name: string, args: Record<string, unknown> = {}) => {
 beforeAll(async () => {
   execSync("npm run mcp:build", {cwd: RAIZ, stdio: "ignore"});
   pasta = mkdtempSync(path.join(tmpdir(), "estudio-anim-mcp-"));
-  cpSync(path.join(RAIZ, "exemplos", "exemplo"), pasta, {recursive: true, filter: (f) => !f.endsWith(".mp4")});
+  cpSync(path.join(RAIZ, "testes", "fixtures", "projeto"), pasta, {recursive: true, filter: (f) => !f.endsWith(".mp4")});
   cliente = new Client({name: "teste-animacao", version: "0"});
   const env = Object.fromEntries(
     Object.entries({...process.env, ESTUDIO_MARCAS: path.join(pasta, ".marcas-teste")}).filter(([, v]) => v !== undefined)
@@ -124,7 +124,7 @@ describe("Ferramentas MCP de Animação", () => {
     const r = await chamar("pixelizar_imagem", {
       documento: docId,
       camada_id: pixel.id,
-      imagem_src: "midia/logo-exemplo.png",
+      imagem_src: "midia/logo.png",
       colunas: 16,
       linhas: 16,
       cores: 4,

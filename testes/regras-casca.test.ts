@@ -53,7 +53,7 @@ describe('checar_texto lê as legendas do vídeo de cenas (transversal-N5)', () 
   let pasta = '';
   beforeAll(() => {
     pasta = mkdtempSync(path.join(tmpdir(), 'estudio-regras-'));
-    cpSync(path.join(__dirname, '..', 'exemplos', 'exemplo'), pasta, {recursive: true, filter: (f) => !f.endsWith('.mp4')});
+    cpSync(path.join(__dirname, 'fixtures', 'projeto'), pasta, {recursive: true, filter: (f) => !f.endsWith('.mp4')});
   });
   afterAll(() => rmSync(pasta, {recursive: true, force: true}));
 

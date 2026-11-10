@@ -1,4 +1,4 @@
-// Carrossel de páginas na imagem: documento de uma prancheta só vira páginas em memória (sem reescrever a capa da Cliente),
+// Carrossel de páginas na imagem: documento de uma prancheta só vira páginas em memória (sem reescrever a capa do projeto de teste),
 // criar, duplicar, reordenar, renomear e excluir páginas por patch, o modelo "Novo carrossel" e a exportação em PNG
 // por página e PDF (lido de volta: N páginas, cada uma do tamanho da imagem).
 import {existsSync, mkdtempSync, readdirSync, readFileSync, rmSync} from 'node:fs';
@@ -13,7 +13,7 @@ import {baseCamadas, caminhoPagina, docCarrossel, idLivre, indiceNaBase, indiceP
 import type {DocImagem, OperacaoPatch} from '../src/nucleo/documentos';
 import {gravarPaginas, pdfDasPaginas} from '../src/main/exportar-paginas';
 
-const EXEMPLO = path.join(__dirname, '..', 'exemplos', 'exemplo');
+const EXEMPLO = path.join(__dirname, 'fixtures', 'projeto');
 const capa = (): DocImagem => JSON.parse(readFileSync(path.join(EXEMPLO, 'imagem', 'capa.json'), 'utf-8')) as DocImagem;
 const aplicar = (doc: DocImagem, patch: OperacaoPatch[]): DocImagem => jsonpatch.applyPatch(structuredClone(doc), patch as Operation[], true, false).newDocument;
 
@@ -21,7 +21,7 @@ const tmp = mkdtempSync(path.join(os.tmpdir(), 'estudio-carrossel-'));
 afterAll(() => rmSync(tmp, {recursive: true, force: true}));
 
 describe('documento sem páginas', () => {
-  it('a capa da Cliente vale como uma página só, sem mudar o arquivo', () => {
+  it('a capa do projeto de teste vale como uma página só, sem mudar o arquivo', () => {
     const doc = capa();
     expect(temPaginas(doc)).toBe(false);
     const paginas = paginasDe(doc);

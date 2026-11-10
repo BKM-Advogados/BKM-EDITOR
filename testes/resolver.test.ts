@@ -53,7 +53,7 @@ describe('resolver do roteiro', () => {
     expect(Math.max(...legendas.map((l) => l.palavras.length))).toBeLessThanOrEqual(4);
     const todas = legendas.flatMap((l) => l.palavras.map((p) => p.w));
     expect(todas).toContain('90%');
-    expect(todas).toContain('seguro-desemprego,');
+    expect(todas).toContain('e-mail,');
     expect(todas).toHaveLength(palavras.length - 2);
   });
 

@@ -34,7 +34,7 @@ const portaLivre = () => new Promise<number>((ok) => {
 beforeAll(async () => {
   pasta = mkdtempSync(path.join(tmpdir(), 'estudio-apps-'));
   dados = mkdtempSync(path.join(tmpdir(), 'estudio-apps-dados-'));
-  cpSync(path.join(__dirname, '..', 'exemplos', 'exemplo'), pasta, {recursive: true, filter: (f) => !f.endsWith('.mp4')});
+  cpSync(path.join(__dirname, 'fixtures', 'projeto'), pasta, {recursive: true, filter: (f) => !f.endsWith('.mp4')});
   const projeto = new Projeto(pasta);
   mcp = new McpHttp(path.join(pasta, '.config-teste'), () => projeto, undefined, async (p) => (pedidos.push(p), {permitir: true}));
   apps = new AppsDeFora({pasta: dados, cofre, mcp: () => mcp, ponte: () => ({exe: process.execPath, script: PONTE})});

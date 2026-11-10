@@ -24,7 +24,7 @@ vi.mock('remotion', async (original) => ({
   useVideoConfig: () => ({fps: 30, width: 1080, height: 1920, durationInFrames: 1, id: 'x', defaultProps: {}, props: {}}),
 }));
 const TEMA = novoDocCenas({largura: 1080, altura: 1920, fps: 30}).tema;
-const FALA_C2 = JSON.parse(readFileSync(path.join(__dirname, '..', 'exemplos', 'exemplo', 'video', 'palavras.json'), 'utf-8')) as {w: string; s: number; e: number}[];
+const FALA_TESTE = JSON.parse(readFileSync(path.join(__dirname, 'fixtures', 'carrossel', 'palavras.json'), 'utf-8')) as {w: string; s: number; e: number}[];
 
 const SRT = '1\r\n00:00:01,000 --> 00:00:02,500\r\nA rescisão e o aviso prévio\r\n\r\n2\r\n00:00:03,000 --> 00:00:04,000\r\nmudança de função\r\n';
 /** Windows-1252: ã = E3, é = E9, ç = E7 (o "ANSI" do Bloco de Notas). */
@@ -219,8 +219,8 @@ describe('régua: pausa de 300 ms, 833 ms a 7 s e 17 caracteres por segundo', ()
     expect(cpsDe({texto: 'linha um\nlinha dois', em: 0, sai: 1000})).toBe(19);
   });
 
-  it('na narração do C2, a régua vale em toda legenda que tem vão para isso', () => {
-    const segs = quebrarEmSegmentos(FALA_C2, {max_caracteres: 84});
+  it('na narração de teste, a régua vale em toda legenda que tem vão para isso', () => {
+    const segs = quebrarEmSegmentos(FALA_TESTE, {max_caracteres: 84});
     for (const [i, s] of segs.entries()) {
       expect(s.sai - s.em).toBeLessThanOrEqual(7000);
       const vao = (segs[i + 1]?.em ?? Infinity) - s.em;
@@ -272,9 +272,9 @@ describe('linhas: 42 caracteres, corte equilibrado sem palavra fraca no fim e la
   });
 
   for (const [largura, altura] of [[1920, 1080], [1080, 1920], [1080, 1350]] as const) {
-    it(`a narração do C2 em ${largura}×${altura}: toda legenda cabe em duas linhas medidas, de até 42 caracteres`, () => {
+    it(`a narração de teste em ${largura}×${altura}: toda legenda cabe em duas linhas medidas, de até 42 caracteres`, () => {
       for (const predefinicao of ['classica', 'karaoke', 'caixa'] as const) {
-        const leg = legendasDaFala([{clipe: {id: 'n1', arquivo: 'a.wav', em: 0, duracao_ms: 80_000}, faixa: {}, palavras: FALA_C2, caminhoPalavras: 'x'}],
+        const leg = legendasDaFala([{clipe: {id: 'n1', arquivo: 'a.wav', em: 0, duracao_ms: 80_000}, faixa: {}, palavras: FALA_TESTE, caminhoPalavras: 'x'}],
           {estilo: {predefinicao}, largura, altura, fonte: 'Inter'});
         const cap = capacidadeDaLegenda({predefinicao, fonte: 'Inter'}, largura, altura);
         for (const s of leg.segmentos) {
@@ -470,7 +470,7 @@ describe('legendas na exportação: queimar, só o SRT ou os dois, por destino',
 });
 
 describe('VAD: o tempo das palavras volta ao relógio do arquivo e o que não é fala não vira palavra', () => {
-  // o que o whisper-cli escreve no stderr com --vad (medido na narração do C2 depois de 14 s de silêncio e música)
+  // o que o whisper-cli escreve no stderr com --vad (medido numa narração depois de 14 s de silêncio e música)
   const LOG = [
     'whisper_vad: vad_segment_info: orig_start: 14.27, orig_end: 16.22, vad_start: 0.00, vad_end: 1.95',
     'whisper_vad: vad_segment_info: orig_start: 16.74, orig_end: 19.58, vad_start: 2.15, vad_end: 4.99',

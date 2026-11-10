@@ -28,7 +28,7 @@ const PREAMBULO = `<p>${'Texto de enchimento para a página não parecer curta d
 
 beforeAll(async () => {
   pasta = mkdtempSync(path.join(tmpdir(), 'estudio-pesquisa-'));
-  cpSync(path.join(__dirname, '..', 'exemplos', 'exemplo'), pasta, {recursive: true, filter: (f) => !f.endsWith('.mp4')});
+  cpSync(path.join(__dirname, 'fixtures', 'projeto'), pasta, {recursive: true, filter: (f) => !f.endsWith('.mp4')});
   servidorHttp = http.createServer((req, res) => {
     if (req.url === '/del5452compilado.htm') return void res.writeHead(200, {'Content-Type': 'text/html; charset=windows-1252'}).end(HTML);
     if (req.url === '/antigo') return void res.writeHead(302, {Location: '/del5452compilado.htm'}).end();

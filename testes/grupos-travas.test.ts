@@ -19,7 +19,7 @@ import {destravando, motivoDaTrava} from '../src/nucleo/travas-imagem';
 import {definirRemovedorDeFundo} from '../src/nucleo/remover-fundo';
 import {gravarSemFundo} from '../src/main/remover-fundo';
 
-const EXEMPLO = path.join(__dirname, '..', 'exemplos', 'exemplo');
+const EXEMPLO = path.join(__dirname, 'fixtures', 'projeto');
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'estudio-grupos-'));
 afterAll(() => rmSync(tmp, {recursive: true, force: true}));
 afterEach(() => definirRemovedorDeFundo(null));
@@ -180,7 +180,7 @@ describe('ferramentas de grupo e trava', () => {
     expect(r.dado.camada).toBe('/paginas/1/camadas/0');
     const d = m.capa();
     expect(d.paginas![1].id).toBe('p1');
-    expect(d.paginas![1].camadas[0].src_original).toBe('midia/Cidade Exemplo.jpg');
+    expect(d.paginas![1].camadas[0].src_original).toBe('midia/foto.jpg');
     expect(d.paginas![0].camadas[0].src_original).toBeUndefined();
     await m.fechar();
   }, 30_000);

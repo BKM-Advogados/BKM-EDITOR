@@ -89,7 +89,7 @@ describe("marca d'água", () => {
     expect(texto.largura).toBeGreaterThan(texto.altura * (1920 / 1080));
   });
 
-  it('o logo e a assinatura vêm do tema do vídeo de cenas ou, no carrossel da Cliente, do logo e do Instagram', () => {
+  it('o logo e a assinatura vêm do tema do vídeo de cenas ou, no carrossel narrado, do logo e do Instagram', () => {
     const doc = {...novoDocCenas({largura: 1080, altura: 1920, fps: 30}), tema: temaDaMarca(MARCA_CLIENTE, {logo: 'midia/logo-exemplo.png', fontes_arquivos: []})};
     const {props} = resolverCenas(doc);
     expect(fontesDaMarcaDagua(props as unknown as Record<string, unknown>)).toEqual({logo: 'midia/logo-exemplo.png', assinatura: '@escritorioexemplo', fonte: 'Archivo'});

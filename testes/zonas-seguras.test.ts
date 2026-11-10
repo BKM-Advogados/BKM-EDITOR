@@ -60,7 +60,7 @@ describe('zonas seguras', () => {
   });
 });
 
-describe('legenda do carrossel da Cliente (video-D17)', () => {
+describe('legenda do carrossel narrado (video-D17)', () => {
   it('acaba acima da faixa que a rede cobre embaixo no 9:16, com respiro', async () => {
     const {baseDaLegendaCarrossel} = await import('../src/nucleo/zonas-seguras');
     const faixa = conjuntoDe('vertical')!.zonas.find((z) => z.tipo === 'coberta' && z.largura >= 0.99 && z.y > 0.5)!;

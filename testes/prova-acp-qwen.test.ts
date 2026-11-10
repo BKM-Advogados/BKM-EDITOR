@@ -31,7 +31,7 @@ const memoriaMb = (pid: number) => {
 describe.skipIf(!QWEN)('F0: Qwen Code por ACP com a API falsa e o MCP estudio', () => {
   it('lê, pede permissão, aplica o patch com a origem da aba e termina', async () => {
     const pasta = mkdtempSync(path.join(tmpdir(), 'estudio-f0-'));
-    cpSync(path.join(__dirname, '..', 'exemplos', 'exemplo'), pasta, {recursive: true, filter: (f) => !f.endsWith('.mp4')});
+    cpSync(path.join(__dirname, 'fixtures', 'projeto'), pasta, {recursive: true, filter: (f) => !f.endsWith('.mp4')});
     const casa = path.join(pasta, '.casa-qwen');
     mkdirSync(casa, {recursive: true});
     limpar.push(() => rmSync(pasta, {recursive: true, force: true}));

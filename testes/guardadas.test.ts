@@ -22,7 +22,7 @@ let base = '';
 
 beforeAll(async () => {
   pasta = mkdtempSync(path.join(tmpdir(), 'estudio-guardadas-'));
-  cpSync(path.join(__dirname, '..', 'exemplos', 'exemplo'), pasta, {recursive: true, filter: (f) => !f.endsWith('.mp4')});
+  cpSync(path.join(__dirname, 'fixtures', 'projeto'), pasta, {recursive: true, filter: (f) => !f.endsWith('.mp4')});
   const projeto = new Projeto(pasta);
   mcp = new McpHttp(path.join(pasta, '.config-teste'), () => projeto);
   servidor = http.createServer((req, res) => void mcp.atender(req, res).then((ok) => ok || res.writeHead(404).end()));

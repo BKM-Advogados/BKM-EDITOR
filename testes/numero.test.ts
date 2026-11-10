@@ -1,5 +1,5 @@
 // Rodada 3, frente C: o número que conta mostra as casas decimais dos valores (video-D8): R$ 1.412,50 e 7,5% não saem
-// arredondados, no vídeo de cenas e no carrossel da Cliente.
+// arredondados, no vídeo de cenas e no carrossel narrado.
 import {describe, expect, it} from 'vitest';
 import {casasDe, casasDoNumero, formatarNumero} from '../src/composicoes/formatar-numero';
 

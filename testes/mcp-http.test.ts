@@ -17,7 +17,7 @@ let mcp: McpHttp;
 
 beforeAll(async () => {
   pasta = mkdtempSync(path.join(tmpdir(), 'estudio-http-'));
-  cpSync(path.join(__dirname, '..', 'exemplos', 'exemplo'), pasta, {recursive: true, filter: (f) => !f.endsWith('.mp4')});
+  cpSync(path.join(__dirname, 'fixtures', 'projeto'), pasta, {recursive: true, filter: (f) => !f.endsWith('.mp4')});
   const projeto = new Projeto(pasta);
   mcp = new McpHttp(path.join(pasta, '.config-teste'), () => projeto);
   servidor = http.createServer((req, res) => void mcp.atender(req, res).then((ok) => ok || res.writeHead(404).end()));
@@ -48,9 +48,9 @@ describe('MCP por HTTP', () => {
     const c = await conectar(cfg.mcpServers.estudio.headers);
     const ler = (await c.callTool({name: 'ler_documento', arguments: {documento: 'cena3d', caminho: '/objetos/0/cor'}})) as {content: {text: string}[]};
     const lido = JSON.parse(ler.content[0].text);
-    expect(lido.conteudo).toBe('#C88155');
+    expect(lido.conteudo).toBe('#4A90D9');
     const r = (await c.callTool({name: 'aplicar_patch', arguments: {documento: 'cena3d', versao_base: lido.versao, rotulo: 'anel mais claro',
-      patch: [{op: 'test', path: '/objetos/0/cor', value: '#C88155'}, {op: 'replace', path: '/objetos/0/cor', value: '#E4B492'}]}})) as {isError?: boolean};
+      patch: [{op: 'test', path: '/objetos/0/cor', value: '#4A90D9'}, {op: 'replace', path: '/objetos/0/cor', value: '#9CC8F5'}]}})) as {isError?: boolean};
     expect(r.isError).toBeFalsy();
     const diario = new Projeto(pasta).diario();
     expect(diario[diario.length - 1]).toMatchObject({autor: 'agente', origem: 'Claude 1', rotulo: 'anel mais claro'});

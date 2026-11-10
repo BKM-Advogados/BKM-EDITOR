@@ -24,7 +24,7 @@ describe('cena de dúvida opcional (video-D6)', () => {
   it('narração que fecha com "Tem dúvida? Fale com um advogado" monta o vídeo, com aviso e sem os tempos', () => {
     const sem = palavras().map((p) => (/^(ficou|procure)/i.test(p.w.trim()) ? {...p, w: p.w.replace(/ficou|procure/i, 'fale')} : p));
     const r = roteiro();
-    r.cenas.find((c) => c.tipo === 'duvida')!.inicio = 'Fale@76400'; // o autor começa a cena por outra palavra
+    r.cenas.find((c) => c.tipo === 'duvida')!.inicio = 'Fale@72800'; // o autor começa a cena por outra palavra
     const {props, avisos} = resolverRoteiro(r, sem);
     expect(duvida(props.cenas).ev).toEqual({}); // a composição usa o começo da cena e +1,5 s
     expect(avisos.filter((a) => a.includes('cena de dúvida')).map((a) => a.match(/"(\w+)"/)![1])).toEqual(['ficou', 'procure']);
