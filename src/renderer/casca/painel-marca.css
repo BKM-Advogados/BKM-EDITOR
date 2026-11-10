@@ -14,7 +14,7 @@
 .marca-lista-acoes { display: flex; gap: 6px; margin-top: 8px; }
 .marca-detalhe { display: flex; flex-direction: column; gap: 10px; min-width: 0; min-height: 0; overflow: auto; padding-right: 4px; }
 .marca-cab { display: flex; align-items: center; gap: 12px; }
-.marca-logo { display: grid; place-items: center; width: 180px; height: 76px; border-radius: var(--raio-2); background: var(--fundo-0); border: 1px solid var(--borda);
+.marca-logo { display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 180px; height: 76px; border-radius: var(--raio-2); background: var(--fundo-0); border: 1px solid var(--borda);
   overflow: hidden; flex: none; }
 .marca-logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .marca-amostra { flex: 1; min-width: 0; font-size: 22px; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
