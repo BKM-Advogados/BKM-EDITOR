@@ -1,7 +1,9 @@
 # Pacotes do Estúdio para Linux, Windows e Mac (docs/portes.md). Cada sistema empacota a si mesmo: npm ci, typecheck,
 # testes e o MCP; depois o pacote e o instalador da plataforma sobem como artifact da execução (14 dias).
-# Roda à mão (Actions › Build › Run workflow) ou ao subir uma tag v* (git tag v3.1.0 && git push --tags). Não roda a cada
-# push: em repositório privado o minuto do Mac conta 10 vezes (custo em docs/portes.md).
+# Roda à mão (Actions › Build › Run workflow), ao subir uma tag v* (git tag v3.1.0 && git push --tags) ou ao subir um branch
+# ci/* (git push origin HEAD:ci/<nome>), que serve para validar um branch antes de ele chegar ao main: o "Run workflow"
+# só existe para o que já está no branch padrão. Não roda a cada push: em repositório privado o minuto do Mac conta 10
+# vezes (custo em docs/portes.md).
 #
 # Assinatura e notarização do Mac só acontecem quando os secrets existem (Settings › Secrets and variables › Actions):
 #   MAC_CERTIFICADO_P12        o certificado "Developer ID Application" exportado do Keychain (.p12), em base64
@@ -18,6 +20,7 @@ on:
   workflow_dispatch:
   push:
     tags: ['v*']
+    branches: ['ci/**']
 
 permissions:
   contents: read
