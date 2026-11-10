@@ -232,8 +232,10 @@ Windows. Fica como alternativa se o app embutido pesar (são ~3 MB).
 
 ## 7. CI (`.github/workflows/build.yml`)
 
-**Como disparar:** Actions › **Build** › **Run workflow** (`workflow_dispatch`), ou subindo uma tag `v*`
-(`git tag v3.1.0 && git push origin v3.1.0`). Não roda em push comum nem em PR.
+**Como disparar:** Actions › **Build** › **Run workflow** (`workflow_dispatch`, só para o que já está no `main`), subindo
+uma tag `v*` (`git tag v3.1.0 && git push origin v3.1.0`) ou subindo um branch `ci/*` (`git push origin HEAD:ci/<nome>`),
+que valida um branch antes do `main`. Não roda em push comum nem em PR. Acompanhar: `gh run list --branch ci/<nome>` e
+`gh run view <id> --log-failed`.
 
 **Matriz:** `ubuntu-latest` (Linux x64), `windows-latest` (Windows x64), `macos-15` (Mac Apple Silicon; o `macos-14` deixou de ser aceito em 10/11/2026) e
 `macos-15-intel` (Mac Intel). O `macos-13` pedido no início foi aposentado pelo GitHub em dezembro de 2025; o
