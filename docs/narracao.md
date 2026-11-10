@@ -173,12 +173,13 @@ Reverter. Dois provedores:
   - provedor, modelo e voz (a lista vem da API e fica guardada na sessão, com o botão de buscar de novo);
   - o estilo (Gemini) ou a velocidade (Cloud TTS) e a folga;
   - **Ouvir amostra**: uma frase curta. A amostra fica em `userData/ia/amostras-narracao/<hash>.wav` e não é paga duas vezes;
-  - a fala de cada cena, com o estado e "Gerar esta cena";
+  - a fala de cada cena, com o estado e "Gerar esta cena". Na cena já gerada, o botão vira "Outra tomada", que vai ao Google
+    de novo (com custo) com o mesmo texto e a mesma voz;
   - **Gerar todas**, que confirma antes com o custo estimado e mostra o andamento e o Cancelar;
   - **Ajustar as cenas à fala** e **Criar legendas**;
   - o **dicionário de pronúncia**.
-- No inspetor da cena, a seção **Fala (narração por IA)** tem o texto falado, o estado, "Gerar esta cena" e o atalho para o
-  painel.
+- No inspetor da cena, a seção **Fala (narração por IA)** tem o texto falado, o estado, "Gerar esta cena" (ou "Outra
+  tomada") e o atalho para o painel.
 - Em **Configurações › IA**, a seção **Narração por IA** tem duas partes:
   - o estado da chave do Gemini (a mesma das conversas), com o aviso do plano gratuito;
   - a chave do **Google Cloud TTS**: Testar e gravar, Apagar e "Onde pego a chave?".
@@ -317,6 +318,6 @@ No fim, ele mostra o cabeçalho de cada WAV e a pasta para ouvir. O que conferir
 | `src/main/ia/precos.ts` | `custoNarracao` e a tabela com a data |
 | `src/renderer/modulos/video/NarracaoIA.tsx`, `acoes-narracao.ts` | o painel e as ações |
 | `scripts/narracao-ao-vivo.mjs` | o teste ao vivo |
-| `testes/narracao*.test.ts` | núcleo e provedores, serviço e MCP, chaves |
+| `testes/narracao*.test.ts` | núcleo e provedores, serviço e MCP, chaves, IPC sem o Electron |
 
 Nenhuma dependência nova. As chamadas são REST com `fetch`: o do Node no stdio e o `net.fetch` do Electron no app.
