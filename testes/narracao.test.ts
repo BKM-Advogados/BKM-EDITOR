@@ -8,7 +8,7 @@ import {envelopeDeAmostras} from '../src/nucleo/audio';
 import {novoDocCenas, resolverCenas, type DocCenas} from '../src/nucleo/cenas';
 import {aplicarPronuncias, amostrasDoWav16, configDaNarracao, ErroNarracao, erroDoGoogle, hashDaFala, lerWav16, medirFala, problemasDaNarracao, textoFalado, wavDaResposta,
   wavDePcm16} from '../src/nucleo/narracao';
-import {ajustarCenasAFala, itensDaNarracao, patchDasFalas} from '../src/nucleo/narracao-cenas';
+import {ajustarCenasAFala, itensDaNarracao, patchDasFalas, temposDasCenas} from '../src/nucleo/narracao-cenas';
 import {corpoCloudTts, sintetizarCloudTts, vozesCloudTts} from '../src/nucleo/narracao-cloud-tts';
 import {corpoGemini, sintetizarGemini, vozesGemini} from '../src/nucleo/narracao-gemini';
 import {sha256Texto} from '../src/nucleo/sha256';
@@ -263,6 +263,14 @@ describe('estado de cada cena: sem texto, a gerar, gerada, desatualizada', () =>
     expect(m.segundos).toBeGreaterThan(3);
     expect(m.tokens_saida).toBe(Math.ceil(m.segundos * 25));
     expect(medirFala('a b c', configDaNarracao({provedor: 'google-tts', velocidade: 2})).segundos).toBeLessThan(medirFala('a b c', configDaNarracao({})).segundos);
+  });
+});
+
+describe('tempos das cenas sem montar o vídeo', () => {
+  it('a mesma conta do resolvedor: duração padrão, mínimo e máximo', () => {
+    const doc = {...docBase(), cenas: [{id: 'a', duracao_ms: 100, blocos: []}, {id: 'b', blocos: []}, {id: 'c', duracao_ms: 99_999_999, blocos: []}, {id: 'd', duracao_ms: 1234, blocos: []}]} as unknown as DocCenas;
+    const doResolvedor = resolverCenas(doc).props.cenas.map((c) => [c.id, c.t_in, c.t_out]);
+    expect(temposDasCenas(doc).map((c) => [c.id, c.t_in, c.t_out])).toEqual(doResolvedor);
   });
 });
 

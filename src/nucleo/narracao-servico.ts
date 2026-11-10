@@ -7,7 +7,7 @@
 // parâmetros). Mudou só a cena 3: só a cena 3 vai ao Google. Ao lado de cada WAV ficam o envelope de loudness
 // (<hash>.wav.envelope.json, medido aqui mesmo, das amostras, para o ducking valer na hora, também fora do app) e uma
 // ficha (.estudio/narracao/<hash>.json, fora de midia/ para não aparecer no painel Mídia) com o texto, a voz e a data.
-import {mkdirSync, readFileSync, renameSync, statSync, writeFileSync} from 'node:fs';
+import {closeSync, mkdirSync, openSync, readFileSync, readSync, renameSync, statSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import {envelopeDeAmostras} from './audio';
 import {ehDocCenas, type DocCenas} from './cenas';
@@ -78,12 +78,20 @@ export const gravarEnvelopeDaFala = (projeto: Projeto, arquivo: string, wav: Uin
   projeto.gravarTexto(`${arquivo}.envelope.json`, `${JSON.stringify({...env, fonte: {tamanho: st.size, modificado_ms: st.mtimeMs, sha256: sha256DoArquivo(abs)}})}\n`);
 };
 
-/** A duração (ms) de um WAV de fala do cache, ou null se não estiver lá inteiro. */
+/** A duração (ms) de um WAV de fala do cache, ou null se não estiver lá. Lê só o cabeçalho (a prévia roda a cada edição). */
 export const duracaoNoCache = (projeto: Projeto, arquivo: string): number | null => {
   try {
     if (!projeto.existe(arquivo)) return null;
-    const b = new Uint8Array(readFileSync(projeto.caminho(arquivo)));
-    const w = lerWav16(b);
+    const abs = projeto.caminho(arquivo);
+    const fd = openSync(abs, 'r');
+    let cabeca: Uint8Array;
+    try {
+      const buf = Buffer.alloc(4096);
+      cabeca = new Uint8Array(buf.subarray(0, readSync(fd, buf, 0, buf.length, 0)));
+    } finally {
+      closeSync(fd);
+    }
+    const w = lerWav16(cabeca, statSync(abs).size);
     return w && w.bytes > 0 ? Math.round((w.bytes / (2 * w.canais) / w.taxa) * 1000) : null;
   } catch {
     return null;

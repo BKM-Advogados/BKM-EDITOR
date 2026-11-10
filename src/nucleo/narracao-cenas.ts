@@ -8,7 +8,7 @@
 // pessoa fica onde está). A música, que já nasce com ducking, cai sob essa voz como cai sob qualquer outra: o envelope do
 // WAV gerado é medido na hora em que ele é gravado (narracao-servico.ts).
 import {novaFaixaAudio, novoAudioCenas, papelDe, type AudioCenas, type ClipeAudio, type FaixaAudio} from './audio';
-import {idLivre, resolverCenas, type DocCenas} from './cenas';
+import {idLivre, type DocCenas} from './cenas';
 import type {OperacaoPatch} from './documentos';
 import {arquivoDaNarracao, configDaNarracao, hashDaFala, medirFala, textoFalado, type ConfigNarracaoN, type MarcaNarracaoIA, type MedidaFala} from './narracao';
 import {edicoesDeTempo, somComEdicoes} from './som-com-cenas';
@@ -35,6 +35,8 @@ export type ItemNarracao = {
   motivo?: string; // por que está desatualizada
 };
 
+const DURACAO_MIN = 300;
+const DURACAO_MAX = 10 * 60 * 1000;
 const ehMarca = (m: unknown): m is MarcaNarracaoIA => Boolean(m) && typeof (m as MarcaNarracaoIA).cena === 'string' && typeof (m as MarcaNarracaoIA).hash === 'string';
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
 const seg = (ms: number) => (ms / 1000).toLocaleString('pt-BR', {maximumFractionDigits: 1});
@@ -54,8 +56,20 @@ export const clipesDaNarracao = (doc: Pick<DocCenas, 'audio'>): {porCena: Map<st
   return {porCena, extras};
 };
 
-/** Início e fim de cada cena no vídeo (ms), como o resolvedor conta. */
-export const temposDasCenas = (doc: DocCenas) => resolverCenas(doc).props.cenas.map((c) => ({id: c.id, n: c.n, nome: c.nome, t_in: c.t_in, t_out: c.t_out}));
+const DURACAO_PADRAO = 4000;
+
+/** Início e fim de cada cena no vídeo (ms), com a mesma conta do resolvedor (duração padrão e limites), sem montar o resto do
+ *  vídeo: o inspetor e o painel pedem isto a cada desenho. */
+export const temposDasCenas = (doc: DocCenas) => {
+  let t = 0;
+  return (Array.isArray(doc.cenas) ? doc.cenas : []).map((c, i) => {
+    const d = typeof c?.duracao_ms === 'number' && Number.isFinite(c.duracao_ms) ? c.duracao_ms : DURACAO_PADRAO;
+    const dur = Math.min(DURACAO_MAX, Math.max(DURACAO_MIN, d));
+    const t_in = t;
+    t += dur;
+    return {id: c?.id, n: i + 1, nome: c?.nome, t_in, t_out: t};
+  });
+};
 
 /** O estado da fala de cada cena. `existe` (o disco): sem ele, o arquivo do clipe conta como presente. */
 export const itensDaNarracao = (doc: DocCenas, existe?: (rel: string) => boolean): ItemNarracao[] => {
@@ -186,9 +200,6 @@ export const patchDasFalas = (doc: DocCenas, geradas: FalaGerada[]): ResultadoPa
 
 export type MudancaDeCena = {cena: string; n: number; antes_ms: number; depois_ms: number; fala_ms: number};
 export type AjusteAFala = {patch: OperacaoPatch[]; mudancas: MudancaDeCena[]; avisos: string[]};
-
-const DURACAO_MIN = 300;
-const DURACAO_MAX = 10 * 60 * 1000;
 
 /** Cada cena que tem fala gerada passa a durar folga + fala + margem (padrão: a margem da configuração). As falas vão para o
  *  começo das cenas no tempo novo (com o mesmo deslocamento que tinham), e o resto do som anda com as cenas como em qualquer

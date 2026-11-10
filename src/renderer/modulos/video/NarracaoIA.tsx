@@ -168,8 +168,10 @@ export const NarracaoIA: React.FC<{documento: string; aoFechar: () => void}> = (
                   title="Duração da fala e da cena">fala {s1(it.clipe.duracao_ms)} s · cena {s1(it.t_out - it.t_in)} s</span>}
                 {!it.clipe && it.medida && <span className="meta" title="Estimativa antes de gerar">~{s1(it.medida.segundos * 1000)} s</span>}
                 {it.estado !== 'sem_texto' && (
-                  <button className="bt mini" disabled={Boolean(andamento)} title={p ? `${p.caracteres} caracteres · ${textoCusto(p.em_cache ? 0 : p.custo_usd)}` : 'Gerar de novo (sai do cache se nada mudou)'}
-                    onClick={() => void gerarFalas(documento, {cenas: [it.cena]})}>{it.estado === 'gerada' ? 'Gerar de novo' : 'Gerar esta cena'}</button>
+                  <button className="bt mini" disabled={Boolean(andamento)}
+                    title={it.estado === 'gerada' ? 'Pede outra tomada ao Google, com o mesmo texto e a mesma voz (tem custo; Ctrl+Z volta à anterior)'
+                      : p ? `${p.caracteres} caracteres · ${textoCusto(p.em_cache ? 0 : p.custo_usd)}` : undefined}
+                    onClick={() => void gerarFalas(documento, {cenas: [it.cena], refazer: it.estado === 'gerada'})}>{it.estado === 'gerada' ? 'Outra tomada' : 'Gerar esta cena'}</button>
                 )}
               </div>
               <TextoDaCena documento={documento} i={i} valor={doc.cenas[i]?.narracao?.texto ?? ''} />

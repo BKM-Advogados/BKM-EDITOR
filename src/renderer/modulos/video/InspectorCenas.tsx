@@ -149,8 +149,8 @@ const FalaDaCena: React.FC<{documento: string; n: number}> = ({documento, n}) =>
         valor={doc.cenas[n - 1]?.narracao?.texto ?? ''} aoMudar={(v) => void trocarTextoDaCena(documento, n - 1, v)} />
       {it.clipe && <CampoLeitura rotulo="Fala gerada">{numeroBr(it.clipe.duracao_ms / 1000, 1)} s{it.clipe.em + it.clipe.duracao_ms > it.t_out + 1 ? ' · passa do fim da cena' : ''}</CampoLeitura>}
       <div style={{padding: '2px 10px 6px 18px', display: 'flex', gap: 6}}>
-        {it.estado !== 'sem_texto' && <button className="bt mini" disabled={Boolean(andamento)} onClick={() => void gerarFalas(documento, {cenas: [it.cena]})}>
-          {it.estado === 'gerada' ? 'Gerar de novo' : 'Gerar esta cena'}</button>}
+        {it.estado !== 'sem_texto' && <button className="bt mini" disabled={Boolean(andamento)} onClick={() => void gerarFalas(documento, {cenas: [it.cena], refazer: it.estado === 'gerada'})}
+          title={it.estado === 'gerada' ? 'Pede outra tomada ao Google (tem custo; Ctrl+Z volta à anterior)' : undefined}>{it.estado === 'gerada' ? 'Outra tomada' : 'Gerar esta cena'}</button>}
         <button className="bt mini fantasma" onClick={() => abrirNarracaoIA(documento)}>Narração por IA…</button>
       </div>
     </Secao>

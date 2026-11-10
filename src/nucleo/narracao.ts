@@ -350,8 +350,9 @@ export const wavDePcm16 = (pcm: Uint8Array, taxa: number, canais = 1): Uint8Arra
 export type SomPcm16 = {taxa: number; canais: number; inicio: number; bytes: number};
 
 /** Onde estão as amostras de um WAV PCM 16 bits; null se não for um. O tamanho do bloco `data` pode vir 0 ou 0xFFFFFFFF
- *  (gravado em fluxo): aí vale até o fim do arquivo. */
-export const lerWav16 = (b: Uint8Array): SomPcm16 | null => {
+ *  (gravado em fluxo): aí vale até o fim do arquivo. `tamanho`: o do arquivo inteiro, quando `b` é só o começo dele (o cache
+ *  lê só o cabeçalho). */
+export const lerWav16 = (b: Uint8Array, tamanho = b.length): SomPcm16 | null => {
   if (b.length < 44) return null;
   const v = new DataView(b.buffer, b.byteOffset, b.byteLength);
   const id = (pos: number) => String.fromCharCode(b[pos], b[pos + 1], b[pos + 2], b[pos + 3]);
@@ -363,7 +364,7 @@ export const lerWav16 = (b: Uint8Array): SomPcm16 | null => {
     if (nome === 'fmt ' && pos + 24 <= b.length) fmt = {formato: v.getUint16(pos + 8, true), canais: v.getUint16(pos + 10, true), taxa: v.getUint32(pos + 12, true), bits: v.getUint16(pos + 22, true)};
     if (nome === 'data') {
       if (!fmt || fmt.formato !== 1 || fmt.bits !== 16 || fmt.canais < 1) return null;
-      const resto = b.length - (pos + 8);
+      const resto = tamanho - (pos + 8);
       const util = tam === 0 || tam > resto ? resto : tam;
       return {taxa: fmt.taxa, canais: fmt.canais, inicio: pos + 8, bytes: util - (util % (2 * fmt.canais))};
     }
