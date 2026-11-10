@@ -241,6 +241,10 @@ input[type="range"]:focus-visible { outline: none; }
 .linha-campo > .ler { color: var(--texto-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .linha-campo.alta { align-items: start; }
 .linha-campo.alta > .rot { padding-top: 5px; }
+/* painel estreito (janela lado a lado no Hyprland): o rótulo cede espaço para o valor não cortar (hex, vetor) */
+@container (max-width: 260px) {
+  .linha-campo { grid-template-columns: 14px 64px minmax(0, 1fr); padding-right: 6px; }
+}
 .difere { width: 6px; height: 6px; border-radius: 50%; background: var(--acento); border: 0; padding: 0; cursor: pointer; }
 .difere:hover { box-shadow: 0 0 0 3px var(--acento-fraco); }
 .lado { display: grid; gap: 4px; }
