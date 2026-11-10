@@ -183,7 +183,11 @@ class MotorMusica {
     this.duracao_s = r.duracao_s ?? 0;
     this.avisos = r.avisos ?? [];
     this.chaveMusica = chave;
-    if (this.tocando) this.retomar();
+    if (this.pendente) {
+      const p = this.pendente;
+      this.pendente = null;
+      this.tocar(p.de_s, p.o);
+    } else if (this.tocando) this.retomar();
     return true;
   }
 
@@ -280,8 +284,9 @@ class MotorMusica {
     return corrido < b ? corrido : a + ((corrido - a) % Math.max(0.01, b - a));
   }
   estaTocando() {
-    return Boolean(this.tocando);
+    return Boolean(this.tocando) || Boolean(this.pendente);
   }
+  private pendente: {de_s: number; o: {loop: [number, number] | null; guia: boolean; metronomo: boolean}} | null = null;
 
   private opcoes: {loop: [number, number] | null; guia: boolean; metronomo: boolean} = {loop: null, guia: true, metronomo: false};
 
@@ -290,7 +295,11 @@ class MotorMusica {
     this.parar();
     const ctx = this.contexto();
     void ctx.resume();
-    if (!this.musica) return;
+    if (!this.musica) {
+      // o som ainda está sendo feito (música nova, primeiro render): toca assim que ficar pronto, em vez de ignorar o Espaço
+      this.pendente = {de_s, o};
+      return;
+    }
     const de = Math.max(0, Math.min(de_s, Math.max(0, this.duracao_s - 0.01)));
     const ganho = ctx.createGain();
     ganho.connect(ctx.destination);
@@ -335,6 +344,7 @@ class MotorMusica {
   }
 
   parar() {
+    this.pendente = null;
     const t = this.tocando;
     this.tocando = null;
     if (!t) return;
