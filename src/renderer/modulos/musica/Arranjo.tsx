@@ -15,7 +15,8 @@ import {loja, useLoja} from '../../estado/loja';
 import {musica, selecionarMusica, useMusica} from './estado';
 import {arranjar, apagarSelecionado, campo, dividirNaCabeca} from './acoes';
 import {alternarLoop, parar, tocarOuPausar, useDocMusica} from './Monitor';
-import {motor} from './motor';
+import {motor, urlDaMidia} from './motor';
+import type {Envelope} from '../../../nucleo/audio';
 
 type Arrasto = {id: string; modo: 'mover' | 'ini' | 'fim'; x0: number; db: number; livre: boolean};
 const passo = (b: number, livre: boolean) => (livre ? Math.round(b * 960) / 960 : Math.round(b * 4) / 4);
@@ -31,6 +32,46 @@ const comArrasto = (c: ClipeMusicaP, a: Arrasto | null) => {
   return {em: c.em, dur: Math.max(0.25, c.dur + d)};
 };
 
+/** Envelopes medidos (midia/x.wav.envelope.json) dos áudios do arranjo; um fetch por arquivo, guardado na sessão. */
+const envelopes = new Map<string, Promise<Envelope | null>>();
+const envelopeDe = (arquivo: string) => {
+  let p = envelopes.get(arquivo);
+  if (!p) {
+    p = fetch(urlDaMidia(`${arquivo}.envelope.json`)).then((r) => (r.ok ? (r.json() as Promise<Envelope>) : null)).catch(() => null);
+    envelopes.set(arquivo, p);
+  }
+  return p;
+};
+
+/** Forma de onda do clipe de áudio (do envelope do arquivo, do corte até o fim do clipe), a mesma escala do vídeo. */
+const Onda: React.FC<{arquivo: string; corte_s: number; dur_s: number; largura: number}> = ({arquivo, corte_s, dur_s, largura}) => {
+  const [env, setEnv] = useState<Envelope | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    void envelopeDe(arquivo).then((e) => vivo && setEnv(e));
+    return () => { vivo = false; };
+  }, [arquivo]);
+  const d = useMemo(() => {
+    if (!env || largura < 8) return '';
+    const n = Math.max(2, Math.min(Math.floor(largura / 2), Math.ceil((dur_s * 1000) / env.janela_ms)));
+    const topo: string[] = [];
+    const base: string[] = [];
+    for (let j = 0; j < n; j++) {
+      const i0 = Math.floor(((corte_s + (j / n) * dur_s) * 1000) / env.janela_ms);
+      const i1 = Math.max(i0 + 1, Math.ceil(((corte_s + ((j + 1) / n) * dur_s) * 1000) / env.janela_ms));
+      let db = -100;
+      for (let i = i0; i < i1 && i < env.db.length; i++) if (env.db[i] > db) db = env.db[i];
+      const h = db <= -100 ? 0 : Math.max(0, Math.min(1, (db + 48) / 48)) * 8; // −48 a 0 dB em 8 px para cada lado do eixo
+      const x = ((j + 0.5) / n) * largura;
+      topo.push(`${x.toFixed(1)},${(9 - h).toFixed(1)}`);
+      base.unshift(`${x.toFixed(1)},${(9 + h).toFixed(1)}`);
+    }
+    return `M${topo.join('L')}L${base.join('L')}Z`;
+  }, [env, corte_s, dur_s, largura]);
+  if (!d) return null;
+  return <svg className="onda" viewBox={`0 0 ${largura} 18`} preserveAspectRatio="none"><path d={d} /></svg>;
+};
+
 const Clipe: React.FC<{c: ClipeMusicaP; m: ReturnType<typeof resolverMusica>['musica']; px: number; sel: boolean; arrasto: Arrasto | null; titulo: string;
   aoPegar: (e: React.PointerEvent, c: ClipeMusicaP, modo: Arrasto['modo']) => void; aoMover: (e: React.PointerEvent) => void; aoSoltar: () => void; veio?: boolean}> =
   ({c, m, px, sel, arrasto, titulo, aoPegar, aoMover, aoSoltar, veio}) => {
@@ -40,6 +81,7 @@ const Clipe: React.FC<{c: ClipeMusicaP; m: ReturnType<typeof resolverMusica>['mu
     return (
       <div className={`mclipe${c.audio ? ' audio' : ''}${sel ? ' sel' : ''}${c.mudo ? ' mudo' : ''}`} style={{left: em * px, width: largura}} title={titulo}
         onPointerDown={(e) => aoPegar(e, c, 'mover')} onPointerMove={aoMover} onPointerUp={aoSoltar} onPointerCancel={aoSoltar} onClick={(e) => e.stopPropagation()}>
+        {c.audio && <Onda arquivo={c.audio} corte_s={c.corte_s ?? 0} dur_s={dur * m.seg_por_batida} largura={largura} />}
         {largura > 30 && <span className="txt">{titulo}</span>}
         {notas.slice(0, 600).map((n, i) => {
           const x = (n.s / m.seg_por_batida - c.em) * px;
@@ -130,7 +172,7 @@ const Arranjo: React.FC<{doc: DocMusica}> = ({doc}) => {
     musica.definir((s) => ({pxPorBatida: Math.min(160, Math.max(6, s.pxPorBatida * (e.deltaY < 0 ? 1.15 : 1 / 1.15)))}));
   };
   const nomeDoClipe = (c: ClipeMusicaP) => {
-    if (c.audio) return `${c.audio.split('/').pop()}${c.corte_s ? ` · desde ${c.corte_s.toFixed(1)} s` : ''}`;
+    if (c.audio) return `${(c.audio.split('/').pop() ?? '').replace(/\.[0-9a-f]{16}(?=\.\w+$)/, '')}${c.corte_s ? ` · desde ${c.corte_s.toFixed(1)} s` : ''}`;
     const p = c.padrao ? doc.padroes.find((x) => x.id === c.padrao) : undefined;
     return p?.nome ?? c.padrao ?? c.id;
   };

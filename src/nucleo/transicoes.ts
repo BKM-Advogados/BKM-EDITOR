@@ -212,7 +212,7 @@ export const concluirTransicao = (b: BaseProjeto, p: {transicao: string; aplicar
   let selecao: string | undefined;
   const alvo = t.intencao === 'criar' ? null : acharAlvoAudio(video.doc, t.origem.caminho) ?? acharClipePorId(video.doc, t.origem.caminho.split('@').pop() ?? '');
   if (alvo?.clipe && alvo.ci !== undefined) {
-    patch = patchLigarClipe({...alvo, clipe: alvo.clipe, ci: alvo.ci}, idMusica, render);
+    patch = patchLigarClipe({...alvo, clipe: alvo.clipe, ci: alvo.ci}, idMusica, render, titulo);
     caminho = caminhoPorId(alvo.faixa.id, alvo.clipe.id);
     selecao = `/audio/faixas/${alvo.fi}/clipes/${alvo.ci}`;
   } else {

@@ -356,8 +356,10 @@ export const MonitorMusica: React.FC = () => {
         {temAberta && <span style={{marginLeft: 'auto', color: 'var(--texto-2)', alignSelf: 'center', fontSize: 11}}>editando para o vídeo</span>}
       </div>
       <div className="musica-corpo">
-        {verVideo && doc.video && <VideoNaMusica doc={doc} />}
-        {aba === 'passos' ? <Passos doc={doc} /> : <Mixer doc={doc} />}
+        <div className="musica-corpo-linha">
+          <div className="musica-corpo-principal">{aba === 'passos' ? <Passos doc={doc} /> : <Mixer doc={doc} />}</div>
+          {verVideo && doc.video && <VideoNaMusica doc={doc} />}
+        </div>
         {avisos.length > 0 && <div className="vazio" style={{marginTop: 8}}>{avisos.slice(0, 4).join(' · ')}</div>}
       </div>
     </div>

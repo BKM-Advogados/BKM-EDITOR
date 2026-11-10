@@ -68,7 +68,7 @@ export const acharClipePorId = (doc: DocCenas, id: string): AlvoAudio | null => 
 // ---------- patches no vídeo ----------
 /** Liga um clipe existente ao documento de música: o arquivo vira o render, o corte zera (o render começa onde o clipe
  *  começava), a duração vira a da música, e o áudio de antes fica em `musica_original` (só da primeira vez). */
-export const patchLigarClipe = (a: Required<Pick<AlvoAudio, 'clipe' | 'ci'>> & AlvoAudio, idMusica: string, render: {arquivo: string; duracao_ms: number}): OperacaoPatch[] => {
+export const patchLigarClipe = (a: Required<Pick<AlvoAudio, 'clipe' | 'ci'>> & AlvoAudio, idMusica: string, render: {arquivo: string; duracao_ms: number}, nome?: string): OperacaoPatch[] => {
   const c = a.clipe;
   const base = `/audio/faixas/${a.fi}/clipes/${a.ci}`;
   const trocar = (campo: string, valor: unknown, antes: unknown): OperacaoPatch[] =>
@@ -78,6 +78,8 @@ export const patchLigarClipe = (a: Required<Pick<AlvoAudio, 'clipe' | 'ci'>> & A
     {op: 'test', path: `${base}/arquivo`, value: c.arquivo},
     ...trocar('arquivo', render.arquivo, c.arquivo),
     ...trocar('musica', idMusica, c.musica),
+    // sem nome, o clipe mostraria o arquivo do render (musica.77da….wav) na linha do tempo
+    ...(nome && !c.nome ? [{op: 'add' as const, path: `${base}/nome`, value: nome}] : []),
     ...(c.musica_original || c.musica ? [] : [{op: 'add' as const, path: `${base}/musica_original`, value: {arquivo: c.arquivo, ...(c.corte_ms ? {corte_ms: c.corte_ms} : {}), duracao_ms: c.duracao_ms}}]),
     ...(c.corte_ms ? [{op: 'replace' as const, path: `${base}/corte_ms`, value: 0}] : []),
     ...trocar('duracao_ms', render.duracao_ms, c.duracao_ms),

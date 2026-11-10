@@ -122,7 +122,9 @@
 .faixa-secoes .acorde.secao { border-left-color: var(--comentario); color: var(--comentario); background: rgba(255, 202, 22, 0.08); cursor: grab; }
 
 /* monitor do vídeo dentro da Música (item 25) */
-.video-na-musica { float: right; margin: 0 0 8px 10px; position: relative; border: 1px solid var(--borda); border-radius: var(--raio); overflow: hidden; background: #000; }
+.musica-corpo-linha { display: flex; gap: 10px; align-items: flex-start; }
+.musica-corpo-principal { flex: 1; min-width: 0; }
+.video-na-musica { flex: none; position: relative; border: 1px solid var(--borda); border-radius: var(--raio); overflow: hidden; background: #000; }
 .video-na-musica.vazio { width: 120px; height: 168px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--texto-2); padding: 6px; text-align: center; }
 .video-na-musica .tempo { position: absolute; left: 4px; bottom: 4px; font-size: 10px; color: #fff; background: rgba(0, 0, 0, 0.55); padding: 1px 4px; border-radius: 3px; }
 .tira.master .ler { font-size: 10px; color: var(--texto-2); }

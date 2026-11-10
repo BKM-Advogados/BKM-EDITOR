@@ -241,7 +241,7 @@ export const porNoVideo = (p: Projeto, o: {musica: string; video?: string; faixa
   if (o.substituir) {
     const alvo = acharClipePorId(v, o.substituir);
     if (!alvo?.clipe || alvo.ci === undefined) throw new ErroProjeto(`clipe não achado no vídeo: ${o.substituir}`, 'nao_achado');
-    patch = patchLigarClipe({...alvo, clipe: alvo.clipe, ci: alvo.ci}, idMusica, render);
+    patch = patchLigarClipe({...alvo, clipe: alvo.clipe, ci: alvo.ci}, idMusica, render, p.manifesto().documentos.find((d) => d.id === idMusica)?.titulo);
     caminho = caminhoPorId(alvo.faixa.id, alvo.clipe.id);
   } else {
     const titulo = p.manifesto().documentos.find((d) => d.id === idMusica)?.titulo;

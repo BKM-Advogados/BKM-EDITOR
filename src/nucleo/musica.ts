@@ -222,7 +222,7 @@ export type ClipeDoVideo = {id: string; arquivo: string; nome?: string; em: numb
  *  começo da música no ponto do vídeo em que o clipe está. O BPM fica em 120 (o áudio toca no tempo dele; a grade é só
  *  guia). Os fades, o volume e o ducking continuam no clipe do vídeo: o render sai cru, como o arquivo tocava. */
 export const musicaDeClipe = (clipe: ClipeDoVideo, o: {video: string; titulo?: string; bpm?: number}): DocMusica => {
-  const doc = novaMusica({titulo: o.titulo ?? clipe.nome ?? clipe.arquivo.split('/').pop(), bpm: o.bpm});
+  const doc = novaMusica({titulo: o.titulo ?? (clipe.nome || (clipe.arquivo.split('/').pop() ?? '').replace(/\.[0-9a-f]{16}(?=\.\w+$)/, '').replace(/\.\w+$/, '') || undefined), bpm: o.bpm});
   const spb = segPorBatida(doc.bpm);
   const canal: CanalMusica = {id: 'audio', nome: clipe.nome || 'Áudio do vídeo', tipo: 'audio', faixa_mixer: 'audio'};
   doc.canais.push(canal);
