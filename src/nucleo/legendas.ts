@@ -221,6 +221,10 @@ const PALAVRA_FRACA = /^(a|o|as|os|um|uma|uns|umas|de|da|do|das|dos|em|na|no|nas
 // verbo auxiliar e "não" ficam com o verbo que vem depois ("vai | pagar", "não | pode")
 const AUXILIAR = /^(é|são|foi|foram|era|eram|ser|sido|está|estão|estava|estavam|tem|têm|tinha|tinham|ter|tido|vai|vão|ia|iam|ir|pode|podem|podia|podiam|deve|devem|devia|deviam|há|havia|haver|será|serão|seria|seriam|fica|ficam|ficou|precisa|precisam|não)$/i;
 const PAUSA_DE_FRASE = /[,;:]["'”»)]*$/;
+/** Depois de artigo, preposição, auxiliar ou "não", a pausa abaixo disto não fecha a legenda: a frase não acabou
+ *  ("entenda as regras da | transferência", com 580 ms do whisper depois do "da", deixava "da" no fim e
+ *  "transferência." sozinha por 810 ms). Pausa maior fecha como antes. */
+export const PAUSA_DEPOIS_DE_FRACA_MS = 1000;
 
 /** Junta o que o Whisper às vezes separa ("25 %", "seguro -desemprego") e tira palavras vazias. */
 export const juntarPedacos = (palavras: PalavraLegenda[]): PalavraLegenda[] => {
@@ -240,7 +244,7 @@ export const juntarPedacos = (palavras: PalavraLegenda[]): PalavraLegenda[] => {
   return out;
 };
 
-/** Quebra as palavras em legendas: fecha no silêncio de 300 ms, no fim de frase, na vírgula quando já há meia legenda,
+/** Quebra as palavras em legendas: fecha no silêncio de 300 ms (até 1 s depois de palavra fraca segue junto), no fim de frase, na vírgula quando já há meia legenda,
  *  quando passaria da largura (em caracteres) ou do número de palavras, e aos 7 s. O fim fica 250 ms depois da última
  *  palavra e, se precisar, avança no vão até a próxima para dar tempo de ler: pelo menos 833 ms e no máximo 17
  *  caracteres por segundo, sem passar de 7 s nem invadir a próxima. */
@@ -268,7 +272,9 @@ export const quebrarEmSegmentos = (palavras: PalavraLegenda[], o: OpcoesQuebra):
   for (const p of juntarPedacos(palavras)) {
     if (atual.length) {
       const ultima = atual[atual.length - 1];
-      if (p.s - ultima.e >= pausa) fechar();
+      const vao = p.s - ultima.e;
+      const fracaAntes = atual.length > 1 && fracaNoFim(ultima.w) && vao < Math.max(pausa, PAUSA_DEPOIS_DE_FRACA_MS);
+      if (vao >= pausa && !fracaAntes) fechar();
       else if (excede([...atual, p]) || (o.max_palavras && atual.length >= o.max_palavras) || p.e - atual[0].s > maxMs) fecharSemFraca();
     }
     atual.push(p);

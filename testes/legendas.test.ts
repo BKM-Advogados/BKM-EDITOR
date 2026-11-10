@@ -94,6 +94,21 @@ describe('quebrar as palavras em legendas', () => {
     expect(pausa.map((s) => s.texto)).toEqual(['um', 'dois']);
   });
 
+  it('pausa curta depois de palavra fraca não fecha a legenda (medido no app: "as regras da | transferência.")', () => {
+    // os tempos do whisper na narração do C2 (small): 580 ms entre "da" e "transferência."
+    const ws = [{w: 'Antes', s: 2780, e: 2820}, {w: 'de', s: 2820, e: 2940}, {w: 'responder,', s: 2940, e: 3520}, {w: 'entenda', s: 3640, e: 4080},
+      {w: 'as', s: 4080, e: 4170}, {w: 'regras', s: 4270, e: 4560}, {w: 'da', s: 4560, e: 4600}, {w: 'transferência.', s: 5180, e: 5510}, {w: 'Com', s: 5990, e: 6100}];
+    const r = quebrarEmSegmentos(ws, {max_caracteres: 84});
+    expect(r[0].texto).toBe('Antes de responder, entenda as regras da transferência.');
+    expect(r[0].sai - r[0].em).toBeGreaterThanOrEqual(833);
+    // sem caber, a palavra fraca vai para a próxima legenda, como no corte por largura
+    const estreito = quebrarEmSegmentos(ws, {max_caracteres: 42});
+    expect(estreito.map((s) => s.texto)).toEqual(['Antes de responder, entenda as regras', 'da transferência.', 'Com']);
+    // pausa longa (1 s ou mais) fecha como antes
+    const longa = quebrarEmSegmentos([{w: 'regras', s: 0, e: 300}, {w: 'da', s: 300, e: 400}, {w: 'casa.', s: 1500, e: 1900}], {max_caracteres: 42});
+    expect(longa.map((s) => s.texto)).toEqual(['regras da', 'casa.']);
+  });
+
   it('junta "25 %" e "seguro -desemprego", e respeita o máximo de palavras', () => {
     const r = quebrarEmSegmentos([{w: '25', s: 0, e: 200}, {w: '%', s: 200, e: 300}, {w: 'seguro', s: 300, e: 600}, {w: '-desemprego', s: 600, e: 900}], {max_caracteres: 42});
     expect(r[0].texto).toBe('25% seguro-desemprego');
