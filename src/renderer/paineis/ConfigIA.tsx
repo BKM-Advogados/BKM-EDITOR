@@ -187,6 +187,13 @@ const DialogoConfigIA: React.FC = () => {
     setAberto(cfg.foco);
     void window.estudio.ia.usoDoMes().then(setUso).catch(() => setUso({}));
   }, [cfg]);
+  // Esc fecha mesmo com o foco fora do diálogo (o onKeyDown do fundo só pega com o foco dentro dele)
+  useEffect(() => {
+    if (!cfg) return;
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && fecharConfigIA();
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [cfg]);
   if (!cfg) return null;
   const persistente = provedores.some((p) => p.cofre_persistente);
   const cofreTexto = provedores.find((p) => p.cofre_texto)?.cofre_texto;
