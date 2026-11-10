@@ -153,6 +153,17 @@ describe('no projeto', () => {
     for (const a of Object.values(ARQUIVOS_IDE)) expect(existsSync(path.join(raiz, a))).toBe(true);
   });
 
+  it('Mac aberto de Downloads (App Translocation): não grava o caminho temporário e avisa para mover o app', () => {
+    const raiz = projeto();
+    const ide = criarIde({executavel: '/private/var/folders/xy/T/AppTranslocation/ABCD-1234/d/Estudio.app/Contents/MacOS/Estudio',
+      script: '/private/var/folders/xy/T/AppTranslocation/ABCD-1234/d/Estudio.app/Contents/Resources/dist-mcp/nucleo.cjs', ligado: () => true});
+    const r = ide.preparar(raiz);
+    expect(r?.gravados).toEqual([]);
+    expect(r?.avisos.join(' ')).toContain('Aplicativos');
+    expect(existsSync(path.join(raiz, '.mcp.json'))).toBe(false);
+    expect(ide.estado(raiz)).toMatchObject({ligado: true, raiz, avisos: [expect.stringContaining('cópia temporária')]});
+  });
+
   it('o CLAUDE.md ensina a trabalhar pela IDE; as prévias só onde há vídeo ou animação', () => {
     const video = claudeMd(['video']);
     expect(video).toContain('## Trabalhando por uma IDE (T3 Code, Claude Code)');

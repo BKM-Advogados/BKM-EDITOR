@@ -43,12 +43,21 @@ export const adicionarNoT3 = (t3: string | null, raiz: string, titulo: string): 
   });
 };
 
+/** O app roda de uma cópia temporária do macOS (App Translocation), e o caminho do executável não vale depois de fechar. */
+export const emTranslocacao = (executavel: string) => executavel.includes('/AppTranslocation/');
+
 export const criarIde = (o: {executavel: string; script: string; ligado: () => boolean}) => {
   let ultimo: (ResultadoIde & {raiz: string}) | undefined;
   return {
     /** Ao criar ou abrir um projeto (e ao ligar a opção): escreve ou atualiza os arquivos. Desligado, não toca em nada. */
     preparar(raiz: string) {
       if (!o.ligado()) return null;
+      // Mac aberto de Downloads sem mover (App Translocation): o executável mora numa cópia temporária que some ao fechar;
+      // um .mcp.json com esse caminho quebraria na próxima abertura (docs/portes.md, seção 8)
+      if (emTranslocacao(o.executavel)) {
+        ultimo = {raiz, gravados: [], avisos: ['o Estúdio está rodando de uma cópia temporária do macOS (aberto de Downloads): mova o Estudio.app para Aplicativos e abra de novo para os projetos ficarem prontos para a IDE']};
+        return ultimo;
+      }
       ultimo = {raiz, ...prepararParaIde(raiz, servidorDoMcp({executavel: o.executavel, script: o.script, projeto: raiz}))};
       return ultimo;
     },
