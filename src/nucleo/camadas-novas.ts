@@ -8,10 +8,14 @@ const ENTRELINHA = 1.15;
 /** Texto novo, em 6% da largura; com ponto (coordenadas do documento), nasce onde a pessoa clicou. */
 export const textoNovo = (doc: Pick<DocImagem, 'largura' | 'altura'>, ponto?: {x: number; y: number}): Omit<CamadaImagem, 'id'> => {
   const tamanho = Math.max(12, Math.round(doc.largura * 0.06));
-  const largura = Math.round(doc.largura * (ponto ? 0.6 : 0.8));
+  const larguraPadrao = Math.round(doc.largura * (ponto ? 0.6 : 0.8));
+  const x0 = Math.round(ponto ? Math.min(ponto.x, doc.largura - 40) : doc.largura * 0.1);
+  // clicado perto da borda direita, a caixa encolhe (até 20% da prancheta) e recua para caber: uma caixa para fora da
+  // página estica a área rolável do monitor e a prancheta sai do lugar
+  const largura = ponto ? Math.max(Math.round(doc.largura * 0.2), Math.min(larguraPadrao, doc.largura - x0 - 20)) : larguraPadrao;
   return {
     nome: 'Texto', tipo: 'texto', texto: 'Novo texto', fonte: '@titulo', peso: 700, tamanho, cor: '@texto', alinhar: 'esquerda',
-    x: Math.round(ponto ? Math.min(ponto.x, doc.largura - 40) : doc.largura * 0.1), y: Math.round(ponto ? ponto.y : doc.altura * 0.45),
+    x: ponto ? Math.max(0, Math.min(x0, doc.largura - largura - 20)) : x0, y: Math.round(ponto ? ponto.y : doc.altura * 0.45),
     largura, altura: Math.round(tamanho * ENTRELINHA * 2),
   };
 };

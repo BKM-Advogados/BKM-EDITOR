@@ -109,6 +109,10 @@ describe('imagem-D8: camada nova nasce na marca da peça', () => {
     const doc = {...novoDocImagem(1080, 1350), marca: marcaDoKit(MARCA_BKM)};
     expect(textoNovo(doc)).toMatchObject({fonte: '@titulo', cor: '@texto', peso: 700, x: 108});
     expect(textoNovo(doc, {x: 500, y: 600})).toMatchObject({x: 500, y: 600});
+    // perto da borda direita a caixa recua e encolhe, em vez de sair da página
+    const perto = textoNovo(doc, {x: 1000, y: 600});
+    expect(perto.x + perto.largura).toBeLessThanOrEqual(doc.largura);
+    expect(perto.largura).toBeGreaterThanOrEqual(Math.round(doc.largura * 0.2));
     expect(formaNova(doc)).toMatchObject({preenchimento: '@destaque', largura: 324, altura: 324});
     // a fonte e a cor se leem do kit da imagem na hora de pintar: BKM em Inter, Cliente em Archivo, sem kit o neutro
     const lida = (marca?: Marca) => resolverMarcaNoDoc({...novoDocImagem(1080, 1350), ...(marca ? {marca: marcaDoKit(marca)} : {}), camadas: [{id: 't', ...textoNovo(doc)} as CamadaImagem]}).camadas[0];
