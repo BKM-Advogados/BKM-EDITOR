@@ -154,6 +154,10 @@ const api: ApiEstudio = {
     guardadas: () => ipcRenderer.invoke(CANAL.iaGuardadas),
     apagarGuardada: (s) => ipcRenderer.invoke(CANAL.iaApagarGuardada, s),
   },
+  ide: {
+    estado: () => ipcRenderer.invoke(CANAL.ideEstado),
+    abrirNoT3: () => ipcRenderer.invoke(CANAL.ideAbrirNoT3),
+  },
   // carrossel em partes (rodada 3, B2)
   exportarPaginasEmPartes: {
     abrir: (o) => ipcRenderer.invoke(CANAL.exportarPaginasAbrir, o),

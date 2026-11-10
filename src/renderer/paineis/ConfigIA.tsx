@@ -8,6 +8,7 @@ import type {ConfigsDoApp, EstadoAppsDeFora, EstadoProvedor, UsoDoMes} from '../
 import {copiar} from '../componentes/Campos';
 import {avisar} from '../estado/loja';
 import {estadoConversas, fecharConfigIA, lerProvedores, responderAvulso} from './conversas';
+import {SecaoProjetosIde} from './ConfigIde'; // frente IDE
 import './config-ia.css';
 import './conversa.css'; // o cartão de permissão solto usa o mesmo estilo do da conversa
 
@@ -210,6 +211,7 @@ const DialogoConfigIA: React.FC = () => {
           {provedores.map((p) => <LinhaProvedor key={p.id} p={p} aberto={aberto === p.id} abrir={() => setAberto((a) => (a === p.id ? undefined : p.id))} />)}
         </div>
         <SecaoAppsDeFora />
+        <SecaoProjetosIde />
         <div className="ia-uso">
           <div className="ia-uso-titulo">Uso deste mês neste PC</div>
           {linhasUso.length ? (

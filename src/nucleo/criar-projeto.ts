@@ -21,6 +21,7 @@ import {LINHAS_DO_TEXTO_ANTIGO} from './claude-md-antigo';
 import {REGRAS_MIDIA_PESADA} from './midia-git';
 import type {MarcaLida} from './pasta-marcas';
 import {serializar} from './projeto';
+import {secaoIde} from './ide'; // frente IDE: a seção "Trabalhando por uma IDE"
 
 // o texto baixado de cada fonte (pesquisa/fontes/<id>.txt) fica fora do git: é grande e se baixa de novo pela url
 // vídeo e áudio sem perda em midia/ também ficam de fora (transversal-D7, midia-git.ts); o que passa de 25 MB entra na regra
@@ -298,6 +299,7 @@ export const claudeMd = (modulos: Modulo[]) => {
   if (tem('animacao')) passos.push('`criar_animacao`, `adicionar_camada_animacao`, `animar`, `pixelizar_imagem`, `efeito_pixel` e `ver_animacao` montam e animam a animação (docs/animacao.md).');
   linhas.push('', '## Como trabalhar', '', ...passos.map((t, i) => `${i + 1}. ${t}`));
   if (tem('video') || tem('imagem')) linhas.push(...secaoPesquisa());
+  linhas.push(...secaoIde(tem('video') || tem('animacao'))); // frente IDE (docs/ide.md)
   linhas.push('', FIM_DO_TEXTO);
   return [MARCA_CLAUDE_INICIO, ...linhas, MARCA_CLAUDE_FIM, ''].join('\n');
 };

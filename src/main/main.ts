@@ -42,6 +42,8 @@ import {aoAbrirMusica, registrarIpcMusica} from './ipc-musica'; // frente Músic
 import {criarPonteJanela} from './ponte-janela';
 import {definirServicoPrevia} from '../nucleo/mcp-previa'; // frente IDE: prévias do MCP
 import {criarServicoPrevia} from './previa'; // frente IDE
+import {criarIde} from './ide'; // frente IDE: projetos prontos para IDE de agentes
+import {scriptDoMcp} from '../nucleo/ide'; // frente IDE
 
 // o mesmo id do instalador (electron-builder.yml): a barra de tarefas agrupa a janela com o atalho
 app.setAppUserModelId('br.com.bkmadvogados.estudio');
@@ -88,6 +90,9 @@ const conversas = criarSessoesIA({evento: (id, e) => enviar(CANAL.conversaEvento
     ...(claudeFalso ? {prefixo: [claudeFalso], ambienteExtra: {ELECTRON_RUN_AS_NODE: '1'}} : {})}});
 
 const recursos = (rel: string) => (app.isPackaged ? path.join(process.resourcesPath, rel) : path.join(app.getAppPath(), rel));
+// frente IDE (docs/ide.md): .mcp.json, .claude/settings.local.json e t3.json em cada projeto, com o MCP por stdio deste app
+const ide = criarIde({executavel: process.execPath, script: scriptDoMcp({empacotado: app.isPackaged, recursos: process.resourcesPath, raizApp: app.getAppPath()}),
+  ligado: () => memoria.prefs().projetos_ide !== false});
 const pastaDoExemplo = () => recursos(path.join('exemplos', 'exemplo'));
 
 const confiavel = (e: IpcMainInvokeEvent | Electron.IpcMainEvent) => {
@@ -171,6 +176,7 @@ const abrirProjeto = async (raiz: string) => {
   });
   midia.servir(raiz);
   regerarClaudeMd(raiz); // o Claude conhece os campos desta versão também nos projetos criados antes dela
+  ide.preparar(raiz); // frente IDE: os arquivos da IDE antes do primeiro commit do projeto novo
   sessao.projeto.adicionarAjuste(somAcompanhaCenas); // frente Som: a narração presa às cenas (som-com-cenas.ts)
   apagarLimposSemUso(sessao.projeto); // frente Som: as versões limpas da voz que nem documento nem diário citam (limpeza-voz.ts)
   aoAbrirMusica(sessao.projeto); // frente Música: renders que faltam (pasta clonada) e os que sobraram (ipc-musica.ts)
@@ -304,7 +310,16 @@ lidar(CANAL.ambiente, async () => ({perfil: PERFIL, git: await gitInstalado, cla
 lidar(CANAL.recentes, () => memoria.recentes());
 lidar(CANAL.esquecerRecente, (raiz: string) => memoria.esquecer(raiz));
 lidar(CANAL.preferencias, () => memoria.prefs());
-lidar(CANAL.gravarPreferencias, (p: Partial<Preferencias>) => memoria.gravarPrefs(p));
+lidar(CANAL.gravarPreferencias, (p: Partial<Preferencias>) => {
+  const r = memoria.gravarPrefs(p);
+  if (p.projetos_ide === true && sessao) ide.preparar(sessao.projeto.raiz); // frente IDE: ligar vale já para o projeto aberto
+  return r;
+});
+lidar(CANAL.ideEstado, () => ide.estado(sessao?.projeto.raiz)); // frente IDE
+lidar(CANAL.ideAbrirNoT3, () => {
+  const p = exigirProjeto();
+  return ide.abrirNoT3(p.raiz, p.manifesto().nome);
+});
 lidar(CANAL.escolherPasta, async (titulo?: string) => {
   const r = await dialog.showOpenDialog(janela!, {properties: ['openDirectory', 'createDirectory'], title: titulo ?? 'Escolher pasta'});
   return r.canceled || !r.filePaths[0] ? null : r.filePaths[0];
