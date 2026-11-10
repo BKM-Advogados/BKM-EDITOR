@@ -41,4 +41,7 @@ mac:
     - target: dmg
 dmg:
   title: Estúdio ${version}
+  # cor no lugar da imagem de fundo: no macOS 15 o dmgbuild quebra ao gravar o atalho da imagem de fundo
+  # (struct.error 'I' format em mac_alias, backgroundImageAlias; CI de 10/11/2026)
+  backgroundColor: '#1C0613'
   artifactName: Estudio-${version}-${arch}.${ext}

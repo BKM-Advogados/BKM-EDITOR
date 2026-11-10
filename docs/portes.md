@@ -63,7 +63,7 @@ máquina real confirma · ❌ não funciona ou falta · ➖ não se aplica.
 3. Com assinatura e hardened runtime, o ffmpeg do Remotion só acha as bibliotecas com os entitlements de DYLD
    (`build/entitlements.filhos.plist`). É o caminho previsto, mas **ninguém assinou e rodou um render ainda**.
 4. O whisper-cli só vem no app se o CI compilar; o pacote gerado daqui não tem (transcrição pede o Homebrew).
-5. DMG só num Mac (CI `macos-14`/`macos-15-intel` ou à mão).
+5. DMG só num Mac (CI `macos-15`/`macos-15-intel` ou à mão).
 
 ---
 
@@ -235,7 +235,7 @@ Windows. Fica como alternativa se o app embutido pesar (são ~3 MB).
 **Como disparar:** Actions › **Build** › **Run workflow** (`workflow_dispatch`), ou subindo uma tag `v*`
 (`git tag v3.1.0 && git push origin v3.1.0`). Não roda em push comum nem em PR.
 
-**Matriz:** `ubuntu-latest` (Linux x64), `windows-latest` (Windows x64), `macos-14` (Mac Apple Silicon) e
+**Matriz:** `ubuntu-latest` (Linux x64), `windows-latest` (Windows x64), `macos-15` (Mac Apple Silicon; o `macos-14` deixou de ser aceito em 10/11/2026) e
 `macos-15-intel` (Mac Intel). O `macos-13` pedido no início foi aposentado pelo GitHub em dezembro de 2025; o
 `macos-15-intel` é a imagem Intel que ficou (prevista até agosto de 2027). Se ela também sair, o Intel passa a sair do
 `macos-14` com `--arch x64` (o x64 empacota num Apple Silicon; o whisper x64 precisaria de compilação cruzada com

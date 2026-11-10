@@ -40,7 +40,8 @@ jobs:
         include:
           - {nome: Linux x64, os: ubuntu-latest, alvo: linux, arch: x64}
           - {nome: Windows x64, os: windows-latest, alvo: win, arch: x64}
-          - {nome: Mac Apple Silicon, os: macos-14, alvo: mac, arch: arm64}
+          # o macos-14 deixou de ser aceito ("configuration 'macos-14-arm64-us-xl' is not supported", 10/11/2026)
+          - {nome: Mac Apple Silicon, os: macos-15, alvo: mac, arch: arm64}
           # o macos-13 (Intel) foi aposentado pelo GitHub em dez/2025; o macos-15-intel é a imagem Intel que ficou
           - {nome: Mac Intel, os: macos-15-intel, alvo: mac, arch: x64}
     env:
