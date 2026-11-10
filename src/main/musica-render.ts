@@ -5,6 +5,7 @@
 // Na abertura do projeto, apagarRendersSemUso tira os que nenhum vídeo nem o diário citam. Exportar (item 23) grava em
 // saidas/: a conta (alvo de loudness, stems) vem do worker da janela ou é feita aqui, e o ffmpeg só codifica M4A e Opus.
 // Ver docs/musica.md.
+import {nomeDeArquivo} from '../nucleo/nome-de-arquivo'; // portes: nomes reservados do Windows
 import {mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import {envelopeDeAmostras, type Envelope} from '../nucleo/audio';
@@ -133,7 +134,7 @@ export const servicoDeRender = (o: {binarios?: () => string | null | undefined; 
 });
 
 /** Nome de arquivo a partir do título (sem os caracteres que o Windows recusa). */
-export const nomeDeSaida = (titulo: string) => titulo.replace(/\.(wav|mp3|m4a|opus|ogg|flac|mid)$/i, '').replace(/[\\/:*?"<>|\x00-\x1f]+/g, '-').replace(/\s+/g, ' ').trim().replace(/[. ]+$/, '') || 'musica';
+export const nomeDeSaida = (titulo: string) => nomeDeArquivo(titulo.replace(/\.(wav|mp3|m4a|opus|ogg|flac|mid)$/i, '').replace(/[\\/:*?"<>|\x00-\x1f]+/g, '-'), {vazio: 'musica'});
 
 /** Codificação de cada formato com perda: AAC no M4A (o mesmo codificador da exportação do vídeo) e Opus. */
 const CODIFICAR: Record<'m4a' | 'opus', string[]> = {m4a: ['-c:a', 'libfdk_aac', '-b:a', '256k', '-movflags', '+faststart', '-f', 'mp4'] /* o ffmpeg do Remotion não tem o ipod */, opus: ['-c:a', 'libopus', '-b:a', '192k']};

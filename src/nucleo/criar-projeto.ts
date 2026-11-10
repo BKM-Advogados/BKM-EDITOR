@@ -5,6 +5,7 @@
 // tela inicial também importa. Um kit de marca entra depois, por aplicarMarcaAoPlano: tema do documento, logo em
 // midia/ e fontes em fontes/. Projeto com vídeo ou imagem ganha no CLAUDE.md a seção "Pesquisa" (pesquisa/, docs/pesquisa.md);
 // no modelo modelo-carrossel, que copia o CLAUDE.md do exemplo, a seção já vem no exemplo (e é acrescentada se faltar).
+import {ehNomeReservado} from './nome-de-arquivo';
 import {copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import jsonpatch, {type Operation} from 'fast-json-patch';
@@ -43,7 +44,8 @@ export const nomeDePasta = (nome: string) => {
     .trim()
     .slice(0, 60)
     .replace(/[. ]+$/, '');
-  return /^(con|prn|aux|nul|com\d|lpt\d)$/i.test(limpo) || !limpo ? `Projeto ${limpo}`.trim() : limpo;
+  // nome reservado do Windows, também com extensão ("nul.x", nome-de-arquivo.ts)
+  return ehNomeReservado(limpo) || !limpo ? `Projeto ${limpo}`.trim() : limpo;
 };
 
 /** Pasta que ainda não existe dentro de `raiz`: "Nome", "Nome (2)", "Nome (3)"... */
