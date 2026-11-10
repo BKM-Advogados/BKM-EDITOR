@@ -30,7 +30,9 @@ for (const a of passos) {
     if (!ok) console.log('NÃO ACHEI botão:', a.texto);
   }
   else if (a.title) { const ok = await p.evaluate((t) => { const el = [...document.querySelectorAll('[title],[aria-label]')].find((e) => (e.title || e.getAttribute('aria-label') || '').startsWith(t)); if (!el) return false; el.click(); return true; }, a.title); if (!ok) console.log('NÃO ACHEI title:', a.title); }
+  else if (a.opt) { await p.locator('select', {has: p.locator(`option:text-is("${a.opt}")`)}).first().selectOption({label: a.opt}); }
   else if (a.sel) { await p.locator('select').nth(a.sel[0]).selectOption({label: a.sel[1]}); }
+  else if (a.wheel) { await p.mouse.move(S(a.wheel[0]), S(a.wheel[1])); if (a.ctrl) await p.keyboard.down('Control'); await p.mouse.wheel(0, a.wheel[2]); if (a.ctrl) await p.keyboard.up('Control'); }
   else if (a.press) await p.keyboard.press(a.press);
   else if (a.type) await p.keyboard.type(a.type, {delay: 20});
   else if (a.js) { try { console.log('JS:', JSON.stringify(await p.evaluate(a.js))); } catch (e) { console.log('JSERR', e.message); } }

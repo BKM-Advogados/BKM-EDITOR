@@ -2,7 +2,8 @@
 // "Ouvir como no vídeo") e, embaixo, o sequenciador de passos do padrão em foco ou o mixer. Aqui também o motor fica em
 // dia com o documento: cada mudança refaz o som (só o que mudou) e a cabeça anda enquanto toca.
 import React, {useEffect, useMemo, useState} from 'react';
-import {Mic, Pause, Play, Repeat, Square, Timer, Tv, Clapperboard} from 'lucide-react';
+import {Mic, Pause, Play, Repeat, Square, Timer, Tv, Clapperboard, Download} from 'lucide-react';
+import {BotaoMenu} from '../../componentes/Menu';
 import {resolverMusica, NOME_PECA, PECAS, posicaoEmCompasso, type DocMusica, type PecaBateria} from '../../../nucleo/musica';
 import {PianoRoll} from './PianoRoll';
 import {VideoNaMusica} from './VideoNaMusica';
@@ -15,7 +16,7 @@ import {MODELOS_MUSICA} from '../../../nucleo/musica-modelos';
 import {numeroBr} from '../../componentes/Campos';
 import {docMusica, musica, selecionarMusica, transicaoAberta, useMusica} from './estado';
 import {motor, vozGuiaDe} from './motor';
-import {campo, campoFaixa, estilo, forcaDaNota, novaBateria, novoPadrao, passo, novaMusicaDoModelo} from './acoes';
+import {campo, campoFaixa, estilo, exportarMusica, forcaDaNota, novaBateria, novoPadrao, passo, novaMusicaDoModelo} from './acoes';
 
 export const useDocMusica = () => {
   const id = useLoja((e) => e.ativo.musica);
@@ -137,7 +138,7 @@ const Transporte: React.FC<{doc: DocMusica}> = ({doc}) => {
     <div className="musica-transporte">
       <button className="bti" title={tocando ? 'Pausar (Espaço)' : 'Tocar (Espaço)'} onClick={tocarOuPausar}>{tocando ? <Pause size={16} /> : <Play size={16} />}</button>
       <button className="bti" title="Parar e voltar ao começo" onClick={parar}><Square size={14} /></button>
-      <span className="pos" title="Compasso.tempo · minutos:segundos">{posicaoEmCompasso(batida, m.compasso).split('+')[0]}<small>{tempoTexto(cabeca)} / {tempoTexto(m.duracao_s)}</small></span>
+      <span className="pos" title={`Compasso.tempo · minutos:segundos${motor.ultimoRender_ms ? ` (o som foi refeito em ${motor.ultimoRender_ms} ms na última mudança)` : ''}`}>{posicaoEmCompasso(batida, m.compasso).split('+')[0]}<small>{tempoTexto(cabeca)} / {tempoTexto(m.duracao_s)}</small></span>
       <span className="sep" />
       <label title="Batidas por minuto">BPM <input className="campo bpm" value={bpm} onChange={(e) => setBpm(e.target.value)}
         onBlur={() => {
@@ -162,7 +163,16 @@ const Transporte: React.FC<{doc: DocMusica}> = ({doc}) => {
             <Clapperboard size={15} /></button>
         </>
       )}
-      <span className="estado" title="Quanto o som levou para ser refeito depois da última mudança">{renderizando ? 'atualizando a trilha no vídeo…' : motor.ultimoRender_ms ? `refeito em ${motor.ultimoRender_ms} ms` : ''}</span>
+      <span className="estado" title="Quanto o som levou para ser refeito depois da última mudança">{renderizando ? 'atualizando a trilha no vídeo…' : ''}</span>
+      <BotaoMenu titulo="Exportar a música em arquivo (pasta saidas do projeto)" icone={<Download size={14} />} rotulo="Exportar" className="bt" lado="direita"
+        itens={[
+          {rotulo: 'WAV (24 bits)', acao: () => void exportarMusica({formato: 'wav'})},
+          {rotulo: 'WAV e um WAV por faixa (stems)', acao: () => void exportarMusica({formato: 'wav', stems: true})},
+          {rotulo: 'M4A (AAC)', acao: () => void exportarMusica({formato: 'm4a'})},
+          {rotulo: 'Opus', acao: () => void exportarMusica({formato: 'opus'})},
+          'sep',
+          {rotulo: 'MIDI (só as notas)', acao: () => void exportarMusica({formato: 'mid'})},
+        ]} />
     </div>
   );
 };

@@ -362,7 +362,7 @@ const InspectorDocumento: React.FC<{doc: DocMusica; id: string}> = ({doc, id}) =
           <CampoLeitura rotulo="Publicar">{licencas.pode_publicar ? 'pode' : 'falta dizer a licença (no inspetor do clipe)'}</CampoLeitura>
           {licencas.creditos.length > 0 && <CampoLeitura rotulo="Créditos">{licencas.creditos.join(' · ')}</CampoLeitura>}
         </Secao>
-        <Secao titulo="Exportar" chave="musica:exportar" fechadaDePadrao>
+        <Secao titulo="Exportar" chave="musica:exportar">
           <CampoSelecao rotulo="Formato" valor={formato} opcoes={[['wav', 'WAV (24 bits)'], ['m4a', 'M4A (AAC)'], ['opus', 'Opus'], ['mid', 'MIDI (só as notas)']]}
             aoMudar={(v) => setFormato(v as FormatoMusica)} />
           {formato !== 'mid' && <CampoInterruptor rotulo="Stems" valor={stems} aoMudar={setStems} texto="um WAV por faixa e por retorno" />}

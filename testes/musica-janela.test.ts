@@ -6,7 +6,7 @@ import path from 'node:path';
 import {afterAll, describe, expect, it} from 'vitest';
 import {CANAL, type RespostaJanela} from '../src/compartilhado/api';
 import {criarPonteJanela} from '../src/main/ponte-janela';
-import {servicoDeRender} from '../src/main/musica-render';
+import {servicoDeRender, nomeDeSaida} from '../src/main/musica-render';
 import {gravarWav} from '../src/main/ffmpeg-som';
 import {envelopeDeAmostras} from '../src/nucleo/audio';
 import {medirAmostras} from '../src/nucleo/loudness';
@@ -88,5 +88,14 @@ describe('ponte com a janela', () => {
     const r = await servicoDeRender({janela: ponte}).renderizar(p, 'musica');
     expect(r.medida.feito_por).toBe('processo');
     expect(p.existe(r.arquivo)).toBe(true);
+  });
+});
+
+describe('nome do arquivo exportado', () => {
+  it('tira da música o .wav que veio do nome do áudio e os caracteres que o Windows recusa', () => {
+    expect(nomeDeSaida('musica.wav')).toBe('musica');
+    expect(nomeDeSaida('Trilha final.MP3')).toBe('Trilha final');
+    expect(nomeDeSaida('a/b:c?')).toBe('a-b-c-');
+    expect(nomeDeSaida('')).toBe('musica');
   });
 });

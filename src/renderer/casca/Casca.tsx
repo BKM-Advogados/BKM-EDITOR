@@ -26,6 +26,7 @@ import {Rodape} from './Rodape';
 import {PaineisMusica} from '../modulos/musica/paineis'; // frente Música
 import {FaixaTransicao} from '../modulos/musica/FaixaTransicao';
 import {observarMusica} from '../modulos/musica/estado';
+import {exportarMusica} from '../modulos/musica/acoes';
 import {PainelMarca} from './PainelMarca';
 import './casca.css';
 
@@ -153,7 +154,7 @@ const layoutPadrao = (api: DockviewApi, area: Area, faixa: Faixa, o: Orientacao)
     abasDoInspector(true);
   } else {
     // vídeo horizontal, imagem, 3D e efeitos: monitor largo; à direita o terminal em cima e, embaixo dele, lista e propriedades
-    if (temLinha) api.addPanel({id: 'linha', component: 'linha', title: 'Linha do tempo', position: {referencePanel: 'monitor', direction: 'below'}, initialHeight: 200});
+    if (temLinha) api.addPanel({id: 'linha', component: 'linha', title: 'Linha do tempo', position: {referencePanel: 'monitor', direction: 'below'}, initialHeight: area === 'musica' ? Math.max(230, Math.round(H * 0.4)) : 200}); // o arranjo da Música tem uma linha por canal e a da automação
     api.addPanel({id: 'terminal', component: 'terminal', title: 'Claude', position: {direction: 'right'}, initialWidth: Math.min(620, Math.round(W * 0.42))});
     api.addPanel({id: 'lista', component: 'lista', title: 'Lista', position: {referencePanel: 'terminal', direction: 'below'}, initialHeight: Math.round(H * 0.5)});
     api.addPanel({id: 'inspector', component: 'inspector', title: 'Propriedades', position: {referencePanel: 'lista', direction: 'right'}});
@@ -177,7 +178,7 @@ const exportarArea = () => {
   const e = loja.get();
   const id = e.area === 'efeitos' ? e.alvoEfeitos : e.area === '3d' ? undefined : e.ativo[e.area];
   const modulo = e.info?.manifesto.documentos.find((d) => d.id === id)?.modulo;
-  if (modulo === 'musica') return avisar('A música vai para o vídeo pelo "Pôr no vídeo" (ou "Concluir e voltar"); exportar a música em arquivo vem depois.', 'info'); // frente Música
+  if (modulo === 'musica') return void exportarMusica({formato: 'wav'}); // frente Música: WAV a −14 LUFS em saidas/; outros formatos no botão Exportar do transporte
   if (!id || !modulo || modulo === '3d') return avisar(e.area === '3d' ? 'A cena 3D ainda não exporta.' : 'Nada para exportar nesta área.', 'info');
   abrirDialogoExportar(id);
 };
@@ -419,7 +420,7 @@ export const Casca: React.FC = () => {
   const alvoEfeitos = useLoja((e) => e.alvoEfeitos);
   const idDoc = area === 'efeitos' ? alvoEfeitos : (ativo as Record<string, string | undefined>)[area];
   const docAtivo = info?.manifesto.documentos.find((d) => d.id === idDoc);
-  const podeExportar = Boolean(docAtivo && docAtivo.modulo !== '3d' && docAtivo.modulo !== 'musica');
+  const podeExportar = Boolean(docAtivo && docAtivo.modulo !== '3d');
 
   return (
     <div className="casca">
@@ -481,7 +482,8 @@ export const Casca: React.FC = () => {
           </button>
           <button className="bt fantasma" onClick={() => void desfazer()} title="Desfazer a sua última edição (Ctrl+Z)"><Undo2 size={15} /></button>
           <button className="bt exportar" disabled={!podeExportar} onClick={exportarArea}
-            title={podeExportar ? `Exportar ${docAtivo!.modulo === 'video' ? 'o vídeo' : 'a imagem'} para a pasta saidas… (Ctrl+Shift+E)` : docAtivo?.modulo === 'musica' ? 'A música vai para o vídeo pelo "Pôr no vídeo"' : 'A cena 3D ainda não exporta'}>
+            title={podeExportar ? (docAtivo!.modulo === 'musica' ? 'Exportar a música em WAV para a pasta saidas (M4A, Opus, MIDI e stems: botão Exportar do transporte) (Ctrl+Shift+E)'
+              : `Exportar ${docAtivo!.modulo === 'video' ? 'o vídeo' : 'a imagem'} para a pasta saidas… (Ctrl+Shift+E)`) : 'A cena 3D ainda não exporta'}>
             <Download size={15} />Exportar
           </button>
         </div>

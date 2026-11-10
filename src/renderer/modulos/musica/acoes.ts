@@ -177,8 +177,10 @@ export const exportarMusica = async (pedido: PedidoExportarMusica) => {
     const r = await window.estudio.musica.exportar(id, pedido);
     const m = r.medida;
     const lufs = r.arquivo_lufs ?? m?.lufs;
-    avisar(`Exportada em ${r.arquivos[0]}${lufs !== undefined && lufs !== null ? ` (${String(lufs).replace('.', ',')} LUFS)` : ''}${r.arquivos.length > 1 ? ` e ${r.arquivos.length - 1} stems` : ''}`, 'ok');
-    for (const a of r.avisos) avisar(a, 'info');
+    // os avisos primeiro: o rodapé mostra o último, e o que a pessoa quer saber é onde o arquivo ficou
+    for (const a of r.avisos) avisar(a.replace(' (diga no inspetor do clipe ou em /licencas)', ' (diga a licença no inspetor do clipe)'), 'info');
+    const stems = r.arquivos.filter((a) => a.includes(' - stems/')).length;
+    avisar(`Exportada em ${r.arquivos[0]}${lufs !== undefined && lufs !== null ? ` (${String(lufs).replace('.', ',')} LUFS)` : ''}${stems ? ` e ${stems} stems` : ''}`, 'ok');
     return r;
   } catch (e) {
     avisar(mensagemDe(e), 'erro');

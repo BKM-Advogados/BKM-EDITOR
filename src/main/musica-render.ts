@@ -133,7 +133,7 @@ export const servicoDeRender = (o: {binarios?: () => string | null | undefined; 
 });
 
 /** Nome de arquivo a partir do título (sem os caracteres que o Windows recusa). */
-export const nomeDeSaida = (titulo: string) => titulo.replace(/[\\/:*?"<>|\x00-\x1f]+/g, '-').replace(/\s+/g, ' ').trim().replace(/[. ]+$/, '') || 'musica';
+export const nomeDeSaida = (titulo: string) => titulo.replace(/\.(wav|mp3|m4a|opus|ogg|flac|mid)$/i, '').replace(/[\\/:*?"<>|\x00-\x1f]+/g, '-').replace(/\s+/g, ' ').trim().replace(/[. ]+$/, '') || 'musica';
 
 /** Codificação de cada formato com perda: AAC no M4A (o mesmo codificador da exportação do vídeo) e Opus. */
 const CODIFICAR: Record<'m4a' | 'opus', string[]> = {m4a: ['-c:a', 'libfdk_aac', '-b:a', '256k', '-movflags', '+faststart', '-f', 'mp4'] /* o ffmpeg do Remotion não tem o ipod */, opus: ['-c:a', 'libopus', '-b:a', '192k']};

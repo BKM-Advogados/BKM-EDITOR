@@ -4,18 +4,19 @@
 // "inicio" do padrão, então o que toca fica no lugar), clicar seleciona, clicar na régua leva a cabeça. Teclas na área
 // Música: Espaço toca, S divide o clipe na cabeça, Delete apaga, L repete o clipe, Home volta ao começo.
 import React, {useEffect, useMemo, useRef, useState} from 'react';
-import {Volume2, VolumeX} from 'lucide-react';
+import {Volume2, VolumeX, ZoomIn, ZoomOut} from 'lucide-react';
 import {iconeDoCanal} from './Inspector';
 import {acordeDe} from '../../../nucleo/musica-teoria';
 import {posicaoEmCompasso, resolverMusica, type ClipeMusicaP, type DocMusica} from '../../../nucleo/musica';
 import {notasDoClipe} from '../../../nucleo/musica-som';
 import {cortesDoVideo} from '../../../nucleo/musica-video';
 import type {DocCenas} from '../../../nucleo/cenas';
-import {loja, useLoja} from '../../estado/loja';
+import {avisar, loja, useLoja} from '../../estado/loja';
 import {musica, selecionarMusica, useMusica} from './estado';
 import {arranjar, apagarSelecionado, campo, dividirNaCabeca} from './acoes';
 import {alternarLoop, parar, tocarOuPausar, useDocMusica} from './Monitor';
 import {motor, urlDaMidia} from './motor';
+import {CabecaAutomacao, LinhaAutomacao} from './AutomacaoArranjo';
 import type {Envelope} from '../../../nucleo/audio';
 
 type Arrasto = {id: string; modo: 'mover' | 'ini' | 'fim'; x0: number; db: number; livre: boolean};
@@ -115,6 +116,44 @@ const Arranjo: React.FC<{doc: DocMusica}> = ({doc}) => {
   const [arrasto, setArrasto] = useState<Arrasto | null>(null);
   const [secaoArrastada, setSecaoArrastada] = useState<{id: string; x0: number; db: number} | null>(null);
   const rolo = useRef<HTMLDivElement>(null);
+  const cabecas = useRef<HTMLDivElement>(null);
+  // "pintar": arrastar no vazio de um canal de bateria ou de sintetizador põe um clipe do padrão em compassos inteiros
+  const [pintura, setPintura] = useState<{canal: string; x0: number; a: number; b: number; max: number} | null>(null);
+  const pintou = useRef(false);
+  const padraoParaPintar = (canalId: string) => {
+    const s = selecao;
+    const clipe = s?.tipo === 'clipe' ? doc.arranjo.clipes.find((c) => c.id === s.id) : undefined;
+    if (clipe?.padrao && clipe.canal === canalId) return clipe.padrao;
+    const sp = s?.tipo === 'padrao' ? doc.padroes.find((p) => p.id === s.id) : undefined;
+    if (sp?.canal === canalId) return sp.id;
+    const ultimo = [...doc.arranjo.clipes].reverse().find((c) => c.canal === canalId && c.padrao);
+    return ultimo?.padrao ?? doc.padroes.find((p) => p.canal === canalId)?.id;
+  };
+  const pintarComeco = (e: React.PointerEvent<HTMLDivElement>, canalId: string, tipo: string) => {
+    if (e.button !== 0 || tipo === 'audio') return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const b = (e.clientX - e.currentTarget.getBoundingClientRect().left) / px;
+    const a = Math.floor(b / bpc) * bpc;
+    const proximo = doc.arranjo.clipes.filter((c) => c.canal === canalId && c.em >= a + 1e-6).reduce((mn, c) => Math.min(mn, c.em), Infinity);
+    setPintura({canal: canalId, x0: e.clientX, a, b: a + bpc, max: proximo});
+  };
+  const pintarMover = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!pintura) return;
+    const b = (e.clientX - e.currentTarget.getBoundingClientRect().left) / px;
+    const fim = Math.max(pintura.a + bpc, Math.ceil(b / bpc) * bpc);
+    setPintura({...pintura, b: Math.min(fim, pintura.max)});
+  };
+  const pintarFim = async (e: React.PointerEvent<HTMLDivElement>) => {
+    const p = pintura;
+    setPintura(null);
+    if (!p || Math.abs(e.clientX - p.x0) < 8) return;
+    pintou.current = true;
+    const padrao = padraoParaPintar(p.canal);
+    if (!padrao) return avisar('Este canal ainda não tem padrão: crie um em Passos (+ Padrão) e arraste de novo', 'info');
+    const r = await arranjar({acao: 'por', canal: p.canal, padrao, em: p.a, dur: p.b - p.a});
+    const id = r?.extra?.clipe as string | undefined;
+    if (id) selecionarMusica({tipo: 'clipe', id});
+  };
   const bpc = m.batidas_por_compasso;
   const total = Math.max(16 * bpc, Math.ceil((m.duracao_batidas + 4 * bpc) / bpc) * bpc);
   const cortes = useMemo(() => (video ? cortesDoVideo(video).map((ms) => ({ms, b: (ms - (doc.video?.em_ms ?? 0)) / 1000 / m.seg_por_batida})).filter((x) => x.b > 0) : []),
@@ -166,11 +205,19 @@ const Arranjo: React.FC<{doc: DocMusica}> = ({doc}) => {
     musica.definir({cabeca_s: s});
     if (motor.estaTocando()) (motor.parar(), tocarOuPausar());
   };
-  const zoom = (e: React.WheelEvent) => {
-    if (!e.ctrlKey) return;
-    e.preventDefault();
-    musica.definir((s) => ({pxPorBatida: Math.min(160, Math.max(6, s.pxPorBatida * (e.deltaY < 0 ? 1.15 : 1 / 1.15)))}));
-  };
+  const zoomar = (f: number) => musica.definir((s) => ({pxPorBatida: Math.min(160, Math.max(6, s.pxPorBatida * f))}));
+  // Ctrl + roda do mouse: o ouvinte tem de ser nativo e não passivo para o preventDefault valer (o do React é passivo)
+  useEffect(() => {
+    const el = rolo.current;
+    if (!el) return;
+    const roda = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      zoomar(e.deltaY < 0 ? 1.15 : 1 / 1.15);
+    };
+    el.addEventListener('wheel', roda, {passive: false});
+    return () => el.removeEventListener('wheel', roda);
+  }, []);
   const nomeDoClipe = (c: ClipeMusicaP) => {
     if (c.audio) return `${(c.audio.split('/').pop() ?? '').replace(/\.[0-9a-f]{16}(?=\.\w+$)/, '')}${c.corte_s ? ` · desde ${c.corte_s.toFixed(1)} s` : ''}`;
     const p = c.padrao ? doc.padroes.find((x) => x.id === c.padrao) : undefined;
@@ -179,8 +226,12 @@ const Arranjo: React.FC<{doc: DocMusica}> = ({doc}) => {
 
   return (
     <div className="arranjo">
-      <div className="cabecas">
-        <div className="cab-regua">{m.bpm} BPM · {m.compasso[0]}/{m.compasso[1]}</div>
+      <div className="cabecas" ref={cabecas}>
+        <div className="cab-regua">{m.bpm} BPM · {m.compasso[0]}/{m.compasso[1]}
+          <span className="zoom-botoes">
+            <button className="bti" title="Afastar (Ctrl + roda do mouse)" onClick={() => zoomar(1 / 1.3)}><ZoomOut size={12} /></button>
+            <button className="bti" title="Aproximar (Ctrl + roda do mouse)" onClick={() => zoomar(1.3)}><ZoomIn size={12} /></button>
+          </span></div>
         {doc.secoes?.length ? <div className="cab-acordes" style={{color: 'var(--comentario)'}}>Seções</div> : null}
         {doc.acordes?.length ? <div className="cab-acordes">Acordes · {doc.tom ?? 'C'} {doc.escala ?? 'maior'}</div> : null}
         {m.canais.map((c, i) => (
@@ -193,8 +244,10 @@ const Arranjo: React.FC<{doc: DocMusica}> = ({doc}) => {
             <button className={`bti${c.solo ? ' ligado' : ''}`} title="Solo" onClick={(e) => (e.stopPropagation(), void campo(`/canais/${i}/solo`, c.solo ? undefined : true, `solo em ${c.nome}`))}>S</button>
           </div>
         ))}
+        <CabecaAutomacao doc={doc} />
+        <div style={{height: 16}} /> {/* o espaço da barra de rolagem horizontal do arranjo: o fim das duas colunas coincide */}
       </div>
-      <div className="rolo" ref={rolo} onWheel={zoom} onClick={() => selecionarMusica(null)}>
+      <div className="rolo" ref={rolo} onScroll={(e) => { if (cabecas.current) cabecas.current.scrollTop = e.currentTarget.scrollTop; }} onClick={() => selecionarMusica(null)}>
         <div className="tela" style={{width: total * px + 40}}>
           <div className="regua" onClick={(e) => (e.stopPropagation(), irPara(e))} title="Clique para levar a cabeça; Ctrl + roda do mouse muda o zoom">
             {Array.from({length: Math.ceil(total / bpc)}, (_, k) => <span key={k} className="compasso" style={{left: k * bpc * px, width: bpc * px}}>{k + 1}</span>)}
@@ -232,13 +285,19 @@ const Arranjo: React.FC<{doc: DocMusica}> = ({doc}) => {
           {px >= 14 && Array.from({length: total}, (_, b) => (b % bpc ? <span key={`b${b}`} className="grade" style={{left: b * px}} /> : null))}
           {cortes.map((c) => <span key={c.ms} className="corte" style={{left: c.b * px}}><span>corte {(c.ms / 1000).toFixed(1)} s</span></span>)}
           {m.canais.map((canal) => (
-            <div key={canal.id} className="linha-canal">
+            <div key={canal.id} className={`linha-canal${canal.tipo === 'audio' ? '' : ' pintavel'}`}
+              onPointerDown={(e) => pintarComeco(e, canal.id, canal.tipo)} onPointerMove={pintarMover} onPointerUp={(e) => void pintarFim(e)} onPointerCancel={() => setPintura(null)}
+              onClick={(e) => { if (pintou.current) { pintou.current = false; e.stopPropagation(); } }}
+              title={canal.tipo === 'audio' ? undefined : 'Arraste no vazio para pintar o padrão em compassos inteiros'}>
+              {pintura?.canal === canal.id && <span className="mclipe fantasma" style={{left: pintura.a * px, width: Math.max(6, (pintura.b - pintura.a) * px - 1)}}>
+                <span className="txt">{doc.padroes.find((x) => x.id === padraoParaPintar(canal.id))?.nome ?? 'sem padrão'} · {Math.round((pintura.b - pintura.a) / bpc)} comp.</span></span>}
               {m.clipes.filter((c) => c.canal === canal.id).map((c) => (
                 <Clipe key={c.id} c={c} m={m} px={px} sel={selecao?.tipo === 'clipe' && selecao.id === c.id} arrasto={arrasto} titulo={nomeDoClipe(c)}
                   aoPegar={pegar} aoMover={mover} aoSoltar={soltar} veio={Boolean(doc.arranjo.clipes[c.indice]?.origem)} />
               ))}
             </div>
           ))}
+          <LinhaAutomacao doc={doc} px={px} largura={total * px + 40} />
           <span className="cabeca" style={{left: (cabeca / m.seg_por_batida) * px, top: 0}} />
         </div>
         {avisos.length > 0 && <div className="vazio" style={{position: 'sticky', left: 0}}>{avisos.slice(0, 3).join(' · ')}</div>}

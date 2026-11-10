@@ -29,6 +29,8 @@ export type EstadoMusica = {
   transicoes: Transicao[];
   renderizando: boolean;
   avisos: string[];
+  autoAberta?: boolean; // a linha de automação de volume no pé do arranjo
+  autoAlvo?: string; // 'master' ou o id de uma faixa do mixer
   focoNotas: boolean; // o piano roll tem notas selecionadas ou o teclado ligado: Delete, setas e letras são dele
 };
 

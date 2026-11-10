@@ -138,3 +138,23 @@
 .selo-licenca.credito { color: var(--comentario); }
 .selo-licenca.sem_licenca { color: #ff8a65; border-color: #ff8a65; }
 .modelos-musica { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+
+/* automação desenhada no arranjo (item 22) */
+.arranjo .cab-auto { display: flex; flex-direction: column; gap: 4px; padding: 3px 6px; border-bottom: 1px solid var(--borda); background: var(--fundo-2); overflow: hidden; }
+.arranjo .cab-auto-alternar { display: flex; align-items: center; gap: 3px; background: none; border: 0; color: var(--texto-2); padding: 0; cursor: pointer; font-size: 11px; text-align: left; }
+.arranjo .cab-auto select { height: 20px; font-size: 11px; padding: 0 4px; }
+.arranjo .cab-auto .dica { font-size: 10px; color: var(--texto-3); }
+.arranjo .auto-lane { display: block; background: var(--fundo-2); border-bottom: 1px solid var(--borda); cursor: crosshair; }
+.arranjo .auto-lane .regua-db { stroke: #ffffff10; }
+.arranjo .auto-lane .zero { stroke: #ffffff26; stroke-dasharray: 3 3; }
+.arranjo .auto-lane .rotulo-db { fill: var(--texto-3); font-size: 9px; pointer-events: none; }
+.arranjo .auto-lane .curva { fill: none; stroke: var(--comentario); stroke-width: 1.5; pointer-events: none; }
+.arranjo .auto-lane .curva.fader { stroke: var(--texto-3); stroke-dasharray: 4 3; }
+.arranjo .auto-lane .cab { stroke: var(--cabeca); stroke-width: 1; pointer-events: none; }
+.arranjo .auto-lane .ponto { fill: var(--comentario); stroke: #000; stroke-width: 1; cursor: grab; }
+.arranjo .auto-lane .ponto.ativo, .arranjo .auto-lane .ponto:hover { fill: #fff; cursor: grabbing; }
+.arranjo .auto-lane .rotulo-ponto { fill: #fff; font-size: 10px; pointer-events: none; }
+.arranjo .linha-canal.pintavel { cursor: crosshair; }
+.mclipe.fantasma { opacity: 0.55; border-style: dashed; pointer-events: none; }
+.arranjo .cab-regua .zoom-botoes { margin-left: auto; display: flex; gap: 2px; }
+.arranjo .cab-regua .zoom-botoes .bti { width: 20px; height: 20px; }
