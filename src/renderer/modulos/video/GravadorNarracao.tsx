@@ -71,7 +71,7 @@ export const GravadorNarracao: React.FC<{documento: string; aoFechar: () => void
       setEstado('gravando');
     } catch (e) {
       setEstado('parado');
-      avisar(`Não deu para abrir o microfone: ${mensagemDe(e)}. Confira em Configurações do Windows › Privacidade › Microfone.`, 'erro');
+      avisar(`Não deu para abrir o microfone: ${mensagemDe(e)}. ${/Windows/.test(navigator.userAgent) ? 'Confira em Configurações do Windows › Privacidade › Microfone.' : 'Confira o microfone nas configurações de som do sistema (PipeWire ou PulseAudio).'}`, 'erro');
     }
   };
   const parar = async () => {

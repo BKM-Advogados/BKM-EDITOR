@@ -67,9 +67,9 @@ ${t.ficha.url_pagina}` : t.caminho}
         ))}
       </div>
       <div className="rodape">
-        <span className="meta" title={lista?.pasta}>{lista ? lista.pasta.split(/[\\/]/).slice(-2).join('\\') : ''}</span>
+        <span className="meta" title={lista?.pasta}>{lista ? lista.pasta.split(/[\\/]/).slice(-2).join('/') : ''}</span>
         <span className="espaco" />
-        <button className="bt fantasma mini" onClick={() => lista && window.estudio.mostrarNaPasta(lista.pasta)} disabled={!lista} title="Abrir a pasta no Explorador"><FolderOpen size={13} />Abrir</button>
+        <button className="bt fantasma mini" onClick={() => lista && window.estudio.mostrarNaPasta(lista.pasta)} disabled={!lista} title="Abrir a pasta no gerenciador de arquivos"><FolderOpen size={13} />Abrir</button>
         <button className="bt fantasma mini" onClick={() => void trocarPasta()} title="Escolher outra pasta de trilhas"><FolderSearch size={13} />Trocar pasta…</button>
       </div>
     </div>
