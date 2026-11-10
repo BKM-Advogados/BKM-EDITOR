@@ -25,7 +25,7 @@ import {tipoDe} from './tipos';
 type BlocoP = {tipo: string; em: number; sai?: number; origem?: string; texto?: string; id?: string};
 type CenaP = {tipo: string; t_in: number; t_out: number; n?: number; titulo?: string; nome?: string; tag?: string; origem?: string; blocos?: BlocoP[]};
 type Legenda = {s: number; e: number; palavras: {w: string; s?: number; e?: number}[]};
-type PropsLt = {duracao_ms: number; cenas: CenaP[]; legendas?: Legenda[]; narracao?: {trechos: TrechoNarracao[]}; composicao?: string; audio?: AudioP};
+type PropsLt = {duracao_ms: number; cenas: CenaP[]; legendas?: Legenda[]; narracao?: {trechos: TrechoNarracao[]}; composicao?: string; audio?: AudioP | string};
 type ArrastoCena = {origem: string; x0: number; dms: number; dur: number};
 type Arrasto = {origem: string; modo: 'mover' | 'ini' | 'fim'; x0: number; dms: number; em: number; fim: number};
 
@@ -167,9 +167,11 @@ export const LinhaDoTempo: React.FC = () => {
     return out;
   }, [props]);
   const nBlocos = faixas.reduce((n, f) => n + f.length, 0);
-  const nClipes = props?.audio?.faixas.reduce((n, f) => n + f.clipes.length, 0) ?? 0;
+  // só o vídeo de cenas tem faixas de áudio; nos roteiros (Cliente, tema) `audio` é o nome do arquivo da narração
+  const audioFaixas = props && typeof props.audio === 'object' && Array.isArray(props.audio.faixas) ? props.audio : undefined;
+  const nClipes = audioFaixas?.faixas.reduce((n, f) => n + f.clipes.length, 0) ?? 0;
   // clipe sem envelope (arquivo trocado à mão, projeto de outro PC): mede em segundo plano e as props voltam com a onda
-  useEffect(() => medirPendentes(props), [props]);
+  useEffect(() => medirPendentes(audioFaixas && {audio: audioFaixas}), [audioFaixas]);
 
   // palavras da fala no tempo de saída; as que não cabem sem encostar na anterior ficam de fora
   const falas = useMemo(() => {
@@ -284,7 +286,7 @@ export const LinhaDoTempo: React.FC = () => {
 
   if (!documento || !props) return <div className="vazio">{montado && 'erro' in montado ? montado.erro : 'sem vídeo'}</div>;
   // clipe de áudio que passa do fim do vídeo continua alcançável (para aparar ou arrastar de volta)
-  const fimAudio = props.audio?.faixas.reduce((m, f) => f.clipes.reduce((n, c) => Math.max(n, c.em + c.duracao_ms), m), 0) ?? 0;
+  const fimAudio = audioFaixas?.faixas.reduce((m, f) => f.clipes.reduce((n, c) => Math.max(n, c.em + c.duracao_ms), m), 0) ?? 0;
   const larguraConteudo = Math.max(largura, x(Math.max(props.duracao_ms, fimAudio)) + ESQ);
 
   // régua hierárquica: rótulos a cada passo; marcas menores quando cabem; traço de quadro a partir de 240 px/s
@@ -459,7 +461,7 @@ export const LinhaDoTempo: React.FC = () => {
               {falas.map((p, i) => <div key={i} className="palavra" style={{left: p.l}}>{p.w}</div>)}
             </div>
           )}
-          {deCenas && props.audio && <FaixasAudio documento={documento} audio={props.audio} x={x} pxs={pxs} duracaoVideo={props.duracao_ms} aoBuscar={buscar} />}
+          {deCenas && audioFaixas && <FaixasAudio documento={documento} audio={audioFaixas} x={x} pxs={pxs} duracaoVideo={props.duracao_ms} aoBuscar={buscar} />}
           {deCenas && <FaixaLegendas documento={documento} legendas={(props as {legendas_cenas?: LegendasP}).legendas_cenas} x={x} pxs={pxs} aoBuscar={buscar} />}
           <div className="cabeca" ref={cabeca} />
         </div>

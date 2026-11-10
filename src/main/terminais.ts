@@ -82,7 +82,7 @@ export class Terminais {
       // as ferramentas do projeto (MCP estudio) ficam liberadas: só mexem nos JSON do projeto, com diário e desfazer
       args = [...(o.sessao ? ['--resume', sessao] : ['--session-id', sessao]), ...(o.arquivoMcp ? ['--mcp-config', o.arquivoMcp, '--allowedTools', 'mcp__estudio'] : [])];
     } else {
-      arquivo = windows ? 'powershell.exe' : process.env.SHELL || '/bin/zsh';
+      arquivo = windows ? 'powershell.exe' : process.env.SHELL || '/bin/sh'; // /bin/sh existe em todo Linux e macOS; zsh não
       args = windows ? ['-NoLogo'] : ['-l'];
     }
     // claude.cmd do npm (transversal-D22): pelo cmd.exe, com a linha montada à mão (no Windows o node-pty aceita a linha pronta)
