@@ -13,6 +13,9 @@ let primeiraVez = true;
 // projeto novo, painel novo: a primeira montagem volta a abrir uma conversa (ou um terminal, sem o Claude)
 quandoTrocarProjeto(() => (primeiraVez = true));
 
+/** O shell que o processo principal abre: PowerShell no Windows, o `$SHELL` da pessoa nos outros (terminais.ts). */
+const NOME_DO_SHELL = /^win/i.test(navigator.platform) ? 'PowerShell' : 'shell do sistema';
+
 const ESTADO: Record<string, string> = {nova: '', pronta: '', trabalhando: 'trabalhando', precisa: 'precisa de você', hibernada: 'hibernada'};
 
 export const Terminal: React.FC = () => {
@@ -98,7 +101,7 @@ export const Terminal: React.FC = () => {
         ))}
         <span className="espaco" />
         <button className="bt fantasma mini" onClick={() => void novaConversa()} disabled={!temClaude} title={temClaude ? 'Nova conversa com o Claude' : 'Claude Code não instalado'}><Plus size={13} /><span className="rot">Claude</span></button>
-        <button className="bt fantasma mini" onClick={() => (focarTerminal(), void abrirAba('shell'))} title="Novo terminal (PowerShell)"><SquareTerminal size={13} /><span className="rot">Terminal</span></button>
+        <button className="bt fantasma mini" onClick={() => (focarTerminal(), void abrirAba('shell'))} title={`Novo terminal (${NOME_DO_SHELL})`}><SquareTerminal size={13} /><span className="rot">Terminal</span></button>
         {conversa && <button className="bt fantasma mini" onClick={() => void verNoTerminal()} title="Ver esta conversa no terminal (o mesmo Claude, em modo texto)"><IconeTerminal size={13} /></button>}
         {conversa && conversa.estado !== 'hibernada' && conversa.estado !== 'nova' && (
           <button className="bt fantasma mini" onClick={() => void hibernarConversa(conversa.id)} title="Hibernar: encerra o processo e libera a memória; a próxima mensagem volta à conversa"><Moon size={13} /></button>
