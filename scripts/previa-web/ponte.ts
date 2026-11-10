@@ -160,7 +160,7 @@ const novoDocumento = (p: Proj, modulo: Modulo, f?: {largura: number; altura: nu
   let n = 1;
   while (p.manifesto.documentos.some((d) => d.id === (n === 1 ? base : `${base}-${n}`))) n++;
   const id = n === 1 ? base : `${base}-${n}`;
-  const e: EntradaDocumento = {id, modulo, caminho: `${modulo}/${id}.json`, titulo: titulo || ({video: 'Vídeo', imagem: 'Imagem', '3d': 'Cena 3D'}[modulo] + (n > 1 ? ` ${n}` : ''))};
+  const e: EntradaDocumento = {id, modulo, caminho: `${modulo}/${id}.json`, titulo: titulo || (({video: 'Vídeo', imagem: 'Imagem', '3d': 'Cena 3D', animacao: 'Animação'} as Record<Modulo, string>)[modulo] + (n > 1 ? ` ${n}` : ''))};
   p.manifesto.documentos.push(e);
   p.docs[id] = conteudo(modulo, f);
   return e;

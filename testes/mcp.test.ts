@@ -45,11 +45,12 @@ describe('MCP estudio', () => {
   it('lista as ferramentas', async () => {
     const {tools} = await cliente.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
-      'adicionar_clipe_audio', 'agrupar_camadas', 'alinhar_camadas', 'anotar_fonte', 'aplicar_cortes_fala', 'aplicar_marca', 'aplicar_patch', 'buscar_icone', 'checar_texto', 'copiar_clipe', 'cor_da_marca', 'creditos_das_musicas',
-      'criar_comentario', 'criar_documento', 'crossfade', 'desagrupar_camadas', 'desfazer', 'destravar_camadas', 'distribuir_camadas', 'dividir_clipe', 'editar_legenda', 'escolher_trilha', 'estado_do_editor', 'exportar_legendas',
-      'fazer_lista', 'fonte_da_marca', 'guia_do_projeto', 'importar_legendas', 'inserir_icone', 'inserir_linha', 'ler_comentario', 'ler_documento', 'ler_fonte', 'ler_legendas', 'listar_comentarios', 'listar_midia',
-      'listar_mudancas', 'listar_pesquisa', 'listar_trilhas', 'marca_dagua', 'marcar_midia', 'medir_contraste_marca', 'preparar_teleprompter', 'projeto_info', 'propor_cortes_fala', 'reabrir_comentario', 'registrar_fato', 'remover_fundo',
-      'renomear_projeto', 'resolver_comentario', 'responder_comentario', 'reverter', 'selecionar_camadas', 'texto_da_fonte', 'transcrever', 'travar_camadas', 'ver_marca',
+      'adicionar_camada_animacao', 'adicionar_clipe_audio', 'agrupar_camadas', 'alinhar_camadas', 'animar', 'anotar_fonte', 'aplicar_cortes_fala', 'aplicar_marca', 'aplicar_patch', 'buscar_icone', 'checar_texto', 'copiar_clipe',
+      'cor_da_marca', 'creditos_das_musicas', 'criar_animacao', 'criar_comentario', 'criar_documento', 'crossfade', 'desagrupar_camadas', 'desfazer', 'destravar_camadas', 'distribuir_camadas', 'dividir_clipe', 'editar_legenda',
+      'efeito_pixel', 'escolher_trilha', 'estado_do_editor', 'exportar_legendas', 'fazer_lista', 'fonte_da_marca', 'guia_do_projeto', 'importar_legendas', 'inserir_icone', 'inserir_linha', 'ler_comentario', 'ler_documento',
+      'ler_fonte', 'ler_legendas', 'listar_comentarios', 'listar_midia', 'listar_mudancas', 'listar_pesquisa', 'listar_trilhas', 'marca_dagua', 'marcar_midia', 'medir_contraste_marca', 'pixelizar_imagem', 'preparar_teleprompter',
+      'projeto_info', 'propor_cortes_fala', 'reabrir_comentario', 'registrar_fato', 'remover_fundo', 'renomear_projeto', 'resolver_comentario', 'responder_comentario', 'reverter', 'selecionar_camadas', 'texto_da_fonte', 'transcrever',
+      'travar_camadas', 'ver_animacao', 'ver_marca',
     ]);
   });
 

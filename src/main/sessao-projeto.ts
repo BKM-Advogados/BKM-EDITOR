@@ -9,6 +9,7 @@ import chokidar, {type FSWatcher} from 'chokidar';
 import {PASTA_INTERNA, Projeto} from '../nucleo/projeto';
 import {ErroRoteiro, resolverRoteiro, type Palavra, type Roteiro} from '../nucleo/roteiro/resolver';
 import {ehDocCenas, resolverCenas} from '../nucleo/cenas';
+import {ehDocAnimacao, resolverAnimacao} from '../nucleo/animacao';
 import {FORMATO_PADRAO} from '../nucleo/formatos';
 import type {DocVideo} from '../nucleo/documentos';
 import type {PropsVideo} from '../compartilhado/api';
@@ -123,6 +124,10 @@ export class SessaoProjeto {
     try {
       const rel = this.projeto.arquivoDoDocumento(documento);
       const {doc} = this.projeto.lerJson<DocVideo>(rel);
+      if (ehDocAnimacao(doc)) {
+        const {props, avisos} = resolverAnimacao(doc, `${base}/midia`);
+        return {props, avisos};
+      }
       if (ehDocCenas(doc)) {
         // os envelopes medidos (midia/*.envelope.json) entram nas props: prévia e exportação veem o mesmo ducking
         const {props, avisos} = resolverCenas(doc, {envelopes: lerEnvelopes(this.projeto, doc)});

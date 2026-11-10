@@ -4,10 +4,12 @@ import {FPS} from './anim';
 import {COMPOSICOES} from './registro';
 import {TEMA_NEUTRO} from '../nucleo/cenas';
 import {FORMATO_PADRAO} from '../nucleo/formatos';
+import {novaAnimacao} from '../nucleo/animacao';
 
 const VAZIO = {duracao_ms: 3000, audio: '', legendas: [], cenas: [{tipo: 'final', t_in: 0, t_out: 3000, ev: {}}], total_partes: 0, rotulo_partes: '',
   marca: {nome: '', site: '', insta: ''}, decisao: {titulo: '', linha: ''}, final: {titulo: '', aviso: ''}, duvida: {pergunta: '', resposta: ''}, sons: []};
 const VAZIO_CENAS = {composicao: 'VideoCenas', duracao_ms: 3000, ...FORMATO_PADRAO, tema: TEMA_NEUTRO, cenas: [], efeitos: []};
+const VAZIO_ANIMACAO = {composicao: 'Animacao', ...novaAnimacao(FORMATO_PADRAO.largura, FORMATO_PADRAO.altura)};
 
 type Medidas = {duracao_ms: number; largura?: number; altura?: number; fps?: number};
 
@@ -40,6 +42,21 @@ export const Root: React.FC = () => (
       calculateMetadata={({props}) => ({
         durationInFrames: Math.max(1, Math.ceil(((props as unknown as Medidas).duracao_ms / 1000) * FPS)),
       })}
+    />
+    <Composition
+      id="Animacao"
+      component={COMPOSICOES.Animacao}
+      fps={FPS}
+      width={FORMATO_PADRAO.largura}
+      height={FORMATO_PADRAO.altura}
+      durationInFrames={FPS * 3}
+      defaultProps={VAZIO_ANIMACAO as unknown as Record<string, unknown>}
+      calculateMetadata={({props}) => {
+        const p = props as unknown as Medidas & {fps?: number};
+        const fps = p.fps ?? FPS;
+        return {fps, width: p.largura ?? FORMATO_PADRAO.largura, height: p.altura ?? FORMATO_PADRAO.altura,
+          durationInFrames: Math.max(1, Math.ceil((p.duracao_ms / 1000) * fps))};
+      }}
     />
   </>
 );

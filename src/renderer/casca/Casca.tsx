@@ -8,7 +8,7 @@ import React, {Suspense, useCallback, useEffect, useRef, useState} from 'react';
 import {DockviewReact, type DockviewApi, type DockviewReadyEvent, type DockviewTheme, type IDockviewPanelHeaderProps, type IDockviewPanelProps} from 'dockview-react';
 import 'dockview-react/dist/styles/dockview.css';
 import {Blend, BookOpen, Box, Check, Copy, Download, Film, FilePlus2, FolderOpen, FolderSearch, History, Home, Image as ImageIcon, Images, LayoutPanelLeft, ListTree,
-  MessageSquare, MessageSquarePlus, MonitorPlay, Palette, Plus, Quote, Rows3, Settings, SlidersHorizontal, Sparkle, Undo2, X} from 'lucide-react';
+  MessageSquare, MessageSquarePlus, MonitorPlay, Palette, Plus, Quote, Rows3, Settings, SlidersHorizontal, Sparkle, Sparkles, Undo2, X} from 'lucide-react';
 import type {Preferencias, Recente} from '../../compartilhado/api';
 import type {Modulo} from '../../nucleo/documentos';
 import {FORMATOS_IMAGEM, FORMATOS_VIDEO} from '../../nucleo/formatos';
@@ -21,6 +21,7 @@ import type {PaineisDoModulo} from './contrato';
 import {PaineisVideo} from '../modulos/video/paineis';
 import {PaineisImagem} from '../modulos/imagem/paineis';
 import {PaineisEfeitos} from '../modulos/efeitos/paineis';
+import {PaineisAnimacao} from '../modulos/animacao/paineis';
 import {abrirDialogoExportar, RaizDialogoExportar} from '../componentes/DialogoExportar';
 import {Comentarios} from '../paineis/Comentarios';
 import {Historico} from '../paineis/Historico';
@@ -39,6 +40,7 @@ const AREAS: {id: Area; nome: string; icone: React.ReactNode; atalho: string}[] 
   {id: 'imagem', nome: 'Imagem', icone: <ImageIcon size={15} />, atalho: '2'},
   {id: '3d', nome: '3D', icone: <Box size={15} />, atalho: '3'},
   {id: 'efeitos', nome: 'Efeitos', icone: <Blend size={15} />, atalho: '4'},
+  {id: 'animacao', nome: 'Animação', icone: <Sparkles size={15} />, atalho: '6'},
 ];
 
 const Carregando: React.FC = () => <div className="vazio">carregando…</div>;
@@ -47,6 +49,7 @@ const paineisDa = (area: Area): PaineisDoModulo | null => {
   if (area === 'video') return PaineisVideo;
   if (area === 'imagem') return PaineisImagem;
   if (area === 'efeitos') return PaineisEfeitos;
+  if (area === 'animacao') return PaineisAnimacao;
   return Paineis3d;
 };
 
@@ -127,7 +130,7 @@ const gravarLayout = (area: Area, faixa: Faixa, o: Orientacao, api: DockviewApi)
 
 // O terminal fica sempre na coluna da direita: embaixo é da linha do tempo, e altura é o que falta em notebook.
 const layoutPadrao = (api: DockviewApi, area: Area, faixa: Faixa, o: Orientacao) => {
-  const temLinha = area === 'video' || area === 'efeitos';
+  const temLinha = area === 'video' || area === 'efeitos' || area === 'animacao';
   const W = window.innerWidth;
   const H = window.innerHeight;
   const abasDoInspector = (comLista: boolean) => {
@@ -165,7 +168,7 @@ const layoutPadrao = (api: DockviewApi, area: Area, faixa: Faixa, o: Orientacao)
   api.getPanel('inspector')?.api.setActive();
 };
 
-const TITULOS: Record<Area, string> = {video: 'Cenas e blocos', imagem: 'Camadas', '3d': 'Objetos', efeitos: 'Pilha de efeitos'};
+const TITULOS: Record<Area, string> = {video: 'Cenas e blocos', imagem: 'Camadas', '3d': 'Objetos', efeitos: 'Pilha de efeitos', animacao: 'Camadas'};
 
 /** Orientação do vídeo ativo, pelas props montadas (sem props ainda: vertical, o carrossel). */
 const orientacaoDe = (e: ReturnType<typeof loja.get>): Orientacao => {
@@ -348,10 +351,10 @@ export const Casca: React.FC = () => {
       const digitando = /INPUT|TEXTAREA|SELECT/.test(alvo.tagName) || alvo.isContentEditable || alvo.closest('.xterm');
       if (document.querySelector('.dialogo-fundo')) return;
       const k = ev.key.toLowerCase();
-      // Alt+1 a 4, Ctrl+' e Ctrl+S valem até com o terminal em foco (escuta na captura, antes do xterm). Ctrl+O, N e W são
+      // Alt+1 a 6, Ctrl+' e Ctrl+S valem até com o terminal em foco (escuta na captura, antes do xterm). Ctrl+O, N e W são
       // de arquivo só fora do terminal, onde o Ctrl+W apaga uma palavra (transversal-D4, atalhos.ts)
       const arquivo = acaoDeArquivo(ev, Boolean(alvo.closest('.xterm')));
-      if (ev.altKey && !ev.ctrlKey && /^Digit[1-4]$/.test(ev.code)) {
+      if (ev.altKey && !ev.ctrlKey && /^Digit[1-6]$/.test(ev.code)) {
         ev.preventDefault();
         ev.stopPropagation();
         loja.definir({area: AREAS[Number(ev.code.slice(5)) - 1].id});
@@ -378,7 +381,7 @@ export const Casca: React.FC = () => {
       } else if (ev.ctrlKey && k === 'z' && !digitando) {
         ev.preventDefault();
         void desfazer();
-      } else if (!digitando && !ev.ctrlKey && !ev.altKey && /^[1-4]$/.test(ev.key)) {
+      } else if (!digitando && !ev.ctrlKey && !ev.altKey && /^[1-6]$/.test(ev.key)) {
         loja.definir({area: AREAS[Number(ev.key) - 1].id});
       } else if (!digitando && !ev.ctrlKey && k === 'm') {
         loja.definir((s) => ({modoComentario: !s.modoComentario}));

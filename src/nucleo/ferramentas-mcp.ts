@@ -11,6 +11,7 @@ import {z} from 'zod';
 import {ErroProjeto, valorEm, type Projeto} from './projeto';
 import type {DocImagem, Modulo, OperacaoPatch} from './documentos';
 import {documentoNovo} from './criar-projeto';
+import {registrarFerramentasAnimacao} from './ferramentas-animacao';
 import {FORMATOS_IMAGEM, FORMATOS_VIDEO, formatoDoVideo} from './formatos';
 import {MARCAS_INICIAIS} from './marca';
 import {registrarMarca} from './mcp-marca';
@@ -120,6 +121,8 @@ export const criarRede = (buscar: Buscar = (url, init) => fetch(url, init), opco
 export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, autor: string, origem: string, rede?: Rede, transcritor?: TranscritorMcp, portao?: Portao) => {
   // frente IA: tudo o que for registrado daqui em diante passa pelo portão (permissão e mudanças do diário no resultado)
   instalarPortao(servidor, {projeto, origem, portao});
+  // frente Animação: depois do portão, como as outras
+  registrarFerramentasAnimacao(servidor, projeto, autor, origem);
   servidor.registerTool('projeto_info', {
     description: 'Nome do projeto, documentos (id, módulo, caminho), quantos comentários estão abertos e quantas fontes e fatos a pesquisa tem.',
     inputSchema: {},
@@ -184,7 +187,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   servidor.registerTool('criar_documento', {
     description: `Cria um documento novo no projeto (vídeo de cenas, imagem ou cena 3D) e o põe no manifesto; a tela abre sozinha. Formatos de vídeo: ${FORMATOS_VIDEO.map((f) => `${f.id} (${f.proporcao}, ${f.largura}x${f.altura})`).join(', ')}. De imagem: ${FORMATOS_IMAGEM.map((f) => `${f.id} (${f.largura}x${f.altura})`).join(', ')}. Ou largura e altura livres.`,
     inputSchema: {
-      modulo: z.enum(['video', 'imagem', '3d']),
+      modulo: z.enum(['video', 'imagem', '3d', 'animacao']),
       titulo: z.string().optional(),
       formato: z.string().optional().describe('id do formato da lista'),
       largura: z.number().int().min(16).max(7680).optional(),

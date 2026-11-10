@@ -4,7 +4,7 @@
 // cria; Enter cria com o que está marcado. Nada pergunta fps, codec ou pasta: tudo tem padrão e fica em "Mais opções".
 // Esta tela não carrega o editor (Remotion, Player, dockview): a casca vem depois, com React.lazy.
 import React, {useEffect, useMemo, useState} from 'react';
-import {ArrowUp, BookOpen, Box, Check, ChevronDown, ChevronRight, Copy, Film, FolderOpen, FolderSearch, Image as ImageIcon, MoreHorizontal, Sparkle, Trash2,
+import {ArrowUp, BookOpen, Box, Check, ChevronDown, ChevronRight, Copy, Film, FolderOpen, FolderSearch, Image as ImageIcon, MoreHorizontal, Sparkle, Sparkles, Trash2,
   TriangleAlert, X} from 'lucide-react';
 import type {Ambiente, ContaClaude, MarcaInfo, NovoProjeto, Preferencias, Recente} from '../../compartilhado/api';
 import type {Modulo} from '../../nucleo/documentos';
@@ -20,9 +20,15 @@ import './inicio.css';
 const ABAS: {id: Modulo; nome: string; icone: React.ReactNode}[] = [
   {id: 'video', nome: 'Vídeo', icone: <Film size={15} />},
   {id: 'imagem', nome: 'Imagem', icone: <ImageIcon size={15} />},
+  {id: 'animacao', nome: 'Animação', icone: <Sparkles size={15} />},
   {id: '3d', nome: '3D', icone: <Box size={15} />},
 ];
-const ICONE_MODULO: Record<Modulo, React.ReactNode> = {video: <Film size={18} />, imagem: <ImageIcon size={18} />, '3d': <Box size={18} />};
+const ICONE_MODULO: Record<Modulo, React.ReactNode> = {
+  video: <Film size={18} />,
+  imagem: <ImageIcon size={18} />,
+  animacao: <Sparkles size={18} />,
+  '3d': <Box size={18} />,
+};
 const PERSONALIZADO = 'personalizado';
 
 /** Largura e altura do tamanho livre (transversal-D17): digitar 9000 não vira 1080×1920 em silêncio. O campo guarda o texto
@@ -118,7 +124,7 @@ export const Inicio: React.FC = () => {
   const [ambiente, setAmbiente] = useState<Ambiente | null>(null);
   const [conta, setConta] = useState<ContaClaude | null>(null);
   const [recentes, setRecentes] = useState<Recente[] | null>(null);
-  const [formato, setFormato] = useState<Record<'video' | 'imagem', string>>({video: 'reels', imagem: 'feed'});
+  const [formato, setFormato] = useState<Record<'video' | 'imagem' | 'animacao', string>>({video: 'reels', imagem: 'feed', animacao: 'youtube'});
   const [livre, setLivre] = useState({largura: 1080, altura: 1080, fps: 30});
   const [larguraInvalida, setLarguraInvalida] = useState(false);
   const [alturaInvalida, setAlturaInvalida] = useState(false);
@@ -135,7 +141,7 @@ export const Inicio: React.FC = () => {
   useEffect(() => {
     void window.estudio.preferencias().then((p) => {
       setPrefs(p);
-      setFormato({video: p.formato_video, imagem: p.formato_imagem});
+      setFormato({video: p.formato_video, imagem: p.formato_imagem, animacao: 'youtube'});
     });
     void window.estudio.ambiente().then(setAmbiente);
     void lerConta().then(setConta).catch(() => setConta(null));

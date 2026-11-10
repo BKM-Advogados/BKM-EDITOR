@@ -1,0 +1,454 @@
+/* Módulo de Animação 2D e Arte em Pixel */
+
+/* Painel de Camadas */
+.painel-camadas-animacao {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-painel, #161b22);
+  color: var(--fg, #f0f6fc);
+  font-size: 13px;
+  overflow: hidden;
+}
+.pca-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--borda, rgba(255, 255, 255, 0.08));
+  font-weight: 600;
+}
+.pca-acoes {
+  display: flex;
+  gap: 4px;
+}
+.bt-acao-camada {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  color: var(--fg, #f0f6fc);
+  cursor: pointer;
+  font-size: 11px;
+}
+.bt-acao-camada:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.pca-lista {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.pca-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid transparent;
+  cursor: pointer;
+  user-select: none;
+}
+.pca-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.pca-item.selecionado {
+  background: rgba(112, 184, 255, 0.15);
+  border-color: rgba(112, 184, 255, 0.4);
+}
+.pca-item.oculta {
+  opacity: 0.5;
+}
+.bt-olho, .bt-cadeado {
+  background: transparent;
+  border: none;
+  color: inherit;
+  opacity: 0.7;
+  cursor: pointer;
+  padding: 2px;
+}
+.bt-olho:hover, .bt-cadeado:hover {
+  opacity: 1;
+}
+.pca-tipo-icone {
+  display: inline-flex;
+  opacity: 0.8;
+}
+.pca-nome-wrapper {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pca-nome {
+  display: block;
+}
+.pca-input-nome {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--azul, #70b8ff);
+  border-radius: 3px;
+  color: inherit;
+  padding: 2px 4px;
+  font-size: 12px;
+}
+.pca-botoes-item {
+  display: flex;
+  gap: 2px;
+  opacity: 0.4;
+}
+.pca-item:hover .pca-botoes-item, .pca-item.selecionado .pca-botoes-item {
+  opacity: 1;
+}
+.bt-min {
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+}
+.bt-min:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+}
+.bt-min.perigo:hover {
+  color: #ff6b6b;
+}
+
+/* Monitor de Animação */
+.painel-monitor-animacao {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #0d1117;
+  overflow: hidden;
+  position: relative;
+}
+/* o palco tem o tamanho real da cena (1080 px) e só o transform o reduz: o wrapper não pode ser flex, senão o flex
+   encolhe a largura do palco e o centraliza pelo tamanho real, jogando o desenho para fora da área visível */
+.pma-palco-wrapper {
+  flex: none;
+  display: block;
+  margin: auto;
+  position: relative;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.pma-palco {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+.pma-overlay-interacao {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+}
+.pma-borda-selecao {
+  border: 2px solid var(--azul, #70b8ff);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+.pma-transporte {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 14px;
+  background: rgba(22, 27, 34, 0.95);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.pma-controles-esq, .pma-controles-dir {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bt-transporte {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  color: var(--fg, #f0f6fc);
+  padding: 5px 9px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+.bt-transporte:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+.bt-transporte.principal {
+  background: var(--azul, #70b8ff);
+  color: #0d1117;
+}
+.bt-transporte.ativo {
+  border-color: var(--azul, #70b8ff);
+  color: var(--azul, #70b8ff);
+}
+.pma-tempo-display {
+  font-family: var(--mono, monospace);
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  margin-left: 6px;
+}
+
+/* Linha do Tempo da Animação */
+.painel-lt-animacao {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-painel, #161b22);
+  color: var(--fg, #f0f6fc);
+  overflow: hidden;
+  user-select: none;
+}
+.plt-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.15);
+}
+.plt-controles, .plt-zoom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.plt-tempo {
+  font-family: var(--mono, monospace);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--azul, #70b8ff);
+}
+.plt-duracao {
+  font-family: var(--mono, monospace);
+  font-size: 11px;
+  opacity: 0.6;
+}
+.plt-area-rolagem {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+}
+.plt-linha-regua {
+  display: flex;
+  height: 28px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.25);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+.plt-col-rotulo {
+  width: 140px;
+  min-width: 140px;
+  max-width: 140px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 500;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-painel, #161b22);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.plt-rotulo-regua {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 10px;
+  opacity: 0.7;
+}
+.plt-trilha {
+  position: relative;
+  height: 100%;
+}
+.plt-regua {
+  cursor: pointer;
+}
+.plt-marca {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.15);
+  padding-left: 3px;
+}
+.plt-marca-texto {
+  font-size: 9px;
+  font-family: var(--mono, monospace);
+  opacity: 0.6;
+}
+.plt-cabeca-marcador {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  margin-left: -6px;
+  background: #ff5252;
+  clip-path: polygon(0 0, 100% 0, 100% 60%, 50% 100%, 0 60%);
+  cursor: ew-resize;
+  z-index: 10;
+}
+.plt-guia-cabeca {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #ff5252;
+  pointer-events: none;
+  z-index: 8;
+}
+.plt-linha-camada {
+  display: flex;
+  height: 32px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+}
+.plt-linha-camada:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+.plt-linha-camada.selecionada {
+  background: rgba(112, 184, 255, 0.08);
+}
+.plt-camada-nome {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.plt-losango-wrapper {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  cursor: grab;
+  z-index: 6;
+  color: var(--azul, #70b8ff);
+  padding: 4px;
+}
+.plt-losango-wrapper:hover {
+  color: #ffffff;
+  transform: translate(-50%, -50%) scale(1.3);
+}
+
+/* Inspetor e Botão Losango */
+.linha-com-losango {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.bt-losango {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  padding: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+}
+.bt-losango:hover {
+  color: var(--azul, #70b8ff);
+  background: rgba(255, 255, 255, 0.08);
+}
+.bt-losango.animado {
+  color: var(--azul, #70b8ff);
+  opacity: 0.6;
+}
+.bt-losango.ativo {
+  color: var(--azul, #70b8ff);
+  opacity: 1;
+}
+
+/* Editor de Pixel */
+.editor-pixel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+}
+.ep-barra-ferramentas {
+  display: flex;
+  gap: 4px;
+}
+.bt-icone {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: inherit;
+  padding: 4px 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.bt-icone:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.bt-icone.ativo {
+  background: var(--azul, #70b8ff);
+  color: #0d1117;
+  border-color: var(--azul, #70b8ff);
+}
+.bt-icone.fantasma {
+  background: transparent;
+  border-color: transparent;
+}
+.ep-paleta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+.ep-cor-wrapper {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+.ep-cor-wrapper.ativa {
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px var(--azul, #70b8ff);
+}
+.ep-cor {
+  width: 100%;
+  height: 100%;
+  border: none;
+  cursor: pointer;
+}
+.ep-color-input {
+  position: absolute;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+.ep-canvas-area {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 8px;
+  background: #090d13;
+  border-radius: 4px;
+}
+.ep-canvas {
+  image-rendering: pixelated;
+  cursor: crosshair;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}

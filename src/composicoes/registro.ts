@@ -9,10 +9,11 @@ import {VideoCenas} from './cenas/VideoCenas';
 import {deFonteArquivo, registrarFontesDeArquivo} from './fontes';
 import {CarrosselTema} from './cliente/CarrosselTema';
 import {definirBaseMidia, midia} from './midia';
+import {Animacao} from './animacao/Animacao';
 import type {MarcaDaguaP} from '../nucleo/exportacao';
 import {MarcaDagua} from './MarcaDagua';
 
-export type IdComposicao = 'VideoCenas' | 'CarrosselTema';
+export type IdComposicao = 'VideoCenas' | 'CarrosselTema' | 'Animacao';
 
 type Props = Record<string, unknown> & {base_midia?: string; tema?: {fontes_arquivos?: FonteArquivo[]}; marca_dagua?: MarcaDaguaP};
 
@@ -34,8 +35,9 @@ const comFontesDoTema = (Componente: React.FC<Record<string, unknown>>): React.F
 export const COMPOSICOES: Record<IdComposicao, React.FC<Record<string, unknown>>> = {
   VideoCenas: comFontesDoTema(VideoCenas as unknown as React.FC<Record<string, unknown>>),
   CarrosselTema: comFontesDoTema(CarrosselTema as unknown as React.FC<Record<string, unknown>>),
+  Animacao: Animacao as unknown as React.FC<Record<string, unknown>>,
 };
 
 /** Id da composição pelas props; o que não for reconhecido é o carrossel da Cliente (documento antigo). */
 export const composicaoDe = (props: Record<string, unknown> | null | undefined): IdComposicao =>
-  props?.composicao === 'VideoCenas' ? 'VideoCenas' : 'CarrosselTema';
+  props?.composicao === 'VideoCenas' ? 'VideoCenas' : props?.composicao === 'Animacao' ? 'Animacao' : 'CarrosselTema';

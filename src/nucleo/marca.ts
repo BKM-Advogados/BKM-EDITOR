@@ -181,6 +181,10 @@ const ehDocImagem = (doc: unknown): doc is DocImagem => {
   const d = doc as DocImagem | null;
   return Boolean(d) && typeof d === 'object' && Array.isArray(d!.camadas) && typeof d!.largura === 'number';
 };
+const ehDocAnimacao = (doc: unknown): doc is {camadas: unknown[]; tema?: unknown} => {
+  const d = doc as Record<string, unknown> | null;
+  return Boolean(d && typeof d === 'object' && Array.isArray(d.camadas) && typeof d.fps === 'number' && typeof d.duracao_ms === 'number');
+};
 const por = (atual: unknown, path: string, value: unknown): OperacaoPatch => ({op: atual === undefined ? 'add' : 'replace', path, value});
 
 /** O kit como a imagem o guarda: id, nome, cores por nome e fontes, para a cor "@destaque" das camadas se ler daí. */
@@ -268,13 +272,16 @@ const patchDaImagem = (doc: DocImagem, m: Marca): OperacaoPatch[] => {
 };
 
 /** Patch que aplica o kit a um documento: o vídeo de cenas troca o `tema` inteiro; a imagem passa cada cor e fonte para
- *  o mesmo papel no kit novo (ver acima) e guarda o kit em `marca`. Outro tipo de documento: lista vazia (não recebe
- *  kit). */
+ *  o mesmo papel no kit novo (ver acima) e guarda o kit em `marca`; a animação troca o `tema` (que resolve as cores de
+ *  referência @destaque etc.). Outro tipo de documento: lista vazia (não recebe kit). */
 export const patchDaMarca = (doc: unknown, m: Marca, tema: TemaDeMarca = temaDaMarca(m)): OperacaoPatch[] => {
   if (ehDocCenas(doc)) {
     return doc.tema === undefined ? [{op: 'add', path: '/tema', value: tema}] : [{op: 'test', path: '/tema', value: doc.tema}, {op: 'replace', path: '/tema', value: tema}];
   }
   if (ehDocImagem(doc)) return patchDaImagem(doc, m);
+  if (ehDocAnimacao(doc)) {
+    return doc.tema === undefined ? [{op: 'add', path: '/tema', value: tema}] : [{op: 'test', path: '/tema', value: doc.tema}, {op: 'replace', path: '/tema', value: tema}];
+  }
   return [];
 };
 

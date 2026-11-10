@@ -44,7 +44,7 @@ export const App: React.FC = () => {
     // imagem com várias páginas: o caminho da página ativa ("/paginas/2"), para o agente saber onde a pessoa está
     const doc = documento ? (e.docs[documento]?.doc as DocImagem | undefined) : undefined;
     const pagina = doc && Array.isArray(doc.paginas) ? caminhoPagina(doc, Math.max(0, paginasDe(doc).findIndex((p) => p.id === e.paginaAtiva[documento!]))) : undefined;
-    const estado = {area: e.area, documento, selecao: e.selecao?.caminho, tempo_ms: e.area === 'video' || e.area === 'efeitos' ? e.tempo_ms : undefined, pagina,
+    const estado = {area: e.area, documento, selecao: e.selecao?.caminho, tempo_ms: e.area === 'video' || e.area === 'efeitos' || e.area === 'animacao' ? e.tempo_ms : undefined, pagina,
       selecao_varias: e.selecao?.outros?.length ? caminhosDaSelecao(e.selecao) : undefined}; // seleção múltipla da imagem (B2, rodada 3)
     const chave = JSON.stringify(estado);
     if (chave !== ultimoEstado.current) {
