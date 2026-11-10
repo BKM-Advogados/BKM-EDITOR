@@ -10,11 +10,12 @@ import {prepararParaIde, servidorDoMcp, type ResultadoIde} from '../nucleo/ide';
 /** Um executável no PATH (no Windows, com as extensões do PATHEXT); null se não houver. */
 export const acharNoPath = (nome: string, env: NodeJS.ProcessEnv = process.env, plataforma: string = process.platform, existe: (p: string) => boolean = existsSync) => {
   const win = plataforma === 'win32';
+  const caminho = win ? path.win32 : path.posix; // o sistema pedido, não o de quem roda (testes e CI)
   const pastas = (env.PATH ?? env.Path ?? '').split(win ? ';' : ':').filter(Boolean);
   const exts = win ? (env.PATHEXT ?? '.EXE;.CMD;.BAT').split(';').filter(Boolean).map((e) => e.toLowerCase()) : [''];
   for (const p of pastas) {
     for (const e of exts) {
-      const c = path.join(p, `${nome}${e}`);
+      const c = caminho.join(p, `${nome}${e}`);
       if (existe(c)) return c;
     }
   }

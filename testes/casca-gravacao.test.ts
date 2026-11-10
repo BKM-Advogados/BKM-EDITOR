@@ -111,26 +111,27 @@ describe('selo "Salvo" (transversal-D11)', () => {
 });
 
 describe('atalhos de arquivo (transversal-D4)', () => {
+  // fora do Mac o comando é o Ctrl; o Cmd do Mac tem os testes dele em testes/portes.test.ts (o terceiro argumento diz o sistema)
   const ctrl = (key: string, extra: Partial<{altKey: boolean; shiftKey: boolean; ctrlKey: boolean}> = {}) => ({key, ctrlKey: true, altKey: false, shiftKey: false, ...extra});
 
   it('Ctrl+O, N e W valem fora do terminal', () => {
-    expect(acaoDeArquivo(ctrl('o'), false)).toBe('abrir');
-    expect(acaoDeArquivo(ctrl('N'), false)).toBe('novo');
-    expect(acaoDeArquivo(ctrl('w'), false)).toBe('fechar');
+    expect(acaoDeArquivo(ctrl('o'), false, false)).toBe('abrir');
+    expect(acaoDeArquivo(ctrl('N'), false, false)).toBe('novo');
+    expect(acaoDeArquivo(ctrl('w'), false, false)).toBe('fechar');
   });
 
   it('no terminal ficam com ele: o Ctrl+W apaga a palavra', () => {
-    expect(acaoDeArquivo(ctrl('w'), true)).toBeNull();
-    expect(acaoDeArquivo(ctrl('n'), true)).toBeNull();
-    expect(acaoDeArquivo(ctrl('o'), true)).toBeNull();
+    expect(acaoDeArquivo(ctrl('w'), true, false)).toBeNull();
+    expect(acaoDeArquivo(ctrl('n'), true, false)).toBeNull();
+    expect(acaoDeArquivo(ctrl('o'), true, false)).toBeNull();
   });
 
   it('outras teclas, ou com Alt ou Shift, não são de arquivo', () => {
-    expect(acaoDeArquivo(ctrl('s'), false)).toBeNull();
-    expect(acaoDeArquivo(ctrl('w', {shiftKey: true}), false)).toBeNull();
-    expect(acaoDeArquivo(ctrl('w', {altKey: true}), false)).toBeNull();
-    expect(acaoDeArquivo(ctrl('w', {ctrlKey: false}), false)).toBeNull();
-    expect(acaoDeArquivo(ctrl('constructor'), false)).toBeNull();
+    expect(acaoDeArquivo(ctrl('s'), false, false)).toBeNull();
+    expect(acaoDeArquivo(ctrl('w', {shiftKey: true}), false, false)).toBeNull();
+    expect(acaoDeArquivo(ctrl('w', {altKey: true}), false, false)).toBeNull();
+    expect(acaoDeArquivo(ctrl('w', {ctrlKey: false}), false, false)).toBeNull();
+    expect(acaoDeArquivo(ctrl('constructor'), false, false)).toBeNull();
   });
 });
 

@@ -10,6 +10,7 @@ import {coeficientesK, resolverAudio, type AudioCenas} from '../src/nucleo/audio
 import {codificarWavPcm} from '../src/nucleo/gravacao';
 import {curtoPrazoEm, Medidor, medirAmostras, medirMistura, type FonteAudio} from '../src/nucleo/loudness';
 import {igualarLoudness, lerLoudnorm, medirArquivo} from '../src/main/loudness';
+import {ambienteDoFfmpeg} from '../src/main/ffmpeg-som';
 
 const seno = (hz: number, segundos: number, taxa: number, amplitude: number, fase = 0) => {
   const out = new Float32Array(Math.round(segundos * taxa));
@@ -223,7 +224,9 @@ describe('loudness do carrossel narrado da Cliente (som-D5)', () => {
       // 6 s de um tom a 300 Hz baixo (perto de −26 LUFS) em AAC, num MP4 só de áudio: o ffmpeg do Remotion não traz filtros nem demuxers de teste
       // para fabricar vídeo, e a correção copia o vídeo que houver (`-map 0:v?`), então o som é o que ela mede e regrava
       writeFileSync(path.join(dir, 'tom.wav'), codificarWavPcm([seno(300, 6, 48000, 0.05)], 48000, 16));
-      execFileSync(FFMPEG, ['-y', '-i', path.join(dir, 'tom.wav'), '-c:a', 'libfdk_aac', '-b:a', '192k', '-f', 'mp4', mp4], {stdio: 'pipe'});
+      // como o app (ambienteDoFfmpeg): no Mac e no Linux o ffmpeg do compositor acha as bibliotecas pela pasta dele
+      execFileSync(FFMPEG, ['-y', '-i', path.join(dir, 'tom.wav'), '-c:a', 'libfdk_aac', '-b:a', '192k', '-f', 'mp4', mp4],
+        {stdio: 'pipe', env: ambienteDoFfmpeg(path.resolve(path.dirname(FFMPEG)))});
       const antes = await medirArquivo(mp4);
       expect(antes!.i).toBeLessThan(-22); // narração baixa: sairia assim
       const r = await igualarLoudness({arquivo: mp4, props: {composicao: 'CarrosselTema', audio: 'narracao.wav'}});

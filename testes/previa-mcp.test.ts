@@ -160,7 +160,8 @@ describe('prévias: contas', () => {
   });
 
   it('de onde o MCP por stdio renderiza: o app instalado (app.asar) ou o repositório', () => {
-    expect(appDoNucleo('/opt/Estudio/resources', (p) => p === '/opt/Estudio/resources/app.asar')).toEqual({raizApp: '/opt/Estudio/resources/app.asar', empacotado: true});
+    const asar = path.join('/opt/Estudio/resources', 'app.asar');
+    expect(appDoNucleo('/opt/Estudio/resources', (p) => p === asar)).toEqual({raizApp: asar, empacotado: true});
     expect(appDoNucleo('/home/x/estudio', () => false)).toEqual({raizApp: '/home/x/estudio', empacotado: false});
   });
 

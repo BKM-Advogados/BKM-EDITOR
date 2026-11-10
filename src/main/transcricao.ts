@@ -253,12 +253,15 @@ export const acharWhisperCli = (pasta: string, o: {plataforma?: string; arq?: st
  *  /opt/homebrew/bin e /usr/local/bin); no Linux, compilar o whisper.cpp na versão presa e pôr o whisper-cli na pasta (ou
  *  no PATH). docs/legendas.md, "Linux", e docs/portes.md. */
 export const comoInstalarWhisper = (pasta: string, plataforma: string = process.platform) =>
+  comoInstalarWhisperEm(pasta, plataforma, (plataforma === 'win32' ? path.win32 : path.posix).join(pasta, 'bin'));
+
+const comoInstalarWhisperEm = (pasta: string, plataforma: string, bin: string) =>
   plataforma === 'darwin'
     ? `falta o whisper-cli (whisper.cpp): esta cópia do Estúdio não o trouxe. No Terminal, instale pelo Homebrew `
-      + `(brew install whisper-cpp) e abra o Estúdio de novo, ou ponha um whisper-cli compilado em ${path.join(pasta, 'bin')}; os modelos baixam sozinhos`
+      + `(brew install whisper-cpp) e abra o Estúdio de novo, ou ponha um whisper-cli compilado em ${bin}; os modelos baixam sozinhos`
     : `falta o whisper-cli (whisper.cpp ${WHISPER_VERSAO}): fora do Windows x64 ele não baixa sozinho. Compile o whisper.cpp v1.9.5 `
       + `(cmake -B build -DBUILD_SHARED_LIBS=OFF && cmake --build build --target whisper-cli) e copie build/bin/whisper-cli para `
-      + `${path.join(pasta, 'bin')} ou para uma pasta do PATH; os modelos baixam sozinhos`;
+      + `${bin} ou para uma pasta do PATH; os modelos baixam sozinhos`;
 
 /** ffmpeg do compositor do Remotion: no app empacotado fica em app.asar.unpacked; no desenvolvimento, no node_modules. */
 export const caminhoFfmpeg = (o: {raizApp?: string; empacotado?: boolean} = {}): string | null => {

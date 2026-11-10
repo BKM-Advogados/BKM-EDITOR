@@ -32,15 +32,15 @@ const ler = (raiz: string, rel: string) => readFileSync(path.join(raiz, rel), 'u
 describe('o comando do MCP no .mcp.json', () => {
   it('app instalado: o executável do app em modo Node e o nucleo.cjs dos recursos', () => {
     const script = scriptDoMcp({empacotado: true, recursos: '/home/p/.local/opt/Estudio/resources', raizApp: '/home/p/.local/opt/Estudio/resources/app.asar'});
-    expect(script).toBe('/home/p/.local/opt/Estudio/resources/dist-mcp/nucleo.cjs');
+    expect(script).toBe(path.join('/home/p/.local/opt/Estudio/resources', 'dist-mcp', 'nucleo.cjs'));
     const s = servidorDoMcp({executavel: '/home/p/.local/opt/Estudio/Estudio', script, projeto: '/home/p/Estudio/Meu vídeo'});
     expect(s).toEqual({type: 'stdio', command: '/home/p/.local/opt/Estudio/Estudio',
-      args: [script, '--projeto', '/home/p/Estudio/Meu vídeo', '--autor', 'agente', '--origem', 'IDE', '--ide'], env: {ELECTRON_RUN_AS_NODE: '1'}});
+      args: [script, '--projeto', path.resolve('/home/p/Estudio/Meu vídeo'), '--autor', 'agente', '--origem', 'IDE', '--ide'], env: {ELECTRON_RUN_AS_NODE: '1'}});
   });
 
   it('desenvolvimento: o electron do node_modules e o dist-mcp do repositório', () => {
     const script = scriptDoMcp({empacotado: false, recursos: '/repo/node_modules/electron/dist/resources', raizApp: '/repo'});
-    expect(script).toBe('/repo/dist-mcp/nucleo.cjs');
+    expect(script).toBe(path.join('/repo', 'dist-mcp', 'nucleo.cjs'));
     const s = servidorDoMcp({executavel: '/repo/node_modules/electron/dist/electron', script, projeto: 'relativo/p'});
     expect(s.command).toBe('/repo/node_modules/electron/dist/electron');
     expect(s.args[2]).toBe(path.resolve('relativo/p')); // sempre absoluto
@@ -201,7 +201,7 @@ describe('Abrir no T3 Code', () => {
   it('acha o t3 no PATH (no Windows, pelo PATHEXT)', () => {
     expect(acharNoPath('t3', {PATH: '/a:/b'}, 'linux', (p) => p === '/b/t3')).toBe('/b/t3');
     expect(acharNoPath('t3', {PATH: '/a'}, 'linux', () => false)).toBeNull();
-    expect(acharNoPath('t3', {Path: 'C:\\x;C:\\y', PATHEXT: '.EXE;.CMD'}, 'win32', (p) => p.endsWith(path.join('C:\\y', 't3.cmd')))).toBe(path.join('C:\\y', 't3.cmd'));
+    expect(acharNoPath('t3', {Path: 'C:\\x;C:\\y', PATHEXT: '.EXE;.CMD'}, 'win32', (p) => p === 'C:\\y\\t3.cmd')).toBe('C:\\y\\t3.cmd');
   });
 
   it('sem o t3, explica como adicionar à mão', async () => {

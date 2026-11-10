@@ -94,7 +94,8 @@ describe('PATH e shell', () => {
 
 describe('abrir projeto vindo de fora', () => {
   it('a primeira pasta com estudio.json nos argumentos; opções e o caminho do app ficam de fora', () => {
-    const existe = tem(path.join('/p/Video', 'estudio.json'));
+    const alvo = path.resolve('/p/Video', 'estudio.json');
+    const existe = (a: string) => path.resolve(a) === alvo; // no Windows o path.resolve põe a letra do disco
     expect(projetoNosArgumentos(['/app/Estudio', '--allow-file-access', '-psn_0_123', '/p/Video'], existe)).toBe('/p/Video');
     expect(projetoNosArgumentos(['electron', '.'], existe)).toBeNull();
     expect(projetoNosArgumentos(['/app/Estudio', 'Video'], existe, '/p')).toBe(path.resolve('/p', 'Video'));

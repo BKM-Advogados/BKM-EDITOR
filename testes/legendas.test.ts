@@ -471,7 +471,9 @@ describe('transcritor: zip e download conferido', () => {
     expect(acharWhisperCli('/m', {plataforma: 'linux', arq: 'x64', PATH: '/a:/b', existe: tem()})).toBeNull();
     // Windows x64: um whisper-cli.exe qualquer do PATH não serve (o baixado tem o SHA-256 conferido)
     expect(acharWhisperCli('C:/m', {plataforma: 'win32', arq: 'x64', PATH: 'C:/b', existe: tem(path.join('C:/b', 'whisper-cli.exe'))})).toBeNull();
-    expect(comoInstalarWhisper('/m')).toMatch(/whisper-cli.*v1\.9\.5.*\/m\/bin/s);
+    expect(comoInstalarWhisper('/m', 'linux')).toMatch(/whisper-cli.*v1\.9\.5.*\/m\/bin/s);
+    expect(comoInstalarWhisper('C:\\m', 'win32')).toContain('C:\\m\\bin');
+    expect(comoInstalarWhisper('/m', 'darwin')).toMatch(/brew install whisper-cpp.*\/m\/bin/s);
   });
 
   it.skipIf(baixaBinario())('fora do Windows x64, sem whisper-cli: o estado diz o que falta e transcrever recusa sem baixar nada', async () => {

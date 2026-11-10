@@ -1,2 +1,7 @@
+# quebras de linha LF em todo checkout, também no Windows (o CI do Windows trazia CRLF: os fixtures do CLAUDE.md e o
+# CLAUDE.md dos exemplos, que vão para dentro do pacote, deixavam de bater com o texto que o app gera)
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
 # recortes reais de páginas (testes/fixtures/pesquisa): guardados byte a byte, com as quebras de linha mistas do original
 testes/fixtures/pesquisa/*.htm -text
