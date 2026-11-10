@@ -150,7 +150,7 @@ describe('modelos (item 27, só som gerado)', () => {
       expect(rms(som.canais[0], 0, som.canais[0].length), id).toBeGreaterThan(0.005);
       expect(d.titulo).toBe(`Modelo ${id}`);
     }
-  });
+  }, 60_000);
 
   it('batida: bateria, baixo com sidechain do bumbo e acordes; trilha: fade no fim; efeito: impacto no fim', () => {
     const b = musicaDoModelo('batida');

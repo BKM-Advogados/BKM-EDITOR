@@ -1,11 +1,11 @@
 // A ida e volta vídeo → música → vídeo pelos dois transportes do MCP: HTTP (o do app, com token por aba) e stdio (o
 // pacote de mcp/nucleo.ts, que outro app de IA usa fora do Estúdio). O render é o de verdade (WAV a 48 kHz, sem ffmpeg).
-import {execFileSync} from 'node:child_process';
 import {existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import http from 'node:http';
 import type {AddressInfo} from 'node:net';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
+import {buildSync} from 'esbuild';
 import {afterAll, beforeAll, describe, expect, it} from 'vitest';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StreamableHTTPClientTransport} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -93,8 +93,8 @@ describe('ida e volta pelos transportes do MCP', () => {
     const saida = mkdtempSync(path.join(tmpdir(), 'estudio-mcp-pacote-'));
     pastas.push(saida);
     const pacote = path.join(saida, 'nucleo.cjs');
-    execFileSync(process.execPath, [path.join(RAIZ, 'node_modules', 'esbuild', 'bin', 'esbuild'), path.join(RAIZ, 'mcp', 'nucleo.ts'), '--bundle', '--platform=node',
-      '--format=cjs', '--target=node20', `--outfile=${pacote}`, '--log-level=warning'], {cwd: RAIZ, stdio: 'ignore'});
+    buildSync({entryPoints: [path.join(RAIZ, 'mcp', 'nucleo.ts')], bundle: true, platform: 'node', format: 'cjs', target: 'node20', outfile: pacote,
+      absWorkingDir: RAIZ, logLevel: 'warning'});
     const pasta = projetoDeTeste();
     const c = new Client({name: 'outro-app', version: '0'});
     await c.connect(new StdioClientTransport({command: process.execPath, args: [pacote, '--projeto', pasta, '--autor', 'outro-app'], cwd: RAIZ}));
