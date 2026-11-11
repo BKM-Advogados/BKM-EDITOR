@@ -51,6 +51,11 @@ import {criarIde} from './ide'; // frente IDE: projetos prontos para IDE de agen
 import {scriptDoMcp} from '../nucleo/ide'; // frente IDE
 import {criarClaudeDesktop} from './claude-desktop'; // Claude Desktop (docs/claude-desktop.md)
 import {SCRIPT_DESKTOP} from '../nucleo/claude-desktop';
+import {criarAtualizador} from './atualizacao'; // atualização do app (docs/atualizacao.md)
+import {motorWindows, type UpdaterNsis} from './atualizacao-windows';
+import {limparSobras, motorLinux} from './atualizacao-linux';
+import {archDoSistema, instaladoPeloScript, pastaDoScriptLinux} from '../nucleo/atualizacao';
+import type {AcaoAtualizacao, OcupadoNaTela} from '../compartilhado/atualizacao';
 
 // o mesmo id do instalador (electron-builder.yml): a barra de tarefas agrupa a janela com o atalho
 app.setAppUserModelId('br.com.bkmadvogados.estudio');
@@ -547,6 +552,7 @@ lidar(CANAL.exportar, async (documento: string, opcoes?: OpcoesExportarVideo): P
     await encerrarRender(preparado); // o Chrome que serviu a todos os destinos
     cancelarExportacao = null;
     janela?.setProgressBar(-1);
+    atualizador.livre(); // um reinício para atualizar que esperava a exportação segue agora
   }
 });
 // a interface manda a imagem já desenhada (PNG, JPG ou WebP em data URL); aqui só grava com o nome livre em saidas/
@@ -631,6 +637,50 @@ registrarIpcNarracao({lidar, enviar, projeto: exigirProjeto, pasta: path.join(ap
 registrarIpcMusica(lidar, exigirProjeto, criarPonteJanela({enviar, temJanela: () => Boolean(janela && !janela.isDestroyed()),
   ouvir: (canal, f) => ipcMain.on(canal, (e, ...a) => (confiavel(e), f(...(a as never[]))))}));
 
+// ---------- atualização do app (docs/atualizacao.md) ----------
+// Windows: electron-updater (baixa sozinho, instala ao fechar ou no "Reiniciar e atualizar"). Mac e Linux: aviso com as
+// notas e o download certo no navegador; no Linux instalado pelo scripts/instalar-linux.sh, também a troca da pasta com a
+// confirmação da pessoa. Em desenvolvimento, nada. ESTUDIO_ATUALIZACAO_TESTE=1 aceita as pre-releases (testar de verdade).
+const ATUALIZACAO_TESTE = process.env.ESTUDIO_ATUALIZACAO_TESTE === '1';
+const PASTA_LINUX = pastaDoScriptLinux(app.getPath('home'));
+const LINUX_DO_SCRIPT = app.isPackaged && instaladoPeloScript(process.platform, process.execPath, app.getPath('home'));
+const registrarAtualizacao = (m: string) => console.warn(m);
+const atualizador = criarAtualizador({
+  empacotado: app.isPackaged, plataforma: process.platform, versao: app.getVersion(), home: app.getPath('home'), executavel: process.execPath,
+  arch: archDoSistema(process.platform, process.arch, app.runningUnderARM64Translation), aceitarTestes: ATUALIZACAO_TESTE,
+  prefs: () => memoria.prefs(), gravarPrefs: (p) => memoria.gravarPrefs(p),
+  buscar: (url, init) => net.fetch(url, init),
+  abrirNoNavegador: (url) => void shell.openExternal(url),
+  avisarTela: (e) => enviar(CANAL.atualizacaoMudou, e),
+  ocupadoNoPrincipal: () => (cancelarExportacao ? 'a exportação' : null),
+  // o mesmo que fechar a janela faz (window-all-closed), antes de o app sair para trocar de versão: o app.quit() do
+  // atualizador não passa pelo window-all-closed, e o instalador do Windows derruba o app que demora a sair
+  encerrar: async () => {
+    await emFila(() => fecharSessao());
+    terminais.fecharTodos();
+    conversas.fecharTodas({agora: true});
+    mcpHttp?.esquecerTudo();
+    await Promise.race([fecharAppsDeFora(), new Promise((ok) => setTimeout(ok, 5000))]);
+    midia.parar();
+  },
+  // o electron-updater só carrega no Windows, na primeira procura
+  windows: app.isPackaged && process.platform === 'win32' ? async () => {
+    const {NsisUpdater} = await import('electron-updater');
+    return motorWindows({updater: new NsisUpdater() as unknown as UpdaterNsis, pastaDados: app.getPath('userData'), aceitarTestes: ATUALIZACAO_TESTE,
+      registrar: registrarAtualizacao});
+  } : undefined,
+  linux: LINUX_DO_SCRIPT ? motorLinux({destino: PASTA_LINUX, buscar: (url) => net.fetch(url),
+    reabrir: (executavel) => {
+      app.relaunch({execPath: executavel, args: []});
+      app.exit(0);
+    }}) : undefined,
+  registrar: registrarAtualizacao,
+});
+lidar(CANAL.atualizacaoEstado, () => atualizador.estado());
+lidar(CANAL.atualizacaoProcurar, () => atualizador.procurarAgora());
+lidar(CANAL.atualizacaoAcao, (a: AcaoAtualizacao) => atualizador.acao(a));
+ipcMain.on(CANAL.atualizacaoOcupado, (e, o: OcupadoNaTela) => (confiavel(e), atualizador.ocupadoNaTela(o)));
+
 // ---------- abrir uma pasta de projeto vinda de fora (argumento, segunda abertura, ícone do Dock) ----------
 let pastaDeFora: string | null = null;
 function abrirDeFora(pasta: string) {
@@ -666,6 +716,8 @@ app.on('ready', async () => {
   claudeDesktop.publicar(); // Claude Desktop: a descoberta com o token dele, antes de qualquer projeto abrir
   claude = await terminais.preparar();
   criarJanela();
+  atualizador.iniciar(); // primeira procura 15 s depois, e a cada 6 horas (docs/atualizacao.md)
+  if (LINUX_DO_SCRIPT) void limparSobras(PASTA_LINUX); // a pasta antiga da última atualização
   // a pasta pedida de fora (variável, argumento, ícone do Dock) vem antes do "abrir o último" das preferências
   const deFora = process.env.ESTUDIO_PROJETO ? path.resolve(process.env.ESTUDIO_PROJETO) : (pastaDeFora ?? projetoNosArgumentos(process.argv, existsSync));
   const inicial = deFora ?? (memoria.prefs().ao_iniciar === 'ultimo' ? memoria.ultimo() : null);

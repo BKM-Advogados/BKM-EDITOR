@@ -8,6 +8,7 @@
 import jsonpatch, {type Operation} from 'fast-json-patch';
 import type {ApiEstudio, EstadoProvedor, InfoProjeto, PedidoPortaoTela, MarcaInfo, Mudanca, NovoProjeto, Preferencias, Progresso, ProgressoTranscricao, Recente, ResultadoLimpezaVoz, Trilha, RespostaJanela} from '../../src/compartilhado/api';
 import type {EntradaDocumento, Manifesto, Modulo} from '../../src/nucleo/documentos';
+import type {ApiAtualizacao, EstadoAtualizacao} from '../../src/compartilhado/atualizacao';
 import type {Envelope, IntensidadeLimpeza} from '../../src/nucleo/audio';
 import {LimpezaCancelada, limparVoz} from '../../src/nucleo/limpeza-voz';
 import {medirMistura, type FonteAudio, type MedidasLoudness} from '../../src/nucleo/loudness';
@@ -348,6 +349,7 @@ const api: ApiEstudio = {
     };
   },
   metricas: async () => ({memoria_mb: 312, processos: []}),
+  atualizacao: atualizacaoDeMentira(),
   audio: {
     gravarEnvelope: async (arquivo, envelope) => {
       envelopes[arquivo] = envelope;
@@ -1156,5 +1158,38 @@ function narracaoSimulada(): ApiEstudio['narracao'] {
       const b = blobDeFala(3000);
       return {wav: b.wav.buffer.slice(0) as ArrayBuffer, do_cache: false, custo_usd: 0.0007};
     },
+  };
+}
+
+// atualização do app (docs/atualizacao.md): com ?atualizacao=aviso (Mac/Linux), ?atualizacao=linux (Linux do script) ou
+// ?atualizacao=windows na URL, a prévia mostra o aviso de versão nova; sem nada, está em dia
+function atualizacaoDeMentira(): ApiAtualizacao {
+  const modo = new URLSearchParams(location.search).get('atualizacao');
+  const ouvintes = new Set<(e: EstadoAtualizacao) => void>();
+  const novidade = {versao: '2.0.2', tag: 'v4.0.2', titulo: 'Estúdio 2.0.2', pagina: 'https://github.com/BKM-Advogados/BKM-EDITOR/releases',
+    notas: '## Novidades\n\n- Atualização automática no Windows\n- Aviso de versão nova no Mac e no Linux\n\n## Correções\n\n- A exportação não é mais interrompida pelo reinício',
+    arquivo: modo === 'linux'
+      ? {nome: 'Estudio-linux-x64-2.0.2.zip', url: 'https://github.com/BKM-Advogados/BKM-EDITOR/releases/download/v4.0.2/Estudio-linux-x64-2.0.2.zip', versao: '2.0.2',
+        tamanho: 256_667_148}
+      : {nome: 'Estudio-2.0.2-arm64.dmg', url: 'https://github.com/BKM-Advogados/BKM-EDITOR/releases/download/v4.0.2/Estudio-2.0.2-arm64.dmg', versao: '2.0.2'},
+    ...(modo === 'linux' ? {somas: 'https://github.com/BKM-Advogados/BKM-EDITOR/releases/download/v4.0.2/SHA256SUMS.txt'} : {})};
+  let e: EstadoAtualizacao = {versao_atual: '2.0.1', modo: modo === 'windows' ? 'windows' : 'aviso', linux_script: modo === 'linux', automatico: true,
+    procurando: false, adiada: false, fase: modo ? (modo === 'windows' ? 'pronta' : 'disponivel') : 'nada', ...(modo ? {novidade} : {}),
+    ...(modo === 'linux' ? {comando_linux: 'cd <pasta do repositório do Estúdio> && git pull && bash scripts/instalar-linux.sh'} : {})};
+  const mudar = (m: Partial<EstadoAtualizacao>) => {
+    e = {...e, ...m};
+    ouvintes.forEach((f) => f(e));
+    return e;
+  };
+  return {
+    estado: async () => e,
+    procurar: async () => mudar({ultima_procura: new Date().toISOString(), mensagem: modo ? 'Há uma versão nova: 2.0.2.' : 'Você já está na versão mais nova (2.0.1).'}),
+    acao: async (a) => (a === 'depois' ? mudar({adiada: true}) : a === 'mostrar' ? mudar({adiada: false})
+      : a === 'pular' ? mudar({fase: 'nada', novidade: undefined}) : a === 'atualizar_linux' ? mudar({fase: 'pronta'}) : e),
+    aoMudar: (cb) => {
+      ouvintes.add(cb);
+      return () => void ouvintes.delete(cb);
+    },
+    ocupado: () => undefined,
   };
 }

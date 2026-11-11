@@ -28,6 +28,7 @@ import {exportarPng, type SaidaPng} from '../modulos/imagem/exportarPng';
 import {exportarCarrossel, exportarPagina} from '../modulos/imagem/exportarPaginas';
 import {numeroBr} from './Campos';
 import {Caixa, Escolha, Segmentado} from './Controles';
+import {usarOcupado} from '../estado/ocupado'; // segura o reinício para atualizar
 import '../modulos/video/zonas-seguras.css';
 import './dialogo-exportar.css';
 
@@ -615,6 +616,7 @@ const ExportarImagem: React.FC<{documento: string; fechar: () => void}> = ({docu
   const [escala, setEscala] = useState(1);
   const [nome, setNome] = useState(titulo);
   const [fase, setFase] = useState<FaseImagem>({tipo: 'opcoes'});
+  usarOcupado('exportando', fase.tipo === 'exportando');
   const f = FORMATOS_IMAGEM_SAIDA.find((x) => x.id === formato)!;
   const W = Math.round((doc?.largura ?? 0) * escala);
   const H = Math.round((doc?.altura ?? 0) * escala);

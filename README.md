@@ -104,6 +104,13 @@ atalho na área de trabalho e no Iniciar). O guia para outro PC está em `INSTAL
 nativos:win` / `nativos:mac`); o DMG e o NSIS saem num Mac e num Windows, ou no CI (`.github/workflows/build.yml`).
 Auditoria, o que já foi testado em cada sistema e a lista de verificação: `docs/portes.md`.
 
+**Atualização automática (a partir da 2.0.1):** o app procura a release nova no GitHub ao abrir e a cada 6 horas. No
+Windows baixa sozinho e instala ao fechar; no Mac e no Linux avisa e abre o download certo; no Linux instalado pelo
+`scripts/instalar-linux.sh`, também troca a pasta se você confirmar. Preferências › Atualizações liga e desliga a
+procura e tem o "Procurar agora". Quem tem a 2.0.0 instala a 2.0.1 à mão uma vez. Para publicar uma versão:
+`node scripts/publicar-release.mjs --execucao <id do CI> --tag v4.0.x --notas notas.md` (ensaio com `--seco`).
+Detalhes, modo de teste e o que falta conferir: `docs/atualizacao.md`.
+
 Desenvolvimento:
 
 ```bash

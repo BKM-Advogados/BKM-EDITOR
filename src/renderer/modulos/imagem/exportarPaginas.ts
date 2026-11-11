@@ -7,6 +7,7 @@ import type {DocImagem} from '../../../nucleo/documentos';
 import {paginasDe, vistaDaPagina} from '../../../nucleo/carrossel';
 import {avisar, loja} from '../../estado/loja';
 import {desenharDocumento} from './exportarPng';
+import {ocupadoDurante} from '../../estado/ocupado';
 
 const soltar = (c: HTMLCanvasElement) => {
   c.width = 0;
@@ -21,8 +22,10 @@ const desenharPagina = async (doc: DocImagem, p: number) => {
   return {png, faltaram};
 };
 
-/** Todas as páginas em PNG numerado e o PDF, em saidas/. */
-export const exportarCarrossel = async (documento: string) => {
+/** Todas as páginas em PNG numerado e o PDF, em saidas/ (um reinício para atualizar espera terminar). */
+export const exportarCarrossel = (documento: string) => ocupadoDurante('exportando', () => exportarCarrosselAgora(documento));
+
+const exportarCarrosselAgora = async (documento: string) => {
   const doc = loja.get().docs[documento]?.doc as DocImagem | undefined;
   if (!doc) return avisar('A imagem ainda não carregou.', 'erro');
   const paginas = paginasDe(doc);

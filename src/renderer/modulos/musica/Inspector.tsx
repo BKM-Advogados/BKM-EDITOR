@@ -20,6 +20,7 @@ import {arranjar, campo, campoEmObjeto, campoFaixa, dividirNaCabeca, encaixar, e
 import {useDocMusica} from './Monitor';
 import {SeletorDocumento} from '../../componentes/SeletorDocumento';
 import {corDoCanal} from './estado';
+import {usarOcupado} from '../../estado/ocupado';
 
 const InspectorClipe: React.FC<{doc: DocMusica; id: string}> = ({doc, id}) => {
   const m = useMemo(() => resolverMusica(doc).musica, [doc]);
@@ -257,6 +258,7 @@ const InspectorDocumento: React.FC<{doc: DocMusica; id: string}> = ({doc, id}) =
   const [formato, setFormato] = React.useState<FormatoMusica>('wav');
   const [stems, setStems] = React.useState(false);
   const [exportando, setExportando] = React.useState(false);
+  usarOcupado('exportando', exportando); // um reinício para atualizar espera a exportação
   const porNoVideo = async () => {
     try {
       const r = await window.estudio.musica.porNoVideo({musica: id});

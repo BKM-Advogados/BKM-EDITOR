@@ -1,0 +1,17 @@
+/* Aviso de versão nova e Preferências › Atualizações (AvisoAtualizacao.tsx, docs/atualizacao.md) */
+.atualizacao-aviso { position: fixed; right: var(--esp-4); bottom: calc(var(--esp-4) + 24px); z-index: 90; width: min(380px, calc(100vw - 32px));
+  max-height: calc(100vh - 80px); overflow: auto; display: flex; flex-direction: column; gap: var(--esp-2); padding: var(--esp-3) var(--esp-4);
+  background: var(--fundo-elevado); border: 1px solid var(--borda); border-radius: var(--raio-2); box-shadow: var(--sombra-2); font-size: var(--tam-3); }
+.atualizacao-topo { display: flex; align-items: center; justify-content: space-between; gap: var(--esp-2); font-size: var(--tam-3); }
+.atualizacao-texto { color: var(--texto-2); line-height: 1.5; }
+.atualizacao-notas { margin: 0; max-height: 220px; overflow: auto; padding: var(--esp-2); white-space: pre-wrap; word-break: break-word;
+  font: var(--tam-2)/1.5 var(--fonte); color: var(--texto-2); background: var(--fundo-3); border-radius: var(--raio-1); }
+.atualizacao-link { align-self: flex-start; padding: 0; border: 0; background: none; color: var(--acento); font: inherit; font-size: var(--tam-2); cursor: pointer; }
+.atualizacao-link:hover { text-decoration: underline; }
+.atualizacao-comando { display: flex; flex-direction: column; gap: var(--esp-1); font-size: var(--tam-2); color: var(--texto-2); }
+.atualizacao-comando code { font: var(--tam-1)/1.5 var(--fonte-mono); color: var(--texto); background: var(--fundo-3); border-radius: var(--raio-1);
+  padding: var(--esp-1) var(--esp-2); word-break: break-all; user-select: text; }
+.atualizacao-botoes { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--esp-2); }
+.atualizacao-barra { display: block; height: 6px; border-radius: 3px; background: var(--fundo-3); overflow: hidden; margin-top: var(--esp-1); }
+.atualizacao-barra > span { display: block; height: 100%; background: var(--acento); transition: width 0.2s; }
+.atualizacao-linha { display: flex; align-items: center; flex-wrap: wrap; gap: var(--esp-2); }

@@ -11,6 +11,7 @@ import {usarFora} from '../../componentes/Menu';
 import {adicionarClipeAudio} from './acoes-audio';
 import {iniciarGravacao, listarMicrofones, type NivelGravacao, type SessaoGravacao} from './gravador';
 import {Caixa, Escolha} from '../../componentes/Controles';
+import {usarOcupado} from '../../estado/ocupado'; // segura o reinício para atualizar
 
 const CONTAGEM = 3;
 const dbTexto = (v: number) => (v <= -99 ? '−∞' : `${v.toFixed(0).replace('-', '−')} dB`);
@@ -31,6 +32,7 @@ export const GravadorNarracao: React.FC<{documento: string; aoFechar: () => void
   const [decorrido, setDecorrido] = useState(0);
   const sessao = useRef<SessaoGravacao | null>(null);
   const caixa = usarFora(estado === 'parado', aoFechar);
+  usarOcupado('gravando_narracao', estado !== 'parado'); // o reinício para atualizar espera a tomada (docs/atualizacao.md)
   const atual = useRef<HTMLSpanElement | null>(null);
 
   const palavras = useMemo(() => palavrasDoTeleprompter(texto), [texto]);

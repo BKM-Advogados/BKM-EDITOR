@@ -7,6 +7,14 @@ productName: Estudio
 copyright: Estúdio
 directories:
   output: out/instalador
+# Atualização automática do Windows (docs/atualizacao.md): com o publish, o --publish never grava ao lado do Setup .exe o
+# latest.yml (versão, nome e sha512 do instalador) e o .blockmap, que o electron-updater do app lê da última release do
+# GitHub. Nada é enviado daqui: quem publica é scripts/publicar-release.mjs. O app escreve o próprio app-update.yml
+# (src/main/atualizacao-windows.ts) com estes mesmos dados, porque o --prepackaged não o grava; um teste confere os dois.
+publish:
+  provider: github
+  owner: BKM-Advogados
+  repo: BKM-EDITOR
 win:
   icon: build/icone.ico
   target:
