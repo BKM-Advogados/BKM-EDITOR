@@ -243,6 +243,8 @@ export type ApiEstudio = {
   aoPedirMiniatura: (cb: () => Retangulo | null) => () => void;
   lerDocumento: <T = unknown>(documento: string) => Promise<Lido<T>>;
   lerJson: <T = unknown>(caminho: string) => Promise<T>; // qualquer JSON do projeto, só leitura (ex.: palavras da narração)
+  /** O mesmo, para arquivo que pode não existir (transições, seleção pedida pela IA): ausente ou sem projeto, null. */
+  lerJsonOpcional: <T = unknown>(caminho: string) => Promise<T | null>;
   aplicarPatch: (p: {documento: string; versao_base?: string; patch: OperacaoPatch[]; rotulo?: string}) => Promise<{versao: string; seq: number}>;
   desfazer: () => Promise<{ok: boolean; mensagem: string}>;
   propsVideo: (documento: string) => Promise<PropsVideo>;

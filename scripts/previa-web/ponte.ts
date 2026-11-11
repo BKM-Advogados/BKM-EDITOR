@@ -241,6 +241,7 @@ const api: ApiEstudio = {
   // frente Música: o render da música fica num blob; a tela vê a URL dele, o documento guarda o caminho (paraTela/doDisco)
   lerDocumento: async <T,>(id: string) => ({doc: musicaPrevia.paraTela(structuredClone(aberto!.docs[id])) as T, versao: String(aberto!.versao)}),
   lerJson: async <T,>(caminho: string) => (caminho === '.estudio/transicoes.json' ? structuredClone(musicaPrevia.registro()) : []) as T,
+  lerJsonOpcional: async <T,>(caminho: string) => (caminho === '.estudio/transicoes.json' ? structuredClone(musicaPrevia.registro()) : null) as T | null,
   aplicarPatch: async ({documento, patch: patchDaTela, rotulo}) => {
     const patch = musicaPrevia.doDisco(patchDaTela);
     const antesDaTela = aberto!.docs[documento];

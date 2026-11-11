@@ -18,6 +18,7 @@ import {criarRede} from '../nucleo/ferramentas-mcp';
 import {prepararRender, renderizarVideo} from './exportar';
 import {registrarIpcMarcas} from './ipc-marcas';
 import {registrarExportarPaginas} from './exportar-paginas';
+import {lerJsonDaTela} from './ler-json';
 import {McpHttp} from './mcp-http';
 import {Memoria} from './memoria';
 import {ServidorMidia} from './servidor-midia';
@@ -376,7 +377,8 @@ lidar(CANAL.lerDocumento, (documento: string) => {
   const p = exigirProjeto();
   return p.lerJson(p.arquivoDoDocumento(documento));
 });
-lidar(CANAL.lerJson, (caminho: string) => exigirProjeto().lerJson(caminho).doc);
+// opcional (transições, seleção pedida pela IA): ausente, ou sem projeto aberto, é null e não um erro no log a cada abertura
+lidar(CANAL.lerJson, (caminho: string, o?: {opcional?: boolean}) => lerJsonDaTela(sessao?.projeto ?? null, caminho, o));
 lidar(CANAL.aplicarPatch, (o: {documento: string; versao_base?: string; patch: OperacaoPatch[]; rotulo?: string}) => {
   const r = exigirProjeto().aplicarPatch({...o, autor: 'pessoa', origem: 'interface'});
   return {versao: r.versao, seq: r.entrada.seq};

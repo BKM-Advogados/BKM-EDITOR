@@ -181,7 +181,7 @@ let primeiraLeitura = true;
 export const lerTransicoes = async () => {
   let lista: Transicao[] = [];
   try {
-    const r = await window.estudio.lerJson<{transicoes?: Transicao[]}>('.estudio/transicoes.json');
+    const r = await window.estudio.lerJsonOpcional<{transicoes?: Transicao[]}>('.estudio/transicoes.json');
     lista = Array.isArray(r?.transicoes) ? r.transicoes : [];
   } catch {
     lista = [];
@@ -217,7 +217,12 @@ export const observarMusica = () => {
     void lerTransicoes();
   };
   comecar();
-  const largarTroca = quandoTrocarProjeto(() => setTimeout(comecar, 300));
+  // o relógio armado na troca é cancelado ao desmontar: 300 ms depois de fechar o projeto não há mais o que ler
+  let relogio: ReturnType<typeof setTimeout> | undefined;
+  const largarTroca = quandoTrocarProjeto(() => {
+    clearTimeout(relogio);
+    relogio = setTimeout(comecar, 300);
+  });
   // o render que vai para o vídeo: o processo principal pede, o Web Worker da janela faz (motor.ts carrega só aqui)
   const largarRender = atender('musica:render', async (dados) => {
     const {doc, porFaixa, sohMedir} = dados as {doc: DocMusica; porFaixa?: boolean; sohMedir?: boolean};
@@ -238,6 +243,7 @@ export const observarMusica = () => {
     if (d) agendarVideo(d.id);
   });
   return () => {
+    clearTimeout(relogio);
     largar();
     largarTroca();
     largarRender();
