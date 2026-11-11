@@ -8,7 +8,8 @@ import {docCarrossel} from '../src/nucleo/carrossel';
 import {novoDocImagem} from '../src/nucleo/criar-projeto';
 import type {CamadaImagem, DocImagem, OperacaoPatch} from '../src/nucleo/documentos';
 import {layoutDeLista, MARCADOR_PADRAO, marcadorDe, recuoDaLista, temLista} from '../src/nucleo/lista';
-import {MARCA_BKM, marcaDoKit} from '../src/nucleo/marca';
+import {marcaDoKit} from '../src/nucleo/marca';
+import {KIT_ESCRITORIO} from './fixtures/kit-escritorio';
 import {patchLista} from '../src/nucleo/mcp-marca';
 
 const medir = (t: string) => t.length * 10;
@@ -98,7 +99,7 @@ describe('layout: marcador na margem e recuo pendente', () => {
 
 describe('MCP: fazer_lista', () => {
   const doc = () => {
-    const d = docCarrossel({largura: 1080, altura: 1350, paginas: 3, marca: marcaDoKit(MARCA_BKM)});
+    const d = docCarrossel({largura: 1080, altura: 1350, paginas: 3, marca: marcaDoKit(KIT_ESCRITORIO)});
     d.paginas![1].camadas.find((c) => c.id === 'texto')!.texto = 'Primeiro ponto\nSegundo ponto';
     return d;
   };

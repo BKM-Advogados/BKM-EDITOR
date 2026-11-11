@@ -11,7 +11,8 @@ import {
 } from '../src/nucleo/acabamento';
 import {acharCamada} from '../src/nucleo/carrossel';
 import type {CamadaImagem, DocImagem, OperacaoPatch} from '../src/nucleo/documentos';
-import {MARCA_BKM, MARCAS_INICIAIS} from '../src/nucleo/marca';
+import {MARCAS_INICIAIS} from '../src/nucleo/marca';
+import {KIT_ESCRITORIO} from './fixtures/kit-escritorio';
 import {KIT_TESTE} from './fixtures/kit-teste';
 
 const EXEMPLO = path.join(__dirname, 'fixtures', 'projeto');
@@ -207,8 +208,8 @@ describe('predefinições do kit', () => {
   });
 
   it('o kit da imagem é o da cor de fundo dela; sem nenhum, o primeiro', () => {
-    const kits = [...MARCAS_INICIAIS, MARCA_BKM]; // o kit da BKM não vem mais de fábrica, mas pode estar na pasta da pessoa
-    expect(kitDaImagem({fundo: '#101826'}, kits)?.id).toBe(MARCA_BKM.id);
+    const kits = [...MARCAS_INICIAIS, KIT_ESCRITORIO]; // o de fábrica e um kit de escritório da pasta da pessoa
+    expect(kitDaImagem({fundo: '#101826'}, kits)?.id).toBe(KIT_ESCRITORIO.id);
     expect(kitDaImagem({fundo: '#111418'}, kits)?.id).toBe('neutro');
     expect(kitDaImagem({fundo: '#171a19'}, [...kits, KIT_TESTE])?.id).toBe('teste');
     expect(kitDaImagem({fundo: '#123456'}, kits)?.id).toBe(kits[0].id);

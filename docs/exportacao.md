@@ -96,7 +96,7 @@ lista.
   `testes/marca-dagua-legenda.test.ts`; entre eles, a marca fora das zonas em todo formato, canto e tamanho, as
   preferências juntando por destino, o botão passando Inteira para Preencher com um Ctrl+Z só e a marca fora da legenda
   em todo formato, estilo e posição de legenda, canto e tamanho até 10%).
-- Prévia web (`?vista`, porta 5204): "Escolher imagem" devolve fotos sintéticas e o kit bkm ganha um logo de exemplo
+- Prévia web (`?vista`, porta 5204): "Escolher imagem" devolve fotos sintéticas e o kit de exemplo da prévia ganha um logo
   (`scripts/previa-web/ponte.ts`); o movimento aparece no monitor e no inspetor, e o diálogo mostra a miniatura e
   lembra a escolha.
 - `npx tsx scripts/exportar-teste-kenburns.mjs` renderiza três fotos com movimento nos quatro formatos com o logo e uma

@@ -8,7 +8,8 @@ import {docCarrossel} from '../src/nucleo/carrossel';
 import {novoDocImagem} from '../src/nucleo/criar-projeto';
 import type {CamadaImagem, DocImagem, OperacaoPatch} from '../src/nucleo/documentos';
 import {folgaDaLinha, formaDaCabeca, geometriaDaLinha, linhaDaPredefinicao, linhaDe, linhaNova, PREDEFINICOES_LINHA} from '../src/nucleo/linha';
-import {MARCA_BKM, marcaDoKit} from '../src/nucleo/marca';
+import {marcaDoKit} from '../src/nucleo/marca';
+import {KIT_ESCRITORIO} from './fixtures/kit-escritorio';
 import {patchInserirLinha} from '../src/nucleo/mcp-marca';
 
 const aplicar = (doc: DocImagem, patch: OperacaoPatch[]): DocImagem => jsonpatch.applyPatch(structuredClone(doc), patch as Operation[], true, false).newDocument;
@@ -153,7 +154,7 @@ describe('linha e seta', () => {
 });
 
 describe('MCP: inserir_linha', () => {
-  const carrossel = () => docCarrossel({largura: 1080, altura: 1350, paginas: 3, marca: marcaDoKit(MARCA_BKM)});
+  const carrossel = () => docCarrossel({largura: 1080, altura: 1350, paginas: 3, marca: marcaDoKit(KIT_ESCRITORIO)});
 
   it('põe a linha na página, com o ângulo em rotacao e a cor do kit', () => {
     const doc = carrossel();

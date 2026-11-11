@@ -8,11 +8,12 @@ import {afterAll, describe, expect, it} from 'vitest';
 import {novoDocCenas, TEMA_NEUTRO, type DocCenas} from '../src/nucleo/cenas';
 import {aplicarMarcaAoPlano, claudeMd, gravarPlano, novoDocImagem, planoDoProjeto} from '../src/nucleo/criar-projeto';
 import type {DocImagem} from '../src/nucleo/documentos';
-import {idDeMarca, inferirFonte, MARCA_BKM, MARCA_NEUTRO, MARCAS_INICIAIS, marcaDoDocumento, marcaDoKit, normalizarMarca, patchDaMarca, temaDaMarca} from '../src/nucleo/marca';
+import {idDeMarca, inferirFonte, MARCA_NEUTRO, MARCAS_INICIAIS, marcaDoDocumento, marcaDoKit, normalizarMarca, patchDaMarca, temaDaMarca} from '../src/nucleo/marca';
 import {fontesDoProjeto, PastaMarcas} from '../src/nucleo/pasta-marcas';
 import {Projeto} from '../src/nucleo/projeto';
 import {fonte, listarFontes, registrarFontesDeArquivo} from '../src/composicoes/fontes';
 import {ServidorMidia} from '../src/main/servidor-midia';
+import {KIT_ESCRITORIO} from './fixtures/kit-escritorio';
 import {KIT_TESTE} from './fixtures/kit-teste';
 
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'estudio-marca-'));
@@ -51,10 +52,9 @@ describe('kit de marca', () => {
     expect(teste.logo).toBe('logo.png');
     expect(existsSync(path.join(teste.pasta, 'logo.png'))).toBe(true);
     expect(existsSync(path.join(PASTA, 'neutro', 'marca.json'))).toBe(true);
-    expect(existsSync(path.join(PASTA, 'bkm'))).toBe(false); // o kit da BKM não vem mais de fábrica
     marcas.garantir(); // de novo não muda nada
     expect(marcas.listar()).toHaveLength(2);
-    expect(readdirSync(PASTA).sort()).toEqual(['neutro', 'teste']);
+    expect(readdirSync(PASTA).sort()).toEqual(['neutro', 'teste']); // nenhum kit que saiu de fábrica volta
   });
 
   it('cria, grava, relê e duplica (a cópia leva o logo)', () => {
@@ -132,11 +132,11 @@ describe('kit de marca', () => {
   });
 
   it('projeto novo com kit já nasce no tema do kit, com logo e fontes copiados', () => {
-    marcas.gravar(MARCA_BKM); // kit de escritório que a pessoa já tinha na pasta: continua funcionando
-    const bkm = aplicarMarcaAoPlano(planoDoProjeto({nome: 'N', modelo: 'video-branco'}), marcas.ler('bkm'));
-    expect(JSON.parse(bkm.arquivos['video/video.json']).tema).toEqual({fundo: '#101826', texto: '#F2EEE6', destaque: '#C9A961', suave: '#A5ADBA', fonte: 'Inter', marca: 'bkm',
-      assinatura: 'bkmadvogados.com.br'});
-    expect(bkm.copiar).toBeUndefined();
+    marcas.gravar(KIT_ESCRITORIO); // kit de escritório que a pessoa tem na pasta, sem logo
+    const escritorio = aplicarMarcaAoPlano(planoDoProjeto({nome: 'N', modelo: 'video-branco'}), marcas.ler('escritorio'));
+    expect(JSON.parse(escritorio.arquivos['video/video.json']).tema).toEqual({fundo: '#101826', texto: '#F2EEE6', destaque: '#C9A961', suave: '#A5ADBA', fonte: 'Inter',
+      marca: 'escritorio', assinatura: 'escritorio.exemplo'});
+    expect(escritorio.copiar).toBeUndefined();
 
     const destino = gravarPlano(path.join(tmp, 'novo-teste'), aplicarMarcaAoPlano(planoDoProjeto({nome: 'K', modelo: 'imagem-branco'}), marcas.ler('teste')));
     expect(existsSync(path.join(destino, 'midia', 'logo-teste.png'))).toBe(true);
@@ -151,6 +151,23 @@ describe('kit de marca', () => {
     expect(tema.logo).toBeUndefined();
     expect(tema.fontes_arquivos).toBeUndefined();
     expect(semLogo.copiar).toBeUndefined();
+  });
+
+  it('legado: vídeo com tema.marca no id do kit de fábrica que saiu (fora da pasta) fica com o tema que guardou e troca de kit', () => {
+    // o id que ficou gravado nos projetos de quem já usava, tratado como qualquer outro (montado em pedaços: o nome do
+    // escritório não fica no repositório)
+    const ID_LEGADO = ['b', 'k', 'm'].join('');
+    const plano = planoDoProjeto({nome: 'L', modelo: 'video-branco'});
+    const tema = {fundo: '#101826', texto: '#F2EEE6', destaque: '#C9A961', suave: '#A5ADBA', fonte: 'Inter', marca: ID_LEGADO, assinatura: '@assinatura.antiga'};
+    plano.arquivos['video/video.json'] = JSON.stringify({...JSON.parse(plano.arquivos['video/video.json']), tema});
+    const p = new Projeto(gravarPlano(path.join(tmp, 'legado'), plano));
+    const antes = p.lerJson<DocCenas>('video/video.json').doc;
+    expect(marcaDoDocumento(antes)).toBe(ID_LEGADO);
+    expect(antes.tema).toEqual(tema); // nada no app reescreve o tema antigo
+    expect(() => marcas.ler(ID_LEGADO)).toThrow(/não achado/);
+    expect(marcas.listar().map((m) => m.id)).not.toContain(ID_LEGADO);
+    marcas.aplicar(p, 'neutro', 'video', quem);
+    expect(p.lerJson<DocCenas>('video/video.json').doc.tema).toEqual({...TEMA_NEUTRO, marca: 'neutro'});
   });
 
   it('o CLAUDE.md ensina o kit e a ferramenta', () => {

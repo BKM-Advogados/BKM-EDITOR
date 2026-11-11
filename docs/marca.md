@@ -11,7 +11,7 @@ rodada 1) ganhou três coisas: a imagem guarda o kit que recebeu, cor e fonte da
 Um documento de imagem tem, no fim do tipo, o campo opcional `marca`: o kit como estava quando foi aplicado.
 
 ```json
-"marca": {"id": "bkm", "nome": "BKM Advogados",
+"marca": {"id": "escritorio", "nome": "Escritório Exemplo",
   "cores": {"fundo": "#101826", "texto": "#F2EEE6", "destaque": "#C9A961", "suave": "#A5ADBA"},
   "fontes": {"titulo": "Inter", "texto": "Inter"}}
 ```
@@ -44,7 +44,7 @@ não tem vira cinza `#808080`, que aparece em vez de esconder a camada.
 
 `patchDaMarca` (imagem) passa cada cor e fonte para o **mesmo papel** no kit novo: o que era o destaque do kit
 anterior vira o destaque do novo; título, texto e mono também. O kit anterior é o que a imagem guarda em `marca`; sem
-ele valem os kits de fábrica (BKM, neutro, a paleta escura de um kit de fábrica que saiu e o carrossel de antes do campo). Cor ou fonte que não é de nenhum kit
+ele valem os kits de fábrica (o neutro, as paletas marinho e escura de dois kits de fábrica que saíram e o carrossel de antes do campo). Cor ou fonte que não é de nenhum kit
 (`#123456`, "Impact") é escolha da pessoa e fica. Referência (`@destaque`) não é tocada: ela já lê o kit novo. O texto
 sem cor, ou no branco padrão, recebe `@texto`. Fecha imagem-D1 (fundo, formas e degradês ficavam do kit anterior) e
 imagem-D9 (o subtítulo virava cor de título e o numeral perdia a mono).

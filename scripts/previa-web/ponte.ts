@@ -656,7 +656,7 @@ const lerJsonSemFala = api.lerJson;
 api.lerJson = (async (caminho: string) => (palavrasSimuladas.has(caminho) ? structuredClone(palavrasSimuladas.get(caminho)) : lerJsonSemFala(caminho))) as ApiEstudio['lerJson'];
 // ---------- vídeo curto (frente C): fotos e logo de mentira ----------
 // "Escolher imagem" devolve uma de três fotos sintéticas (SVG em data URL, com céu, sol, morros e uma grade fina para
-// o Ken Burns ficar visível); o kit bkm aplicado ganha um logo de exemplo no tema, para a marca d'água ter o que pôr.
+// o Ken Burns ficar visível); o kit de exemplo aplicado ganha um logo de exemplo no tema, para a marca d'água ter o que pôr.
 const svg = (s: string) => `data:image/svg+xml;utf8,${encodeURIComponent(s)}`;
 const FOTOS = [['#3E6FA8', '#F2C46B', '#2E5E3A'], ['#7A4E8C', '#F28C6B', '#3D3A5E'], ['#1F7A8C', '#F5E6A8', '#5E4A2E']].map(([ceu, sol, morro], i) => svg(
   `<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000"><defs><linearGradient id="c" x1="0" y1="0" x2="0" y2="1">`
@@ -676,7 +676,7 @@ const aplicarOriginal = api.marcas.aplicar;
 api.marcas.aplicar = async (id, documento) => {
   const r = await aplicarOriginal(id, documento);
   const tema = (aberto!.docs[documento] as {tema?: Record<string, unknown>}).tema;
-  if (id === 'bkm' && tema) tema.logo = LOGO_EXEMPLO;
+  if (id === 'exemplo-fonte' && tema) tema.logo = LOGO_EXEMPLO;
   return r;
 };
 // ---------- frente Som (rodada 2): limpeza de voz e medidor de loudness, com o mesmo núcleo do app ----------

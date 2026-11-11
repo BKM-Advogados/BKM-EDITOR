@@ -125,7 +125,7 @@ export class PastaMarcas {
     return {...limpa, pasta};
   }
 
-  /** Id que ainda não tem pasta: "bkm-2", "bkm-3"… */
+  /** Id que ainda não tem pasta: "escritorio-2", "escritorio-3"… */
   idLivre(base: string) {
     const b = idDeMarca(base);
     let id = b;

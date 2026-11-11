@@ -33,18 +33,6 @@ export const PASTA_FONTES = 'fontes';
 export const EXTENSOES_FONTE = ['.ttf', '.otf', '.woff', '.woff2'];
 export const EXTENSOES_LOGO = ['.png', '.svg', '.jpg', '.jpeg', '.webp'];
 
-// Kit que já veio de fábrica e saiu (decisão de 10/11/2026): fica só para as imagens antigas que nasceram nele
-// continuarem trocando de kit pelo papel de cada cor (PALETAS_DE_FABRICA) e para os testes.
-export const MARCA_BKM: Marca = {
-  formato: 1,
-  id: 'bkm',
-  nome: 'BKM Advogados',
-  cores: {fundo: '#101826', texto: '#F2EEE6', destaque: '#C9A961', suave: '#A5ADBA'},
-  fontes: {titulo: 'Inter', texto: 'Inter', arquivos: []},
-  assinatura: 'bkmadvogados.com.br',
-  notas: 'Paleta e fontes provisórias: troque pelas do manual da BKM e importe o logo (menu → Marca…).',
-};
-
 const {fonte: FONTE_NEUTRA, ...CORES_NEUTRAS} = TEMA_NEUTRO;
 export const MARCA_NEUTRO: Marca = {
   formato: 1,
@@ -66,8 +54,8 @@ export const MARCA_NEUTRO_ANTIGO: Marca = {
   notas: 'O tema padrão do Estúdio, igual ao de um vídeo novo sem kit.',
 };
 
-/** Os kits de fábrica, criados na primeira abertura se não existirem: só o Neutro. Kits de escritório (o da BKM
- *  inclusive) ficam na pasta da pessoa e continuam funcionando, mas não vêm mais de fábrica. */
+/** Os kits de fábrica, criados na primeira abertura se não existirem: só o Neutro. Kits de escritório (inclusive um que
+ *  já veio de fábrica e saiu) ficam na pasta da pessoa e continuam funcionando, mas não vêm mais de fábrica. */
 export const MARCAS_INICIAIS: Marca[] = [MARCA_NEUTRO];
 
 /** "Escritório Exemplo" → "escritorio-exemplo": o nome da pasta. */
@@ -203,8 +191,11 @@ const CARROSSEL_ANTIGO = {fundo: '#111418', texto: '#F2F2F2', destaque: '#C88155
 // nele continuam trocando de kit pelo papel de cada cor e fonte
 const PALETA_ANTIGA = {fundo: '#171A19', texto: '#F4F0EA', destaque: '#C88155', suave: '#A09F9B'};
 const FONTES_ANTIGAS: FontesMarca = {titulo: 'Archivo', texto: 'IBM Plex Sans', mono: 'IBM Plex Mono', arquivos: []};
-const PALETAS_DE_FABRICA: Record<string, string>[] = [MARCA_BKM.cores, MARCA_NEUTRO.cores, PALETA_ANTIGA, CARROSSEL_ANTIGO];
-const FONTES_DE_FABRICA = [MARCA_BKM.fontes, MARCA_NEUTRO.fontes, FONTES_ANTIGAS];
+// a paleta marinho e dourado de outro kit de fábrica que saiu (10/11/2026), com as fontes do neutro (Inter): as imagens
+// de antes do campo `marca` que nasceram nela também continuam trocando de kit pelo papel de cada cor
+const PALETA_MARINHO_ANTIGA = {fundo: '#101826', texto: '#F2EEE6', destaque: '#C9A961', suave: '#A5ADBA'};
+const PALETAS_DE_FABRICA: Record<string, string>[] = [PALETA_MARINHO_ANTIGA, MARCA_NEUTRO.cores, PALETA_ANTIGA, CARROSSEL_ANTIGO];
+const FONTES_DE_FABRICA = [MARCA_NEUTRO.fontes, FONTES_ANTIGAS];
 const GENERICAS = new Set(['system-ui', 'sans-serif', 'serif', 'monospace']);
 
 const canais = (cor: string) => {

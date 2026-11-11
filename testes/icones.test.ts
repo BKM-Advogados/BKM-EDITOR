@@ -9,7 +9,8 @@ import {iconeNovo} from '../src/nucleo/camadas-novas';
 import {novoDocImagem} from '../src/nucleo/criar-projeto';
 import type {CamadaImagem, DocImagem, OperacaoPatch} from '../src/nucleo/documentos';
 import {buscarIcones, etiquetasDoIcone, existeIcone, LEXICO, NOMES_DE_ICONES, semAcento, sugerirIcones, VERSAO_LUCIDE} from '../src/nucleo/icones';
-import {MARCA_BKM, marcaDoKit} from '../src/nucleo/marca';
+import {marcaDoKit} from '../src/nucleo/marca';
+import {KIT_ESCRITORIO} from './fixtures/kit-escritorio';
 import {patchInserirIcone} from '../src/nucleo/mcp-marca';
 import geometria from '../src/renderer/modulos/imagem/icones-geometria.json';
 
@@ -123,7 +124,7 @@ describe('forma "icone" no acabamento', () => {
 });
 
 describe('MCP: inserir_icone', () => {
-  const carrossel = () => docCarrossel({largura: 1080, altura: 1350, paginas: 3, marca: marcaDoKit(MARCA_BKM)});
+  const carrossel = () => docCarrossel({largura: 1080, altura: 1350, paginas: 3, marca: marcaDoKit(KIT_ESCRITORIO)});
 
   it('insere na primeira página, na cor de destaque do kit, com id livre', () => {
     const doc = carrossel();

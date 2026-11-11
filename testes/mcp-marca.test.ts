@@ -6,13 +6,14 @@ import {docCarrossel} from '../src/nucleo/carrossel';
 import {resolverMarcaNoDoc} from '../src/nucleo/cor-marca';
 import {novoDocImagem} from '../src/nucleo/criar-projeto';
 import type {DocImagem, OperacaoPatch} from '../src/nucleo/documentos';
-import {MARCA_BKM, marcaDoKit, patchDaMarca} from '../src/nucleo/marca';
+import {marcaDoKit, patchDaMarca} from '../src/nucleo/marca';
+import {KIT_ESCRITORIO} from './fixtures/kit-escritorio';
 import {KIT_TESTE} from './fixtures/kit-teste';
 import {descreverMarca, patchCorDaMarca, patchFonteDaMarca, referenciaDeCor} from '../src/nucleo/mcp-marca';
 import {novoDocCenas} from '../src/nucleo/cenas';
 
 const aplicar = (doc: DocImagem, patch: OperacaoPatch[]): DocImagem => jsonpatch.applyPatch(structuredClone(doc), patch as Operation[], true, false).newDocument;
-const carrossel = () => docCarrossel({largura: 1080, altura: 1350, paginas: 3, marca: marcaDoKit(MARCA_BKM)});
+const carrossel = () => docCarrossel({largura: 1080, altura: 1350, paginas: 3, marca: marcaDoKit(KIT_ESCRITORIO)});
 
 describe('MCP da marca: cor_da_marca', () => {
   it('põe a referência no campo certo da camada e diz a cor e os avisos', () => {
@@ -24,9 +25,9 @@ describe('MCP da marca: cor_da_marca', () => {
 
     const variacao = patchCorDaMarca(doc, '/paginas/0/camadas/0', 'preenchimento', '@destaque+35');
     expect(variacao.valor).toBe('@destaque+35');
-    expect(variacao.cor).toBe('#DCC798'); // o destaque da BKM (#C9A961) 35% em direção ao branco
+    expect(variacao.cor).toBe('#DCC798'); // o destaque do kit do escritório (#C9A961) 35% em direção ao branco
 
-    // a cor do texto sobre o fundo: o suave da BKM no fundo da BKM lê bem; o fundo no fundo, não
+    // a cor do texto sobre o fundo: o suave do kit no fundo do kit lê bem; o fundo no fundo, não
     expect(patchCorDaMarca(doc, '/paginas/0/camadas/1', 'cor', 'texto').avisos).toEqual([]);
     expect(patchCorDaMarca(doc, '/paginas/0/camadas/1', 'cor', 'fundo').avisos[0]).toMatch(/1,0:1/);
   });
@@ -64,7 +65,7 @@ describe('MCP da marca: fonte_da_marca e ver_marca', () => {
     const doc = carrossel();
     const r = patchFonteDaMarca(doc, '/paginas/0/camadas/1', 'mono');
     expect(r.patch).toEqual([{op: 'replace', path: '/paginas/0/camadas/1/fonte', value: '@mono'}]);
-    expect(r.fonte).toBe('Inter'); // a BKM provisória não tem mono: a de texto
+    expect(r.fonte).toBe('Inter'); // o kit do escritório não tem mono: a de texto
     const kit = aplicar(doc, patchDaMarca(doc, KIT_TESTE));
     expect(resolverMarcaNoDoc(aplicar(kit, patchFonteDaMarca(kit, '/paginas/0/camadas/1', 'mono').patch)).paginas![0].camadas[1].fonte).toBe('IBM Plex Mono');
     expect(() => patchFonteDaMarca(doc, '/paginas/0/camadas/0', 'titulo')).toThrow(/é forma/);
@@ -72,7 +73,7 @@ describe('MCP da marca: fonte_da_marca e ver_marca', () => {
 
   it('ver_marca lista os nomes que cor_da_marca aceita', () => {
     const d = descreverMarca(carrossel()) as {kit: string; cores: {nome: string; referencia: string}[]; fontes: {titulo: string}};
-    expect(d.kit).toBe('bkm');
+    expect(d.kit).toBe('escritorio');
     expect(d.cores.map((c) => c.referencia)).toEqual(['@fundo', '@texto', '@destaque', '@suave']);
     expect(d.fontes.titulo).toBe('Inter');
     expect((descreverMarca(novoDocImagem(10, 10)) as {kit: null; aviso: string}).kit).toBeNull();
