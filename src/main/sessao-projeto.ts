@@ -15,9 +15,11 @@ import type {DocVideo} from '../nucleo/documentos';
 import type {PropsVideo} from '../compartilhado/api';
 import {lerEnvelopes} from './ipc-audio';
 import {arquivosDaMidia, gitignoreComMidiaPesada} from '../nucleo/midia-git'; // frente Casca (transversal-D7)
+import {gitignoreComRegrasInternas} from '../nucleo/criar-projeto';
 
 const exec = promisify(execFile);
-const IGNORAR = /(^|[\\/])(\.git|node_modules)([\\/]|$)|\.tmp$|estado\.json$|mcp\.json$/;
+// a trava de escrita (.estudio/escrita.lock) entra e sai a cada gravação: avisar a tela por ela seria um aviso por edição
+const IGNORAR = /(^|[\\/])(\.git|node_modules)([\\/]|$)|\.tmp$|estado\.json$|mcp\.json$|[\\/]\.estudio[\\/](escrita\.lock|mcp-app\.json)/;
 
 export class SessaoProjeto {
   readonly projeto: Projeto;
@@ -93,12 +95,15 @@ export class SessaoProjeto {
   }
 
   /** transversal-D7: vídeo bruto e o que passa de 25 MB em midia/ ficam fora do git (midia-git.ts). Antes de cada commit,
-   *  porque a mídia chega a qualquer hora (gravação, importação, o agente copiando). */
+   *  porque a mídia chega a qualquer hora (gravação, importação, o agente copiando). O diário e a trava de escrita
+   *  também ficam fora (REGRAS_GIT_INTERNAS), inclusive nos projetos criados antes dessa regra. */
   private ignorarMidiaPesada() {
     try {
-      const atual = this.projeto.existe('.gitignore') ? this.projeto.lerTexto('.gitignore') : '';
-      const novo = gitignoreComMidiaPesada(atual, arquivosDaMidia(this.projeto.raiz));
-      if (novo !== atual) this.projeto.gravarTexto('.gitignore', novo);
+      this.projeto.comTrava(() => {
+        const atual = this.projeto.existe('.gitignore') ? this.projeto.lerTexto('.gitignore') : '';
+        const novo = gitignoreComRegrasInternas(gitignoreComMidiaPesada(atual, arquivosDaMidia(this.projeto.raiz)));
+        if (novo !== atual) this.projeto.gravarTexto('.gitignore', novo);
+      });
     } catch {
       /* sem permissão para o .gitignore: o commit segue como antes */
     }
@@ -109,6 +114,8 @@ export class SessaoProjeto {
     this.relogioGit = null;
     try {
       this.ignorarMidiaPesada();
+      // o diário saiu do commit automático: no projeto que já o versionava, sai do índice e fica no disco
+      await this.git('rm', '--cached', '-q', '--ignore-unmatch', '--', `${PASTA_INTERNA}/diario.jsonl`);
       await this.git('add', '-A');
       const {stdout} = await this.git('status', '--porcelain');
       if (!stdout.trim()) return;

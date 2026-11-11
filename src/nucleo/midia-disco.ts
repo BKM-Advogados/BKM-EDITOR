@@ -124,7 +124,7 @@ export const marcarMidia = (
   caminho: string,
   mudanca: {estado?: EstadoDaTomada | null; nota?: string},
   quem: {autor: string; origem: string},
-): {seq: number; documento: string; caminho: string; marca: MarcaDeMidia | null} => {
+): {seq: number; documento: string; caminho: string; marca: MarcaDeMidia | null} => p.comTrava(() => {
   const rel = path.posix.normalize(caminho.replace(/\\/g, '/'));
   if (!rel.startsWith(`${PASTA}/`) || rel === ARQUIVO_MARCAS_MIDIA) throw new ErroProjeto(`só se marca arquivo de ${PASTA}/: ${caminho}`, 'caminho');
   const entradas = indiceDaMidia(p).entradas;
@@ -154,7 +154,7 @@ export const marcarMidia = (
     inverso: jsonpatch.compare(depois, antes) as OperacaoPatch[],
   });
   return {seq, documento: ARQUIVO_MARCAS_MIDIA, caminho: rel, marca};
-};
+});
 
 // ---------- onde cada arquivo é usado ----------
 /** Ids dos documentos do manifesto cujo JSON cita o caminho como valor (entre aspas), por arquivo pedido. */

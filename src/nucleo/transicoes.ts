@@ -56,8 +56,12 @@ export type BaseProjeto = {
   diario(): EntradaDiario[];
   /** Algo do arquivo de áudio que muda quando ele é regravado (o tamanho): entra no código do render. */
   assinatura?(arquivo: string): string;
+  /** A trava de escrita do projeto (Projeto.comTrava): ler o registro, aplicar e gravar sem outro processo no meio. */
+  comTrava?<T>(f: () => T): T;
   autor: string;
 };
+
+const travar = <T,>(b: BaseProjeto, f: () => T): T => (b.comTrava ? b.comTrava(f) : f());
 
 const agora = () => new Date().toISOString();
 const proximoId = (r: RegistroTransicoes) => {
@@ -97,7 +101,9 @@ export type ResultadoLevar = {transicao: string; destino: {documento: string; se
 
 /** Abre a Música com o alvo do vídeo: um clipe de áudio ("editar": o documento ligado a ele, ou um novo com o áudio do
  *  clipe) ou uma faixa ("criar": documento novo, trilha ou efeito pelo papel da faixa). */
-export const levarPara = (b: BaseProjeto, p: PedidoLevar): ResultadoLevar => {
+export const levarPara = (b: BaseProjeto, p: PedidoLevar): ResultadoLevar => travar(b, () => levarParaSemTrava(b, p));
+
+const levarParaSemTrava = (b: BaseProjeto, p: PedidoLevar): ResultadoLevar => {
   if (p.modulo !== 'musica') throw new Error(`por enquanto só se leva para a Música (pedido: ${p.modulo}); os outros módulos entram no mesmo contrato depois`);
   const manifesto = b.manifesto();
   const entradaOrigem = manifesto.documentos.find((d) => d.id === p.alvo.documento || d.caminho === p.alvo.documento);
@@ -202,7 +208,10 @@ const seqsDa = (b: BaseProjeto, id: string) => b.diario().filter((e) => e.transi
 /** Volta ao vídeo com a música no lugar: o clipe de origem passa a tocar o render (ligado ao documento), ou, na
  *  intenção "criar", nasce um clipe na faixa de origem. O render em si é de quem chama (o arquivo pode faltar por
  *  um instante: o caminho e a duração saem do documento). `aplicar: false` é voltar sem aplicar (o mesmo que cancelar). */
-export const concluirTransicao = (b: BaseProjeto, p: {transicao: string; aplicar?: boolean; resultado?: {documento?: string; midia?: string}}): ResultadoConcluir => {
+type PedidoConcluir = {transicao: string; aplicar?: boolean; resultado?: {documento?: string; midia?: string}};
+export const concluirTransicao = (b: BaseProjeto, p: PedidoConcluir): ResultadoConcluir => travar(b, () => concluirSemTrava(b, p));
+
+const concluirSemTrava = (b: BaseProjeto, p: PedidoConcluir): ResultadoConcluir => {
   if (p.aplicar === false) {
     const c = cancelarTransicao(b, {transicao: p.transicao});
     return {transicao: p.transicao, documento: c.volta.documento, seqs: [], volta: c.volta, avisos: ['voltou sem aplicar']};
@@ -260,7 +269,9 @@ export const concluirTransicao = (b: BaseProjeto, p: {transicao: string; aplicar
 // ---------- cancelar_transicao ----------
 /** Volta sem mexer na origem. Com `descartar`, as mudanças feitas no destino durante a transição são desfeitas, da
  *  última para a primeira (o documento criado por ela fica, vazio de novo, no projeto). */
-export const cancelarTransicao = (b: BaseProjeto, p: {transicao: string; descartar?: boolean}) => {
+export const cancelarTransicao = (b: BaseProjeto, p: {transicao: string; descartar?: boolean}) => travar(b, () => cancelarSemTrava(b, p));
+
+const cancelarSemTrava = (b: BaseProjeto, p: {transicao: string; descartar?: boolean}) => {
   const {r, t} = acharAberta(b, p.transicao);
   let revertidas = 0;
   const avisos: string[] = [];

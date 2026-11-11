@@ -60,6 +60,7 @@ export const baseDoProjeto = (p: Projeto, autor: string, origem: string): BasePr
   estado: () => p.estado(),
   diario: () => p.diario(0, {tolerante: true}),
   assinatura: assinaturaDe(p),
+  comTrava: (f) => p.comTrava(f),
 });
 
 // ---------- render: quem faz ----------

@@ -8,6 +8,7 @@ import path from 'node:path';
 import jsonpatch, {type Operation} from 'fast-json-patch';
 import type {ArquivoComentarios, Comentario, EntradaDiario, EntradaDocumento, EstadoEditor, Manifesto, OperacaoPatch} from './documentos';
 import {gravarAtomico} from './gravar-seguro';
+import {comATrava, comTrava} from './trava-escrita';
 import {ARQUIVO_PESQUISA, caminhoTextoFonte, lerPesquisa, pesquisaVazia, type Pesquisa} from './pesquisa';
 import {motivoDaTrava} from './travas-imagem';
 
@@ -69,6 +70,14 @@ export class Projeto {
     gravarAtomico(abs, texto); // arquivo preso (OneDrive, antivírus) tem nova tentativa curta: gravar-seguro.ts
   }
 
+  /** Roda `f` com a trava de escrita do projeto (.estudio/escrita.lock, trava-escrita.ts): todo ler-mudar-gravar do
+   *  projeto passa por aqui, para o app e o MCP da IDE (outro processo) não gravarem um por cima do outro. */
+  comTrava<T>(f: () => T): T {
+    const lock = this.caminho(`${PASTA_INTERNA}/escrita.lock`);
+    if (!comATrava(lock)) mkdirSync(path.dirname(lock), {recursive: true});
+    return comTrava(lock, f, {ocupada: () => new ErroProjeto('outro programa está gravando o projeto; tente de novo', 'conflito')});
+  }
+
   manifesto(): Manifesto {
     const m = this.lerJson<Manifesto>('estudio.json').doc;
     if (!m || typeof m !== 'object' || !Array.isArray(m.documentos)) throw new ErroProjeto('o estudio.json não tem a lista "documentos"', 'patch');
@@ -82,29 +91,35 @@ export class Projeto {
   renomear(nome: string): Manifesto {
     const limpo = nome.trim().slice(0, 120);
     if (!limpo) throw new ErroProjeto('o nome do projeto não pode ficar vazio');
-    const m = {...this.manifesto(), nome: limpo};
-    this.gravarManifesto(m);
-    return m;
+    return this.comTrava(() => {
+      const m = {...this.manifesto(), nome: limpo};
+      this.gravarManifesto(m);
+      return m;
+    });
   }
 
   /** Grava o arquivo de um documento novo e o põe no manifesto (o conteúdo vem de criar-projeto.ts). */
   adicionarDocumento(entrada: EntradaDocumento, conteudo: unknown): EntradaDocumento {
-    const m = this.manifesto();
-    if (m.documentos.some((d) => d.id === entrada.id || d.caminho === entrada.caminho)) throw new ErroProjeto(`já existe o documento ${entrada.id}`, 'conflito');
-    if (this.existe(entrada.caminho)) throw new ErroProjeto(`o arquivo ${entrada.caminho} já existe`, 'conflito');
-    this.gravarTexto(entrada.caminho, serializar(conteudo));
-    this.gravarManifesto({...m, documentos: [...m.documentos, entrada]});
-    return entrada;
+    return this.comTrava(() => {
+      const m = this.manifesto();
+      if (m.documentos.some((d) => d.id === entrada.id || d.caminho === entrada.caminho)) throw new ErroProjeto(`já existe o documento ${entrada.id}`, 'conflito');
+      if (this.existe(entrada.caminho)) throw new ErroProjeto(`o arquivo ${entrada.caminho} já existe`, 'conflito');
+      this.gravarTexto(entrada.caminho, serializar(conteudo));
+      this.gravarManifesto({...m, documentos: [...m.documentos, entrada]});
+      return entrada;
+    });
   }
 
   renomearDocumento(id: string, titulo: string): EntradaDocumento {
-    const m = this.manifesto();
-    const i = m.documentos.findIndex((d) => d.id === id);
-    if (i < 0) throw new ErroProjeto(`documento não achado: ${id}`, 'nao_achado');
-    const documentos = [...m.documentos];
-    documentos[i] = {...documentos[i], titulo: titulo.trim() || documentos[i].titulo};
-    this.gravarManifesto({...m, documentos});
-    return documentos[i];
+    return this.comTrava(() => {
+      const m = this.manifesto();
+      const i = m.documentos.findIndex((d) => d.id === id);
+      if (i < 0) throw new ErroProjeto(`documento não achado: ${id}`, 'nao_achado');
+      const documentos = [...m.documentos];
+      documentos[i] = {...documentos[i], titulo: titulo.trim() || documentos[i].titulo};
+      this.gravarManifesto({...m, documentos});
+      return documentos[i];
+    });
   }
 
   /** Caminho do arquivo de um documento, pelo id do manifesto ou pelo próprio caminho. */
@@ -132,7 +147,7 @@ export class Projeto {
     desfaz?: number; // frente IA: a entrada que esta reverte
     transicao?: string; // frente Música: sem ele, vale a transição aberta cujo destino é este arquivo
   }): {versao: string; entrada: EntradaDiario} {
-    return this.aplicarNoArquivo(this.arquivoDoDocumento(entrada.documento), entrada, true);
+    return this.comTrava(() => this.aplicarNoArquivo(this.arquivoDoDocumento(entrada.documento), entrada, true));
   }
 
   /** O arquivo de uma entrada do diário: documento do manifesto ou um dos arquivos internos (null se não há mais). */
@@ -298,6 +313,11 @@ export class Projeto {
    */
   reverter(seq: number, o: {autor: string; origem: string; forcar?: boolean}):
     {ok: true; seq: number; rotulo: string} | {ok: false; mensagem: string; mudou_depois?: boolean} {
+    return this.comTrava(() => this.reverterSemTrava(seq, o));
+  }
+
+  private reverterSemTrava(seq: number, o: {autor: string; origem: string; forcar?: boolean}):
+    {ok: true; seq: number; rotulo: string} | {ok: false; mensagem: string; mudou_depois?: boolean} {
     const todas = this.diario(0, {tolerante: true});
     const e = todas.find((x) => x.seq === seq);
     if (!e) return {ok: false, mensagem: `não há a mudança #${seq} no histórico`};
@@ -333,6 +353,10 @@ export class Projeto {
   /** Ctrl+Z: a última entrada desse autor e dessa origem que ainda não foi revertida (transversal-D1: vale depois de
    *  reabrir). Pula a que não tem o que reverter e a de arquivo que saiu do projeto, para não ficar preso nelas. */
   desfazerUltima(o: {autor: string; origem: string; como: {autor: string; origem: string}}) {
+    return this.comTrava(() => this.desfazerUltimaSemTrava(o));
+  }
+
+  private desfazerUltimaSemTrava(o: {autor: string; origem: string; como: {autor: string; origem: string}}) {
     const todas = this.diario(0, {tolerante: true});
     const revertidas = revertidasDe(todas);
     const existe = new Map<string, boolean>();
@@ -342,7 +366,7 @@ export class Projeto {
       return existe.get(e.documento)!;
     });
     if (!ultima) return {ok: false as const, mensagem: 'nada para desfazer'};
-    return {...this.reverter(ultima.seq, o.como), alvo: ultima};
+    return {...this.reverterSemTrava(ultima.seq, o.como), alvo: ultima};
   }
 
   // ---------- comentários ----------
@@ -356,20 +380,24 @@ export class Projeto {
   }
 
   novoComentario(c: Omit<Comentario, 'id' | 'criado_em' | 'estado' | 'respostas'>): Comentario {
-    const lista = this.comentarios();
-    const maior = lista.reduce((m, x) => Math.max(m, Number(x.id.replace(/\D/g, '')) || 0), 0);
-    const novo: Comentario = {...c, id: `cmt_${String(maior + 1).padStart(4, '0')}`, criado_em: new Date().toISOString(), estado: 'aberto', respostas: []};
-    this.gravarComentarios([...lista, novo]);
-    return novo;
+    return this.comTrava(() => {
+      const lista = this.comentarios();
+      const maior = lista.reduce((m, x) => Math.max(m, Number(x.id.replace(/\D/g, '')) || 0), 0);
+      const novo: Comentario = {...c, id: `cmt_${String(maior + 1).padStart(4, '0')}`, criado_em: new Date().toISOString(), estado: 'aberto', respostas: []};
+      this.gravarComentarios([...lista, novo]);
+      return novo;
+    });
   }
 
   alterarComentario(id: string, mudar: (c: Comentario) => Comentario): Comentario {
-    const lista = this.comentarios();
-    const i = lista.findIndex((c) => c.id === id);
-    if (i < 0) throw new ErroProjeto(`comentário não achado: ${id}`, 'nao_achado');
-    lista[i] = mudar(lista[i]);
-    this.gravarComentarios(lista);
-    return lista[i];
+    return this.comTrava(() => {
+      const lista = this.comentarios();
+      const i = lista.findIndex((c) => c.id === id);
+      if (i < 0) throw new ErroProjeto(`comentário não achado: ${id}`, 'nao_achado');
+      lista[i] = mudar(lista[i]);
+      this.gravarComentarios(lista);
+      return lista[i];
+    });
   }
 
   responder(id: string, autor: string, texto: string) {
@@ -398,6 +426,10 @@ export class Projeto {
 
   /** Muda a pesquisa (a função mexe na cópia que recebe) e registra no diário o patch e o inverso. */
   alterarPesquisa<R>(mudar: (p: Pesquisa) => R, quem: {autor: string; origem: string; rotulo: string}): R {
+    return this.comTrava(() => this.alterarPesquisaSemTrava(mudar, quem));
+  }
+
+  private alterarPesquisaSemTrava<R>(mudar: (p: Pesquisa) => R, quem: {autor: string; origem: string; rotulo: string}): R {
     const textoAntes = this.existe(ARQUIVO_PESQUISA) ? this.lerTexto(ARQUIVO_PESQUISA) : serializar(pesquisaVazia());
     const antes = this.pesquisa();
     const depois = structuredClone(antes);
@@ -423,10 +455,12 @@ export class Projeto {
    *  .gitignore de projetos criados antes da pesquisa existir. */
   gravarTextoFonte(id: string, texto: string) {
     this.gravarTexto(caminhoTextoFonte(idDeFonte(id)), texto);
-    const ignorar = this.existe('.gitignore') ? this.lerTexto('.gitignore') : '';
-    if (!ignorar.split(/\r?\n/).some((l) => /^\/?pesquisa\/fontes\/?$/.test(l.trim()))) {
-      this.gravarTexto('.gitignore', `${ignorar}${ignorar && !ignorar.endsWith('\n') ? '\n' : ''}pesquisa/fontes/\n`);
-    }
+    this.comTrava(() => {
+      const ignorar = this.existe('.gitignore') ? this.lerTexto('.gitignore') : '';
+      if (!ignorar.split(/\r?\n/).some((l) => /^\/?pesquisa\/fontes\/?$/.test(l.trim()))) {
+        this.gravarTexto('.gitignore', `${ignorar}${ignorar && !ignorar.endsWith('\n') ? '\n' : ''}pesquisa/fontes/\n`);
+      }
+    });
   }
 
   /** Antes de a fonte relida com outro texto gravar por cima: o texto antigo (em que os fatos foram conferidos) passa

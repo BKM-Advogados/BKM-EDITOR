@@ -25,7 +25,20 @@ import {serializar} from './projeto';
 // o texto baixado de cada fonte (pesquisa/fontes/<id>.txt) fica fora do git: é grande e se baixa de novo pela url
 // vídeo e áudio sem perda em midia/ também ficam de fora (transversal-D7, midia-git.ts); o que passa de 25 MB entra na regra
 // pelo caminho exato antes de cada commit
-export const GITIGNORE = `saidas/\n.estudio/estado.json\n.estudio/miniatura.jpg\n.estudio/mcp*\n*.tmp\npesquisa/fontes/\n${REGRAS_MIDIA_PESADA.join('\n')}\n`;
+/** Arquivos internos que ficam fora do commit automático: o diário (o histórico das edições, que cresce a cada mudança e
+ *  já é o histórico fino) e a trava de escrita entre o app e o MCP da IDE. Os projetos antigos ganham estas linhas antes
+ *  do próximo commit (sessao-projeto.ts). */
+export const REGRAS_GIT_INTERNAS = ['.estudio/diario.jsonl', '.estudio/escrita.lock*'];
+
+export const GITIGNORE = `saidas/\n.estudio/estado.json\n.estudio/miniatura.jpg\n.estudio/mcp*\n${REGRAS_GIT_INTERNAS.join('\n')}\n*.tmp\npesquisa/fontes/\n${REGRAS_MIDIA_PESADA.join('\n')}\n`;
+
+/** O .gitignore com as regras internas que faltam no fim (o mesmo texto se não falta nada). */
+export const gitignoreComRegrasInternas = (texto: string): string => {
+  const tem = new Set(texto.split(/\r?\n/).map((l) => l.trim()));
+  const faltam = REGRAS_GIT_INTERNAS.filter((r) => !tem.has(r));
+  if (!faltam.length) return texto;
+  return `${texto}${texto && !texto.endsWith('\n') ? '\n' : ''}${faltam.join('\n')}\n`;
+};
 
 const DOIS = (n: number) => String(n).padStart(2, '0');
 

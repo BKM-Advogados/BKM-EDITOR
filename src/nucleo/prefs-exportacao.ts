@@ -20,16 +20,16 @@ export const lerPrefsExportacao = (p: Projeto): PrefsExportacao => {
 };
 
 /** Junta a mudança ao que já estava (por destino) e grava; devolve o arquivo inteiro como ficou. */
-export const gravarPrefsExportacao = (p: Projeto, mudanca: PrefsExportacao): PrefsExportacao => {
+export const gravarPrefsExportacao = (p: Projeto, mudanca: PrefsExportacao): PrefsExportacao => p.comTrava(() => {
   const atual = lerPrefsExportacao(p);
   const novo = normalizarPrefsExportacao({...atual, marca_dagua: {...atual.marca_dagua, ...normalizarPrefsExportacao(mudanca).marca_dagua}});
   p.gravarTexto(ARQUIVO_PREFS_EXPORTACAO, serializar(novo));
   return novo;
-};
+});
 
 /** O mesmo que `gravarPrefsExportacao`, para quem não é a pessoa na interface (o agente): a mudança entra no diário com o patch e o
  *  inverso, para o Histórico mostrar quem mexeu na marca d'água. As escolhas da pessoa no diálogo não passam por aqui. */
-export const gravarPrefsExportacaoNoDiario = (p: Projeto, mudanca: PrefsExportacao, quem: {autor: string; origem: string; rotulo: string}): PrefsExportacao => {
+export const gravarPrefsExportacaoNoDiario = (p: Projeto, mudanca: PrefsExportacao, quem: {autor: string; origem: string; rotulo: string}): PrefsExportacao => p.comTrava(() => {
   const antes = lerPrefsExportacao(p);
   const textoAntes = p.existe(ARQUIVO_PREFS_EXPORTACAO) ? p.lerTexto(ARQUIVO_PREFS_EXPORTACAO) : serializar(antes);
   const depois = gravarPrefsExportacao(p, mudanca);
@@ -47,4 +47,4 @@ export const gravarPrefsExportacaoNoDiario = (p: Projeto, mudanca: PrefsExportac
     inverso: jsonpatch.compare(depois, antes) as OperacaoPatch[],
   });
   return depois;
-};
+});
