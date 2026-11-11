@@ -17,6 +17,7 @@ import {MARCAS_INICIAIS} from './marca';
 import {registrarMarca} from './mcp-marca';
 import {PastaMarcas} from './pasta-marcas';
 import {ehDocCenas, resolverCenas, type DocCenas} from './cenas';
+import {problemasDosEfeitos} from './efeitos';
 import {arquivoDaFala, arquivoDasPalavras, clipesDeVoz, comTexto, CPS_MAX, cpsDe, deslocamentoDaLegenda, legendasDeArquivo, legendasDeOutraTomada, limitesDoArrasto, nomeLivreDaLegenda, palavrasDuvidosas, termosDoDicionario, textoDeLegenda, type PalavraLegenda, recusaDoDestinoNoProjeto, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt, type EstadoDaFala, type IdEstiloLegenda} from './legendas';
 import {CATALOGO_FONTES} from './catalogo-fontes';
 import {
@@ -188,6 +189,8 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
     try {
       const {doc} = projeto.lerJson<unknown>(projeto.arquivoDoDocumento(documento));
       if (ehDocCenas(doc)) avisos = resolverCenas(doc as DocCenas).avisos;
+      // fora das cenas (imagem, roteiro antigo), o efeito com tipo ou campo errado também volta como aviso
+      else if (doc && typeof doc === 'object' && 'efeitos' in doc) avisos = problemasDosEfeitos((doc as {efeitos: unknown}).efeitos).map((p) => `Efeitos: ${p}`);
     } catch {
       /* sem avisos: o patch já foi gravado */
     }

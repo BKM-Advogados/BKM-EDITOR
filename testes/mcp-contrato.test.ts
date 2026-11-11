@@ -199,3 +199,15 @@ describe('escolher_trilha pede a permissão da pessoa (M11)', () => {
     await c.close();
   });
 });
+
+describe('efeito inválido volta como aviso (M14)', () => {
+  it('aplicar_patch com tipo de efeito que não existe na imagem devolve o aviso', async () => {
+    const lido = await chamar('ler_documento', {documento: 'capa'});
+    const op = lido.dado.conteudo.efeitos === undefined
+      ? {op: 'add', path: '/efeitos', value: [{id: 'e9', tipo: 'explosao', valor: 'muito'}]}
+      : {op: 'add', path: '/efeitos/-', value: {id: 'e9', tipo: 'explosao', valor: 'muito'}};
+    const r = await chamar('aplicar_patch', {documento: 'capa', versao_base: lido.dado.versao, patch: [op]});
+    expect(r.erro, r.texto).toBe(false);
+    expect(r.dado.avisos.join('\n')).toMatch(/explosao/);
+  });
+});
