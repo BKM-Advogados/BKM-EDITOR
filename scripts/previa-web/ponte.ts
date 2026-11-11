@@ -510,6 +510,10 @@ const api: ApiEstudio = {
     },
     appsConfigs: async (id) => iaNaPrevia.configs(id),
     appsRevogar: async (id) => ((iaNaPrevia.apps = iaNaPrevia.apps.filter((x) => x.id !== id)), iaNaPrevia.estadoApps()),
+    // Claude Desktop: só o estado na memória da prévia
+    claudeDesktop: async () => iaNaPrevia.estadoClaude(),
+    claudeDesktopConectar: async () => ((iaNaPrevia.claudeConectado = true), iaNaPrevia.estadoClaude()),
+    claudeDesktopDesconectar: async () => ((iaNaPrevia.claudeConectado = false), iaNaPrevia.estadoClaude()),
     guardar: async () => null,
     guardadas: async () => [],
     apagarGuardada: async () => undefined,
@@ -824,6 +828,11 @@ const iaNaPrevia = {
   appsLigado: false,
   porta: 47815,
   apps: [] as {id: string; nome: string; criado_em: string}[],
+  claudeConectado: false,
+  estadoClaude() {
+    return {arquivo: '~/.config/Claude/claude_desktop_config.json', situacao: this.claudeConectado ? 'conectado' as const : 'desconectado' as const,
+      claude_encontrado: true, extensao: false, translocado: false};
+  },
   estadoApps() {
     return {ligado: this.appsLigado, porta: this.porta, ouvindo: this.appsLigado, apps: this.apps.slice()};
   },

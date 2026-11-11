@@ -49,6 +49,8 @@ import {definirServicoPrevia} from '../nucleo/mcp-previa'; // frente IDE: prévi
 import {criarServicoPrevia} from './previa'; // frente IDE
 import {criarIde} from './ide'; // frente IDE: projetos prontos para IDE de agentes
 import {scriptDoMcp} from '../nucleo/ide'; // frente IDE
+import {criarClaudeDesktop} from './claude-desktop'; // Claude Desktop (docs/claude-desktop.md)
+import {SCRIPT_DESKTOP} from '../nucleo/claude-desktop';
 
 // o mesmo id do instalador (electron-builder.yml): a barra de tarefas agrupa a janela com o atalho
 app.setAppUserModelId('br.com.bkmadvogados.estudio');
@@ -103,6 +105,10 @@ const recursos = (rel: string) => (app.isPackaged ? path.join(process.resourcesP
 // frente IDE (docs/ide.md): .mcp.json, .claude/settings.local.json e t3.json em cada projeto, com o MCP por stdio deste app
 const ide = criarIde({executavel: process.execPath, script: scriptDoMcp({empacotado: app.isPackaged, recursos: process.resourcesPath, raizApp: app.getAppPath()}),
   ligado: () => memoria.prefs().projetos_ide !== false});
+// Claude Desktop (docs/claude-desktop.md): o arquivo de descoberta (o MCP do Claude Desktop passa pelo app aberto) e o
+// botão "Conectar ao Claude Desktop", que grava a entrada no claude_desktop_config.json
+const claudeDesktop = criarClaudeDesktop({dados: app.getPath('userData'), executavel: process.execPath, versao: app.getVersion(),
+  script: recursos(path.join('dist-mcp', SCRIPT_DESKTOP)), mcp: () => mcpHttp, url: () => (mcpHttp ? midia.origem : null)});
 const pastaDoExemplo = () => recursos(path.join('exemplos', EXEMPLO.pasta));
 const temExemplo = () => existsSync(path.join(pastaDoExemplo(), 'estudio.json'));
 
@@ -179,6 +185,7 @@ const fecharSessao = async () => {
   sessao = null;
   avisoAbertura = undefined;
   midia.servir(null);
+  claudeDesktop.publicar(null); // o Claude Desktop deixa de operar no projeto fechado
   tituloDaJanela();
 };
 
@@ -207,6 +214,7 @@ const abrirProjeto = async (raiz: string) => {
     aoAbrirMusica(nova.projeto); // frente Música: renders que faltam (pasta clonada) e os que sobraram (ipc-musica.ts)
     await nova.abrir();
     nova.publicarMcp(mcpHttp?.novaConexao(midia.origem, 'mcp', {ide: true})); // o MCP da IDE passa pelo app enquanto o projeto está aberto (mcp-app.ts)
+    claudeDesktop.publicar(raiz); // e o do Claude Desktop também (claude-desktop.ts)
   } catch (e) {
     await fecharSessao(); // nada de projeto meio aberto (mídia e MCP servindo, sem observador)
     throw e;
@@ -367,6 +375,9 @@ lidar(CANAL.gravarPreferencias, (p: Partial<Preferencias>) => {
   if (p.projetos_ide === true && sessao) ide.preparar(sessao.projeto.raiz, sessao.projeto); // frente IDE: ligar vale já para o projeto aberto
   return r;
 });
+lidar(CANAL.iaClaudeDesktop, () => claudeDesktop.estado()); // Claude Desktop
+lidar(CANAL.iaClaudeDesktopConectar, () => claudeDesktop.conectar());
+lidar(CANAL.iaClaudeDesktopDesconectar, () => claudeDesktop.desconectar());
 lidar(CANAL.ideEstado, () => ide.estado(sessao?.projeto.raiz)); // frente IDE
 lidar(CANAL.ideAbrirNoT3, () => {
   const p = exigirProjeto();
@@ -651,6 +662,7 @@ app.on('ready', async () => {
     perguntarAPessoa); // frente IA: o portão de permissão pergunta à pessoa pela tela
   await iniciarAppsDeFora(); // frente IA: apps de IA de fora (tokens de volta ao MCP e, se ligada, a porta fixa)
   midia.rota((req, res) => mcpHttp!.atender(req, res));
+  claudeDesktop.publicar(); // Claude Desktop: a descoberta com o token dele, antes de qualquer projeto abrir
   claude = await terminais.preparar();
   criarJanela();
   // a pasta pedida de fora (variável, argumento, ícone do Dock) vem antes do "abrir o último" das preferências
@@ -663,6 +675,7 @@ app.on('window-all-closed', async () => {
   terminais.fecharTodos();
   conversas.fecharTodas({agora: true}); // sem os 1,5 s: o processo principal sairia antes e o agente ficaria órfão
   mcpHttp?.esquecerTudo();
+  claudeDesktop.retirar(); // o Claude Desktop volta a trabalhar sozinho, no projeto que escolher
   // o commit da última edição (relógio de 8 s) antes de sair, com teto para nunca prender o fechamento
   await Promise.race([Promise.allSettled([fecharAppsDeFora(), sessao?.fechar()]), new Promise((ok) => setTimeout(ok, 5000))]);
   midia.parar();

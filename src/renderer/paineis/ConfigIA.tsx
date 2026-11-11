@@ -4,7 +4,7 @@
 // uso do mês com a composição: tokens de entrada (parte do cache), de saída e o custo estimado pela tabela.
 import React, {useEffect, useRef, useState, useSyncExternalStore} from 'react';
 import {AudioLines, CircleAlert, CircleCheck, ExternalLink, KeyRound, RefreshCw, ShieldQuestion, X} from 'lucide-react';
-import type {ConfigsDoApp, EstadoAppsDeFora, EstadoNarracaoIA, EstadoProvedor, UsoDoMes} from '../../compartilhado/api';
+import type {ConfigsDoApp, EstadoAppsDeFora, EstadoClaudeDesktop, EstadoNarracaoIA, EstadoProvedor, UsoDoMes} from '../../compartilhado/api';
 import {copiar} from '../componentes/Campos';
 import {avisar} from '../estado/loja';
 import {estadoConversas, fecharConfigIA, lerProvedores, responderAvulso} from './conversas';
@@ -182,6 +182,49 @@ const SecaoNarracao: React.FC<{foco: boolean; abrirGemini: () => void}> = ({foco
   );
 };
 
+// Claude Desktop (docs/claude-desktop.md): um botão grava a entrada "estudio" no claude_desktop_config.json (mesclada,
+// sem apagar o que existe) e outro a tira. Com o app aberto, o Claude Desktop opera no projeto aberto aqui, sem porta
+// fixa nem token colado (arquivo de descoberta); com o app fechado, escolhe um projeto pela lista.
+const TEXTO_SITUACAO: Record<EstadoClaudeDesktop['situacao'], string> = {
+  conectado: 'conectado: reinicie o Claude Desktop se ele estava aberto',
+  desatualizado: 'conectado a outra cópia do Estúdio: conecte de novo',
+  manual: 'já há um "estudio" posto à mão no Claude Desktop',
+  desconectado: 'não conectado',
+  ilegivel: 'o arquivo de configuração do Claude Desktop não é JSON válido',
+};
+
+const SecaoClaudeDesktop: React.FC = () => {
+  const [e, setE] = useState<EstadoClaudeDesktop | null>(null);
+  useEffect(() => {
+    void window.estudio.ia.claudeDesktop().then(setE).catch(() => setE(null));
+  }, []);
+  if (!e) return null;
+  const falhar = (err: unknown) => avisar(String((err as Error).message).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), 'erro');
+  const depois = (x: EstadoClaudeDesktop) => (setE(x), x.aviso && avisar(x.aviso, 'erro'));
+  const ok = e.situacao === 'conectado';
+  return (
+    <div className="ia-apps">
+      <div className="ia-uso-titulo">Claude Desktop</div>
+      <div className="ia-linha">
+        <span className={ok ? 'ia-estado pronto' : 'ia-estado falta'}>{ok ? <CircleCheck size={12} /> : <CircleAlert size={12} />}{TEXTO_SITUACAO[e.situacao]}</span>
+        <span className="espaco" />
+        {e.situacao !== 'conectado' && <button className="bt mini" disabled={e.translocado || e.situacao === 'manual' || e.situacao === 'ilegivel'}
+          onClick={() => void window.estudio.ia.claudeDesktopConectar().then(depois).catch(falhar)}>Conectar ao Claude Desktop</button>}
+        {(e.situacao === 'conectado' || e.situacao === 'desatualizado') && <button className="bt mini fantasma"
+          onClick={() => void window.estudio.ia.claudeDesktopDesconectar().then(depois).catch(falhar)}>Desconectar</button>}
+      </div>
+      <div className="fraco">
+        Com o Estúdio aberto, o Claude Desktop trabalha no projeto aberto aqui, e os pedidos de permissão aparecem nesta tela. Com o app
+        fechado, ele lista os seus projetos e trabalha no que você escolher. Tudo entra no Histórico como "Claude Desktop".
+        {!e.claude_encontrado && ' O Claude Desktop não foi encontrado neste PC: instale e abra uma vez.'}
+        {e.extensao && ' A extensão do Estúdio já está instalada no Claude Desktop: não precisa conectar por aqui também.'}
+        {e.translocado && ' Mova o Estudio.app para Aplicativos e abra de novo antes de conectar.'}
+      </div>
+      <div className="fraco">Arquivo: {e.arquivo}</div>
+    </div>
+  );
+};
+
 // Apps de IA de fora (padrão Screenpipe): ligar a porta só deste PC, criar um app com token próprio, copiar a
 // configuração (HTTP para Cursor, Cline, Windsurf, VS Code; stdio para o Claude Desktop) e revogar. Quem entra por fora
 // passa pelo mesmo portão de permissão e aparece no Histórico com o nome do app.
@@ -229,7 +272,7 @@ const SecaoAppsDeFora: React.FC = () => {
           <div className="ia-config"><span className="rot">HTTP</span><span className="fraco">Cursor, Cline, Windsurf, VS Code</span>
             <button className="bt mini fantasma" onClick={() => copiar(mostrar.configs.http, 'Configuração copiada')}>Copiar</button></div>
           <pre className="perm-cmd">{mostrar.configs.http}</pre>
-          <div className="ia-config"><span className="rot">stdio</span><span className="fraco">Claude Desktop e quem só aceita stdio (usa a ponte do Estúdio)</span>
+          <div className="ia-config"><span className="rot">stdio</span><span className="fraco">quem só aceita stdio (usa a ponte do Estúdio; o Claude Desktop tem a seção própria acima)</span>
             <button className="bt mini fantasma" onClick={() => copiar(mostrar.configs.stdio, 'Configuração copiada')}>Copiar</button></div>
           <pre className="perm-cmd">{mostrar.configs.stdio}</pre>
         </div>
@@ -271,6 +314,7 @@ const DialogoConfigIA: React.FC = () => {
           {provedores.map((p) => <LinhaProvedor key={p.id} p={p} aberto={aberto === p.id} abrir={() => setAberto((a) => (a === p.id ? undefined : p.id))} />)}
         </div>
         <SecaoNarracao foco={cfg.foco === 'narracao'} abrirGemini={() => setAberto('gemini')} />
+        <SecaoClaudeDesktop />
         <SecaoAppsDeFora />
         <SecaoProjetosIde />
         <div className="ia-uso">
