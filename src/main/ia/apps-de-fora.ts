@@ -128,7 +128,9 @@ export class AppsDeFora {
       if (!hostOk || req.headers.origin) return void res.writeHead(403, {'Content-Type': 'text/plain'}).end('recusado');
       const mcp = this.o.mcp();
       if (!mcp) return void res.writeHead(503).end();
-      void mcp.atender(req, res).then((ok) => ok || res.writeHead(404).end());
+      // como o despachar do servidor de mídia: falha no meio vira resposta, nunca rejeição solta e conexão pendurada
+      void mcp.atender(req, res).then((ok) => ok || res.writeHead(404).end(),
+        (e) => (res.headersSent ? res.destroy() : res.writeHead(500, {'Content-Type': 'text/plain'}).end(String((e as Error)?.message ?? e))));
     });
     return new Promise<void>((ok) => {
       s.once('error', (e: NodeJS.ErrnoException) => {
