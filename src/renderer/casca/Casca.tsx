@@ -8,7 +8,7 @@ import React, {Suspense, useCallback, useEffect, useRef, useState} from 'react';
 import {usarTemExemplo} from '../estado/exemplo';
 import {DockviewReact, type DockviewApi, type DockviewReadyEvent, type DockviewTheme, type IDockviewPanelHeaderProps, type IDockviewPanelProps} from 'dockview-react';
 import 'dockview-react/dist/styles/dockview.css';
-import {Blend, BookMarked, BookOpen, Box, Check, Copy, Download, Film, FilePlus2, FolderOpen, FolderSearch, History, Home, Image as ImageIcon, Images, LayoutPanelLeft, ListTree,
+import {Blend, BookMarked, BookOpen, Box, Maximize2, Minimize2, Check, Copy, Download, Film, FilePlus2, FolderOpen, FolderSearch, History, Home, Image as ImageIcon, Images, LayoutPanelLeft, ListTree,
   MessageSquare, MessageSquarePlus, MonitorPlay, Music, Palette, Plus, Rows3, Settings, SlidersHorizontal, Sparkle, Sparkles, Undo2, X} from 'lucide-react';
 import type {Preferencias, Recente} from '../../compartilhado/api';
 import type {Modulo} from '../../nucleo/documentos';
@@ -18,6 +18,7 @@ import {pedirTexto} from '../componentes/Dialogo';
 import {IconeEstudio} from '../componentes/Icones';
 import {acaoDeArquivo} from './atalhos';
 import {SeloSalvo} from './SeloSalvo';
+import {faixaAtual, gravarLayout, layoutPadrao, lerLayout, type Faixa, type Orientacao} from './arranjos';
 import {PainelPreferencias} from './Preferencias';
 import {Midia} from '../paineis/Midia'; // frente Casca (rodada 3): painel de mídia
 import type {PaineisDoModulo} from './contrato';
@@ -121,83 +122,6 @@ const componentes: Record<string, React.FC<IDockviewPanelProps>> = {
   terminal: () => <Suspense fallback={<Carregando />}><Terminal /></Suspense>,
 };
 
-// faixas de layout de docs/tela.md: C (compacta) abaixo de 1600x800, P (padrão) acima; cada área x faixa guarda o seu.
-// No Vídeo, o arranjo depende também do formato: vertical (V) quer o monitor em coluna, horizontal (H) quer largura.
-// A versão na chave sobe quando entra painel novo no arranjo padrão (v6: Pesquisa, v7: Mídia, v8: Claude com largura certa
-// na Imagem e no 3D da faixa P), para os layouts gravados o verem.
-type Faixa = 'C' | 'P';
-type Orientacao = 'V' | 'H';
-const faixaAtual = (): Faixa => (window.innerWidth < 1600 || window.innerHeight < 800 ? 'C' : 'P');
-const CHAVE = (area: Area, faixa: Faixa, o: Orientacao) => `estudio:layout:v8:${area}:${faixa}${area === 'video' ? `:${o}` : ''}`;
-const lerLayout = (area: Area, faixa: Faixa, o: Orientacao) => {
-  try {
-    const t = localStorage.getItem(CHAVE(area, faixa, o));
-    return t ? JSON.parse(t) : null;
-  } catch {
-    return null;
-  }
-};
-const gravarLayout = (area: Area, faixa: Faixa, o: Orientacao, api: DockviewApi) => {
-  try {
-    localStorage.setItem(CHAVE(area, faixa, o), JSON.stringify(api.toJSON()));
-  } catch {
-    /* sem armazenamento: volta ao arranjo padrão na próxima vez */
-  }
-};
-
-// O terminal fica sempre na coluna da direita: embaixo é da linha do tempo, e altura é o que falta em notebook.
-const layoutPadrao = (api: DockviewApi, area: Area, faixa: Faixa, o: Orientacao) => {
-  const temLinha = area === 'video' || area === 'efeitos' || area === 'musica' || area === 'animacao';
-  const W = window.innerWidth;
-  const H = window.innerHeight;
-  const abasDoInspector = (comLista: boolean) => {
-    if (comLista) api.addPanel({id: 'lista', component: 'lista', title: 'Lista', position: {referencePanel: 'inspector', direction: 'within'}});
-    api.addPanel({id: 'comentarios', component: 'comentarios', title: 'Comentários', position: {referencePanel: 'inspector', direction: 'within'}});
-    api.addPanel({id: 'historico', component: 'historico', title: 'Histórico', position: {referencePanel: 'inspector', direction: 'within'}});
-    api.addPanel({id: 'pesquisa', component: 'pesquisa', title: 'Pesquisa', position: {referencePanel: 'inspector', direction: 'within'}});
-    api.getPanel('inspector')?.api.setActive();
-  };
-  api.addPanel({id: 'monitor', component: 'monitor', title: 'Monitor'});
-  if (faixa === 'P' && !temLinha) {
-    // sem linha do tempo (Imagem, 3D) lista, monitor, propriedades e Claude dividem a mesma fileira; o Claude entra por
-    // último, senão a lista e as propriedades nasciam tirando a largura dele (ficava com ~100 px)
-    api.addPanel({id: 'lista', component: 'lista', title: 'Lista', position: {referencePanel: 'monitor', direction: 'left'}, initialWidth: 260});
-    api.addPanel({id: 'inspector', component: 'inspector', title: 'Propriedades', position: {referencePanel: 'monitor', direction: 'right'}, initialWidth: 310});
-    const larguraClaude = Math.min(560, Math.round(W * 0.3));
-    api.addPanel({id: 'terminal', component: 'terminal', title: 'Claude', position: {direction: 'right'}, initialWidth: larguraClaude});
-    abasDoInspector(false);
-    // o dockview reparte a largura entre vizinhos ao montar; cada setSize tira do vizinho da direita (ou da esquerda, no
-    // último), então a ordem é: Claude, lista e, por fim, o monitor (o que sobra fica com as propriedades)
-    api.getPanel('terminal')?.api.setSize({width: larguraClaude});
-    api.getPanel('lista')?.api.setSize({width: 260});
-    api.getPanel('monitor')?.api.setSize({width: Math.max(320, W - 260 - 310 - larguraClaude - 8)});
-  } else if (faixa === 'P') {
-    api.addPanel({id: 'linha', component: 'linha', title: 'Linha do tempo', position: {direction: 'below'}, initialHeight: 260});
-    api.addPanel({id: 'terminal', component: 'terminal', title: 'Claude', position: {direction: 'right'}, initialWidth: o === 'H' && area === 'video' ? 480 : 600});
-    api.addPanel({id: 'lista', component: 'lista', title: 'Lista', position: {referencePanel: 'monitor', direction: 'left'}, initialWidth: 260});
-    api.addPanel({id: 'inspector', component: 'inspector', title: 'Propriedades', position: {referencePanel: 'monitor', direction: 'right'}, initialWidth: 310});
-    abasDoInspector(false);
-  } else if (area === 'video' && o === 'V') {
-    // vídeo vertical: o monitor numa coluna de altura total; à direita, propriedades e terminal em cima e a linha embaixo
-    api.addPanel({id: 'terminal', component: 'terminal', title: 'Claude', position: {direction: 'right'}, initialWidth: Math.max(620, W - 380)});
-    api.addPanel({id: 'linha', component: 'linha', title: 'Linha do tempo', position: {referencePanel: 'terminal', direction: 'below'}, initialHeight: Math.max(200, Math.round(H * 0.34))});
-    api.addPanel({id: 'inspector', component: 'inspector', title: 'Propriedades', position: {referencePanel: 'terminal', direction: 'left'}, initialWidth: 300});
-    abasDoInspector(true);
-  } else {
-    // vídeo horizontal, imagem, 3D e efeitos: monitor largo; à direita o terminal em cima e, embaixo dele, lista e propriedades
-    if (temLinha) api.addPanel({id: 'linha', component: 'linha', title: 'Linha do tempo', position: {referencePanel: 'monitor', direction: 'below'}, initialHeight: area === 'musica' ? Math.max(230, Math.round(H * 0.4)) : 200}); // o arranjo da Música tem uma linha por canal e a da automação
-    api.addPanel({id: 'terminal', component: 'terminal', title: 'Claude', position: {direction: 'right'}, initialWidth: Math.min(620, Math.round(W * 0.42))});
-    api.addPanel({id: 'lista', component: 'lista', title: 'Lista', position: {referencePanel: 'terminal', direction: 'below'}, initialHeight: Math.round(H * 0.5)});
-    api.addPanel({id: 'inspector', component: 'inspector', title: 'Propriedades', position: {referencePanel: 'lista', direction: 'right'}});
-    abasDoInspector(false);
-  }
-  // frente Casca (rodada 3): o painel de mídia é uma aba ao lado da Lista (nas três disposições a Lista existe); a aba que estava
-  // à frente continua à frente
-  api.addPanel({id: 'midia', component: 'midia', title: 'Mídia', position: {referencePanel: 'lista', direction: 'within'}});
-  api.getPanel('lista')?.api.setActive();
-  api.getPanel('inspector')?.api.setActive();
-};
-
 const TITULOS: Record<Area, string> = {video: 'Cenas e blocos', imagem: 'Camadas', '3d': 'Objetos', efeitos: 'Pilha de efeitos', musica: 'Canais', animacao: 'Camadas'};
 
 /** Orientação do vídeo ativo, pelas props montadas (sem props ainda: vertical, o carrossel). */
@@ -268,6 +192,8 @@ export const Casca: React.FC = () => {
     faixa.current = faixaAtual();
     document.documentElement.dataset.faixa = faixa.current;
     const o = orientacaoDe(loja.get());
+    if (d.hasMaximizedGroup()) d.exitMaximizedGroup();
+    setFocado(false);
     d.clear();
     const salvo = padrao ? null : lerLayout(a, faixa.current, o);
     try {
@@ -340,6 +266,19 @@ export const Casca: React.FC = () => {
     p.api.setActive();
   };
 
+  // "Focar no monitor" (Ctrl+\, como o "esconder a interface" do Figma): o grupo do monitor ocupa a doca; de novo, volta
+  const [focado, setFocado] = useState(false);
+  const alternarFoco = () => {
+    const d = api.current;
+    const m = d?.getPanel('monitor');
+    if (!d || !m) return;
+    if (d.hasMaximizedGroup()) d.exitMaximizedGroup();
+    else d.maximizeGroup(m);
+    setFocado(d.hasMaximizedGroup());
+  };
+  const alternarFocoRef = useRef(alternarFoco);
+  alternarFocoRef.current = alternarFoco;
+
   const marcarVersao = async () => {
     const r = await window.estudio.marcarVersao();
     avisar(r.mensagem, r.ok ? 'ok' : 'info');
@@ -388,6 +327,9 @@ export const Casca: React.FC = () => {
       } else if (ev.ctrlKey && !ev.altKey && !ev.shiftKey && k === 's') {
         ev.preventDefault();
         void marcarVersao();
+      } else if (ev.ctrlKey && !ev.altKey && !ev.shiftKey && (ev.code === 'Backslash' || ev.code === 'IntlBackslash')) {
+        ev.preventDefault();
+        alternarFocoRef.current();
       } else if (ev.ctrlKey && ev.shiftKey && !ev.altKey && k === 'e') {
         ev.preventDefault();
         exportarArea();
@@ -508,6 +450,8 @@ export const Casca: React.FC = () => {
           <button className={`bt fantasma${modoComentario ? ' ligado' : ''}`} onClick={() => loja.definir((s) => ({modoComentario: !s.modoComentario}))} title="Comentar na tela (M)">
             <MessageSquarePlus size={15} />Comentar<kbd>M</kbd>
           </button>
+          <button className={`bt fantasma${focado ? ' ligado' : ''}`} onClick={alternarFoco} title={focado ? 'Mostrar os painéis de novo (Ctrl+\\)' : 'Focar no monitor: esconde os outros painéis (Ctrl+\\)'}
+            aria-label={focado ? 'Mostrar os painéis' : 'Focar no monitor'} aria-pressed={focado}>{focado ? <Minimize2 size={15} /> : <Maximize2 size={15} />}</button>
           <button className="bt fantasma" onClick={() => void desfazer()} title="Desfazer a sua última edição (Ctrl+Z)" aria-label="Desfazer"><Undo2 size={15} /></button>
           <button className="bt exportar" disabled={!podeExportar} onClick={exportarArea}
             title={podeExportar ? (docAtivo!.modulo === 'musica' ? 'Exportar a música em WAV para a pasta saidas (M4A, Opus, MIDI e stems: botão Exportar do transporte) (Ctrl+Shift+E)'
