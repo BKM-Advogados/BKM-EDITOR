@@ -284,7 +284,9 @@ Para a **frente/integracao-ide** (`.mcp.json`, `.claude/settings.local.json`, `t
   shell); `JSON.stringify` cuida das barras invertidas.
 - **Render fora do app (`ver_quadro`):** no app empacotado, o `binariesDirectory` é a pasta do compositor acima e o
   `browserExecutable` sai de `getPackagedBrowserPaths` com `projectRoot` = `resources/app.asar`. No Mac o Remotion põe o
-  `DYLD_LIBRARY_PATH` sozinho; quem rodar o ffmpeg direto usa `ambienteDoFfmpeg` (`ffmpeg-som.ts`).
+  `DYLD_LIBRARY_PATH` sozinho; quem rodar o ffmpeg direto usa `opcoesDoFfmpeg`/`ambienteDoFfmpeg`
+  (`src/nucleo/ffmpeg-ambiente.ts`), inclusive as fixtures dos testes: sem ele o ffmpeg do Mac aborta (SIGABRT).
+  `testes/portes.test.ts` confere que todo spawn do ffmpeg no código e nos testes passa por ali.
 - **MCP por stdio e o ffmpeg:** `caminhoFfmpeg` agora acha o ffmpeg com a raiz em `resources` (era o caso do
   `nucleo.cjs` instalado, que transcrevia só no desenvolvimento).
 

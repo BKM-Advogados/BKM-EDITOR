@@ -8,7 +8,7 @@ import path from 'node:path';
 import {afterAll, describe, expect, it} from 'vitest';
 import {makeCancelSignal} from '@remotion/renderer';
 import {corrigirArquivo} from '../src/main/loudness';
-import {decodificarAudio, gravarWav, pastaDoFfmpeg} from '../src/main/ffmpeg-som';
+import {decodificarAudio, executavelDoFfmpeg, gravarWav, opcoesDoFfmpeg, pastaDoFfmpeg} from '../src/main/ffmpeg-som';
 
 const T = 48000;
 const pastas: string[] = [];
@@ -37,8 +37,8 @@ const mp4 = (nome: string, x: Float32Array) => {
   writeFileSync(wav, gravarWav([x, x], T));
   const saida = path.join(dir, `${nome} é.mp4`);
   const ff = pastaDoFfmpeg();
-  execFileSync(path.join(ff, process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'), ['-y', '-v', 'error', '-i', wav, '-c:a', 'aac', saida],
-    {env: {...process.env, LD_LIBRARY_PATH: ff}});
+  // pelo mesmo ambiente que o app usa: no Mac, sem o DYLD_LIBRARY_PATH, o ffmpeg do compositor aborta (SIGABRT)
+  execFileSync(path.join(ff, executavelDoFfmpeg()), ['-y', '-v', 'error', '-i', wav, '-c:a', 'aac', saida], opcoesDoFfmpeg(ff));
   return saida;
 };
 const erro = (m: {i: number; tp: number}, alvo: number, pico: number) => Math.abs(m.i - alvo) + Math.max(0, m.tp - pico) * 2;

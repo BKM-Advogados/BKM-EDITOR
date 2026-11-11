@@ -8,6 +8,7 @@ import {existsSync} from 'node:fs';
 import path from 'node:path';
 import type {CancelSignal} from '@remotion/renderer';
 import {getCompositorPackage} from '../nucleo/compositor-package';
+import {ambienteDoFfmpeg, executavelDoFfmpeg, opcoesDoFfmpeg} from '../nucleo/ffmpeg-ambiente';
 
 /** Pasta do ffmpeg: a do render quando vem (app empacotado: app.asar.unpacked), senão a do node_modules. */
 export const pastaDoFfmpeg = (binariesDirectory?: string | null) => {
@@ -24,19 +25,16 @@ export const pastaDoFfmpeg = (binariesDirectory?: string | null) => {
   return achada;
 };
 
-const executavel = () => (process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
+const executavel = () => executavelDoFfmpeg();
 
-/** As bibliotecas do ffmpeg ficam ao lado dele, e no Mac ele as pede pelo nome curto ("libavcodec.dylib", sem @rpath):
- *  o carregador precisa saber a pasta (no Linux e no Mac). Com o app assinado no Mac, o DYLD_LIBRARY_PATH só vale porque
- *  o ffmpeg leva o entitlement allow-dyld-environment-variables (build/entitlements.filhos.plist). */
-export const ambienteDoFfmpeg = (pasta: string, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv => ({...base, LD_LIBRARY_PATH: pasta, DYLD_LIBRARY_PATH: pasta});
+export {ambienteDoFfmpeg, executavelDoFfmpeg, opcoesDoFfmpeg};
 
 export type Parar = {cancelSignal?: CancelSignal; cancelado?: () => boolean};
 
 /** Roda o ffmpeg e devolve a saída padrão (bytes) e a de erro (texto, onde o loudnorm escreve a medida). */
 export const rodarFfmpeg = (args: string[], o: Parar & {binarios?: string | null} = {}) => new Promise<{saida: Buffer; erro: string}>((ok, falha) => {
   const pasta = pastaDoFfmpeg(o.binarios);
-  const filho = spawn(path.join(pasta, executavel()), ['-hide_banner', '-nostdin', ...args], {cwd: pasta, env: ambienteDoFfmpeg(pasta), windowsHide: true});
+  const filho = spawn(path.join(pasta, executavel()), ['-hide_banner', '-nostdin', ...args], opcoesDoFfmpeg(pasta));
   const saida: Buffer[] = [];
   const erro: string[] = [];
   let parado = false;
@@ -169,9 +167,8 @@ export const decodificarAudio = async (arquivo: string, o: Parar & {binarios?: s
 export const decodificarEmPedacos = (arquivo: string, aoPedaco: (canais: Float32Array[], taxa: number) => void, o: Parar & {binarios?: string | null} = {}) =>
   new Promise<{taxa: number; canais: number; amostras: number}>((ok, falha) => {
     const pasta = pastaDoFfmpeg(o.binarios);
-    const env = {...process.env, LD_LIBRARY_PATH: pasta, DYLD_LIBRARY_PATH: pasta};
     const filho = spawn(path.join(pasta, executavel()), ['-hide_banner', '-nostdin', '-i', arquivo, '-vn', '-map', '0:a:0', '-c:a', 'pcm_s24le', '-f', 'wav', 'pipe:1'],
-      {cwd: pasta, env, windowsHide: true});
+      opcoesDoFfmpeg(pasta));
     let pendente: Buffer = Buffer.alloc(0);
     let formato: {nc: number; taxa: number} | null = null;
     let amostras = 0;

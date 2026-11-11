@@ -7,8 +7,9 @@ import {existsSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import path from 'node:path';
 import {getCompositorPackage} from './compositor-package';
+import {executavelDoFfmpeg, opcoesDoFfmpeg} from './ffmpeg-ambiente';
 
-const executavel = () => (process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
+const executavel = () => executavelDoFfmpeg();
 
 /** Caminho do ffmpeg, ou null. Procura no app empacotado (app.asar.unpacked), ao lado do bundle (dist-mcp/ e .vite/app/
  *  ficam na raiz do app) e pelo require do node_modules, como a transcrição faz. */
@@ -48,7 +49,7 @@ export const converterParaPng = (arquivo: string, o: {ffmpeg?: string | null} = 
   const pasta = path.dirname(ffmpeg);
   const escala = `scale=w='min(${LADO_CONVERTIDO},iw)':h='min(${LADO_CONVERTIDO},ih)':force_original_aspect_ratio=decrease`;
   const filho = spawn(ffmpeg, ['-hide_banner', '-nostdin', '-v', 'error', '-i', arquivo, '-frames:v', '1', '-vf', escala, '-pix_fmt', 'rgba', '-c:v', 'png', '-f', 'image2pipe', 'pipe:1'],
-    {cwd: pasta, env: {...process.env, LD_LIBRARY_PATH: pasta, DYLD_LIBRARY_PATH: pasta}, windowsHide: true});
+    opcoesDoFfmpeg(pasta));
   const saida: Buffer[] = [];
   let erro = '';
   filho.stdout.on('data', (d: Buffer) => saida.push(d));

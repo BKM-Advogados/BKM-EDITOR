@@ -1,7 +1,7 @@
 // Portes para Windows e Mac (docs/portes.md): as decisões por sistema, conferidas aqui nos três sistemas com a
 // plataforma injetada. O que só uma máquina real confirma (a janela, o pedido de microfone, a assinatura) fica na lista
 // de verificação do documento.
-import {existsSync, readFileSync} from 'node:fs';
+import {existsSync, readdirSync, readFileSync} from 'node:fs';
 import path from 'node:path';
 import {describe, expect, it} from 'vitest';
 import {caminhoDeBusca, comPath, decidirPermissao, ehMosaico, gitDoMac, nomeDoShell, opcoesDaBarra, pastasExtrasDoPath, projetoNosArgumentos,
@@ -21,7 +21,7 @@ import {entraNoPacote, plataformaDoNavegador} from '../src/main/navegador-alvo';
 import {getPackagedBrowserPaths} from '../src/main/packaged-browser';
 import {getCompositorPackage} from '../src/nucleo/compositor-package';
 import {garantirInstanciaUnica} from '../src/main/janela-segura';
-import {ambienteDoFfmpeg} from '../src/main/ffmpeg-som';
+import {ambienteDoFfmpeg, executavelDoFfmpeg, opcoesDoFfmpeg} from '../src/nucleo/ffmpeg-ambiente';
 
 const tem = (...arquivos: string[]) => (a: string) => arquivos.includes(a);
 
@@ -240,6 +240,36 @@ describe('whisper-cli no Mac', () => {
 
   it('o ffmpeg do Remotion recebe a pasta das bibliotecas (no Mac elas vêm pelo nome curto)', () => {
     expect(ambienteDoFfmpeg('/b', {HOME: '/h'})).toEqual({HOME: '/h', LD_LIBRARY_PATH: '/b', DYLD_LIBRARY_PATH: '/b'});
+    expect(opcoesDoFfmpeg('/b')).toMatchObject({cwd: '/b', windowsHide: true, env: {LD_LIBRARY_PATH: '/b', DYLD_LIBRARY_PATH: '/b'}});
+    expect(executavelDoFfmpeg('win32')).toBe('ffmpeg.exe');
+    expect(executavelDoFfmpeg('darwin')).toBe('ffmpeg');
+    expect(executavelDoFfmpeg('linux')).toBe('ffmpeg');
+  });
+
+  it('todo spawn do ffmpeg (app e testes) passa pelo ambiente das bibliotecas', () => {
+    // no Mac, um ffmpeg rodado sem o DYLD_LIBRARY_PATH aborta (SIGABRT) antes de começar: a regra vale para o código e
+    // para as fixtures dos testes, que o CI do Mac roda
+    const raiz = path.join(__dirname, '..');
+    const arquivos = (pasta: string): string[] => readdirSync(pasta, {withFileTypes: true}).flatMap((e) =>
+      e.isDirectory() ? arquivos(path.join(pasta, e.name)) : /\.(ts|tsx|mjs|cjs)$/.test(e.name) ? [path.join(pasta, e.name)] : []);
+    const chamadas: string[] = [];
+    const semAmbiente: string[] = [];
+    for (const a of [...arquivos(path.join(raiz, 'src')), ...arquivos(path.join(raiz, 'testes')), ...arquivos(path.join(raiz, 'mcp'))]) {
+      const texto = readFileSync(a, 'utf-8');
+      for (const m of texto.matchAll(/\b(?:spawn|spawnSync|execFile|execFileSync|rodar)\(/g)) {
+        const fim = texto.indexOf(');', m.index);
+        const chamada = texto.slice(m.index, fim < 0 ? undefined : fim);
+        const primeiro = chamada.slice(chamada.indexOf('(') + 1).split('[')[0]; // o executável: o que vem antes da lista de argumentos
+        if (!/ffmpeg|executavel\(\)/i.test(primeiro)) continue;
+        const onde = `${path.relative(raiz, a)}:${texto.slice(0, m.index).split('\n').length}`;
+        chamadas.push(onde);
+        if (!/opcoesDoFfmpeg\(|ambienteDoFfmpeg\(/.test(chamada)) semAmbiente.push(onde);
+      }
+    }
+    expect(chamadas.length).toBeGreaterThanOrEqual(7); // ffmpeg-som (2), imagem-ffmpeg, transcrição e as fixtures (3)
+    expect(semAmbiente).toEqual([]);
+    const variaveis = arquivos(path.join(raiz, 'src')).filter((a) => /DYLD_LIBRARY_PATH:/.test(readFileSync(a, 'utf-8')));
+    expect(variaveis.map((a) => path.relative(raiz, a).split(path.sep).join('/'))).toEqual(['src/nucleo/ffmpeg-ambiente.ts']);
   });
 });
 

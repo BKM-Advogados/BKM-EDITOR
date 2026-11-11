@@ -22,7 +22,7 @@ import {arquivoDasPalavras, conferirFala, fonteDaFala, palavrasValidas, recusaDo
 import type {Palavra} from '../nucleo/roteiro/resolver';
 import {ErroProjeto, type Projeto} from '../nucleo/projeto';
 import {getCompositorPackage} from '../nucleo/compositor-package';
-import {ambienteDoFfmpeg} from './ffmpeg-som';
+import {ambienteDoFfmpeg, executavelDoFfmpeg} from '../nucleo/ffmpeg-ambiente';
 import {caminhoDeBusca} from './plataforma';
 
 // ---------- o que baixa: versões presas, com tamanho e SHA-256 ----------
@@ -265,7 +265,7 @@ const comoInstalarWhisperEm = (pasta: string, plataforma: string, bin: string) =
 
 /** ffmpeg do compositor do Remotion: no app empacotado fica em app.asar.unpacked; no desenvolvimento, no node_modules. */
 export const caminhoFfmpeg = (o: {raizApp?: string; empacotado?: boolean} = {}): string | null => {
-  const exe = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
+  const exe = executavelDoFfmpeg();
   let pacote: string;
   try {
     pacote = getCompositorPackage({arch: process.arch, platform: process.platform});

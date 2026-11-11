@@ -8,14 +8,14 @@ import path from 'node:path';
 import {afterAll, describe, expect, it} from 'vitest';
 import {gravarPlano, planoDoProjeto} from '../src/nucleo/criar-projeto';
 import {Projeto} from '../src/nucleo/projeto';
-import {lerDuracao, medirEntrada, pastaDoFfmpeg} from '../src/main/ffmpeg-som';
+import {executavelDoFfmpeg, lerDuracao, medirEntrada, opcoesDoFfmpeg, pastaDoFfmpeg} from '../src/main/ffmpeg-som';
 import {arquivoLimpo, excedeLimpeza, limparArquivo, MAX_AMOSTRAS_LIMPEZA} from '../src/main/limpeza-voz';
 
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'estudio-limpeza-teto-'));
 afterAll(() => rmSync(tmp, {recursive: true, force: true}));
 const ff = pastaDoFfmpeg();
-const ffmpeg = (...args: string[]) => execFileSync(path.join(ff, process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'), ['-v', 'error', '-y', ...args],
-  {env: {...process.env, LD_LIBRARY_PATH: ff}, windowsHide: true});
+// pelo mesmo ambiente que o app usa: no Mac, sem o DYLD_LIBRARY_PATH, o ffmpeg do compositor aborta (SIGABRT)
+const ffmpeg = (...args: string[]) => execFileSync(path.join(ff, executavelDoFfmpeg()), ['-v', 'error', '-y', ...args], opcoesDoFfmpeg(ff));
 /** Silêncio AAC de `segundos`: 10 s codificados e repetidos sem recodificar (rápido mesmo para 21 min). */
 const silencio = (destino: string, segundos: number, canais: 'mono' | 'stereo') => {
   const dez = path.join(tmp, `dez-${canais}.mp4`);
