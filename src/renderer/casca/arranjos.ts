@@ -6,11 +6,13 @@ import type {Area} from '../estado/loja';
 // No Vídeo, o arranjo depende também do formato: vertical (V) quer o monitor em coluna, horizontal (H) quer largura.
 // A versão na chave sobe quando entra painel novo no arranjo padrão (v6: Pesquisa, v7: Mídia, v8: Claude com largura certa
 // na Imagem e no 3D da faixa P; v9: vídeo vertical na faixa C com a lista em grupo próprio e o Claude em até 42%), para os
-// layouts gravados o verem.
+// layouts gravados o verem. Uma área pode subir sozinha (VERSAO_AREA), sem desfazer o arranjo gravado das outras: a Música
+// foi para v10 com o arranjo próprio da faixa C.
 export type Faixa = 'C' | 'P';
 export type Orientacao = 'V' | 'H';
 export const faixaAtual = (): Faixa => (window.innerWidth < 1600 || window.innerHeight < 800 ? 'C' : 'P');
-export const CHAVE = (area: Area, faixa: Faixa, o: Orientacao) => `estudio:layout:v9:${area}:${faixa}${area === 'video' ? `:${o}` : ''}`;
+const VERSAO_AREA: Partial<Record<Area, number>> = {musica: 10};
+export const CHAVE = (area: Area, faixa: Faixa, o: Orientacao) => `estudio:layout:v${VERSAO_AREA[area] ?? 9}:${area}:${faixa}${area === 'video' ? `:${o}` : ''}`;
 export const lerLayout = (area: Area, faixa: Faixa, o: Orientacao) => {
   try {
     const t = localStorage.getItem(CHAVE(area, faixa, o));
@@ -73,9 +75,23 @@ export const layoutPadrao = (api: DockviewApi, area: Area, faixa: Faixa, o: Orie
     api.getPanel('lista')?.api.setSize({width: 200});
     api.getPanel('inspector')?.api.setSize({width: 290});
     api.getPanel('monitor')?.api.setSize({width: Math.max(280, W - 200 - 290 - larguraClaude - 8)});
+  } else if (area === 'musica') {
+    // Música na tela pequena: os canais numa coluna de altura total à esquerda, ao lado do monitor e da linha do tempo (a
+    // lista e o arranjo são os mesmos canais); à direita, Claude em cima e propriedades embaixo, numa coluna estreita
+    // (no máximo 28%), para o monitor ficar com a largura e a altura que o mixer e o piano roll pedem
+    const larguraLista = 224; // cabem "+ Bateria" e "+ Instrumento" na mesma linha do rodapé
+    const larguraDireita = Math.min(400, Math.round(W * 0.28));
+    api.addPanel({id: 'linha', component: 'linha', title: 'Linha do tempo', position: {referencePanel: 'monitor', direction: 'below'}, initialHeight: Math.max(200, Math.round(H * 0.34))});
+    api.addPanel({id: 'terminal', component: 'terminal', title: 'Claude', position: {direction: 'right'}, initialWidth: larguraDireita});
+    api.addPanel({id: 'inspector', component: 'inspector', title: 'Propriedades', position: {referencePanel: 'terminal', direction: 'below'}, initialHeight: Math.round(H * 0.5)});
+    api.addPanel({id: 'lista', component: 'lista', title: 'Lista', position: {direction: 'left'}, initialWidth: larguraLista});
+    abasDoInspector(false);
+    // a lista entra por último e tira do monitor: acerta a lista e depois o monitor (o que sobra fica com a coluna do Claude)
+    api.getPanel('lista')?.api.setSize({width: larguraLista});
+    api.getPanel('monitor')?.api.setSize({width: Math.max(480, W - larguraLista - larguraDireita - 8)});
   } else {
     // vídeo horizontal, imagem, 3D e efeitos: monitor largo; à direita o terminal em cima e, embaixo dele, lista e propriedades
-    if (temLinha) api.addPanel({id: 'linha', component: 'linha', title: 'Linha do tempo', position: {referencePanel: 'monitor', direction: 'below'}, initialHeight: area === 'musica' ? Math.max(230, Math.round(H * 0.4)) : 200}); // o arranjo da Música tem uma linha por canal e a da automação
+    if (temLinha) api.addPanel({id: 'linha', component: 'linha', title: 'Linha do tempo', position: {referencePanel: 'monitor', direction: 'below'}, initialHeight: 200});
     api.addPanel({id: 'terminal', component: 'terminal', title: 'Claude', position: {direction: 'right'}, initialWidth: Math.min(620, Math.round(W * 0.42))}); // no máximo 42%
     api.addPanel({id: 'lista', component: 'lista', title: 'Lista', position: {referencePanel: 'terminal', direction: 'below'}, initialHeight: Math.round(H * 0.5)});
     api.addPanel({id: 'inspector', component: 'inspector', title: 'Propriedades', position: {referencePanel: 'lista', direction: 'right'}});

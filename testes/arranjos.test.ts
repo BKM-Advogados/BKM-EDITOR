@@ -38,7 +38,21 @@ describe('arranjo padrão', () => {
     expect(1366 - monitor - 200 - 290).toBeLessThanOrEqual(Math.round(1366 * 0.42) + 8);
   });
 
-  it('a chave dos arranjos gravados subiu (os quebrados não voltam)', () => {
+  it('Música na tela pequena: canais em coluna de altura total à esquerda, Claude e propriedades estreitos à direita', () => {
+    janela(1366, 768);
+    const f = falso();
+    layoutPadrao(f.api as never, 'musica', 'C', 'V');
+    const por = (id: string) => f.paineis.find((p) => p.id === id)!;
+    expect(por('lista').position).toEqual({direction: 'left'}); // na raiz: altura total, vizinha do monitor e da linha
+    expect(por('linha').position).toEqual({referencePanel: 'monitor', direction: 'below'});
+    expect(por('inspector').position).toEqual({referencePanel: 'terminal', direction: 'below'});
+    const direita = por('terminal').initialWidth!;
+    expect(direita).toBeLessThanOrEqual(Math.round(1366 * 0.28));
+    expect(f.tamanhos.monitor?.at(-1)).toBeGreaterThanOrEqual(1366 - 224 - direita - 8);
+  });
+
+  it('a chave dos arranjos gravados subiu (os quebrados não voltam); a da Música subiu sozinha', () => {
     expect(CHAVE('video', 'C', 'V')).toBe('estudio:layout:v9:video:C:V');
+    expect(CHAVE('musica', 'C', 'V')).toBe('estudio:layout:v10:musica:C');
   });
 });
