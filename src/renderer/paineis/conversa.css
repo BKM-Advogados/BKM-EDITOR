@@ -89,7 +89,7 @@
 .caixa-pedido textarea::placeholder { color: var(--texto-3); }
 .caixa-pedido .baixo { display: flex; align-items: center; gap: 2px; }
 .caixa-pedido .modelo { font-size: 11px; color: var(--texto-3); margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.caixa-pedido .enviar { width: 26px; height: 26px; border-radius: 50%; border: 0; background: var(--acento); color: var(--sobre-acento, #111); display: grid; place-items: center; margin-left: 8px; cursor: pointer; flex: none; }
+.caixa-pedido .enviar { width: 26px; height: 26px; border-radius: 50%; border: 0; background: var(--acento); color: var(--sobre-acento); display: grid; place-items: center; margin-left: 8px; cursor: pointer; flex: none; }
 .caixa-pedido .enviar:disabled { background: var(--fundo-4); color: var(--texto-3); cursor: default; }
 .rodape-pedido { font-size: 11px; color: var(--texto-3); padding: 4px 2px 0; display: flex; gap: 12px; white-space: nowrap; overflow: hidden; }
 

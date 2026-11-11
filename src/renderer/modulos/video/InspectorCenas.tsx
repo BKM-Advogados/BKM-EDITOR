@@ -86,10 +86,10 @@ const ResumoVideo: React.FC<{documento: string; doc: DocCenas; titulo: string; d
             aoMudar={(n) => void trocar(documento, '/formato', {...f, fps: Number(n)}, `${n} quadros por segundo`)} />
         </Secao>
         <Secao titulo="Cores" chave="cenas:cores">
-          <CampoCor rotulo="Fundo" valor={tema.fundo ?? '#111418'} aoMudar={(v) => void trocar(documento, '/tema/fundo', v, 'cor de fundo')} />
-          <CampoCor rotulo="Texto" valor={tema.texto ?? '#F2F2F2'} aoMudar={(v) => void trocar(documento, '/tema/texto', v, 'cor do texto')} />
+          <CampoCor rotulo="Fundo" valor={tema.fundo ?? TEMA_NEUTRO.fundo} aoMudar={(v) => void trocar(documento, '/tema/fundo', v, 'cor de fundo')} />
+          <CampoCor rotulo="Texto" valor={tema.texto ?? TEMA_NEUTRO.texto} aoMudar={(v) => void trocar(documento, '/tema/texto', v, 'cor do texto')} />
           <CampoCor rotulo="Destaque" valor={tema.destaque ?? TEMA_NEUTRO.destaque} aoMudar={(v) => void trocar(documento, '/tema/destaque', v, 'cor de destaque')} />
-          <CampoCor rotulo="Texto suave" valor={tema.suave ?? '#A3ABB5'} aoMudar={(v) => void trocar(documento, '/tema/suave', v, 'cor do texto suave')} />
+          <CampoCor rotulo="Texto suave" valor={tema.suave ?? TEMA_NEUTRO.suave} aoMudar={(v) => void trocar(documento, '/tema/suave', v, 'cor do texto suave')} />
         </Secao>
         {nClipes > 0 && <SecaoLoudness documento={documento} doc={doc} />}
         {erro && <Secao titulo="Não deu para montar o vídeo"><div className="texto-livre" style={{color: 'var(--erro)'}}>{erro}</div></Secao>}

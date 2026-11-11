@@ -55,7 +55,7 @@
 .aba-doca .aba-icone { display: inline-grid; place-items: center; color: var(--icone-inativo, var(--texto-3)); }
 .dv-active-tab .aba-doca .aba-icone { color: var(--texto-2); }
 .aba-terminal .aba-icone { color: var(--agente) !important; }
-.aba-doca .aba-contador { font: 600 var(--tam-1)/14px var(--fonte); color: var(--sobre-acento, #111); background: var(--comentario); border-radius: 7px; padding: 0 4px; }
+.aba-doca .aba-contador { font: 600 var(--tam-1)/14px var(--fonte); color: var(--sobre-pino); background: var(--pino); border-radius: 7px; padding: 0 4px; }
 .aba-doca .aba-x { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 3px; color: var(--texto-3); visibility: hidden; }
 .dv-tab:hover .aba-doca .aba-x { visibility: visible; }
 .aba-doca .aba-x:hover { background: var(--fundo-3); color: var(--texto); }

@@ -136,3 +136,19 @@ describe('seleção com uma forma só', () => {
     expect(musica).toMatch(/\.mclipe\.sel \{ outline: 2px solid var\(--acento\)/);
   });
 });
+
+describe('cores só nos tokens (item 19)', () => {
+  it('nenhum CSS do renderer escreve cor em hexadecimal nem rgba(): só var(--…) de estilo/tokens.ts', () => {
+    const achados = arquivosCss().flatMap((a) => {
+      const css = semComentarios(fs.readFileSync(a, 'utf8'));
+      return [...css.matchAll(/#[0-9a-fA-F]{3,8}\b|rgba?\(/g)].map((m) => `${path.relative(RAIZ, a)}: ${m[0]}`);
+    });
+    expect(achados).toEqual([]);
+  });
+
+  it('o arquivo de tokens existe e é o único com as cores da interface', () => {
+    const tokens = fs.readFileSync(path.join(RAIZ, 'estilo', 'tokens.ts'), 'utf8');
+    expect(tokens).toMatch(/'--acento': '#70b8ff'/);
+    expect(arquivosCss().some((a) => a.includes(`${path.sep}estilo${path.sep}`))).toBe(false);
+  });
+});

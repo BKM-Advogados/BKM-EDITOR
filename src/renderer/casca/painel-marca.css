@@ -10,7 +10,7 @@
 .marca-item .marca-nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .marca-item svg { color: var(--acento); flex: none; }
 .marca-cores { display: inline-flex; gap: 2px; flex: none; }
-.marca-cores i { width: 9px; height: 18px; border-radius: 2px; border: 1px solid rgba(255, 255, 255, 0.1); }
+.marca-cores i { width: 9px; height: 18px; border-radius: 2px; border: 1px solid var(--borda-forte); }
 .marca-lista-acoes { display: flex; gap: 6px; margin-top: 8px; }
 .marca-detalhe { display: flex; flex-direction: column; gap: 10px; min-width: 0; min-height: 0; overflow: auto; padding-right: 4px; }
 .marca-cab { display: flex; align-items: center; gap: 12px; }

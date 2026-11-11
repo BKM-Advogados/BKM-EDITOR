@@ -33,6 +33,7 @@ export const ESCURO: Tokens = {
   '--texto-3': '#9b9b9b',
   '--icone-inativo': '#6e6e6e', // só ícone e item desabilitado, nunca texto
   '--alca': '#ffffff', // alça de redimensionar sobre a peça
+  '--guia': '#ff3d9a', // guias de encaixe e distâncias no arrasto (não é nenhum sinal da interface)
 
   // acento = seleção, foco e botão principal (não é "a cor da pessoa")
   '--acento': '#70b8ff',
@@ -100,6 +101,7 @@ export const CLARO: Tokens = {
   '--texto-3': '#646464',
   '--icone-inativo': '#8d8d8d',
   '--alca': '#ffffff',
+  '--guia': '#d6247c',
   '--acento': '#0b63c5',
   '--acento-forte': '#0a56ab',
   '--acento-fundo': '#dcebff',
@@ -170,6 +172,8 @@ export const COMUNS: Tokens = {
   '--trilha-sfx-fundo': 'color-mix(in srgb, var(--trilha-sfx) 18%, var(--fundo-2))',
   '--trilha-efeito': 'var(--faixa-rosa)',
   '--trilha-efeito-fundo': 'color-mix(in srgb, var(--trilha-efeito) 20%, var(--fundo-2))',
+  '--trilha-legenda': 'var(--faixa-areia)',
+  '--trilha-legenda-fundo': 'color-mix(in srgb, var(--trilha-legenda) 18%, var(--fundo-2))',
   '--trilha-cena-a': 'var(--fundo-3)',
   '--trilha-cena-b': 'var(--fundo-4)',
 

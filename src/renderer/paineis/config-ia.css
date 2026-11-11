@@ -11,15 +11,15 @@
 .ia-selo { font-size: 11px; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--borda-forte); color: var(--texto-2); }
 .ia-selo.padrao { border-color: var(--acento); color: var(--acento); }
 .ia-estado { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
-.ia-estado.pronto { color: var(--ok, #3dd68c); }
+.ia-estado.pronto { color: var(--ok); }
 .ia-estado.falta { color: var(--texto-2); }
 .ia-corpo { padding: 0 10px 10px; display: flex; flex-direction: column; gap: 8px; }
 .ia-info { font-size: 12px; color: var(--texto-2); }
 .ia-linha { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; }
 .ia-linha .campo { flex: 1; min-width: 160px; }
 .ia-linha .rot { width: 64px; color: var(--texto-2); }
-.ia-msg { font-size: 12px; color: var(--ok, #3dd68c); }
-.ia-msg.erro { color: var(--erro, #ff9592); }
+.ia-msg { font-size: var(--tam-2); color: var(--ok); }
+.ia-msg.erro { color: var(--erro); }
 .ia-uso { border-top: 1px solid var(--borda); padding-top: 8px; font-size: 12px; display: flex; flex-direction: column; gap: 6px; }
 .ia-uso-titulo { font-weight: 600; }
 .ia-uso table { width: 100%; border-collapse: collapse; }
@@ -30,7 +30,7 @@
 /* pedidos do portão de abas sem conversa no painel (terminal, app de fora) */
 /* acima do .dialogo-fundo (100): o pedido tem de poder ser respondido com o Configurações › IA aberto */
 .ia-avulsos { position: fixed; right: 16px; bottom: 32px; z-index: 110; display: flex; flex-direction: column; gap: 8px; width: min(380px, calc(100vw - 32px)); }
-.ia-avulso { background: var(--fundo-2); border: 1px solid var(--borda-forte); border-radius: 10px; padding: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); }
+.ia-avulso { background: var(--fundo-2); border: 1px solid var(--borda-forte); border-radius: var(--raio-2); padding: 10px; box-shadow: var(--sombra-2); }
 
 /* apps de IA de fora (padrão Screenpipe) */
 .ia-apps { border-top: 1px solid var(--borda); padding-top: 8px; display: flex; flex-direction: column; gap: 6px; font-size: 12px; }

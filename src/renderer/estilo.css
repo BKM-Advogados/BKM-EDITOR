@@ -83,7 +83,7 @@ div.campo .pre { color: var(--texto-3); font-weight: var(--peso-forte); font-siz
 .campo.invalido { border-color: var(--erro); }
 .erro-campo { color: var(--erro); font-size: var(--tam-1); margin-top: 2px; }
 .amostra { width: 18px; height: 18px; border-radius: var(--raio-1); flex: none; position: relative; cursor: pointer; overflow: hidden;
-  background: var(--xadrez); background-size: 8px 8px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15); }
+  background: var(--xadrez); background-size: 8px 8px; box-shadow: inset 0 0 0 1px var(--borda-forte); }
 .amostra > span { position: absolute; inset: 0; }
 .amostra > input[type="color"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; padding: 0; border: 0; }
 .campo-cor > input.hex { font-family: var(--fonte-mono); font-size: var(--tam-2); text-transform: lowercase; }
@@ -94,7 +94,7 @@ div.campo .pre { color: var(--texto-3); font-weight: var(--peso-forte); font-siz
 .amostra-marca { width: 16px; height: 16px; border-radius: 3px; border: 1px solid var(--borda-forte); padding: 0; cursor: pointer; }
 .amostra-marca:hover { outline: 1px solid var(--texto-2); }
 .amostra-marca.ativa { outline: 2px solid var(--acento, var(--texto)); outline-offset: 1px; }
-.aviso-contraste { padding: 0 10px 4px 102px; color: var(--aviso, #d9a441); font-size: var(--tam-1); line-height: 1.3; }
+.aviso-contraste { padding: 0 10px 4px 102px; color: var(--aviso); font-size: var(--tam-1); line-height: 1.3; }
 
 /* controle deslizante fino */
 input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 16px; background: transparent; margin: 0; cursor: pointer; }
@@ -119,7 +119,7 @@ input[type="range"]:focus-visible { outline: none; }
 .cab-insp .ico-fam svg.lucide { width: 14px; height: 14px; }
 .cab-insp .ico-fam.texto { background: var(--trilha-texto-fundo); color: var(--trilha-texto); }
 .cab-insp .ico-fam.midia { background: var(--trilha-midia-fundo); color: var(--trilha-midia); }
-.cab-insp .ico-fam.efeito { background: #3a1f40; color: var(--trilha-efeito); }
+.cab-insp .ico-fam.efeito { background: var(--trilha-efeito-fundo); color: var(--trilha-efeito); }
 .cab-insp .nomes { min-width: 0; flex: 1; }
 .cab-insp .nome { font-size: var(--tam-3); font-weight: var(--peso-forte); line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cab-insp .sub { font-size: var(--tam-1); color: var(--texto-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -214,7 +214,7 @@ input[type="range"]:focus-visible { outline: none; }
 .monitor-grade.sem-trilho { grid-template-columns: minmax(0, 1fr); }
 .monitor-grade.sem-transporte { grid-template-rows: minmax(0, 1fr); }
 .monitor { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; background: var(--entorno-monitor); overflow: hidden; min-height: 0; min-width: 0; }
-.monitor .palco { position: relative; flex: none; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 6px 24px rgba(0, 0, 0, 0.55); }
+.monitor .palco { position: relative; flex: none; box-shadow: var(--sombra-peca); }
 .monitor .palco.xadrez { background: var(--xadrez); }
 .rotulo-peca { position: absolute; left: 0; top: -19px; font-size: var(--tam-1); color: var(--texto-3); white-space: nowrap; cursor: pointer; user-select: none; }
 .rotulo-peca b { color: var(--texto-2); }
@@ -222,16 +222,16 @@ input[type="range"]:focus-visible { outline: none; }
 .sobreposicao { position: absolute; inset: 0; pointer-events: none; }
 /* seleção tem uma forma só (no monitor, na lista e na linha do tempo): contorno de 2 px no acento; branco só nas alças */
 .sobreposicao .caixa-sel { position: absolute; border: 2px solid var(--acento); margin: -1px 0 0 -1px; box-shadow: 0 0 0 1px var(--veu); pointer-events: auto; cursor: move; }
-.sobreposicao .caixa-hover { position: absolute; border: 1px dashed rgba(112, 184, 255, 0.7); }
+.sobreposicao .caixa-hover { position: absolute; border: 1px dashed var(--acento-tracejado); }
 .sobreposicao .caixa-nova { position: absolute; border: 1px dashed var(--acento); background: var(--acento-fraco); }
-.sobreposicao .alca { position: absolute; width: 8px; height: 8px; background: #fff; border: 1px solid var(--acento); right: -4px; bottom: -4px; cursor: nwse-resize; pointer-events: auto; }
+.sobreposicao .alca { position: absolute; width: 8px; height: 8px; background: var(--alca); border: 1px solid var(--acento); right: -4px; bottom: -4px; cursor: nwse-resize; pointer-events: auto; }
 .sobreposicao .etiqueta-sel { position: absolute; left: -1px; top: -19px; background: var(--acento); color: var(--sobre-acento); font-size: var(--tam-1);
   font-weight: var(--peso-forte); padding: 1px 6px; border-radius: var(--raio-1); white-space: nowrap; pointer-events: none; }
 .pino { position: absolute; width: 20px; height: 20px; margin: -20px 0 0 -2px; border-radius: 10px 10px 10px 2px; background: var(--comentario); color: var(--sobre-acento);
-  font: var(--peso-forte) 11px/20px var(--fonte); text-align: center; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5); pointer-events: auto; cursor: pointer; }
+  font: var(--peso-forte) 11px/20px var(--fonte); text-align: center; box-shadow: var(--sombra-1); pointer-events: auto; cursor: pointer; }
 .pino.resolvido { opacity: 0.45; }
 .balao { position: absolute; width: 260px; background: var(--fundo-1); border: 1px solid var(--borda-forte); border-radius: var(--raio-2); padding: var(--esp-2);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); pointer-events: auto; z-index: 5; }
+  box-shadow: var(--sombra-2); pointer-events: auto; z-index: 5; }
 .erro-monitor { position: absolute; top: 8px; left: 8px; right: 8px; z-index: 3; background: var(--fundo-1); border-radius: var(--raio-2); color: var(--erro); padding: 12px; }
 
 /* trilho de ferramentas */
@@ -242,7 +242,7 @@ input[type="range"]:focus-visible { outline: none; }
 .trilho button.ativa { background: var(--acento-fundo); color: var(--acento); }
 .trilho hr { width: 16px; border: 0; border-top: 1px solid var(--borda-forte); margin: 4px 0; flex: none; }
 .trilho .fim { margin-top: auto; }
-.trilho.flutuante-3d { position: absolute; left: 8px; top: 8px; z-index: 4; padding: 4px; border-radius: var(--raio-2); background: rgba(17, 17, 17, 0.72); }
+.trilho.flutuante-3d { position: absolute; left: 8px; top: 8px; z-index: 4; padding: 4px; border-radius: var(--raio-2); background: var(--vidro); }
 .pop-trilho { left: calc(var(--trilho) + 4px); width: 260px; display: flex; gap: 4px; align-items: center; padding: 6px; }
 
 /* transporte e barra inferior do monitor */
@@ -266,9 +266,9 @@ input[type="range"]:focus-visible { outline: none; }
 /* 3D: rótulo da vista e leitura do gizmo */
 .vista-3d { position: absolute; top: 8px; left: 52px; right: 8px; z-index: 3; display: flex; align-items: center; gap: 6px; pointer-events: none; }
 .vista-3d > * { pointer-events: auto; }
-.vista-3d .nome-vista { font-size: var(--tam-1); color: var(--texto-2); background: rgba(17, 17, 17, 0.6); padding: 3px 8px; border-radius: var(--raio); pointer-events: none; }
+.vista-3d .nome-vista { font-size: var(--tam-1); color: var(--texto-2); background: var(--vidro); padding: 3px 8px; border-radius: var(--raio); pointer-events: none; }
 .vista-3d .esp { flex: 1; pointer-events: none; }
-.vista-3d .bt { background: rgba(17, 17, 17, 0.72); }
+.vista-3d .bt { background: var(--vidro); }
 .vista-3d .bt:hover { background: var(--fundo-3); }
 .vista-3d .bt.ligado { background: var(--acento-fundo); }
 .leitura-3d { position: absolute; z-index: 6; pointer-events: none; background: var(--fundo-0); color: var(--texto); font-size: var(--tam-1); padding: 2px 6px;
@@ -298,7 +298,7 @@ input[type="range"]:focus-visible { outline: none; }
 .lt .trilha.cenas { height: 22px; }
 .lt .trilha.palavras { height: 22px; }
 .lt .cena { position: absolute; top: 0; height: 22px; display: flex; align-items: center; padding: 0 8px; color: var(--texto-2); font-size: var(--tam-1);
-  white-space: nowrap; overflow: hidden; border-left: 2px solid #484848; cursor: pointer; }
+  white-space: nowrap; overflow: hidden; border-left: 2px solid var(--borda-forte); cursor: pointer; }
 .lt .cena b { color: var(--texto); margin-right: 6px; }
 .lt .cena:hover { color: var(--texto); }
 .lt .bloco { position: absolute; top: 1px; bottom: 1px; border-radius: var(--raio-1); display: flex; align-items: center; gap: 5px; padding: 0 6px; font-size: var(--tam-1);
@@ -345,7 +345,7 @@ input[type="range"]:focus-visible { outline: none; }
 .terminal-abas .aba.ativa { background: var(--fundo-4); color: var(--texto); }
 .terminal-abas .aba .x { opacity: 0.5; }
 .terminal-abas .aba .x:hover { opacity: 1; }
-.terminal-corpo { flex: 1; position: relative; min-height: 0; background: #101113; }
+.terminal-corpo { flex: 1; position: relative; min-height: 0; background: var(--fundo-1); }
 .terminal-corpo .xterm-host { position: absolute; inset: 4px 0 0 8px; }
 
 /* o tema do dockview fica num lugar só: casca/casca.css */
@@ -386,7 +386,7 @@ input[type="range"]:focus-visible { outline: none; }
 .sd-botoes { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; max-width: 520px; }
 .sd-prop { font-size: 11px; opacity: 0.75; font-variant-numeric: tabular-nums; }
 .sem-cenas { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; pointer-events: auto;
-  color: var(--texto-2); font-size: 13px; background: rgba(0, 0, 0, 0.35); }
+  color: var(--texto-2); font-size: var(--tam-3); background: var(--veu); }
 .barra-lista { display: flex; align-items: center; gap: 2px; height: 30px; flex: none; padding: 0 6px; border-bottom: 1px solid var(--borda); background: var(--fundo-1); }
 .barra-lista .espaco { flex: 1; }
 .barra-lista .bti { width: 24px; height: 24px; }
@@ -404,26 +404,26 @@ input[type="range"]:focus-visible { outline: none; }
 .lt .rotulo-faixa .bti { width: 18px; height: 18px; color: var(--texto-3); }
 .lt .trilha.audio.muda .rotulo-faixa .bti { color: var(--aviso); }
 .lt .trilha.audio.sel .rotulo-faixa { color: var(--texto); }
-.lt .clipe { position: absolute; top: 2px; bottom: 2px; border-radius: var(--raio-1); background: #10322a; box-shadow: inset 0 2px 0 var(--trilha-audio); overflow: hidden; cursor: grab; }
-.lt .clipe.musica { background: #122a33; box-shadow: inset 0 2px 0 #4ccce6; }
-.lt .clipe.efeitos { background: #2a2e14; box-shadow: inset 0 2px 0 #c9d64c; }
+.lt .clipe { position: absolute; top: 2px; bottom: 2px; border-radius: var(--raio-1); background: var(--trilha-audio-fundo); box-shadow: inset 0 2px 0 var(--trilha-audio); overflow: hidden; cursor: grab; }
+.lt .clipe.musica { background: var(--trilha-musica-fundo); box-shadow: inset 0 2px 0 var(--trilha-musica); }
+.lt .clipe.efeitos { background: var(--trilha-sfx-fundo); box-shadow: inset 0 2px 0 var(--trilha-sfx); }
 .lt .clipe:hover { filter: brightness(1.1); }
 .lt .clipe.fora, .lt .clipe.mudo { opacity: 0.4; }
 .lt .clipe svg.onda { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
 .lt .clipe .onda .crua { fill: none; stroke: var(--trilha-audio); stroke-opacity: 0.45; stroke-width: 1; vector-effect: non-scaling-stroke; }
 .lt .clipe .onda .cheia { fill: var(--trilha-audio); fill-opacity: 0.6; }
-.lt .clipe.musica .onda .crua { stroke: #4ccce6; }
-.lt .clipe.musica .onda .cheia { fill: #4ccce6; }
-.lt .clipe.efeitos .onda .crua { stroke: #c9d64c; }
-.lt .clipe.efeitos .onda .cheia { fill: #c9d64c; }
+.lt .clipe.musica .onda .crua { stroke: var(--trilha-musica); }
+.lt .clipe.musica .onda .cheia { fill: var(--trilha-musica); }
+.lt .clipe.efeitos .onda .crua { stroke: var(--trilha-sfx); }
+.lt .clipe.efeitos .onda .cheia { fill: var(--trilha-sfx); }
 .lt .clipe .onda .vol { fill: none; stroke: var(--texto); stroke-opacity: 0.85; stroke-width: 1; vector-effect: non-scaling-stroke; }
 .lt .clipe .onda .medindo { fill: var(--texto-3); opacity: 0.5; }
-.lt .clipe .txt { position: absolute; left: 6px; top: 1px; font-size: var(--tam-1); color: var(--texto); text-shadow: 0 0 3px #000, 0 0 3px #000; white-space: nowrap; pointer-events: none; }
+.lt .clipe .txt { position: absolute; left: 6px; top: 1px; font-size: var(--tam-1); color: var(--texto); text-shadow: 0 0 3px var(--fundo-0), 0 0 3px var(--fundo-0); white-space: nowrap; pointer-events: none; }
 .lt .clipe.sel { outline: 2px solid var(--acento); outline-offset: -1px; z-index: 2; overflow: visible; }
 .lt .clipe .alc { position: absolute; top: 0; bottom: 0; width: 6px; background: var(--texto); cursor: ew-resize; z-index: 1; }
 .lt .clipe .alc.ini { left: 0; border-radius: var(--raio-1) 0 0 var(--raio-1); }
 .lt .clipe .alc.fim { right: 0; border-radius: 0 var(--raio-1) var(--raio-1) 0; }
-.cab-insp .ico-fam.audio { background: #10322a; color: var(--trilha-audio); }
+.cab-insp .ico-fam.audio { background: var(--trilha-audio-fundo); color: var(--trilha-audio); }
 .interruptor { display: inline-flex; align-items: center; gap: 8px; min-height: var(--controle); }
 .interruptor .ler { white-space: normal; line-height: 1.3; padding: 2px 0; }
 .biblioteca { position: fixed; left: auto; right: 16px; top: auto; bottom: 48px; width: min(340px, calc(100vw - 32px)); max-height: min(380px, calc(100vh - 80px)); z-index: 60;

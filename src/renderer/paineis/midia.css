@@ -33,7 +33,7 @@
 .midia-icone-grande { color: var(--icone-inativo); }
 .midia-mini.audio { background: linear-gradient(135deg, var(--trilha-midia-fundo), var(--fundo-1)); }
 .midia-mini.audio .midia-icone-grande { color: var(--trilha-audio); }
-.midia-tipo, .midia-duracao { position: absolute; background: rgba(0, 0, 0, 0.62); color: var(--texto); border-radius: 3px; font: var(--tam-1) var(--fonte-mono); padding: 0 4px; line-height: 16px; }
+.midia-tipo, .midia-duracao { position: absolute; background: var(--vidro); color: var(--texto); border-radius: 3px; font: var(--tam-1) var(--fonte-mono); padding: 0 4px; line-height: 16px; }
 .midia-tipo { left: 3px; top: 3px; display: inline-flex; align-items: center; }
 .midia-duracao { right: 3px; bottom: 3px; }
 .midia-marca { position: absolute; right: 8px; top: 8px; width: 16px; height: 16px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }

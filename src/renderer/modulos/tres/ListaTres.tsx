@@ -78,7 +78,7 @@ export const ListaTres: React.FC = () => {
           <button className={`bt mini${menu ? ' ligado' : ''}`} onClick={() => setMenu((m) => !m)} title="Adicionar primitiva"><Plus size={13} />Adicionar</button>
           {menu && (
             <div style={{position: 'absolute', right: 0, top: 26, zIndex: 10, minWidth: 140, padding: 4, background: 'var(--fundo-2)', border: '1px solid var(--borda-forte)',
-              borderRadius: 'var(--raio-2)', boxShadow: '0 8px 24px rgba(0,0,0,0.5)'}}>
+              borderRadius: 'var(--raio-2)', boxShadow: 'var(--sombra-2)'}}>
               {TIPOS.map((t) => (
                 <button key={t.tipo} className="bt fantasma" style={{width: '100%', justifyContent: 'flex-start'}} onClick={() => void adicionar(t.tipo)}>
                   {ICONE[t.tipo]}{t.nome}
