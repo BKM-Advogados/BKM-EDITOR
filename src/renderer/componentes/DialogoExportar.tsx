@@ -27,6 +27,7 @@ import {avisar, useLoja} from '../estado/loja';
 import {exportarPng, type SaidaPng} from '../modulos/imagem/exportarPng';
 import {exportarCarrossel} from '../modulos/imagem/exportarPaginas';
 import {numeroBr} from './Campos';
+import {Caixa, Escolha, Segmentado} from './Controles';
 import '../modulos/video/zonas-seguras.css';
 import './dialogo-exportar.css';
 
@@ -74,11 +75,8 @@ const Linha: React.FC<{rotulo: string; children: React.ReactNode}> = ({rotulo, c
   <div className="linha-exp"><span className="rot">{rotulo}</span><div className="val">{children}</div></div>
 );
 
-const Segmentos = <T extends string | number>({valor, opcoes, aoMudar}: {valor: T; opcoes: {valor: T; nome: string; dica?: string}[]; aoMudar: (v: T) => void}) => (
-  <span className="segmentos">
-    {opcoes.map((o) => <button key={String(o.valor)} type="button" className={o.valor === valor ? 'ativo' : ''} title={o.dica} onClick={() => aoMudar(o.valor)}>{o.nome}</button>)}
-  </span>
-);
+const Segmentos = <T extends string | number>({valor, opcoes, aoMudar, rotulo = 'Opções'}: {valor: T; opcoes: {valor: T; nome: string; dica?: string}[]; aoMudar: (v: T) => void;
+  rotulo?: string}) => <Segmentado valor={valor} rotulo={rotulo} aoMudar={aoMudar} opcoes={opcoes.map((o) => ({valor: o.valor, rotulo: o.nome, dica: o.dica}))} />;
 
 type Andamento = {mensagem?: string; etapa?: string; pct?: number; arquivo?: string; indice?: number; total?: number};
 /** Junta um evento ao andamento guardado: a porcentagem fica até vir outra, e zera quando começa outro arquivo. */
@@ -239,8 +237,8 @@ const OpcoesMarca: React.FC<{destinos: Destino[]; atual: Destino; editar: (id: s
             <Segmentos valor={atual.id} aoMudar={editar} opcoes={destinos.map((d) => ({valor: d.id, nome: nomeDe(d),
               dica: `${nomeDe(d)}: ${config(d).ligada ? 'com' : 'sem'} marca d'água`}))} />
           )}
-          <label className="escolha-exp"><input type="checkbox" checked={c.ligada} onChange={(e) => mudar(atual, {ligada: e.target.checked})} />
-            {destinos.length > 1 ? `Marca d'água no ${nomeDe(atual)}` : 'Pôr marca d\'água'}</label>
+          <Caixa className="escolha-exp" marcado={c.ligada} aoMudar={(ligada) => mudar(atual, {ligada})}>
+            {destinos.length > 1 ? `Marca d'água no ${nomeDe(atual)}` : 'Pôr marca d\'água'}</Caixa>
           {c.ligada && (
             <>
               <div className="md-linha"><span className="rot2">Conteúdo</span>
@@ -478,7 +476,7 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
             return (
               <label key={f.id} className={`${marcado(f.id) ? 'marcado' : ''}${desligado ? ' desligado' : ''}`}
                 title={desligado ? 'O carrossel narrado é fixo em 1080×1920: só sai em 9:16' : `${f.destino}${f.id === doDocumento.id ? ' · o formato deste vídeo' : ''}`}>
-                <input type="checkbox" checked={marcado(f.id)} disabled={desligado} onChange={() => alternar(d)} />
+                <Caixa marcado={marcado(f.id)} desligado={desligado} rotulo={f.nome} aoMudar={() => alternar(d)} />
                 <span>{f.nome} <span className="medida">{f.proporcao}</span>
                   {temMarca && marcado(f.id) && configMarca(d).ligada && <span className="md-ico" title="Com marca d'água"><Stamp size={11} /></span>}</span>
                 <span className="medida">{f.largura}×{f.altura}</span>
@@ -487,7 +485,7 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
             );
           })}
           <label className={`${marcado('personalizado') ? 'marcado' : ''}${fixo ? ' desligado' : ''}`} title={fixo ? 'O carrossel narrado é fixo em 1080×1920' : 'Outro tamanho, em pixels'}>
-            <input type="checkbox" checked={marcado('personalizado')} disabled={fixo} onChange={() => alternar({id: 'personalizado', ...personalizado})} />
+            <Caixa marcado={marcado('personalizado')} desligado={fixo} rotulo="Personalizado" aoMudar={() => alternar({id: 'personalizado', ...personalizado})} />
             <span>Personalizado{doDocumento.id === 'personalizado' ? <span className="medida"> · o formato deste vídeo</span> : null}</span>
             <span className="pers" onClick={(e) => e.preventDefault()}>
               <input className={`campo${persValido('largura') ? '' : ' invalido'}`} type="text" inputMode="numeric" value={textoPers.largura} disabled={fixo} aria-label="Largura"
@@ -522,9 +520,8 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
               return (
                 <label key={d.id} title={OPCOES_LEGENDA_EXPORTACAO.find((x) => x.valor === v)!.nota}>
                   {destinos.length > 1 && <span className="medida">{d.id === 'personalizado' ? `${d.largura}×${d.altura}` : proporcaoDe(d.largura, d.altura)}</span>}
-                  <select className="campo" value={v} aria-label="Legendas neste destino" onChange={(e) => setLegendasPor((x) => ({...x, [d.id]: e.target.value as LegendaNaExportacao}))}>
-                    {OPCOES_LEGENDA_EXPORTACAO.map((x) => <option key={x.valor} value={x.valor}>{x.nome}</option>)}
-                  </select>
+                  <Escolha valor={v} rotulo="Legendas neste destino" aoMudar={(x) => setLegendasPor((y) => ({...y, [d.id]: x}))}
+                    opcoes={OPCOES_LEGENDA_EXPORTACAO.map((x) => ({valor: x.valor as LegendaNaExportacao, rotulo: x.nome, dica: x.nota}))} />
                 </label>
               );
             })}
@@ -533,9 +530,7 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
         </Linha>
       )}
       <Linha rotulo="Formato">
-        <select className="campo" value={codec} onChange={(e) => setCodec(e.target.value as CodecVideo)}>
-          {CODECS.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
-        </select>
+        <Segmentos rotulo="Formato do arquivo" valor={codec} aoMudar={setCodec} opcoes={CODECS.map((c) => ({valor: c.id, nome: c.nome, dica: c.nota}))} />
         <span className="nota">{CODECS.find((c) => c.id === codec)!.nota}</span>
       </Linha>
       <Linha rotulo="Qualidade">
@@ -547,8 +542,8 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
         {escala !== 1 && <span className="nota">{estimativa.porDestino.map((d) => `${d.largura}×${d.altura}`).join(' · ')}</span>}
       </Linha>
       <Linha rotulo="Trecho">
-        <label className="escolha-exp"><input type="radio" name="trecho" checked={!trechoLigado} onChange={() => setTrechoLigado(false)} />Tudo ({numeroBr(duracaoMs / 1000, 1)} s)</label>
-        <label className="escolha-exp"><input type="radio" name="trecho" checked={trechoLigado} onChange={() => setTrechoLigado(true)} />Trecho</label>
+        <Segmentado rotulo="Trecho" valor={trechoLigado ? 'trecho' : 'tudo'} aoMudar={(v) => setTrechoLigado(v === 'trecho')}
+          opcoes={[['tudo', `Tudo (${numeroBr(duracaoMs / 1000, 1)} s)`], ['trecho', 'Só um trecho']]} />
         {trechoLigado && (
           <span className="trecho-campos">de <input className={`campo${trechoOk ? '' : ' invalido'}`} value={de} onChange={(e) => setDe(e.target.value)} aria-label="Início em segundos" /> a
             <input className={`campo${trechoOk ? '' : ' invalido'}`} value={ate} onChange={(e) => setAte(e.target.value)} aria-label="Fim em segundos" /> s</span>

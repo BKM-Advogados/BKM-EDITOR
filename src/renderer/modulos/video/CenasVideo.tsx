@@ -6,12 +6,14 @@
 import React, {useState} from 'react';
 import {ChevronDown, ChevronRight, CopyPlus, ImagePlay, Plus, Scissors, Trash2} from 'lucide-react';
 import {ehDocCenas, TIPOS_BLOCO_CENAS, type TipoBlocoCenas} from '../../../nucleo/cenas';
-import {documentosDe, loja, selecionar, useLoja} from '../../estado/loja';
+import {documentosDe, selecionar, useLoja} from '../../estado/loja';
 import {numeroBr} from '../../componentes/Campos';
 import {BotaoMenu} from '../../componentes/Menu';
 import {formatarCurto, irPara} from './tocador';
 import {resumoBloco, tipoDe} from './tipos';
 import {adicionarBloco, adicionarCena, dividirNaCabeca, duplicarSelecao, excluirSelecao, movimentoEmTodas, TIPOS_ROTEIRO} from './acoes';
+import {Escolha} from '../../componentes/Controles';
+import {trocarDocumento} from '../../componentes/SeletorDocumento';
 
 type Cena = {tipo?: string; nome?: string; tag?: string; titulo?: string; linhas?: {t: string}[]; blocos?: {tipo: string; texto?: string; id?: string}[]};
 type CenaP = {origem?: string; tipo: string; n?: number; t_in: number; t_out: number; blocos?: {origem?: string; em: number}[]};
@@ -62,9 +64,7 @@ export const CenasVideo: React.FC = () => {
     <div className="painel">
       {docs.length > 1 && (
         <div className="painel-topo">
-          <select className="campo" value={documento} onChange={(e) => loja.definir((s) => ({ativo: {...s.ativo, video: e.target.value}, selecao: null, tempo_ms: 0}))}>
-            {docs.map((d) => <option key={d.id} value={d.id}>{d.titulo}</option>)}
-          </select>
+          <Escolha valor={documento} rotulo="Vídeo aberto" aoMudar={(id) => trocarDocumento('video', id)} opcoes={docs.map((d): [string, string] => [d.id, d.titulo])} />
         </div>
       )}
       <div className="barra-lista">

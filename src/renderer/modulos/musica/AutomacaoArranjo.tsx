@@ -8,6 +8,7 @@ import {posicaoEmCompasso, resolverMusica, type DocMusica} from '../../../nucleo
 import {useMusica, musica} from './estado';
 import {pontosDeAutomacao} from './acoes';
 import {numeroBr} from '../../componentes/Campos';
+import {Escolha} from '../../componentes/Controles';
 
 export const ALTURA_AUTOMACAO = 76;
 const FOLGA = 8;
@@ -47,9 +48,8 @@ export const CabecaAutomacao: React.FC<{doc: DocMusica}> = ({doc}) => {
       </button>
       {aberta && (
         <>
-          <select className="campo" value={alvo} onChange={(e) => musica.definir({autoAlvo: e.target.value})} title="O que a curva controla">
-            {lista.map((x) => <option key={x.id} value={x.id}>{x.nome}{pontosDoAlvo(doc, x.id).length ? ' ●' : ''}</option>)}
-          </select>
+          <Escolha valor={alvo} rotulo="O que a curva controla" aoMudar={(autoAlvo) => musica.definir({autoAlvo})}
+            opcoes={lista.map((x): [string, string] => [x.id, `${x.nome}${pontosDoAlvo(doc, x.id).length ? ' ●' : ''}`])} />
           <span className="dica">clique no vazio: ponto</span>
         </>
       )}

@@ -8,6 +8,7 @@ import {amostrasDaMarca, avisoDeContraste, ehReferenciaCor, nomeDaCor, resolverC
 import {avisar} from '../estado/loja';
 import {usarPaleta} from '../estado/paleta';
 import {BotaoMenu, type ItemMenu} from './Menu';
+import {Caixa, Escolha} from './Controles';
 
 /** Número no jeito brasileiro (vírgula decimal), sem casas sobrando. */
 export const numeroBr = (n: number, casas = 3) => String(Number(n.toFixed(casas))).replace('.', ',');
@@ -190,10 +191,8 @@ export const CampoSelecao = <T extends string>({rotulo, valor, opcoes, aoMudar, 
   marcador?: React.ReactNode}) => (
   <LinhaCampo rotulo={rotulo} marcador={marcador} difere={padrao !== undefined && valor !== padrao} padrao={opcoes.find(([v]) => v === padrao)?.[1]}
     aoRedefinir={padrao !== undefined ? () => aoMudar(padrao) : undefined}>
-    <select className="campo" value={valor} onChange={(e) => e.target.value !== valor && aoMudar(e.target.value as T)}>
-      {!opcoes.some(([v]) => v === valor) && <option value={valor}>{valor}</option>}
-      {opcoes.map(([v, nome]) => <option key={v} value={v}>{nome}</option>)}
-    </select>
+    <Escolha valor={valor} rotulo={rotulo} aoMudar={aoMudar}
+      opcoes={[...(opcoes.some(([v]) => v === valor) ? [] : [[valor, valor] as [T, string]]), ...opcoes]} />
   </LinhaCampo>
 );
 
@@ -243,12 +242,11 @@ export const CabecalhoInspector: React.FC<{icone: React.ReactNode; familia?: 'te
   </div>
 );
 
-/** Liga/desliga (mudo, ducking): caixa de marcar na cor do acento, com o rótulo à esquerda como os outros campos. */
+/** Liga/desliga (mudo, ducking): caixa de marcar da casa, com o rótulo à esquerda como os outros campos. */
 export const CampoInterruptor: React.FC<{rotulo: string; valor: boolean; aoMudar: (v: boolean) => void; dica?: string; texto?: string}> = ({rotulo, valor, aoMudar, dica, texto}) => (
-  <LinhaCampo rotulo={rotulo} dica={dica}>
+  <LinhaCampo rotulo={rotulo} dica={dica} como="div">
     <span className="valor interruptor">
-      <input type="checkbox" checked={valor} onChange={(e) => aoMudar(e.target.checked)} aria-label={rotulo} />
-      {texto && <span className="ler">{texto}</span>}
+      <Caixa marcado={valor} aoMudar={aoMudar} rotulo={rotulo}>{texto && <span className="ler">{texto}</span>}</Caixa>
     </span>
   </LinhaCampo>
 );

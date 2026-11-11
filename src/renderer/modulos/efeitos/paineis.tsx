@@ -13,6 +13,7 @@ import {MonitorVideo} from '../video/MonitorVideo';
 import {LinhaDoTempo} from '../video/LinhaDoTempo';
 import {PaineisImagem} from '../imagem/paineis';
 import type {OperacaoPatch} from '../../../nucleo/documentos';
+import {Escolha} from '../../componentes/Controles';
 
 // a pilha como está no documento, validada (nucleo/efeitos.ts, lerEfeitos): item com tipo desconhecido aparece na lista
 // como inválido, com o botão de excluir, em vez de derrubar a área (tres-efeitos-D1); valor fora da faixa ou em texto
@@ -81,12 +82,12 @@ const Pilha: React.FC = () => {
   return (
     <div className="painel">
       <div className="painel-topo">
-        <select className="campo" value={alvo ?? ''} onChange={(e) => {
-          const d = docs.find((x) => x.id === e.target.value);
-          loja.definir((s) => ({alvoEfeitos: e.target.value, selecao: null, ativo: d ? {...s.ativo, [d.modulo]: d.id} : s.ativo}));
-        }}>
-          {docs.map((d) => <option key={d.id} value={d.id}>{d.modulo === 'video' ? 'Vídeo' : 'Imagem'} · {d.titulo}</option>)}
-        </select>
+        <Escolha valor={alvo ?? undefined} rotulo="Documento cujos efeitos se editam" vazio="Escolha o vídeo ou a imagem"
+          opcoes={docs.map((d): [string, string] => [d.id, `${d.modulo === 'video' ? 'Vídeo' : 'Imagem'} · ${d.titulo}`])}
+          aoMudar={(id) => {
+            const d = docs.find((x) => x.id === id);
+            loja.definir((s) => ({alvoEfeitos: id, selecao: null, ativo: d ? {...s.ativo, [d.modulo]: d.id} : s.ativo}));
+          }} />
       </div>
       <div className="painel-corpo">
         {!alvo ? <SemDocumento modulo="video" compacto /> : (

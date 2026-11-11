@@ -17,6 +17,7 @@ import {pedirTexto} from '../componentes/Dialogo';
 import {IconeEstudio} from '../componentes/Icones';
 import {lerConta} from '../paineis/conversas';
 import './inicio.css';
+import {Escolha} from '../componentes/Controles';
 
 const ABAS: {id: Modulo; nome: string; icone: React.ReactNode}[] = [
   {id: 'video', nome: 'Vídeo', icone: <Film size={15} />},
@@ -332,10 +333,8 @@ export const Inicio: React.FC = () => {
                 {/onedrive/i.test(pasta || pastaPadrao) && <div className="alerta-opcoes"><TriangleAlert size={13} />Pasta dentro do OneDrive: a sincronização pode travar a gravação.</div>}
                 {aba !== '3d' && (
                   <label><span>Marca</span>
-                    <select className="campo" value={marca} onChange={(e) => setMarca(e.target.value)} title="Cores, fonte e logo do kit entram no tema do documento novo">
-                      <option value="">Sem kit (tema neutro)</option>
-                      {marcas.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
-                    </select>
+                    <Escolha valor={marca} rotulo="Kit de marca" dica="Cores, fonte e logo do kit entram no tema do documento novo" aoMudar={setMarca}
+                      opcoes={[['', 'Sem kit (tema neutro)'] as [string, string], ...marcas.map((m): [string, string] => [m.id, m.nome])]} />
                   </label>
                 )}
                 {aba !== '3d' && idFormato === PERSONALIZADO && (
@@ -350,9 +349,8 @@ export const Inicio: React.FC = () => {
                 )}
                 {aba === 'video' && (
                   <label><span>Quadros por segundo</span>
-                    <select className="campo" value={livre.fps} onChange={(e) => setLivre((x) => ({...x, fps: Number(e.target.value)}))}>
-                      {[24, 25, 30, 50, 60].map((n) => <option key={n} value={n}>{n}</option>)}
-                    </select>
+                    <Escolha valor={livre.fps} rotulo="Quadros por segundo" aoMudar={(fps) => setLivre((x) => ({...x, fps}))}
+                      opcoes={[24, 25, 30, 50, 60].map((n): [number, string] => [n, String(n)])} />
                   </label>
                 )}
               </div>

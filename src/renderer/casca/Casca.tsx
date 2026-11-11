@@ -15,6 +15,7 @@ import type {Modulo} from '../../nucleo/documentos';
 import {FORMATOS_IMAGEM, FORMATOS_VIDEO} from '../../nucleo/formatos';
 import {abrirProjeto, avisar, criarDocumento, desfazer, fecharProjeto, loja, mensagemDe, quandoVerFato, useLoja, type Area} from '../estado/loja';
 import {pedirTexto} from '../componentes/Dialogo';
+import {Segmentado} from '../componentes/Controles';
 import {acaoDeArquivo} from './atalhos';
 import {SeloSalvo} from './SeloSalvo';
 import {Midia} from '../paineis/Midia'; // frente Casca (rodada 3): painel de mídia
@@ -218,15 +219,11 @@ const exportarArea = () => {
 };
 
 // ---------- preferências ----------
-/** Escolha de poucas opções num segmentado (Preferências › Aparência). */
+/** Escolha de poucas opções num segmentado (Preferências). */
 const Opcoes = <T extends string | number>({rotulo, valor, opcoes, aoMudar}: {rotulo: string; valor: T; opcoes: [T, string][]; aoMudar: (v: T) => void}) => (
   <div className="dialogo-campo">
-    <span id={`pref-${rotulo}`}>{rotulo}</span>
-    <div className="segmentos" role="radiogroup" aria-labelledby={`pref-${rotulo}`}>
-      {opcoes.map(([v, nome]) => (
-        <button key={String(v)} type="button" role="radio" aria-checked={v === valor} className={v === valor ? 'ativo' : ''} onClick={() => aoMudar(v)}>{nome}</button>
-      ))}
-    </div>
+    <span>{rotulo}</span>
+    <Segmentado rotulo={rotulo} valor={valor} opcoes={opcoes} aoMudar={aoMudar} />
   </div>
 );
 

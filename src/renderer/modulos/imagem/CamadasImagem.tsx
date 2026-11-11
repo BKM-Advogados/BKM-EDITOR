@@ -11,9 +11,10 @@ import type {CamadaImagem, DocImagem, OperacaoPatch} from '../../../nucleo/docum
 import {blocoDe, mascaraDe, mascarasEmUso, patchMoverCamada, patchRecortar, patchSoltar, podeRecortar} from '../../../nucleo/acabamento';
 import {caminhoDoAlvo} from '../../../nucleo/carrossel';
 import {patchTravar, travada} from '../../../nucleo/layout-imagem';
-import {alternarNaSelecao, aplicar, avisar, caminhosDaSelecao, documentosDe, loja, selecionar, trocar, useLoja} from '../../estado/loja';
+import {alternarNaSelecao, aplicar, avisar, caminhosDaSelecao, loja, selecionar, trocar, useLoja} from '../../estado/loja';
 import {BotaoMenu, type ItemMenu} from '../../componentes/Menu';
 import {docValido, indiceDe, rotuloCamada, usarDocumentoImagem, usarPaginaAtiva, visivel} from './comum';
+import {SeletorDocumento} from '../../componentes/SeletorDocumento';
 
 export const iconeCamada = (c: CamadaImagem) => {
   if (c.tipo === 'texto') return <Type />;
@@ -27,7 +28,6 @@ export const CamadasImagem: React.FC = () => {
   const ativa = usarPaginaAtiva(documento, doc);
   const selecao = useLoja((e) => e.selecao);
   const comentarios = useLoja((e) => e.comentarios);
-  const docs = documentosDe('imagem');
   if (!documento || !doc) return <div className="vazio">Sem imagem ainda: crie no monitor.</div>;
   if (!docValido(doc) || !ativa) return <div className="vazio" style={{color: 'var(--erro)'}}>o documento {documento} não tem a lista "camadas" nem "paginas"</div>;
 
@@ -80,13 +80,7 @@ export const CamadasImagem: React.FC = () => {
 
   return (
     <div className="painel">
-      {docs.length > 1 && (
-        <div className="painel-topo">
-          <select className="campo" value={documento} onChange={(e) => loja.definir((s) => ({ativo: {...s.ativo, imagem: e.target.value}, selecao: null}))}>
-            {docs.map((d) => <option key={d.id} value={d.id}>{d.titulo}</option>)}
-          </select>
-        </div>
-      )}
+      <SeletorDocumento modulo="imagem" />
       <div className="painel-corpo sem-margem">
         {paginas.length > 1 && (
           <div className="lista-titulo" role="button" tabIndex={0} title="Propriedades da página (clique)" style={{marginTop: 2, cursor: 'pointer'}}

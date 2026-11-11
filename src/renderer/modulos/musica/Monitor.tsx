@@ -17,6 +17,7 @@ import {numeroBr} from '../../componentes/Campos';
 import {docMusica, musica, selecionarMusica, transicaoAberta, useMusica} from './estado';
 import {motor, vozGuiaDe} from './motor';
 import {campo, campoFaixa, estilo, exportarMusica, forcaDaNota, novaBateria, novoPadrao, passo, novaMusicaDoModelo} from './acoes';
+import {Escolha} from '../../componentes/Controles';
 
 export const useDocMusica = () => {
   const id = useLoja((e) => e.ativo.musica);
@@ -234,13 +235,10 @@ const Passos: React.FC<{doc: DocMusica}> = ({doc}) => {
   return (
     <div>
       <div className="passos-topo">
-        <select className="campo" value={p.id} onChange={(e) => selecionarMusica({tipo: 'padrao', id: e.target.value})} title="Padrão do canal">
-          {doCanal.map((x) => <option key={x.id} value={x.id}>{x.nome ?? x.id}</option>)}
-        </select>
-        <select className="campo" value="" onChange={(e) => e.target.value && void estilo(p.id, e.target.value)} title="Troca as notas pelas de um estilo da casa">
-          <option value="">Estilo…</option>
-          {ESTILOS.map((e) => <option key={e.id} value={e.id}>{e.nome} (~{e.bpm} BPM)</option>)}
-        </select>
+        <span className="escolha-curta"><Escolha valor={p.id} rotulo="Padrão do canal" aoMudar={(id) => selecionarMusica({tipo: 'padrao', id})}
+          opcoes={doCanal.map((x): [string, string] => [x.id, x.nome ?? x.id])} /></span>
+        <span className="escolha-curta"><Escolha valor={undefined as string | undefined} rotulo="Troca as notas pelas de um estilo da casa" vazio="Estilo…" aoMudar={(id) => void estilo(p.id, id)}
+          opcoes={ESTILOS.map((e): [string, string] => [e.id, `${e.nome} (~${e.bpm} BPM)`])} /></span>
         <button className="bt" onClick={() => void novoPadrao(p.canal)}>+ Padrão</button>
         <button className="bt" onClick={() => void novoPadrao(p.canal, {clonar: p.id})}>Clonar</button>
         <button className="bt" title="Cópia com mudanças pequenas: tira e põe notas fracas, muda as forças (bumbo e caixa nos tempos ficam)"

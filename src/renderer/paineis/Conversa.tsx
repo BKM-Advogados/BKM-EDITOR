@@ -7,6 +7,7 @@ import type {OperacaoPatch} from '../../nucleo/documentos';
 import {FERRAMENTAS_ESTUDIO, normalizarFerramenta} from '../../compartilhado/ferramentas';
 import {mudancasDoResultado} from '../../nucleo/portao';
 import {confirmar} from '../componentes/Dialogo';
+import {Escolha} from '../componentes/Controles';
 import {avisar, loja, selecionar, useLoja, valorEm, type Area} from '../estado/loja';
 import {enviar, estadoConversas, guardarRascunho, lerConta, parar, responderPermissao, trocarModelo, type Anexo, type Bloco, type Conversa as TConversa} from './conversas';
 import './conversa.css';
@@ -145,12 +146,9 @@ const SeletorModelo: React.FC<{c: TConversa; desligado: boolean}> = ({c, desliga
   const atual = c.modelo ?? '';
   if (atual && !opcoes.some(([v]) => v === atual)) opcoes.unshift([atual, atual]);
   return (
-    <select className="seletor-modelo" value={atual} disabled={desligado} title="Modelo desta conversa: vale a partir da próxima mensagem"
-      onFocus={() => c.provedor !== 'claude' && lista === null && void window.estudio.ia.modelos(c.provedor).then((r) => setLista(r.ok ? r.modelos : []))}
-      onChange={(e) => void trocarModelo(c.id, e.target.value)}>
-      {!opcoes.length && <option value="">{nomeIA(c)}</option>}
-      {opcoes.map(([v, r]) => <option key={v} value={v}>{r}</option>)}
-    </select>
+    <Escolha className="seletor-modelo" valor={atual} desligado={desligado} rotulo="Modelo desta conversa" dica="Modelo desta conversa: vale a partir da próxima mensagem"
+      aoAbrir={() => c.provedor !== 'claude' && lista === null && void window.estudio.ia.modelos(c.provedor).then((r) => setLista(r.ok ? r.modelos : []))}
+      aoMudar={(m) => void trocarModelo(c.id, m)} opcoes={opcoes.length ? opcoes : [['', nomeIA(c)]]} />
   );
 };
 

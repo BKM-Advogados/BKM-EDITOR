@@ -13,6 +13,7 @@ import {avisar, loja, mensagemDe} from '../../estado/loja';
 import {aplicarMusica, musica, selecionarMusica} from './estado';
 import {motor} from './motor';
 import {novoPadrao} from './acoes';
+import {Escolha} from '../../componentes/Controles';
 
 const ALT = 14; // altura de uma linha (uma nota)
 const TECLAS = 'awsedftgyhujk'; // do Dó ao Dó, como um piano no teclado do computador
@@ -191,9 +192,8 @@ export const PianoRoll: React.FC<{doc: DocMusica; padrao: string; agora_bat: num
   return (
     <div className="piano-roll">
       <div className="passos-topo">
-        <select className="campo" value={p.id} onChange={(e) => selecionarMusica({tipo: 'padrao', id: e.target.value})} title="Padrão do canal">
-          {doCanal.map((x) => <option key={x.id} value={x.id}>{x.nome ?? x.id}</option>)}
-        </select>
+        <span className="escolha-curta"><Escolha valor={p.id} rotulo="Padrão do canal" aoMudar={(id) => selecionarMusica({tipo: 'padrao', id})}
+          opcoes={doCanal.map((x): [string, string] => [x.id, x.nome ?? x.id])} /></span>
         <button className="bt" onClick={() => void novoPadrao(p.canal)}>+ Padrão</button>
         <button className="bt" onClick={() => void novoPadrao(p.canal, {clonar: p.id})}>Clonar</button>
         <button className="bt" title="Cópia com mudanças pequenas (notas vizinhas da escala, forças)" onClick={() => void novoPadrao(p.canal, {variar: p.id})}><Shuffle size={14} />Variação</button>
@@ -201,9 +201,8 @@ export const PianoRoll: React.FC<{doc: DocMusica; padrao: string; agora_bat: num
         <button className={`bt${carimbo !== null ? ' ligado' : ''}`} title="Carimbo: clicar põe o acorde inteiro com a fundamental ali"
           onClick={() => setCarimbo((c) => (c === null ? '' : null))}><Stamp size={14} />Carimbo</button>
         {carimbo !== null && (
-          <select className="campo" value={carimbo} onChange={(e) => setCarimbo(e.target.value)} title="Tipo de acorde">
-            {QUALIDADES_CARIMBO.map((q) => <option key={q.id} value={q.id}>{q.nome}</option>)}
-          </select>
+          <span className="escolha-curta"><Escolha valor={carimbo} rotulo="Tipo de acorde" aoMudar={setCarimbo}
+            opcoes={QUALIDADES_CARIMBO.map((q): [string, string] => [q.id, q.nome])} /></span>
         )}
         <button className={`bt${teclado ? ' ligado' : ''}`} title="O teclado do computador toca: A W S E D F T G Y H U J K (Z e X: oitava)"
           onClick={() => (setTeclado((t) => !t), setGravar(false))}><Keyboard size={14} />Teclado{teclado ? ` · Dó${oitava}` : ''}</button>

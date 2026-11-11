@@ -74,10 +74,6 @@ kbd { font: 600 var(--tam-1)/14px var(--fonte-mono); color: var(--texto-2); back
 .campo:hover { border-color: var(--borda-forte); }
 .campo:focus, .campo:focus-within { outline: none; background: var(--fundo-0); border-color: var(--acento); }
 textarea.campo { height: auto; min-height: 52px; padding: 4px 8px; resize: vertical; line-height: 1.35; display: block; }
-select.campo { appearance: none; padding-right: 22px; cursor: pointer;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23b4b4b4' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: right 6px center; }
-select.campo option { background: var(--fundo-1); color: var(--texto); }
 div.campo { display: flex; align-items: center; gap: 6px; padding: 0 8px; }
 div.campo > input { flex: 1; min-width: 0; height: 100%; border: 0; outline: none; background: transparent; padding: 0; color: var(--texto); }
 div.campo.num > input { text-align: right; }
@@ -429,7 +425,6 @@ input[type="range"]:focus-visible { outline: none; }
 .cab-insp .ico-fam.audio { background: #10322a; color: var(--trilha-audio); }
 .interruptor { display: inline-flex; align-items: center; gap: 8px; min-height: var(--controle); }
 .interruptor .ler { white-space: normal; line-height: 1.3; padding: 2px 0; }
-.interruptor input[type="checkbox"] { width: 14px; height: 14px; margin: 0; accent-color: var(--acento); cursor: pointer; }
 .biblioteca { position: fixed; left: auto; right: 16px; top: auto; bottom: 48px; width: min(340px, calc(100vw - 32px)); max-height: min(380px, calc(100vh - 80px)); z-index: 60;
   display: flex; flex-direction: column; padding: 6px; gap: 6px; }
 .biblioteca .topo { display: flex; align-items: center; gap: 6px; }
@@ -496,3 +491,30 @@ input[type="range"]:focus-visible { outline: none; }
 .dialogo-botoes { display: flex; justify-content: flex-end; gap: var(--esp-2); }
 .dialogo.preferencias { width: min(520px, calc(100vw - 40px)); }
 .bt.principal.perigo { background: var(--erro); border-color: var(--erro); }
+
+/* ── controles da casa (componentes/Controles.tsx) ── */
+.caixa-marcar, .interruptor-casa { display: inline-flex; align-items: center; gap: 8px; min-height: var(--controle-p); padding: 0; border: 0; background: none;
+  color: var(--texto); cursor: pointer; text-align: left; font: inherit; }
+.caixa-marcar:disabled, .interruptor-casa:disabled { opacity: 0.5; cursor: default; }
+.caixa-quadro { width: 16px; height: 16px; flex: none; display: grid; place-items: center; border-radius: var(--raio-1); border: 1px solid var(--borda-forte);
+  background: var(--fundo-3); color: var(--sobre-acento); transition: background var(--rapido), border-color var(--rapido); }
+.caixa-quadro svg.lucide { width: 12px; height: 12px; stroke-width: 2.5; }
+.caixa-marcar:hover .caixa-quadro { border-color: var(--texto-3); }
+.caixa-marcar.marcada .caixa-quadro { background: var(--acento); border-color: var(--acento); }
+.caixa-texto { min-width: 0; line-height: 1.35; }
+button.escolha { display: flex; align-items: center; gap: 6px; text-align: left; cursor: pointer; }
+button.escolha .escolha-valor { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+button.escolha .escolha-vazia { color: var(--texto-3); }
+button.escolha .escolha-seta { width: 14px; height: 14px; color: var(--texto-2); flex: none; }
+button.escolha[aria-expanded="true"] { border-color: var(--acento); }
+button.escolha:disabled { opacity: 0.5; cursor: default; }
+.lista-escolha { position: fixed; z-index: 200; overflow: auto; padding: 4px; background: var(--fundo-elevado); border: 1px solid var(--borda); border-radius: var(--raio-2);
+  box-shadow: var(--sombra-2); outline: none; max-width: min(420px, calc(100vw - 16px)); }
+.lista-escolha .opcao { display: flex; align-items: center; gap: 6px; min-height: var(--controle); padding: 0 10px 0 6px; border-radius: var(--raio); color: var(--texto);
+  cursor: pointer; white-space: nowrap; }
+.lista-escolha .opcao.foco { background: var(--acento-fundo); }
+.lista-escolha .opcao.desligada { color: var(--texto-3); cursor: default; }
+.lista-escolha .opcao-marca { width: 14px; display: inline-grid; place-items: center; color: var(--acento); flex: none; }
+.lista-escolha .opcao-marca svg.lucide { width: 14px; height: 14px; }
+.lista-escolha .opcao-rotulo { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.escolha-curta { display: inline-flex; width: 150px; min-width: 0; flex: none; }
