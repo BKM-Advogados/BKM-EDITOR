@@ -1,14 +1,15 @@
 // A pasta dos kits de marca no disco (%USERPROFILE%\Estudio\marcas, trocável nas preferências): lista, lê, grava,
 // duplica, importa logo e fontes e aplica um kit a um documento do projeto, copiando o logo para midia/ e as fontes
 // para fontes/ antes do patch no tema. Serve ao processo principal (IPC) e às ferramentas do MCP, dentro e fora do app.
-import {copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync} from 'node:fs';
+import {copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import {ARQUIVO_MARCA, arquivosDaMarca, EXTENSOES_FONTE, EXTENSOES_LOGO, idDeMarca, inferirFonte, MARCA_NEUTRO, MARCAS_INICIAIS, normalizarMarca, PASTA_FONTES,
   patchDaMarca, temaDaMarca, type FonteArquivo, type Marca} from './marca';
 import {lerEixoDePeso} from './fonte-variavel';
-import {ErroProjeto, serializar, type Projeto} from './projeto';
+import {gravarAtomico} from './gravar-seguro';
+import {dentroDe, ErroProjeto, semBom, serializar, type Projeto} from './projeto';
 
 /** Um kit lido do disco: o kit e a pasta dele. */
 export type MarcaLida = Marca & {pasta: string};
@@ -47,7 +48,10 @@ export class PastaMarcas {
     return this.opcoes.pasta?.() || pastaMarcas();
   }
 
+  /** A pasta de um kit. Recusa id que sai da pasta dos kits ("..", "../fora", com barra); nome criado à mão ("Minha
+   *  Marca") continua valendo. */
   pastaDe(id: string) {
+    if (!id || id === '.' || id === '..' || /[\\/]/.test(id)) throw new ErroProjeto(`id de kit inválido: ${id}`, 'caminho');
     return path.join(this.pasta, id);
   }
 
@@ -75,7 +79,7 @@ export class PastaMarcas {
     if (!existsSync(arq)) throw new ErroProjeto(`kit de marca não achado: ${id} (em ${this.pasta})`, 'nao_achado');
     let bruto: unknown;
     try {
-      bruto = JSON.parse(readFileSync(arq, 'utf-8'));
+      bruto = JSON.parse(semBom(readFileSync(arq, 'utf-8')));
     } catch (e) {
       throw new ErroProjeto(`${arq} não é um JSON válido (${(e as Error).message})`, 'patch');
     }
@@ -88,10 +92,7 @@ export class PastaMarcas {
     const limpa = normalizarMarca(m, m.id);
     const pasta = this.pastaDe(limpa.id);
     mkdirSync(pasta, {recursive: true});
-    const arq = path.join(pasta, ARQUIVO_MARCA);
-    const tmp = `${arq}.${process.pid}.tmp`;
-    writeFileSync(tmp, serializar(limpa), 'utf-8');
-    renameSync(tmp, arq);
+    gravarAtomico(path.join(pasta, ARQUIVO_MARCA), serializar(limpa));
     return {...limpa, pasta};
   }
 
@@ -148,22 +149,29 @@ export class PastaMarcas {
   /** Aplica o kit a um documento do projeto: copia o logo (midia/) e as fontes (fontes/) que faltam, troca os que mudaram
    *  no kit (`atualizados`) e troca o tema por patch, que vai para o diário com o autor. */
   aplicar(projeto: Projeto, id: string, documento: string, o: {autor: string; origem: string}) {
+    return projeto.comTrava(() => this.aplicarSemTrava(projeto, id, documento, o));
+  }
+
+  private aplicarSemTrava(projeto: Projeto, id: string, documento: string, o: {autor: string; origem: string}) {
     const m = this.ler(id);
     const rel = projeto.arquivoDoDocumento(documento);
     const {doc} = projeto.lerJson<unknown>(rel);
     const {copiar, logo, fontes_arquivos} = arquivosDaMarca(m);
     const copiados: string[] = [];
     const atualizados: string[] = [];
-    // o kit aponta para um arquivo que não está mais lá: o tema não o cita
-    const presentes = new Set(copiar.filter((c) => existsSync(path.join(m.pasta, c.de))).map((c) => c.para));
+    // fora da pasta do kit (um marca.json com "../"), ou que não está mais lá: não copia, e o tema não o cita
+    const validos = copiar.filter((c) => {
+      const de = path.join(m.pasta, c.de);
+      return dentroDe(m.pasta, de) && existsSync(de);
+    });
+    const presentes = new Set(validos.map((c) => c.para));
     const tema = temaDaMarca(m, {logo: logo && presentes.has(logo) ? logo : undefined, fontes_arquivos: fontes_arquivos.filter((f) => presentes.has(f.arquivo))});
     const patch = patchDaMarca(doc, m, tema);
     // recusa antes de copiar: documento que não recebe kit não ganha logo nem fonte no projeto
     if (!patch.length) throw new ErroProjeto(`o documento ${documento} não recebe kit de marca (só vídeo de cenas, imagem e animação)`, 'patch');
-    for (const c of copiar) {
-      if (!presentes.has(c.para)) continue;
+    for (const c of validos) {
       const de = path.join(m.pasta, c.de);
-      const para = projeto.caminho(c.para);
+      const para = projeto.caminhoParaGravar(c.para); // midia/ ou fontes/ ligadas para fora por link: não copia para lá
       const jaTem = existsSync(para);
       if (jaTem && readFileSync(de).equals(readFileSync(para))) continue;
       mkdirSync(path.dirname(para), {recursive: true});
@@ -173,6 +181,7 @@ export class PastaMarcas {
     const r = projeto.aplicarPatch({documento, patch, autor: o.autor, origem: o.origem, rotulo: `kit de marca: ${m.nome}`});
     return {versao: r.versao, seq: r.entrada.seq, marca: m.id, nome: m.nome, copiados, atualizados, tema};
   }
+
 }
 
 /** As fontes próprias que um projeto tem em fontes/, pelo nome do arquivo (para a interface registrar antes de desenhar). */

@@ -20,6 +20,18 @@ const SISTEMA: Sistema = {
 
 const preso = (e: unknown) => CODIGOS_DE_ARQUIVO_PRESO.includes((e as NodeJS.ErrnoException)?.code ?? '');
 
+/** Roda `f` tentando de novo enquanto o arquivo estiver preso (abrir o diário para acrescentar, por exemplo). */
+export const comNovaTentativa = <T>(f: () => T, esperar: Sistema['esperar'] = SISTEMA.esperar): T => {
+  for (let tentativa = 0; ; tentativa++) {
+    try {
+      return f();
+    } catch (e) {
+      if (!preso(e) || tentativa >= ESPERAS_MS.length) throw e;
+      esperar(ESPERAS_MS[tentativa]);
+    }
+  }
+};
+
 /** Troca `tmp` por `destino` tentando de novo enquanto o arquivo estiver preso; devolve quantas tentativas a mais precisou. */
 export const renomearComRetry = (tmp: string, destino: string, sistema: Sistema = SISTEMA): number => {
   for (let tentativa = 0; ; tentativa++) {

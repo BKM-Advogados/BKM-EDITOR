@@ -63,11 +63,21 @@ export const listarMidiaBruta = (raiz: string): ArquivoBruto[] => {
     }
     for (const item of itens) {
       const relItem = `${rel}/${item.name}`;
-      if (item.isDirectory()) {
+      // link simbólico (uma pasta de vídeo bruto num disco de fora): lido como o que ele aponta; só leitura (Projeto.caminhoParaGravar)
+      let tipo: 'pasta' | 'arquivo' | null = item.isDirectory() ? 'pasta' : item.isFile() ? 'arquivo' : null;
+      if (item.isSymbolicLink()) {
+        try {
+          const st = statSync(path.join(raiz, relItem));
+          tipo = st.isDirectory() ? 'pasta' : st.isFile() ? 'arquivo' : null;
+        } catch {
+          tipo = null; // link quebrado
+        }
+      }
+      if (tipo === 'pasta') {
         if (nivel < PROFUNDIDADE) andar(relItem, nivel + 1);
         continue;
       }
-      if (!item.isFile() || relItem.endsWith('.tmp')) continue;
+      if (tipo !== 'arquivo' || relItem.endsWith('.tmp')) continue;
       try {
         const abs = path.join(raiz, relItem);
         const st = statSync(abs);
@@ -124,7 +134,7 @@ export const marcarMidia = (
   caminho: string,
   mudanca: {estado?: EstadoDaTomada | null; nota?: string},
   quem: {autor: string; origem: string},
-): {seq: number; documento: string; caminho: string; marca: MarcaDeMidia | null} => {
+): {seq: number; documento: string; caminho: string; marca: MarcaDeMidia | null} => p.comTrava(() => {
   const rel = path.posix.normalize(caminho.replace(/\\/g, '/'));
   if (!rel.startsWith(`${PASTA}/`) || rel === ARQUIVO_MARCAS_MIDIA) throw new ErroProjeto(`só se marca arquivo de ${PASTA}/: ${caminho}`, 'caminho');
   const entradas = indiceDaMidia(p).entradas;
@@ -133,15 +143,15 @@ export const marcarMidia = (
     const dono = classificarDerivado(rel);
     throw new ErroProjeto(`${rel} é um arquivo gerado${dono ? ` a partir de ${dono.origem}` : ''}: marque o original`, 'caminho');
   }
-  const textoAntes = p.existe(ARQUIVO_MARCAS_MIDIA) ? p.lerTexto(ARQUIVO_MARCAS_MIDIA) : serializar(marcasVazias());
+  const existia = p.existe(ARQUIVO_MARCAS_MIDIA) ? p.lerTexto(ARQUIVO_MARCAS_MIDIA) : null;
+  const textoAntes = existia ?? serializar(marcasVazias());
   const antes = lerMarcasDoProjeto(p);
   const depois = comMarca(antes, rel, mudanca);
   const texto = serializar(depois);
-  p.gravarTexto(ARQUIVO_MARCAS_MIDIA, texto);
-  const seq = (p.diario().at(-1)?.seq ?? 0) + 1;
+  const seq = p.ultimaSeq() + 1;
   const marca = depois.marcas[rel] ?? null;
   const rotulo = mudanca.estado === 'boa' ? `tomada boa: ${rel}` : mudanca.estado === 'descartada' ? `tomada descartada: ${rel}` : mudanca.estado === null ? `sem marca: ${rel}` : `nota em ${rel}`;
-  p.registrar({
+  p.gravarComDiario(ARQUIVO_MARCAS_MIDIA, existia, texto, {
     seq,
     em: new Date().toISOString(),
     documento: ARQUIVO_MARCAS_MIDIA,
@@ -154,7 +164,7 @@ export const marcarMidia = (
     inverso: jsonpatch.compare(depois, antes) as OperacaoPatch[],
   });
   return {seq, documento: ARQUIVO_MARCAS_MIDIA, caminho: rel, marca};
-};
+});
 
 // ---------- onde cada arquivo é usado ----------
 /** Ids dos documentos do manifesto cujo JSON cita o caminho como valor (entre aspas), por arquivo pedido. */

@@ -3,7 +3,7 @@
 // muda no disco (pela interface ou pelo agente no terminal), o documento é relido e a tela acompanha.
 import {useRef, useSyncExternalStore} from 'react';
 import type {InfoProjeto, PropsVideo} from '../../compartilhado/api';
-import type {Comentario, DocImagem, EntradaDiario, Modulo, OperacaoPatch} from '../../nucleo/documentos';
+import type {Comentario, DocImagem, Modulo, OperacaoPatch, ResumoDiario} from '../../nucleo/documentos';
 import type {Efeito} from '../../nucleo/efeitos';
 import type {Pesquisa} from '../../nucleo/pesquisa'; // só o tipo: pesquisa.ts usa node:crypto
 import {indicePagina, paginasDe} from '../../nucleo/carrossel';
@@ -28,7 +28,7 @@ export type Estado = {
   selecao: Selecao;
   tempo_ms: number;
   comentarios: Comentario[];
-  diario: EntradaDiario[];
+  diario: ResumoDiario[];
   modoComentario: boolean;
   comentarioAberto?: string;
   pesquisa: Pesquisa | null; // null = ainda não lida; a interface só mostra, quem grava é o Claude pelo MCP

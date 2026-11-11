@@ -243,7 +243,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
     if (formato && !preset) throw new ErroProjeto(`formato desconhecido: ${formato}`, 'nao_achado');
     if ((largura === undefined) !== (altura === undefined)) throw new ErroProjeto('passe largura e altura juntas (ou um formato da lista)', 'patch');
     const tam = largura && altura ? {largura, altura} : preset ? {largura: preset.largura, altura: preset.altura} : undefined;
-    const {entrada, conteudo} = documentoNovo(projeto.manifesto(), modulo, {titulo, formato: tam ? {...tam, fps: fps ?? 30} : undefined});
+    const {entrada, conteudo} = documentoNovo(projeto.manifesto(), modulo, {titulo, formato: tam ? {...tam, fps: fps ?? 30} : undefined, existe: (rel) => projeto.existe(rel)});
     projeto.adicionarDocumento(entrada, modulo === 'musica' && modelo ? musicaDoModelo(modelo, conteudo as DocMusica) : conteudo); // frente Música: modelo
     return {ok: true, ...entrada};
   }));
@@ -291,7 +291,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   }, seguro(({desde = 0, autor, documento, limite = 50}: {desde?: number; autor?: string; documento?: string; limite?: number}) => {
     // transversal-D14: sem limite, um projeto com milhares de mudanças mandava megabytes de diário à IA
     const doc = documento ? projeto.arquivoDoDocumento(documento) : undefined;
-    const lista = projeto.diario(desde).filter((e) => (!autor || e.autor === autor) && (!doc || e.documento === doc));
+    const lista = projeto.diario(desde, {tolerante: true}).filter((e) => (!autor || e.autor === autor) && (!doc || e.documento === doc));
     return lista.slice(-limite).map(({inverso: _i, ...e}) => e);
   }));
 

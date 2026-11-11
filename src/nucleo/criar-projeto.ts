@@ -20,12 +20,26 @@ import {arquivosDaMarca, patchDaMarca, temaDaMarca} from './marca';
 import {linhaDoTextoAntigo} from './claude-md-antigo';
 import {REGRAS_MIDIA_PESADA} from './midia-git';
 import type {MarcaLida} from './pasta-marcas';
-import {serializar} from './projeto';
+import {dentroDe, semBom, serializar} from './projeto';
+import {gravarAtomico} from './gravar-seguro';
 
 // o texto baixado de cada fonte (pesquisa/fontes/<id>.txt) fica fora do git: é grande e se baixa de novo pela url
 // vídeo e áudio sem perda em midia/ também ficam de fora (transversal-D7, midia-git.ts); o que passa de 25 MB entra na regra
 // pelo caminho exato antes de cada commit
-export const GITIGNORE = `saidas/\n.estudio/estado.json\n.estudio/miniatura.jpg\n.estudio/mcp*\n*.tmp\npesquisa/fontes/\n${REGRAS_MIDIA_PESADA.join('\n')}\n`;
+/** Arquivos internos que ficam fora do commit automático: o diário (o histórico das edições, que cresce a cada mudança e
+ *  já é o histórico fino), a trava de escrita e o endereço do MCP do app para a IDE (com token). Os projetos antigos
+ *  ganham estas linhas antes do próximo commit (sessao-projeto.ts). */
+export const REGRAS_GIT_INTERNAS = ['.estudio/mcp*', '.estudio/diario.jsonl', '.estudio/escrita.lock*'];
+
+export const GITIGNORE = `saidas/\n.estudio/estado.json\n.estudio/miniatura.jpg\n${REGRAS_GIT_INTERNAS.join('\n')}\n*.tmp\npesquisa/fontes/\n${REGRAS_MIDIA_PESADA.join('\n')}\n`;
+
+/** O .gitignore com as regras internas que faltam no fim (o mesmo texto se não falta nada). */
+export const gitignoreComRegrasInternas = (texto: string): string => {
+  const tem = new Set(texto.split(/\r?\n/).map((l) => l.trim()));
+  const faltam = REGRAS_GIT_INTERNAS.filter((r) => !tem.has(r));
+  if (!faltam.length) return texto;
+  return `${texto}${texto && !texto.endsWith('\n') ? '\n' : ''}${faltam.join('\n')}\n`;
+};
 
 const DOIS = (n: number) => String(n).padStart(2, '0');
 
@@ -94,13 +108,19 @@ export const conteudoNovo = (modulo: Modulo, formato?: {largura: number; altura:
 };
 
 /** Entrada e conteúdo de um documento novo num manifesto que já existe (id e arquivo que não colidem). */
-export const documentoNovo = (manifesto: Manifesto, modulo: Modulo, o: {formato?: Formato | {largura: number; altura: number}; titulo?: string} = {}) => {
+/** `existe` diz se o arquivo já está no disco (um órfão de uma gravação que parou no meio): o nome dele fica de fora. */
+export const documentoNovo = (manifesto: Manifesto, modulo: Modulo,
+  o: {formato?: Formato | {largura: number; altura: number}; titulo?: string; existe?: (rel: string) => boolean} = {}) => {
   const ids = new Set(manifesto.documentos.map((d) => d.id));
   const caminhos = new Set(manifesto.documentos.map((d) => d.caminho));
   const base = ID_DO_MODULO[modulo];
   let n = 1;
   const nome = (k: number) => (k === 1 ? base : `${base}-${k}`);
-  while (ids.has(nome(n)) || caminhos.has(`${PASTA_DO_MODULO[modulo]}/${nome(n)}.json`)) n++;
+  const ocupado = (k: number) => {
+    const rel = `${PASTA_DO_MODULO[modulo]}/${nome(k)}.json`;
+    return ids.has(nome(k)) || caminhos.has(rel) || Boolean(o.existe?.(rel));
+  };
+  while (ocupado(n)) n++;
   const mesmos = manifesto.documentos.filter((d) => d.modulo === modulo).length;
   const entrada: EntradaDocumento = {
     id: nome(n),
@@ -419,12 +439,15 @@ export const claudeMdAtualizado = (atual: string | null, modulos: Modulo[]): str
  *  um CLAUDE.md que não dá para atualizar não impede abrir o projeto. */
 export const regerarClaudeMd = (raiz: string): boolean => {
   try {
-    const manifesto = JSON.parse(readFileSync(path.join(raiz, 'estudio.json'), 'utf-8')) as Manifesto;
+    const manifesto = JSON.parse(semBom(readFileSync(path.join(raiz, 'estudio.json'), 'utf-8'))) as Manifesto;
     const modulos = [...new Set((manifesto.documentos ?? []).map((d) => d.modulo))];
     const arq = path.join(raiz, 'CLAUDE.md');
-    const novo = claudeMdAtualizado(existsSync(arq) ? readFileSync(arq, 'utf-8') : null, modulos);
+    const atual = existsSync(arq) ? readFileSync(arq, 'utf-8') : null;
+    // o CLAUDE.md em CRLF (core.autocrlf do Git para Windows) continua CRLF: compara e grava no fim de linha dele
+    const crlf = Boolean(atual?.includes('\r\n'));
+    const novo = claudeMdAtualizado(crlf ? atual!.replace(/\r\n/g, '\n') : atual, modulos);
     if (novo === null) return false;
-    writeFileSync(arq, novo, 'utf-8');
+    gravarAtomico(arq, crlf ? novo.replace(/\n/g, '\r\n') : novo); // o arquivo tem texto da pessoa: nunca meio gravado
     return true;
   } catch {
     return false;
@@ -478,7 +501,9 @@ export const planoDoProjeto = (o: OpcoesProjeto): Plano => {
  *  O que o kit cita mas não está na pasta dele (`existe`) fica de fora, para o tema não apontar para arquivo que não há. */
 export const aplicarMarcaAoPlano = (plano: Plano, marca: MarcaLida, existe: (p: string) => boolean = existsSync): Plano => {
   const tudo = arquivosDaMarca(marca);
-  const copiar = tudo.copiar.filter((c) => existe(path.join(marca.pasta, c.de))).map((c) => ({de: path.join(marca.pasta, c.de), para: c.para}));
+  // só o que está dentro da pasta do kit (um marca.json com "../" não traz arquivo de fora para o projeto)
+  const copiar = tudo.copiar.filter((c) => dentroDe(marca.pasta, path.join(marca.pasta, c.de)) && existe(path.join(marca.pasta, c.de)))
+    .map((c) => ({de: path.join(marca.pasta, c.de), para: c.para}));
   const presentes = new Set(copiar.map((c) => c.para));
   const tema = temaDaMarca(marca, {logo: tudo.logo && presentes.has(tudo.logo) ? tudo.logo : undefined, fontes_arquivos: tudo.fontes_arquivos.filter((f) => presentes.has(f.arquivo))});
   for (const e of plano.manifesto.documentos) {

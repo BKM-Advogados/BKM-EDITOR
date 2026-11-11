@@ -33,7 +33,7 @@ export const registrarIa = (servidor: McpServer, projeto: Projeto, autor: string
     description: 'Reverte uma mudança do histórico pelo número (seq de listar_mudancas). Mudança de outro autor pede a permissão da pessoa.',
     inputSchema: {seq: z.number().int().min(1), mesmo_se_mudou: z.boolean().optional().describe('reverter mesmo se o valor mudou depois')},
   }, async ({seq, mesmo_se_mudou}: {seq: number; mesmo_se_mudou?: boolean}) => {
-    const e = projeto.diario(seq - 1).find((x) => x.seq === seq);
+    const e = projeto.diario(seq - 1, {tolerante: true}).find((x) => x.seq === seq);
     if (!e) return erro(`não há a mudança #${seq}`);
     if (e.origem !== origem && portao) {
       const ok = await portao.perguntar({ferramenta: 'reverter', entrada: {seq, rotulo: e.rotulo, autor: e.origem}, motivo: `reverter a mudança #${seq} feita por ${e.origem}: ${e.rotulo}`});

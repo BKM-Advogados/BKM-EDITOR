@@ -15,9 +15,12 @@ import type {DocVideo} from '../nucleo/documentos';
 import type {PropsVideo} from '../compartilhado/api';
 import {lerEnvelopes} from './ipc-audio';
 import {arquivosDaMidia, gitignoreComMidiaPesada} from '../nucleo/midia-git'; // frente Casca (transversal-D7)
+import {gitignoreComRegrasInternas} from '../nucleo/criar-projeto';
+import {publicarMcpApp, retirarMcpApp} from '../nucleo/mcp-app';
 
 const exec = promisify(execFile);
-const IGNORAR = /(^|[\\/])(\.git|node_modules)([\\/]|$)|\.tmp$|estado\.json$|mcp\.json$/;
+// a trava de escrita (.estudio/escrita.lock) entra e sai a cada gravação: avisar a tela por ela seria um aviso por edição
+const IGNORAR = /(^|[\\/])(\.git|node_modules)([\\/]|$)|\.tmp$|estado\.json$|mcp\.json$|[\\/]\.estudio[\\/](escrita\.lock|mcp-app\.json)/;
 
 export class SessaoProjeto {
   readonly projeto: Projeto;
@@ -28,6 +31,7 @@ export class SessaoProjeto {
   private fechada = false;
   // um git por vez: o Ctrl+S que cai no meio do commit automático espera em vez de bater no index.lock
   private filaGit: Promise<boolean> = Promise.resolve(true);
+  private tokenMcp: string | null = null;
 
   constructor(raiz: string, private readonly aoMudar: (arquivo: string) => void) {
     this.projeto = new Projeto(raiz);
@@ -45,10 +49,25 @@ export class SessaoProjeto {
     this.observador.on('all', (_ev, abs) => this.avisar(path.relative(this.projeto.raiz, abs).split(path.sep).join('/')));
   }
 
+  /** O MCP da IDE (mcp/nucleo.ts, outro processo) passa a mandar as chamadas de ferramenta ao app enquanto o projeto
+   *  está aberto aqui (src/nucleo/mcp-app.ts). `headers` traz o token que o McpHttp deu para isso. */
+  publicarMcp(c: {url: string; headers: {Authorization: string}} | undefined) {
+    const token = /^Bearer\s+(\S+)$/.exec(c?.headers.Authorization ?? '')?.[1];
+    if (!c || !token) return;
+    try {
+      publicarMcpApp(this.projeto.raiz, {url: c.url, token});
+      this.tokenMcp = token;
+    } catch {
+      /* pasta sem escrita: o MCP da IDE segue gravando direto, com a trava */
+    }
+  }
+
   async fechar() {
     this.fechada = true;
     for (const t of this.pendentes.values()) clearTimeout(t);
     this.pendentes.clear();
+    if (this.tokenMcp) retirarMcpApp(this.projeto.raiz, this.tokenMcp);
+    this.tokenMcp = null;
     await this.observador?.close();
     this.observador = null;
     if (this.relogioGit) {
@@ -106,12 +125,15 @@ export class SessaoProjeto {
   }
 
   /** transversal-D7: vídeo bruto e o que passa de 25 MB em midia/ ficam fora do git (midia-git.ts). Antes de cada commit,
-   *  porque a mídia chega a qualquer hora (gravação, importação, o agente copiando). */
+   *  porque a mídia chega a qualquer hora (gravação, importação, o agente copiando). O diário e a trava de escrita
+   *  também ficam fora (REGRAS_GIT_INTERNAS), inclusive nos projetos criados antes dessa regra. */
   private ignorarMidiaPesada() {
     try {
-      const atual = this.projeto.existe('.gitignore') ? this.projeto.lerTexto('.gitignore') : '';
-      const novo = gitignoreComMidiaPesada(atual, arquivosDaMidia(this.projeto.raiz));
-      if (novo !== atual) this.projeto.gravarTexto('.gitignore', novo);
+      this.projeto.comTrava(() => {
+        const atual = this.projeto.existe('.gitignore') ? this.projeto.lerTexto('.gitignore') : '';
+        const novo = gitignoreComRegrasInternas(gitignoreComMidiaPesada(atual, arquivosDaMidia(this.projeto.raiz)));
+        if (novo !== atual) this.projeto.gravarTexto('.gitignore', novo);
+      });
     } catch {
       /* sem permissão para o .gitignore: o commit segue como antes */
     }
@@ -129,6 +151,9 @@ export class SessaoProjeto {
   private async commitAgora(mensagem?: string): Promise<boolean> {
     try {
       this.ignorarMidiaPesada();
+      // o diário saiu do commit automático: no projeto que já o versionava, sai do índice e fica no disco (e o endereço
+      // do MCP, com token, nunca entra)
+      await this.git('rm', '--cached', '-q', '--ignore-unmatch', '--', `${PASTA_INTERNA}/diario.jsonl`, `${PASTA_INTERNA}/mcp-app.json`);
       await this.git('add', '-A');
       const {stdout} = await this.git('status', '--porcelain');
       if (!stdout.trim()) return true;

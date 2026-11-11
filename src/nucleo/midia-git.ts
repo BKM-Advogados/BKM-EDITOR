@@ -18,6 +18,10 @@ export type ArquivoDaMidia = {rel: string; tamanho: number};
 
 const extensao = (rel: string) => (rel.includes('.') ? rel.slice(rel.lastIndexOf('.') + 1).toLowerCase() : '');
 
+/** O caminho como regra literal do .gitignore: \ * ? [ ] escapados, e # ou ! no começo e espaço no fim também
+ *  ("midia/take [1].wav" viraria uma classe de caracteres e o arquivo entraria no commit). */
+export const regraDoCaminho = (rel: string) => rel.replace(/[\\*?[\]]/g, '\\$&').replace(/^([#!])/, '\\$1').replace(/ $/, '\\ ');
+
 /** Linhas de .gitignore que faltam: `ignoradas` são as linhas que o .gitignore já tem. Sem repetir o que já está. */
 export const regrasQueFaltam = (arquivos: ArquivoDaMidia[], ignoradas: string[], limite = LIMITE_MIDIA_BYTES): string[] => {
   const tem = new Set(ignoradas.map((l) => l.trim()));
@@ -27,7 +31,8 @@ export const regrasQueFaltam = (arquivos: ArquivoDaMidia[], ignoradas: string[],
     const rel = a.rel.split('\\').join('/');
     if (!rel.startsWith(`${PASTA_MIDIA}/`) || a.tamanho <= limite) continue;
     if (EXTENSOES_PESADAS.includes(extensao(rel))) continue; // já coberto pela regra da extensão
-    if (!tem.has(rel) && !novas.includes(rel)) novas.push(rel);
+    const regra = regraDoCaminho(rel);
+    if (!tem.has(regra) && !novas.includes(regra)) novas.push(regra);
   }
   return novas;
 };
