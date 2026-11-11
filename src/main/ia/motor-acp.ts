@@ -7,6 +7,7 @@ import {spawn, type ChildProcessWithoutNullStreams} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
 import type {EventoConversa} from '../../compartilhado/api';
 import {cortarResultado} from '../../compartilhado/ferramentas';
+import {matarArvore} from '../terminais';
 import {ClienteAcp, type InicioAcp, type McpHttpAcp, type OpcaoPermissao, type PedidoPermissaoAcp, type RespostaPermissaoAcp} from './acp';
 
 export type OpcoesAcp = {
@@ -101,12 +102,13 @@ export class SessaoAcp {
     return this.sessao;
   }
 
-  fechar() {
-    this.matar();
+  /** `agora`: ao fechar o app, sem os 1,5 s de espera (o processo principal sai antes e o agente ficaria órfão). */
+  fechar(agora = false) {
+    this.matar(agora);
     this.idAgente = null;
   }
 
-  private matar() {
+  private matar(agora = false) {
     this.cliente?.encerrar();
     this.cliente = null;
     const p = this.proc;
@@ -116,7 +118,8 @@ export class SessaoAcp {
     if (!p) return;
     try {
       p.stdin.end();
-      setTimeout(() => p.exitCode === null && p.kill(), 1500);
+      if (agora) matarArvore(p);
+      else setTimeout(() => matarArvore(p), 1500);
     } catch {
       /* já saiu */
     }
@@ -141,22 +144,37 @@ export class SessaoAcp {
       this.cliente = null;
       this.o.evento({tipo: 'saiu', codigo, detalhe: codigo ? erro.trim().split(/\r?\n/).pop()?.slice(0, 300) : undefined});
     });
-    proc.on('error', (e) => this.o.evento({tipo: 'erro', mensagem: e.message}));
+    proc.stdin.on('error', () => undefined); // EPIPE do agente que caiu: o 'exit' já conta
+    proc.on('error', (e) => {
+      // spawn que falhou (ENOENT) não emite 'exit': solta o processo e o cliente, e a próxima mensagem tenta subir de novo
+      if (this.proc === proc) {
+        this.proc = null;
+        this.cliente?.encerrar(e);
+        this.cliente = null;
+      }
+      this.o.evento({tipo: 'erro', mensagem: e.message});
+    });
     const cliente = new ClienteAcp(proc.stdin, proc.stdout, {
       atualizacao: (a) => this.atualizar(a.update),
       permissao: (p) => this.pedirPermissao(p),
     });
     this.cliente = cliente;
-    this.inicio = await cliente.inicializar();
-    if (!this.inicio.agentCapabilities?.mcpCapabilities?.http) throw new Error('este agente não aceita servidor MCP por HTTP do app');
-    const nome = this.inicio.agentInfo?.title ?? this.inicio.agentInfo?.name;
-    if (this.idAgente && this.inicio.agentCapabilities?.loadSession) {
-      await cliente.carregarSessao(this.idAgente, this.o.cwd, this.mcpServers());
-    } else {
-      if (this.idAgente) this.o.evento({tipo: 'erro', mensagem: 'este agente não retoma conversas: a próxima resposta começa do zero'});
-      this.idAgente = (await cliente.novaSessao(this.o.cwd, this.mcpServers())).sessionId;
+    try {
+      this.inicio = await cliente.inicializar();
+      if (!this.inicio.agentCapabilities?.mcpCapabilities?.http) throw new Error('este agente não aceita servidor MCP por HTTP do app');
+      const nome = this.inicio.agentInfo?.title ?? this.inicio.agentInfo?.name;
+      if (this.idAgente && this.inicio.agentCapabilities?.loadSession) {
+        await cliente.carregarSessao(this.idAgente, this.o.cwd, this.mcpServers());
+      } else {
+        if (this.idAgente) this.o.evento({tipo: 'erro', mensagem: 'este agente não retoma conversas: a próxima resposta começa do zero'});
+        this.idAgente = (await cliente.novaSessao(this.o.cwd, this.mcpServers())).sessionId;
+      }
+      this.o.evento({tipo: 'pronto', sessao: this.sessao, modelo: nome ?? undefined});
+    } catch (e) {
+      // não subiu direito: sem processo meio vivo contando no limite nem cliente morto preso para a próxima mensagem
+      if (this.cliente === cliente) this.matar();
+      throw e;
     }
-    this.o.evento({tipo: 'pronto', sessao: this.sessao, modelo: nome ?? undefined});
   }
 
   private fecharSegmento() {

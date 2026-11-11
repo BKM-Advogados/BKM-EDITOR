@@ -75,7 +75,8 @@ const midia = new ServidorMidia();
 // dos JSON e sobe o .git do projeto
 const memoria = new Memoria(app.getPath('userData'), path.join(app.getPath('home'), 'Estudio'));
 let mcpHttp: McpHttp | null = null;
-const enviar = (canal: string, ...a: unknown[]) => janela?.webContents.send(canal, ...a);
+// com a janela já destruída (a espera do commit ao fechar o app), webContents.send lançaria "Object has been destroyed"
+const enviar = (canal: string, ...a: unknown[]) => janela && !janela.isDestroyed() && janela.webContents.send(canal, ...a);
 const terminais = new Terminais({dados: (id, d) => enviar(CANAL.terminalDados, id, d), saiu: (id, c) => enviar(CANAL.terminalSaiu, id, c)});
 // teste da conversa sem login: ESTUDIO_CLAUDE_FALSO aponta para um claude falso (testes/fixtures/claude-falso.mjs),
 // rodado pelo próprio Electron em modo Node
@@ -270,6 +271,7 @@ const criarJanela = () => {
     void guardarMiniatura().catch(() => undefined).finally(() => janela?.close());
   });
   janela.once('ready-to-show', () => janela?.show());
+  janela.once('closed', () => (janela = null));
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) void janela.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   else void janela.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
 };
@@ -566,12 +568,12 @@ app.on('ready', async () => {
   if (inicial) await abrirProjeto(inicial).catch(() => undefined);
 });
 
-app.on('window-all-closed', () => {
-  void fecharAppsDeFora(); // frente IA
+app.on('window-all-closed', async () => {
   terminais.fecharTodos();
-  conversas.fecharTodas();
+  conversas.fecharTodas({agora: true}); // sem os 1,5 s: o processo principal sairia antes e o agente ficaria órfão
   mcpHttp?.esquecerTudo();
-  void sessao?.fechar();
+  // o commit da última edição (relógio de 8 s) antes de sair, com teto para nunca prender o fechamento
+  await Promise.race([Promise.allSettled([fecharAppsDeFora(), sessao?.fechar()]), new Promise((ok) => setTimeout(ok, 5000))]);
   midia.parar();
   app.quit();
 });

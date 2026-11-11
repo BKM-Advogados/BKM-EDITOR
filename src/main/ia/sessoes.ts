@@ -204,19 +204,20 @@ export class SessoesIA {
     return i.sessao; // o laço não tem processo: guarda o histórico em memória
   }
 
-  fechar(id: number) {
+  /** `agora`: ao fechar o app, o agente é encerrado na hora (com o que ele abriu) em vez de 1,5 s depois. */
+  fechar(id: number, agora = false) {
     const i = this.itens.get(id);
     if (!i) return;
     this.itens.delete(id);
     if (i.via === 'claude-cli') {
-      this.claude.fechar(i.interno);
+      this.claude.fechar(i.interno, agora);
       this.doInterno.delete(i.interno);
     } else if (i.via === 'openai') void i.laco.fechar();
-    else i.acp.fechar();
+    else i.acp.fechar(agora);
   }
 
-  fecharTodas() {
-    for (const id of [...this.itens.keys()]) this.fechar(id);
+  fecharTodas(o: {agora?: boolean} = {}) {
+    for (const id of [...this.itens.keys()]) this.fechar(id, o.agora);
     this.contagem.clear();
   }
 }
