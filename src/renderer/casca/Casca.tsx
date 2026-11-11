@@ -15,9 +15,10 @@ import type {Modulo} from '../../nucleo/documentos';
 import {FORMATOS_IMAGEM, FORMATOS_VIDEO} from '../../nucleo/formatos';
 import {abrirProjeto, avisar, criarDocumento, desfazer, dispensarMudancasAgente, fecharProjeto, loja, mensagemDe, quandoVerFato, useLoja, type Area} from '../estado/loja';
 import {pedirTexto} from '../componentes/Dialogo';
-import {Segmentado} from '../componentes/Controles';
+import {IconeEstudio} from '../componentes/Icones';
 import {acaoDeArquivo} from './atalhos';
 import {SeloSalvo} from './SeloSalvo';
+import {PainelPreferencias} from './Preferencias';
 import {Midia} from '../paineis/Midia'; // frente Casca (rodada 3): painel de mídia
 import type {PaineisDoModulo} from './contrato';
 import {PaineisVideo} from '../modulos/video/paineis';
@@ -34,7 +35,7 @@ import {FaixaTransicao} from '../modulos/musica/FaixaTransicao';
 import {observarMusica} from '../modulos/musica/estado';
 import {exportarMusica} from '../modulos/musica/acoes';
 import {PainelMarca} from './PainelMarca';
-import {aparencia, ESCALAS, usarAparencia} from '../estado/aparencia';
+import {usarAparencia} from '../estado/aparencia';
 import './casca.css';
 
 // o 3D (Three.js) e o terminal (xterm.js) só carregam quando alguém abre: a memória do app parado fica menor
@@ -216,55 +217,6 @@ const exportarArea = () => {
   if (modulo === 'musica') return void exportarMusica({formato: 'wav'}); // frente Música: WAV a −14 LUFS em saidas/; outros formatos no botão Exportar do transporte
   if (!id || !modulo || modulo === '3d') return avisar(e.area === '3d' ? 'A cena 3D ainda não exporta.' : 'Nada para exportar nesta área.', 'info');
   abrirDialogoExportar(id);
-};
-
-// ---------- preferências ----------
-/** Escolha de poucas opções num segmentado (Preferências). */
-const Opcoes = <T extends string | number>({rotulo, valor, opcoes, aoMudar}: {rotulo: string; valor: T; opcoes: [T, string][]; aoMudar: (v: T) => void}) => (
-  <div className="dialogo-campo">
-    <span>{rotulo}</span>
-    <Segmentado rotulo={rotulo} valor={valor} opcoes={opcoes} aoMudar={aoMudar} />
-  </div>
-);
-
-const PainelPreferencias: React.FC<{aoFechar: () => void}> = ({aoFechar}) => {
-  const [p, setP] = useState<Preferencias | null>(null);
-  const {escolha: ap} = usarAparencia();
-  useEffect(() => void window.estudio.preferencias().then(setP), []);
-  const gravar = async (m: Partial<Preferencias>) => setP(await window.estudio.gravarPreferencias(m));
-  return (
-    <div className="dialogo-fundo" onPointerDown={(e) => e.target === e.currentTarget && aoFechar()} onKeyDown={(e) => e.key === 'Escape' && aoFechar()}>
-      <div className="dialogo preferencias" role="dialog" aria-label="Preferências">
-        <div className="dialogo-titulo">Preferências</div>
-        <div className="dialogo-secao">Projetos</div>
-        {!p ? <div className="vazio">carregando…</div> : (
-          <>
-            <label className="dialogo-campo"><span>Pasta dos projetos novos</span>
-              <span style={{display: 'flex', gap: 6}}>
-                <input className="campo" readOnly value={p.pasta_projetos} title={p.pasta_projetos} />
-                <button className="bt" onClick={async () => {
-                  const pasta = await window.estudio.escolherPasta('Pasta dos projetos do Estúdio');
-                  if (pasta) void gravar({pasta_projetos: pasta});
-                }}>Trocar…</button>
-              </span>
-            </label>
-            {/onedrive/i.test(p.pasta_projetos) && <div className="dialogo-texto" style={{color: 'var(--aviso)'}}>Pasta dentro do OneDrive: a sincronização pode travar a gravação.</div>}
-            <Opcoes rotulo="Ao iniciar o Estúdio" valor={p.ao_iniciar} opcoes={[['inicio', 'Tela inicial'], ['ultimo', 'Último projeto']]}
-              aoMudar={(v) => void gravar({ao_iniciar: v})} />
-          </>
-        )}
-        <div className="dialogo-secao">Aparência</div>
-        <Opcoes rotulo="Tema" valor={ap.tema} opcoes={[['sistema', 'Do sistema'], ['escuro', 'Escuro'], ['claro', 'Claro']]} aoMudar={(tema) => aparencia.definir({tema})} />
-        <Opcoes rotulo="Contraste" valor={ap.contraste} opcoes={[['sistema', 'Do sistema'], ['normal', 'Normal'], ['alto', 'Alto']]} aoMudar={(contraste) => aparencia.definir({contraste})} />
-        <Opcoes rotulo="Densidade" valor={ap.densidade} opcoes={[['auto', 'Pela janela'], ['confortavel', 'Confortável'], ['compacta', 'Compacta']]}
-          aoMudar={(densidade) => aparencia.definir({densidade})} />
-        <Opcoes rotulo="Tamanho da interface" valor={ap.escala} opcoes={ESCALAS.map((e): [number, string] => [e, `${Math.round(e * 100)}%`])} aoMudar={(escala) => aparencia.definir({escala})} />
-        <Opcoes rotulo="Movimento" valor={ap.movimento} opcoes={[['sistema', 'Do sistema'], ['reduzido', 'Reduzir'], ['normal', 'Normal']]} aoMudar={(movimento) => aparencia.definir({movimento})} />
-        <div className="dialogo-texto">"Pela janela" usa a densidade compacta abaixo de 1600 × 800. A aparência vale para este computador.</div>
-        <div className="dialogo-botoes"><button className="bt principal" onClick={aoFechar} autoFocus>Fechar</button></div>
-      </div>
-    </div>
-  );
 };
 
 /** Nome do projeto na barra: um clique vira campo; Enter grava, Esc desiste. */
@@ -502,7 +454,7 @@ export const Casca: React.FC = () => {
     <div className="casca">
       <header className="barra">
         <button className="marca" onPointerDown={(e) => e.stopPropagation()} onClick={() => setMenu((m) => !m)} title="Menu do Estúdio">
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="9" height="9" rx="2" fill="none" stroke="var(--acento)" strokeWidth="1.5" /><rect x="5.5" y="5.5" width="9" height="9" rx="2" fill="none" stroke="var(--agente)" strokeWidth="1.5" /></svg>
+          <IconeEstudio />
           Estúdio
         </button>
         {menu && (
