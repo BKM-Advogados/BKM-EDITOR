@@ -2,7 +2,7 @@
 // conversa do painel manda o mesmo em chips (Conversa.tsx, useAnexos); a IA também lê pelo estado_do_editor.
 import {loja, valorEm} from '../estado/loja';
 
-const NOME: Record<string, string> = {video: 'Vídeo', imagem: 'Imagem', '3d': '3D', efeitos: 'Efeitos', musica: 'Música'};
+const NOME: Record<string, string> = {video: 'Vídeo', imagem: 'Imagem', animacao: 'Animação', '3d': '3D', efeitos: 'Efeitos', musica: 'Música'};
 
 const tempo = (ms: number) => {
   const s = Math.floor(ms / 1000);

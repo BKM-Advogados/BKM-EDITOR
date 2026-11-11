@@ -30,6 +30,9 @@ const ver = (e: ResumoDiario) => {
   if (objeto && objeto.split('/').length > 2) selecionar({documento: d.id, caminho: objeto});
 };
 
+// a conversa da IDE grava "ide-<id>" no diário (mcp-app.ts): na tela vira um nome legível, com o id na dica
+const nomeDaOrigem = (origem?: string) => (!origem ? 'Claude' : origem.startsWith('ide-') ? 'Claude na IDE' : origem);
+
 const Grupo: React.FC<{g: GrupoHistorico; revertidas: Set<number>}> = ({g, revertidas}) => {
   const [aberto, setAberto] = useState(g.autor === 'agente');
   const [ocupado, setOcupado] = useState(false);
@@ -48,7 +51,7 @@ const Grupo: React.FC<{g: GrupoHistorico; revertidas: Set<number>}> = ({g, rever
       <div className="grupo-topo" role="button" tabIndex={0} aria-expanded={aberto} onClick={() => setAberto((a) => !a)}
         onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setAberto((a) => !a))}>
         {aberto ? <ChevronDown className="i12" /> : <ChevronRight className="i12" />}
-        <span className={`etiqueta ${g.autor}`}>{agente ? <Sparkles /> : <User />}{agente ? g.origem || 'Claude' : g.autor === 'pessoa' ? 'Você' : g.autor}</span>
+        <span className={`etiqueta ${g.autor}`} title={agente ? g.origem : undefined}>{agente ? <Sparkles /> : <User />}{agente ? nomeDaOrigem(g.origem) : g.autor === 'pessoa' ? 'Você' : g.autor}</span>
         <span className="resumo-grupo">{resumoDoGrupo(g)}</span>
         <span className="hora">{hora(g.fim)}</span>
       </div>

@@ -10,6 +10,7 @@ import {confirmar} from '../componentes/Dialogo';
 import {Escolha} from '../componentes/Controles';
 import {avisar, loja, selecionar, useLoja, valorEm, type Area} from '../estado/loja';
 import {enviar, estadoConversas, guardarRascunho, lerConta, parar, responderPermissao, trocarModelo, type Anexo, type Bloco, type Conversa as TConversa} from './conversas';
+import {tipoDe} from '../modulos/video/tipos';
 import './conversa.css';
 
 // ── texto do Claude: markdown pequeno (parágrafos, listas, negrito, itálico, código), sempre escapado ──
@@ -230,13 +231,15 @@ const rotuloObjeto = (v: any, caminho: string) => {
   if (v && typeof v === 'object') {
     const nome = v.nome ?? v.titulo;
     const texto = typeof v.texto === 'string' ? v.texto.replace(/\*\*/g, '') : v.ate !== undefined ? `${v.ate}${v.sufixo ?? ''}` : undefined;
-    const r = [v.tipo, nome ?? texto].filter(Boolean).join(' · ');
+    const r = [typeof v.tipo === 'string' && v.tipo ? tipoDe(v.tipo).nome : undefined, nome ?? texto].filter(Boolean).join(' · ');
     if (r) return r.length > 34 ? `${r.slice(0, 33)}…` : r;
   }
+  const cena = /^\/cenas\/(\d+)$/.exec(caminho);
+  if (cena) return `Cena ${Number(cena[1]) + 1}`;
   return caminho.split('/').slice(-2).join('/');
 };
 
-const NOME_AREA: Record<string, string> = {video: 'Vídeo', imagem: 'Imagem', '3d': '3D', efeitos: 'Efeitos', musica: 'Música'};
+const NOME_AREA: Record<string, string> = {video: 'Vídeo', imagem: 'Imagem', animacao: 'Animação', '3d': '3D', efeitos: 'Efeitos', musica: 'Música'};
 
 const useAnexos = (): Anexo[] => {
   const selecao = useLoja((e) => e.selecao);
