@@ -118,7 +118,7 @@ describe('trava de escrita', () => {
 
   it('a trava e o diário ficam fora do git, também nos projetos antigos', () => {
     expect(GITIGNORE.split('\n')).toEqual(expect.arrayContaining(['.estudio/diario.jsonl', '.estudio/escrita.lock*']));
-    expect(gitignoreComRegrasInternas('saidas/')).toBe('saidas/\n.estudio/diario.jsonl\n.estudio/escrita.lock*\n');
+    expect(gitignoreComRegrasInternas('saidas/')).toBe('saidas/\n.estudio/mcp*\n.estudio/diario.jsonl\n.estudio/escrita.lock*\n');
     expect(gitignoreComRegrasInternas(GITIGNORE)).toBe(GITIGNORE);
   });
 });

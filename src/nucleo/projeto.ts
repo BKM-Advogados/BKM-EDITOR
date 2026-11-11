@@ -51,27 +51,28 @@ export class Projeto {
    *  estar dentro do projeto. Um link em midia/ para um disco de fora funciona só para ler; nada se grava por ele. */
   caminhoParaGravar(rel: string): string {
     const abs = this.caminho(rel);
-    let existente = abs;
-    for (;;) {
+    const fora = () => new ErroProjeto(`${rel} passa por um link simbólico para fora do projeto: por ele só se lê, não se grava`, 'caminho');
+    for (let atual = abs; ;) {
+      let real: string;
       try {
-        lstatSync(existente);
-        break;
+        real = realpathSync(atual);
       } catch {
-        const pai = path.dirname(existente);
-        if (pai === existente) return abs;
-        existente = pai;
+        // não existe (ainda, ou acabou de sair: a trava de outro processo) ou é um link quebrado, que não se sabe aonde vai
+        let link = false;
+        try {
+          link = lstatSync(atual).isSymbolicLink();
+        } catch {
+          /* não existe: confere a pasta de cima */
+        }
+        if (link) throw fora();
+        const pai = path.dirname(atual);
+        if (pai === atual) return abs;
+        atual = pai;
+        continue;
       }
+      if (!dentroDe(realpathSync(this.raiz), real)) throw fora();
+      return abs;
     }
-    let real: string;
-    try {
-      real = realpathSync(existente);
-    } catch {
-      real = ''; // link quebrado: não se sabe para onde aponta
-    }
-    if (!real || !dentroDe(realpathSync(this.raiz), real)) {
-      throw new ErroProjeto(`${rel} passa por um link simbólico para fora do projeto: por ele só se lê, não se grava`, 'caminho');
-    }
-    return abs;
   }
 
   existe(rel: string) {
@@ -109,7 +110,7 @@ export class Projeto {
    *  projeto passa por aqui, para o app e o MCP da IDE (outro processo) não gravarem um por cima do outro. */
   comTrava<T>(f: () => T): T {
     const lock = this.caminho(`${PASTA_INTERNA}/escrita.lock`);
-    if (!comATrava(lock)) mkdirSync(path.dirname(this.caminhoParaGravar(`${PASTA_INTERNA}/escrita.lock`)), {recursive: true});
+    if (!comATrava(lock)) mkdirSync(this.caminhoParaGravar(PASTA_INTERNA), {recursive: true});
     return comTrava(lock, f, {ocupada: () => new ErroProjeto('outro programa está gravando o projeto; tente de novo', 'conflito')});
   }
 

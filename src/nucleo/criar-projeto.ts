@@ -27,11 +27,11 @@ import {gravarAtomico} from './gravar-seguro';
 // vídeo e áudio sem perda em midia/ também ficam de fora (transversal-D7, midia-git.ts); o que passa de 25 MB entra na regra
 // pelo caminho exato antes de cada commit
 /** Arquivos internos que ficam fora do commit automático: o diário (o histórico das edições, que cresce a cada mudança e
- *  já é o histórico fino) e a trava de escrita entre o app e o MCP da IDE. Os projetos antigos ganham estas linhas antes
- *  do próximo commit (sessao-projeto.ts). */
-export const REGRAS_GIT_INTERNAS = ['.estudio/diario.jsonl', '.estudio/escrita.lock*'];
+ *  já é o histórico fino), a trava de escrita e o endereço do MCP do app para a IDE (com token). Os projetos antigos
+ *  ganham estas linhas antes do próximo commit (sessao-projeto.ts). */
+export const REGRAS_GIT_INTERNAS = ['.estudio/mcp*', '.estudio/diario.jsonl', '.estudio/escrita.lock*'];
 
-export const GITIGNORE = `saidas/\n.estudio/estado.json\n.estudio/miniatura.jpg\n.estudio/mcp*\n${REGRAS_GIT_INTERNAS.join('\n')}\n*.tmp\npesquisa/fontes/\n${REGRAS_MIDIA_PESADA.join('\n')}\n`;
+export const GITIGNORE = `saidas/\n.estudio/estado.json\n.estudio/miniatura.jpg\n${REGRAS_GIT_INTERNAS.join('\n')}\n*.tmp\npesquisa/fontes/\n${REGRAS_MIDIA_PESADA.join('\n')}\n`;
 
 /** O .gitignore com as regras internas que faltam no fim (o mesmo texto se não falta nada). */
 export const gitignoreComRegrasInternas = (texto: string): string => {

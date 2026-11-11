@@ -131,8 +131,9 @@ export class SessaoProjeto {
     this.relogioGit = null;
     try {
       this.ignorarMidiaPesada();
-      // o diário saiu do commit automático: no projeto que já o versionava, sai do índice e fica no disco
-      await this.git('rm', '--cached', '-q', '--ignore-unmatch', '--', `${PASTA_INTERNA}/diario.jsonl`);
+      // o diário saiu do commit automático: no projeto que já o versionava, sai do índice e fica no disco (e o endereço
+      // do MCP, com token, nunca entra)
+      await this.git('rm', '--cached', '-q', '--ignore-unmatch', '--', `${PASTA_INTERNA}/diario.jsonl`, `${PASTA_INTERNA}/mcp-app.json`);
       await this.git('add', '-A');
       const {stdout} = await this.git('status', '--porcelain');
       if (!stdout.trim()) return;
