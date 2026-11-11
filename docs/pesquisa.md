@@ -120,7 +120,7 @@ metades e duplicar copia. Um id em `refs` que não existe na pesquisa é só um 
 
 `projeto_info` passa a contar fontes e fatos. Sem rede (`registrarFerramentas` chamado sem o 5º parâmetro), `ler_fonte`
 responde "este MCP não tem acesso à rede". A rede sai de `criarRede` (em `ferramentas-mcp.ts`, junto do tipo `Rede`):
-User-Agent "Mozilla/5.0 (compatible; Estudio-BKM/0.2; +https://bkmadvogados.com.br)", 40 s, até 20 MB lidos em pedaços (vale
+User-Agent "Mozilla/5.0 (compatible; Estudio/<versão do app>)" (`src/nucleo/versao.ts`), 40 s, até 20 MB lidos em pedaços (vale
 também sem Content-Length), segue redirecionamentos, só http/https. No app ela usa o `net.fetch` do Electron e entra pelo
 construtor do `McpHttp` (`src/main/mcp-http.ts`); no MCP por stdio (`mcp/nucleo.ts`) e nos testes, o `fetch` do Node.
 

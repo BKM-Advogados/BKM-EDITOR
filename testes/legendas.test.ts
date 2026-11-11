@@ -14,6 +14,7 @@ import {
   resolverLegendas, substituirEmLote, type LegendasCenas, type PalavraLegenda, type SegmentoLegenda,
 } from '../src/nucleo/legendas';
 import {norm} from '../src/nucleo/roteiro/resolver';
+import pacote from '../package.json';
 import {acharWhisperCli, baixaBinario, baixarConferido, comoInstalarWhisper, extrairZip, palavrasDoWhisper, Transcritor} from '../src/main/transcricao';
 
 const RAIZ = path.join(__dirname, '..');
@@ -464,6 +465,13 @@ describe('transcritor: zip e download conferido', () => {
     await expect(baixarConferido({url: 'https://exemplo/m.bin', destino: outro, bytes: 10, sha256, buscar})).rejects.toThrow(/passou do tamanho/);
     expect(existsSync(`${outro}.parcial`)).toBe(false); // apagado depois de fechar, não antes
     await expect(baixarConferido({url: 'https://exemplo/x', destino: outro, bytes: 10, sha256, buscar: async () => new Response('nada', {status: 404})})).rejects.toThrow(/HTTP 404/);
+    // o download se apresenta como o Estúdio e a versão do app
+    let agente = '';
+    await baixarConferido({url: 'https://exemplo/m.bin', destino: path.join(pasta, 'ua.bin'), bytes: dados.length, sha256, buscar: async (_u, init) => {
+      agente = new Headers(init.headers).get('user-agent') ?? '';
+      return new Response(new Blob([dados]).stream(), {status: 200});
+    }});
+    expect(agente).toBe(`Estudio/${pacote.version}`);
   });
 
   it('acha o whisper-cli: no Windows x64 só o baixado; no Linux o da pasta e depois o do PATH', () => {

@@ -11,6 +11,7 @@ import {createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, rmSy
 import path from 'node:path';
 import {CANAL, type RespostaFundo} from '../compartilhado/api';
 import {ErroProjeto, type Projeto} from '../nucleo/projeto';
+import {USER_AGENT_ESTUDIO} from '../nucleo/versao';
 import {caminhoSemFundo, chaveDoOriginal, definirRemovedorDeFundo, MODELO_FUNDO, type EstadoModeloFundo, type ModeloFundo} from '../nucleo/remover-fundo';
 
 export type Buscar = (url: string, init: RequestInit) => Promise<Response>;
@@ -32,7 +33,7 @@ export const baixarModelo = async (o: {pasta: string; buscar: Buscar; aoProgress
   const destino = arquivoDoModelo(o.pasta, m);
   const parcial = `${destino}.parcial`;
   mkdirSync(path.dirname(destino), {recursive: true});
-  const r = await o.buscar(m.url, {redirect: 'follow', headers: {'User-Agent': 'Estudio-BKM (remover fundo)'}});
+  const r = await o.buscar(m.url, {redirect: 'follow', headers: {'User-Agent': `${USER_AGENT_ESTUDIO} (remover fundo)`}});
   if (!r.ok || !r.body) throw new Error(`o download do modelo respondeu ${r.status}`);
   const hash = createHash('sha256');
   const saida = createWriteStream(parcial);

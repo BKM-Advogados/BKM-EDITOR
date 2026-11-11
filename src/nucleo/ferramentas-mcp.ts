@@ -41,6 +41,7 @@ import {ARQUIVO_TRANSICOES, lerRegistro, transicaoEmCurso} from './transicoes'; 
 import {registrarNarracao} from './mcp-narracao'; // narração por IA (docs/narracao.md)
 import type {ServicoNarracao} from './narracao-servico';
 import {registrarPrevia} from './mcp-previa'; // frente IDE: ver_quadro, ver_cenas e ver_trecho (docs/ide.md)
+import {USER_AGENT_ESTUDIO} from './versao';
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x, null, 2)}]});
 const erro = (e: unknown) => ({
@@ -56,13 +57,13 @@ const seguro = <A,>(f: (a: A) => unknown) => async (a: A) => {
 };
 
 // ---------- rede do ler_fonte ----------
-// Segue redirecionamentos, desiste em 40 s, não passa de 20 MB e se apresenta com um User-Agent próprio, para o site
-// saber quem está lendo. Nada aqui é síncrono.
+// Segue redirecionamentos, desiste em 40 s, não passa de 20 MB e se apresenta com um User-Agent próprio (o Estúdio e a
+// versão, no formato de robô educado que os sites aceitam), para o site saber quem está lendo. Nada aqui é síncrono.
 
 /** O que o ler_fonte recebe: status, endereço depois dos redirecionamentos, Content-Type e os bytes crus. */
 export type Rede = (url: string) => Promise<{status: number; url_final: string; content_type?: string; bytes: Uint8Array}>;
 
-export const USER_AGENT = 'Mozilla/5.0 (compatible; Estudio-BKM/0.2; +https://bkmadvogados.com.br)';
+export const USER_AGENT = `Mozilla/5.0 (compatible; ${USER_AGENT_ESTUDIO})`;
 export const TEMPO_REDE_MS = 40_000;
 export const LIMITE_REDE_BYTES = 20 * 1024 * 1024;
 

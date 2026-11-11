@@ -23,6 +23,7 @@ import type {Palavra} from '../nucleo/roteiro/resolver';
 import {ErroProjeto, type Projeto} from '../nucleo/projeto';
 import {getCompositorPackage} from '../nucleo/compositor-package';
 import {ambienteDoFfmpeg, executavelDoFfmpeg} from '../nucleo/ffmpeg-ambiente';
+import {USER_AGENT_ESTUDIO} from '../nucleo/versao';
 import {caminhoDeBusca} from './plataforma';
 
 // ---------- o que baixa: versões presas, com tamanho e SHA-256 ----------
@@ -114,7 +115,7 @@ export const baixarConferido = async (o: {url: string; destino: string; bytes: n
   rmSync(parcial, {force: true});
   let r: Response;
   try {
-    r = await buscar(o.url, {redirect: 'follow', signal: o.sinal, headers: {'User-Agent': 'Estudio-BKM'}});
+    r = await buscar(o.url, {redirect: 'follow', signal: o.sinal, headers: {'User-Agent': USER_AGENT_ESTUDIO}});
   } catch (e) {
     if (o.sinal?.aborted) throw new Cancelado();
     throw new Error(`não deu para baixar ${o.url}: ${(e as Error).message}`);

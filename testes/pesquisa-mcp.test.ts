@@ -14,6 +14,8 @@ import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import {criarRede, registrarFerramentas, type Rede} from '../src/nucleo/ferramentas-mcp';
 import {decodificar, hashTexto, limparHtml, normalizar, type Fato, type Fonte} from '../src/nucleo/pesquisa';
 import {Projeto} from '../src/nucleo/projeto';
+import {VERSAO_DO_APP} from '../src/nucleo/versao';
+import pacote from '../package.json';
 
 const FIXTURES = path.join(__dirname, 'fixtures', 'pesquisa');
 const HTML = readFileSync(path.join(FIXTURES, 'planalto-art477.htm'));
@@ -270,6 +272,17 @@ describe('pesquisa pelo MCP', () => {
     expect(r.erro).toBe(true);
     expect(String(r.dado)).toContain('este MCP não tem acesso à rede');
     await semRede.cliente.close();
+  });
+
+  it('a rede se apresenta só como o Estúdio e a versão do app, sem endereço de ninguém', async () => {
+    let agente = '';
+    await criarRede(async (_url, init) => {
+      agente = new Headers(init.headers).get('user-agent') ?? '';
+      return new Response('ok');
+    })('https://exemplo.invalid/');
+    expect(VERSAO_DO_APP).toBe(pacote.version);
+    expect(agente).toBe(`Mozilla/5.0 (compatible; Estudio/${pacote.version})`);
+    expect(agente).not.toMatch(/https?:|\.com|\+/);
   });
 
   it('a rede desiste acima do limite de tamanho', async () => {
