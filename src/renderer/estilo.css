@@ -2,7 +2,7 @@
    Superfícies em grafite sem matiz, com degraus visíveis: as barras ficam um degrau ABAIXO do corpo do painel, como no
    VS Code (fundo-1 = barras, fundo-2 = corpo; o docs/tela.md §7 tinha o contrário). Cada cor tem um sentido só: azul =
    seleção, foco e botão principal; violeta = agente; âmbar = comentário; vermelho = cabeça de reprodução. A pessoa não
-   tem cor e o cobre da Cliente fica fora da interface (é cor de conteúdo). Densidade pensada para 1366×768. */
+   tem cor e o cobre da marca fica fora da interface (é cor de conteúdo). Densidade pensada para 1366×768. */
 :root {
   /* superfícies */
   --fundo-0: #0f0f0f;            /* vão entre painéis, barra de título */
@@ -40,7 +40,7 @@
   --ok: #3dd68c;
   --aviso: #ffa057;
   --erro: #ff9592;
-  --marca: #c88155;              /* cobre da Cliente: conteúdo, não interface (mantido só por compatibilidade) */
+  --marca: #c88155;              /* cobre do nome do app na barra: conteúdo, não interface (mantido só por compatibilidade) */
 
   /* famílias da linha do tempo (o --trilha-video do tela.md virou --trilha-texto) */
   --trilha-texto: #70b8ff;

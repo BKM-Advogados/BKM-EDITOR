@@ -187,7 +187,7 @@ describe('índice da mídia', () => {
     bruto(recortePng),
     bruto('midia/tomadas/c2.mp4', {duracao_ms: 15_000}),
     bruto('midia/voz.limpo.wav'),
-    bruto('midia/logo-exemplo.png'),
+    bruto('midia/logo-kit.png'),
     bruto('midia/solta.palavras.json'),
     bruto(ARQUIVO_MARCAS_MIDIA),
   ];
@@ -197,7 +197,7 @@ describe('índice da mídia', () => {
 
   it('derivados ficam dentro do original; marcas.json e derivados não viram linha', () => {
     expect(indice.map((e) => e.caminho)).toEqual([
-      'midia/foto.jpg', 'midia/foto.png', 'midia/logo-exemplo.png', 'midia/narracao.wav', 'midia/solta.palavras.json', 'midia/tomadas/c2.mp4', 'midia/voz.limpo.wav',
+      'midia/foto.jpg', 'midia/foto.png', 'midia/logo-kit.png', 'midia/narracao.wav', 'midia/solta.palavras.json', 'midia/tomadas/c2.mp4', 'midia/voz.limpo.wav',
     ]);
     const n = por('midia/narracao.wav');
     expect(n.derivados.map((d) => `${d.tipo}:${d.detalhe ?? ''}:${d.caminho}`)).toEqual([

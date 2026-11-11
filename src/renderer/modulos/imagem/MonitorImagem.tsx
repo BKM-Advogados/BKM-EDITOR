@@ -1,5 +1,5 @@
 // Monitor da imagem: prévia em DOM do documento (fundo, camadas e pilha de efeitos) sobre o entorno cinza, com xadrez
-// onde o fundo é transparente e o rótulo "Capa C2 · 1080 × 1350" acima da peça. À esquerda, o trilho: V mover, H mão,
+// onde o fundo é transparente e o rótulo "Capa · 1080 × 1350" acima da peça. À esquerda, o trilho: V mover, H mão,
 // Z zoom | T texto, U forma, inserir imagem | M comentário (as teclas valem neste monitor). Apertar numa camada já a
 // escolhe e arrastar a move, mesmo sem estar selecionada (o gesto do Canva); Shift+clique põe ou tira da seleção,
 // arrastar no vazio faz o laço, Ctrl+A escolhe a página toda e Esc solta. Várias selecionadas andam juntas e a barra
@@ -84,7 +84,7 @@ const InserirImagem: React.FC<{documento: string; doc: DocImagem; fechar: () => 
   };
   return (
     <div ref={caixa} className="flutuante pop-trilho" style={{top: 160}}>
-      <input className="campo" autoFocus value={caminho} placeholder="midia/logo-exemplo.png" title="Caminho do arquivo dentro da pasta do projeto"
+      <input className="campo" autoFocus value={caminho} placeholder="midia/logo.png" title="Caminho do arquivo dentro da pasta do projeto"
         onChange={(e) => setCaminho(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void confirmar()} />
       <button className="bti ligado" disabled={!caminho.trim()} onClick={() => void confirmar()} title="Inserir"><Check /></button>
       <button className="bti" onClick={fechar} title="Cancelar"><X /></button>

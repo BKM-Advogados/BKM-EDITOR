@@ -96,7 +96,7 @@ export type PaginaImagem = {
   camadas: CamadaImagem[]; // de baixo para cima
 };
 
-// Uma prancheta só tem `camadas` na raiz (a capa da Cliente, os projetos de antes). O carrossel tem `paginas`, cada uma
+// Uma prancheta só tem `camadas` na raiz (as capas e os projetos de antes). O carrossel tem `paginas`, cada uma
 // com as suas camadas, e a lista `camadas` da raiz fica vazia. Documento sem `paginas` vale como uma página só, em
 // memória, sem reescrever o arquivo (src/nucleo/carrossel.ts, docs/carrossel.md).
 /** O kit que a imagem recebeu, copiado para o documento: `id` do kit, as cores por nome (fundo, texto, destaque, suave e

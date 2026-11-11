@@ -1,8 +1,8 @@
 // Marca d'água da exportação: o logo ou a assinatura do kit de marca por cima da composição inteira (fora da pilha de
 // efeitos), na caixa que o núcleo já posicionou fora das zonas seguras do destino (nucleo/exportacao.ts,
 // marcaDaguaDoDestino). Entra pelo registro.ts quando as props trazem `marca_dagua`, o que só a exportação e a
-// miniatura do diálogo põem: o documento e a prévia normal não a veem. O logo vai como está, sem sombra nem filtro (o
-// manual da Cliente não deixa o logo levar efeito); a assinatura sai em branco com uma sombra curta para ler em fundo claro.
+// miniatura do diálogo põem: o documento e a prévia normal não a veem. O logo vai como está, sem sombra nem filtro (os
+// manuais de marca não deixam o logo levar efeito); a assinatura sai em branco com uma sombra curta para ler em fundo claro.
 import React from 'react';
 import {AbsoluteFill, Img, useVideoConfig} from 'remotion';
 import type {MarcaDaguaP} from '../nucleo/exportacao';

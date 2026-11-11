@@ -134,7 +134,7 @@ const InspectorCamada: React.FC<{documento: string; caminho: string; c: CamadaIm
 
         {c.tipo === 'imagem' && (
           <Secao titulo="Imagem" chave="imagem:imagem">
-            <CampoTexto rotulo="Arquivo" valor={c.src ?? ''} dica="caminho dentro da pasta do projeto, ex.: midia/logo-exemplo.png"
+            <CampoTexto rotulo="Arquivo" valor={c.src ?? ''} dica="caminho dentro da pasta do projeto, ex.: midia/logo.png"
               invalido={(v) => (caminhoNoProjeto(v) ? null : 'use um caminho dentro do projeto')} aoMudar={(v) => gravar('src')(caminhoNoProjeto(v))} />
             <CampoSelecao rotulo="Ajuste" valor={c.ajuste ?? PADRAO.ajuste} opcoes={[['cobrir', 'Cobrir (corta)'], ['conter', 'Conter (inteira)']]} aoMudar={gravar('ajuste')} />
             {c.src_original && <CampoLeitura rotulo="Original" dica="O arquivo de antes do remover fundo, intocado">{c.src_original}</CampoLeitura>}

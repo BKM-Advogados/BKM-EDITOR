@@ -1,6 +1,6 @@
-// As camadas que a interface cria de um clique (texto e forma), sem DOM: nascem na marca da peça, não na da Cliente. A fonte é
+// As camadas que a interface cria de um clique (texto e forma), sem DOM: nascem na marca da peça, não num kit fixo. A fonte é
 // a referência "@titulo" e a cor, "@texto" e "@destaque" (cor-marca.ts), lidas do kit que a imagem guarda (`marca`), então a
-// peça da BKM não traz o cobre da Cliente e trocar de kit leva as camadas junto. Imagem sem kit usa o neutro.
+// peça da BKM não traz as cores de outro kit e trocar de kit leva as camadas junto. Imagem sem kit usa o neutro.
 import type {CamadaImagem, DocImagem} from './documentos';
 
 const ENTRELINHA = 1.15;

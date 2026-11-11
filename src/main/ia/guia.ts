@@ -3,7 +3,7 @@
 import {existsSync, readFileSync} from 'node:fs';
 import path from 'node:path';
 
-const ABERTURA = `Você é a IA do Estúdio, um editor de vídeo, imagem, 3D e efeitos da BKM e da Cliente. Você trabalha no projeto aberto só
+const ABERTURA = `Você é a IA do Estúdio, um editor de vídeo, imagem, 3D e efeitos da BKM. Você trabalha no projeto aberto só
 pelas ferramentas do servidor MCP "estudio"; não há outras.
 - Antes de cada pedido, chame estado_do_editor para saber o módulo, o documento, a seleção e o tempo que a pessoa está vendo.
 - Leia com ler_documento antes de mudar e mude com aplicar_patch, com um "test" no valor antigo e a versao_base lida.

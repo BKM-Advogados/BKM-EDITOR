@@ -33,7 +33,7 @@ export const BINARIO_WHISPER = {
 };
 
 // Modelos ggml do Whisper da OpenAI (MIT), convertidos pelo projeto whisper.cpp, presos no commit 5359861 do repositório
-// ggerganov/whisper.cpp no Hugging Face. O SHA-256 é o oid do LFS. Medido em 07/11/2026 na narração do exemplo Cliente C2
+// ggerganov/whisper.cpp no Hugging Face. O SHA-256 é o oid do LFS. Medido em 07/11/2026 numa narração real
 // (72 s, pt-BR), i5-1135G7 com 7 threads, decodificação gulosa: small 29,8 s e 465 MB de pico, 4,6% de palavras
 // erradas; base 14,7 s e 271 MB, 8,2% (scripts/transcrever-teste.mjs, docs/legendas.md).
 const HF = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1';
@@ -51,7 +51,7 @@ export const MODELO_PADRAO: IdModeloWhisper = 'small';
  *  attention, dobra o tempo e, medido, não melhorou o começo das palavras: fica desligado. */
 export const FEIXE_PADRAO = 1;
 /** Começo de conversa que o whisper lê antes do áudio: puxa o vocabulário e a pontuação do direito do trabalho. Na
- *  narração do C2 levou o small de 4,6% para 3,6% de palavras erradas ("Exija" e "exceção" passaram a sair certas). */
+ *  narração medida levou o small de 4,6% para 3,6% de palavras erradas ("Exija" e "exceção" passaram a sair certas). */
 export const PROMPT_PADRAO = 'Vídeo sobre direito do trabalho, com regras, exceções e prazos da CLT: rescisão, aviso prévio, FGTS, férias, 13º salário, horas extras, justa causa, transferência.';
 
 // Detector de voz (VAD): o Silero VAD v6.2.0 (MIT), convertido para ggml pelo projeto whisper.cpp, preso no commit
@@ -314,7 +314,7 @@ const SO_PONTUACAO = /^[.,;:!?…)"'”»\]-]+$/;
 
 // ---------- o relógio do VAD ----------
 // Com --vad, o whisper-cli junta os trechos de voz num áudio só e devolve o tempo de cada token nesse áudio encurtado
-// (só o tempo do segmento volta ao relógio do arquivo). Medido: a narração do C2 depois de 14 s de silêncio e música saiu
+// (só o tempo do segmento volta ao relógio do arquivo). Medido: uma narração depois de 14 s de silêncio e música saiu
 // começando em 0 s. O whisper-cli escreve no stderr, para cada trecho, onde ele está no arquivo e no áudio encurtado
 // (vad_segment_info); com essa tabela o tempo de cada token volta ao arquivo.
 

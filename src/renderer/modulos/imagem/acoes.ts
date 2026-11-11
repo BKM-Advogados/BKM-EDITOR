@@ -43,7 +43,7 @@ export const novaLinha = async (documento: string, doc: DocImagem, predefinicao:
 export const novaImagem = async (documento: string, doc: DocImagem, bruto: string) => {
   const src = caminhoNoProjeto(bruto);
   if (!src) {
-    avisar('Use um caminho dentro da pasta do projeto, ex.: midia/logo-exemplo.png', 'erro');
+    avisar('Use um caminho dentro da pasta do projeto, ex.: midia/logo.png', 'erro');
     return false;
   }
   try {
