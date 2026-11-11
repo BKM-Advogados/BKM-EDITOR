@@ -7,7 +7,7 @@
 // quem chama, como o Dialogo.tsx: `abrirDialogoExportar(documento)` abre e <RaizDialogoExportar/>, montada na casca, desenha.
 import React, {useEffect, useMemo, useState, useSyncExternalStore} from 'react';
 import {Thumbnail} from '@remotion/player';
-import {ArrowDownLeft, ArrowDownRight, ArrowUpLeft, ArrowUpRight, CircleCheck, FolderOpen, Stamp, X} from 'lucide-react';
+import {ArrowDownLeft, ArrowDownRight, ArrowUpLeft, ArrowUpRight, Check, CircleCheck, Download, FolderOpen, Stamp, TriangleAlert, X} from 'lucide-react';
 import type {Progresso, ResultadoExportacao} from '../../compartilhado/api';
 import {COMPOSICOES, composicaoDe} from '../../composicoes/registro';
 import {fonte as familiaDaFonte} from '../../composicoes/fontes';
@@ -51,7 +51,12 @@ const lerSegundos = (t: string) => Number(t.trim().replace(/\s/g, '').replace(',
 const nomeDoArquivo = (caminho: string) => caminho.split(/[\\/]/).pop() ?? caminho;
 
 // ---------- pedaços comuns ----------
-const Moldura: React.FC<{titulo: string; sub?: string; fechar?: () => void; aoEnter?: () => void; children: React.ReactNode}> = ({titulo, sub, fechar, aoEnter, children}) => (
+/** O formato desenhado na proporção (cartão de destino). */
+const Quadro: React.FC<{l: number; a: number; livre?: boolean}> = ({l, a, livre}) => {
+  const k = 26 / Math.max(l, a, 1);
+  return <span className="quadro-destino" aria-hidden="true"><span className={livre ? 'livre' : ''} style={{width: Math.max(8, l * k), height: Math.max(8, a * k)}} /></span>;
+};
+const Moldura: React.FC<{titulo: string; sub?: string; fechar?: () => void; aoEnter?: () => void; children: React.ReactNode; largo?: boolean}> = ({titulo, sub, fechar, aoEnter, children, largo}) => (
   <div className="dialogo-fundo" onPointerDown={(e) => e.target === e.currentTarget && fechar?.()}
     onKeyDown={(e) => {
       if (e.key === 'Escape') fechar?.();
@@ -60,11 +65,11 @@ const Moldura: React.FC<{titulo: string; sub?: string; fechar?: () => void; aoEn
         aoEnter();
       }
     }}>
-    <div className="dialogo exportar" role="dialog" aria-modal="true" aria-label={titulo}>
+    <div className={`dialogo exportar${largo ? ' largo' : ''}`} role="dialog" aria-modal="true" aria-label={titulo}>
       <div className="dialogo-titulo">
-        {titulo}
+        <Download size={16} />{titulo}
         {sub && <span className="sub" title={sub}>· {sub}</span>}
-        {fechar && <button className="bti" onClick={fechar} title="Fechar (Esc)"><X size={14} /></button>}
+        {fechar && <button className="bti" onClick={fechar} title="Fechar (Esc)" aria-label="Fechar"><X size={14} /></button>}
       </div>
       {children}
     </div>
@@ -136,7 +141,7 @@ type EstadoContraste = 'medindo' | {avaliacao: AvaliacaoContraste} | {erro: stri
 type Sobreposto = {a: string; b: string; caixa: {x: number; y: number; largura: number; altura: number}[]};
 
 const Miniatura: React.FC<{props: Record<string, unknown>; largura: number; altura: number; fixo: boolean; fps: number; duracaoMs: number; marca: MarcaDaguaP | null;
-  legendas: LegendasP | null; aoSobrepor?: (pares: string[]) => void}> = ({props, largura, altura, fixo, fps, duracaoMs, marca, legendas, aoSobrepor}) => {
+  legendas: LegendasP | null; aoSobrepor?: (pares: string[]) => void; lado?: number}> = ({props, largura, altura, fixo, fps, duracaoMs, marca, legendas, aoSobrepor, lado = 150}) => {
     const raiz = React.useRef<HTMLDivElement>(null);
     const [sobre, setSobre] = useState<Sobreposto[]>([]);
     const tempo = useLoja((e) => e.tempo_ms);
@@ -145,7 +150,7 @@ const Miniatura: React.FC<{props: Record<string, unknown>; largura: number; altu
     const quadro = Math.min(total - 1, Math.round(((tempo > 500 ? tempo : 1500) / 1000) * fps));
     const entrada = useMemo(() => ({...props, ...(fixo ? {} : {largura, altura}), ...(legendas ? {legendas_cenas: legendas} : {}), ...(marca ? {marca_dagua: marca} : {})}),
       [props, fixo, largura, altura, legendas, marca]);
-    const escala = Math.min(150 / largura, 150 / altura);
+    const escala = Math.min(lado / largura, lado / altura);
     const zonas = conjuntoDe(zonasDaMarca(largura, altura))?.zonas ?? [];
     // video-D4: mede os blocos que a composição desenhou neste quadro, no tamanho do destino, e marca os que se sobrepõem.
     // Bloco ainda invisível (opacidade ~0: entra depois ou já saiu) não conta; a medida é a do DOM de verdade.
@@ -197,25 +202,26 @@ const Miniatura: React.FC<{props: Record<string, unknown>; largura: number; altu
     );
   };
 
-/** Uma miniatura por destino marcado, no tamanho dele, com o aviso dos blocos que se sobrepõem nesse quadro: o layout feito num
- *  formato pode não caber em outro, e o diálogo avisa antes do render (video-D4). */
-const PreviaDosDestinos: React.FC<{destinos: Destino[]; props: Record<string, unknown>; medidaDe: (d: Destino) => {largura: number; altura: number}; fixo: boolean; fps: number;
-  duracaoMs: number; marcaDe: (d: Destino) => MarcaDaguaP | null; legendasDe: (d: Destino) => LegendasP | null}> = ({destinos, props, medidaDe, fixo, fps, duracaoMs, marcaDe, legendasDe}) => {
-  const [avisos, setAvisos] = useState<Record<string, string[]>>({});
+/** A prévia do destino escolhido, grande, com as zonas da rede e os blocos que se sobrepõem nesse quadro (video-D4: o
+ *  layout feito num formato pode encavalar noutro). Os avisos de todos os destinos marcados sobem para o diálogo, que
+ *  os mostra com "Ver" (troca a prévia para aquele destino). */
+const PainelPrevia: React.FC<{destinos: Destino[]; ver: Destino; aoVer: (id: string) => void; props: Record<string, unknown>; medidaDe: (d: Destino) => {largura: number; altura: number};
+  fixo: boolean; fps: number; duracaoMs: number; marcaDe: (d: Destino) => MarcaDaguaP | null; legendasDe: (d: Destino) => LegendasP | null;
+  aoSobrepor: (id: string, pares: string[]) => void}> = ({destinos, ver, aoVer, props, medidaDe, fixo, fps, duracaoMs, marcaDe, legendasDe, aoSobrepor}) => {
+  const rotulo = (d: Destino) => (d.id === 'personalizado' ? `${d.largura}×${d.altura}` : proporcaoDe(medidaDe(d).largura, medidaDe(d).altura));
   return (
-    <div className="previa-destinos">
-      {destinos.map((d) => {
-        const m = medidaDe(d);
-        const lista = avisos[d.id] ?? [];
-        return (
-          <div key={d.id} className="previa-destino">
-            <Miniatura props={props} {...m} fixo={fixo} fps={fps} duracaoMs={duracaoMs} marca={marcaDe(d)} legendas={legendasDe(d)}
-              aoSobrepor={(pares) => setAvisos((a) => (JSON.stringify(a[d.id] ?? []) === JSON.stringify(pares) ? a : {...a, [d.id]: pares}))} />
-            <div className="nota">{d.id === 'personalizado' ? `${m.largura}×${m.altura}` : proporcaoDe(m.largura, m.altura)}</div>
-            {lista.length > 0 && <div className="erro-exp" data-aviso-sobreposicao title={lista.join('; ')}>Sobrepõe: {lista.slice(0, 2).join('; ')}{lista.length > 2 ? '…' : ''}</div>}
-          </div>
-        );
-      })}
+    <div className="previa-exp">
+      {destinos.length > 1 && <Segmentado rotulo="Destino na prévia" valor={ver.id} aoMudar={aoVer} opcoes={destinos.map((d): [string, string] => [d.id, rotulo(d)])} />}
+      <Miniatura props={props} {...medidaDe(ver)} fixo={fixo} fps={fps} duracaoMs={duracaoMs} marca={marcaDe(ver)} legendas={legendasDe(ver)} lado={210}
+        aoSobrepor={(pares) => aoSobrepor(ver.id, pares)} />
+      {/* os outros destinos também medem (sem aparecer), para os avisos valerem para todos */}
+      <div className="previa-oculta" aria-hidden="true">
+        {destinos.filter((d) => d.id !== ver.id).map((d) => (
+          <Miniatura key={d.id} props={props} {...medidaDe(d)} fixo={fixo} fps={fps} duracaoMs={duracaoMs} marca={marcaDe(d)} legendas={legendasDe(d)} lado={210}
+            aoSobrepor={(pares) => aoSobrepor(d.id, pares)} />
+        ))}
+      </div>
+      <div className="nota">Em vermelho, o que a interface da rede cobre no {rotulo(ver)}. O quadro é o da agulha.</div>
     </div>
   );
 };
@@ -419,6 +425,11 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
     }
   };
   const emEdicao = destinos.find((d) => d.id === editando) ?? destinos[0];
+  // a prévia mostra um destino de cada vez (o seletor dela, ou o "Ver na prévia" de um aviso)
+  const [vendo, setVendo] = useState(doDocumento.id);
+  const emVista = destinos.find((d) => d.id === vendo) ?? destinos[0];
+  const [sobrepostos, setSobrepostos] = useState<Record<string, string[]>>({});
+  const avisosSobre = Object.entries(sobrepostos).filter(([id, pares]) => pares.length > 0 && destinos.some((d) => d.id === id));
   // o carrossel narrado só sai no tamanho dele; o vídeo de cenas, no do destino
   const medidaDe = (d: Destino) => (fixo ? {largura: formato.largura, altura: formato.altura} : d);
   // a legenda de cada destino na área livre dele: a marca se afasta dela, e a miniatura a desenha ali
@@ -466,101 +477,127 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
     );
   }
   return (
-    <Moldura titulo="Exportar vídeo" sub={sub} fechar={fechar} aoEnter={() => void exportar()}>
+    <Moldura titulo="Exportar vídeo" sub={sub} fechar={fechar} aoEnter={() => void exportar()} largo>
       {montado && 'erro' in montado && <div className="erro-exp">{montado.erro}</div>}
-      <Linha rotulo="Destinos">
-        <div className="destinos">
-          {FORMATOS_VIDEO.map((f) => {
-            const d: Destino = {id: f.id, largura: f.largura, altura: f.altura};
-            const desligado = fixo && (f.largura !== formato.largura || f.altura !== formato.altura);
-            return (
-              <label key={f.id} className={`${marcado(f.id) ? 'marcado' : ''}${desligado ? ' desligado' : ''}`}
-                title={desligado ? 'O carrossel narrado é fixo em 1080×1920: só sai em 9:16' : `${f.destino}${f.id === doDocumento.id ? ' · o formato deste vídeo' : ''}`}>
-                <Caixa marcado={marcado(f.id)} desligado={desligado} rotulo={f.nome} aoMudar={() => alternar(d)} />
-                <span>{f.nome} <span className="medida">{f.proporcao}</span>
-                  {temMarca && marcado(f.id) && configMarca(d).ligada && <span className="md-ico" title="Com marca d'água"><Stamp size={11} /></span>}</span>
-                <span className="medida">{f.largura}×{f.altura}</span>
-                <span className="tam">{marcado(f.id) ? tamanhoDe(f.id) : ''}</span>
-              </label>
-            );
-          })}
-          <label className={`${marcado('personalizado') ? 'marcado' : ''}${fixo ? ' desligado' : ''}`} title={fixo ? 'O carrossel narrado é fixo em 1080×1920' : 'Outro tamanho, em pixels'}>
-            <Caixa marcado={marcado('personalizado')} desligado={fixo} rotulo="Personalizado" aoMudar={() => alternar({id: 'personalizado', ...personalizado})} />
-            <span>Personalizado{doDocumento.id === 'personalizado' ? <span className="medida"> · o formato deste vídeo</span> : null}</span>
-            <span className="pers" onClick={(e) => e.preventDefault()}>
-              <input className={`campo${persValido('largura') ? '' : ' invalido'}`} type="text" inputMode="numeric" value={textoPers.largura} disabled={fixo} aria-label="Largura"
-                title="de 16 a 7680 px" onChange={(e) => mudarPersonalizado('largura', e.target.value)} onBlur={() => sairPersonalizado('largura')} />×
-              <input className={`campo${persValido('altura') ? '' : ' invalido'}`} type="text" inputMode="numeric" value={textoPers.altura} disabled={fixo} aria-label="Altura"
-                title="de 16 a 7680 px" onChange={(e) => mudarPersonalizado('altura', e.target.value)} onBlur={() => sairPersonalizado('altura')} />
-            </span>
-            <span className="tam">{marcado('personalizado') ? tamanhoDe('personalizado') : ''}</span>
-          </label>
-        </div>
-      </Linha>
-      <Linha rotulo="Marca d'água">
-        {!temMarca ? <span className="nota">O tema deste vídeo não tem logo nem assinatura: aplique um kit de marca (menu → Marca…) para pôr a marca d'água.</span>
-          : !emEdicao ? <span className="nota">Marque um destino.</span>
-          : (
-            <OpcoesMarca destinos={destinos} atual={emEdicao} editar={setEditando} config={configMarca} mudar={mudarMarca} fontes={fontesMarca} marca={marcaDe(emEdicao)}
-              contraste={contrastes[emEdicao.id]} aoMedir={(placa) => void medirContraste(emEdicao, placa)}
-              miniatura={props && <Miniatura props={props} {...medidaDe(emEdicao)} fixo={fixo} fps={formato.fps} duracaoMs={duracaoMs} marca={marcaDe(emEdicao)}
-                legendas={legendasDe(emEdicao)} />} />
-          )}
-      </Linha>
-      {props && destinos.length > 0 && (
-        <Linha rotulo="Prévia">
-          <PreviaDosDestinos destinos={destinos} props={props} medidaDe={medidaDe} fixo={fixo} fps={formato.fps} duracaoMs={duracaoMs} marcaDe={marcaDe} legendasDe={legendasDe} />
-        </Linha>
-      )}
-      {legendas && !fixo && destinos.length > 0 && ( // frente Fala: por destino, queimar a legenda, só o SRT ao lado, ou os dois
-        <Linha rotulo="Legendas">
-          <div className="legendas-exp">
-            {destinos.map((d) => {
-              const v = legendasPor[d.id] ?? 'video';
+      <div className="exp-colunas">
+        <div className="exp-opcoes">
+          <div className="exp-pergunta"><b>Para onde vai?</b> · marque um ou mais; sai um arquivo por formato</div>
+          <div className="destinos-exp">
+            {FORMATOS_VIDEO.map((f) => {
+              const d: Destino = {id: f.id, largura: f.largura, altura: f.altura};
+              const desligado = fixo && (f.largura !== formato.largura || f.altura !== formato.altura);
+              const m = marcado(f.id);
               return (
-                <label key={d.id} title={OPCOES_LEGENDA_EXPORTACAO.find((x) => x.valor === v)!.nota}>
-                  {destinos.length > 1 && <span className="medida">{d.id === 'personalizado' ? `${d.largura}×${d.altura}` : proporcaoDe(d.largura, d.altura)}</span>}
-                  <Escolha valor={v} rotulo="Legendas neste destino" aoMudar={(x) => setLegendasPor((y) => ({...y, [d.id]: x}))}
-                    opcoes={OPCOES_LEGENDA_EXPORTACAO.map((x) => ({valor: x.valor as LegendaNaExportacao, rotulo: x.nome, dica: x.nota}))} />
-                </label>
+                <div key={f.id} role="checkbox" aria-checked={m} aria-disabled={desligado || undefined} tabIndex={desligado ? -1 : 0}
+                  className={`cartao-destino${m ? ' marcado' : ''}${desligado ? ' desligado' : ''}`}
+                  title={desligado ? 'O carrossel narrado é fixo em 1080×1920: só sai em 9:16' : `${f.destino}${f.id === doDocumento.id ? ' · o formato deste vídeo' : ''}`}
+                  onClick={() => !desligado && alternar(d)} onKeyDown={(e) => (e.key === ' ' || e.key === 'Enter') && !desligado && (e.preventDefault(), alternar(d))}>
+                  <span className="caixa-quadro" aria-hidden="true">{m && <Check />}</span>
+                  <Quadro l={f.largura} a={f.altura} />
+                  <span className="cd-textos">
+                    <span className="cd-nome">{f.nome}{temMarca && m && configMarca(d).ligada && <span className="md-ico" title="Com marca d'água"><Stamp size={11} /></span>}</span>
+                    <span className="cd-meta">{f.proporcao} · {f.destino}</span>
+                  </span>
+                  <span className="cd-tam">{m ? tamanhoDe(f.id) : ''}</span>
+                </div>
               );
             })}
-            <span className="nota">O SRT sai com o nome do vídeo, como .pt_BR.srt (o Facebook pede) e em .vtt, sem gravar por cima do que já está em saidas/.</span>
+            <div role="checkbox" aria-checked={marcado('personalizado')} aria-disabled={fixo || undefined} tabIndex={fixo ? -1 : 0}
+              className={`cartao-destino${marcado('personalizado') ? ' marcado' : ''}${fixo ? ' desligado' : ''}`} title={fixo ? 'O carrossel narrado é fixo em 1080×1920' : 'Outro tamanho, em pixels'}
+              onClick={(e) => !fixo && !(e.target instanceof HTMLInputElement) && alternar({id: 'personalizado', ...personalizado})}
+              onKeyDown={(e) => !(e.target instanceof HTMLInputElement) && (e.key === ' ' || e.key === 'Enter') && !fixo && (e.preventDefault(), alternar({id: 'personalizado', ...personalizado}))}>
+              <span className="caixa-quadro" aria-hidden="true">{marcado('personalizado') && <Check />}</span>
+              <Quadro l={personalizado.largura} a={personalizado.altura} livre />
+              <span className="cd-textos">
+                <span className="cd-nome">Personalizado{doDocumento.id === 'personalizado' ? <span className="cd-meta"> · o deste vídeo</span> : null}</span>
+                <span className="pers">
+                  <input className={`campo${persValido('largura') ? '' : ' invalido'}`} type="text" inputMode="numeric" value={textoPers.largura} disabled={fixo} aria-label="Largura"
+                    title="de 16 a 7680 px" onChange={(e) => mudarPersonalizado('largura', e.target.value)} onBlur={() => sairPersonalizado('largura')} />×
+                  <input className={`campo${persValido('altura') ? '' : ' invalido'}`} type="text" inputMode="numeric" value={textoPers.altura} disabled={fixo} aria-label="Altura"
+                    title="de 16 a 7680 px" onChange={(e) => mudarPersonalizado('altura', e.target.value)} onBlur={() => sairPersonalizado('altura')} />
+                </span>
+              </span>
+              <span className="cd-tam">{marcado('personalizado') ? tamanhoDe('personalizado') : ''}</span>
+            </div>
           </div>
-        </Linha>
-      )}
-      <Linha rotulo="Formato">
-        <Segmentos rotulo="Formato do arquivo" valor={codec} aoMudar={setCodec} opcoes={CODECS.map((c) => ({valor: c.id, nome: c.nome, dica: c.nota}))} />
-        <span className="nota">{CODECS.find((c) => c.id === codec)!.nota}</span>
-      </Linha>
-      <Linha rotulo="Qualidade">
-        <Segmentos valor={qualidade} aoMudar={setQualidade} opcoes={QUALIDADES.map((q) => ({valor: q.id, nome: q.nome, dica: q.nota}))} />
-        <span className="nota">{QUALIDADES.find((q) => q.id === qualidade)!.nota}</span>
-      </Linha>
-      <Linha rotulo="Escala">
-        <Segmentos valor={escala} aoMudar={setEscala} opcoes={ESCALAS_VIDEO.map((e) => ({valor: e, nome: `${numeroBr(e, 2)}×`}))} />
-        {escala !== 1 && <span className="nota">{estimativa.porDestino.map((d) => `${d.largura}×${d.altura}`).join(' · ')}</span>}
-      </Linha>
-      <Linha rotulo="Trecho">
-        <Segmentado rotulo="Trecho" valor={trechoLigado ? 'trecho' : 'tudo'} aoMudar={(v) => setTrechoLigado(v === 'trecho')}
-          opcoes={[['tudo', `Tudo (${numeroBr(duracaoMs / 1000, 1)} s)`], ['trecho', 'Só um trecho']]} />
-        {trechoLigado && (
-          <span className="trecho-campos">de <input className={`campo${trechoOk ? '' : ' invalido'}`} value={de} onChange={(e) => setDe(e.target.value)} aria-label="Início em segundos" /> a
-            <input className={`campo${trechoOk ? '' : ' invalido'}`} value={ate} onChange={(e) => setAte(e.target.value)} aria-label="Fim em segundos" /> s</span>
+          <Linha rotulo="Qualidade">
+            <Segmentos rotulo="Qualidade" valor={qualidade} aoMudar={setQualidade} opcoes={QUALIDADES.map((q) => ({valor: q.id, nome: q.nome, dica: q.nota}))} />
+            <span className="nota">{QUALIDADES.find((q) => q.id === qualidade)!.nota}</span>
+          </Linha>
+          <Linha rotulo="Arquivo">
+            <Segmentos rotulo="Formato do arquivo" valor={codec} aoMudar={setCodec} opcoes={CODECS.map((c) => ({valor: c.id, nome: c.nome, dica: c.nota}))} />
+            <span className="nota">{CODECS.find((c) => c.id === codec)!.nota}</span>
+          </Linha>
+          <Linha rotulo="Marca d'água">
+            {!temMarca ? <span className="nota">O tema deste vídeo não tem logo nem assinatura: aplique um kit de marca (menu → Marca…) para pôr a marca d'água.</span>
+              : !emEdicao ? <span className="nota">Marque um destino.</span>
+              : (
+                <OpcoesMarca destinos={destinos} atual={emEdicao} editar={setEditando} config={configMarca} mudar={mudarMarca} fontes={fontesMarca} marca={marcaDe(emEdicao)}
+                  contraste={contrastes[emEdicao.id]} aoMedir={(placa) => void medirContraste(emEdicao, placa)}
+                  miniatura={props && <Miniatura props={props} {...medidaDe(emEdicao)} fixo={fixo} fps={formato.fps} duracaoMs={duracaoMs} marca={marcaDe(emEdicao)}
+                    legendas={legendasDe(emEdicao)} />} />
+              )}
+          </Linha>
+          {legendas && !fixo && destinos.length > 0 && ( // frente Fala: por destino, queimar a legenda, só o SRT ao lado, ou os dois
+            <Linha rotulo="Legendas">
+              <div className="legendas-exp">
+                {destinos.map((d) => {
+                  const v = legendasPor[d.id] ?? 'video';
+                  return (
+                    <span key={d.id} className="legenda-destino" title={OPCOES_LEGENDA_EXPORTACAO.find((x) => x.valor === v)!.nota}>
+                      {destinos.length > 1 && <span className="medida">{d.id === 'personalizado' ? `${d.largura}×${d.altura}` : proporcaoDe(d.largura, d.altura)}</span>}
+                      <Escolha valor={v} rotulo="Legendas neste destino" aoMudar={(x) => setLegendasPor((y) => ({...y, [d.id]: x}))}
+                        opcoes={OPCOES_LEGENDA_EXPORTACAO.map((x) => ({valor: x.valor as LegendaNaExportacao, rotulo: x.nome, dica: x.nota}))} />
+                    </span>
+                  );
+                })}
+                <span className="nota">O SRT sai com o nome do vídeo, como .pt_BR.srt (o Facebook pede) e em .vtt, sem gravar por cima do que já está em saidas/.</span>
+              </div>
+            </Linha>
+          )}
+          <Linha rotulo="Escala">
+            <Segmentos rotulo="Escala" valor={escala} aoMudar={setEscala} opcoes={ESCALAS_VIDEO.map((e) => ({valor: e, nome: `${numeroBr(e, 2)}×`}))} />
+            {escala !== 1 && <span className="nota">{estimativa.porDestino.map((d) => `${d.largura}×${d.altura}`).join(' · ')}</span>}
+          </Linha>
+          <Linha rotulo="Trecho">
+            <Segmentado rotulo="Trecho" valor={trechoLigado ? 'trecho' : 'tudo'} aoMudar={(v) => setTrechoLigado(v === 'trecho')}
+              opcoes={[['tudo', `Tudo (${numeroBr(duracaoMs / 1000, 1)} s)`], ['trecho', 'Só um trecho']]} />
+            {trechoLigado && (
+              <span className="trecho-campos">de <input className={`campo${trechoOk ? '' : ' invalido'}`} value={de} onChange={(e) => setDe(e.target.value)} aria-label="Início em segundos" /> a
+                <input className={`campo${trechoOk ? '' : ' invalido'}`} value={ate} onChange={(e) => setAte(e.target.value)} aria-label="Fim em segundos" /> s</span>
+            )}
+          </Linha>
+          <Linha rotulo="Nome">
+            <input className="campo" value={nome} onChange={(e) => setNome(e.target.value)} placeholder={titulo} aria-label="Nome do arquivo" />
+            <span className="nota">vai para <code>saidas/</code></span>
+          </Linha>
+          {avisosSobre.map(([id, pares]) => {
+            const d = destinos.find((x) => x.id === id);
+            if (!d) return null;
+            return (
+              <div key={id} className="aviso-exp" role="status" data-aviso-sobreposicao>
+                <TriangleAlert size={14} />
+                <span>No <b>{d.id === 'personalizado' ? `${d.largura}×${d.altura}` : `${FORMATOS_VIDEO.find((f) => f.id === d.id)?.nome ?? ''} ${proporcaoDe(d.largura, d.altura)}`}</b>,
+                  {' '}{pares.slice(0, 2).join('; ')} se sobrepõem{pares.length > 2 ? ' (e mais)' : ''}.</span>
+                <button className="bt mini fantasma" onClick={() => setVendo(d.id)}>Ver na prévia</button>
+              </div>
+            );
+          })}
+        </div>
+        {props && emVista && (
+          <PainelPrevia destinos={destinos} ver={emVista} aoVer={setVendo} props={props} medidaDe={medidaDe} fixo={fixo} fps={formato.fps} duracaoMs={duracaoMs}
+            marcaDe={marcaDe} legendasDe={legendasDe} aoSobrepor={(id, pares) => setSobrepostos((a) => (JSON.stringify(a[id] ?? []) === JSON.stringify(pares) ? a : {...a, [id]: pares}))} />
         )}
-      </Linha>
-      <Linha rotulo="Nome">
-        <input className="campo" value={nome} onChange={(e) => setNome(e.target.value)} placeholder={titulo} aria-label="Nome do arquivo" />
-      </Linha>
-      <div className="estimativa-exp">
-        <span>
-          {destinos.length === 0 ? 'Marque pelo menos um destino.' : destinos.length === 1 ? <>Sai <b>{nomes[0].nome}.{ext}</b> em saidas/</> : <><b>{destinos.length} arquivos</b> em saidas/: {nomes.map((n) => `${n.nome}.${ext}`).join(', ')}</>}
-        </span>
-        {destinos.length > 0 && <span title="Estimativa pelo bitrate × duração; o tamanho real varia com o conteúdo">~<b>{formatarBytes(estimativa.total)}</b></span>}
       </div>
-      <div className="dialogo-botoes">
+      <div className="rodape-exp">
+        <span className="resumo-exp" title={destinos.length > 1 ? nomes.map((n) => `${n.nome}.${ext}`).join('\n') : undefined}>
+          {destinos.length === 0 ? 'Marque pelo menos um destino.' : destinos.length === 1 ? <>Sai <b>{nomes[0].nome}.{ext}</b> · ~<b>{formatarBytes(estimativa.total)}</b></>
+            : <>Saem <b>{destinos.length} arquivos</b> · ~<b>{formatarBytes(estimativa.total)}</b></>}
+        </span>
         <button className="bt fantasma" onClick={fechar}>Cancelar</button>
-        <button className="bt principal" disabled={!podeExportar} onClick={() => void exportar()} autoFocus>Exportar</button>
+        <button className="bt principal" disabled={!podeExportar} onClick={() => void exportar()} autoFocus>
+          <Download size={14} />{destinos.length > 1 ? `Exportar ${destinos.length} arquivos` : 'Exportar vídeo'}
+        </button>
       </div>
     </Moldura>
   );
