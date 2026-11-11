@@ -58,8 +58,18 @@ export class Projeto {
     return abs;
   }
 
+  /** A pasta saidas/, para as exportações do app (vídeo, imagem, páginas do carrossel): é aqui que se decide a exceção
+   *  à regra do caminhoParaGravar. Se saidas/ for um link para outro disco, a exportação grava lá, porque exportar
+   *  direto para outro disco é uso legítimo e saidas/ não tem documento, diário nem nada que o app releia. Só a pasta
+   *  em si escapa: o nome do arquivo dentro dela continua preso a ela (arquivoLivre, pastaLivre). As legendas
+   *  (exportar_legendas) e a música (exportar_musica) gravam pelo caminhoParaGravar e por isso recusam o link. */
+  pastaDeSaidas(): string {
+    return this.caminho('saidas');
+  }
+
   /** O mesmo caminho, para gravar, copiar, renomear ou apagar: o lugar real (seguindo links simbólicos) também tem de
-   *  estar dentro do projeto. Um link em midia/ para um disco de fora funciona só para ler; nada se grava por ele. */
+   *  estar dentro do projeto. Um link em midia/ para um disco de fora funciona só para ler; nada se grava por ele. A
+   *  exceção, saidas/ das exportações do app, está em pastaDeSaidas. */
   caminhoParaGravar(rel: string): string {
     const abs = this.caminho(rel);
     const fora = () => new ErroProjeto(`${rel} passa por um link simbólico para fora do projeto: por ele só se lê, não se grava`, 'caminho');

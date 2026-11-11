@@ -10,6 +10,7 @@ import {Projeto, serializar} from '../src/nucleo/projeto';
 import {salvarTomada} from '../src/main/ipc-gravacao';
 import {gravarSemFundo} from '../src/main/remover-fundo';
 import {apagarRendersSemUso} from '../src/main/musica-render';
+import {gravarPaginas} from '../src/main/exportar-paginas';
 
 const pastas: string[] = [];
 afterAll(() => pastas.forEach((p) => rmSync(p, {recursive: true, force: true})));
@@ -60,5 +61,29 @@ describe('link simbólico em midia/ para fora: as gravações do app não passam
     writeFileSync(render, 'RIFF');
     expect(apagarRendersSemUso(p)).toEqual([]);
     expect(existsSync(render)).toBe(true);
+  });
+});
+
+describe('saidas/ por link para outro disco: a exceção das exportações (Projeto.pastaDeSaidas)', () => {
+  const comSaidasFora = () => {
+    const pasta = pastaNova('saidas-link');
+    writeFileSync(path.join(pasta, 'estudio.json'), serializar({formato: 1, nome: 't', documentos: []}));
+    const fora = pastaNova('outro-disco');
+    symlinkSync(fora, path.join(pasta, 'saidas'));
+    return {p: new Projeto(pasta), fora};
+  };
+
+  it('a exportação das páginas grava no outro disco', async () => {
+    const {p, fora} = comSaidasFora();
+    expect(p.pastaDeSaidas()).toBe(path.join(p.raiz, 'saidas'));
+    const r = await gravarPaginas({saidas: p.pastaDeSaidas(), nome: 'capa', pdf: false, paginas: [{numero: 3, png: Buffer.from(PNG, 'base64')}]});
+    expect(r.ok).toBe(true);
+    expect(readdirSync(fora)).toEqual(['capa - 03.png']);
+  });
+
+  it('o resto continua pela regra dos links: gravar arquivo em saidas/ pelo projeto é recusado', () => {
+    const {p, fora} = comSaidasFora();
+    expect(() => p.gravarTexto('saidas/video.srt', '1')).toThrow(/link simbólico/);
+    expect(readdirSync(fora)).toEqual([]);
   });
 });

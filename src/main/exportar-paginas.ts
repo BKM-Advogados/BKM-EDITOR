@@ -127,10 +127,11 @@ type Lidar = <A extends unknown[], R>(canal: string, f: (...a: A) => R | Promise
 /** Registra o IPC (uma linha no main.ts; os canais das partes vêm junto). `mostrar` abre a pasta com o arquivo marcado
  *  (shell.showItemInFolder). */
 export const registrarExportarPaginas = (lidar: Lidar, canal: string, deps: {projeto: () => Projeto; mostrar: (arquivo: string) => void}) => {
+  // saidas/ por link para outro disco grava lá: a exceção à regra dos links está em Projeto.pastaDeSaidas
   lidar(CANAL.exportarPaginasAbrir, (o: {documento: string; pdf: boolean}) => {
     const p = deps.projeto();
     const nome = p.manifesto().documentos.find((d) => d.id === o.documento)?.titulo ?? o.documento;
-    return {sessao: abrirExportacao({saidas: p.caminho('saidas'), nome, pdf: o.pdf, ptPorPx: ptPorPxDe(p, o.documento)}).sessao};
+    return {sessao: abrirExportacao({saidas: p.pastaDeSaidas(), nome, pdf: o.pdf, ptPorPx: ptPorPxDe(p, o.documento)}).sessao};
   });
   lidar(CANAL.exportarPaginasParte, (sessao: string, pagina: {png: string; numero: number}) => gravarParte(sessao, {numero: pagina.numero, png: dataUrlParaBuffer(pagina.png)}));
   lidar(CANAL.exportarPaginasFechar, async (sessao: string) => {
@@ -146,7 +147,7 @@ export const registrarExportarPaginas = (lidar: Lidar, canal: string, deps: {pro
     const p = deps.projeto();
     const nome = p.manifesto().documentos.find((d) => d.id === o.documento)?.titulo ?? o.documento;
     try {
-      const r = await gravarPaginas({saidas: p.caminho('saidas'), nome, pdf: o.pdf, ptPorPx: ptPorPxDe(p, o.documento),
+      const r = await gravarPaginas({saidas: p.pastaDeSaidas(), nome, pdf: o.pdf, ptPorPx: ptPorPxDe(p, o.documento),
         paginas: o.paginas.map((x) => ({numero: x.numero, png: dataUrlParaBuffer(x.png)}))});
       if (r.ok && r.mostrar) deps.mostrar(r.mostrar);
       return r;

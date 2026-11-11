@@ -440,7 +440,7 @@ lidar(CANAL.exportar, async (documento: string, opcoes?: OpcoesExportarVideo): P
   // a animação, como o carrossel, tem tamanho fixo (camadas em pixels): o diálogo só oferece o tamanho dela e a escala vai no `scale` do render
   const fixo = props.composicao !== 'VideoCenas';
   const o: OpcoesExportarVideo = {codec: 'h264', qualidade: 'alta', escala: 1, ...opcoes, destinos: fixo || !opcoes?.destinos?.length ? [destinoDoFormato(formato)] : opcoes.destinos};
-  const pasta = p.caminho('saidas');
+  const pasta = p.pastaDeSaidas(); // saidas/ por link para outro disco grava lá (a exceção, em Projeto.pastaDeSaidas)
   mkdirSync(pasta, {recursive: true});
   const planos = nomesDosArquivos(o.nome?.trim() || tituloDoDocumento(p, documento), o.destinos, formato);
   const comAudio = fixo || Boolean(['audio', 'trilha', 'narracao', 'sons'].some((k) => (Array.isArray(props[k]) ? (props[k] as unknown[]).length > 0 : Boolean(props[k]))));
@@ -508,7 +508,7 @@ lidar(CANAL.exportar, async (documento: string, opcoes?: OpcoesExportarVideo): P
 // a interface manda a imagem já desenhada (PNG, JPG ou WebP em data URL); aqui só grava com o nome livre em saidas/
 lidar(CANAL.exportarImagem, (documento: string, dados: string, opcoes?: OpcoesExportarImagem) => {
   const p = exigirProjeto();
-  const pasta = p.caminho('saidas');
+  const pasta = p.pastaDeSaidas(); // saidas/ por link para outro disco grava lá (a exceção, em Projeto.pastaDeSaidas)
   mkdirSync(pasta, {recursive: true});
   const ext = FORMATOS_IMAGEM_SAIDA.find((f) => f.id === opcoes?.formato)?.ext ?? 'png';
   const destino = arquivoLivre(pasta, `${opcoes?.nome?.trim() || tituloDoDocumento(p, documento)}${opcoes?.sufixo ?? ''}`, ext);
