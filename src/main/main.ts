@@ -7,7 +7,7 @@ import os from 'node:os';
 import {CANAL, type InfoProjeto, type Metricas, type NovoProjeto, type Perfil, type Preferencias, type Progresso, type ResultadoExportacao, type Retangulo} from '../compartilhado/api';
 import {contaClaude} from './conversa';
 import type {Comentario, EstadoEditor, Manifesto, Modulo, OperacaoPatch} from '../nucleo/documentos';
-import {aplicarMarcaAoPlano, dentroDoOneDrive, documentoNovo, gravarPlano, nomeDePasta, nomePadrao, pastaLivre, planoDoExemplo, planoDoProjeto, regerarClaudeMd} from '../nucleo/criar-projeto';
+import {aplicarMarcaAoPlano, dentroDoOneDrive, documentoNovo, gravarPlano, nomePadrao, pastaLivre, planoDoExemplo, planoDoProjeto, regerarClaudeMd} from '../nucleo/criar-projeto';
 import {EXEMPLO} from '../nucleo/exemplo';
 import {MODELOS} from '../nucleo/modelos';
 import {FORMATO_PADRAO, type Formato} from '../nucleo/formatos';
@@ -17,7 +17,7 @@ import {ErroProjeto, Projeto, serializar} from '../nucleo/projeto';
 import {criarRede} from '../nucleo/ferramentas-mcp';
 import {discoCheio, faltaEspaco, prepararRender, renderizarVideo} from './exportar';
 import {registrarIpcMarcas} from './ipc-marcas';
-import {registrarExportarPaginas} from './exportar-paginas';
+import {arquivoLivre, registrarExportarPaginas} from './exportar-paginas';
 import {lerJsonDaTela} from './ler-json';
 import {McpHttp} from './mcp-http';
 import {Memoria} from './memoria';
@@ -216,13 +216,6 @@ const criarProjeto = async (o: NovoProjeto) => {
   return abrirProjeto(destino);
 };
 
-/** Arquivo que ainda não existe em `pasta`: "Nome.mp4", "Nome (2).mp4"... */
-const arquivoLivre = (pasta: string, nome: string, ext: string) => {
-  const base = nomeDePasta(nome) || 'saida';
-  let p = path.join(pasta, `${base}.${ext}`);
-  for (let n = 2; existsSync(p); n++) p = path.join(pasta, `${base} (${n}).${ext}`);
-  return p;
-};
 const tituloDoDocumento = (p: Projeto, id: string) => p.manifesto().documentos.find((d) => d.id === id)?.titulo ?? id;
 
 const criarJanela = () => {

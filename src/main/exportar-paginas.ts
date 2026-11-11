@@ -38,8 +38,8 @@ export const pdfDasPaginas = async (pngs: (Buffer | string)[], ptPorPx = 1) => {
   return Buffer.from(await pdf.save({useObjectStreams: false}));
 };
 
-/** Arquivo que ainda não existe em `pasta`: "Nome.png", "Nome (2).png"… (o mesmo critério do main.ts). */
-const arquivoLivre = (pasta: string, nome: string, ext: string) => {
+/** Arquivo que ainda não existe em `pasta`: "Nome.mp4", "Nome (2).mp4"… (vídeo, imagem e páginas usam o mesmo). */
+export const arquivoLivre = (pasta: string, nome: string, ext: string) => {
   const base = nomeDePasta(nome) || 'saida';
   let p = path.join(pasta, `${base}.${ext}`);
   for (let n = 2; existsSync(p); n++) p = path.join(pasta, `${base} (${n}).${ext}`);
