@@ -117,7 +117,7 @@ export const PainelMarca: React.FC<{aoFechar: () => void}> = ({aoFechar}) => {
 
   return (
     <div className="dialogo-fundo" onPointerDown={(e) => e.target === e.currentTarget && aoFechar()} onKeyDown={(e) => e.key === 'Escape' && aoFechar()}>
-      <div className="dialogo marca-dialogo" role="dialog" aria-label="Marca">
+      <div className="dialogo marca-dialogo" role="dialog" aria-modal="true" aria-label="Marca">
         <div className="dialogo-titulo">Marca</div>
         {!kits ? <div className="vazio">carregando os kits…</div> : (
           <div className="marca-corpo">
@@ -195,7 +195,7 @@ export const PainelMarca: React.FC<{aoFechar: () => void}> = ({aoFechar}) => {
           )}
         </div>
         <div className="dialogo-botoes">
-          <button className="bt fantasma" onClick={aoFechar}>Fechar</button>
+          <button className="bt fantasma" onClick={aoFechar} autoFocus>Fechar</button>
           <button className="bt principal" disabled={ocupado || !sel || !recebe} onClick={() => void aplicar()}
             title={recebe ? 'Troca o tema do documento ativo pelas cores e fontes deste kit (vai para o histórico; Ctrl+Z desfaz)' : 'Abra um vídeo ou uma imagem para aplicar'}>
             Aplicar ao documento ativo
