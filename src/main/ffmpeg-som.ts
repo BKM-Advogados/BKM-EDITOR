@@ -130,6 +130,18 @@ export const lerEntrada = (erro: string) => {
   return {codec: m[1], taxa: Number(m[2]), canais};
 };
 
+/** A duração (s) que o ffmpeg escreve na saída de erro ("Duration: 00:21:02.67"); null quando ele não sabe (N/A). */
+export const lerDuracao = (erro: string) => {
+  const m = /Duration: (\d+):(\d{2}):(\d{2}(?:\.\d+)?)/.exec(erro);
+  return m ? Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) : null;
+};
+
+/** Duração, taxa e canais do áudio de um arquivo, lidos do cabeçalho, sem decodificar nada. */
+export const medirEntrada = async (arquivo: string, o: Parar & {binarios?: string | null} = {}) => {
+  const {erro} = await rodarFfmpeg(['-i', arquivo, '-map', '0:a:0', '-t', '0', '-f', 'null', '-'], o);
+  return {duracao_s: lerDuracao(erro), ...lerEntrada(erro)};
+};
+
 /** Amostras por pacote que o ffmpeg entrega desse codec: o WAV vem em blocos de 4096 bytes; os comprimidos, no quadro deles. */
 export const amostrasPorPacote = (e: {codec: string; canais: number}) => {
   const pcm = /^pcm_[suf](8|16|24|32|64)/.exec(e.codec);
