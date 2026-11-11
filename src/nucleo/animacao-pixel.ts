@@ -113,6 +113,37 @@ export const ordemAleatoria = (n: number, semente: number): number[] => {
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
+/** Quando (de 0 a 1 do progresso) a célula i, na coluna c e linha l, entra nos efeitos de frente fixa: aleatório e
+ *  decodificar (pela ordem embaralhada), varredura, varredura para baixo e meio. É o único lugar das fórmulas: revelar e
+ *  revelarRGBA usam esta função, então mudar a geometria de um efeito é mudar só aqui. */
+export const limiarDaCelula = (efeito: EfeitoPixel | undefined, i: number, c: number, l: number, colunas: number, linhas: number, ordem: ArrayLike<number>, n: number) => {
+  switch (efeito) {
+    case 'aleatorio':
+    case 'decodificar':
+      return ordem[i] / n;
+    case 'varredura':
+      return c / colunas;
+    case 'varredura-baixo':
+      return l / linhas;
+    case 'meio': {
+      const cx = (colunas - 1) / 2;
+      const cy = (linhas - 1) / 2;
+      return Math.hypot(c - cx, l - cy) / Math.hypot(cx, cy);
+    }
+    default:
+      return 0;
+  }
+};
+
+/** Quanto do progresso a célula do `decodificar` leva para assentar na cor final, depois de entrar. */
+const ASSENTAR = Math.max(0.05, 0.25);
+
+/** Lados inteiros da grade (grade torta não derruba quem desenha). */
+const ladosDe = (grade: GradePixel) => ({
+  colunas: Math.max(1, Math.floor(grade.colunas) || 1),
+  linhas: Math.max(1, Math.floor(grade.linhas) || 1),
+});
+
 // ---------- revelação ----------
 /**
  * A cor a desenhar de cada célula no instante `progresso` (0 a 1), determinística pela `semente`. `null` = célula ainda
@@ -122,11 +153,11 @@ const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
  * - varredura / varredura-baixo: uma frente anda da esquerda para a direita / de cima para baixo;
  * - meio: a revelação cresce do centro para fora;
  * - chuva: colunas caem como a chuva do Matrix, com a ponta clara.
+ * A composição usa revelarRGBA (a mesma conta, em bytes); esta versão em texto serve à interface e aos testes.
  */
 export const revelar = (grade: GradePixel, efeito: EfeitoPixel | undefined, semente: number, progresso: number): (string | null)[] => {
   // defensiva: a grade normalmente já passou por lerGrade, mas quem chama direto não derruba a composição
-  const colunas = Math.max(1, Math.floor(grade.colunas) || 1);
-  const linhas = Math.max(1, Math.floor(grade.linhas) || 1);
+  const {colunas, linhas} = ladosDe(grade);
   const n = colunas * linhas;
   const celulas = typeof grade.celulas === 'string' ? grade.celulas : '';
   const paleta = Array.isArray(grade.paleta) ? grade.paleta : [];
@@ -137,47 +168,28 @@ export const revelar = (grade: GradePixel, efeito: EfeitoPixel | undefined, seme
   if (p <= 0) return finais.map(() => null);
   if (p >= 1) return finais;
   const rnd = mulberry32(semente * 2654435761 + 7);
-  const ordem = ordemAleatoria(Math.max(0, n), semente);
+  const ordem = ordemAleatoria(n, semente);
+  const limiar = (i: number) => limiarDaCelula(efeito, i, i % colunas, Math.floor(i / colunas), colunas, linhas, ordem, n);
 
   const out: (string | null)[] = new Array(n).fill(null);
-  const celula = (c: number, l: number) => l * colunas + c;
 
   switch (efeito) {
     case 'aleatorio':
-      for (let i = 0; i < n; i++) if (ordem[i] / n <= p) out[i] = finais[i];
+    case 'varredura':
+    case 'varredura-baixo':
+    case 'meio':
+      for (let i = 0; i < n; i++) if (limiar(i) <= p) out[i] = finais[i];
       return out;
 
     case 'decodificar': {
       for (let i = 0; i < n; i++) {
         if (finais[i] === null) continue;
-        const limiar = ordem[i] / n;
-        if (p <= limiar) continue;
+        const lim = limiar(i);
+        if (p <= lim) continue;
         const corTrocada = paleta[Math.floor(rnd() * paleta.length)] ?? finais[i];
         // assim que entra, a célula ainda está com a cor trocada; assenta rápido na final
-        const local = clamp01((p - limiar) / Math.max(0.05, 0.25));
+        const local = clamp01((p - lim) / ASSENTAR);
         out[i] = local >= 1 ? finais[i] : misturarCor(corTrocada, finais[i]!, local);
-      }
-      return out;
-    }
-
-    case 'varredura':
-      for (let l = 0; l < linhas; l++) for (let c = 0; c < colunas; c++) {
-        if (c / colunas <= p) out[celula(c, l)] = finais[celula(c, l)];
-      }
-      return out;
-
-    case 'varredura-baixo':
-      for (let l = 0; l < linhas; l++) for (let c = 0; c < colunas; c++) {
-        if (l / linhas <= p) out[celula(c, l)] = finais[celula(c, l)];
-      }
-      return out;
-
-    case 'meio': {
-      const cx = (colunas - 1) / 2;
-      const cy = (linhas - 1) / 2;
-      const maxD = Math.hypot(cx, cy);
-      for (let l = 0; l < linhas; l++) for (let c = 0; c < colunas; c++) {
-        if (Math.hypot(c - cx, l - cy) / maxD <= p) out[celula(c, l)] = finais[celula(c, l)];
       }
       return out;
     }
@@ -188,7 +200,7 @@ export const revelar = (grade: GradePixel, efeito: EfeitoPixel | undefined, seme
         const atraso = Math.floor(rnd() * linhas);
         const ponta = p * (linhas + atraso) - atraso;
         for (let l = 0; l < linhas; l++) {
-          const i = celula(c, l);
+          const i = l * colunas + c;
           if (l <= ponta) out[i] = finais[i];
           // a ponta brilha (mais clara) na frente da chuva
           if (l === Math.floor(ponta) && l >= 0 && l < linhas && finais[i]) out[i] = misturarCor(finais[i]!, '#FFFFFF', 0.6);
@@ -199,6 +211,129 @@ export const revelar = (grade: GradePixel, efeito: EfeitoPixel | undefined, seme
 
     default:
       return finais;
+  }
+};
+
+// ---------- revelação em RGBA, para o canvas (ImageData) ----------
+// O que não depende do quadro (células decodificadas, cores finais em número, a permutação da semente e os limiares de cada
+// célula) fica guardado por grade + semente: a camada de pixel refaz só a comparação com o progresso a cada quadro, e o
+// canvas recebe tudo de uma vez (putImageData) em vez de um fillRect por célula. A saída é a mesma de revelar, célula a célula.
+type Preparo = {celulas: string; n: number; vazia: Uint8Array; final: Int32Array; paleta: Int32Array; ordem: Int32Array;
+  limiares: Map<string, Float64Array>};
+const LIMITE_PREPAROS = 16;
+const LIMITE_CELULAS_GUARDADAS = 4_000_000; // ~100 MB no pior caso (4 + 4 + 1 + 4 bytes por célula, mais 8 por efeito usado)
+const preparos = new Map<string, Preparo>(); // na ordem de uso: o mais antigo sai primeiro
+const rgbDe = (c: unknown) => parseInt(corDaPaleta(c).slice(1), 16);
+
+const preparar = (g: GradePixel, colunas: number, linhas: number, semente: number): Preparo => {
+  const paletaCrua = Array.isArray(g.paleta) ? g.paleta : [];
+  const celulas = typeof g.celulas === 'string' ? g.celulas : '';
+  const chave = `${colunas}x${linhas}|${semente}|${paletaCrua.join(',')}`;
+  const achado = preparos.get(chave);
+  if (achado && achado.celulas === celulas) {
+    preparos.delete(chave);
+    preparos.set(chave, achado);
+    return achado;
+  }
+  const n = colunas * linhas;
+  const indices = decodificarCelulas(celulas.slice(0, n).padEnd(n, VAZIO));
+  const paleta = Int32Array.from(paletaCrua.map(rgbDe));
+  const vazia = new Uint8Array(n);
+  const final = new Int32Array(n);
+  for (let i = 0; i < n; i++) {
+    const k = indices[i];
+    if (k < 0) vazia[i] = 1;
+    else final[i] = k < paleta.length ? paleta[k] : paleta.length ? paleta[0] : 0; // como corDaCelula: fora da paleta, a 1ª cor
+  }
+  const novo: Preparo = {celulas, n, vazia, final, paleta, ordem: Int32Array.from(ordemAleatoria(n, semente)), limiares: new Map()};
+  preparos.delete(chave);
+  preparos.set(chave, novo);
+  let total = 0;
+  for (const x of preparos.values()) total += x.n;
+  for (const [k, x] of preparos) {
+    if (preparos.size <= 1 || (preparos.size <= LIMITE_PREPAROS && total <= LIMITE_CELULAS_GUARDADAS)) break;
+    total -= x.n;
+    preparos.delete(k);
+  }
+  return novo;
+};
+
+const limiaresDe = (pr: Preparo, efeito: EfeitoPixel, colunas: number, linhas: number) => {
+  let lim = pr.limiares.get(efeito);
+  if (!lim) {
+    lim = new Float64Array(pr.n);
+    for (let i = 0; i < pr.n; i++) lim[i] = limiarDaCelula(efeito, i, i % colunas, Math.floor(i / colunas), colunas, linhas, pr.ordem, pr.n);
+    pr.limiares.set(efeito, lim);
+  }
+  return lim;
+};
+
+/** Quantos preparos estão guardados (para os testes conferirem o teto). */
+export const preparosGuardados = () => ({quantos: preparos.size, celulas: [...preparos.values()].reduce((s, x) => s + x.n, 0)});
+
+const misturarRgb = (a: number, b: number, u: number) => {
+  const p = clamp01(u);
+  const canal = (s: number) => Math.max(0, Math.min(255, Math.round(((a >> s) & 255) * (1 - p) + ((b >> s) & 255) * p)));
+  return (canal(16) << 16) | (canal(8) << 8) | canal(0);
+};
+
+/**
+ * Como revelar, mas em RGBA (4 bytes por célula, transparente onde não há cor), pronto para `new ImageData(rgba, colunas,
+ * linhas)`. O tamanho é sempre colunas × linhas (inteiros): célula que falta fica transparente e a que sobra não entra.
+ */
+export const revelarRGBA = (grade: GradePixel, efeito: EfeitoPixel | undefined, semente: number, progresso: number): Uint8ClampedArray<ArrayBuffer> => {
+  const {colunas, linhas} = ladosDe(grade);
+  const px = new Uint8ClampedArray(colunas * linhas * 4);
+  const pr = preparar(grade, colunas, linhas, semente);
+  const {n, vazia, final, paleta} = pr;
+  const pinta = (i: number, v: number) => {
+    const o = i * 4;
+    px[o] = (v >> 16) & 255;
+    px[o + 1] = (v >> 8) & 255;
+    px[o + 2] = v & 255;
+    px[o + 3] = 255;
+  };
+  const p = clamp01(progresso);
+  if (p <= 0) return px;
+  const tudo = () => {
+    for (let i = 0; i < n; i++) if (!vazia[i]) pinta(i, final[i]);
+    return px;
+  };
+  if (p >= 1) return tudo();
+  const rnd = mulberry32(semente * 2654435761 + 7);
+  switch (efeito) {
+    case 'aleatorio':
+    case 'varredura':
+    case 'varredura-baixo':
+    case 'meio': {
+      const lim = limiaresDe(pr, efeito, colunas, linhas);
+      for (let i = 0; i < n; i++) if (!vazia[i] && lim[i] <= p) pinta(i, final[i]);
+      return px;
+    }
+    case 'decodificar': {
+      const lim = limiaresDe(pr, efeito, colunas, linhas);
+      for (let i = 0; i < n; i++) {
+        if (vazia[i] || p <= lim[i]) continue;
+        const trocada = paleta[Math.floor(rnd() * paleta.length)];
+        const local = clamp01((p - lim[i]) / ASSENTAR);
+        pinta(i, local >= 1 ? final[i] : misturarRgb(trocada ?? final[i], final[i], local));
+      }
+      return px;
+    }
+    case 'chuva':
+      for (let c = 0; c < colunas; c++) {
+        const atraso = Math.floor(rnd() * linhas);
+        const ponta = p * (linhas + atraso) - atraso;
+        for (let l = 0; l < linhas; l++) {
+          const i = l * colunas + c;
+          if (vazia[i]) continue;
+          if (l === Math.floor(ponta)) pinta(i, misturarRgb(final[i], 0xffffff, 0.6));
+          else if (l <= ponta) pinta(i, final[i]);
+        }
+      }
+      return px;
+    default:
+      return tudo();
   }
 };
 

@@ -1,16 +1,17 @@
 // Composição Remotion "Animacao": desenha o documento quadro a quadro. Prévia (Player) e exportação passam por aqui
 // (registro.ts), então desenham a mesma coisa. Tudo é determinístico: os valores vêm de valorEm (nucleo/animacao.ts) e a
-// revelação do pixel de revelar (nucleo/animacao-pixel.ts, com semente), nada de Math.random.
+// revelação do pixel de revelarRGBA (nucleo/animacao-pixel.ts, com semente), nada de Math.random.
 import React, {useLayoutEffect, useRef} from 'react';
 import {AbsoluteFill, Img, useCurrentFrame, useVideoConfig} from 'remotion';
 import {fonte} from '../fontes';
 import {definirBaseMidia, midia} from '../midia';
-import {revelar} from '../../nucleo/animacao-pixel';
+import {revelarRGBA} from '../../nucleo/animacao-pixel';
 import {resolverCor, valorEm, type CamadaAnimacao, type PropsAnimacao, type TemaAnimacao} from '../../nucleo/animacao';
 
 const num = (v: number | string) => Number(v);
 
-/** Camada de pixel: desenha a grade num canvas 2D (1 px por célula) e a amplia com image-rendering pixelated. */
+/** Camada de pixel: desenha a grade num canvas 2D (1 px por célula, de uma vez com putImageData) e a amplia com
+ *  image-rendering pixelated. */
 const CamadaPixel: React.FC<{c: CamadaAnimacao; t_ms: number}> = ({c, t_ms}) => {
   const grade = c.grade;
   const ref = useRef<HTMLCanvasElement>(null);
@@ -21,18 +22,12 @@ const CamadaPixel: React.FC<{c: CamadaAnimacao; t_ms: number}> = ({c, t_ms}) => 
     if (!cv || !grade) return;
     const ctx = cv.getContext('2d');
     if (!ctx) return;
-    const colunas = Math.max(1, grade.colunas);
-    const linhas = Math.max(1, grade.linhas);
-    cv.width = colunas;
-    cv.height = linhas;
-    ctx.clearRect(0, 0, colunas, linhas);
-    const cores = revelar(grade, c.efeito, c.semente ?? 1, progresso);
-    for (let l = 0; l < linhas; l++) for (let x = 0; x < colunas; x++) {
-      const cor = cores[l * colunas + x];
-      if (!cor) continue;
-      ctx.fillStyle = cor;
-      ctx.fillRect(x, l, 1, 1);
-    }
+    const colunas = Math.max(1, Math.floor(grade.colunas) || 1);
+    const linhas = Math.max(1, Math.floor(grade.linhas) || 1);
+    if (cv.width !== colunas) cv.width = colunas;
+    if (cv.height !== linhas) cv.height = linhas;
+    // putImageData troca todos os pixels, transparentes inclusive: não precisa de clearRect
+    ctx.putImageData(new ImageData(revelarRGBA(grade, c.efeito, c.semente ?? 1, progresso), colunas, linhas), 0, 0);
   }, [grade, c.efeito, c.semente, progresso]);
   if (!grade) return null;
   return <canvas ref={ref} style={{width: grade.colunas * tamanho, height: grade.linhas * tamanho, imageRendering: 'pixelated', display: 'block'}} />;
