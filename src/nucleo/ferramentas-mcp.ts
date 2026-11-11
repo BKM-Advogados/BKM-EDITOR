@@ -174,7 +174,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
     description: 'Muda um documento com JSON Patch (RFC 6902), de forma atômica. Passe a versao_base lida em ler_documento e um "test" no valor que vai trocar; se o documento mudou por baixo, nada é gravado e você deve ler de novo. A tela do app atualiza sozinha.',
     inputSchema: {
       documento: z.string(),
-      versao_base: z.string(),
+      versao_base: z.string().min(1),
       patch: z.array(z.object({op: z.enum(['add', 'remove', 'replace', 'move', 'copy', 'test']), path: z.string(), value: z.any().optional(), from: z.string().optional()})),
       rotulo: z.string().optional().describe('o que a mudança faz, em poucas palavras'),
     },

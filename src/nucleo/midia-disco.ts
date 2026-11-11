@@ -63,11 +63,21 @@ export const listarMidiaBruta = (raiz: string): ArquivoBruto[] => {
     }
     for (const item of itens) {
       const relItem = `${rel}/${item.name}`;
-      if (item.isDirectory()) {
+      // link simbólico (uma pasta de vídeo bruto num disco de fora): lido como o que ele aponta; só leitura (Projeto.caminhoParaGravar)
+      let tipo: 'pasta' | 'arquivo' | null = item.isDirectory() ? 'pasta' : item.isFile() ? 'arquivo' : null;
+      if (item.isSymbolicLink()) {
+        try {
+          const st = statSync(path.join(raiz, relItem));
+          tipo = st.isDirectory() ? 'pasta' : st.isFile() ? 'arquivo' : null;
+        } catch {
+          tipo = null; // link quebrado
+        }
+      }
+      if (tipo === 'pasta') {
         if (nivel < PROFUNDIDADE) andar(relItem, nivel + 1);
         continue;
       }
-      if (!item.isFile() || relItem.endsWith('.tmp')) continue;
+      if (tipo !== 'arquivo' || relItem.endsWith('.tmp')) continue;
       try {
         const abs = path.join(raiz, relItem);
         const st = statSync(abs);

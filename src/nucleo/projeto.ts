@@ -2,12 +2,12 @@
 // Toda escrita em documento passa por aplicarPatch: confere a versão (lock otimista), aplica o JSON Patch de forma
 // atômica (os "test" falham antes de qualquer mudança), grava, e registra a mudança com o patch inverso no diário.
 import {createHash} from 'node:crypto';
-import {existsSync, mkdirSync, readFileSync, renameSync, rmSync, closeSync, fstatSync, openSync, readSync, statSync, writeSync} from 'node:fs';
+import {existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync, closeSync, fstatSync, openSync, readSync, statSync, writeSync} from 'node:fs';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import jsonpatch, {type Operation} from 'fast-json-patch';
 import type {ArquivoComentarios, Comentario, EntradaDiario, EntradaDocumento, EstadoEditor, Manifesto, OperacaoPatch} from './documentos';
-import {comNovaTentativa, gravarAtomico} from './gravar-seguro';
+import {comNovaTentativa, gravarAtomico, renomearComRetry} from './gravar-seguro';
 import {comATrava, comTrava} from './trava-escrita';
 import {ARQUIVO_PESQUISA, caminhoTextoFonte, lerPesquisa, pesquisaVazia, type Pesquisa} from './pesquisa';
 import {motivoDaTrava} from './travas-imagem';
@@ -23,6 +23,9 @@ export class ErroProjeto extends Error {
 export const versaoDe = (texto: string) => createHash('sha256').update(texto).digest('hex').slice(0, 12);
 
 export const serializar = (doc: unknown) => `${JSON.stringify(doc, null, 2)}\n`;
+
+/** Texto sem o BOM do UTF-8 no começo (Bloco de Notas antigo, PowerShell 5 com -Encoding utf8). */
+export const semBom = (texto: string) => (texto.charCodeAt(0) === 0xfeff ? texto.slice(1) : texto);
 
 /** `alvo` está dentro de `base` (ou é a própria base)? Só pelo texto do caminho; "..notas.json" é nome legítimo. */
 export const dentroDe = (base: string, alvo: string) => {
@@ -44,6 +47,33 @@ export class Projeto {
     return abs;
   }
 
+  /** O mesmo caminho, para gravar, copiar, renomear ou apagar: o lugar real (seguindo links simbólicos) também tem de
+   *  estar dentro do projeto. Um link em midia/ para um disco de fora funciona só para ler; nada se grava por ele. */
+  caminhoParaGravar(rel: string): string {
+    const abs = this.caminho(rel);
+    let existente = abs;
+    for (;;) {
+      try {
+        lstatSync(existente);
+        break;
+      } catch {
+        const pai = path.dirname(existente);
+        if (pai === existente) return abs;
+        existente = pai;
+      }
+    }
+    let real: string;
+    try {
+      real = realpathSync(existente);
+    } catch {
+      real = ''; // link quebrado: não se sabe para onde aponta
+    }
+    if (!real || !dentroDe(realpathSync(this.raiz), real)) {
+      throw new ErroProjeto(`${rel} passa por um link simbólico para fora do projeto: por ele só se lê, não se grava`, 'caminho');
+    }
+    return abs;
+  }
+
   existe(rel: string) {
     return existsSync(this.caminho(rel));
   }
@@ -51,7 +81,7 @@ export class Projeto {
   lerTexto(rel: string): string {
     const abs = this.caminho(rel);
     if (!existsSync(abs)) throw new ErroProjeto(`arquivo não achado: ${rel}`, 'nao_achado');
-    return readFileSync(abs, 'utf-8');
+    return semBom(readFileSync(abs, 'utf-8')); // a versão sai do texto sem BOM, e a próxima gravação o tira do arquivo
   }
 
   lerJson<T>(rel: string): {doc: T; versao: string} {
@@ -70,7 +100,7 @@ export class Projeto {
 
   /** Grava de forma atômica (arquivo temporário + rename), para o observador nunca ler meio arquivo. */
   gravarTexto(rel: string, texto: string) {
-    const abs = this.caminho(rel);
+    const abs = this.caminhoParaGravar(rel);
     mkdirSync(path.dirname(abs), {recursive: true});
     gravarAtomico(abs, texto); // arquivo preso (OneDrive, antivírus) tem nova tentativa curta: gravar-seguro.ts
   }
@@ -79,7 +109,7 @@ export class Projeto {
    *  projeto passa por aqui, para o app e o MCP da IDE (outro processo) não gravarem um por cima do outro. */
   comTrava<T>(f: () => T): T {
     const lock = this.caminho(`${PASTA_INTERNA}/escrita.lock`);
-    if (!comATrava(lock)) mkdirSync(path.dirname(lock), {recursive: true});
+    if (!comATrava(lock)) mkdirSync(path.dirname(this.caminhoParaGravar(`${PASTA_INTERNA}/escrita.lock`)), {recursive: true});
     return comTrava(lock, f, {ocupada: () => new ErroProjeto('outro programa está gravando o projeto; tente de novo', 'conflito')});
   }
 
@@ -113,7 +143,7 @@ export class Projeto {
       try {
         this.gravarManifesto({...m, documentos: [...m.documentos, entrada]});
       } catch (e) {
-        rmSync(this.caminho(entrada.caminho), {force: true}); // sem órfão: o mesmo nome serve na próxima tentativa
+        rmSync(this.caminhoParaGravar(entrada.caminho), {force: true}); // sem órfão: o mesmo nome serve na próxima tentativa
         throw e;
       }
       return entrada;
@@ -173,7 +203,7 @@ export class Projeto {
 
   private aplicarNoArquivo(rel: string, entrada: Parameters<Projeto['aplicarPatch']>[0], documento: boolean): {versao: string; entrada: EntradaDiario} {
     const {doc, versao, texto: textoAntes} = this.lerJsonComTexto<unknown>(rel);
-    if (entrada.versao_base && entrada.versao_base !== versao) {
+    if (entrada.versao_base !== undefined && entrada.versao_base !== versao) {
       throw new ErroProjeto(`o documento mudou (versão ${versao}, esperada ${entrada.versao_base}); leia de novo e refaça o patch`, 'conflito');
     }
     const erro = jsonpatch.validate(entrada.patch as Operation[], doc);
@@ -226,7 +256,7 @@ export class Projeto {
       this.registrar(registro);
     } catch (e) {
       try {
-        if (textoAntes === null) rmSync(this.caminho(rel), {force: true});
+        if (textoAntes === null) rmSync(this.caminhoParaGravar(rel), {force: true});
         else this.gravarTexto(rel, textoAntes);
       } catch {
         /* o arquivo também ficou preso: vale o erro do diário */
@@ -309,7 +339,7 @@ export class Projeto {
   }
 
   registrar(e: EntradaDiario) {
-    const abs = this.caminho(this.arquivoDiario());
+    const abs = this.caminhoParaGravar(this.arquivoDiario());
     mkdirSync(path.dirname(abs), {recursive: true});
     // se a última gravação parou no meio da linha, a entrada nova começa numa linha própria (transversal-D2)
     let quebra = '';
@@ -404,7 +434,10 @@ export class Projeto {
   // ---------- comentários ----------
   comentarios(): Comentario[] {
     if (!this.existe('comentarios.json')) return [];
-    return this.lerJson<ArquivoComentarios>('comentarios.json').doc.comentarios;
+    const lista = this.lerJson<Partial<ArquivoComentarios> | null>('comentarios.json').doc?.comentarios;
+    // sem a lista, lança: devolver [] faria o próximo comentário gravar por cima do que o arquivo tiver
+    if (!Array.isArray(lista)) throw new ErroProjeto('o comentarios.json não tem a lista "comentarios"; desfaça a última mudança no arquivo', 'patch');
+    return lista;
   }
 
   private gravarComentarios(lista: Comentario[]) {
@@ -450,10 +483,6 @@ export class Projeto {
   pesquisa(): Pesquisa {
     if (!this.existe(ARQUIVO_PESQUISA)) return pesquisaVazia();
     return lerPesquisa(this.lerJson<unknown>(ARQUIVO_PESQUISA).doc);
-  }
-
-  gravarPesquisa(p: Pesquisa) {
-    this.gravarTexto(ARQUIVO_PESQUISA, serializar(p));
   }
 
   /** Muda a pesquisa (a função mexe na cópia que recebe) e registra no diário o patch e o inverso. */
@@ -503,7 +532,7 @@ export class Projeto {
     if (!this.existe(atual)) return undefined;
     const sha8 = /^[0-9a-f]{8}/i.exec(sha256Antigo)?.[0]?.toLowerCase() ?? 'anterior';
     const destino = atual.replace(/\.txt$/, `.${sha8}.txt`);
-    renameSync(this.caminho(atual), this.caminho(destino));
+    renomearComRetry(this.caminhoParaGravar(atual), this.caminhoParaGravar(destino));
     return destino;
   }
 
