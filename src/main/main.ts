@@ -191,7 +191,7 @@ const abrirProjeto = async (raiz: string) => {
     apagarLimposSemUso(nova.projeto); // frente Som: as versões limpas da voz que nem documento nem diário citam (limpeza-voz.ts)
     aoAbrirMusica(nova.projeto); // frente Música: renders que faltam (pasta clonada) e os que sobraram (ipc-musica.ts)
     await nova.abrir();
-    nova.publicarMcp(mcpHttp?.novaConexao(midia.origem, 'mcp')); // o MCP da IDE passa pelo app enquanto o projeto está aberto (mcp-app.ts)
+    nova.publicarMcp(mcpHttp?.novaConexao(midia.origem, 'mcp', {ide: true})); // o MCP da IDE passa pelo app enquanto o projeto está aberto (mcp-app.ts)
   } catch (e) {
     await fecharSessao(); // nada de projeto meio aberto (mídia e MCP servindo, sem observador)
     throw e;
@@ -258,7 +258,7 @@ const criarJanela = () => {
     mcpHttp?.esquecerTudo();
     // o esquecerTudo revoga também o token do MCP da IDE, que não é aba da tela (e o did-navigate do primeiro
     // carregamento pode vir depois de o projeto inicial abrir): ele segue passando pelo app com um token novo
-    sessao?.publicarMcp(mcpHttp?.novaConexao(midia.origem, 'mcp'));
+    sessao?.publicarMcp(mcpHttp?.novaConexao(midia.origem, 'mcp', {ide: true}));
   };
   // did-navigate (a página nova entrou) e não did-start-navigation: este vem ANTES do will-navigate, e um arquivo solto na
   // janela, mesmo barrado lá, derrubaria todas as conversas

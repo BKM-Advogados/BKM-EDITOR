@@ -4,6 +4,11 @@
 // da IDE) confere o arquivo a cada chamada de ferramenta: com o app vivo, repassa a chamada a ele, e a gravação passa
 // pelo portão, pelo aviso na tela e por um escritor só; com o app fechado (ou sem projeto, ou o token revogado), roda
 // ali mesmo, com a trava de arquivo (trava-escrita.ts). O arquivo está no .gitignore do projeto (.estudio/mcp*).
+// Cada processo da IDE é uma conversa: nasce com um id curto, e a origem dele no diário é ide-<id> nos dois caminhos
+// (pelo app, pelo cabeçalho X-Estudio-Conversa; sem o app, ali mesmo). Assim o desfazer de uma conversa só desfaz as
+// mudanças dela, o "Sempre nesta conversa" do portão vale só para ela e reverter a mudança de outra pede permissão.
+// O autor continua "agente" (a tela compara com ele) ou o --autor do processo, que o app aceita se não for reservado.
+import {randomBytes} from 'node:crypto';
 import {existsSync, mkdirSync, readFileSync, rmSync} from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
@@ -16,6 +21,23 @@ import {PASTA_INTERNA} from './projeto';
 export const ARQUIVO_MCP_APP = `${PASTA_INTERNA}/mcp-app.json`;
 
 export type ConexaoApp = {formato: 1; url: string; token: string; pid: number; host: string; raiz: string; em: string};
+
+/** Quem fala pelo MCP da IDE: a conversa (o processo) e o autor que vai ao diário. */
+export type ConversaIde = {conversa: string; autor: string};
+
+export const CABECALHO_CONVERSA = 'x-estudio-conversa';
+export const CABECALHO_AUTOR = 'x-estudio-autor';
+const ID_CONVERSA = /^[0-9a-f]{6,16}$/;
+// quem não pode vir de fora: "pessoa" passaria pelas travas de camada, "sistema" se passaria pelo próprio app
+const AUTORES_RESERVADOS = new Set(['pessoa', 'sistema', 'interface']);
+
+/** Um id novo para a conversa deste processo (estável enquanto ele vive). */
+export const novaConversaIde = () => randomBytes(3).toString('hex');
+/** A origem no diário de uma conversa da IDE; o formato não se confunde com o rótulo de uma aba do app ("Claude 2"). */
+export const origemDaIde = (conversa: string) => `ide-${conversa}`;
+export const conversaValida = (c: unknown): c is string => typeof c === 'string' && ID_CONVERSA.test(c);
+export const autorAceito = (a: unknown): a is string =>
+  typeof a === 'string' && /^[\p{L}\p{N}][\p{L}\p{N} ._:-]{0,39}$/u.test(a) && !AUTORES_RESERVADOS.has(a.trim().toLowerCase());
 
 const arquivo = (raiz: string) => path.join(raiz, ARQUIVO_MCP_APP);
 const mesmaPasta = (a: string, b: string) => {
@@ -66,11 +88,12 @@ export const appAberto = (raiz: string): ConexaoApp | null => {
 
 type Resposta = {status: number; tipo: string; texto: string};
 
-const postar = (c: ConexaoApp, corpo: string) =>
+const postar = (c: ConexaoApp, corpo: string, quem?: ConversaIde) =>
   new Promise<Resposta>((ok, falhou) => {
     // sem prazo: o portão espera a pessoa responder no app (até 10 min)
     const req = http.request(c.url, {method: 'POST', headers: {'Content-Type': 'application/json', Accept: 'application/json, text/event-stream',
-      Authorization: `Bearer ${c.token}`, 'Content-Length': Buffer.byteLength(corpo)}}, (res) => {
+      Authorization: `Bearer ${c.token}`, 'Content-Length': Buffer.byteLength(corpo),
+      ...(quem ? {[CABECALHO_CONVERSA]: quem.conversa, [CABECALHO_AUTOR]: encodeURIComponent(quem.autor)} : {})}}, (res) => {
       let texto = '';
       res.setEncoding('utf-8');
       res.on('data', (d: string) => (texto += d));
@@ -85,11 +108,11 @@ const erroJsonRpc = (id: unknown, message: string): JSONRPCMessage => ({jsonrpc:
 
 /** Repassa uma mensagem JSON-RPC ao app. Devolve a resposta, ou null quando o app não a atende (fechou, sem projeto,
  *  token revogado) e a chamada deve rodar aqui; o pedido recusado na conexão não chegou a rodar no app. */
-export const encaminharAoApp = async (c: ConexaoApp, msg: JSONRPCMessage): Promise<JSONRPCMessage | null> => {
+export const encaminharAoApp = async (c: ConexaoApp, msg: JSONRPCMessage, quem?: ConversaIde): Promise<JSONRPCMessage | null> => {
   const id = (msg as {id?: unknown}).id;
   let r: Resposta;
   try {
-    r = await postar(c, JSON.stringify(msg));
+    r = await postar(c, JSON.stringify(msg), quem);
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === 'ECONNREFUSED') return null;
     return erroJsonRpc(id, `o Estúdio aberto neste projeto não respondeu (${(e as Error).message}); tente de novo`);
@@ -115,7 +138,7 @@ const ehChamadaDeFerramenta = (msg: JSONRPCMessage) => (msg as {method?: string;
 /** Liga o repasse no transporte de um servidor já conectado: cada tools/call vai ao app quando ele está aberto neste
  *  projeto; o resto (initialize, a lista de ferramentas) e as chamadas com o app fechado ficam no servidor local. As
  *  chamadas repassadas seguem uma de cada vez, na ordem em que chegaram. */
-export const repassarAoAppQuandoAberto = (t: Transport, raiz: string, o: {encontrar?: typeof appAberto} = {}) => {
+export const repassarAoAppQuandoAberto = (t: Transport, raiz: string, o: {encontrar?: typeof appAberto; quem?: ConversaIde} = {}) => {
   const local = t.onmessage;
   if (!local) throw new Error('conecte o servidor ao transporte antes de ligar o repasse');
   const encontrar = o.encontrar ?? appAberto;
@@ -124,7 +147,7 @@ export const repassarAoAppQuandoAberto = (t: Transport, raiz: string, o: {encont
     if (!ehChamadaDeFerramenta(msg)) return local(msg, extra);
     fila = fila.then(async () => {
       const app = encontrar(raiz);
-      const r = app ? await encaminharAoApp(app, msg) : null;
+      const r = app ? await encaminharAoApp(app, msg, o.quem) : null;
       if (r) await t.send(r); // o app já rodou: se a resposta não sair, não roda de novo aqui
       else local(msg, extra);
     }).catch(() => undefined);

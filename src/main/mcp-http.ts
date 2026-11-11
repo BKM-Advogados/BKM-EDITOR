@@ -10,13 +10,16 @@ import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {StreamableHTTPServerTransport} from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import {registrarFerramentas, type Rede, type TranscritorMcp} from '../nucleo/ferramentas-mcp';
 import {INSTRUCOES_MCP} from '../nucleo/mcp-ia';
+import {autorAceito, CABECALHO_AUTOR, CABECALHO_CONVERSA, conversaValida, origemDaIde} from '../nucleo/mcp-app';
 import type {PedidoPortao, Portao} from '../nucleo/portao';
 import type {Projeto} from '../nucleo/projeto';
 
 /** Quem pergunta à pessoa no app (ipc-ia.ts). sempre: a pessoa marcou "Sempre nesta conversa". */
 export type Perguntador = (p: PedidoPortao & {origem: string}) => Promise<{permitir: boolean; sempre?: boolean}>;
 
-type Aba = {origem: string; arquivo?: string; fixo?: boolean}; // fixo: app de IA de fora, com token que sobrevive a trocar de projeto
+// fixo: app de IA de fora, com token que sobrevive a trocar de projeto; ide: o token do MCP da IDE (mcp-app.ts), um só
+// para todas as conversas dela, que se distinguem pelo cabeçalho X-Estudio-Conversa
+type Aba = {origem: string; arquivo?: string; fixo?: boolean; ide?: boolean};
 
 // frente Fala: o transcritor local (transcricao.ts) chega depois do construtor, pelo registro do IPC da fala
 let transcritorMcp: TranscritorMcp | undefined;
@@ -26,7 +29,7 @@ export const definirTranscritorMcp = (t: TranscritorMcp) => {
 
 export class McpHttp {
   private abas = new Map<string, Aba>();
-  private sempre = new Map<string, Set<string>>(); // por token: ferramentas que a pessoa liberou nesta conversa
+  private sempre = new Map<string, Set<string>>(); // por conversa (token, e a conversa da IDE): ferramentas que a pessoa liberou
 
   constructor(private readonly pastaConfig: string, private readonly projeto: () => Projeto | null, private readonly rede?: Rede,
     private readonly perguntador?: Perguntador) {}
@@ -37,7 +40,7 @@ export class McpHttp {
   }
 
   /** O mesmo, com o endereço e o cabeçalho à mão: o laço próprio e os agentes ACP recebem assim, sem ler o arquivo. */
-  novaConexao(base: string, origem: string) {
+  novaConexao(base: string, origem: string, o: {ide?: boolean} = {}) {
     const token = randomBytes(18).toString('hex');
     mkdirSync(this.pastaConfig, {recursive: true});
     const arquivo = path.join(this.pastaConfig, `aba-${token.slice(0, 8)}.json`);
@@ -45,7 +48,7 @@ export class McpHttp {
     const headers = {Authorization: `Bearer ${token}`};
     const config = {mcpServers: {estudio: {type: 'http', url, headers}}};
     writeFileSync(arquivo, JSON.stringify(config, null, 2), {encoding: 'utf-8', mode: 0o600});
-    this.abas.set(token, {origem, arquivo});
+    this.abas.set(token, {origem, arquivo, ...(o.ide ? {ide: true} : {})});
     return {arquivo, url, headers};
   }
 
@@ -55,8 +58,12 @@ export class McpHttp {
       if (a.fixo) continue;
       if (a.arquivo) rmSync(a.arquivo, {force: true});
       this.abas.delete(token);
-      this.sempre.delete(token);
+      this.esquecerSempre(token);
     }
+  }
+
+  private esquecerSempre(token: string) {
+    for (const chave of [...this.sempre.keys()]) if (chave === token || chave.startsWith(`${token} `)) this.sempre.delete(chave);
   }
 
   /** Padrão Screenpipe (frente IA): um app de IA de fora (Cursor, Cline, Claude Desktop) entra com um token próprio, que
@@ -67,7 +74,25 @@ export class McpHttp {
 
   esquecerFixo(token: string) {
     this.abas.delete(token);
-    this.sempre.delete(token);
+    this.esquecerSempre(token);
+  }
+
+  /** Autor e origem no diário, e a chave do "Sempre nesta conversa". A aba é uma conversa só; o token da IDE serve a
+   *  todos os processos dela, e cada um diz a sua conversa (ide-<id>) e o seu autor, que não pode ser um reservado. */
+  private quem(token: string, aba: Aba, req: http.IncomingMessage): {autor: string; origem: string; chave: string} | {erro: string} {
+    if (!aba.ide) return {autor: 'agente', origem: aba.origem, chave: token};
+    const conversa = req.headers[CABECALHO_CONVERSA];
+    const bruto = req.headers[CABECALHO_AUTOR];
+    let autor = 'agente';
+    if (typeof bruto === 'string') {
+      try {
+        autor = decodeURIComponent(bruto);
+      } catch {
+        autor = '';
+      }
+      if (!autorAceito(autor)) return {erro: `o autor "${autor}" não pode gravar pelo Estúdio; use outro --autor`};
+    }
+    return conversaValida(conversa) ? {autor, origem: origemDaIde(conversa), chave: `${token} ${conversa}`} : {autor, origem: aba.origem, chave: token};
   }
 
   /** Atende /mcp; devolve false se o pedido não é para cá. */
@@ -98,19 +123,24 @@ export class McpHttp {
         .end(JSON.stringify({jsonrpc: '2.0', id: null, error: {code: -32700, message: 'o corpo não é JSON válido'}}));
       return true;
     }
+    const quem = this.quem(token!, aba, req);
+    if ('erro' in quem) {
+      res.writeHead(400, {'Content-Type': 'application/json'}).end(JSON.stringify({jsonrpc: '2.0', id: null, error: {code: -32600, message: quem.erro}}));
+      return true;
+    }
     const servidor = new McpServer({name: 'estudio', version: '0.1.0'}, {instructions: INSTRUCOES_MCP});
-    // frente IA: o portão pergunta à pessoa pelo app; "Sempre nesta conversa" vale para o token desta aba
+    // frente IA: o portão pergunta à pessoa pelo app; "Sempre nesta conversa" vale para esta conversa (aba ou conversa da IDE)
     const perguntar = this.perguntador;
     const portao: Portao | undefined = perguntar && {
       perguntar: async (p) => {
-        const lembradas = this.sempre.get(token!);
+        const lembradas = this.sempre.get(quem.chave);
         if (lembradas?.has(p.ferramenta)) return true;
-        const r = await perguntar({...p, origem: aba.origem});
-        if (r.permitir && r.sempre) this.sempre.set(token!, new Set([...(lembradas ?? []), p.ferramenta]));
+        const r = await perguntar({...p, origem: quem.origem});
+        if (r.permitir && r.sempre) this.sempre.set(quem.chave, new Set([...(this.sempre.get(quem.chave) ?? []), p.ferramenta]));
         return r.permitir;
       },
     };
-    registrarFerramentas(servidor, projeto, 'agente', aba.origem, this.rede, transcritorMcp, portao);
+    registrarFerramentas(servidor, projeto, quem.autor, quem.origem, this.rede, transcritorMcp, portao);
     const transporte = new StreamableHTTPServerTransport({sessionIdGenerator: undefined, enableJsonResponse: true});
     res.on('close', () => {
       void transporte.close();

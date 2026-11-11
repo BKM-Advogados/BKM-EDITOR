@@ -8,7 +8,7 @@ import path from 'node:path';
 import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
 import {Projeto} from '../src/nucleo/projeto';
-import {repassarAoAppQuandoAberto} from '../src/nucleo/mcp-app';
+import {novaConversaIde, origemDaIde, repassarAoAppQuandoAberto} from '../src/nucleo/mcp-app';
 import {criarRede, registrarFerramentas} from '../src/nucleo/ferramentas-mcp';
 import {INSTRUCOES_MCP} from '../src/nucleo/mcp-ia';
 import {Transcritor} from '../src/main/transcricao';
@@ -25,11 +25,13 @@ const servidor = new McpServer({name: 'estudio', version: '0.1.0'}, {instruction
 definirServicoMusica(servicoDeRender());
 // a transcrição local acha o ffmpeg no node_modules do repositório (dist-mcp/ fica na raiz)
 const raiz = path.resolve(arg('--projeto') ?? process.cwd());
-registrarFerramentas(servidor, new Projeto(raiz), arg('--autor') ?? 'agente', 'mcp', criarRede(),
+// um processo por conversa da IDE: a mesma origem (ide-<id>) no diário com o app aberto ou fechado (mcp-app.ts)
+const quem = {conversa: novaConversaIde(), autor: arg('--autor') ?? 'agente'};
+registrarFerramentas(servidor, new Projeto(raiz), quem.autor, origemDaIde(quem.conversa), criarRede(),
   new Transcritor({raizApp: path.resolve(__dirname, '..')}));
 
 const transporte = new StdioServerTransport();
-servidor.connect(transporte).then(() => repassarAoAppQuandoAberto(transporte, raiz)).catch((e: unknown) => {
+servidor.connect(transporte).then(() => repassarAoAppQuandoAberto(transporte, raiz, {quem})).catch((e: unknown) => {
   process.stderr.write(`estudio MCP: ${String(e)}\n`);
   process.exit(1);
 });

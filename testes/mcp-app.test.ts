@@ -13,7 +13,7 @@ import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import {McpHttp} from '../src/main/mcp-http';
 import {registrarFerramentas} from '../src/nucleo/ferramentas-mcp';
-import {ARQUIVO_MCP_APP, appAberto, publicarMcpApp, repassarAoAppQuandoAberto, retirarMcpApp} from '../src/nucleo/mcp-app';
+import {ARQUIVO_MCP_APP, appAberto, origemDaIde, publicarMcpApp, repassarAoAppQuandoAberto, retirarMcpApp} from '../src/nucleo/mcp-app';
 import {Projeto} from '../src/nucleo/projeto';
 
 let pasta = '';
@@ -38,22 +38,22 @@ afterAll(() => {
 });
 
 /** O MCP por stdio da IDE (um processo à parte): servidor local sobre outro Projeto da mesma pasta, com o repasse. */
-const ide = async () => {
+const ide = async (conversa?: string) => {
   const local = new McpServer({name: 'estudio', version: '0'});
-  registrarFerramentas(local, new Projeto(pasta), 'agente', 'mcp');
+  registrarFerramentas(local, new Projeto(pasta), 'agente', conversa ? origemDaIde(conversa) : 'mcp');
   const [a, b] = InMemoryTransport.createLinkedPair();
   await local.connect(a);
-  repassarAoAppQuandoAberto(a, pasta);
+  repassarAoAppQuandoAberto(a, pasta, conversa ? {quem: {conversa, autor: 'agente'}} : {});
   const c = new Client({name: 'ide', version: '0'});
   await c.connect(b);
   return c;
 };
 
-const trocarCor = async (c: Client, cor: string) => {
-  const ler = (await c.callTool({name: 'ler_documento', arguments: {documento: 'cena3d', caminho: '/objetos/0/cor'}})) as {content: {text: string}[]};
+const trocarCor = async (c: Client, cor: string, objeto = 0) => {
+  const ler = (await c.callTool({name: 'ler_documento', arguments: {documento: 'cena3d', caminho: `/objetos/${objeto}/cor`}})) as {content: {text: string}[]};
   const {versao} = JSON.parse(ler.content[0].text);
   return (await c.callTool({name: 'aplicar_patch', arguments: {documento: 'cena3d', versao_base: versao, rotulo: `cor ${cor}`,
-    patch: [{op: 'replace', path: '/objetos/0/cor', value: cor}]}})) as {isError?: boolean; content: {text: string}[]};
+    patch: [{op: 'replace', path: `/objetos/${objeto}/cor`, value: cor}]}})) as {isError?: boolean; content: {text: string}[]};
 };
 const ultima = () => new Projeto(pasta).diario(0, {tolerante: true}).at(-1)!;
 
@@ -92,6 +92,27 @@ describe('repasse do MCP da IDE', () => {
     expect(r.isError).toBeFalsy();
     expect(ultima()).toMatchObject({autor: 'agente', origem: 'IDE pelo app', rotulo: 'cor #111111'});
     await cliente.close();
+  });
+
+  it('cada conversa da IDE grava com a origem dela, e o desfazer de uma não desfaz a da outra', async () => {
+    const c = mcp.novaConexao(origem, 'mcp', {ide: true});
+    publicarMcpApp(pasta, {url: c.url, token: c.headers.Authorization.slice('Bearer '.length)});
+    const [a, b] = [await ide('aaaaaa'), await ide('bbbbbb')];
+    expect((await trocarCor(a, '#a00000')).isError).toBeFalsy();
+    expect(ultima()).toMatchObject({autor: 'agente', origem: 'ide-aaaaaa', rotulo: 'cor #a00000'});
+    expect((await trocarCor(b, '#b00000', 1)).isError).toBeFalsy();
+    expect(ultima()).toMatchObject({autor: 'agente', origem: 'ide-bbbbbb', rotulo: 'cor #b00000'});
+    const desfez = (await a.callTool({name: 'desfazer', arguments: {}})) as {isError?: boolean; content: {text: string}[]};
+    expect(desfez.isError).toBeFalsy();
+    expect(JSON.parse(desfez.content[0].text).desfeitas[0]).toContain('cor #a00000');
+    expect(ultima()).toMatchObject({origem: 'ide-aaaaaa', rotulo: 'reverter: cor #a00000'});
+    // com o app fechado, a mesma conversa segue sendo ela: o desfazer acha só as dela
+    retirarMcpApp(pasta, c.headers.Authorization.slice('Bearer '.length));
+    const outra = (await b.callTool({name: 'desfazer', arguments: {}})) as {isError?: boolean; content: {text: string}[]};
+    expect(JSON.parse(outra.content[0].text).desfeitas[0]).toContain('cor #b00000');
+    expect(ultima()).toMatchObject({origem: 'ide-bbbbbb', rotulo: 'reverter: cor #b00000'});
+    await a.close();
+    await b.close();
   });
 
   it('com o app aberto e sem projeto (409), roda na IDE', async () => {

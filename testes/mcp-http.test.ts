@@ -120,3 +120,65 @@ describe('MCP por HTTP: o corpo do pedido', () => {
     expect(r.status).toBe(413);
   });
 });
+
+describe('MCP por HTTP: as conversas da IDE pelo token do app (mcp-app.ts)', () => {
+  let outro: http.Server;
+  let base = '';
+  const perguntas: string[] = [];
+  beforeAll(async () => {
+    const projeto = new Projeto(pasta);
+    const comPortao = new McpHttp(path.join(pasta, '.config-teste-2'), () => projeto, undefined, async (p) => {
+      perguntas.push(p.origem);
+      return {permitir: true, sempre: true};
+    });
+    outro = http.createServer((req, res) => void comPortao.atender(req, res).then((ok) => ok || res.writeHead(404).end()));
+    await new Promise<void>((ok) => outro.listen(0, '127.0.0.1', ok));
+    base = `http://127.0.0.1:${(outro.address() as AddressInfo).port}`;
+    const ide = comPortao.novaConexao(base, 'mcp', {ide: true});
+    const aba = comPortao.novaConexao(base, 'Claude 9');
+    cabecalhos = {ide: ide.headers, aba: aba.headers};
+  });
+  afterAll(() => outro?.close());
+  let cabecalhos: {ide: Record<string, string>; aba: Record<string, string>};
+
+  const cliente = async (headers: Record<string, string>) => {
+    const c = new Client({name: 'teste', version: '0'});
+    await c.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`), {requestInit: {headers}}));
+    return c;
+  };
+  const trocar = async (c: Client, valor: number) => {
+    const {versao} = JSON.parse(((await c.callTool({name: 'ler_documento', arguments: {documento: 'cena3d', caminho: '/objetos/0/cor'}})) as {content: {text: string}[]}).content[0].text);
+    const r = (await c.callTool({name: 'aplicar_patch', arguments: {documento: 'cena3d', versao_base: versao, rotulo: `cor ${valor}`,
+      patch: [{op: 'replace', path: '/objetos/0/cor', value: `#00000${valor}`}]}})) as {isError?: boolean};
+    expect(r.isError).toBeFalsy();
+    return new Projeto(pasta).diario(0, {tolerante: true}).at(-1)!;
+  };
+
+  it('"Sempre nesta conversa" vale só para a conversa que marcou', async () => {
+    const dono = await cliente({...cabecalhos.ide, 'X-Estudio-Conversa': 'c0c0c0'});
+    const a = await cliente({...cabecalhos.ide, 'X-Estudio-Conversa': 'a1a1a1'});
+    const b = await cliente({...cabecalhos.ide, 'X-Estudio-Conversa': 'b2b2b2'});
+    const m1 = await trocar(dono, 1);
+    const m2 = await trocar(dono, 2);
+    expect(m1).toMatchObject({autor: 'agente', origem: 'ide-c0c0c0'});
+    // reverter a mudança de outra conversa pergunta à pessoa; com "Sempre", a mesma conversa não pergunta de novo
+    expect(((await a.callTool({name: 'reverter', arguments: {seq: m2.seq, mesmo_se_mudou: true}})) as {isError?: boolean}).isError).toBeFalsy();
+    expect(((await a.callTool({name: 'reverter', arguments: {seq: m1.seq, mesmo_se_mudou: true}})) as {isError?: boolean}).isError).toBeFalsy();
+    expect(perguntas).toEqual(['ide-a1a1a1']);
+    // outra conversa da mesma IDE (mesmo token) pergunta
+    const m3 = await trocar(dono, 3);
+    await b.callTool({name: 'reverter', arguments: {seq: m3.seq, mesmo_se_mudou: true}});
+    expect(perguntas).toEqual(['ide-a1a1a1', 'ide-b2b2b2']);
+    for (const c of [dono, a, b]) await c.close();
+  });
+
+  it('o autor vem do processo da IDE, menos os reservados; a aba do app ignora os cabeçalhos', async () => {
+    const outroAutor = await cliente({...cabecalhos.ide, 'X-Estudio-Conversa': 'd3d3d3', 'X-Estudio-Autor': encodeURIComponent('revisão')});
+    expect(await trocar(outroAutor, 4)).toMatchObject({autor: 'revisão', origem: 'ide-d3d3d3'});
+    await outroAutor.close();
+    await expect(cliente({...cabecalhos.ide, 'X-Estudio-Conversa': 'e4e4e4', 'X-Estudio-Autor': 'pessoa'})).rejects.toThrow();
+    const aba = await cliente({...cabecalhos.aba, 'X-Estudio-Conversa': 'f5f5f5', 'X-Estudio-Autor': 'pessoa'});
+    expect(await trocar(aba, 5)).toMatchObject({autor: 'agente', origem: 'Claude 9'});
+    await aba.close();
+  });
+});

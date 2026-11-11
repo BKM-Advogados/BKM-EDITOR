@@ -82,7 +82,8 @@ describe('MCP estudio', () => {
 
     const mud = await chamar('listar_mudancas');
     expect(mud.dado).toHaveLength(1);
-    expect(mud.dado[0]).toMatchObject({autor: 'agente', origem: 'mcp', rotulo: 'número entra no fim da palavra'});
+    expect(mud.dado[0]).toMatchObject({autor: 'agente', rotulo: 'número entra no fim da palavra'});
+    expect(mud.dado[0].origem).toMatch(/^ide-[0-9a-f]{6}$/); // cada processo da IDE é uma conversa (mcp-app.ts)
     expect(p.diario()[0].inverso).toEqual([{op: 'replace', path: '/cenas/2/blocos/1/em', value: '5@36700'}]);
   });
 
