@@ -6,6 +6,7 @@
 // clicar leva ao fato no painel Pesquisa e o × tira um da lista. O som tem ainda o loudness (o alvo do arquivo exportado
 // e os medidores da narração e da mistura no resumo do vídeo; o da faixa no inspetor dela) e, no clipe de voz, a limpeza.
 import React, {useState, useSyncExternalStore} from 'react';
+import {rotuloDoAtalho} from '../../teclas';
 import {Clapperboard, CopyPlus, Film, FileAudio, FileJson, ImagePlus, Link, Quote, Scissors, Shuffle, Sparkles, Trash2, Undo2, X} from 'lucide-react';
 import {ALVO_LU_MAX, ALVO_LU_MIN, ALVO_LUFS_MAX, ALVO_LUFS_MIN, ALVO_LUFS_PADRAO, DUCKING_PADRAO, PAPEIS, PICO_DBTP_MAX, PICO_DBTP_MIN, PICO_DBTP_PADRAO, type AudioP,
   type ClipeAudio, type ClipeAudioP, type CurvaFade, type FaixaAudio, type FaixaAudioP, type IntensidadeLimpeza, type PapelFaixa} from '../../../nucleo/audio';
@@ -151,7 +152,7 @@ const FalaDaCena: React.FC<{documento: string; n: number}> = ({documento, n}) =>
       {it.clipe && <CampoLeitura rotulo="Fala gerada">{numeroBr(it.clipe.duracao_ms / 1000, 1)} s{it.clipe.em + it.clipe.duracao_ms > it.t_out + 1 ? ' · passa do fim da cena' : ''}</CampoLeitura>}
       <div style={{padding: '2px 10px 6px 18px', display: 'flex', gap: 6}}>
         {it.estado !== 'sem_texto' && <button className="bt mini" disabled={Boolean(andamento)} onClick={() => void gerarFalas(documento, {cenas: [it.cena], refazer: it.estado === 'gerada'})}
-          title={it.estado === 'gerada' ? 'Pede outra tomada ao Google (tem custo; Ctrl+Z volta à anterior)' : undefined}>{it.estado === 'gerada' ? 'Outra tomada' : 'Gerar esta cena'}</button>}
+          title={it.estado === 'gerada' ? `Pede outra tomada ao Google (tem custo; ${rotuloDoAtalho('Ctrl+Z')} volta à anterior)` : undefined}>{it.estado === 'gerada' ? 'Outra tomada' : 'Gerar esta cena'}</button>}
         <button className="bt mini fantasma" onClick={() => abrirNarracaoIA(documento)}>Narração por IA…</button>
       </div>
     </Secao>

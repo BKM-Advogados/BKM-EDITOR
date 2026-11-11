@@ -227,7 +227,7 @@ const usarAntesDepois = (sem: () => void, com: () => void, ligado: boolean) => {
     const baixa = (e: KeyboardEvent) => {
       const alvo = e.target as HTMLElement;
       if (/INPUT|TEXTAREA/.test(alvo.tagName) || alvo.isContentEditable || alvo.closest?.('.xterm')) return;
-      if (e.shiftKey && !e.ctrlKey && !e.altKey && e.code === 'KeyD' && !segurando) {
+      if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && e.code === 'KeyD' && !segurando) {
         e.preventDefault();
         segurando = true;
         ref.current.sem();

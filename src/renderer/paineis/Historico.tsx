@@ -3,6 +3,7 @@
 // diário que o agente lê com listar_mudancas. Ctrl+Z desfaz só as edições da própria pessoa; Reverter desfaz qualquer
 // uma (de qualquer autor e de qualquer provedor) e, se o valor mudou depois, pergunta antes de passar por cima.
 import React, {useMemo, useState} from 'react';
+import {rotuloDoAtalho} from '../teclas';
 import {ChevronDown, ChevronRight, Eye, Sparkles, Undo2, User} from 'lucide-react';
 import type {ResumoDiario} from '../../nucleo/documentos';
 import {avisar, carregarDiario, desfazer, loja, selecionar, useLoja, type Area} from '../estado/loja';
@@ -102,11 +103,11 @@ export const Historico: React.FC = () => {
   return (
     <div className="painel historico">
       <div className="painel-topo">
-        <span className="rotulo" title="Ctrl+Z desfaz só as suas edições. Desfazer, aqui, vale para qualquer mudança, inclusive as do Claude.">
-          Ctrl+Z desfaz só as suas edições; aqui, qualquer uma.
+        <span className="rotulo" title={`${rotuloDoAtalho('Ctrl+Z')} desfaz só as suas edições. Desfazer, aqui, vale para qualquer mudança, inclusive as do Claude.`}>
+          {rotuloDoAtalho('Ctrl+Z')} desfaz só as suas edições; aqui, qualquer uma.
         </span>
         <span className="esp" />
-        <button className="bt mini" onClick={() => void desfazer()} title="Desfaz a sua última edição (Ctrl+Z)"><Undo2 className="i14" />Ctrl+Z</button>
+        <button className="bt mini" onClick={() => void desfazer()} title={`Desfaz a sua última edição (${rotuloDoAtalho('Ctrl+Z')})`}><Undo2 className="i14" />{rotuloDoAtalho('Ctrl+Z')}</button>
       </div>
       <div className="painel-corpo sem-margem">
         {grupos.length === 0 && <div className="vazio">Nenhuma mudança ainda.</div>}

@@ -2,6 +2,7 @@
 // inteira com o transporte junto. O botão fica no transporte; Ctrl+F alterna (fora do terminal e dos campos de texto,
 // Casca.tsx) e Esc sai. A peça se reescala sozinha, porque cada monitor mede o próprio espaço com ResizeObserver.
 import React, {useEffect, useState} from 'react';
+import {rotuloDoAtalho} from '../teclas';
 import {Maximize, Minimize} from 'lucide-react';
 
 /** Atributo do elemento que vai para a tela cheia (o painel do monitor). */
@@ -33,7 +34,7 @@ export const useTelaCheia = () => {
 
 export const BotaoTelaCheia: React.FC = () => {
   const cheia = useTelaCheia();
-  const rotulo = cheia ? 'Sair da tela cheia (Esc ou Ctrl+F)' : 'Ver o monitor em tela cheia (Ctrl+F) · Esc sai';
+  const rotulo = cheia ? `Sair da tela cheia (Esc ou ${rotuloDoAtalho('Ctrl+F')})` : `Ver o monitor em tela cheia (${rotuloDoAtalho('Ctrl+F')}) · Esc sai`;
   return (
     <button className={`bti tela-cheia${cheia ? ' ligado' : ''}`} aria-label={rotulo} title={rotulo} aria-pressed={cheia}
       onClick={(e) => alternarTelaCheia(e.currentTarget.closest(`[${MARCA_TELA_CHEIA}]`))}>

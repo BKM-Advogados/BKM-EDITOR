@@ -5,6 +5,7 @@
 // gerada ou desatualizada, e "Gerar" por cena. Embaixo, "Gerar todas" com o custo estimado antes e o andamento, "Ajustar as
 // cenas à fala", "Criar legendas" (a transcrição local que já existe) e o dicionário de pronúncia.
 import React, {useEffect, useMemo, useState, useSyncExternalStore} from 'react';
+import {rotuloDoAtalho} from '../../teclas';
 import {AudioLines, BookA, Captions, KeyRound, Play, Plus, RefreshCw, Timer, Trash2, X} from 'lucide-react';
 import type {DocCenas} from '../../../nucleo/cenas';
 import {configDaNarracao, MODELOS_GEMINI_TTS, NOMES_PROVEDOR, VELOCIDADE_MAX, VELOCIDADE_MIN, vozDoProvedor, type ProvedorNarracao} from '../../../nucleo/narracao';
@@ -112,7 +113,7 @@ export const NarracaoIA: React.FC<{documento: string; aoFechar: () => void}> = (
       </div>
 
       <div className="narracao-config">
-        <div className="rotulo-campo curto"><span>Provedor</span>
+        <div className="rotulo-campo provedor"><span>Provedor</span>
           <Segmentado<ProvedorNarracao> rotulo="Provedor da narração" valor={cfg.provedor} aoMudar={trocarProvedor} desligado={Boolean(andamento)}
             opcoes={[['gemini', NOMES_PROVEDOR.gemini], ['google-tts', NOMES_PROVEDOR['google-tts']]]} />
         </div>
@@ -124,7 +125,7 @@ export const NarracaoIA: React.FC<{documento: string; aoFechar: () => void}> = (
                 ...MODELOS_GEMINI_TTS.map((m): [string, string] => [m.id, m.nome])]} />
           </div>
         )}
-        <div className="rotulo-campo"><span>Voz</span>
+        <div className="rotulo-campo voz"><span>Voz</span>
           <span className="par">
             <Escolha<string> rotulo="Voz da narração" valor={cfg.voz} desligado={Boolean(andamento)}
               aoMudar={(v) => void configurar(documento, {voz: v}, `voz ${v}`)}
@@ -168,7 +169,7 @@ export const NarracaoIA: React.FC<{documento: string; aoFechar: () => void}> = (
                 {!it.clipe && it.medida && <span className="meta" title="Estimativa antes de gerar">~{s1(it.medida.segundos * 1000)} s</span>}
                 {it.estado !== 'sem_texto' && (
                   <button className="bt mini" disabled={Boolean(andamento)}
-                    title={it.estado === 'gerada' ? 'Pede outra tomada ao Google, com o mesmo texto e a mesma voz (tem custo; Ctrl+Z volta à anterior)'
+                    title={it.estado === 'gerada' ? 'Pede outra tomada ao Google, com o mesmo texto e a mesma voz (tem custo; ' + rotuloDoAtalho('Ctrl+Z') + ' volta à anterior)'
                       : p ? `${p.caracteres} caracteres · ${textoCusto(p.em_cache ? 0 : p.custo_usd)}` : undefined}
                     onClick={() => void gerarFalas(documento, {cenas: [it.cena], refazer: it.estado === 'gerada'})}>{it.estado === 'gerada' ? 'Outra tomada' : 'Gerar esta cena'}</button>
                 )}
@@ -195,7 +196,7 @@ export const NarracaoIA: React.FC<{documento: string; aoFechar: () => void}> = (
         </div>
       )}
       <div className="linha-gravador">
-        <button className="bt mini" disabled={!temFala || Boolean(andamento)} title={`Cada cena com fala passa a durar folga + fala + margem (${s1(cfg.margem_ms)} s). Ctrl+Z desfaz.`}
+        <button className="bt mini" disabled={!temFala || Boolean(andamento)} title={`Cada cena com fala passa a durar folga + fala + margem (${s1(cfg.margem_ms)} s). ${rotuloDoAtalho('Ctrl+Z')} desfaz.`}
           onClick={() => void ajustarCenas(documento)}><Timer size={12} />Ajustar as cenas à fala{passam.length ? ` (${passam.length} passam)` : ''}</button>
         <button className="bt mini" disabled={!temFala || Boolean(andamento)} title="Transcreve as falas no PC (whisper) e gera as legendas com o tempo de cada palavra"
           onClick={() => void transcreverEGerar(documento)}><Captions size={12} />Criar legendas</button>

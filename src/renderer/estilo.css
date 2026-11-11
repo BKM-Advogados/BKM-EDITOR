@@ -604,6 +604,8 @@ button.escolha:disabled { opacity: 0.5; cursor: default; }
 .narracao-config > .rotulo-campo { display: flex; flex-direction: column; gap: 4px; flex: 1 1 140px; min-width: 0; color: var(--texto-2); font-size: var(--tam-2); }
 .narracao-config > .rotulo-campo.largo { flex: 3 1 220px; }
 .narracao-config > .rotulo-campo.curto { flex: 0 0 auto; }
+.narracao-config > .rotulo-campo.provedor { flex: 1 1 100%; align-items: flex-start; }
+.narracao-config > .rotulo-campo.voz { flex: 2 1 240px; }
 .narracao-config .par { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .narracao-config .par > .campo { flex: 1; min-width: 0; }
 .narracao-config button.escolha { width: 100%; min-width: 0; }
