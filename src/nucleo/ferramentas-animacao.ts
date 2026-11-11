@@ -48,6 +48,7 @@ export const registrarFerramentasAnimacao = (
     const {entrada, conteudo} = documentoNovo(projeto.manifesto(), "animacao", {
       titulo,
       formato: tam,
+      existe: (rel) => projeto.existe(rel),
     });
     const docAnim = conteudo as DocAnimacao;
     if (duracao_ms) docAnim.duracao_ms = duracao_ms;

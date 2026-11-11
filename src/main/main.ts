@@ -302,7 +302,7 @@ lidar(CANAL.renomearProjeto, (nome: string) => {
 });
 lidar(CANAL.criarDocumento, (o: {modulo: Modulo; formato?: Formato | {largura: number; altura: number}; titulo?: string}) => {
   const p = exigirProjeto();
-  const {entrada, conteudo} = documentoNovo(p.manifesto(), o.modulo, {formato: o.formato, titulo: o.titulo});
+  const {entrada, conteudo} = documentoNovo(p.manifesto(), o.modulo, {formato: o.formato, titulo: o.titulo, existe: (rel) => p.existe(rel)});
   return p.adicionarDocumento(entrada, conteudo);
 });
 lidar(CANAL.renomearDocumento, (id: string, titulo: string) => exigirProjeto().renomearDocumento(id, titulo));

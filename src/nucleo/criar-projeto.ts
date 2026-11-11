@@ -107,13 +107,19 @@ export const conteudoNovo = (modulo: Modulo, formato?: {largura: number; altura:
 };
 
 /** Entrada e conteúdo de um documento novo num manifesto que já existe (id e arquivo que não colidem). */
-export const documentoNovo = (manifesto: Manifesto, modulo: Modulo, o: {formato?: Formato | {largura: number; altura: number}; titulo?: string} = {}) => {
+/** `existe` diz se o arquivo já está no disco (um órfão de uma gravação que parou no meio): o nome dele fica de fora. */
+export const documentoNovo = (manifesto: Manifesto, modulo: Modulo,
+  o: {formato?: Formato | {largura: number; altura: number}; titulo?: string; existe?: (rel: string) => boolean} = {}) => {
   const ids = new Set(manifesto.documentos.map((d) => d.id));
   const caminhos = new Set(manifesto.documentos.map((d) => d.caminho));
   const base = ID_DO_MODULO[modulo];
   let n = 1;
   const nome = (k: number) => (k === 1 ? base : `${base}-${k}`);
-  while (ids.has(nome(n)) || caminhos.has(`${PASTA_DO_MODULO[modulo]}/${nome(n)}.json`)) n++;
+  const ocupado = (k: number) => {
+    const rel = `${PASTA_DO_MODULO[modulo]}/${nome(k)}.json`;
+    return ids.has(nome(k)) || caminhos.has(rel) || Boolean(o.existe?.(rel));
+  };
+  while (ocupado(n)) n++;
   const mesmos = manifesto.documentos.filter((d) => d.modulo === modulo).length;
   const entrada: EntradaDocumento = {
     id: nome(n),
