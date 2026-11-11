@@ -1,9 +1,10 @@
 // Preferências (menu → Preferências…, e o botão da tela inicial): a pasta dos projetos, o que abre ao iniciar e a
-// aparência (tema, contraste, densidade, tamanho e movimento; estado/aparencia.ts).
+// aparência (tema, contraste, densidade, tamanho e movimento; estado/aparencia.ts) e as atualizações (docs/atualizacao.md).
 import React, {useEffect, useState} from 'react';
 import type {Preferencias} from '../../compartilhado/api';
 import {aparencia, ESCALAS, usarAparencia} from '../estado/aparencia';
 import {Segmentado} from '../componentes/Controles';
+import {SecaoAtualizacoes} from '../componentes/AvisoAtualizacao';
 
 /** Escolha de poucas opções num segmentado (Preferências). */
 const Opcoes = <T extends string | number>({rotulo, valor, opcoes, aoMudar}: {rotulo: string; valor: T; opcoes: [T, string][]; aoMudar: (v: T) => void}) => (
@@ -47,6 +48,7 @@ export const PainelPreferencias: React.FC<{aoFechar: () => void}> = ({aoFechar})
         <Opcoes rotulo="Tamanho da interface" valor={ap.escala} opcoes={ESCALAS.map((e): [number, string] => [e, `${Math.round(e * 100)}%`])} aoMudar={(escala) => aparencia.definir({escala})} />
         <Opcoes rotulo="Movimento" valor={ap.movimento} opcoes={[['sistema', 'Do sistema'], ['reduzido', 'Reduzir'], ['normal', 'Normal']]} aoMudar={(movimento) => aparencia.definir({movimento})} />
         <div className="dialogo-texto">"Pela janela" usa a densidade compacta abaixo de 1600 × 800. A aparência vale para este computador.</div>
+        {p && <SecaoAtualizacoes automatico={p.procurar_atualizacoes !== false} aoMudar={(v) => void gravar({procurar_atualizacoes: v})} />}
         <div className="dialogo-botoes"><button className="bt principal" onClick={aoFechar} autoFocus>Fechar</button></div>
       </div>
     </div>

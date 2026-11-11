@@ -17,8 +17,10 @@ import type {PedidoLevar, ResultadoConcluir, ResultadoLevar, ResultadoVolta} fro
 import type {PedidoExportarMusica, ResultadoExportarMusica} from '../nucleo/musica-projeto'; // frente Música
 import type {ConfigNarracao, ProvedorNarracao, VozNarracao} from '../nucleo/narracao'; // narração por IA
 import type {AndamentoNarracao, Previa, ResultadoNarracao} from '../nucleo/narracao-servico'; // só os tipos
+import {CANAL_ATUALIZACAO, type ApiAtualizacao} from './atualizacao'; // atualização do app (docs/atualizacao.md)
 
 export const CANAL = {
+  ...CANAL_ATUALIZACAO, // atualização do app (src/main/atualizacao.ts)
   abrirPasta: 'estudio:abrir-pasta',
   abrirExemplo: 'estudio:abrir-exemplo',
   temExemplo: 'estudio:tem-exemplo',
@@ -184,7 +186,8 @@ export type Recente = {raiz: string; nome: string; aberto_em: string; existe: bo
 export type Preferencias = {pasta_projetos: string; ao_iniciar: 'inicio' | 'ultimo'; formato_video: string; formato_imagem: string; boas_vindas_vista: boolean;
   pasta_trilhas: string; // biblioteca de músicas e efeitos da pessoa (padrão: Estudio/trilhas)
   pasta_marcas: string;
-  projetos_ide?: boolean}; // frente IDE: .mcp.json, .claude/settings.local.json e t3.json em cada projeto (padrão: ligado)
+  projetos_ide?: boolean; // frente IDE: .mcp.json, .claude/settings.local.json e t3.json em cada projeto (padrão: ligado)
+  procurar_atualizacoes?: boolean; versao_pulada?: string}; // atualização do app (padrão: procura; "Pular esta versão")
 
 /** `marca` é o id do kit de marca que entra no tema do documento novo (sem ele, o tema neutro). */
 export type NovoProjeto = {nome?: string; modelo: IdModelo; formato?: Formato | {largura: number; altura: number}; pasta?: string; formato_id?: string; marca?: string};
@@ -299,6 +302,7 @@ export type ApiEstudio = {
   exportarImagem: (documento: string, dados: string, opcoes?: OpcoesExportarImagem) => Promise<{ok: boolean; arquivo?: string; pasta?: string}>;
   aoProgresso: (cb: (p: Progresso) => void) => () => void;
   metricas: () => Promise<Metricas>;
+  atualizacao: ApiAtualizacao; // atualização do app (docs/atualizacao.md)
   // som do vídeo de cenas: envelope medido pela interface, biblioteca de trilhas
   audio: {
     /** Grava midia/<arquivo>.envelope.json; devolve o caminho gravado. */

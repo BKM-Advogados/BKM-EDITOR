@@ -1,6 +1,7 @@
 import {contextBridge, ipcRenderer, type IpcRendererEvent} from 'electron';
 import {CANAL, type ApiEstudio, type EventoConversa, type Mudanca, type PedidoPortaoTela, type Progresso, type ProgressoTranscricao, type Retangulo} from '../compartilhado/api';
 import type {AndamentoNarracao} from '../nucleo/narracao-servico';
+import type {EstadoAtualizacao} from '../compartilhado/atualizacao';
 
 const ouvir = <A extends unknown[]>(canal: string, cb: (...a: A) => void) => {
   const h = (_e: IpcRendererEvent, ...a: A) => cb(...a);
@@ -77,6 +78,13 @@ const api: ApiEstudio = {
   exportarImagem: (documento, dados, opcoes) => ipcRenderer.invoke(CANAL.exportarImagem, documento, dados, opcoes),
   aoProgresso: (cb) => ouvir<[Progresso]>(CANAL.progresso, cb),
   metricas: () => ipcRenderer.invoke(CANAL.metricas),
+  atualizacao: {
+    estado: () => ipcRenderer.invoke(CANAL.atualizacaoEstado),
+    procurar: () => ipcRenderer.invoke(CANAL.atualizacaoProcurar),
+    acao: (a) => ipcRenderer.invoke(CANAL.atualizacaoAcao, a),
+    aoMudar: (cb) => ouvir<[EstadoAtualizacao]>(CANAL.atualizacaoMudou, cb),
+    ocupado: (o) => ipcRenderer.send(CANAL.atualizacaoOcupado, o),
+  },
   audio: {
     gravarEnvelope: (arquivo, envelope) => ipcRenderer.invoke(CANAL.audioGravarEnvelope, arquivo, envelope),
     listarTrilhas: () => ipcRenderer.invoke(CANAL.audioListarTrilhas),
