@@ -84,12 +84,20 @@
 .aba-doca .aba-x { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 3px; color: var(--texto-3); visibility: hidden; }
 .dv-tab:hover .aba-doca .aba-x { visibility: visible; }
 .aba-doca .aba-x:hover { background: var(--fundo-3); color: var(--texto); }
-/* grupo estreito: as abas de trás ficam só com o ícone (o nome continua na dica) */
-@container (max-width: 360px) {
-  .dv-tab:not(.dv-active-tab) .aba-doca .aba-titulo { display: none; }
+/* grupo estreito: as abas de trás ficam só com o nome curto (Coment., Hist.); mais estreito ainda, só com o ícone (o
+   nome inteiro continua na dica) */
+.aba-doca .aba-curto { display: none; }
+@container (max-width: 400px) {
+  .dv-tab:not(.dv-active-tab) .aba-doca:has(.aba-curto) .aba-titulo { display: none; }
+  .dv-tab:not(.dv-active-tab) .aba-doca .aba-curto { display: inline; }
+  .dv-tab:not(.dv-active-tab) .aba-doca:has(.aba-curto) .aba-icone { display: none; }
   /* o × escondido ainda ocupava lugar e deixava vão entre os ícones; fecha-se pela aba ativa */
   .dv-tab:not(.dv-active-tab) .aba-doca .aba-x { display: none; }
   .dv-tab:not(.dv-active-tab) { padding: 0 8px; }
+}
+@container (max-width: 300px) {
+  .dv-tab:not(.dv-active-tab) .aba-doca .aba-titulo, .dv-tab:not(.dv-active-tab) .aba-doca .aba-curto { display: none; }
+  .dv-tab:not(.dv-active-tab) .aba-doca .aba-icone { display: inline-grid; }
 }
 
 /* ── painel do Claude: abas de conversa e de terminal ── */

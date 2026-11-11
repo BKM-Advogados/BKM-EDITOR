@@ -8,8 +8,8 @@ import React, {Suspense, useCallback, useEffect, useRef, useState} from 'react';
 import {usarTemExemplo} from '../estado/exemplo';
 import {DockviewReact, type DockviewApi, type DockviewReadyEvent, type DockviewTheme, type IDockviewPanelHeaderProps, type IDockviewPanelProps} from 'dockview-react';
 import 'dockview-react/dist/styles/dockview.css';
-import {Blend, BookOpen, Box, Check, Copy, Download, Film, FilePlus2, FolderOpen, FolderSearch, History, Home, Image as ImageIcon, Images, LayoutPanelLeft, ListTree,
-  MessageSquare, MessageSquarePlus, MonitorPlay, Music, Palette, Plus, Quote, Rows3, Settings, SlidersHorizontal, Sparkle, Sparkles, Undo2, X} from 'lucide-react';
+import {Blend, BookMarked, BookOpen, Box, Check, Copy, Download, Film, FilePlus2, FolderOpen, FolderSearch, History, Home, Image as ImageIcon, Images, LayoutPanelLeft, ListTree,
+  MessageSquare, MessageSquarePlus, MonitorPlay, Music, Palette, Plus, Rows3, Settings, SlidersHorizontal, Sparkle, Sparkles, Undo2, X} from 'lucide-react';
 import type {Preferencias, Recente} from '../../compartilhado/api';
 import type {Modulo} from '../../nucleo/documentos';
 import {FORMATOS_IMAGEM, FORMATOS_VIDEO} from '../../nucleo/formatos';
@@ -77,9 +77,11 @@ const PorArea: React.FC<{parte: 'Lista' | 'Monitor' | 'Inspector' | 'Linha'}> = 
 // sustentam a área não têm ×; os outros mostram o × ao passar o mouse.
 const ICONES_ABA: Record<string, React.ReactNode> = {
   monitor: <MonitorPlay size={14} />, linha: <Rows3 size={14} />, lista: <ListTree size={14} />, inspector: <SlidersHorizontal size={14} />,
-  comentarios: <MessageSquare size={14} />, historico: <History size={14} />, pesquisa: <Quote size={14} />, midia: <Images size={14} />, terminal: <Sparkle size={14} />,
+  comentarios: <MessageSquare size={14} />, historico: <History size={14} />, pesquisa: <BookMarked size={14} />, midia: <Images size={14} />, terminal: <Sparkle size={14} />,
 };
 const ESSENCIAIS = new Set(['monitor', 'linha', 'lista', 'inspector', 'terminal']);
+// nome curto das abas de trás num grupo estreito (o inspetor tem ~310 px na tela grande): o nome inteiro fica na dica
+const CURTOS: Record<string, string> = {comentarios: 'Coment.', historico: 'Hist.', pesquisa: 'Pesq.', midia: 'Mídia', inspector: 'Props.'};
 const AbaDoPainel: React.FC<IDockviewPanelHeaderProps> = ({api}) => {
   const [titulo, setTitulo] = useState(api.title ?? '');
   useEffect(() => {
@@ -91,6 +93,7 @@ const AbaDoPainel: React.FC<IDockviewPanelHeaderProps> = ({api}) => {
     <div className={`aba-doca aba-${api.id}`} title={titulo}>
       <span className="aba-icone">{ICONES_ABA[api.id]}</span>
       <span className="aba-titulo">{titulo}</span>
+      {CURTOS[api.id] && <span className="aba-curto" aria-hidden="true">{CURTOS[api.id]}</span>}
       {abertos > 0 && <span className="aba-contador">{abertos}</span>}
       {!ESSENCIAIS.has(api.id) && (
         <span className="aba-x" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => (e.stopPropagation(), api.close())} title="Fechar"><X size={12} /></span>

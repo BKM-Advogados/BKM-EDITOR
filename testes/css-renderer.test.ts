@@ -104,3 +104,13 @@ describe('tipo legível', () => {
     expect(estilo).toMatch(/html, body, #raiz \{[^}]*font: var\(--tam-3\)/);
   });
 });
+
+describe('abas do grupo do inspetor', () => {
+  it('ficam com o nome curto antes de virar só ícone, e a Pesquisa não usa mais a aspa', () => {
+    const casca = fs.readFileSync(path.join(RAIZ, 'casca', 'casca.css'), 'utf8');
+    const tsx = fs.readFileSync(path.join(RAIZ, 'casca', 'Casca.tsx'), 'utf8');
+    expect(casca).toMatch(/@container \(max-width: 300px\)/);
+    expect(tsx).toMatch(/comentarios: 'Coment\.', historico: 'Hist\.'/);
+    expect(tsx).not.toMatch(/pesquisa: <Quote/);
+  });
+});
