@@ -3,7 +3,8 @@
 // por aqui. Responde a Range, que o <audio>/<video> usa para buscar um trecho sem baixar o arquivo inteiro. Uma rota
 // própria (~marcas/<id>/…) serve o logo e as fontes dos kits de marca, com ou sem projeto aberto, para o painel Marca.
 import {randomBytes} from 'node:crypto';
-import {createReadStream, statSync} from 'node:fs';
+import {closeSync, createReadStream, fstatSync, openSync, realpathSync} from 'node:fs';
+import {pipeline} from 'node:stream';
 import http from 'node:http';
 import path from 'node:path';
 import type {AddressInfo} from 'node:net';
@@ -19,6 +20,11 @@ const TIPOS: Record<string, string> = {
 export const ROTA_MARCAS = '~marcas';
 // da pasta dos kits só saem logo e fontes
 const TIPOS_DE_MARCA = new Set(['.ttf', '.otf', '.woff', '.woff2', '.png', '.svg', '.jpg', '.jpeg', '.webp']);
+
+// .git em qualquer caixa e nas grafias que o Windows aceita para a mesma pasta (".git." e ".git " e o nome curto GIT~1)
+const ehGit = (segmento: string) => /^(\.git[. ]*|git~\d+)$/i.test(segmento);
+// o que um link de midia/ para fora do projeto pode servir: só mídia (nada de .json, .gltf com caminhos, texto)
+const TIPOS_DE_LINK = new Set(Object.keys(TIPOS).filter((ext) => !['.json', '.gltf'].includes(ext)));
 
 type Rota = (req: http.IncomingMessage, res: http.ServerResponse) => Promise<boolean>;
 
@@ -76,6 +82,13 @@ export class ServidorMidia {
     this.servidor?.close();
   }
 
+  /** Pedido que passa por midia/ do projeto e acaba num arquivo de mídia fora dele (link simbólico só para leitura). */
+  private linkDeMidia(raiz: string, pedido: string, real: string) {
+    const primeiro = pedido.split(path.sep)[0];
+    return raiz === this.raiz && (process.platform === 'win32' ? primeiro.toLowerCase() : primeiro) === 'midia'
+      && TIPOS_DE_LINK.has(path.extname(real).toLowerCase()) && !real.split(path.sep).some(ehGit);
+  }
+
   private responder(req: http.IncomingMessage, res: http.ServerResponse) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     const url = new URL(req.url ?? '/', 'http://x');
@@ -94,28 +107,50 @@ export class ServidorMidia {
     }
     if (!raiz) return void res.writeHead(404).end();
     const abs = path.resolve(raiz, ...rel);
-    const dentro = path.relative(raiz, abs);
-    if (dentro.startsWith('..') || path.isAbsolute(dentro) || dentro.split(path.sep)[0] === '.git') return void res.writeHead(403).end();
-    let tamanho: number;
+    const pedido = path.relative(raiz, abs);
+    if (pedido.startsWith('..') || path.isAbsolute(pedido) || ehGit(pedido.split(path.sep)[0])) return void res.writeHead(403).end();
+    // o caminho real (links resolvidos) tem de cair dentro da raiz real, com uma exceção decidida: um link em midia/ do
+    // projeto para fora dele (a pasta de fotos de outro disco) serve para leitura, e só arquivo de mídia
+    let real: string;
+    let dentro: string;
     try {
-      const st = statSync(abs);
-      if (!st.isFile()) return void res.writeHead(404).end();
-      tamanho = st.size;
+      real = realpathSync(abs);
+      dentro = path.relative(realpathSync(raiz), real);
     } catch {
       return void res.writeHead(404).end();
     }
+    const fora = dentro.startsWith('..') || path.isAbsolute(dentro);
+    if (fora ? !this.linkDeMidia(raiz, pedido, real) : ehGit(dentro.split(path.sep)[0])) return void res.writeHead(403).end();
+    let fd: number;
+    try {
+      fd = openSync(real, 'r');
+    } catch (e) {
+      const codigo = (e as NodeJS.ErrnoException).code;
+      return void res.writeHead(codigo === 'ENOENT' || codigo === 'EISDIR' ? 404 : 403).end(); // pasta no Windows: EISDIR
+    }
+    let tamanho: number;
+    try {
+      const st = fstatSync(fd);
+      if (!st.isFile()) throw new Error('não é arquivo');
+      tamanho = st.size;
+    } catch {
+      closeSync(fd);
+      return void res.writeHead(404).end();
+    }
+    // pipeline fecha o arquivo quando o cliente desiste (busca no <video>) e não deixa 'error' solto
+    const enviar = (o: {start?: number; end?: number}) => void pipeline(createReadStream('', {fd, ...o}), res, () => undefined);
     const tipo = TIPOS[path.extname(abs).toLowerCase()] ?? 'application/octet-stream';
     const range = /bytes=(\d*)-(\d*)/.exec(req.headers.range ?? '');
     if (range) {
       const inicio = range[1] ? Number(range[1]) : Math.max(0, tamanho - Number(range[2]));
       const fim = range[1] && range[2] ? Math.min(Number(range[2]), tamanho - 1) : tamanho - 1;
-      if (inicio >= tamanho || inicio > fim) return void res.writeHead(416, {'Content-Range': `bytes */${tamanho}`}).end();
+      if (inicio >= tamanho || inicio > fim) return void (closeSync(fd), res.writeHead(416, {'Content-Range': `bytes */${tamanho}`}).end());
       res.writeHead(206, {'Content-Type': tipo, 'Content-Length': fim - inicio + 1, 'Content-Range': `bytes ${inicio}-${fim}/${tamanho}`, 'Accept-Ranges': 'bytes'});
-      if (req.method === 'HEAD') return void res.end();
-      return void createReadStream(abs, {start: inicio, end: fim}).pipe(res);
+      if (req.method === 'HEAD') return void (closeSync(fd), res.end());
+      return enviar({start: inicio, end: fim});
     }
     res.writeHead(200, {'Content-Type': tipo, 'Content-Length': tamanho, 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-cache'});
-    if (req.method === 'HEAD') return void res.end();
-    createReadStream(abs).pipe(res);
+    if (req.method === 'HEAD') return void (closeSync(fd), res.end());
+    enviar({});
   }
 }
