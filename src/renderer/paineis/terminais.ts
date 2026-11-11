@@ -6,17 +6,14 @@ import {Terminal} from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 import {avisar, quandoTrocarProjeto} from '../estado/loja';
 import {preencher} from './conversas';
+import {temaDoTerminal} from '../estilo/tokens';
+import {aparencia} from '../estado/aparencia';
 
 export type Aba = {id: number; tipo: 'claude' | 'shell'; titulo: string; estado: 'viva' | 'hibernada' | 'saiu'; sessao?: string; el: HTMLDivElement; term: Terminal; fit: FitAddon};
 
-// as 16 cores saem dos mesmos tokens da interface (grafite e sinal): azul = seleção, magenta = agente, amarelo = comentário.
-// O Claude Code só usa essa paleta no tema dark-ansi dele; nos outros temas ele pinta com as próprias cores.
-const TEMA = {
-  background: '#1a1a1a', foreground: '#eeeeee', cursor: '#70b8ff', cursorAccent: '#1a1a1a', selectionBackground: 'rgba(112,184,255,0.28)',
-  black: '#1a1a1a', red: '#ff9592', green: '#3dd68c', yellow: '#ffca16', blue: '#70b8ff', magenta: '#baa7ff', cyan: '#7ce2fe', white: '#b4b4b4',
-  brightBlack: '#8a8a8a', brightRed: '#ffb4b1', brightGreen: '#74e3ac', brightYellow: '#ffdc5c', brightBlue: '#9ccdff', brightMagenta: '#d2c6ff',
-  brightCyan: '#a6ecff', brightWhite: '#eeeeee',
-};
+// as 16 cores saem dos mesmos tokens da interface (estilo/tokens.ts): azul = seleção, magenta = agente, amarelo =
+// comentário. O Claude Code só usa essa paleta no tema dark-ansi dele; nos outros temas ele pinta com as próprias cores.
+const tema = () => temaDoTerminal(aparencia.efetiva().tema);
 const FONTE = '"JetBrains Mono", "Cascadia Mono", Consolas, monospace';
 const tamanhoFonte = () => (window.innerWidth < 1600 || window.innerHeight < 800 ? 12 : 13);
 // a grade do xterm é medida com a fonte: carregar antes de abrir, senão mede com a de reserva e desalinha
@@ -30,6 +27,11 @@ const avisarMudanca = () => {
   abas = [...abas];
   ouvintes.forEach((f) => f());
 };
+// troca de tema (Preferências › Aparência ou o sistema): os terminais abertos acompanham
+aparencia.assinar(() => {
+  const t = tema();
+  for (const a of abas) a.term.options.theme = t;
+});
 
 export const terminais = {
   abas: () => abas,
@@ -59,7 +61,7 @@ const ligar = () => {
 };
 
 const novoXterm = () => {
-  const term = new Terminal({fontFamily: FONTE, fontSize: tamanhoFonte(), lineHeight: 1.2, fontWeightBold: 600, minimumContrastRatio: 4.5, theme: TEMA,
+  const term = new Terminal({fontFamily: FONTE, fontSize: tamanhoFonte(), lineHeight: 1.2, fontWeightBold: 600, minimumContrastRatio: 4.5, theme: tema(),
     scrollback: 2000, cursorBlink: true, cursorInactiveStyle: 'outline', allowTransparency: false, macOptionIsMeta: true});
   const fit = new FitAddon();
   term.loadAddon(fit);

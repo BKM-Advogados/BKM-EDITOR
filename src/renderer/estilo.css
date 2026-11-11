@@ -1,97 +1,5 @@
-/* Tokens do Estúdio, identidade "grafite e sinal" (tasks/estudio-comparativo-visual-2026-11-05, relatorio.md §2).
-   Superfícies em grafite sem matiz, com degraus visíveis: as barras ficam um degrau ABAIXO do corpo do painel, como no
-   VS Code (fundo-1 = barras, fundo-2 = corpo; o docs/tela.md §7 tinha o contrário). Cada cor tem um sentido só: azul =
-   seleção, foco e botão principal; violeta = agente; âmbar = comentário; vermelho = cabeça de reprodução. A pessoa não
-   tem cor e nenhuma cor de marca entra na interface (marca é conteúdo). Densidade pensada para 1366×768. */
-:root {
-  /* superfícies */
-  --fundo-0: #0f0f0f;            /* vão entre painéis, barra de título */
-  --fundo-1: #1a1a1a;            /* barras: abas, rodapé, terminal, transporte, régua, trilho, cabeçalho de faixa */
-  --fundo-2: #212121;            /* corpo do painel, aba ativa */
-  --fundo-3: #2a2a2a;            /* campo, hover */
-  --fundo-4: #343434;            /* ativo, pressionado */
-  --entorno-monitor: #222222;    /* em volta da peça no monitor (ISO 12646 pede cinza) */
-  --entorno: var(--entorno-monitor);
-  --xadrez: repeating-conic-gradient(#2c2c2c 0 25%, #383838 0 50%) 0 0 / 16px 16px;
-
-  /* bordas e texto (texto ≥ 4,5:1 em corpo, campo, hover e seleção) */
-  --borda: #2e2e2e;
-  --borda-forte: #454545;
-  --texto: #eeeeee;
-  --texto-2: #b4b4b4;
-  --texto-3: #9c9c9c;
-  --icone-inativo: #6e6e6e;      /* só ícone e item desabilitado, nunca texto */
-
-  /* acento = seleção e foco (não é "a cor da pessoa") */
-  --acento: #70b8ff;
-  --acento-forte: #3b9eff;       /* hover do botão principal */
-  --acento-fundo: #003362;       /* fundo de item selecionado (opaco) */
-  --acento-fraco: rgba(112, 184, 255, 0.12); /* translúcido: arrasto do dockview, realces leves */
-  --acento-selecao: rgba(112, 184, 255, 0.28); /* ::selection */
-  --sobre-acento: #111111;       /* texto sobre o acento: 9:1 */
-  --texto-sobre-acento: var(--sobre-acento);
-
-  /* significados fixos */
-  --agente: #baa7ff;
-  --agente-fundo: #291f43;
-  --pessoa: var(--texto-2);      /* a pessoa não tem cor: só o agente salta à vista */
-  --comentario: #ffca16;
-  --cabeca: #ff4d4d;
-  --ok: #3dd68c;
-  --aviso: #ffa057;
-  --erro: #ff9592;
-
-  /* famílias da linha do tempo (o --trilha-video do tela.md virou --trilha-texto) */
-  --trilha-texto: #70b8ff;
-  --trilha-texto-fundo: #0f2d4d;
-  --trilha-video: var(--trilha-texto);
-  --trilha-midia: #4ccce6;
-  --trilha-midia-fundo: #0d3640;
-  --trilha-audio: #3dd68c;
-  --trilha-efeito: #e796f3;
-  --trilha-cena-a: #262626;
-  --trilha-cena-b: #2e2e2e;
-
-  /* eixos (Z só em traço, nunca em letra: 3,1:1) */
-  --eixo-x: #e5484d;
-  --eixo-y: #46a758;
-  --eixo-z: #3e63dd;
-
-  /* forma */
-  --raio-1: 2px;
-  --raio: 4px;
-  --raio-2: 6px;
-  --esp-0: 2px;
-  --esp-1: 4px;
-  --esp-2: 8px;
-  --esp-3: 12px;
-  --esp-4: 16px;
-  --fonte: 'Inter Variable', 'Segoe UI Variable Text', system-ui, sans-serif;
-  --fonte-mono: 'JetBrains Mono', 'Cascadia Mono', monospace;
-  --tam-1: 11px;
-  --tam-2: 12px;
-  --tam-3: 13px;
-  --tam-4: 15px;
-  --peso-normal: 400;
-  --peso-forte: 600;
-  --icone: 16px;
-  --icone-p: 14px;
-  --traco-icone: 1.5;
-
-  /* medidas */
-  --barra: 36px;
-  --rodape: 22px;
-  --controle: 24px;
-  --linha-lista: 24px;
-  --trilho: 36px;
-  --transporte: 32px;
-  --linha-bloco: 28px;           /* faixa de blocos na linha do tempo: 28 (C) / 36 (P) */
-}
-/* faixa P (padrão) de docs/tela.md: janela de 1600×800 para cima; só mexe em medidas, nunca em cor */
-@media (min-width: 1600px) and (min-height: 800px) {
-  :root { --linha-bloco: 36px; }
-}
-
+/* Estilo base da interface. Os tokens (cores, tipo, medidas, tema claro, alto contraste e densidade) vêm de
+   estilo/tokens.ts, que os põe na página antes do primeiro desenho; aqui só se usa var(--…). */
 * { box-sizing: border-box; }
 html, body, #raiz { margin: 0; height: 100%; overflow: hidden; background: var(--fundo-0); color: var(--texto);
   font: var(--tam-3)/1.4 var(--fonte); font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; }
@@ -160,8 +68,8 @@ kbd { font: 600 var(--tam-1)/14px var(--fonte-mono); color: var(--texto-2); back
 .bti.ligado { background: var(--acento-fundo); color: var(--acento); }
 .bti:disabled { color: var(--icone-inativo); background: transparent; cursor: default; }
 
-/* campo preenchido de 24 px: um tom acima do painel, borda só no hover e no foco */
-.campo { width: 100%; height: var(--controle); padding: 0 8px; border: 1px solid transparent; border-radius: var(--raio); background: var(--fundo-3);
+/* campo preenchido: um tom acima do painel, com contorno próprio (--borda-campo; no alto contraste, 3:1) */
+.campo { width: 100%; height: var(--controle); padding: 0 8px; border: 1px solid var(--borda-campo); border-radius: var(--raio); background: var(--fundo-3);
   color: var(--texto); min-width: 0; }
 .campo:hover { border-color: var(--borda-forte); }
 .campo:focus, .campo:focus-within { outline: none; background: var(--fundo-0); border-color: var(--acento); }
@@ -262,9 +170,11 @@ input[type="range"]:focus-visible { outline: none; }
 .painel-topo .esp { flex: 1; }
 .painel-corpo { flex: 1; overflow: auto; padding: var(--esp-2); min-height: 0; }
 .painel-corpo.sem-margem { padding: 0; }
-.segmentos { display: inline-flex; border-radius: var(--raio); background: var(--fundo-1); padding: 2px; gap: 2px; }
-.segmentos button { height: 20px; padding: 0 8px; border: 0; border-radius: 3px; background: transparent; color: var(--texto-2); cursor: pointer; font-size: var(--tam-1); }
-.segmentos button.ativo { background: var(--fundo-4); color: var(--texto); }
+.segmentos { display: inline-flex; flex-wrap: wrap; border-radius: var(--raio); background: var(--fundo-1); padding: 2px; gap: 2px; border: 1px solid var(--borda); }
+.segmentos button { height: calc(var(--controle-p) - 2px); padding: 0 10px; border: 0; border-radius: calc(var(--raio) - 2px); background: transparent; color: var(--texto-2);
+  cursor: pointer; font-size: var(--tam-2); }
+.segmentos button:hover { color: var(--texto); }
+.segmentos button.ativo { background: var(--fundo-4); color: var(--texto); box-shadow: var(--sombra-1); }
 .vazio { color: var(--texto-3); padding: var(--esp-4); text-align: center; font-size: var(--tam-2); }
 .lista { list-style: none; margin: 0; padding: 4px 0; }
 .lista li { display: flex; align-items: center; gap: var(--esp-2); min-height: var(--linha-lista); padding: 0 8px 0 10px; cursor: pointer; color: var(--texto);
@@ -286,8 +196,8 @@ input[type="range"]:focus-visible { outline: none; }
 .etiqueta.pessoa { background: var(--fundo-4); color: var(--pessoa); }
 .etiqueta.agente { background: var(--agente-fundo); color: var(--agente); }
 .etiqueta.sistema { color: var(--texto-3); }
-.flutuante { position: absolute; z-index: 20; background: var(--fundo-1); border: 1px solid var(--borda-forte); border-radius: var(--raio-2);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); padding: 4px; }
+.flutuante { position: absolute; z-index: 20; background: var(--fundo-elevado); border: 1px solid var(--borda); border-radius: var(--raio-2);
+  box-shadow: var(--sombra-2); padding: 4px; }
 .menu { min-width: 160px; display: flex; flex-direction: column; }
 .menu button { display: flex; align-items: center; gap: 8px; height: 26px; padding: 0 8px; border: 0; border-radius: var(--raio); background: transparent;
   color: var(--texto); cursor: pointer; text-align: left; white-space: nowrap; }
@@ -572,3 +482,17 @@ input[type="range"]:focus-visible { outline: none; }
 .gravador .nivel { flex: 1; min-width: 80px; height: 8px; border-radius: 4px; background: var(--fundo-4); overflow: hidden; }
 .gravador .nivel > span { display: block; height: 100%; background: var(--trilha-audio); transition: width 0.08s; }
 .gravador .nivel.cortou > span { background: var(--erro); }
+
+/* ── diálogo (componentes/Dialogo.tsx, Preferências, Marca, Exportar) ── */
+.dialogo-fundo { position: fixed; inset: 0; z-index: 100; background: var(--veu); display: grid; place-items: center; }
+.dialogo { width: min(420px, calc(100vw - 40px)); max-height: calc(100vh - 40px); overflow: auto; background: var(--fundo-elevado); border: 1px solid var(--borda);
+  border-radius: var(--raio-3); padding: var(--esp-4) var(--esp-5) var(--esp-4); display: flex; flex-direction: column; gap: var(--esp-3); box-shadow: var(--sombra-3); }
+.dialogo-titulo { font: var(--peso-forte) var(--tam-4) var(--fonte); }
+.dialogo-secao { font: var(--peso-forte) var(--tam-2) var(--fonte); color: var(--texto); padding-top: var(--esp-2); border-top: 1px solid var(--borda); }
+.dialogo-titulo + .dialogo-secao { border-top: 0; padding-top: 0; }
+.dialogo-texto { color: var(--texto-2); font-size: var(--tam-2); line-height: 1.5; }
+.dialogo-campo { display: flex; flex-direction: column; gap: 5px; font-size: var(--tam-2); color: var(--texto-2); }
+.dialogo-campo .segmentos { align-self: flex-start; }
+.dialogo-botoes { display: flex; justify-content: flex-end; gap: var(--esp-2); }
+.dialogo.preferencias { width: min(520px, calc(100vw - 40px)); }
+.bt.principal.perigo { background: var(--erro); border-color: var(--erro); }

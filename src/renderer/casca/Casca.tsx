@@ -33,6 +33,7 @@ import {FaixaTransicao} from '../modulos/musica/FaixaTransicao';
 import {observarMusica} from '../modulos/musica/estado';
 import {exportarMusica} from '../modulos/musica/acoes';
 import {PainelMarca} from './PainelMarca';
+import {aparencia, ESCALAS, usarAparencia} from '../estado/aparencia';
 import './casca.css';
 
 // o 3D (Three.js) e o terminal (xterm.js) só carregam quando alguém abre: a memória do app parado fica menor
@@ -101,7 +102,10 @@ const AbaDoPainel: React.FC<IDockviewPanelHeaderProps> = ({api}) => {
     </div>
   );
 };
-const TEMA: DockviewTheme = {name: 'estudio', className: 'dockview-theme-estudio', colorScheme: 'dark', gap: 2};
+const TEMAS: Record<'escuro' | 'claro', DockviewTheme> = {
+  escuro: {name: 'estudio', className: 'dockview-theme-estudio', colorScheme: 'dark', gap: 2},
+  claro: {name: 'estudio-claro', className: 'dockview-theme-estudio', colorScheme: 'light', gap: 2},
+};
 
 const componentes: Record<string, React.FC<IDockviewPanelProps>> = {
   lista: () => <PorArea parte="Lista" />,
@@ -214,14 +218,28 @@ const exportarArea = () => {
 };
 
 // ---------- preferências ----------
+/** Escolha de poucas opções num segmentado (Preferências › Aparência). */
+const Opcoes = <T extends string | number>({rotulo, valor, opcoes, aoMudar}: {rotulo: string; valor: T; opcoes: [T, string][]; aoMudar: (v: T) => void}) => (
+  <div className="dialogo-campo">
+    <span id={`pref-${rotulo}`}>{rotulo}</span>
+    <div className="segmentos" role="radiogroup" aria-labelledby={`pref-${rotulo}`}>
+      {opcoes.map(([v, nome]) => (
+        <button key={String(v)} type="button" role="radio" aria-checked={v === valor} className={v === valor ? 'ativo' : ''} onClick={() => aoMudar(v)}>{nome}</button>
+      ))}
+    </div>
+  </div>
+);
+
 const PainelPreferencias: React.FC<{aoFechar: () => void}> = ({aoFechar}) => {
   const [p, setP] = useState<Preferencias | null>(null);
+  const {escolha: ap} = usarAparencia();
   useEffect(() => void window.estudio.preferencias().then(setP), []);
   const gravar = async (m: Partial<Preferencias>) => setP(await window.estudio.gravarPreferencias(m));
   return (
     <div className="dialogo-fundo" onPointerDown={(e) => e.target === e.currentTarget && aoFechar()} onKeyDown={(e) => e.key === 'Escape' && aoFechar()}>
-      <div className="dialogo" role="dialog" aria-label="Preferências">
+      <div className="dialogo preferencias" role="dialog" aria-label="Preferências">
         <div className="dialogo-titulo">Preferências</div>
+        <div className="dialogo-secao">Projetos</div>
         {!p ? <div className="vazio">carregando…</div> : (
           <>
             <label className="dialogo-campo"><span>Pasta dos projetos novos</span>
@@ -234,14 +252,18 @@ const PainelPreferencias: React.FC<{aoFechar: () => void}> = ({aoFechar}) => {
               </span>
             </label>
             {/onedrive/i.test(p.pasta_projetos) && <div className="dialogo-texto" style={{color: 'var(--aviso)'}}>Pasta dentro do OneDrive: a sincronização pode travar a gravação.</div>}
-            <label className="dialogo-campo"><span>Ao iniciar o Estúdio</span>
-              <select className="campo" value={p.ao_iniciar} onChange={(e) => void gravar({ao_iniciar: e.target.value as Preferencias['ao_iniciar']})}>
-                <option value="inicio">Mostrar a tela inicial</option>
-                <option value="ultimo">Abrir o último projeto</option>
-              </select>
-            </label>
+            <Opcoes rotulo="Ao iniciar o Estúdio" valor={p.ao_iniciar} opcoes={[['inicio', 'Tela inicial'], ['ultimo', 'Último projeto']]}
+              aoMudar={(v) => void gravar({ao_iniciar: v})} />
           </>
         )}
+        <div className="dialogo-secao">Aparência</div>
+        <Opcoes rotulo="Tema" valor={ap.tema} opcoes={[['sistema', 'Do sistema'], ['escuro', 'Escuro'], ['claro', 'Claro']]} aoMudar={(tema) => aparencia.definir({tema})} />
+        <Opcoes rotulo="Contraste" valor={ap.contraste} opcoes={[['sistema', 'Do sistema'], ['normal', 'Normal'], ['alto', 'Alto']]} aoMudar={(contraste) => aparencia.definir({contraste})} />
+        <Opcoes rotulo="Densidade" valor={ap.densidade} opcoes={[['auto', 'Pela janela'], ['confortavel', 'Confortável'], ['compacta', 'Compacta']]}
+          aoMudar={(densidade) => aparencia.definir({densidade})} />
+        <Opcoes rotulo="Tamanho da interface" valor={ap.escala} opcoes={ESCALAS.map((e): [number, string] => [e, `${Math.round(e * 100)}%`])} aoMudar={(escala) => aparencia.definir({escala})} />
+        <Opcoes rotulo="Movimento" valor={ap.movimento} opcoes={[['sistema', 'Do sistema'], ['reduzido', 'Reduzir'], ['normal', 'Normal']]} aoMudar={(movimento) => aparencia.definir({movimento})} />
+        <div className="dialogo-texto">"Pela janela" usa a densidade compacta abaixo de 1600 × 800. A aparência vale para este computador.</div>
         <div className="dialogo-botoes"><button className="bt principal" onClick={aoFechar} autoFocus>Fechar</button></div>
       </div>
     </div>
@@ -277,6 +299,7 @@ const NomeProjeto: React.FC<{nome: string; raiz?: string}> = ({nome, raiz}) => {
 
 export const Casca: React.FC = () => {
   const temExemplo = usarTemExemplo();
+  const aparenciaAtual = usarAparencia();
   const area = useLoja((e) => e.area);
   const info = useLoja((e) => e.info);
   const modoComentario = useLoja((e) => e.modoComentario);
@@ -533,7 +556,7 @@ export const Casca: React.FC = () => {
       </header>
       <FaixaTransicao />
       <div className="doca">
-        <DockviewReact theme={TEMA} components={componentes} defaultTabComponent={AbaDoPainel} onReady={pronto} />
+        <DockviewReact theme={TEMAS[aparenciaAtual.tema]} components={componentes} defaultTabComponent={AbaDoPainel} onReady={pronto} />
       </div>
       <Rodape />
       {preferencias && <PainelPreferencias aoFechar={() => setPreferencias(false)} />}

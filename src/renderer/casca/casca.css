@@ -34,8 +34,8 @@
   .barra .acoes .bt.fantasma { font-size: 0; gap: 0; }
   .barra .acoes kbd { display: none; }
 }
-.menu-app { position: absolute; top: 34px; left: 8px; z-index: 50; min-width: 250px; padding: 4px; background: var(--fundo-2); border: 1px solid var(--borda-forte);
-  border-radius: 8px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55); -webkit-app-region: no-drag; }
+.menu-app { position: absolute; top: 34px; left: 8px; z-index: 50; min-width: 250px; padding: 4px; background: var(--fundo-elevado); border: 1px solid var(--borda);
+  border-radius: var(--raio-2); box-shadow: var(--sombra-2); -webkit-app-region: no-drag; }
 .menu-app button { width: 100%; display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px; border: 0; border-radius: 4px; background: none;
   color: var(--texto); font: 12px var(--fonte); text-align: left; cursor: default; }
 .menu-app button:hover { background: var(--fundo-3); }
@@ -43,32 +43,7 @@
 .menu-app kbd { margin-left: auto; font: var(--tam-1) var(--fonte-mono); color: var(--texto-3); }
 .menu-app hr { border: 0; border-top: 1px solid var(--borda); margin: 4px 2px; }
 
-/* ── tema próprio do dockview: grupos com cantos de 4 px sobre o vão, abas na cor das barras ── */
-.dockview-theme-estudio {
-  --dv-background-color: var(--fundo-0);
-  --dv-group-view-background-color: var(--fundo-2);
-  --dv-tabs-and-actions-container-background-color: var(--fundo-1);
-  --dv-tabs-and-actions-container-height: 28px;
-  --dv-tabs-and-actions-container-font-size: 12px;
-  --dv-activegroup-visiblepanel-tab-background-color: var(--fundo-2);
-  --dv-activegroup-hiddenpanel-tab-background-color: var(--fundo-1);
-  --dv-inactivegroup-visiblepanel-tab-background-color: var(--fundo-2);
-  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--fundo-1);
-  --dv-activegroup-visiblepanel-tab-color: var(--texto);
-  --dv-activegroup-hiddenpanel-tab-color: var(--texto-3);
-  --dv-inactivegroup-visiblepanel-tab-color: var(--texto-2);
-  --dv-inactivegroup-hiddenpanel-tab-color: var(--texto-3);
-  --dv-tab-divider-color: transparent;
-  --dv-separator-border: transparent;
-  --dv-paneview-header-border-color: var(--borda);
-  --dv-sash-color: transparent;
-  --dv-active-sash-color: var(--acento);
-  --dv-drag-over-background-color: var(--acento-fraco);
-  --dv-drag-over-border-color: var(--acento);
-  --dv-icon-hover-background-color: var(--fundo-3);
-  --dv-scrollbar-background-color: var(--fundo-4);
-}
-[data-faixa='P'] .dockview-theme-estudio { --dv-tabs-and-actions-container-height: 30px; }
+/* ── dockview: as variáveis do tema vêm de estilo/tokens.ts; aqui, a forma dos grupos e das abas ── */
 .dockview-theme-estudio .dv-groupview { border-radius: 4px; overflow: hidden; container-type: inline-size; }
 .dockview-theme-estudio .dv-tab { padding: 0 10px; }
 /* aba da frente de cada grupo: sublinhado de 2 px no texto; no grupo ativo (o que recebe as teclas), no acento */
