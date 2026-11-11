@@ -9,6 +9,8 @@
 // (pelo app, pelo cabeçalho X-Estudio-Conversa; sem o app, ali mesmo). Assim o desfazer de uma conversa só desfaz as
 // mudanças dela, o "Sempre nesta conversa" do portão vale só para ela e reverter a mudança de outra pede permissão.
 // O autor continua "agente" (a tela compara com ele) ou o --autor do processo, que o app aceita se não for reservado.
+// O --origem diz qual harness abriu o processo ("Codex", "Gemini CLI"; docs/harnesses.md): vai depois do id, na mesma
+// origem (ide-<id> Codex), e o Histórico mostra o nome dele no lugar de "Claude na IDE".
 import {randomBytes} from 'node:crypto';
 import {existsSync, mkdirSync, readFileSync, rmSync} from 'node:fs';
 import http from 'node:http';
@@ -25,10 +27,11 @@ export const ARQUIVO_MCP_APP = `${PASTA_INTERNA}/mcp-app.json`;
 export type ConexaoApp = {formato: 1; url: string; token: string; pid: number; host: string; raiz: string; em: string};
 
 /** Quem fala pelo MCP da IDE: a conversa (o processo) e o autor que vai ao diário. */
-export type ConversaIde = {conversa: string; autor: string};
+export type ConversaIde = {conversa: string; autor: string; rotulo?: string};
 
 export const CABECALHO_CONVERSA = 'x-estudio-conversa';
 export const CABECALHO_AUTOR = 'x-estudio-autor';
+export const CABECALHO_ORIGEM = 'x-estudio-origem';
 const ID_CONVERSA = /^[0-9a-f]{6,16}$/;
 // quem não pode vir de fora: "pessoa" passaria pelas travas de camada, "sistema" se passaria pelo próprio app
 const AUTORES_RESERVADOS = new Set(['pessoa', 'sistema', 'interface']);
@@ -36,7 +39,10 @@ const AUTORES_RESERVADOS = new Set(['pessoa', 'sistema', 'interface']);
 /** Um id novo para a conversa deste processo (estável enquanto ele vive). */
 export const novaConversaIde = () => randomBytes(3).toString('hex');
 /** A origem no diário de uma conversa da IDE; o formato não se confunde com o rótulo de uma aba do app ("Claude 2"). */
-export const origemDaIde = (conversa: string) => `ide-${conversa}`;
+export const origemDaIde = (conversa: string, rotulo?: string) => (rotulo ? `ide-${conversa} ${rotulo}` : `ide-${conversa}`);
+/** O nome do harness no diário: letras, números, espaço, ponto e hífen, até 32 letras ("Gemini CLI", "VS Code"). */
+export const rotuloAceito = (r: unknown): r is string => typeof r === 'string' && /^[\p{L}\p{N}][\p{L}\p{N} .-]{0,31}$/u.test(r);
+
 export const conversaValida = (c: unknown): c is string => typeof c === 'string' && ID_CONVERSA.test(c);
 export const autorAceito = (a: unknown): a is string =>
   typeof a === 'string' && /^[\p{L}\p{N}][\p{L}\p{N} ._:-]{0,39}$/u.test(a) && !AUTORES_RESERVADOS.has(a.trim().toLowerCase());
@@ -121,7 +127,8 @@ const postar = (c: DestinoApp, corpo: string, quem: ConversaIde | undefined, pra
     const req = http.request(c.url, {method: 'POST', ...(criarConexao ? {createConnection: criarConexao} : {agent: false}),
       headers: {'Content-Type': 'application/json', Accept: 'application/json, text/event-stream',
         Authorization: `Bearer ${c.token}`, 'Content-Length': Buffer.byteLength(corpo),
-        ...(quem ? {[CABECALHO_CONVERSA]: quem.conversa, [CABECALHO_AUTOR]: encodeURIComponent(quem.autor)} : {})}}, (res) => {
+        ...(quem ? {[CABECALHO_CONVERSA]: quem.conversa, [CABECALHO_AUTOR]: encodeURIComponent(quem.autor)} : {}),
+        ...(quem?.rotulo ? {[CABECALHO_ORIGEM]: encodeURIComponent(quem.rotulo)} : {})}}, (res) => {
       let texto = '';
       res.setEncoding('utf-8');
       res.on('data', (d: string) => (texto += d));

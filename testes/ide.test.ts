@@ -10,7 +10,7 @@ import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import {claudeMd, GITIGNORE, gravarPlano, planoDoProjeto, REGRAS_GIT_INTERNAS} from '../src/nucleo/criar-projeto';
 import {
-  ARQUIVOS_IDE, gitignoreComIde, ICONE_T3, mcpJsonAtualizado, prepararParaIde, scriptDoMcp, servidorDoMcp, settingsLocalAtualizado, T3_SCHEMA, t3JsonAtualizado,
+  ARQUIVOS_IDE, gitignoreComIde, HARNESSES, ICONE_T3, LINHAS_GITIGNORE_IDE, mcpJsonAtualizado, prepararParaIde, scriptDoMcp, servidorDoMcp, settingsLocalAtualizado, T3_SCHEMA, t3JsonAtualizado,
   type ServidorMcpStdio,
 } from '../src/nucleo/ide';
 import {acharNoPath, adicionarNoT3, criarIde} from '../src/main/ide';
@@ -92,12 +92,12 @@ describe('mesclar sem apagar', () => {
     expect(t3JsonAtualizado(JSON.stringify(novo)).texto).toBeNull();
   });
 
-  it('.gitignore: as duas linhas da máquina, uma vez só', () => {
+  it('.gitignore: as linhas da máquina (as duas do Claude Code e os arquivos de MCP dos harnesses), uma vez só', () => {
     const g = gitignoreComIde('saidas/\n')!;
     expect(g.split('\n')).toEqual(expect.arrayContaining(['saidas/', ARQUIVOS_IDE.mcp, ARQUIVOS_IDE.claude]));
     expect(gitignoreComIde(g)).toBeNull();
     expect(gitignoreComIde('saidas/')).toMatch(/^saidas\/\n# IDE/); // arquivo sem quebra no fim
-    expect(gitignoreComIde('/.mcp.json\n/.claude/settings.local.json\n')).toBeNull();
+    expect(gitignoreComIde(LINHAS_GITIGNORE_IDE.map((l) => `/${l}`).join('\n'))).toBeNull();
   });
 
   it('.gitignore do projeto novo: as regras internas (diário, trava, mcp-app) e as linhas da IDE', () => {
@@ -114,7 +114,7 @@ describe('no projeto', () => {
     writeFileSync(path.join(raiz, '.claude/settings.local.json'), JSON.stringify({permissions: {allow: ['Bash(ls)']}}));
     const r = prepararParaIde(raiz, SERVIDOR);
     // o .gitignore do projeto novo já traz as linhas da IDE (GITIGNORE, criar-projeto.ts): não é regravado
-    expect(r.gravados.sort()).toEqual(['.claude/settings.local.json', '.mcp.json', 't3.json']);
+    expect(r.gravados.sort()).toEqual(['.claude/settings.local.json', 't3.json', ...HARNESSES.map((h) => h.mcp)].sort());
     expect(r.avisos).toEqual([]);
     expect(json(ler(raiz, '.claude/settings.local.json'))).toEqual({permissions: {allow: ['Bash(ls)']}, enabledMcpjsonServers: ['estudio']});
     expect(json(ler(raiz, '.mcp.json')).mcpServers.estudio).toEqual(SERVIDOR);

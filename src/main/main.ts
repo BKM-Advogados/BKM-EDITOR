@@ -6,7 +6,7 @@ import os from 'node:os';
 import {CANAL, type InfoProjeto, type Metricas, type NovoProjeto, type Perfil, type Preferencias, type Progresso, type ResultadoExportacao, type Retangulo} from '../compartilhado/api';
 import {contaClaude} from './conversa';
 import type {Comentario, EstadoEditor, Manifesto, Modulo, OperacaoPatch} from '../nucleo/documentos';
-import {aplicarMarcaAoPlano, dentroDoOneDrive, documentoNovo, gravarPlano, nomePadrao, pastaLivre, planoDoExemplo, planoDoProjeto, regerarClaudeMd} from '../nucleo/criar-projeto';
+import {aplicarMarcaAoPlano, dentroDoOneDrive, documentoNovo, gravarPlano, nomePadrao, pastaLivre, planoDoExemplo, planoDoProjeto, regerarClaudeMd, regerarGuias} from '../nucleo/criar-projeto';
 import {EXEMPLO} from '../nucleo/exemplo';
 import {MODELOS} from '../nucleo/modelos';
 import {FORMATO_PADRAO, type Formato} from '../nucleo/formatos';
@@ -102,9 +102,9 @@ const conversas = criarSessoesIA({evento: (id, e) => enviar(CANAL.conversaEvento
     ...(claudeFalso ? {prefixo: [claudeFalso], ambienteExtra: {ELECTRON_RUN_AS_NODE: '1'}} : {})}});
 
 const recursos = (rel: string) => (app.isPackaged ? path.join(process.resourcesPath, rel) : path.join(app.getAppPath(), rel));
-// frente IDE (docs/ide.md): .mcp.json, .claude/settings.local.json e t3.json em cada projeto, com o MCP por stdio deste app
+// frente IDE e harnesses (docs/ide.md, docs/harnesses.md): o guia e o MCP de cada harness em cada projeto, com o MCP por stdio deste app
 const ide = criarIde({executavel: process.execPath, script: scriptDoMcp({empacotado: app.isPackaged, recursos: process.resourcesPath, raizApp: app.getAppPath()}),
-  ligado: () => memoria.prefs().projetos_ide !== false});
+  ligado: () => memoria.prefs().projetos_ide !== false, guias: (raiz) => regerarGuias(raiz, ['AGENTS.md', 'GEMINI.md'])}); // harnesses: o guia de cada um
 // Claude Desktop (docs/claude-desktop.md): o arquivo de descoberta (o MCP do Claude Desktop passa pelo app aberto) e o
 // botão "Conectar ao Claude Desktop", que grava a entrada no claude_desktop_config.json
 const claudeDesktop = criarClaudeDesktop({dados: app.getPath('userData'), executavel: process.execPath, versao: app.getVersion(),
@@ -200,7 +200,8 @@ const abrirProjeto = async (raiz: string) => {
       } catch {
         /* manifesto quebrado no meio de uma gravação: a próxima mudança acerta */
       }
-      regerarClaudeMd(raiz); // documento de outro módulo criado depois: o CLAUDE.md ganha a seção dele
+      // documento de outro módulo criado depois: o guia ganha a seção dele (o AGENTS.md e o GEMINI.md com a opção ligada)
+      regerarGuias(raiz, memoria.prefs().projetos_ide !== false ? ['CLAUDE.md', 'AGENTS.md', 'GEMINI.md'] : ['CLAUDE.md']);
     }
     enviar(CANAL.mudou, {arquivo});
   });

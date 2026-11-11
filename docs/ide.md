@@ -1,7 +1,12 @@
-# Projetos prontos para IDE de agentes (T3 Code, Claude Code, Cursor)
+# Projetos prontos para IDE de agentes (T3 Code, Claude Code e os outros harnesses)
 
 Frente IDE (branch `frente/integracao-ide`, 10/11/2026). Cada projeto do Estúdio pode ser aberto direto numa IDE de
 agentes, principalmente o T3 Code, com o MCP `estudio` já ligado, e o agente pode **ver o vídeo** sem o app aberto.
+
+**Desde a 2.0.1 (frente harnesses, 11/11/2026):** o mesmo vale para Codex, Gemini CLI, Antigravity, Cursor, VS Code e
+opencode. O guia vai também para `AGENTS.md` e `GEMINI.md`, e o MCP para o arquivo de cada harness, com a origem de cada
+um no diário. Arquivos, formatos, links das docs oficiais e o que foi provado em `docs/harnesses.md`; este documento
+segue valendo para o Claude Code e o T3.
 
 ## O que o app escreve em cada projeto, e por quê
 
@@ -15,6 +20,8 @@ Ao **criar ou abrir** um projeto, junto do `CLAUDE.md`, o app escreve ou atualiz
 | `t3.json` | `$schema`, `iconPath: ".estudio/miniatura.jpg"`, `defaultThreadEnvMode: "local"` | threads do T3 na própria pasta (worktree não serve: a mídia pesada fica fora do git) e o ícone do projeto (a foto do monitor que o app tira ao fechar) | sim |
 | `.gitignore` | `.mcp.json` e `.claude/settings.local.json`, com um comentário | os dois têm caminhos ou escolhas desta máquina | sim |
 | `CLAUDE.md` | a seção "Trabalhando por uma IDE (T3 Code, Claude Code)" | como ver o vídeo (prévias), que a tela recarrega e que tudo entra no diário com Reverter | sim |
+| `AGENTS.md`, `GEMINI.md` | o mesmo guia, com a seção do harness no fim (2.0.1) | Codex, Cursor, VS Code, opencode e Antigravity leem o `AGENTS.md`; o Gemini CLI, o `GEMINI.md` | sim |
+| `.codex/config.toml`, `.gemini/settings.json`, `.agents/mcp_config.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, `opencode.json` | o mesmo servidor `estudio`, no formato de cada harness e com `--origem` (2.0.1) | `docs/harnesses.md` | **não** |
 
 O servidor do `.mcp.json`:
 
@@ -55,16 +62,19 @@ outro PC traria caminhos errados. O `t3.json` não tem nada da máquina e fica n
 
 Configurações › IA (no painel da IA, "+ Conversa" → "Provedores e chaves…"), seção **IDE de agentes**:
 
-- **"Projetos prontos para IDE: T3 Code, Claude Code, Cursor"**: padrão ligado (`projetos_ide` nas preferências).
-  Ligar com um projeto aberto escreve os arquivos na hora.
-- A linha de baixo mostra o que a abertura escreveu no projeto aberto e os avisos, se houver.
+- **"Projetos prontos para agentes: Claude Code, T3 Code, Codex, Gemini CLI, Antigravity, Cursor, VS Code, opencode"**:
+  padrão ligado (`projetos_ide` nas preferências). Ligar com um projeto aberto escreve os arquivos na hora.
+- Abaixo, a lista harness → guia → arquivo de MCP, com "(escrito agora)" no que a abertura gravou, e a linha do projeto
+  aberto com o que foi escrito, os avisos e o botão **Copiar comando do Codex** (`docs/harnesses.md`).
 - **Desligar não apaga nada:** só deixa de escrever. Para tirar de um projeto:
 
 ```bash
 cd "<pasta do projeto>"
-rm -f .mcp.json t3.json
+rm -f .mcp.json t3.json AGENTS.md GEMINI.md
+rm -f .codex/config.toml .gemini/settings.json .agents/mcp_config.json .cursor/mcp.json .vscode/mcp.json opencode.json
 rm -f .claude/settings.local.json   # ou só tire "estudio" de enabledMcpjsonServers, se houver outras chaves
-# e, se quiser, apague do .gitignore as duas linhas debaixo de "# IDE de agentes (Estúdio…"
+# (nos JSON e no TOML com outras escolhas suas, tire só a entrada "estudio")
+# e, se quiser, apague do .gitignore as linhas debaixo de "# IDE de agentes (Estúdio…"
 ```
 
 Com a opção ligada, abrir o projeto no app escreve tudo de novo. Desligue antes.
@@ -75,7 +85,8 @@ Com a opção ligada, abrir o projeto no app escreve tudo de novo. Desligue ante
 |---|---|---|
 | T3 Code, thread **Claude** | sim | o SDK roda sem `settingSources` e carrega o `.mcp.json` da pasta; o `settings.local.json` aprova |
 | Claude Code (terminal ou extensão de editor) | sim | `.mcp.json` do projeto; aprovado pelo `settings.local.json` |
-| Cursor | sim | lê o `.mcp.json` do projeto. Se a sua versão só ler `.cursor/mcp.json`, copie para lá o mesmo bloco `estudio` |
+| Cursor | sim | desde a 2.0.1, `.cursor/mcp.json` (o que a doc do Cursor cita) e o `AGENTS.md`; `docs/harnesses.md` |
+| Codex, Gemini CLI, Antigravity, VS Code e opencode **fora do T3** | sim (2.0.1) | o arquivo de cada um; `docs/harnesses.md` |
 | T3 Code com **Codex**, **OpenCode** ou agente **ACP** (Gemini CLI, Qwen…) | **não** | exige mudança no T3 (abaixo) |
 | A aba Claude **dentro do Estúdio** | sem mudança | continua no MCP HTTP do app, com o portão. O `--mcp-config` do app vence o `.mcp.json` do projeto: conferido em 10/11/2026, o `init` do `claude -p` lista um `estudio` só, com `source: "dynamic"` |
 
@@ -197,7 +208,8 @@ O botão **Abrir no T3 Code**, ao lado da opção:
 
 ## O que ficou de fora
 
-- **Codex, OpenCode e ACP no T3:** exigem mudança no T3, descrita acima.
+- **Codex, OpenCode e ACP no T3:** exigem mudança no T3, descrita acima. Fora do T3, desde a 2.0.1, cada um tem o seu
+  arquivo no projeto (`docs/harnesses.md`).
 - **`scripts` no `t3.json`:** por exemplo, "Abrir no Estúdio". A segunda instância do app só traz a primeira para a frente
   e não troca de projeto, então o script não abriria a pasta certa com o app já aberto.
 - **Prévia de imagem e de 3D.** Elas desenham na janela, não no Remotion.

@@ -188,7 +188,7 @@ export type Recente = {raiz: string; nome: string; aberto_em: string; existe: bo
 export type Preferencias = {pasta_projetos: string; ao_iniciar: 'inicio' | 'ultimo'; formato_video: string; formato_imagem: string; boas_vindas_vista: boolean;
   pasta_trilhas: string; // biblioteca de músicas e efeitos da pessoa (padrão: Estudio/trilhas)
   pasta_marcas: string;
-  projetos_ide?: boolean}; // frente IDE: .mcp.json, .claude/settings.local.json e t3.json em cada projeto (padrão: ligado)
+  projetos_ide?: boolean}; // frente IDE e harnesses: guias e MCP de cada harness em cada projeto (padrão: ligado; docs/ide.md)
 
 /** `marca` é o id do kit de marca que entra no tema do documento novo (sem ele, o tema neutro). */
 export type NovoProjeto = {nome?: string; modelo: IdModelo; formato?: Formato | {largura: number; altura: number}; pasta?: string; formato_id?: string; marca?: string};
@@ -527,7 +527,10 @@ export type EstadoClaudeDesktop = {arquivo: string; situacao: 'conectado' | 'des
 /** A configuração pronta para colar no app de fora, por HTTP e por stdio (com a ponte do próprio Estúdio). */
 export type ConfigsDoApp = {http: string; stdio: string};
 /** Projetos prontos para IDE: a opção, o comando t3 (null fora do PATH) e o que a última abertura escreveu neste projeto. */
-export type EstadoIde = {ligado: boolean; t3: string | null; raiz?: string; gravados?: string[]; avisos?: string[]};
+/** `harnesses`: o arquivo de instrução e o de MCP de cada harness (docs/harnesses.md). `comandoCodex`: o `codex mcp add` do
+ *  projeto aberto, para quem não quer marcar a pasta como confiável no Codex. */
+export type EstadoIde = {ligado: boolean; t3: string | null; raiz?: string; gravados?: string[]; avisos?: string[];
+  harnesses: {nome: string; guia: string; mcp: string}[]; comandoCodex?: string};
 /** Conversa guardada no projeto (.estudio/conversas/): o que a tela desenha e de quem é. */
 export type ConversaGuardadaTela = {sessao: string; provedor: string; titulo: string; modelo?: string; criada_em: string; atualizada_em: string;
   itens: unknown[]; uso?: unknown};

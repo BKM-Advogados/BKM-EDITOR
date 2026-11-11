@@ -10,7 +10,7 @@ import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {StreamableHTTPServerTransport} from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import {registrarFerramentas, type Rede, type TranscritorMcp} from '../nucleo/ferramentas-mcp';
 import {INSTRUCOES_MCP} from '../nucleo/mcp-ia';
-import {autorAceito, CABECALHO_AUTOR, CABECALHO_CONVERSA, conversaValida, origemDaIde} from '../nucleo/mcp-app';
+import {autorAceito, CABECALHO_AUTOR, CABECALHO_CONVERSA, CABECALHO_ORIGEM, conversaValida, origemDaIde, rotuloAceito} from '../nucleo/mcp-app';
 import type {PedidoPortao, Portao} from '../nucleo/portao';
 import type {Projeto} from '../nucleo/projeto';
 import type {ServicoNarracao} from '../nucleo/narracao-servico';
@@ -98,7 +98,18 @@ export class McpHttp {
       }
       if (!autorAceito(autor)) return {erro: `o autor "${autor}" não pode gravar pelo Estúdio; use outro --autor`};
     }
-    return conversaValida(conversa) ? {autor, origem: origemDaIde(conversa), chave: `${token} ${conversa}`} : {autor, origem: aba.origem, chave: token};
+    // o nome do harness (--origem): ilegível ou fora do formato, a origem fica sem ele (não recusa: não grava por cima de nada)
+    let rotulo: string | undefined;
+    const brutoOrigem = req.headers[CABECALHO_ORIGEM];
+    if (typeof brutoOrigem === 'string') {
+      try {
+        rotulo = decodeURIComponent(brutoOrigem);
+      } catch {
+        rotulo = undefined;
+      }
+      if (!rotuloAceito(rotulo)) rotulo = undefined;
+    }
+    return conversaValida(conversa) ? {autor, origem: origemDaIde(conversa, rotulo), chave: `${token} ${conversa}`} : {autor, origem: aba.origem, chave: token};
   }
 
   /** Atende /mcp; devolve false se o pedido não é para cá. */

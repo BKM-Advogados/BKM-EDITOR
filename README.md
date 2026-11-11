@@ -8,6 +8,12 @@ Nome provisório. Pasta: `C:\Users\usuario\projetos\estudio` (fora do OneDrive, 
 Repositório: `BKM-Advogados/BKM-EDITOR` (privado). Versões (tag do git → versão do pacote): V1 = `v1.0.0` (0.1.0),
 V2 = `v2.0.0` (0.2.0), V3 = `v3.0.0` (1.0.0), V4 = `v4.0.0` (2.0.0). No Linux a pasta é `~/Projects/estudio`.
 
+## Na 2.0.1
+
+- **Qualquer agente abre o projeto (`docs/harnesses.md`):** além do `CLAUDE.md`, cada projeto traz o mesmo guia em
+  `AGENTS.md` (Codex, Cursor, VS Code, opencode, Antigravity) e `GEMINI.md` (Gemini CLI), e o MCP `estudio` já ligado no
+  arquivo de cada harness, com o nome dele no Histórico. Quem clona o código acha as instruções no `AGENTS.md` da raiz.
+
 ## Novidades da V4 (pacote 2.0.0, 11/11/2026)
 
 A V4 junta a reformulação (visual neutro, as três levas de UX e as correções auditadas do núcleo) com a rodada 4

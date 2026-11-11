@@ -13,7 +13,7 @@ import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import {McpHttp} from '../src/main/mcp-http';
 import {registrarFerramentas} from '../src/nucleo/ferramentas-mcp';
-import {ARQUIVO_MCP_APP, appAberto, type ConexaoApp, type CriarConexao, encaminharAoApp, origemDaIde, pedidoNaoSaiu, publicarMcpApp, repassarAoAppQuandoAberto,
+import {ARQUIVO_MCP_APP, appAberto, type ConexaoApp, type CriarConexao, encaminharAoApp, origemDaIde, pedidoNaoSaiu, rotuloAceito, publicarMcpApp, repassarAoAppQuandoAberto,
   retirarMcpApp} from '../src/nucleo/mcp-app';
 import {Projeto} from '../src/nucleo/projeto';
 
@@ -39,12 +39,12 @@ afterAll(() => {
 });
 
 /** O MCP por stdio da IDE (um processo à parte): servidor local sobre outro Projeto da mesma pasta, com o repasse. */
-const ide = async (conversa?: string, encontrar?: (raiz: string) => ConexaoApp | null, prazo?: number) => {
+const ide = async (conversa?: string, encontrar?: (raiz: string) => ConexaoApp | null, prazo?: number, rotulo?: string) => {
   const local = new McpServer({name: 'estudio', version: '0'});
-  registrarFerramentas(local, new Projeto(pasta), 'agente', conversa ? origemDaIde(conversa) : 'mcp');
+  registrarFerramentas(local, new Projeto(pasta), 'agente', conversa ? origemDaIde(conversa, rotulo) : 'mcp');
   const [a, b] = InMemoryTransport.createLinkedPair();
   await local.connect(a);
-  repassarAoAppQuandoAberto(a, pasta, {...(conversa ? {quem: {conversa, autor: 'agente'}} : {}), ...(encontrar ? {encontrar} : {}), ...(prazo ? {prazo} : {})});
+  repassarAoAppQuandoAberto(a, pasta, {...(conversa ? {quem: {conversa, autor: 'agente', ...(rotulo ? {rotulo} : {})}} : {}), ...(encontrar ? {encontrar} : {}), ...(prazo ? {prazo} : {})});
   const c = new Client({name: 'ide', version: '0'});
   await c.connect(b);
   return c;
@@ -93,6 +93,22 @@ describe('repasse do MCP da IDE', () => {
     expect(r.isError).toBeFalsy();
     expect(ultima()).toMatchObject({autor: 'agente', origem: 'IDE pelo app', rotulo: 'cor #111111'});
     await cliente.close();
+  });
+
+  it('o nome do harness (--origem) vai junto da conversa, pelo app e sem ele (docs/harnesses.md)', async () => {
+    expect(origemDaIde('abcdef')).toBe('ide-abcdef');
+    expect(origemDaIde('abcdef', 'Gemini CLI')).toBe('ide-abcdef Gemini CLI');
+    for (const ok of ['Codex', 'Gemini CLI', 'VS Code', 'opencode', 'Antigravity']) expect(rotuloAceito(ok)).toBe(true);
+    for (const ruim of ['', ' Codex', 'a\nb', 'x'.repeat(40), 'ide-<script>', 12]) expect(rotuloAceito(ruim)).toBe(false);
+    const c = mcp.novaConexao(origem, 'mcp', {ide: true});
+    publicarMcpApp(pasta, {url: c.url, token: c.headers.Authorization.slice('Bearer '.length)});
+    const pelo = await ide('cccccc', undefined, undefined, 'Gemini CLI');
+    expect((await trocarCor(pelo, '#c00000')).isError).toBeFalsy();
+    expect(ultima()).toMatchObject({autor: 'agente', origem: 'ide-cccccc Gemini CLI'}); // pelo app (cabeçalho X-Estudio-Origem)
+    retirarMcpApp(pasta, c.headers.Authorization.slice('Bearer '.length));
+    expect((await trocarCor(pelo, '#c00001')).isError).toBeFalsy();
+    expect(ultima()).toMatchObject({autor: 'agente', origem: 'ide-cccccc Gemini CLI'}); // com o app fechado, ali mesmo
+    await pelo.close();
   });
 
   it('cada conversa da IDE grava com a origem dela, e o desfazer de uma não desfaz a da outra', async () => {

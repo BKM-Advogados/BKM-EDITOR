@@ -4,7 +4,9 @@
 // tela e um escritor só. Com o app fechado, rodam aqui, com a trava de escrita do projeto.
 // A rede do ler_fonte aqui é o fetch do Node (criarRede, em src/nucleo/ferramentas-mcp.ts).
 // A narração por IA (docs/narracao.md) usa as chaves do ambiente: GEMINI_API_KEY (ou GOOGLE_API_KEY) e GOOGLE_TTS_API_KEY.
-// Uso: node dist-mcp/nucleo.cjs --projeto <pasta> [--autor agente] [--ide]
+// Uso: node dist-mcp/nucleo.cjs --projeto <pasta> [--autor agente] [--ide] [--origem "Gemini CLI"]
+// --origem é o nome do harness que abriu o processo (docs/harnesses.md): o diário grava "ide-<id> Gemini CLI" e o
+// Histórico mostra "Gemini CLI"; sem ele, "Claude na IDE", como antes.
 // O .mcp.json que o app escreve em cada projeto (frente IDE, docs/ide.md) roda este arquivo pelo próprio executável do
 // Estúdio em modo Node (ELECTRON_RUN_AS_NODE=1), com --ide: a pasta de trabalho da IDE manda quando ela é
 // um projeto do Estúdio (uma pasta copiada à mão leva o .mcp.json da original, com o --projeto de lá).
@@ -13,7 +15,7 @@ import path from 'node:path';
 import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
 import {Projeto} from '../src/nucleo/projeto';
-import {novaConversaIde, origemDaIde, repassarAoAppQuandoAberto} from '../src/nucleo/mcp-app';
+import {novaConversaIde, origemDaIde, repassarAoAppQuandoAberto, rotuloAceito} from '../src/nucleo/mcp-app';
 import {criarRede, registrarFerramentas} from '../src/nucleo/ferramentas-mcp';
 import {INSTRUCOES_MCP} from '../src/nucleo/mcp-ia';
 import {Transcritor} from '../src/main/transcricao';
@@ -42,8 +44,10 @@ definirServicoPrevia(servicoDePreviaStdio(path.resolve(__dirname, '..')));
 // a transcrição local acha o ffmpeg no node_modules do repositório (dist-mcp/ fica na raiz)
 const raiz = pasta;
 // um processo por conversa da IDE: a mesma origem (ide-<id>) no diário com o app aberto ou fechado (mcp-app.ts)
-const quem = {conversa: novaConversaIde(), autor: arg('--autor') ?? 'agente'};
-registrarFerramentas(servidor, new Projeto(raiz), quem.autor, origemDaIde(quem.conversa), criarRede(),
+const rotulo = arg('--origem');
+if (rotulo !== undefined && !rotuloAceito(rotulo)) process.stderr.write(`estudio MCP: --origem "${rotulo}" ignorado (letras, números, espaço, ponto e hífen, até 32)\n`);
+const quem = {conversa: novaConversaIde(), autor: arg('--autor') ?? 'agente', ...(rotuloAceito(rotulo) ? {rotulo} : {})};
+registrarFerramentas(servidor, new Projeto(raiz), quem.autor, origemDaIde(quem.conversa, quem.rotulo), criarRede(),
   new Transcritor({raizApp: path.resolve(__dirname, '..')}), undefined, servicoDoAmbiente());
 
 const transporte = new StdioServerTransport();

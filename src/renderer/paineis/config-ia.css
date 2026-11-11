@@ -44,3 +44,7 @@
 .ia-narracao.foco { outline: 1px solid var(--acento); outline-offset: 2px; border-radius: var(--raio); }
 .ia-narracao .link { border: 0; background: none; padding: 0; font: inherit; color: var(--acento); cursor: pointer; }
 .ia-narracao .link:hover { text-decoration: underline; }
+/* harnesses (docs/harnesses.md): harness → guia → arquivo de MCP */
+.ia-harnesses { border-collapse: collapse; font-size: 11px; margin: 4px 0; }
+.ia-harnesses td { padding: 1px 10px 1px 0; vertical-align: top; }
+.ia-harnesses code { font-size: 11px; }

@@ -31,8 +31,9 @@ const ver = (e: ResumoDiario) => {
   if (objeto && objeto.split('/').length > 2) selecionar({documento: d.id, caminho: objeto});
 };
 
-// a conversa da IDE grava "ide-<id>" no diário (mcp-app.ts): na tela vira um nome legível, com o id na dica
-const nomeDaOrigem = (origem?: string) => (!origem ? 'Claude' : origem.startsWith('ide-') ? 'Claude na IDE' : origem);
+// a conversa da IDE grava "ide-<id>" (ou "ide-<id> Codex", com o nome do harness) no diário (mcp-app.ts): na tela vira
+// um nome legível, com o id na dica
+const nomeDaOrigem = (origem?: string) => (!origem ? 'Claude' : !origem.startsWith('ide-') ? origem : /^ide-[0-9a-f]+ (.+)$/.exec(origem)?.[1] ?? 'Claude na IDE');
 
 const Grupo: React.FC<{g: GrupoHistorico; revertidas: Set<number>}> = ({g, revertidas}) => {
   const [aberto, setAberto] = useState(g.autor === 'agente');

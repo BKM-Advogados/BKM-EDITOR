@@ -125,7 +125,9 @@ Envolve o `registerTool`: toda ferramenta registrada depois dele passa por ele, 
   Desktop" e o mesmo portão. A configuração stdio antiga, com a ponte, segue funcionando, e o botão a troca pela nova.
   Detalhes em `docs/claude-desktop.md`.
 - **IDE de agentes** (T3 Code, Claude Code, Cursor): cada projeto leva um `.mcp.json` com o MCP por stdio, sem token e sem
-  o app aberto, e o agente vê o vídeo por `ver_quadro`, `ver_cenas` e `ver_trecho`. Detalhes em `docs/ide.md`.
+  o app aberto, e o agente vê o vídeo por `ver_quadro`, `ver_cenas` e `ver_trecho`. Detalhes em `docs/ide.md`. Desde a
+  2.0.1, também o guia em `AGENTS.md` e `GEMINI.md` e o MCP de Codex, Gemini CLI, Antigravity, Cursor, VS Code e
+  opencode, com a origem de cada um no diário (`--origem`): `docs/harnesses.md`.
 
 ## Ferramentas MCP da frente (`src/nucleo/mcp-ia.ts`)
 
