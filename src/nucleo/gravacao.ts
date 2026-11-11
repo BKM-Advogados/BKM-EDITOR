@@ -70,7 +70,6 @@ export const lerCabecalhoWav = (b: Uint8Array): CabecalhoWav | {erro: string} =>
       if (!fmt) return {erro: 'o WAV não traz o bloco fmt antes dos dados'};
       if (fmt.formato !== 1) return {erro: `o WAV não é PCM de inteiros (formato ${fmt.formato})`};
       if (![16, 24].includes(fmt.bits)) return {erro: `o WAV tem ${fmt.bits} bits; vale 16 ou 24`};
-      if (fmt.canais < 1 || fmt.taxa < 1) return {erro: `o WAV tem ${fmt.canais} canais a ${fmt.taxa} Hz`};
       const util = Math.min(tam, b.length - (pos + 8));
       return {canais: fmt.canais, taxa: fmt.taxa, bits: fmt.bits, amostras: Math.floor(util / (fmt.canais * (fmt.bits / 8)))};
     }
