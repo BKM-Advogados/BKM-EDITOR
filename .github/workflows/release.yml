@@ -1,0 +1,45 @@
+# Publica a release a partir de uma execução do Build que passou (docs/atualizacao.md): roda no GitHub, onde os
+# artifacts já estão, em vez de baixar e reenviar uns 2 GB por uma conexão lenta. O trabalho é o do
+# scripts/publicar-release.mjs (confere a execução, junta os arquivos com os nomes que o app procura, confere o
+# latest.yml do Windows, gera o SHA256SUMS.txt e cria a release na tag, que já precisa existir no GitHub).
+#   Actions › Release › Run workflow, ou: gh workflow run release.yml -f execucao=<id do Build> -f tag=v4.0.1
+# As notas vêm de docs/notas/<tag>.md (o app mostra esse texto no aviso de versão nova).
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      execucao:
+        description: 'id da execução do Build que passou (gh run list)'
+        required: true
+      tag:
+        description: 'tag já enviada ao GitHub (ex.: v4.0.1)'
+        required: true
+
+permissions:
+  contents: write # criar a release e anexar os arquivos
+  actions: read # ler a execução do Build e baixar os artifacts
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # as entradas vão pelo ambiente, nunca coladas no script do shell
+      - name: Publicar
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXECUCAO: ${{ inputs.execucao }}
+          TAG: ${{ inputs.tag }}
+          REPO: ${{ github.repository }}
+        run: |
+          [[ "$EXECUCAO" =~ ^[0-9]+$ ]] || { echo "execucao deve ser o número da execução do Build" >&2; exit 1; }
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || { echo "tag fora do formato v<maior>.<menor>.<correção>" >&2; exit 1; }
+          notas="docs/notas/$TAG.md"
+          [[ -f "$notas" ]] || { echo "faltam as notas em $notas" >&2; exit 1; }
+          node scripts/publicar-release.mjs --execucao "$EXECUCAO" --tag "$TAG" --notas "$notas" --repo "$REPO"

@@ -95,9 +95,13 @@ electron-builder gravaria a partir do bloco `publish` do `electron-builder.yml`;
 2. Crie e suba a tag: `git tag v4.0.2 && git push origin v4.0.2`. O CI (`build.yml`) roda na tag. Também serve uma
    execução de um branch `ci/*`: nesse caso o script cria a tag no commit que o CI compilou.
 3. Espere o CI terminar verde nas quatro linhas. Ache o id: `gh run list --workflow build.yml --limit 5`.
-4. Escreva as novidades num arquivo `.md`. É este texto que o app mostra no aviso.
-5. Ensaie: `node scripts/publicar-release.mjs --execucao <id> --tag v4.0.2 --notas notas.md --seco`.
-6. Publique: o mesmo comando, sem `--seco`.
+4. Escreva as novidades em `docs/notas/<tag>.md` (ex.: `docs/notas/v4.0.2.md`) e suba no `main`. É este texto que o
+   app mostra no aviso.
+5. Publique pelo workflow **Release** (`.github/workflows/release.yml`), que roda o script no GitHub, onde os artifacts
+   já estão: `gh workflow run release.yml -f execucao=<id> -f tag=v4.0.2` (ou Actions › Release › Run workflow).
+   É o caminho padrão desde a v4.0.1: numa conexão lenta, baixar e reenviar os 2 GB pela máquina leva horas.
+6. Pela máquina, também dá: ensaie com `node scripts/publicar-release.mjs --execucao <id> --tag v4.0.2 --notas
+   docs/notas/v4.0.2.md --seco` e publique com o mesmo comando, sem `--seco`.
 
 O script:
 
@@ -182,5 +186,6 @@ O que já foi conferido sem essas máquinas:
 - `src/compartilhado/atualizacao.ts`: canais e tipos.
 - `src/renderer/componentes/AvisoAtualizacao.tsx` e `src/renderer/estado/ocupado.ts`: o aviso, as Preferências e o
   que segura o reinício.
-- `scripts/publicar-release.mjs` e `scripts/conferir-latest-yml.mjs`: a release.
+- `scripts/publicar-release.mjs` e `scripts/conferir-latest-yml.mjs`: a release; `.github/workflows/release.yml` roda o
+  script no GitHub; `docs/notas/<tag>.md`: as notas de cada versão.
 - Testes: `testes/atualizacao.test.ts`, `testes/atualizacao-motores.test.ts`, `testes/publicar-release.test.ts`.
