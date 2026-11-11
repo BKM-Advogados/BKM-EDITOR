@@ -79,3 +79,28 @@ describe('tema do dockview', () => {
     expect(casca).toMatch(/\.dv-active-group \.dv-tab\.dv-active-tab::before \{ background: var\(--acento\)/);
   });
 });
+
+describe('tipo legível', () => {
+  it('nada abaixo de 11 px e nenhum rótulo em caixa alta', () => {
+    const pequenos: string[] = [];
+    const caixaAlta: string[] = [];
+    for (const a of arquivosCss()) {
+      const css = semComentarios(fs.readFileSync(a, 'utf8'));
+      for (const m of css.matchAll(/(?:font-size|font)\s*:[^;}]*/g)) {
+        for (const t of m[0].matchAll(/(?<![\d.])(\d+(?:\.\d+)?)px/g)) {
+          // em `font:` o tamanho vem antes da barra; altura de linha (depois da barra) não conta
+          const antes = m[0].slice(0, t.index);
+          if (!antes.includes('/') && Number(t[1]) > 0 && Number(t[1]) < 11) pequenos.push(`${path.relative(RAIZ, a)}: ${m[0].trim()}`);
+        }
+      }
+      for (const m of css.matchAll(/([^{}]+)\{[^}]*text-transform:\s*uppercase/g)) caixaAlta.push(`${path.relative(RAIZ, a)}: ${m[1].trim()}`);
+    }
+    expect(pequenos).toEqual([]);
+    expect(caixaAlta.filter((c) => !/input\.hex/.test(c))).toEqual([]);
+  });
+
+  it('o corpo da interface é o --tam-3 (13 px)', () => {
+    const estilo = fs.readFileSync(path.join(RAIZ, 'estilo.css'), 'utf8');
+    expect(estilo).toMatch(/html, body, #raiz \{[^}]*font: var\(--tam-3\)/);
+  });
+});

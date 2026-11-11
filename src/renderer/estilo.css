@@ -94,7 +94,7 @@
 
 * { box-sizing: border-box; }
 html, body, #raiz { margin: 0; height: 100%; overflow: hidden; background: var(--fundo-0); color: var(--texto);
-  font: var(--tam-2)/1.35 var(--fonte); font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; }
+  font: var(--tam-3)/1.4 var(--fonte); font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; }
 button, input, select, textarea { font: inherit; color: inherit; font-variant-numeric: tabular-nums; }
 b, strong { font-weight: var(--peso-forte); }
 ::selection { background: var(--acento-selecao); }
@@ -107,7 +107,7 @@ b, strong { font-weight: var(--peso-forte); }
 svg.lucide { width: var(--icone); height: var(--icone); stroke-width: var(--traco-icone); flex: none; }
 .i14 svg.lucide, svg.lucide.i14, .bt.mini svg.lucide, .lista svg.lucide, .lt svg.lucide { width: var(--icone-p); height: var(--icone-p); }
 .i12 svg.lucide, svg.lucide.i12 { width: 12px; height: 12px; }
-kbd { font: 600 10px/14px var(--fonte-mono); color: var(--texto-2); background: var(--fundo-3); border-radius: 3px; padding: 0 4px; }
+kbd { font: 600 var(--tam-1)/14px var(--fonte-mono); color: var(--texto-2); background: var(--fundo-3); border-radius: 3px; padding: 0 4px; }
 
 /* anel de foco só na navegação por teclado */
 :where(button, [role="tab"], [tabindex], a, summary, .dv-tab):focus-visible { outline: 1px solid var(--acento); outline-offset: -1px; }
@@ -417,7 +417,7 @@ input[type="range"]:focus-visible { outline: none; }
 .pilha .alca-fx { color: var(--icone-inativo); cursor: grab; visibility: hidden; display: inline-flex; }
 .pilha .linha-fx:hover .alca-fx { visibility: visible; }
 .pilha .fx { width: 20px; height: 20px; border-radius: var(--raio); border: 0; padding: 0; display: grid; place-items: center; cursor: pointer; flex: none;
-  background: transparent; color: var(--trilha-efeito); font: var(--peso-forte) 10px/1 var(--fonte-mono); }
+  background: transparent; color: var(--trilha-efeito); font: var(--peso-forte) var(--tam-1)/1 var(--fonte-mono); }
 .pilha .fx:hover { background: var(--fundo-4); }
 .pilha .fx.desligado { color: var(--texto-3); }
 .pilha .nome-fx { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -457,7 +457,7 @@ input[type="range"]:focus-visible { outline: none; }
 .efeito-linha .alca-arrastar { color: var(--icone-inativo, var(--texto-3)); visibility: hidden; cursor: grab; flex: none; }
 .efeito-linha:hover .alca-arrastar { visibility: visible; }
 .efeito-linha .fx { width: 22px; height: 18px; border-radius: 3px; border: 1px solid var(--borda-forte); background: transparent; color: var(--texto-3);
-  font: italic 600 10px var(--fonte); cursor: pointer; padding: 0; flex: none; }
+  font: italic 600 var(--tam-1) var(--fonte); cursor: pointer; padding: 0; flex: none; }
 .efeito-linha .fx.ligado { border-color: var(--trilha-efeito); color: var(--trilha-efeito); }
 .efeito-linha .nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .efeito.desligado .efeito-linha .nome, .efeito.desligado .efeito-linha .valor { opacity: 0.45; }

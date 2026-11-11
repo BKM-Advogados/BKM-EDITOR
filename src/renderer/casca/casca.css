@@ -27,7 +27,7 @@
 .barra .areas kbd { display: none; }
 .barra .acoes { flex: 1 1 0; justify-content: flex-end; display: flex; align-items: center; gap: 2px; white-space: nowrap; }
 .barra .acoes .bt { height: 26px; }
-.barra .acoes kbd { font: 600 10px var(--fonte-mono); color: var(--texto-2); background: var(--fundo-3); border-radius: 3px; padding: 0 4px; margin-left: 2px; }
+.barra .acoes kbd { font: 600 var(--tam-1) var(--fonte-mono); color: var(--texto-2); background: var(--fundo-3); border-radius: 3px; padding: 0 4px; margin-left: 2px; }
 /* janela estreita: áreas e "Comentar" só com o ícone (o nome continua na dica). Com as seis áreas, o nome inteiro pede cerca de 1170 px: 1240 deixa folga para o nome do projeto */
 @media (max-width: 1240px) {
   .barra .areas button { font-size: 0; gap: 0; padding: 0 9px; }
@@ -40,7 +40,7 @@
   color: var(--texto); font: 12px var(--fonte); text-align: left; cursor: default; }
 .menu-app button:hover { background: var(--fundo-3); }
 .menu-app button svg { color: var(--texto-2); }
-.menu-app kbd { margin-left: auto; font: 10px var(--fonte-mono); color: var(--texto-3); }
+.menu-app kbd { margin-left: auto; font: var(--tam-1) var(--fonte-mono); color: var(--texto-3); }
 .menu-app hr { border: 0; border-top: 1px solid var(--borda); margin: 4px 2px; }
 
 /* ── tema próprio do dockview: grupos com cantos de 4 px sobre o vão, abas na cor das barras ── */
@@ -80,7 +80,7 @@
 .aba-doca .aba-icone { display: inline-grid; place-items: center; color: var(--icone-inativo, var(--texto-3)); }
 .dv-active-tab .aba-doca .aba-icone { color: var(--texto-2); }
 .aba-terminal .aba-icone { color: var(--agente) !important; }
-.aba-doca .aba-contador { font: 600 10px/14px var(--fonte); color: var(--sobre-acento, #111); background: var(--comentario); border-radius: 7px; padding: 0 4px; }
+.aba-doca .aba-contador { font: 600 var(--tam-1)/14px var(--fonte); color: var(--sobre-acento, #111); background: var(--comentario); border-radius: 7px; padding: 0 4px; }
 .aba-doca .aba-x { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 3px; color: var(--texto-3); visibility: hidden; }
 .dv-tab:hover .aba-doca .aba-x { visibility: visible; }
 .aba-doca .aba-x:hover { background: var(--fundo-3); color: var(--texto); }
@@ -128,8 +128,8 @@
 .barra .acoes .bt.exportar { background: var(--fundo-3); color: var(--texto); margin-left: 6px; padding: 0 10px; }
 .barra .acoes .bt.exportar:hover { background: var(--fundo-4); }
 .barra .acoes .bt.exportar:disabled { opacity: 0.45; }
-.menu-app .menu-rotulo { display: flex; align-items: center; gap: 8px; padding: 6px 8px 2px; font: 600 10.5px var(--fonte); letter-spacing: 0.04em; text-transform: uppercase;
-  color: var(--texto-3); }
+.menu-app .menu-rotulo { display: flex; align-items: center; gap: 8px; padding: 6px 8px 2px; font: 600 var(--tam-2) var(--fonte);
+  color: var(--texto-2); }
 .menu-app .menu-rotulo svg { color: var(--texto-3); }
 .menu-app .menu-sub { display: flex; flex-direction: column; }
 .menu-app .menu-linha { display: flex; flex-wrap: wrap; gap: 2px; padding: 2px 4px 2px 26px; }

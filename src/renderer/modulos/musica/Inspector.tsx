@@ -403,7 +403,7 @@ export const ListaMusica: React.FC = () => {
           <React.Fragment key={c.id}>
             <div className={`item${s?.tipo === 'canal' && s.id === c.id ? ' sel' : ''}`} onClick={() => selecionarMusica({tipo: 'canal', id: c.id})}>
               {iconeDoCanal(c, 14)}<span className="nome">{c.nome}</span>
-              <span className="ler" style={{fontSize: 10}}>{doc.arranjo.clipes.filter((x) => x.canal === c.id).length}</span>
+              <span className="ler" style={{fontSize: "var(--tam-1)"}}>{doc.arranjo.clipes.filter((x) => x.canal === c.id).length}</span>
             </div>
             {doc.padroes.filter((p) => p.canal === c.id).map((p) => (
               <div key={p.id} className={`item sub${s?.tipo === 'padrao' && s.id === p.id ? ' sel' : ''}`}
