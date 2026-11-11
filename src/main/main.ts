@@ -263,6 +263,8 @@ const criarJanela = () => {
   // did-navigate (a página nova entrou) e não did-start-navigation: este vem ANTES do will-navigate, e um arquivo solto na
   // janela, mesmo barrado lá, derrubaria todas as conversas
   janela.webContents.on('did-navigate', () => largarTerminais());
+  // o <title> da página não passa por cima do nome do projeto (o projeto pode abrir antes de a página carregar)
+  janela.on('page-title-updated', (e) => e.preventDefault());
   // frente Casca (transversal-D6): o renderer que cai (falta de memória no perfil leve) recarrega a janela em vez de ficar
   // branca; o projeto segue aberto aqui e a tela o relê. Depois de quedas em laço, avisa em vez de recarregar de novo.
   let recargas: number[] = [];
