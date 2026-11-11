@@ -13,8 +13,9 @@
 // Tudo mesclado: o que a pessoa já tiver nesses arquivos fica, e nada é regravado se não mudou (o app commita o git do
 // projeto sozinho). Os arquivos de MCP (caminhos absolutos desta máquina) e o settings.local.json vão para o .gitignore
 // do projeto; o t3.json, sem nada da máquina, fica no git. As funções `...Atualizado` são puras; `prepararParaIde` grava.
-import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, readFileSync} from 'node:fs';
 import path from 'node:path';
+import {gravarAtomicoNoLugar} from './gravar-seguro';
 
 export const SERVIDOR_IDE = 'estudio';
 export const T3_SCHEMA = 'https://t3.codes/schema/t3.json';
@@ -110,15 +111,26 @@ const CHAVES: Record<Exclude<FormatoMcp, 'toml'>, string[]> = {
   mcpServers: ['mcpServers'], 'mcpServers-sem-tipo': ['mcpServers'], servers: ['servers'], opencode: ['mcp', 'servers'],
 };
 
+/** A entrada do app por cima da que está no arquivo: só os campos do app mudam. O que a pessoa pôs no "estudio" fica
+ *  (`enabled: false` do opencode, `trust` e `timeout` do Gemini, uma `GEMINI_API_KEY` no `env` para a narração), e os
+ *  objetos do app (`env`, `environment`) mesclam com os dela, chave a chave. */
+export const mesclarEntrada = (antes: unknown, entrada: Objeto): Objeto => {
+  if (!ehObjeto(antes)) return entrada;
+  const nova: Objeto = {...antes};
+  for (const [k, v] of Object.entries(entrada)) nova[k] = ehObjeto(v) && ehObjeto(antes[k]) ? {...antes[k], ...v} : v;
+  return nova;
+};
+
 /** Um arquivo JSON de MCP com a entrada "estudio" deste app em `chaves` (por exemplo `mcp.servers`), sem mexer nos outros
- *  servidores nem nas outras chaves. Igual: null. "estudio" trocado à mão: fica, com aviso. */
+ *  servidores, nas outras chaves nem no que a pessoa acrescentou ao "estudio" (mesclarEntrada). Igual: null. "estudio"
+ *  trocado à mão: fica, com aviso. */
 export const configJsonAtualizado = (atual: string | null, arquivo: string, chaves: string[], entrada: Objeto): Resultado => {
-  const montar = (base: Objeto, i: number): Objeto => {
+  const montar = (base: Objeto, i: number, e: Objeto): Objeto => {
     const k = chaves[i];
     const dentro = (base[k] ?? {}) as Objeto;
-    return {...base, [k]: i === chaves.length - 1 ? {...dentro, [SERVIDOR_IDE]: entrada} : montar(dentro, i + 1)};
+    return {...base, [k]: i === chaves.length - 1 ? {...dentro, [SERVIDOR_IDE]: e} : montar(dentro, i + 1, e)};
   };
-  if (atual === null) return {texto: json(montar({}, 0))};
+  if (atual === null) return {texto: json(montar({}, 0, entrada))};
   const lido = lerObjeto(atual, arquivo);
   if ('aviso' in lido) return {texto: null, aviso: lido.aviso};
   let nivel: Objeto = lido.obj;
@@ -132,9 +144,10 @@ export const configJsonAtualizado = (atual: string | null, arquivo: string, chav
     nivel = prox;
   }
   const antes = nivel[SERVIDOR_IDE];
-  if (igual(antes, entrada)) return {texto: null};
   if (antes !== undefined && !ehDoApp(antes)) return {texto: null, aviso: `o servidor "${SERVIDOR_IDE}" do ${arquivo} foi trocado à mão; ficou como estava`};
-  return {texto: json(montar(lido.obj, 0))};
+  const nova = mesclarEntrada(antes, entrada);
+  if (igual(antes, nova)) return {texto: null};
+  return {texto: json(montar(lido.obj, 0, nova))};
 };
 
 /** .mcp.json com o servidor "estudio" deste app, sem mexer nos outros servidores nem nas outras chaves. */
@@ -160,40 +173,109 @@ const tabelaDaLinha = (linha: string): string | null => {
   return m ? m[1].split('.').map((p) => p.trim().replace(/^"(.*)"$/, '$1').replace(/^'(.*)'$/, '$1')).join('.') : null;
 };
 
-/** .codex/config.toml com as tabelas do "estudio" refeitas no lugar delas (ou no fim), e o resto do arquivo como está.
- *  O "estudio" escrito de outro jeito (tabela em linha, chave pontilhada) ou trocado à mão fica, com aviso. */
+/** A chave de uma linha `chave = valor` do TOML (sem aspas), ou null. */
+const chaveDaLinha = (linha: string): string | null => {
+  const m = /^\s*("([^"]*)"|'([^']*)'|[A-Za-z0-9_-]+)\s*=/.exec(linha);
+  return m ? (m[2] ?? m[3] ?? m[1]) : null;
+};
+
+/** Quantas linhas, a partir de `i`, o valor da chave ocupa: uma lista aberta (`args = [`) vai até fechar. Os colchetes
+ *  dentro de texto entre aspas não contam. */
+const linhasDoValor = (linhas: string[], i: number): number => {
+  let nivel = 0;
+  for (let j = i; j < linhas.length; j++) {
+    const semTexto = linhas[j].replace(/"(?:[^"\\]|\\.)*"|'[^']*'/g, '').replace(/#.*$/, '');
+    for (const c of semTexto) nivel += c === '[' ? 1 : c === ']' ? -1 : 0;
+    if (nivel <= 0) return j - i + 1;
+  }
+  return linhas.length - i;
+};
+
+/** As linhas de uma tabela (sem o cabeçalho) com as chaves do app trocadas no lugar, as que faltam no começo e as da
+ *  pessoa (outras chaves, comentários) como estão. */
+const mesclarTabelaToml = (corpo: string[], doApp: [string, string][]): string[] => {
+  const pendentes = new Map(doApp);
+  const saida: string[] = [];
+  for (let i = 0; i < corpo.length; ) {
+    const k = chaveDaLinha(corpo[i]);
+    const n = k === null ? 1 : linhasDoValor(corpo, i);
+    if (k !== null && pendentes.has(k)) {
+      saida.push(pendentes.get(k)!);
+      pendentes.delete(k);
+    } else saida.push(...corpo.slice(i, i + n));
+    i += n;
+  }
+  return [...pendentes.values(), ...saida];
+};
+
+/** .codex/config.toml com o "estudio" do app atualizado no lugar: só `command`, `args` e as chaves do `env` que o app usa
+ *  mudam; o que a pessoa pôs nas tabelas do "estudio" (outra variável no `env`, `enabled`, `tool_timeout_sec`), os
+ *  comentários, o fim de linha (CRLF) e o resto do arquivo ficam. O "estudio" escrito de outro jeito (tabela em linha,
+ *  chave pontilhada) ou trocado à mão fica, com aviso. */
 export const codexTomlAtualizado = (atual: string | null, servidor: ServidorMcpStdio, arquivo = '.codex/config.toml'): Resultado => {
   const bloco = blocoToml(servidor);
   if (atual === null) return {texto: `${bloco}\n`};
-  const linhas = atual.replace(/^﻿/, '').replace(/\r\n/g, '\n').split('\n');
-  const nossa = (t: string | null) => t !== null && (t === TABELA_CODEX || t.startsWith(`${TABELA_CODEX}.`));
-  let tabela: string | null = null;
-  const dentro: number[] = [];
+  const bom = atual.startsWith('﻿') ? '﻿' : '';
+  const eol = atual.includes('\r\n') ? '\r\n' : '\n';
+  const linhas = atual.slice(bom.length).replace(/\r\n/g, '\n').split('\n');
+  const montar = (ls: string[]) => `${bom}${ls.join('\n').replace(/\n*$/, '')}\n`.replace(/\n/g, eol);
+  const ENV = `${TABELA_CODEX}.env`;
   // o "estudio" em chave pontilhada na raiz (`mcp_servers.estudio.command = ...`) ou dentro de `[mcp_servers]`
   // (`estudio = {...}`) não é do app
   const naRaiz = new RegExp(`^\\s*mcp_servers\\s*\\.\\s*["']?${SERVIDOR_IDE}["']?\\s*[.=]`);
   const emMcpServers = new RegExp(`^\\s*["']?${SERVIDOR_IDE}["']?\\s*[.=]`);
+  // as tabelas do arquivo: [cabeçalho, fim) de cada uma; a do começo (sem cabeçalho) é a raiz
+  const tabelas: {nome: string | null; ini: number; fim: number}[] = [{nome: null, ini: -1, fim: linhas.length}];
   for (const [i, l] of linhas.entries()) {
     const t = tabelaDaLinha(l);
-    if (t !== null) tabela = t;
-    else if ((tabela === null && naRaiz.test(l)) || (tabela === 'mcp_servers' && emMcpServers.test(l))) {
+    const atualT = tabelas[tabelas.length - 1];
+    if (t !== null) {
+      atualT.fim = i;
+      tabelas.push({nome: t, ini: i, fim: linhas.length});
+    } else if ((atualT.nome === null && naRaiz.test(l)) || (atualT.nome === 'mcp_servers' && emMcpServers.test(l))) {
       return {texto: null, aviso: `o servidor "${SERVIDOR_IDE}" do ${arquivo} está escrito de outro jeito; ficou como estava`};
     }
-    if (nossa(tabela)) dentro.push(i);
   }
-  if (!dentro.length) {
+  const nossa = (t: string | null) => t !== null && (t === TABELA_CODEX || t.startsWith(`${TABELA_CODEX}.`));
+  const nossas = tabelas.filter((t) => nossa(t.nome));
+  if (!nossas.length) {
     const corpo = linhas.join('\n').replace(/\n*$/, '');
-    return {texto: `${corpo}${corpo ? '\n\n' : ''}${bloco}\n`};
+    return {texto: montar([...(corpo ? [corpo, ''] : []), bloco])};
   }
-  const antes = dentro.map((i) => linhas[i]).join('\n');
-  if (!antes.includes('nucleo.cjs')) return {texto: null, aviso: `o servidor "${SERVIDOR_IDE}" do ${arquivo} foi trocado à mão; ficou como estava`};
-  if (antes.trim() === bloco.trim()) return {texto: null};
-  // tira as nossas linhas (com as em branco do fim de cada tabela) e põe o bloco novo onde estava a primeira; antes
-  // dela nada saiu, então a posição no resto é a mesma
-  const resto = linhas.filter((_, i) => !dentro.includes(i));
-  const pos = Math.min(dentro[0], resto.length);
-  const novo = [...resto.slice(0, pos), ...bloco.split('\n'), ...(pos < resto.length ? [''] : []), ...resto.slice(pos)].join('\n');
-  return {texto: `${novo.replace(/\n*$/, '')}\n`};
+  // o corpo de cada tabela vai até a última linha `chave = valor`: as linhas em branco e os comentários depois dela são
+  // da tabela seguinte (o comentário que a apresenta)
+  const corpoDe = (t: {ini: number; fim: number}) => {
+    let fim = t.fim;
+    while (fim > t.ini + 1 && /^\s*(#.*)?$/.test(linhas[fim - 1])) fim--;
+    return {ini: t.ini + 1, fim};
+  };
+  const textoDoEstudio = nossas.map((t) => linhas.slice(t.ini, corpoDe(t).fim).join('\n')).join('\n');
+  if (!textoDoEstudio.includes('nucleo.cjs')) return {texto: null, aviso: `o servidor "${SERVIDOR_IDE}" do ${arquivo} foi trocado à mão; ficou como estava`};
+  const principal: [string, string][] = [['command', `command = ${tomlTexto(servidor.command)}`], ['args', `args = [${servidor.args.map(tomlTexto).join(', ')}]`]];
+  const doEnv: [string, string][] = Object.entries(servidor.env ?? {}).map(([k, v]) => [k, `${k} = ${tomlTexto(v)}`]);
+  const novas = [...linhas];
+  // de trás para frente, para os índices de cima continuarem valendo
+  const tabelaEnv = nossas.find((t) => t.nome === ENV);
+  const tabelaPrincipal = nossas.find((t) => t.nome === TABELA_CODEX);
+  const trocar = (t: {ini: number; fim: number}, doApp: [string, string][]) => {
+    const c = corpoDe(t);
+    novas.splice(c.ini, c.fim - c.ini, ...mesclarTabelaToml(linhas.slice(c.ini, c.fim), doApp));
+  };
+  const ordem = [tabelaEnv, tabelaPrincipal].filter((t): t is NonNullable<typeof t> => Boolean(t)).sort((a, b) => b.ini - a.ini);
+  for (const t of ordem) trocar(t, t === tabelaEnv ? doEnv : principal);
+  if (!tabelaEnv && doEnv.length && tabelaPrincipal) {
+    // a tabela do env que faltava entra logo depois do corpo da principal (antes dela, nada mudou de tamanho se ela vem
+    // depois; por isso a posição é recalculada no texto novo)
+    const novasTabelas = novas.map((l) => tabelaDaLinha(l));
+    const iniP = novasTabelas.indexOf(TABELA_CODEX);
+    let fimP = novasTabelas.findIndex((t, i) => i > iniP && t !== null);
+    if (fimP < 0) fimP = novas.length;
+    while (fimP > iniP + 1 && /^\s*(#.*)?$/.test(novas[fimP - 1])) fimP--;
+    novas.splice(fimP, 0, '', `[${ENV}]`, ...doEnv.map(([, l]) => l));
+  }
+  if (!tabelaPrincipal) return {texto: null, aviso: `o servidor "${SERVIDOR_IDE}" do ${arquivo} está escrito de outro jeito; ficou como estava`};
+  const texto = montar(novas);
+  return texto === atual ? {texto: null} : {texto};
 };
 
 /** O arquivo de MCP de um harness atualizado (puro). */
@@ -245,7 +327,9 @@ export const prepararParaIde = (raiz: string, servidor: ServidorMcpStdio, guias?
   const ler = (rel: string) => (existsSync(path.join(raiz, rel)) ? readFileSync(path.join(raiz, rel), 'utf-8') : null);
   const gravar = (rel: string, texto: string) => {
     mkdirSync(path.dirname(path.join(raiz, rel)), {recursive: true});
-    writeFileSync(path.join(raiz, rel), texto, 'utf-8');
+    // atômico e no lugar: um arquivo da pessoa (opencode.json, .vscode/mcp.json) nunca fica meio gravado, e o symlink e o
+    // modo dele ficam
+    gravarAtomicoNoLugar(path.join(raiz, rel), texto);
     r.gravados.push(rel);
   };
   // o .gitignore antes: o commit do app nunca vê os arquivos de MCP fora dele

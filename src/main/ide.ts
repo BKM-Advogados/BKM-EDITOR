@@ -45,13 +45,16 @@ export const adicionarNoT3 = (t3: string | null, raiz: string, titulo: string): 
   });
 };
 
-/** Um argumento para colar no terminal: entre aspas simples no Linux e no Mac; entre aspas duplas no Windows. */
-const argumentoDoShell = (a: string, plataforma: string) => {
+/** Um argumento para colar no terminal: entre aspas simples no Linux e no Mac (sh); no Windows, entre aspas simples do
+ *  PowerShell (o terminal padrão), com a aspa simples dobrada: nada dentro delas expande (`$(...)`, `$var`, crase), ao
+ *  contrário das duplas. O `--` vai entre aspas no Windows: solto, o PowerShell o engole ao chamar o codex.ps1 do npm. */
+export const argumentoDoShell = (a: string, plataforma: string) => {
+  if (plataforma === 'win32') return a !== '--' && /^[\w./:=+\\-]+$/.test(a) ? a : `'${a.replace(/'/g, "''")}'`;
   if (/^[\w./:=@%+,-]+$/.test(a)) return a;
-  return plataforma === 'win32' ? `"${a.replace(/"/g, '\\"')}"` : `'${a.replace(/'/g, `'\\''`)}'`;
+  return `'${a.replace(/'/g, `'\\''`)}'`;
 };
 
-/** O `codex mcp add` do servidor deste projeto, para colar no terminal: liga o MCP na configuração da pessoa
+/** O `codex mcp add` do servidor deste projeto, para colar no terminal (no Windows, no PowerShell): liga o MCP na configuração da pessoa
  *  (~/.codex/config.toml, que o CLI, o app e a extensão do Codex dividem), para quem não quer marcar a pasta como
  *  confiável. Com o `--ide`, a pasta em que o Codex abrir vale no lugar do `--projeto`, se for um projeto do Estúdio. */
 export const comandoCodexMcpAdd = (s: ServidorMcpStdio, plataforma: string = process.platform) => {

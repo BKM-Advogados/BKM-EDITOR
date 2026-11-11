@@ -56,8 +56,8 @@ export const SecaoProjetosIde: React.FC = () => {
           <span className="espaco" />
           <button className="bt mini fantasma" onClick={() => copiar(e.raiz!, 'Caminho copiado')}>Copiar caminho</button>
           {e.comandoCodex && (
-            <button className="bt mini fantasma" title="Para quem não quer marcar a pasta como confiável no Codex: liga o MCP na configuração do Codex deste computador"
-              onClick={() => copiar(e.comandoCodex!, 'Comando do Codex copiado: cole no terminal')}>Copiar comando do Codex</button>
+            <button className="bt mini fantasma" title="Para quem não quer marcar a pasta como confiável no Codex: liga o MCP na configuração do Codex deste computador (no Windows, cole no PowerShell)"
+              onClick={() => copiar(e.comandoCodex!, 'Comando do Codex copiado: cole no terminal (no Windows, no PowerShell)')}>Copiar comando do Codex</button>
           )}
           <button className="bt mini" disabled={ocupado} title={e.t3 ? `roda ${e.t3} project add` : 'o comando t3 não está no PATH: o botão explica como adicionar à mão'}
             onClick={() => void abrirNoT3()}>Abrir no T3 Code</button>

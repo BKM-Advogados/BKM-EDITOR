@@ -12,7 +12,7 @@ import {
   blocoToml, codexTomlAtualizado, comOrigem, configJsonAtualizado, ehDoApp, entradaDoServidor, HARNESSES, LINHAS_GITIGNORE_IDE, mcpDoHarness, prepararParaIde,
   secaoDoHarness, servidorDoMcp, type Harness, type ServidorMcpStdio,
 } from '../src/nucleo/ide';
-import {acharNoPath, comandoCodexMcpAdd, criarIde} from '../src/main/ide';
+import {acharNoPath, argumentoDoShell, comandoCodexMcpAdd, criarIde} from '../src/main/ide';
 
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'estudio-harnesses-'));
 afterAll(() => rmSync(tmp, {recursive: true, force: true}));
@@ -138,10 +138,11 @@ describe('o MCP de cada harness: formato, mesclagem e origem', () => {
     expect(ehDoApp(r.mcp.servers.estudio)).toBe(true);
   });
 
-  it('o estudio antigo do app é refeito; o trocado à mão fica, com aviso; o caminho do Windows também é reconhecido', () => {
+  it('o estudio antigo do app é atualizado só nos campos do app; o trocado à mão fica, com aviso; o caminho do Windows também é reconhecido', () => {
     const antigo = entradaDoServidor(servidorDoMcp({executavel: '/velho/electron', script: '/velho/dist-mcp/nucleo.cjs', projeto: '/x'}), 'servers');
-    const r = json(configJsonAtualizado(JSON.stringify({servers: {estudio: antigo}}), '.vscode/mcp.json', ['servers'], {novo: 1}).texto);
-    expect(r.servers.estudio).toEqual({novo: 1});
+    const novo = entradaDoServidor(servidorDoMcp({executavel: '/novo/electron', script: '/novo/dist-mcp/nucleo.cjs', projeto: '/x'}), 'servers');
+    const r = json(configJsonAtualizado(JSON.stringify({servers: {estudio: antigo}}), '.vscode/mcp.json', ['servers'], novo).texto);
+    expect(r.servers.estudio).toEqual(novo);
     const http = JSON.stringify({mcpServers: {estudio: {httpUrl: 'http://127.0.0.1:47815/mcp'}}});
     expect(mcpDoHarness(h('gemini'), http, SERVIDOR)).toMatchObject({texto: null, aviso: expect.stringContaining('trocado à mão')});
     expect(ehDoApp({command: 'C:\\Program Files\\Estudio\\Estudio.exe', args: ['C:\\Program Files\\Estudio\\resources\\dist-mcp\\nucleo.cjs']})).toBe(true);
@@ -195,7 +196,8 @@ describe('Codex: .codex/config.toml', () => {
     expect(posix).toContain(`'${path.resolve('/home/p/Meu vídeo')}'`);
     expect(posix.endsWith('--origem Codex')).toBe(true);
     const win = comandoCodexMcpAdd(servidorDoMcp({executavel: 'C:\\Program Files\\Estudio\\Estudio.exe', script: 'C:\\Program Files\\Estudio\\resources\\dist-mcp\\nucleo.cjs', projeto: PROJETO}), 'win32');
-    expect(win).toContain('-- "C:\\Program Files\\Estudio\\Estudio.exe" "C:\\Program Files\\Estudio\\resources\\dist-mcp\\nucleo.cjs"');
+    // PowerShell: aspas simples (nada expande) e o -- entre aspas (solto, o PowerShell o engole ao chamar o codex.ps1)
+    expect(win).toContain("'--' 'C:\\Program Files\\Estudio\\Estudio.exe' 'C:\\Program Files\\Estudio\\resources\\dist-mcp\\nucleo.cjs'");
   });
 });
 
@@ -272,4 +274,58 @@ describe.skipIf(!codex)('prova com o Codex instalado', () => {
     expect(estudio).toBeTruthy();
     expect(JSON.stringify(estudio)).toContain('--origem');
   }, 60_000);
+});
+
+// revisão da 2.0.1: reabrir o projeto não pode apagar o que a pessoa pôs na entrada "estudio" de cada harness
+describe('o que a pessoa pôs no "estudio" fica ao reabrir', () => {
+  const OUTRO = servidorDoMcp({executavel: '/outro/Estudio', script: '/outro/resources/dist-mcp/nucleo.cjs', projeto: PROJETO});
+
+  it('JSON (Gemini CLI e opencode): a chave no env, o trust, o timeout e o enabled ficam; de novo, não regrava', () => {
+    const gemini = json(mcpDoHarness(h('gemini'), null, SERVIDOR).texto);
+    gemini.mcpServers.estudio.env = {...gemini.mcpServers.estudio.env, GEMINI_API_KEY: 'chave-de-teste'};
+    gemini.mcpServers.estudio.trust = true;
+    gemini.mcpServers.estudio.timeout = 60000;
+    const r = json(mcpDoHarness(h('gemini'), JSON.stringify(gemini), OUTRO).texto);
+    expect(r.mcpServers.estudio).toMatchObject({command: '/outro/Estudio', trust: true, timeout: 60000,
+      env: {GEMINI_API_KEY: 'chave-de-teste', ELECTRON_RUN_AS_NODE: '1'}});
+    expect(r.mcpServers.estudio.args[0]).toBe('/outro/resources/dist-mcp/nucleo.cjs');
+    expect(mcpDoHarness(h('gemini'), JSON.stringify(r), OUTRO).texto).toBeNull();
+
+    const opencode = json(mcpDoHarness(h('opencode'), null, SERVIDOR).texto);
+    opencode.mcp.servers.estudio.enabled = false;
+    const o = json(mcpDoHarness(h('opencode'), JSON.stringify(opencode), OUTRO).texto);
+    expect(o.mcp.servers.estudio.enabled).toBe(false);
+    expect(o.mcp.servers.estudio.command[0]).toBe('/outro/Estudio');
+  });
+
+  it('TOML do Codex: a chave no env, o enabled e o tool_timeout_sec ficam; o comentário da tabela seguinte e o CRLF também', () => {
+    const base = blocoToml(comOrigem(SERVIDOR, 'Codex')).split('\n');
+    expect(base[3]).toBe('');
+    const daPessoa = ['model = "o3"', '', base[0], base[1], base[2], 'enabled = false', 'tool_timeout_sec = 120', '', base[4], base[5],
+      'GEMINI_API_KEY = "chave-de-teste"', '', '# servidor do GitHub', '[mcp_servers.github]', 'command = "gh-mcp"', ''].join('\r\n');
+    const r = codexTomlAtualizado(daPessoa, comOrigem(OUTRO, 'Codex')).texto!;
+    expect(r.replace(/\r\n/g, '')).not.toContain('\n'); // continua CRLF
+    for (const linha of ['model = "o3"', 'enabled = false', 'tool_timeout_sec = 120', 'GEMINI_API_KEY = "chave-de-teste"', 'ELECTRON_RUN_AS_NODE = "1"',
+      'command = "/outro/Estudio"', 'command = "gh-mcp"']) expect(r).toContain(linha);
+    expect(r).toContain('\r\n\r\n# servidor do GitHub\r\n[mcp_servers.github]');
+    expect(r).not.toContain('/opt/Estudio/Estudio');
+    expect(r.match(/^\[mcp_servers\.estudio\.env\]/gm)).toHaveLength(1);
+    expect(codexTomlAtualizado(r, comOrigem(OUTRO, 'Codex')).texto).toBeNull();
+  });
+
+  it('TOML do Codex sem a tabela do env: ela entra logo depois da principal, antes da tabela seguinte', () => {
+    const base = blocoToml(comOrigem(SERVIDOR, 'Codex')).split('\n');
+    const semEnv = [base[0], base[1], base[2], '', '[outra]', 'x = 1', ''].join('\n');
+    const r = codexTomlAtualizado(semEnv, comOrigem(OUTRO, 'Codex')).texto!;
+    expect(r.indexOf('[mcp_servers.estudio.env]')).toBeLessThan(r.indexOf('[outra]'));
+    expect(r).toContain('[mcp_servers.estudio.env]\nELECTRON_RUN_AS_NODE = "1"');
+  });
+
+  it('comando do Codex para colar no Windows: aspas simples do PowerShell, nada expande', () => {
+    expect(argumentoDoShell("C:\\P\\Promo $(Start-Process calc) R$50 `x` it's 100%", 'win32')).toBe("'C:\\P\\Promo $(Start-Process calc) R$50 `x` it''s 100%'");
+    expect(argumentoDoShell('--', 'win32')).toBe("'--'");
+    expect(argumentoDoShell('C:\\Estudio\\Estudio.exe', 'win32')).toBe('C:\\Estudio\\Estudio.exe');
+    expect(argumentoDoShell('a,b', 'win32')).toBe("'a,b'"); // vírgula vira lista no PowerShell
+    expect(argumentoDoShell("it's", 'linux')).toBe("'it'\\''s'");
+  });
 });

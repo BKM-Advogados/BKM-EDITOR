@@ -92,10 +92,15 @@ ELECTRON_RUN_AS_NODE = "1"
   segue a regra antiga (não é tocado). CRLF continua CRLF. O que não mudou não é regravado, e reabrir não gera commit.
 - **O `AGENTS.md` e o `GEMINI.md` seguem a opção.** O `CLAUDE.md` é escrito sempre, como antes. Os outros dois só com a
   opção ligada; desligar não apaga nada.
-- **Mesclar sem apagar.** Em cada arquivo de MCP, só a entrada `estudio` é do app; outros servidores e outras chaves
-  ficam. Um `estudio` sem o `nucleo.cjs` (a pessoa trocou por outro) fica, com aviso em Configurações › IA. No TOML do
-  Codex, as tabelas `[mcp_servers.estudio]` e `[mcp_servers.estudio.env]` são refeitas no lugar delas; o `estudio`
-  escrito de outro jeito (chave pontilhada, tabela em linha) fica, com aviso. JSON ilegível não é tocado.
+- **Mesclar sem apagar.** Em cada arquivo de MCP, só os campos do app dentro da entrada `estudio` mudam (o comando, os
+  argumentos e o `ELECTRON_RUN_AS_NODE` do ambiente); outros servidores, outras chaves e o que a pessoa pôs dentro do
+  `estudio` ficam: uma `GEMINI_API_KEY` no `env` para a narração, o `enabled: false` do opencode, o `trust` e o
+  `timeout` do Gemini, o `enabled` e o `tool_timeout_sec` do Codex. Vale também para o `.mcp.json`. Um `estudio` sem o
+  `nucleo.cjs` (a pessoa trocou por outro) fica, com aviso em Configurações › IA. No TOML do Codex, só as linhas do app
+  nas tabelas `[mcp_servers.estudio]` e `[mcp_servers.estudio.env]` são trocadas no lugar; os comentários (inclusive o
+  que apresenta a tabela seguinte), o CRLF e o BOM ficam; o `estudio` escrito de outro jeito (chave pontilhada, tabela
+  em linha) fica, com aviso. JSON ilegível não é tocado. A gravação é atômica e no lugar: um symlink continua symlink e o
+  modo do arquivo fica.
 - **Tudo que tem caminho absoluto vai para o `.gitignore`.** As linhas novas: `.codex/config.toml`,
   `.gemini/settings.json`, `.agents/mcp_config.json`, `.cursor/mcp.json`, `.vscode/mcp.json` e `opencode.json`. Ficam de
   fora do git o arquivo inteiro, mesmo com outras escolhas da pessoa dentro (a alternativa seria versionar caminho desta
@@ -104,7 +109,8 @@ ELECTRON_RUN_AS_NODE = "1"
   `.opencode/opencode.json` também seria lido e venceria o da raiz, mas brigaria com uma configuração da pessoa ali.
 - **Codex: a pasta confiável é decisão da pessoa.** O app não mexe no `~/.codex/config.toml`. Sem confiar na pasta, o
   Codex ignora o `.codex/config.toml` (provado: `codex mcp list` vazio; com `trust_level = "trusted"`, o `estudio`
-  aparece). Para quem não quer confiar na pasta, Configurações › IA tem **Copiar comando do Codex**, com o
+  aparece). Para quem não quer confiar na pasta, Configurações › IA tem **Copiar comando do Codex** (no Windows, para
+  colar no PowerShell: aspas simples, em que nada expande, e o `--` entre aspas, que o PowerShell engoliria), com o
   `codex mcp add estudio --env ELECTRON_RUN_AS_NODE=1 -- <executável> <nucleo.cjs> --projeto <pasta> … --origem Codex`
   do projeto aberto (liga na configuração global; com `--ide`, a pasta em que o Codex abrir vale se for um projeto).
 - **A origem de cada harness no diário.** `--origem "Gemini CLI"` (novo no `mcp/nucleo.ts`) faz o diário gravar
