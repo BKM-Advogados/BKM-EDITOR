@@ -16,9 +16,10 @@ on:
         description: 'tag já enviada ao GitHub (ex.: v4.0.1)'
         required: true
 
+# Só contents: write. Com `actions: read` junto, o GitHub recusava a execução na partida (startup_failure, "An unexpected
+# error has occurred"; 11/11/2026); sem ela o gh run download funciona do mesmo jeito, porque o repositório é público.
 permissions:
   contents: write # criar a release e anexar os arquivos
-  actions: read # ler a execução do Build e baixar os artifacts
 
 jobs:
   publicar:
