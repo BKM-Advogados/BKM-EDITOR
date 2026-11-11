@@ -8,7 +8,10 @@ import {afterAll, beforeAll, describe, expect, it} from 'vitest';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
+import {claudeMd} from '../src/nucleo/criar-projeto';
+import type {Modulo} from '../src/nucleo/documentos';
 import {registrarFerramentas} from '../src/nucleo/ferramentas-mcp';
+import {INSTRUCOES_MCP} from '../src/nucleo/mcp-ia';
 import {Projeto} from '../src/nucleo/projeto';
 
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'estudio-contrato-'));
@@ -85,3 +88,87 @@ describe('trava otimista e formato do documento (M9)', () => {
 });
 
 
+
+describe('documento criado vai para a tela; mostrar_documento (M10)', () => {
+  const selecao = () => JSON.parse(readFileSync(path.join(pasta, '.estudio', 'selecao.json'), 'utf-8'));
+  const apagarSelecao = () => rmSync(path.join(pasta, '.estudio', 'selecao.json'), {force: true});
+
+  it('criar_documento e criar_animacao levam a tela ao documento novo por padrão', async () => {
+    apagarSelecao();
+    const img = await chamar('criar_documento', {modulo: 'imagem', titulo: 'Nova'});
+    expect(img.erro, img.texto).toBe(false);
+    expect(img.dado).toMatchObject({ok: true, mostrado: true});
+    expect(selecao()).toMatchObject({documento: img.dado.id, caminhos: [], autor: 'agente'});
+    const anim = await chamar('criar_animacao', {titulo: 'Abertura'});
+    expect(anim.erro, anim.texto).toBe(false);
+    expect(anim.dado).toMatchObject({ok: true, mostrado: true});
+    expect(selecao()).toMatchObject({documento: anim.dado.documento, caminhos: []});
+  });
+
+  it('com mostrar: false, cria sem mexer na tela', async () => {
+    apagarSelecao();
+    const r = await chamar('criar_documento', {modulo: '3d', titulo: 'Quieta', mostrar: false});
+    expect(r.dado).toMatchObject({ok: true, mostrado: false});
+    const a = await chamar('criar_animacao', {titulo: 'Quieta', mostrar: false});
+    expect(a.dado).toMatchObject({ok: true, mostrado: false});
+    expect(existsSync(path.join(pasta, '.estudio', 'selecao.json'))).toBe(false);
+  });
+
+  it('criar_documento com largura sem altura dá erro em vez de ignorar', async () => {
+    const r = await chamar('criar_documento', {modulo: 'imagem', largura: 800});
+    expect(r.erro).toBe(true);
+    expect(r.texto).toMatch(/largura e altura juntas/);
+  });
+
+  it('mostrar_documento grava o pedido com caminho e tempo; documento ou caminho inexistente dá nao_achado', async () => {
+    const r = await chamar('mostrar_documento', {documento: 'capa', caminho: '/camadas/0', tempo_ms: 1200});
+    expect(r.dado).toMatchObject({ok: true, documento: 'capa', modulo: 'imagem'});
+    expect(selecao()).toMatchObject({documento: 'capa', caminhos: ['/camadas/0'], tempo_ms: 1200, autor: 'agente'});
+    expect((await chamar('mostrar_documento', {documento: 'imagem/capa.json'})).dado).toMatchObject({documento: 'capa'});
+    const sem = await chamar('mostrar_documento', {documento: 'nao-existe'});
+    expect(sem.erro).toBe(true);
+    expect(sem.texto).toMatch(/^nao_achado:/);
+    const semCaminho = await chamar('mostrar_documento', {documento: 'capa', caminho: '/camadas/999'});
+    expect(semCaminho.erro).toBe(true);
+    expect(semCaminho.texto).toMatch(/^nao_achado: o caminho \/camadas\/999 não existe/);
+  });
+});
+
+describe('o guia do projeto cobre as ferramentas (M13)', () => {
+  // ferramentas de um módulo só: aparecem no guia de um projeto com aquele módulo; as outras aparecem em qualquer guia
+  const DO_MODULO: Record<string, Modulo[]> = {
+    ...Object.fromEntries(['criar_animacao', 'adicionar_camada_animacao', 'animar', 'pixelizar_imagem', 'efeito_pixel', 'ver_animacao'].map((n) => [n, ['animacao']])),
+    ...Object.fromEntries(['ler_musica', 'arranjar', 'medir_musica', 'por_no_video', 'levar_para', 'concluir_transicao', 'cancelar_transicao', 'trocar_kit', 'criar_padrao',
+      'escrever_notas', 'editar_notas', 'aplicar_progressao', 'gerar_notas', 'encaixar_no_video', 'exportar_musica', 'importar_midi', 'licencas_do_projeto'].map((n) => [n, ['musica']])),
+    ...Object.fromEntries(['transcrever', 'ler_legendas', 'editar_legenda', 'exportar_legendas', 'importar_legendas', 'propor_cortes_fala', 'aplicar_cortes_fala',
+      'preparar_teleprompter', 'adicionar_clipe_audio', 'dividir_clipe', 'copiar_clipe', 'crossfade', 'listar_trilhas', 'escolher_trilha', 'creditos_das_musicas',
+      'marca_dagua', 'medir_contraste_marca'].map((n) => [n, ['video']])),
+    ...Object.fromEntries(['remover_fundo', 'selecionar_camadas', 'alinhar_camadas', 'distribuir_camadas', 'agrupar_camadas', 'desagrupar_camadas', 'travar_camadas',
+      'destravar_camadas', 'buscar_icone', 'inserir_icone', 'inserir_linha', 'fazer_lista', 'ver_marca', 'cor_da_marca', 'fonte_da_marca'].map((n) => [n, ['imagem']])),
+    ...Object.fromEntries(['ler_fonte', 'anotar_fonte', 'registrar_fato', 'listar_pesquisa', 'texto_da_fonte', 'checar_texto'].map((n) => [n, ['video', 'imagem']])),
+    aplicar_marca: ['video', 'imagem', 'animacao'],
+  };
+  const TODOS: Modulo[] = ['video', 'imagem', '3d', 'musica', 'animacao'];
+
+  it('cada ferramenta registrada está no guia dos módulos dela', async () => {
+    const {tools} = await cliente.listTools();
+    const faltam: string[] = [];
+    for (const {name} of tools) {
+      for (const m of DO_MODULO[name] ?? TODOS) if (!claudeMd([m]).includes(`\`${name}`)) faltam.push(`${name} (${m})`);
+    }
+    expect(faltam).toEqual([]);
+  });
+
+  it('a frase do criar_documento cita os 5 módulos e o mostrar; as instruções citam música e animação', () => {
+    const frase = claudeMd(['3d']).split('\n').find((l) => l.includes('`criar_documento` cria'))!;
+    for (const m of ['vídeo de cenas', 'imagem', 'cena 3D', 'música', 'animação']) expect(frase).toContain(m);
+    expect(claudeMd(['3d'])).toContain('`mostrar: false`');
+    expect(INSTRUCOES_MCP).toMatch(/música e animação/);
+  });
+
+  it('kit de marca na animação e seção de Música só onde cabem', () => {
+    expect(claudeMd(['animacao'])).toMatch(/Na animação grava o `tema`/);
+    expect(claudeMd(['musica'])).toContain('## Música');
+    expect(claudeMd(['video'])).not.toContain('## Música');
+  });
+});

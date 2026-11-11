@@ -193,6 +193,47 @@ export const linhasDaImagem = (): string[] => [
   '  `src_original`. A pessoa exporta PNG por página e PDF pelo app; o MCP não exporta.',
 ];
 
+// O texto da música é o de docs/musica.md ("Para o guia da IA"), mais o editar_notas.
+const secaoMusica = () => [
+  '',
+  '## Música',
+  '',
+  '- Música (`"tipo": "musica"`, em `musica/<id>.json`): tempo em batidas (a semínima) a partir do começo; `bpm` e',
+  '  `compasso`. `canais` de `audio` ou `bateria` (com `kit`); `padroes` de notas `{peca, em, forca}` (peças: bumbo,',
+  '  caixa, palma, aro, chimbal_fechado, chimbal_aberto, prato, tom_grave, tom_agudo, shaker); `arranjo.clipes` com',
+  '  `canal`, `em`, `dur` e `audio` (+ `corte_s` em segundos do arquivo) ou `padrao`; `mixer.faixas` com `volume_db`,',
+  '  `pan`, `eq`, `compressor` e `reverb` (0 a 1). Leia com `ler_musica`; mexa com `arranjar`, `criar_padrao`,',
+  '  `escrever_notas`, `editar_notas` (quantizar, transpor, duplicar, apagar, força) e `trocar_kit`; o resto (BPM,',
+  '  mixer) por `aplicar_patch`.',
+  '- Melodia e harmonia: `tom` e `escala` por patch; `aplicar_progressao {acordes: ["I","vi","IV","V"]}` escreve a faixa de',
+  '  acordes; `gerar_notas {tipo: "baixo"|"arpejo"|"acordes", estilo?}` faz o padrão num canal de sintetizador (`preset`',
+  '  baixo, pad, pluck ou lead; `macros` brilho, ataque, soltura e cor, de 0 a 1). Notas MIDI (60 = Dó central) com',
+  '  `escrever_notas` (`na_escala: true` encaixa na escala); `criar_padrao {canal, instrumento: "lead"}` cria o canal.',
+  '- Ida e volta com o vídeo: `levar_para {modulo: "musica", alvo: {documento: "video", caminho:',
+  '  "/audio/faixas/@musica/clipes/@<id>"}}` abre a música daquele áudio (ou, com só a faixa e `intencao: "criar"`, uma',
+  '  nova); `concluir_transicao {transicao}` põe no vídeo e volta; `cancelar_transicao {transicao, descartar?}` volta sem',
+  '  mudar o vídeo. A tela troca de área sozinha. A voz não vai para a Música.',
+  '- Um clipe do vídeo com `musica` toca o render dela e se atualiza sozinho a cada mudança: não exporte a música para pôr',
+  '  no vídeo. `por_no_video` liga uma música a um clipe novo ou existente. `medir_musica` dá LUFS e pico; o vídeo leva a',
+  '  mistura final a −14 LUFS e a música fica de 18 a 23 LU abaixo da voz pelo ducking da faixa.',
+  '- Mixer: cada faixa tem `reverb` e `delay` (envios de 0 a 1); `mixer.master.delay.tempo` é a figura (`1/8.` = colcheia',
+  '  pontuada) e `mixer.master.limitador {ativo, teto_db}` segura o pico. Para a trilha ficar sob a voz, use na faixa os',
+  '  valores do preset "Cama sob a voz" (médios −4 dB).',
+  '- Encaixe: `encaixar_no_video {modo: "tudo", viradas: true}` fecha a música no fim do vídeo em compassos inteiros e',
+  '  põe uma seção por cena, com virada antes de cada corte. Use depois de `por_no_video`.',
+  '- Arquivo: `exportar_musica {formato: "wav"|"m4a"|"opus"|"mid", stems?}` grava em `saidas/` a −14 LUFS (só quando a',
+  '  pessoa pedir o arquivo: no vídeo, a música já toca ligada). `importar_midi {arquivo}` traz um .mid como canais e',
+  '  padrões.',
+  '- Sidechain e automação: `mixer.faixas[i].sidechain = {de: "bateria", peca: "bumbo", quanto_db: 6}` faz a faixa abaixar',
+  '  a cada bumbo; `automacoes: [{alvo: "master", pontos: [{em: 28, db: 0}, {em: 32, db: -40}]}]` faz um fade (a curva toma',
+  '  o lugar do fader).',
+  '- Licenças: cada áudio de fora precisa de uma entrada em `licencas` (`{arquivo, licenca: "CC-BY-4.0", titulo, autor,',
+  '  link}` ou `"uso_proprio"`); sem ela, `licencas_do_projeto` diz que impede publicar. Não invente licença: pergunte à',
+  '  pessoa. Os sons do Estúdio (kit eletrônico, sintetizadores) são próprios.',
+  '- Modelos: `criar_documento {modulo: "musica", modelo: "batida"|"trilha_video"|"efeito_sonoro"}`; do vídeo,',
+  '  `levar_para {..., intencao: "criar", modelo: "trilha_video"}`.',
+];
+
 export const claudeMd = (modulos: Modulo[]) => {
   const tem = (m: Modulo) => modulos.includes(m);
   const linhas = [
@@ -259,17 +300,22 @@ export const claudeMd = (modulos: Modulo[]) => {
       '  `entrada`, `saida`, `mola` e `degrau`. A camada `pixel` tem `grade` {colunas, linhas, paleta, celulas},',
       '  `tamanho_pixel`, `progresso` (0 a 1), `efeito` (`aleatorio`, `decodificar`, `varredura`, `varredura-baixo`, `meio`',
       '  ou `chuva`) e `semente`. Use `criar_animacao`, `adicionar_camada_animacao`, `animar`, `pixelizar_imagem` e',
-      '  `efeito_pixel` (docs/animacao.md) em vez de montar à mão.',
+      '  `efeito_pixel` (docs/animacao.md) em vez de montar à mão. `opacidade` e `progresso` vão de 0 a 1 e `tamanho_pixel`',
+      '  é 1 ou mais; `x` e `y` podem ser negativos (entrada de fora do quadro). `pixelizar_imagem` lê uma imagem do projeto',
+      '  (PNG ou JPG, até 4096 px de lado). Das ferramentas da imagem, só `selecionar_camadas`, `travar_camadas` e',
+      '  `destravar_camadas` valem na animação.',
     );
   }
   if (tem('video') || tem('imagem')) linhas.push(...secaoEfeitos());
-  if (tem('video') || tem('imagem')) {
+  if (tem('video') || tem('imagem') || tem('animacao')) {
     linhas.push(
       '- Kit de marca: `aplicar_marca` põe num documento as cores, a fonte, o logo (`midia/logo-<id>.*`) e as fontes próprias',
-      '  (`fontes/`) de um kit (bkm, neutro ou outro criado no app). No vídeo de cenas isso fica no `tema`: `marca` é o id do',
+      '  (`fontes/`) de um kit (o neutro ou outro criado no app). No vídeo de cenas isso fica no `tema`: `marca` é o id do',
       '  kit, e `logo`, `assinatura` e `fontes_arquivos` (cada uma com `familia`, `arquivo` e `peso`) acompanham as cores. Na',
-      '  imagem muda o fundo e a fonte e a cor dos textos. `fonte` aceita Inter, Archivo, IBM Plex Sans, IBM Plex Mono ou a',
-      '  `familia` de uma fonte própria. Fique nas cores do kit; para outra marca, troque o kit em vez de inventar cores.',
+      '  imagem muda o fundo e a fonte e a cor dos textos. Na animação grava o `tema`, que resolve `@fundo`, `@texto`,',
+      '  `@destaque` e `@suave`; `pixelizar_imagem {usar_paleta_marca: true}` usa essas cores. Cena 3D e música não recebem',
+      '  kit. `fonte` aceita Inter, Archivo, IBM Plex Sans, IBM Plex Mono ou a `familia` de uma fonte própria. Fique nas',
+      '  cores do kit; para outra marca, troque o kit em vez de inventar cores.',
     );
   }
   linhas.push(
@@ -284,19 +330,30 @@ export const claudeMd = (modulos: Modulo[]) => {
     );
   }
   const passos = [
-    '`estado_do_editor` diz o que a pessoa está vendo e o que está selecionado.',
+    '`estado_do_editor` diz o que a pessoa está vendo e o que está selecionado; `projeto_info` dá o nome e os documentos.',
     '`ler_documento` devolve o JSON e a `versao`; `aplicar_patch` muda com JSON Patch (RFC 6902) e `versao_base`.\n   Ponha um `test` no valor que vai trocar. Se o documento mudou por baixo, leia de novo e refaça.',
-    '`criar_documento` cria vídeo, imagem ou cena 3D no projeto; `renomear_projeto` muda o nome.',
-    '`listar_comentarios`, `ler_comentario`, `responder_comentario` e `resolver_comentario` cuidam dos pedidos da pessoa.',
-    '`listar_mudancas` mostra o que a pessoa mudou à mão desde a sua última olhada.',
+    '`criar_documento` cria vídeo de cenas, imagem, cena 3D, música (com `modelo`) ou animação e leva a tela até ele\n   (`mostrar: false` para não levar); `renomear_projeto` muda o nome.',
+    '`mostrar_documento` leva a tela da pessoa a um documento, a um objeto (`caminho`) ou a um tempo (`tempo_ms`).',
+    '`listar_comentarios`, `ler_comentario`, `responder_comentario`, `resolver_comentario` e `reabrir_comentario` cuidam dos\n   pedidos da pessoa; `criar_comentario` deixa uma nota ancorada num objeto que existe.',
+    '`listar_mudancas` mostra o que a pessoa mudou à mão desde a sua última olhada. `desfazer` desfaz as suas últimas\n   mudanças; `reverter {seq}` volta uma mudança do histórico (a de outro autor pede a permissão da pessoa).',
+    '`listar_midia` mostra os arquivos de `midia/` e onde são usados; `marcar_midia` marca uma tomada como boa ou descartada.',
+    '`guia_do_projeto` devolve este guia, se você não o recebeu.',
   ];
-  if (tem('video') || tem('imagem')) passos.push('`aplicar_marca` troca o kit de marca (cores, fonte, logo e fontes próprias) de um documento.');
+  if (tem('video') || tem('imagem') || tem('animacao')) passos.push('`aplicar_marca` troca o kit de marca (cores, fonte, logo e fontes próprias) de um documento.');
   if (tem('video')) {
     passos.push('`transcrever` transcreve a fala no próprio PC: grava `<arquivo>.palavras.json` e, no vídeo de cenas, gera as\n   legendas que faltam. `ler_legendas` mostra as legendas nos tempos da tela e `editar_legenda` corrige texto e tempo.\n   `exportar_legendas` grava SRT e VTT em `saidas/`; `importar_legendas` lê um SRT ou VTT do projeto.');
+    passos.push('`propor_cortes_fala` propõe tirar pausas longas e "ãh" de um clipe de voz e `aplicar_cortes_fala` grava a\n   narração emendada (as legendas vão junto). `preparar_teleprompter` grava o texto que a pessoa lê ao gravar.');
+    passos.push('Som: `adicionar_clipe_audio` põe um áudio do projeto numa faixa; `dividir_clipe`, `copiar_clipe` e `crossfade`\n   editam os clipes. `listar_trilhas` mostra a pasta de trilhas da pessoa e `escolher_trilha` traz uma para o vídeo\n   (pede a permissão dela); `creditos_das_musicas` dá os créditos que as licenças pedem.');
+    passos.push('`marca_dagua` lê ou muda a marca d\'água de cada destino da exportação; `medir_contraste_marca` confere se ela lê\n   sobre o fundo (só com o app aberto).');
   }
-  if (tem('imagem')) passos.push('`remover_fundo` tira o fundo de uma foto de pessoa com o modelo local; com `voltar: true`, volta ao original.');
+  if (tem('imagem')) {
+    passos.push('`remover_fundo` tira o fundo de uma foto de pessoa com o modelo local; com `voltar: true`, volta ao original.');
+    passos.push('`selecionar_camadas` mostra camadas na tela da pessoa; `alinhar_camadas`, `distribuir_camadas`, `agrupar_camadas`\n   e `desagrupar_camadas` arrumam o layout; `travar_camadas` trava e `destravar_camadas` destrava (pede a permissão\n   da pessoa: a trava é dela).');
+    passos.push('`ver_marca` mostra o kit da imagem; `cor_da_marca` e `fonte_da_marca` põem a cor (`@destaque`) ou a fonte\n   (`@titulo`) do kit numa camada. `buscar_icone` e `inserir_icone` (Lucide), `inserir_linha` (linha e seta) e\n   `fazer_lista` (marcadores ou números num texto) criam as peças já no kit.');
+  }
   if (tem('animacao')) passos.push('`criar_animacao`, `adicionar_camada_animacao`, `animar`, `pixelizar_imagem`, `efeito_pixel` e `ver_animacao` montam e animam a animação (docs/animacao.md).');
   linhas.push('', '## Como trabalhar', '', ...passos.map((t, i) => `${i + 1}. ${t}`));
+  if (tem('musica')) linhas.push(...secaoMusica());
   if (tem('video') || tem('imagem')) linhas.push(...secaoPesquisa());
   linhas.push('', FIM_DO_TEXTO);
   return [MARCA_CLAUDE_INICIO, ...linhas, MARCA_CLAUDE_FIM, ''].join('\n');

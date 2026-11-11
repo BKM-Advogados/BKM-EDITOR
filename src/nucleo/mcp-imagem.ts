@@ -4,9 +4,9 @@
 // com autor e origem, no diário e com Reverter. Classe de permissão: livre, menos destravar_camadas (cartão: desfaz uma
 // trava que a pessoa pôs). Esquemas sem união solta, para qualquer provedor. Ver docs/imagem.md.
 import type {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
-import path from 'node:path';
 import {z} from 'zod';
-import {ErroProjeto, PASTA_INTERNA, serializar, type Projeto} from './projeto';
+import {ErroProjeto, type Projeto} from './projeto';
+import {pedirTela} from './mcp-tela';
 import {ehDocImagem, type DocImagem, type OperacaoPatch} from './documentos';
 import {baseCamadas, caminhosDoId, indiceNaBase, paginasDe, temPaginas} from './carrossel';
 import {ALINHAMENTOS, DISTRIBUICOES, patchAgrupar, patchDesagrupar, patchMover, patchTravar, planoAlinhar, planoDistribuir, unidadesDe, type Alinhamento, type Distribuicao} from './layout-imagem';
@@ -68,7 +68,7 @@ export const registrarImagem = (servidor: McpServer, projeto: Projeto, autor: st
     const {doc} = ler(documento);
     const r = camadas.length ? resolverCamadas(doc, camadas) : {caminhos: [] as string[], pagina: 0};
     const id = projeto.manifesto().documentos.find((d) => d.id === documento || d.caminho === documento)?.id ?? documento;
-    projeto.gravarTexto(path.join(PASTA_INTERNA, 'selecao.json'), serializar({documento: id, caminhos: r.caminhos, autor, em: new Date().toISOString()}));
+    pedirTela(projeto, {documento: id, caminhos: r.caminhos, autor});
     return {ok: true, documento: id, caminhos: r.caminhos, ...(temPaginas(doc) && r.caminhos.length ? {pagina: `/paginas/${r.pagina}`} : {})};
   }));
 

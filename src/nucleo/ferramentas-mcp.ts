@@ -31,6 +31,7 @@ import {registrarExportar} from './mcp-exportar';
 import {instalarPortao, type Portao} from './portao'; // frente IA: portão de permissão e seq em todo resultado
 import {registrarIa} from './mcp-ia'; // frente IA: desfazer, reverter, guia, comentários
 import {registrarImagem} from './mcp-imagem';
+import {instalarMostrarCriado, registrarTela} from './mcp-tela';
 import {medidasDoVideo, registrarSom} from './mcp-som'; // frente Som (rodada 3)
 import {registrarMusica} from './mcp-musica'; // frente Música
 import {musicaDoModelo, type ModeloMusica} from './musica-modelos'; // frente Música (item 27)
@@ -125,6 +126,8 @@ export const criarRede = (buscar: Buscar = (url, init) => fetch(url, init), opco
 export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, autor: string, origem: string, rede?: Rede, transcritor?: TranscritorMcp, portao?: Portao) => {
   // frente IA: tudo o que for registrado daqui em diante passa pelo portão (permissão e mudanças do diário no resultado)
   instalarPortao(servidor, {projeto, origem, portao});
+  // documento criado pelo Claude: a tela da pessoa vai até ele por padrão ("mostrar: false" não leva), em mcp-tela.ts
+  instalarMostrarCriado(servidor, projeto, autor);
   // frente Animação: depois do portão, como as outras
   registrarFerramentasAnimacao(servidor, projeto, autor, origem);
   servidor.registerTool('projeto_info', {
@@ -148,7 +151,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   }));
 
   servidor.registerTool('estado_do_editor', {
-    description: 'O que a pessoa está vendo agora no app: área (video, imagem, 3d, efeitos, musica), documento, objeto selecionado (caminho JSON Pointer), tempo do vídeo e a transição em curso (levar_para).',
+    description: 'O que a pessoa está vendo agora no app: área (video, imagem, 3d, efeitos, musica, animacao), documento, objeto selecionado (caminho JSON Pointer), tempo do vídeo e a transição em curso (levar_para).',
     inputSchema: {},
   }, seguro(() => {
     const e = projeto.estado();
@@ -192,7 +195,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   }));
 
   servidor.registerTool('criar_documento', {
-    description: `Cria um documento novo no projeto (vídeo de cenas, imagem, cena 3D ou música) e o põe no manifesto; a tela abre sozinha. Formatos de vídeo: ${FORMATOS_VIDEO.map((f) => `${f.id} (${f.proporcao}, ${f.largura}x${f.altura})`).join(', ')}. De imagem: ${FORMATOS_IMAGEM.map((f) => `${f.id} (${f.largura}x${f.altura})`).join(', ')}. Ou largura e altura livres.`,
+    description: `Cria um documento novo no projeto (vídeo de cenas, imagem, cena 3D, música com "modelo" ou animação) e o põe no manifesto. Formatos de vídeo: ${FORMATOS_VIDEO.map((f) => `${f.id} (${f.proporcao}, ${f.largura}x${f.altura})`).join(', ')}. De imagem: ${FORMATOS_IMAGEM.map((f) => `${f.id} (${f.largura}x${f.altura})`).join(', ')}. Ou largura e altura livres.`,
     inputSchema: {
       modulo: z.enum(['video', 'imagem', '3d', 'musica', 'animacao']),
       titulo: z.string().optional(),
@@ -206,6 +209,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
     modelo?: ModeloMusica}) => {
     const preset = (modulo === 'imagem' ? FORMATOS_IMAGEM : FORMATOS_VIDEO).find((f) => f.id === formato);
     if (formato && !preset) throw new ErroProjeto(`formato desconhecido: ${formato}`, 'nao_achado');
+    if ((largura === undefined) !== (altura === undefined)) throw new ErroProjeto('passe largura e altura juntas (ou um formato da lista)', 'patch');
     const tam = largura && altura ? {largura, altura} : preset ? {largura: preset.largura, altura: preset.altura} : undefined;
     const {entrada, conteudo} = documentoNovo(projeto.manifesto(), modulo, {titulo, formato: tam ? {...tam, fps: fps ?? 30} : undefined});
     projeto.adicionarDocumento(entrada, modulo === 'musica' && modelo ? musicaDoModelo(modelo, conteudo as DocMusica) : conteudo); // frente Música: modelo
@@ -288,6 +292,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   registrarImagem(servidor, projeto, autor, origem); // seleção e layout da imagem (rodada 3, B2): src/nucleo/mcp-imagem.ts
   registrarSom(servidor, projeto, autor, origem); // frente Som (rodada 3): dividir, copiar e crossfade de clipe de áudio
   registrarMusica(servidor, projeto, autor, origem); // frente Música: música e ida e volta entre módulos (docs/musica.md)
+  registrarTela(servidor, projeto, autor); // mostrar_documento: leva a tela da pessoa a um documento (mcp-tela.ts)
 };
 
 // ---------- pesquisa: fontes e fatos (src/nucleo/pesquisa.ts, docs/pesquisa.md) ----------

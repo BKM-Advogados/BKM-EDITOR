@@ -50,7 +50,7 @@ describe('MCP estudio', () => {
       'desfazer', 'destravar_camadas', 'distribuir_camadas', 'dividir_clipe', 'editar_legenda', 'editar_notas', 'efeito_pixel', 'encaixar_no_video', 'escolher_trilha', 'escrever_notas', 'estado_do_editor', 'exportar_legendas',
       'exportar_musica', 'fazer_lista', 'fonte_da_marca', 'gerar_notas', 'guia_do_projeto', 'importar_legendas', 'importar_midi', 'inserir_icone', 'inserir_linha', 'ler_comentario', 'ler_documento', 'ler_fonte',
       'ler_legendas', 'ler_musica', 'levar_para', 'licencas_do_projeto', 'listar_comentarios', 'listar_midia', 'listar_mudancas', 'listar_pesquisa', 'listar_trilhas', 'marca_dagua', 'marcar_midia', 'medir_contraste_marca',
-      'medir_musica', 'pixelizar_imagem', 'por_no_video', 'preparar_teleprompter', 'projeto_info', 'propor_cortes_fala', 'reabrir_comentario', 'registrar_fato', 'remover_fundo', 'renomear_projeto', 'resolver_comentario', 'responder_comentario',
+      'medir_musica', 'mostrar_documento', 'pixelizar_imagem', 'por_no_video', 'preparar_teleprompter', 'projeto_info', 'propor_cortes_fala', 'reabrir_comentario', 'registrar_fato', 'remover_fundo', 'renomear_projeto', 'resolver_comentario', 'responder_comentario',
       'reverter', 'selecionar_camadas', 'texto_da_fonte', 'transcrever', 'travar_camadas', 'trocar_kit', 'ver_animacao', 'ver_marca',
     ]);
   });
