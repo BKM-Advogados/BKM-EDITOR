@@ -568,6 +568,18 @@ Abas de painel: 28 px (C) / 30 px (P).
 
 ## 7. Tokens de design
 
+> **Visual neutro (10/11/2026, implementado).** `src/renderer/estilo/tokens.ts` existe e é a fonte única: gera o CSS de
+> `:root` (escuro grafite, o padrão), `:root[data-tema="claro"]` (mesmos nomes), `:root[data-contraste="alto"]` (só
+> reatribui: texto suave mais forte, contorno de campo a 3:1, anel de foco duplo), a densidade compacta
+> (`data-densidade="compacta"`, e "pela janela" na faixa C), o tema do dockview e o `ITheme` do xterm. Nenhum CSS do
+> renderer escreve cor em hexadecimal ou `rgba()` (teste `css-renderer`). Valores de `ux/pesquisa-ux-visual.md` §4: corpo
+> `#202020`, `--fundo-elevado`, `--borda-campo`, fundos de status, `--agente-borda`, `--pino`, as cores de faixa
+> (`--faixa-azul/-ciano/-verde/-lima/-rosa/-areia`, das quais as famílias da linha do tempo são apelidos), raios 3/6/8/12,
+> corpo de 13 px (nada abaixo de 11), controles de 28 px (24 na compacta), traço de ícone 1,6 e sombras só no que flutua.
+> O acento é o azul `#70B8FF` (no claro, `#0B63C5`). A aparência (tema, contraste, densidade, tamanho 90–150% e movimento)
+> fica em Preferências › Aparência e vale para a máquina (`estado/aparencia.ts`). As tabelas abaixo são o desenho
+> original; onde divergirem, valem os tokens.
+
 Uma fonte só, `src/renderer/estilo/tokens.ts`, gera:
 - as variáveis CSS abaixo;
 - a classe de tema do dockview (mapeando para `--dv-*` [B10]);
@@ -707,6 +719,12 @@ Os nomes mantêm os do `estilo.css` atual onde já existem, e os valores mudam p
 
 ### 8.1 Seleção
 
+> **Implementado (visual neutro):** a seleção tem uma forma só, contorno de 2 px `--acento` no monitor, na linha do tempo
+> e no arranjo, e barra lateral + fundo nas listas; o branco fica para as alças. "Acabou de mudar pelo agente" fica 30 s:
+> contorno tracejado `--agente` com a etiqueta "Claude mudou · há N s" e o brilho de 1,2 s no monitor, barra violeta na
+> lista, tracejado no bloco da linha do tempo, os campos com "era X" no inspetor, um aviso com Ver e Desfazer e o
+> contador no rodapé (`estado/agente.ts`, `componentes/Agente.tsx`); somem com Esc ou com a próxima edição.
+
 **Uma seleção só no app** (`loja.selecao`), sincronizada entre monitor, Estrutura, linha do tempo, Propriedades e Comentários pelo id do objeto, o mesmo que os comentários usam [A §6.2]. Selecionar em qualquer lugar seleciona em todos.
 
 | Estado | Lista (Estrutura, Histórico) | Monitor 2D / 3D | Linha do tempo |
@@ -725,14 +743,14 @@ Os nomes mantêm os do `estilo.css` atual onde já existem, e os valores mudam p
 
 ### 8.2 Foco
 
-- **O grupo ativo do dockview** (o que recebe as teclas de painel) fica com a aba visível com texto `--texto` e uma **linha de 1 px `--acento` no topo da aba**. Grupos inativos ficam com a aba em `--texto-2`. Assim a pessoa sempre sabe para onde vão J/K/L ou Delete [inferência].
-- **Foco por teclado** (`:focus-visible`): anel de 1 px `--acento` com `outline-offset: -1px` dentro de botões e campos, e de 2 px nas linhas de lista. **Nunca** remover o contorno de foco sem trocar por outro.
+- **O grupo ativo do dockview** (o que recebe as teclas de painel) fica com a aba visível com texto `--texto` e um **sublinhado de 2 px `--acento`** (as abas da frente dos outros grupos, sublinhado `--texto`). Grupos inativos ficam com a aba em `--texto-2`. Assim a pessoa sempre sabe para onde vão J/K/L ou Delete [inferência].
+- **Foco por teclado** (`:focus-visible`): anel de 2 px `--acento` afastado 2 px do controle (WCAG 2.4.13); no alto contraste, anel duplo; 2 px por dentro nas linhas de lista. **Nunca** remover o contorno de foco sem trocar por outro.
 - **Campo em edição:** borda `--acento`, fundo `--fundo-0`. Enter confirma (gera o patch), e Esc cancela e devolve o foco ao painel.
 - **Terminal:**
   - em foco, cursor em bloco cheio e aba com a linha `--acento`;
   - sem foco, cursor em contorno (`cursorInactiveStyle: 'outline'` do xterm) [conhecimento prévio].
 - **Modo comentário:** cursor de pino, borda interna de 2 px `--comentario` no monitor e "Modo comentário · Esc sai" na barra de status.
-- **Tab / Shift+Tab** (esconder painéis) não roubam o Tab do terminal nem dos campos: só valem com foco no monitor, na lista ou na linha do tempo.
+- **Focar no monitor** (esconder os painéis) é **Ctrl+\\** e o botão da barra, não Tab: o Tab fica para a navegação por teclado e para o terminal.
 
 ### 8.3 Botões e controles
 
