@@ -133,15 +133,15 @@ export const marcarMidia = (
     const dono = classificarDerivado(rel);
     throw new ErroProjeto(`${rel} é um arquivo gerado${dono ? ` a partir de ${dono.origem}` : ''}: marque o original`, 'caminho');
   }
-  const textoAntes = p.existe(ARQUIVO_MARCAS_MIDIA) ? p.lerTexto(ARQUIVO_MARCAS_MIDIA) : serializar(marcasVazias());
+  const existia = p.existe(ARQUIVO_MARCAS_MIDIA) ? p.lerTexto(ARQUIVO_MARCAS_MIDIA) : null;
+  const textoAntes = existia ?? serializar(marcasVazias());
   const antes = lerMarcasDoProjeto(p);
   const depois = comMarca(antes, rel, mudanca);
   const texto = serializar(depois);
-  p.gravarTexto(ARQUIVO_MARCAS_MIDIA, texto);
   const seq = p.ultimaSeq() + 1;
   const marca = depois.marcas[rel] ?? null;
   const rotulo = mudanca.estado === 'boa' ? `tomada boa: ${rel}` : mudanca.estado === 'descartada' ? `tomada descartada: ${rel}` : mudanca.estado === null ? `sem marca: ${rel}` : `nota em ${rel}`;
-  p.registrar({
+  p.gravarComDiario(ARQUIVO_MARCAS_MIDIA, existia, texto, {
     seq,
     em: new Date().toISOString(),
     documento: ARQUIVO_MARCAS_MIDIA,

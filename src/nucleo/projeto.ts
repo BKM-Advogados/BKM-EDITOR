@@ -2,12 +2,12 @@
 // Toda escrita em documento passa por aplicarPatch: confere a versão (lock otimista), aplica o JSON Patch de forma
 // atômica (os "test" falham antes de qualquer mudança), grava, e registra a mudança com o patch inverso no diário.
 import {createHash} from 'node:crypto';
-import {existsSync, mkdirSync, readFileSync, renameSync, appendFileSync, closeSync, fstatSync, openSync, readSync, statSync} from 'node:fs';
+import {existsSync, mkdirSync, readFileSync, renameSync, rmSync, closeSync, fstatSync, openSync, readSync, statSync, writeSync} from 'node:fs';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import jsonpatch, {type Operation} from 'fast-json-patch';
 import type {ArquivoComentarios, Comentario, EntradaDiario, EntradaDocumento, EstadoEditor, Manifesto, OperacaoPatch} from './documentos';
-import {gravarAtomico} from './gravar-seguro';
+import {comNovaTentativa, gravarAtomico} from './gravar-seguro';
 import {comATrava, comTrava} from './trava-escrita';
 import {ARQUIVO_PESQUISA, caminhoTextoFonte, lerPesquisa, pesquisaVazia, type Pesquisa} from './pesquisa';
 import {motivoDaTrava} from './travas-imagem';
@@ -55,9 +55,14 @@ export class Projeto {
   }
 
   lerJson<T>(rel: string): {doc: T; versao: string} {
+    const {doc, versao} = this.lerJsonComTexto<T>(rel);
+    return {doc, versao};
+  }
+
+  private lerJsonComTexto<T>(rel: string): {doc: T; versao: string; texto: string} {
     const texto = this.lerTexto(rel);
     try {
-      return {doc: JSON.parse(texto) as T, versao: versaoDe(texto)};
+      return {doc: JSON.parse(texto) as T, versao: versaoDe(texto), texto};
     } catch (e) {
       throw new ErroProjeto(`${rel} não é um JSON válido (${(e as Error).message}); desfaça a última mudança no arquivo`, 'patch');
     }
@@ -105,7 +110,12 @@ export class Projeto {
       if (m.documentos.some((d) => d.id === entrada.id || d.caminho === entrada.caminho)) throw new ErroProjeto(`já existe o documento ${entrada.id}`, 'conflito');
       if (this.existe(entrada.caminho)) throw new ErroProjeto(`o arquivo ${entrada.caminho} já existe`, 'conflito');
       this.gravarTexto(entrada.caminho, serializar(conteudo));
-      this.gravarManifesto({...m, documentos: [...m.documentos, entrada]});
+      try {
+        this.gravarManifesto({...m, documentos: [...m.documentos, entrada]});
+      } catch (e) {
+        rmSync(this.caminho(entrada.caminho), {force: true}); // sem órfão: o mesmo nome serve na próxima tentativa
+        throw e;
+      }
       return entrada;
     });
   }
@@ -162,7 +172,7 @@ export class Projeto {
   }
 
   private aplicarNoArquivo(rel: string, entrada: Parameters<Projeto['aplicarPatch']>[0], documento: boolean): {versao: string; entrada: EntradaDiario} {
-    const {doc, versao} = this.lerJson<unknown>(rel);
+    const {doc, versao, texto: textoAntes} = this.lerJsonComTexto<unknown>(rel);
     if (entrada.versao_base && entrada.versao_base !== versao) {
       throw new ErroProjeto(`o documento mudou (versão ${versao}, esperada ${entrada.versao_base}); leia de novo e refaça o patch`, 'conflito');
     }
@@ -188,9 +198,8 @@ export class Projeto {
     }
     const texto = serializar(depois);
     const versaoDepois = versaoDe(texto);
-    this.gravarTexto(rel, texto);
     const registro: EntradaDiario = {
-      seq: this.proximaSeq(),
+      seq: this.proximaSeq(), // dentro da trava: ninguém acrescenta ao diário entre ler o número e gravar
       em: new Date().toISOString(),
       documento: rel,
       autor: entrada.autor,
@@ -204,8 +213,26 @@ export class Projeto {
     };
     const transicao = entrada.transicao ?? (documento ? this.transicaoAbertaPara(rel) : undefined); // frente Música
     if (transicao) registro.transicao = transicao;
-    this.registrar(registro);
+    this.gravarComDiario(rel, textoAntes, texto, registro);
     return {versao: versaoDepois, entrada: registro};
+  }
+
+  /** Grava `texto` em `rel` e acrescenta `registro` ao diário. Se o diário falhar, o arquivo volta a `textoAntes` (null:
+   *  não existia e sai): sem entrada no diário, sem mudança, e o Ctrl+Z e o Histórico continuam valendo. Chame dentro
+   *  de comTrava, para a volta não apagar a gravação de outro processo. */
+  gravarComDiario(rel: string, textoAntes: string | null, texto: string, registro: EntradaDiario) {
+    this.gravarTexto(rel, texto);
+    try {
+      this.registrar(registro);
+    } catch (e) {
+      try {
+        if (textoAntes === null) rmSync(this.caminho(rel), {force: true});
+        else this.gravarTexto(rel, textoAntes);
+      } catch {
+        /* o arquivo também ficou preso: vale o erro do diário */
+      }
+      throw e;
+    }
   }
 
   /** frente Música: a transição aberta (.estudio/transicoes.json, src/nucleo/transicoes.ts) cujo destino é este
@@ -296,7 +323,12 @@ export class Projeto {
         if (b[0] !== 0x0a) quebra = '\n';
       }
     }
-    appendFileSync(abs, `${quebra}${JSON.stringify(e)}\n`, 'utf-8');
+    const fd = comNovaTentativa(() => openSync(abs, 'a')); // diário preso pelo OneDrive ou antivírus: tenta de novo
+    try {
+      writeSync(fd, `${quebra}${JSON.stringify(e)}\n`);
+    } finally {
+      closeSync(fd);
+    }
   }
 
   // ---------- reverter e desfazer pelo diário (frente IA, rodada 3) ----------
@@ -430,13 +462,13 @@ export class Projeto {
   }
 
   private alterarPesquisaSemTrava<R>(mudar: (p: Pesquisa) => R, quem: {autor: string; origem: string; rotulo: string}): R {
-    const textoAntes = this.existe(ARQUIVO_PESQUISA) ? this.lerTexto(ARQUIVO_PESQUISA) : serializar(pesquisaVazia());
+    const existia = this.existe(ARQUIVO_PESQUISA) ? this.lerTexto(ARQUIVO_PESQUISA) : null;
+    const textoAntes = existia ?? serializar(pesquisaVazia());
     const antes = this.pesquisa();
     const depois = structuredClone(antes);
     const r = mudar(depois);
     const texto = serializar(depois);
-    this.gravarTexto(ARQUIVO_PESQUISA, texto);
-    this.registrar({
+    this.gravarComDiario(ARQUIVO_PESQUISA, existia, texto, {
       seq: this.proximaSeq(),
       em: new Date().toISOString(),
       documento: ARQUIVO_PESQUISA,
