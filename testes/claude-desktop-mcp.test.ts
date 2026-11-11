@@ -4,7 +4,7 @@
 // No fim, a prova ponta a ponta: o .mcpb gerado, desempacotado, rodado como o Claude Desktop roda (node server/index.js),
 // achando um Estúdio "instalado" numa pasta pessoal temporária, com um cliente MCP de verdade (o SDK).
 import {execSync} from 'node:child_process';
-import {copyFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync} from 'node:fs';
+import {copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync} from 'node:fs';
 import http from 'node:http';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
@@ -140,9 +140,6 @@ describe('MCP do Claude Desktop com o app aberto (descoberta, sem token colado)'
     expect(lista).toMatchObject({app_aberto: true, aberto_no_app: path.resolve(alfa)});
     // sem escolher nada: vai ao projeto aberto no app
     expect(JSON.parse(textoDe(await c.callTool({name: 'projeto_info', arguments: {}}))).nome).toBe('Alfa');
-    // escolher outro com o app aberto avisa que o app manda
-    expect(textoDe(await c.callTool({name: 'escolher_projeto', arguments: {projeto: 'Beta'}}))).toMatch(/aberto em .*Alfa/);
-    expect(JSON.parse(textoDe(await c.callTool({name: 'projeto_info', arguments: {}}))).nome).toBe('Alfa');
     // gravação pelo app: origem "Claude Desktop" no diário do projeto do app
     const lido = JSON.parse(textoDe(await c.callTool({name: 'ler_documento', arguments: {documento: 'capa', caminho: '/fundo'}})));
     await c.callTool({name: 'aplicar_patch', arguments: {documento: 'capa', versao_base: lido.versao, rotulo: 'fundo pelo Desktop',
@@ -154,10 +151,113 @@ describe('MCP do Claude Desktop com o app aberto (descoberta, sem token colado)'
     const negado = await c.callTool({name: 'ler_fonte', arguments: {url: 'https://exemplo.invalid/'}});
     expect(textoDe(negado)).toMatch(/negou/);
     expect(pedidos[0]).toMatchObject({origem: 'Claude Desktop', ferramenta: 'ler_fonte'});
-    // o app fecha o projeto (409): a chamada roda aqui, no escolhido (Beta)
+    // escolher outro com o app aberto avisa; enquanto o app estiver no outro, nada roda (nem lá, nem no escolhido)
+    expect(textoDe(await c.callTool({name: 'escolher_projeto', arguments: {projeto: 'Beta'}}))).toMatch(/aberto em .*Alfa.*não rodam/s);
+    const diarioAlfa = new Projeto(alfa).diario().length;
+    const recusado = await c.callTool({name: 'aplicar_patch', arguments: {documento: 'capa', versao_base: lido.versao + 1, rotulo: 'no projeto errado',
+      patch: [{op: 'replace', path: '/fundo', value: '#333333'}]}});
+    expect(recusado.isError).toBe(true);
+    expect(textoDe(recusado)).toMatch(/aberto em .*Alfa.*escolhido é .*Beta.*Nada foi feito/s);
+    expect(new Projeto(alfa).diario().length).toBe(diarioAlfa);
+    // o app fecha o projeto (publica a descoberta sem projeto; 409 no MCP): a chamada roda aqui, no escolhido (Beta)
     projetoDoApp = null;
+    app.publicar(null);
     expect(JSON.parse(textoDe(await c.callTool({name: 'projeto_info', arguments: {}}))).nome).toBe('Beta');
     app.retirar();
+    await d.fechar();
+  });
+});
+
+// revisão da 2.0.1: o Claude Desktop nunca grava num projeto que não escolheu, nem sem dizer que o projeto mudou
+describe('o projeto certo', () => {
+  const registrar = (s: Parameters<typeof registrarFerramentas>[0], projeto: Projeto, origem: string, portao?: Parameters<typeof registrarFerramentas>[5]) =>
+    registrarFerramentas(s, projeto, 'agente', origem, undefined, undefined, portao);
+
+  it('escolheu Gama com o app fechado; a pessoa abre Alfa no app: recusa, sem gravar em nenhum dos dois', async () => {
+    const gama = novoProjeto('Gama');
+    const alfa = path.join(projetos, 'Alfa');
+    let desc: Descoberta | null = null;
+    const {c, d} = await conectar(() => desc);
+    await c.callTool({name: 'escolher_projeto', arguments: {projeto: 'Gama'}});
+    const lido = JSON.parse(textoDe(await c.callTool({name: 'ler_documento', arguments: {documento: 'capa', caminho: '/fundo'}})));
+    const app = abrirApp(mkdtempSync(path.join(casa, 'dados-gama-')), alfa);
+    desc = descobertaViva(app.arquivoDescoberta);
+    const nAlfa = new Projeto(alfa).diario().length;
+    const nGama = new Projeto(gama).diario().length;
+    const r = await c.callTool({name: 'aplicar_patch', arguments: {documento: 'capa', versao_base: lido.versao, rotulo: 'no projeto errado',
+      patch: [{op: 'replace', path: '/fundo', value: '#101010'}]}});
+    expect(r.isError).toBe(true);
+    expect(textoDe(r)).toMatch(/aberto em .*Alfa.*escolhido é .*Gama.*Nada foi feito/s);
+    expect((await c.callTool({name: 'projeto_info', arguments: {}})).isError).toBe(true);
+    expect(new Projeto(alfa).diario().length).toBe(nAlfa);
+    expect(new Projeto(gama).diario().length).toBe(nGama);
+    // escolher o que está aberto resolve
+    await c.callTool({name: 'escolher_projeto', arguments: {projeto: 'Alfa'}});
+    expect(JSON.parse(textoDe(await c.callTool({name: 'projeto_info', arguments: {}}))).nome).toBe('Alfa');
+    app.retirar();
+    projetoDoApp = null;
+    await d.fechar();
+  });
+
+  it('sem escolha, o app troca de projeto entre duas chamadas: a primeira depois da troca é recusada, dizendo de qual para qual', async () => {
+    const alfa = path.join(projetos, 'Alfa');
+    const beta = path.join(projetos, 'Beta');
+    const app = abrirApp(mkdtempSync(path.join(casa, 'dados-troca-')), alfa);
+    const {c, d} = await conectar(() => descobertaViva(app.arquivoDescoberta));
+    expect(JSON.parse(textoDe(await c.callTool({name: 'projeto_info', arguments: {}}))).nome).toBe('Alfa');
+    projetoDoApp = new Projeto(beta);
+    app.publicar(beta);
+    const r = await c.callTool({name: 'projeto_info', arguments: {}});
+    expect(r.isError).toBe(true);
+    expect(textoDe(r)).toMatch(/O projeto mudou: .*Alfa.*agora .*Beta.*Nada foi feito/s);
+    expect(JSON.parse(textoDe(await c.callTool({name: 'projeto_info', arguments: {}}))).nome).toBe('Beta');
+    app.retirar();
+    projetoDoApp = null;
+    await d.fechar();
+  });
+
+  it('pelo .estudio/mcp-app.json (app que não publicou a descoberta), o rótulo "Claude Desktop" vai junto', async () => {
+    const quem: unknown[] = [];
+    const d = criarServidorDesktop({dados, pastas: [projetos], descoberta: () => null, registrar,
+      appDoProjeto: () => ({url: 'http://127.0.0.1:9/mcp', token: 'x'}) as never,
+      encaminhar: (async (_destino: unknown, msg: {id: number}, q: unknown) => (quem.push(q),
+        {jsonrpc: '2.0', id: msg.id, result: {content: [{type: 'text', text: 'pelo app'}]}})) as never});
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    await d.servidor.connect(a);
+    const c = new Client({name: 'claude-desktop-falso', version: '0'});
+    await c.connect(b);
+    await c.callTool({name: 'escolher_projeto', arguments: {projeto: 'Alfa'}});
+    expect(textoDe(await c.callTool({name: 'projeto_info', arguments: {}}))).toBe('pelo app');
+    expect(quem[0]).toMatchObject({autor: 'agente', rotulo: 'Claude Desktop'});
+    await d.fechar();
+  });
+
+  it('a pasta do catálogo de ferramentas não vira projeto sem portão', async () => {
+    const pasta = path.join(tmpdir(), 'estudio-catalogo-sem-projeto');
+    const criada = !existsSync(pasta);
+    if (criada) cpSync(path.join(__dirname, 'fixtures', 'projeto'), pasta, {recursive: true, filter: (f) => !f.endsWith('.mp4')});
+    try {
+      if (!existsSync(path.join(pasta, 'estudio.json'))) return; // a pasta existe com outra coisa: não mexe
+      const {c, d} = await conectar(() => null);
+      await c.listTools(); // monta o catálogo
+      expect(textoDe(await c.callTool({name: 'escolher_projeto', arguments: {projeto: pasta}}))).toMatch(/^Projeto escolhido/);
+      const r = await c.callTool({name: 'ler_fonte', arguments: {url: 'https://exemplo.invalid/'}});
+      expect(textoDe(r)).toBe(SEM_PORTAO);
+      await d.fechar();
+    } finally {
+      if (criada) rmSync(pasta, {recursive: true, force: true});
+    }
+  });
+
+  it('ferramenta sensível sem o app, com a permissão ACEITA pela confirmação do Claude Desktop: roda', async () => {
+    const perguntas: string[] = [];
+    const {c, d} = await conectar(() => null, {elicitar: (m) => (perguntas.push(m), {action: 'accept', content: {permitir: true}})});
+    await c.callTool({name: 'escolher_projeto', arguments: {projeto: 'Beta'}});
+    const r = await c.callTool({name: 'ler_fonte', arguments: {url: 'https://exemplo.invalid/'}});
+    expect(perguntas).toHaveLength(1);
+    // passou do portão: a resposta é da própria ferramenta (o endereço não existe), não a recusa
+    expect(textoDe(r)).not.toMatch(/negou/);
+    expect(textoDe(r)).not.toBe(SEM_PORTAO);
     await d.fechar();
   });
 });

@@ -11,12 +11,12 @@ import {chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, wri
 import os from 'node:os';
 import path from 'node:path';
 import {
-  ARQUIVO_DESCOBERTA, arquivoConfigClaude, configConectada, configDesconectada, lerDescoberta, ORIGEM_CLAUDE_DESKTOP, pastaDoClaude,
+  ARQUIVO_DESCOBERTA, ARQUIVO_INSTALACAO, arquivoConfigClaude, configConectada, configDesconectada, lerDescoberta, ORIGEM_CLAUDE_DESKTOP, pastaDoClaude,
   servidorClaudeDesktop, situacaoDaConfig, sistemaAtual, type Descoberta, type SituacaoConfig, type Sistema,
 } from '../nucleo/claude-desktop';
 import type {EstadoClaudeDesktop} from '../compartilhado/api';
 export type {EstadoClaudeDesktop};
-import {gravarAtomico} from '../nucleo/gravar-seguro';
+import {gravarAtomico, gravarAtomicoNoLugar} from '../nucleo/gravar-seguro';
 import {emTranslocacao} from './ide';
 
 type Mcp = {registrarFixo: (token: string, origem: string) => void; esquecerFixo: (token: string) => void};
@@ -41,6 +41,7 @@ export const criarClaudeDesktop = (o: {dados: string; executavel: string; script
   url: () => string | null; sistema?: Sistema; pid?: number}) => {
   const sistema = o.sistema ?? sistemaAtual();
   const descoberta = path.join(o.dados, ARQUIVO_DESCOBERTA);
+  const instalacao = path.join(o.dados, ARQUIVO_INSTALACAO);
   const servidor = servidorClaudeDesktop({executavel: o.executavel, script: o.script});
   let token: string | null = null;
   let projeto: string | null = null;
@@ -62,6 +63,21 @@ export const criarClaudeDesktop = (o: {dados: string; executavel: string; script
 
   return {
     arquivoDescoberta: descoberta,
+    arquivoInstalacao: instalacao,
+    /** Grava onde este Estúdio está instalado (sem token; não sai ao fechar), para o lançador da extensão achar a pasta
+     *  escolhida à mão com o app fechado. Rodando de uma cópia temporária do macOS, não grava. Nunca lança. */
+    registrarInstalacao() {
+      if (emTranslocacao(o.executavel)) return false;
+      const texto = `${JSON.stringify({formato: 1, executavel: o.executavel, script: o.script, versao: o.versao}, null, 2)}\n`;
+      try {
+        if (ler(instalacao) === texto) return true;
+        mkdirSync(path.dirname(instalacao), {recursive: true});
+        gravarAtomicoNoLugar(instalacao, texto);
+        return true;
+      } catch {
+        return false;
+      }
+    },
     /** Publica (ou republica) a descoberta: na abertura do app e ao abrir ou fechar um projeto. Nunca lança. */
     publicar(raiz?: string | null) {
       if (raiz !== undefined) projeto = raiz ? path.resolve(raiz) : null;
@@ -98,7 +114,7 @@ export const criarClaudeDesktop = (o: {dados: string; executavel: string; script
       if (r.aviso) return estado(r.aviso);
       if (r.texto !== null) {
         mkdirSync(path.dirname(arquivo), {recursive: true});
-        gravarAtomico(arquivo, r.texto);
+        gravarAtomicoNoLugar(arquivo, r.texto);
       }
       return estado();
     },
@@ -107,7 +123,7 @@ export const criarClaudeDesktop = (o: {dados: string; executavel: string; script
       const arquivo = arquivoConfigClaude(sistema);
       const r = configDesconectada(ler(arquivo));
       if (r.aviso) return estado(r.aviso);
-      if (r.texto !== null) gravarAtomico(arquivo, r.texto);
+      if (r.texto !== null) gravarAtomicoNoLugar(arquivo, r.texto);
       return estado();
     },
   };

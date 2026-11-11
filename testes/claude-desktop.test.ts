@@ -8,7 +8,7 @@ import path from 'node:path';
 import Ajv from 'ajv';
 import {afterAll, beforeEach, describe, expect, it} from 'vitest';
 import {
-  arquivoConfigClaude, arquivoDescoberta, configConectada, configDesconectada, descobertaViva, ehDoEstudio, instalacoesPadrao, lerDescoberta,
+  arquivoConfigClaude, arquivoDescoberta, configConectada, lerInstalacao, configDesconectada, descobertaViva, ehDoEstudio, instalacoesPadrao, lerDescoberta,
   listarProjetos, pastaDadosEstudio, pastaDoClaude, resolverProjeto, servidorClaudeDesktop, situacaoDaConfig, type Sistema,
 } from '../src/nucleo/claude-desktop';
 import {criarClaudeDesktop, temExtensao} from '../src/main/claude-desktop';
@@ -240,7 +240,7 @@ describe('arquivo de descoberta', () => {
     // viva só com o processo vivo e nesta máquina
     expect(descobertaViva(cd.arquivoDescoberta)).not.toBeNull();
     expect(descobertaViva(cd.arquivoDescoberta, {vivo: () => false})).toBeNull();
-    expect(descobertaViva(cd.arquivoDescoberta, {host: 'outra-maquina'})).toBeNull();
+    expect(descobertaViva(cd.arquivoDescoberta, {vivo: () => true})).not.toBeNull(); // o nome da máquina não conta (no Mac muda com a rede)
     cd.retirar();
     expect(lerDescoberta(cd.arquivoDescoberta)).toBeNull();
     expect(fixos.size).toBe(0);
@@ -325,5 +325,43 @@ describe('a extensão .mcpb', () => {
     const z = zipar(entradas);
     z[z.indexOf(Buffer.from('manifest.json')) + 20] ^= 0xff; // estraga um byte dos dados comprimidos
     expect(() => deszipar(z)).toThrow();
+  });
+});
+
+// revisão da 2.0.1: no Windows, com a pasta de instalação escolhida à mão, a extensão acha o Estúdio também com o app
+// fechado (a descoberta só existe com ele aberto)
+describe('registro da instalação (instalacao.json)', () => {
+  it('sem token, fica ao fechar o app, e o lançador acha por ele a pasta escolhida à mão; de uma cópia temporária do macOS, não grava', () => {
+    const base = mkdtempSync(path.join(tmpdir(), 'estudio-instalacao-'));
+    try {
+      const pasta = path.join(base, 'Pasta Escolhida', 'Estudio');
+      const exe = path.join(pasta, 'Estudio.exe');
+      const script = path.join(pasta, 'resources', 'dist-mcp', 'desktop.cjs');
+      mkdirSync(path.dirname(script), {recursive: true});
+      writeFileSync(exe, '');
+      writeFileSync(script, '');
+      const dadosApp = path.join(base, 'dados');
+      const cd = criarClaudeDesktop({dados: dadosApp, executavel: exe, script, versao: '2.0.1', mcp: () => null, url: () => null});
+      expect(cd.registrarInstalacao()).toBe(true);
+      const texto = readFileSync(cd.arquivoInstalacao, 'utf-8');
+      expect(JSON.parse(texto)).toEqual({formato: 1, executavel: exe, script, versao: '2.0.1'});
+      expect(texto).not.toMatch(/token/i);
+      cd.retirar(); // o app fecha
+      expect(lerInstalacao(cd.arquivoInstalacao)).toEqual({executavel: exe, script});
+      // o lançador, com o app fechado (sem descoberta) e nada no lugar padrão
+      const s: Sistema = {plataforma: 'win32', home: path.join(base, 'casa'), env: {}};
+      const lista = candidatos(s, null, lerInstalacao(cd.arquivoInstalacao));
+      expect(procurar(lista)).toEqual({achado: {executavel: exe, script}});
+      expect(procurar(candidatos(s, null, null))).toMatchObject({nada: expect.any(Array)});
+      // caminho relativo não vale
+      writeFileSync(cd.arquivoInstalacao, JSON.stringify({formato: 1, executavel: 'Estudio.exe', script: 'x.cjs'}));
+      expect(lerInstalacao(cd.arquivoInstalacao)).toBeNull();
+      // de uma cópia temporária do macOS: não grava
+      const trans = criarClaudeDesktop({dados: path.join(base, 'dados-mac'), executavel: '/private/var/folders/x/AppTranslocation/y/d/Estudio.app/Contents/MacOS/Estudio',
+        script: 'x', versao: '2.0.1', mcp: () => null, url: () => null});
+      expect(trans.registrarInstalacao()).toBe(false);
+    } finally {
+      rmSync(base, {recursive: true, force: true});
+    }
   });
 });

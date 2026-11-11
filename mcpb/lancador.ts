@@ -5,12 +5,14 @@
 // Estúdio atualiza as ferramentas, e o MCP lê os recursos do app (ffmpeg, Remotion, whisper) de dentro do pacote dele,
 // o que o Node do Claude Desktop não conseguiria (parte deles mora no app.asar).
 // Sem o Estúdio, um servidor mínimo responde com uma ferramenta só, que diz para instalar o Estúdio.
-// Ordem da busca: ESTUDIO_EXECUTAVEL (e ESTUDIO_SCRIPT), o Estúdio aberto agora (arquivo de descoberta, que cobre a pasta
-// de instalação escolhida à mão no Windows) e o lugar padrão de cada sistema.
+// Ordem da busca: ESTUDIO_EXECUTAVEL (e ESTUDIO_SCRIPT), o Estúdio aberto agora (arquivo de descoberta), o registro da
+// instalação que o app deixa ao abrir (instalacao.json, sem token: cobre a pasta escolhida à mão no instalador do Windows
+// com o app fechado) e o lugar padrão de cada sistema.
 import {spawn} from 'node:child_process';
 import {existsSync} from 'node:fs';
 import readline from 'node:readline';
-import {arquivoDescoberta, caminhos, instalacoesPadrao, lerDescoberta, SCRIPT_DESKTOP, sistemaAtual, type Instalacao, type Sistema} from '../src/nucleo/claude-desktop';
+import {arquivoDescoberta, arquivoInstalacao, caminhos, instalacoesPadrao, lerDescoberta, lerInstalacao, SCRIPT_DESKTOP, sistemaAtual, type Instalacao,
+  type Sistema} from '../src/nucleo/claude-desktop';
 
 declare const __VERSAO__: string;
 const VERSAO = typeof __VERSAO__ === 'string' ? __VERSAO__ : '0.0.0';
@@ -23,11 +25,12 @@ export const scriptAoLado = (executavel: string, plataforma: string) => {
 };
 
 /** Os lugares onde procurar, em ordem. */
-export const candidatos = (s: Sistema, descoberta: Instalacao | null): Instalacao[] => {
+export const candidatos = (s: Sistema, descoberta: Instalacao | null, instalacao: Instalacao | null = null): Instalacao[] => {
   const r: Instalacao[] = [];
   const exe = s.env.ESTUDIO_EXECUTAVEL;
   if (exe) r.push({executavel: exe, script: s.env.ESTUDIO_SCRIPT || scriptAoLado(exe, s.plataforma)});
   if (descoberta?.executavel && descoberta.script) r.push(descoberta);
+  if (instalacao) r.push(instalacao);
   return [...r, ...instalacoesPadrao(s)];
 };
 
@@ -76,7 +79,7 @@ export const servirAviso = (mensagem: string, entrada: NodeJS.ReadableStream = p
 export const principal = () => {
   const s = sistemaAtual();
   const d = lerDescoberta(arquivoDescoberta(s));
-  const busca = procurar(candidatos(s, d ? {executavel: d.executavel, script: d.script} : null));
+  const busca = procurar(candidatos(s, d ? {executavel: d.executavel, script: d.script} : null, lerInstalacao(arquivoInstalacao(s))));
   if (!('achado' in busca)) {
     const msg = mensagemDaBusca(busca);
     process.stderr.write(`estudio (extensão ${VERSAO}): ${msg}\n`);

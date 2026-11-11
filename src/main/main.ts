@@ -713,6 +713,7 @@ app.on('ready', async () => {
     perguntarAPessoa); // frente IA: o portão de permissão pergunta à pessoa pela tela
   await iniciarAppsDeFora(); // frente IA: apps de IA de fora (tokens de volta ao MCP e, se ligada, a porta fixa)
   midia.rota((req, res) => mcpHttp!.atender(req, res));
+  claudeDesktop.registrarInstalacao(); // onde este Estúdio está, para a extensão achar com o app fechado (sem token)
   claudeDesktop.publicar(); // Claude Desktop: a descoberta com o token dele, antes de qualquer projeto abrir
   claude = await terminais.preparar();
   criarJanela();

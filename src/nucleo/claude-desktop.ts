@@ -23,6 +23,9 @@ export const ORIGEM_CLAUDE_DESKTOP = 'Claude Desktop';
 export const SCRIPT_DESKTOP = 'desktop.cjs';
 /** O arquivo de descoberta, na pasta de dados do Estúdio. */
 export const ARQUIVO_DESCOBERTA = 'claude-desktop.json';
+/** Onde o Estúdio está instalado (executável e MCP), sem token, na pasta de dados: o app grava ao abrir e não apaga ao
+ *  fechar. O lançador da extensão acha por ele a pasta escolhida à mão no instalador do Windows com o app fechado. */
+export const ARQUIVO_INSTALACAO = 'instalacao.json';
 export const ARQUIVO_CONFIG_CLAUDE = 'claude_desktop_config.json';
 
 // ---------- pastas de cada sistema ----------
@@ -46,11 +49,26 @@ export const pastaDadosEstudio = (s: Sistema) => {
 };
 
 export const arquivoDescoberta = (s: Sistema) => caminhos(s.plataforma).join(pastaDadosEstudio(s), ARQUIVO_DESCOBERTA);
+export const arquivoInstalacao = (s: Sistema) => caminhos(s.plataforma).join(pastaDadosEstudio(s), ARQUIVO_INSTALACAO);
 
 /** Pasta padrão dos projetos (a mesma do main.ts: ~/Estudio). */
 export const pastaPadraoProjetos = (s: Sistema) => caminhos(s.plataforma).join(s.home, 'Estudio');
 
 export type Instalacao = {executavel: string; script: string};
+
+/** O registro da instalação ({formato: 1, executavel, script, versao}); null se não existe, está fora do formato ou aponta
+ *  para caminho relativo. Quem usa confere se os arquivos existem. */
+export const lerInstalacao = (arquivo: string): Instalacao | null => {
+  try {
+    if (!existsSync(arquivo)) return null;
+    const d = JSON.parse(readFileSync(arquivo, 'utf-8')) as {formato?: unknown; executavel?: unknown; script?: unknown};
+    if (d.formato !== 1 || typeof d.executavel !== 'string' || typeof d.script !== 'string') return null;
+    const absoluto = (x: string) => /^([A-Za-z]:[\\/]|\\\\|\/)/.test(x);
+    return absoluto(d.executavel) && absoluto(d.script) ? {executavel: d.executavel, script: d.script} : null;
+  } catch {
+    return null;
+  }
+};
 
 /** Onde o instalador de cada sistema põe o Estúdio, em ordem de preferência. */
 export const instalacoesPadrao = (s: Sistema): Instalacao[] => {
@@ -102,11 +120,13 @@ export const processoVivo = (pid: number) => {
   }
 };
 
-/** A descoberta de um app vivo nesta máquina, ou null (app fechado, morto sem apagar, arquivo vindo de outra máquina). */
-export const descobertaViva = (arquivo: string, o: {vivo?: (pid: number) => boolean; host?: string} = {}): Descoberta | null => {
+/** A descoberta de um app vivo, ou null (app fechado, ou morto sem apagar o arquivo). Não confere o nome da máquina: o
+ *  arquivo mora na pasta de dados local, e no Mac o nome muda com a rede (o app aberto passaria por fechado). Um pid vivo
+ *  que não é o app só leva a um token recusado, que o MCP trata. */
+export const descobertaViva = (arquivo: string, o: {vivo?: (pid: number) => boolean} = {}): Descoberta | null => {
   const d = lerDescoberta(arquivo);
   if (!d) return null;
-  if (d.host !== (o.host ?? os.hostname()) || !(o.vivo ?? processoVivo)(d.pid)) return null;
+  if (!(o.vivo ?? processoVivo)(d.pid)) return null;
   return d;
 };
 

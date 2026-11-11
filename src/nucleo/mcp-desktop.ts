@@ -2,6 +2,9 @@
 // ele sobe um servidor por stdio e conversa com ele. Este servidor decide, a cada chamada de ferramenta, onde ela roda:
 // 1. Com o Estúdio aberto num projeto (o arquivo de descoberta, claude-desktop.ts), a chamada vai ao app com o token do
 //    Claude Desktop: um escritor só, o portão de permissão na tela da pessoa, o diário e o Reverter. É o caminho preferido.
+//    Se o Claude escolheu outro projeto, a chamada é recusada (nunca grava num projeto que ele não escolheu nem por fora
+//    do app aberto); sem escolha, quando o projeto muda entre uma chamada e outra (a pessoa abriu outro no app), a
+//    primeira chamada depois da troca é recusada, dizendo de qual para qual.
 // 2. Com o app fechado (ou aberto sem projeto), roda aqui, no projeto que o Claude escolheu com escolher_projeto (os
 //    recentes do app e ~/Estudio, por listar_projetos), com a trava de escrita do projeto, como o MCP da IDE. Se o
 //    projeto escolhido estiver aberto num Estúdio que não publicou a descoberta, a chamada vai a ele pelo
@@ -33,6 +36,14 @@ export const SEM_PROJETO = 'Nenhum projeto escolhido e o Estúdio não está abe
   + 'escolher_projeto com o nome ou a pasta; ou peça à pessoa para abrir o projeto no Estúdio.';
 export const SEM_PORTAO = 'Esta ação precisa da permissão da pessoa, e o Claude Desktop não ofereceu como perguntar com o Estúdio '
   + 'fechado. Peça à pessoa para abrir o Estúdio com o projeto e tente de novo: o pedido de permissão aparece na tela do app.';
+/** O app está aberto num projeto e o Claude escolheu outro: nada roda. */
+export const outroProjetoNoApp = (noApp: string, escolhido: string) => `O Estúdio está aberto em ${noApp}, mas o projeto escolhido é `
+  + `${escolhido}. Nada foi feito. Para trabalhar no escolhido, peça à pessoa para abri-lo no Estúdio (ou fechar o projeto do app); `
+  + `para trabalhar no que está aberto, chame escolher_projeto com ${noApp}.`;
+/** O projeto mudou entre duas chamadas sem o Claude escolher: a primeira depois da troca não roda. */
+export const projetoMudou = (antes: string, agora: string) => `O projeto mudou: as chamadas anteriores foram em ${antes}, e agora `
+  + `o Estúdio está em ${agora}. Nada foi feito. Confirme com a pessoa e repita a chamada para trabalhar em ${agora}, ou chame `
+  + 'escolher_projeto.';
 export const RECUSADO_DESKTOP = 'O Estúdio aberto recusou a conexão do Claude Desktop (o app foi reaberto?). Tente de novo; '
   + 'se continuar, feche e abra o Estúdio. Nada foi gravado.';
 
@@ -84,8 +95,12 @@ export const criarServidorDesktop = (o: OpcoesDesktop) => {
   const encaminhar = o.encaminhar ?? encaminharAoApp;
   const appDoProjeto = o.appDoProjeto ?? appAberto;
   const prazo = o.prazo ?? PRAZO_DO_APP_MS;
-  const conversa = {conversa: novaConversaIde(), autor: 'agente'};
+  // o rótulo leva "Claude Desktop" ao diário também pelo .estudio/mcp-app.json (a origem fica ide-<id> Claude Desktop, e o
+  // Histórico mostra o nome)
+  const conversa = {conversa: novaConversaIde(), autor: 'agente', rotulo: ORIGEM_CLAUDE_DESKTOP};
   let escolhido: string | null = null;
+  // o projeto em que a última chamada rodou (para avisar quando ele muda sem o Claude escolher)
+  let ultimo: string | null = null;
 
   // o portão daqui (app fechado): a confirmação do próprio Claude Desktop, quando ele oferece; sem ela, não roda
   const portaoLocal: Portao = {
@@ -118,11 +133,20 @@ export const criarServidorDesktop = (o: OpcoesDesktop) => {
     }
     return c;
   };
-  // o catálogo: as mesmas ferramentas, registradas sobre um projeto que não existe (registrar não toca no disco)
+  // o catálogo: as mesmas ferramentas, registradas sobre um projeto que não existe (registrar não toca no disco). Fica
+  // fora do mapa dos internos e com um portão que sempre nega: escolher uma pasta com o mesmo caminho dá um interno novo,
+  // com o portão de verdade
   let catalogo: Promise<Tool[]> | null = null;
   const ferramentasDoEstudio = () => (catalogo ??= (async () => {
-    const c = await interno(path.join(os.tmpdir(), 'estudio-catalogo-sem-projeto'));
-    return (await c.listTools()).tools;
+    const s = new McpServer({name: 'estudio', version: o.versao ?? '0.1.0'});
+    o.registrar(s, new Projeto(path.join(os.tmpdir(), 'estudio-catalogo-sem-projeto')), ORIGEM_CLAUDE_DESKTOP, {perguntar: async () => false});
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    await s.connect(a);
+    const c = new Client({name: 'estudio-catalogo', version: o.versao ?? '0.1.0'});
+    await c.connect(b);
+    const lista = (await c.listTools()).tools;
+    await c.close().catch(() => undefined);
+    return lista;
   })());
 
   servidor.setRequestHandler(ListToolsRequestSchema, async () => ({tools: [...FERRAMENTAS_PROPRIAS, ...(await ferramentasDoEstudio())]}));
@@ -153,15 +177,26 @@ export const criarServidorDesktop = (o: OpcoesDesktop) => {
       const r = resolverProjeto(String((args as {projeto?: unknown})?.projeto ?? ''), listar());
       if ('erro' in r) return texto(r.erro, true);
       escolhido = r.pasta;
+      ultimo = r.pasta; // escolha explícita: a troca não precisa de aviso
       const aviso = app?.projeto && !mesma(app.projeto, r.pasta)
-        ? ` Atenção: o Estúdio está aberto em ${app.projeto}, e enquanto ele estiver aberto com um projeto as ferramentas operam lá. `
-          + 'Para trabalhar neste, peça à pessoa para abri-lo no app (ou fechar o projeto do app).'
+        ? ` Atenção: o Estúdio está aberto em ${app.projeto}. Enquanto ele estiver aberto nesse projeto, as ferramentas não rodam `
+          + '(para não gravar no projeto errado). Peça à pessoa para abrir este no app, ou fechar o projeto do app.'
         : '';
       return texto(`Projeto escolhido: ${r.nome} (${r.pasta}).${aviso}`);
     }
 
     const msg = {jsonrpc: '2.0', id: extra.requestId, method: 'tools/call', params: req.params} as JSONRPCMessage;
     const peloApp = async (destino: DestinoApp, quem?: typeof conversa) => encaminhar(destino, msg, quem, prazo, undefined, extra.signal);
+
+    // o projeto em que a chamada vai rodar: o do app, se ele está aberto num projeto; senão, o escolhido
+    const alvo = app?.projeto ?? escolhido;
+    if (app?.projeto && escolhido && !mesma(app.projeto, escolhido)) return texto(outroProjetoNoApp(app.projeto, escolhido), true);
+    if (alvo && ultimo && !mesma(alvo, ultimo)) {
+      const antes = ultimo;
+      ultimo = alvo;
+      return texto(projetoMudou(antes, alvo), true);
+    }
+    if (alvo) ultimo = alvo;
 
     // 1. o app aberto num projeto
     if (app) {

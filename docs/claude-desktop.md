@@ -66,9 +66,12 @@ instalado, o Claude Desktop mostra só que o servidor não abriu, e não a mensa
 Ele procura nesta ordem e usa o primeiro com executável e `desktop.cjs`:
 
 1. `ESTUDIO_EXECUTAVEL` (e `ESTUDIO_SCRIPT`, opcional), para desenvolvimento;
-2. o Estúdio aberto agora, pelo arquivo de descoberta (abaixo). Isso cobre a pasta escolhida à mão no instalador do
-   Windows: basta abrir o app uma vez com o Claude Desktop já conectado;
-3. o lugar padrão de cada sistema:
+2. o Estúdio aberto agora, pelo arquivo de descoberta (abaixo);
+3. o registro da instalação, `instalacao.json` na pasta de dados do Estúdio (`{formato: 1, executavel, script, versao}`,
+   sem token). O app grava ao abrir e não apaga ao fechar. É o que cobre a pasta escolhida à mão no instalador do
+   Windows com o app fechado: basta o Estúdio ter sido aberto uma vez. Rodando de uma cópia temporária do macOS, o app
+   não grava;
+4. o lugar padrão de cada sistema:
    - Windows: `%LOCALAPPDATA%\Programs\Estudio\Estudio.exe`;
    - Mac: `/Applications/Estudio.app` e `~/Applications/Estudio.app`;
    - Linux: `~/.local/opt/Estudio/Estudio`.
@@ -95,10 +98,16 @@ O Claude Desktop não abre pasta de projeto. O MCP decide a cada chamada:
   do projeto, como no MCP da IDE. Se o projeto escolhido estiver aberto num Estúdio que não publicou a descoberta (um
   app 2.0.0, por exemplo), a chamada vai a ele pelo `.estudio/mcp-app.json` do projeto, para nunca gravar por fora de um
   app aberto.
-- **Escolher outro projeto com o app aberto** num projeto avisa que o app manda: as ferramentas seguem operando no
-  projeto do app até a pessoa abrir o outro nele ou fechar o projeto.
+- **O Claude Desktop nunca grava num projeto que não escolheu.** Com um projeto escolhido e o app aberto em OUTRO, toda
+  chamada é recusada, sem gravar em nenhum dos dois, e a resposta diz os dois projetos e o que fazer: abrir o escolhido
+  no app (ou fechar o projeto do app), ou escolher o que está aberto. Escolher outro projeto com o app aberto já avisa
+  disso.
+- **Sem projeto escolhido, a troca não passa calada.** Se o projeto muda entre uma chamada e outra (a pessoa abriu outro
+  no app), a primeira chamada depois da troca é recusada, dizendo de qual para qual; a seguinte roda no novo.
 
-**Origem.** Em qualquer caso, a origem no diário e no Histórico é **"Claude Desktop"** e o autor é `agente`.
+**Origem.** Em qualquer caso, o Histórico mostra **"Claude Desktop"** e o autor é `agente`. No diário, a origem é
+`Claude Desktop`; pelo `.estudio/mcp-app.json` (app que não publicou a descoberta) é `ide-<id> Claude Desktop`, a forma
+das conversas de IDE com o nome do harness.
 
 **Portão.** Com o app aberto, as ferramentas da classe "cartao" (`src/nucleo/portao.ts`) perguntam à pessoa pela tela do
 app, com a origem "Claude Desktop". O "Sempre nesta conversa" vale para o token do Claude Desktop, ou seja, para todas
@@ -124,8 +133,8 @@ O conteúdo é `{formato: 1, url, token, pid, host, executavel, script, versao, 
 O arquivo é gravado de forma atômica, com modo `0600` no Mac e no Linux. No Windows, a pasta do perfil já é só do
 usuário. Ao fechar, o app apaga o arquivo se ele ainda for o dele.
 
-O MCP só usa a descoberta se o `pid` estiver vivo, se o `host` for esta máquina e se a `url` for `127.0.0.1` ou
-`localhost`. Com o token recusado (o app reabriu), relê o arquivo uma vez. Recusado de novo, responde erro sem gravar
+O MCP só usa a descoberta se o `pid` estiver vivo e se a `url` for `127.0.0.1` ou `localhost`. O nome da máquina
+(`host`) fica no arquivo, mas não conta: no Mac ele muda com a rede, e o app aberto passaria por fechado. Com o token recusado (o app reabriu), relê o arquivo uma vez. Recusado de novo, responde erro sem gravar
 nada.
 
 Quanto à segurança, o token dá a outro programa do mesmo usuário o mesmo acesso que o Claude Desktop tem, e esse acesso
@@ -152,6 +161,9 @@ roda de uma cópia temporária do macOS (App Translocation, aberto de Downloads)
 desligado, porque o caminho gravado sumiria.
 
 Regras da mesclagem (`configConectada` e `configDesconectada` em `src/nucleo/claude-desktop.ts`):
+
+- a gravação é atômica e no lugar (`gravarAtomicoNoLugar`): um symlink (dotfiles) continua symlink, e o modo do arquivo
+  fica (um `600` com o token de outro servidor continua `600`);
 
 - os outros servidores e as outras chaves do arquivo ficam intactos;
 - arquivo novo cria a pasta;
