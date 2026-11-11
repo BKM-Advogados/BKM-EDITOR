@@ -106,9 +106,12 @@ describe('N9 .gitignore com caracteres especiais no nome', () => {
     const raiz = pastaNova('git');
     execFileSync('git', ['init', '-q'], {cwd: raiz});
     mkdirSync(path.join(raiz, 'midia'));
-    const nomes = ['midia/take [1].wav', 'midia/a*b.wav', 'midia/#x.wav', 'midia/q?.wav'];
+    // "*" e "?" não cabem num nome de arquivo do Windows: lá só os outros; no Linux e no Mac, todos
+    const proibidosNoWindows = ['midia/a*b.wav', 'midia/q?.wav'];
+    const nomes = ['midia/take [1].wav', 'midia/#x.wav', ...(process.platform === 'win32' ? [] : proibidosNoWindows)];
     for (const n of nomes) writeFileSync(path.join(raiz, n), 'x');
-    writeFileSync(path.join(raiz, 'midia', 'take 1.wav'), 'x');
+    const parecidos = ['midia/take 1.wav', ...(process.platform === 'win32' ? [] : ['midia/axb.wav', 'midia/qq.wav'])];
+    for (const n of parecidos) writeFileSync(path.join(raiz, n), 'x');
     writeFileSync(path.join(raiz, '.gitignore'), gitignoreComMidiaPesada('', nomes.map((rel) => ({rel, tamanho: 30 * 1024 * 1024}))));
     const ignorado = (rel: string) => {
       try {
@@ -119,7 +122,7 @@ describe('N9 .gitignore com caracteres especiais no nome', () => {
       }
     };
     for (const n of nomes) expect(ignorado(n), n).toBe(true);
-    expect(ignorado('midia/take 1.wav')).toBe(false); // a regra não vira coringa
+    for (const n of parecidos) expect(ignorado(n), n).toBe(false); // a regra não vira coringa
   });
 });
 
