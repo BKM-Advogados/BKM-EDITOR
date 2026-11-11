@@ -23,6 +23,7 @@ import {alvosDeEncaixe, distancias, encaixar, margemSegura, passoDaGrade, TOLERA
 import {CamadaEfeitos} from '../../../composicoes/efeitos/CamadaEfeitos';
 import {aplicar, caminhosDaSelecao, comentar, loja, patchTrocar, selecionar, selecionarVarias, useLoja} from '../../estado/loja';
 import {SemDocumento} from '../../componentes/SemDocumento';
+import {BotaoTelaCheia} from '../../componentes/TelaCheia';
 import {BotaoMenu, usarFora} from '../../componentes/Menu';
 import {Trilho, teclaLivre} from '../../componentes/Trilho';
 import {comValor, definirPrevia, docValido, indiceDe, irParaPagina, paginaAtivaDe, rotuloCamada, usarDocumentoImagem, usarPaginaAtiva, usarPrevia, visivel} from './comum';
@@ -546,7 +547,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
   const cursor = modoComentario ? 'crosshair' : ferr === 'mao' ? 'grab' : ferr === 'zoom' ? 'zoom-in' : ferr === 'texto' ? 'text' : ferr === 'forma' ? 'crosshair' : 'default';
 
   return (
-    <div className="painel">
+    <div className="painel" data-monitor-tela-cheia>
       <div className={`monitor-grade${editavel ? ' com-paginas' : ''}`}>
         <Trilho grupos={grupos} />
         <div className="monitor" ref={refMonitor} style={{overflow: 'auto', justifyContent: 'flex-start', alignItems: 'flex-start', padding: `${MARGEM + 8}px ${MARGEM}px ${MARGEM - 8}px`}}
@@ -650,6 +651,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
           <button className="bt fantasma" style={{marginLeft: 'auto'}} onClick={exportar} title="Exportar… (Ctrl+Shift+E): PNG, JPG ou WebP; num carrossel, PNG por página e PDF, ou só esta página">
             <Download /><span className="largo">Exportar…</span>
           </button>
+          <BotaoTelaCheia />
         </div>
       </div>
       {inserindo && editavel && <InserirImagem documento={documento} doc={doc} fechar={() => setInserindo(false)} />}

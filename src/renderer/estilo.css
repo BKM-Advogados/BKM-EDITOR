@@ -260,6 +260,9 @@ input[type="range"]:focus-visible { outline: none; }
 .transporte .dur { font: var(--tam-1) var(--fonte-mono); color: var(--texto-3); }
 .transporte .dur .curta { display: none; }
 .transporte .coords { font: var(--tam-1) var(--fonte-mono); color: var(--texto-3); margin-left: 8px; }
+/* tela cheia do monitor (componentes/TelaCheia.tsx): o painel inteiro, com o transporte, sobre o entorno do monitor */
+[data-monitor-tela-cheia]:fullscreen { width: 100vw; height: 100vh; background: var(--entorno-monitor); }
+.transporte .tela-cheia { margin-left: 4px; flex: none; }
 .transporte .zoom-bt { height: 22px; background: var(--fundo-3); color: var(--texto); }
 @container (max-width: 470px) {
   .transporte .largo { display: none; }

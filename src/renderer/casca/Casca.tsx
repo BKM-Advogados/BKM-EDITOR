@@ -27,6 +27,7 @@ import {PaineisImagem} from '../modulos/imagem/paineis';
 import {PaineisEfeitos} from '../modulos/efeitos/paineis';
 import {PaineisAnimacao} from '../modulos/animacao/paineis';
 import {abrirDialogoExportar, RaizDialogoExportar} from '../componentes/DialogoExportar';
+import {alternarTelaCheia, sairDaTelaCheia} from '../componentes/TelaCheia';
 import {Comentarios} from '../paineis/Comentarios';
 import {Historico} from '../paineis/Historico';
 import {Pesquisa} from '../paineis/Pesquisa';
@@ -123,6 +124,7 @@ const componentes: Record<string, React.FC<IDockviewPanelProps>> = {
   terminal: () => <Suspense fallback={<Carregando />}><Terminal /></Suspense>,
 };
 
+const COM_TELA_CHEIA = new Set<Area>(['video', 'imagem', 'animacao']);
 const TITULOS: Record<Area, string> = {video: 'Cenas e blocos', imagem: 'Camadas', '3d': 'Objetos', efeitos: 'Pilha de efeitos', musica: 'Canais', animacao: 'Camadas'};
 
 /** Orientação do vídeo ativo, pelas props montadas (sem props ainda: vertical, o carrossel). */
@@ -334,6 +336,10 @@ export const Casca: React.FC = () => {
       } else if (ev.ctrlKey && ev.shiftKey && !ev.altKey && k === 'e') {
         ev.preventDefault();
         exportarArea();
+      } else if (ev.ctrlKey && !ev.altKey && !ev.shiftKey && k === 'f' && !digitando && COM_TELA_CHEIA.has(loja.get().area)) {
+        // tela cheia do monitor (docs/tela.md, atalhos): fora do terminal e dos campos de texto
+        ev.preventDefault();
+        alternarTelaCheia();
       } else if (ev.ctrlKey && k === 'z' && !digitando) {
         ev.preventDefault();
         void desfazer();
@@ -343,6 +349,8 @@ export const Casca: React.FC = () => {
         loja.definir((s) => ({modoComentario: !s.modoComentario}));
       } else if (!digitando && !ev.ctrlKey && k === 'v') {
         loja.definir({modoComentario: false});
+      } else if (ev.key === 'Escape' && !digitando && sairDaTelaCheia()) {
+        ev.preventDefault();
       } else if (ev.key === 'Escape') {
         loja.definir({modoComentario: false, comentarioAberto: undefined});
         dispensarMudancasAgente();

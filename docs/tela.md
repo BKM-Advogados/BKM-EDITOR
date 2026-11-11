@@ -502,7 +502,7 @@ Abas de painel: 28 px (C) / 30 px (P).
 | Esconder só as colunas laterais | Shift+Tab | Shift+Tab | Photoshop [B34] | ✔ |
 | Maximizar o painel sob o cursor | Ctrl+Espaço · duplo clique na aba | duplo clique na aba (tecla a definir) | Blender [A29] | ✔ |
 | Tela cheia da janela | F11 | Ctrl+Cmd+F | — | ✔ |
-| Tela cheia do monitor | Ctrl+F (com foco no monitor ou na linha do tempo) | Cmd+F | Resolve [A15] | depois |
+| Tela cheia do monitor (Vídeo, Imagem, Animação; botão no transporte, Esc sai) | Ctrl+F (fora do terminal e dos campos de texto) | Cmd+F | Resolve [A15] | ✔ |
 | Recolher coluna esquerda / Propriedades / linha do tempo | Ctrl+Alt+B / Ctrl+Alt+I / Ctrl+Alt+L | Cmd+Option+… | VS Code (Ctrl+B foi para "cortar") [B36] | ✔ |
 | Modo comentário / mostrar pinos / comentar a seleção | M / Shift+M / Ctrl+Shift+M | igual (Cmd) | Premiere/Resolve (marcador), Figma [B41] | ✔ |
 | Preferências | Ctrl+, | Cmd+, | — | ✔ |
@@ -823,7 +823,6 @@ Junto com `desempenho.md`, que manda nos números:
 - keyframes (◇ nas propriedades, I sobre o campo) e dope sheet no 3D;
 - antes/depois com cortina;
 - visão de nós dos efeitos;
-- tela cheia do monitor;
 - agrupar;
 - editor de atalhos e predefinições "Resolve" e "Blender";
 - tema claro e alto contraste;

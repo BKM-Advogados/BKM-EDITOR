@@ -17,6 +17,7 @@ import {aplicar, comentar, loja, patchTrocar, selecionar, useLoja, valorEm} from
 import {Trilho, teclaLivre} from '../../componentes/Trilho';
 import {BotaoMenu} from '../../componentes/Menu';
 import {SemDocumento} from '../../componentes/SemDocumento';
+import {BotaoTelaCheia} from '../../componentes/TelaCheia';
 import {Tempo} from './Tempo';
 import {
   alternar, alternarRepetir, andar, aoQuadro, assinarControle, definirFps, FPS, formatarCurto, formatarTempo, irPara, lerControle, msAtual, parar, registrarPlayer,
@@ -327,7 +328,7 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
 
   if (!documento) return <SemDocumento modulo="video" />;
   return (
-    <div className="painel">
+    <div className="painel" data-monitor-tela-cheia>
       <div className="monitor-grade">
         <Trilho grupos={[
           [
@@ -425,6 +426,7 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
               itens={[...ZONAS_SEGURAS, {...CONJUNTO_QUADRADO, id: 'quadrado' as const}].map((z) => ({rotulo: `${z.nome} · ${z.proporcao}${z.id === sugerida ? ' · este quadro' : ''}`, acao: () => escolherZona(z.id)}))} />
           </span>
           <span className="dur" title="Duração"><span className="longa">{formatarTempo(duracaoMs)}</span><span className="curta">/{formatarCurto(duracaoMs)}</span></span>
+          <BotaoTelaCheia />
         </div>
       </div>
     </div>

@@ -9,6 +9,7 @@ import type {DocAnimacao} from "../../../nucleo/animacao";
 import {resolverAnimacao, valorEm} from "../../../nucleo/animacao";
 import {aplicar, avisar, selecionar, useLoja} from "../../estado/loja";
 import {SemDocumento} from "../../componentes/SemDocumento";
+import {BotaoTelaCheia} from "../../componentes/TelaCheia";
 import {
   alternar, alternarRepetir, aoQuadro, assinarControle, definirFps, formatarTempo,
   irPara, msAtual, registrarPlayer,
@@ -197,7 +198,7 @@ export const MonitorAnimacao: React.FC = () => {
   const umQuadro = 1000 / Math.max(1, doc.fps);
 
   return (
-    <div className="painel">
+    <div className="painel" data-monitor-tela-cheia>
       <div className="monitor-grade sem-trilho">
         <div className={`monitor monitor-animacao${animando ? " animando" : ""}`} ref={containerRef}>
           <AvisoAgente />
@@ -253,6 +254,7 @@ export const MonitorAnimacao: React.FC = () => {
             <button className={`bti largo${repetir ? " ligado" : ""}`} onClick={alternarRepetir} title="Repetir" aria-label="Repetir" aria-pressed={repetir}><Repeat2 /></button>
           </div>
           <span className="dur" title="Duração · quadros por segundo">{formatarTempo(doc.duracao_ms)} · {doc.fps} qps</span>
+          <BotaoTelaCheia />
         </div>
       </div>
     </div>
