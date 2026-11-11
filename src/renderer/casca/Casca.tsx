@@ -114,11 +114,12 @@ const componentes: Record<string, React.FC<IDockviewPanelProps>> = {
 
 // faixas de layout de docs/tela.md: C (compacta) abaixo de 1600x800, P (padrão) acima; cada área x faixa guarda o seu.
 // No Vídeo, o arranjo depende também do formato: vertical (V) quer o monitor em coluna, horizontal (H) quer largura.
-// A versão na chave sobe quando entra painel novo no arranjo padrão (v6: Pesquisa, v7: Mídia), para os layouts gravados o verem.
+// A versão na chave sobe quando entra painel novo no arranjo padrão (v6: Pesquisa, v7: Mídia, v8: Claude com largura certa
+// na Imagem e no 3D da faixa P), para os layouts gravados o verem.
 type Faixa = 'C' | 'P';
 type Orientacao = 'V' | 'H';
 const faixaAtual = (): Faixa => (window.innerWidth < 1600 || window.innerHeight < 800 ? 'C' : 'P');
-const CHAVE = (area: Area, faixa: Faixa, o: Orientacao) => `estudio:layout:v7:${area}:${faixa}${area === 'video' ? `:${o}` : ''}`;
+const CHAVE = (area: Area, faixa: Faixa, o: Orientacao) => `estudio:layout:v8:${area}:${faixa}${area === 'video' ? `:${o}` : ''}`;
 const lerLayout = (area: Area, faixa: Faixa, o: Orientacao) => {
   try {
     const t = localStorage.getItem(CHAVE(area, faixa, o));
@@ -148,8 +149,21 @@ const layoutPadrao = (api: DockviewApi, area: Area, faixa: Faixa, o: Orientacao)
     api.getPanel('inspector')?.api.setActive();
   };
   api.addPanel({id: 'monitor', component: 'monitor', title: 'Monitor'});
-  if (faixa === 'P') {
-    if (temLinha) api.addPanel({id: 'linha', component: 'linha', title: 'Linha do tempo', position: {direction: 'below'}, initialHeight: 260});
+  if (faixa === 'P' && !temLinha) {
+    // sem linha do tempo (Imagem, 3D) lista, monitor, propriedades e Claude dividem a mesma fileira; o Claude entra por
+    // último, senão a lista e as propriedades nasciam tirando a largura dele (ficava com ~100 px)
+    api.addPanel({id: 'lista', component: 'lista', title: 'Lista', position: {referencePanel: 'monitor', direction: 'left'}, initialWidth: 260});
+    api.addPanel({id: 'inspector', component: 'inspector', title: 'Propriedades', position: {referencePanel: 'monitor', direction: 'right'}, initialWidth: 310});
+    const larguraClaude = Math.min(560, Math.round(W * 0.3));
+    api.addPanel({id: 'terminal', component: 'terminal', title: 'Claude', position: {direction: 'right'}, initialWidth: larguraClaude});
+    abasDoInspector(false);
+    // o dockview reparte a largura entre vizinhos ao montar; cada setSize tira do vizinho da direita (ou da esquerda, no
+    // último), então a ordem é: Claude, lista e, por fim, o monitor (o que sobra fica com as propriedades)
+    api.getPanel('terminal')?.api.setSize({width: larguraClaude});
+    api.getPanel('lista')?.api.setSize({width: 260});
+    api.getPanel('monitor')?.api.setSize({width: Math.max(320, W - 260 - 310 - larguraClaude - 8)});
+  } else if (faixa === 'P') {
+    api.addPanel({id: 'linha', component: 'linha', title: 'Linha do tempo', position: {direction: 'below'}, initialHeight: 260});
     api.addPanel({id: 'terminal', component: 'terminal', title: 'Claude', position: {direction: 'right'}, initialWidth: o === 'H' && area === 'video' ? 480 : 600});
     api.addPanel({id: 'lista', component: 'lista', title: 'Lista', position: {referencePanel: 'monitor', direction: 'left'}, initialWidth: 260});
     api.addPanel({id: 'inspector', component: 'inspector', title: 'Propriedades', position: {referencePanel: 'monitor', direction: 'right'}, initialWidth: 310});
