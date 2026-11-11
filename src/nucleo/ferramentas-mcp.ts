@@ -124,6 +124,31 @@ export const criarRede = (buscar: Buscar = (url, init) => fetch(url, init), opco
 
 // ---------- ferramentas ----------
 
+/** Acima disto, ler_documento sem caminho resume as grades de pixel: a resposta passaria do limite de saída do cliente. */
+export const TETO_LEITURA = 200_000;
+
+/** Cópia do documento com cada `grade.celulas` trocado por um resumo (quantas células e o caminho para ler). */
+const resumirGrades = (doc: unknown) => {
+  let grades = 0;
+  let exemplo = '';
+  const andar = (x: unknown, onde: string): unknown => {
+    if (Array.isArray(x)) return x.map((v, i) => andar(v, `${onde}/${i}`));
+    if (!x || typeof x !== 'object') return x;
+    const o = x as Record<string, unknown>;
+    const fora: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(o)) {
+      const g = v as {celulas?: unknown} | null;
+      if (k === 'grade' && g && typeof g === 'object' && (typeof g.celulas === 'string' || Array.isArray(g.celulas))) {
+        grades++;
+        exemplo ||= `${onde}/grade/celulas`;
+        fora[k] = {...g, celulas: `<${(g.celulas as string | unknown[]).length} células: leia com caminho ${onde}/grade/celulas>`};
+      } else fora[k] = andar(v, `${onde}/${k.replace(/~/g, '~0').replace(/\//g, '~1')}`);
+    }
+    return fora;
+  };
+  return {doc: andar(doc, ''), grades, exemplo};
+};
+
 export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, autor: string, origem: string, rede?: Rede, transcritor?: TranscritorMcp, portao?: Portao) => {
   // frente IA: tudo o que for registrado daqui em diante passa pelo portão (permissão e mudanças do diário no resultado)
   instalarPortao(servidor, {projeto, origem, portao});
@@ -166,12 +191,16 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   }));
 
   servidor.registerTool('ler_documento', {
-    description: 'Lê um documento (pelo id do manifesto ou caminho). Devolve o JSON e a versão, que vai em versao_base no aplicar_patch. No vídeo de cenas traz também os avisos do resolvedor e o som medido (nível e ducking de cada clipe). Com "caminho", devolve só aquele trecho.',
+    description: `Lê um documento (pelo id do manifesto ou caminho). Devolve o JSON e a versão, que vai em versao_base no aplicar_patch. No vídeo de cenas traz também os avisos do resolvedor e o som medido (nível e ducking de cada clipe). Com "caminho", devolve só aquele trecho (e a versão do documento inteiro). Documento acima de ${Math.round(TETO_LEITURA / 1000)} KB vem com as células das grades de pixel resumidas e um "aviso": leia a grade pelo caminho.`,
     inputSchema: {documento: z.string(), caminho: z.string().optional().describe('JSON Pointer, ex.: /cenas/2/blocos/1')},
   }, seguro(({documento, caminho}: {documento: string; caminho?: string}) => {
     const rel = projeto.arquivoDoDocumento(documento);
     const {doc, versao} = projeto.lerJson(rel);
-    return {documento: rel, versao, conteudo: caminho ? valorEm(doc, caminho) : doc, ...(caminho ? {} : medidasDoVideo(projeto, doc))}; // frente Som: avisos e som medido (som-D11)
+    if (caminho) return {documento: rel, versao, conteudo: valorEm(doc, caminho)};
+    const resumo = JSON.stringify(doc).length > TETO_LEITURA ? resumirGrades(doc) : undefined;
+    const grande = resumo?.grades ? resumo : undefined;
+    return {documento: rel, versao, conteudo: grande?.doc ?? doc, ...medidasDoVideo(projeto, doc), // frente Som: avisos e som medido (som-D11)
+      ...(grande ? {aviso: `documento grande: as células de ${grande.grades} grade(s) de pixel vieram resumidas; leia uma pelo caminho (ex.: ${grande.exemplo}) e não grave o resumo de volta`} : {})};
   }));
 
   servidor.registerTool('aplicar_patch', {

@@ -224,3 +224,31 @@ describe('comentário ancorado no que existe (M18)', () => {
     expect(ok.erro, ok.texto).toBe(false);
   });
 });
+
+describe('ler_documento num documento grande (M16)', () => {
+  it('uma animação de 2 MB com grades volta abaixo de 200 KB, com versão e aviso; o caminho lê a grade inteira', async () => {
+    const id = (await chamar('criar_animacao', {titulo: 'Grande', mostrar: false})).dado.documento as string;
+    const rel = projeto.arquivoDoDocumento(id);
+    const {doc, versao} = projeto.lerJson<{camadas: unknown[]}>(rel);
+    const celulas = '0123456789abcdef'.repeat(1024); // 128x128
+    const camadas = Array.from({length: 120}, (_, i) => ({id: `px-${i}`, nome: `Pixel ${i}`, tipo: 'pixel', x: 0, y: 0, largura: 256, altura: 256,
+      tamanho_pixel: 2, progresso: 1, efeito: 'aleatorio', semente: 1, grade: {colunas: 128, linhas: 128, paleta: ['#000000', '#FFFFFF'], celulas}}));
+    projeto.aplicarPatch({documento: rel, versao_base: versao, patch: [{op: 'replace', path: '/camadas', value: [...doc.camadas, ...camadas]}], autor: 'pessoa', origem: 'teste'});
+    expect(readFileSync(path.join(pasta, rel), 'utf-8').length).toBeGreaterThan(1_900_000);
+    const r = await chamar('ler_documento', {documento: id});
+    expect(r.texto.length).toBeLessThan(200_000);
+    expect(r.dado.versao).toBe(projeto.lerJson(rel).versao);
+    expect(r.dado.aviso).toMatch(/120 grade/);
+    const n = doc.camadas.length;
+    expect(r.dado.conteudo.camadas[n].grade).toMatchObject({colunas: 128, linhas: 128, celulas: expect.stringMatching(/^<16384 células/)});
+    expect(r.dado.aviso).toContain(`/camadas/${n}/grade/celulas`);
+    const uma = await chamar('ler_documento', {documento: id, caminho: `/camadas/${n}/grade/celulas`});
+    expect(uma.dado).toMatchObject({conteudo: celulas, versao: r.dado.versao});
+  });
+
+  it('documento pequeno vem inteiro, sem aviso', async () => {
+    const r = await chamar('ler_documento', {documento: 'capa'});
+    expect(r.dado.aviso).toBeUndefined();
+    expect(Array.isArray(r.dado.conteudo.camadas)).toBe(true);
+  });
+});
