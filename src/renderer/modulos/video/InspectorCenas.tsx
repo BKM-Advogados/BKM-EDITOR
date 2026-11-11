@@ -10,7 +10,7 @@ import {Clapperboard, CopyPlus, Film, FileAudio, FileJson, ImagePlus, Link, Quot
 import {ALVO_LU_MAX, ALVO_LU_MIN, ALVO_LUFS_MAX, ALVO_LUFS_MIN, ALVO_LUFS_PADRAO, DUCKING_PADRAO, PAPEIS, PICO_DBTP_MAX, PICO_DBTP_MIN, PICO_DBTP_PADRAO, type AudioP,
   type ClipeAudio, type ClipeAudioP, type CurvaFade, type FaixaAudio, type FaixaAudioP, type IntensidadeLimpeza, type PapelFaixa} from '../../../nucleo/audio';
 import {INTENSIDADE_PADRAO, INTENSIDADES} from '../../../nucleo/limpeza-voz';
-import {TIPOS_BLOCO_CENAS, type BlocoCenas, type CenaCenas, type DocCenas, type PropsCenas} from '../../../nucleo/cenas';
+import {TEMA_NEUTRO, TIPOS_BLOCO_CENAS, type BlocoCenas, type CenaCenas, type DocCenas, type PropsCenas} from '../../../nucleo/cenas';
 import {FORMATOS_VIDEO, formatoDoVideo, rotuloFormato} from '../../../nucleo/formatos';
 import {avisar, mensagemDe, trocar, useLoja, valorEm, verFato} from '../../estado/loja';
 import {CriarEmMusica, MusicaDoClipe} from '../musica/NoVideo'; // frente Música
@@ -23,6 +23,7 @@ import {andamentoLimpeza, assinarLimpeza, cancelarLimpeza, crossfadeComSeguinte,
   voltarAoOriginal} from './acoes-audio';
 import {CamposMovimento} from './CamposMovimento';
 import {lufsTexto, MedidorLoudness, useMedidasLoudness} from './MedidorLoudness';
+import {MudancasNoInspetor} from '../../componentes/Agente';
 
 const CURVAS_OPCOES: [CurvaFade, string][] = [['linear', 'Linear'], ['suave', 'Suave'], ['potencia', 'Potência igual']]; // frente Som: forma do fade
 const pct = (v: number | undefined, padrao: number) => Math.round((v ?? padrao) * 1000) / 10;
@@ -85,10 +86,10 @@ const ResumoVideo: React.FC<{documento: string; doc: DocCenas; titulo: string; d
             aoMudar={(n) => void trocar(documento, '/formato', {...f, fps: Number(n)}, `${n} quadros por segundo`)} />
         </Secao>
         <Secao titulo="Cores" chave="cenas:cores">
-          <CampoCor rotulo="Fundo" valor={tema.fundo ?? '#111418'} aoMudar={(v) => void trocar(documento, '/tema/fundo', v, 'cor de fundo')} />
-          <CampoCor rotulo="Texto" valor={tema.texto ?? '#F2F2F2'} aoMudar={(v) => void trocar(documento, '/tema/texto', v, 'cor do texto')} />
-          <CampoCor rotulo="Destaque" valor={tema.destaque ?? '#70B8FF'} aoMudar={(v) => void trocar(documento, '/tema/destaque', v, 'cor de destaque')} />
-          <CampoCor rotulo="Texto suave" valor={tema.suave ?? '#A3ABB5'} aoMudar={(v) => void trocar(documento, '/tema/suave', v, 'cor do texto suave')} />
+          <CampoCor rotulo="Fundo" valor={tema.fundo ?? TEMA_NEUTRO.fundo} aoMudar={(v) => void trocar(documento, '/tema/fundo', v, 'cor de fundo')} />
+          <CampoCor rotulo="Texto" valor={tema.texto ?? TEMA_NEUTRO.texto} aoMudar={(v) => void trocar(documento, '/tema/texto', v, 'cor do texto')} />
+          <CampoCor rotulo="Destaque" valor={tema.destaque ?? TEMA_NEUTRO.destaque} aoMudar={(v) => void trocar(documento, '/tema/destaque', v, 'cor de destaque')} />
+          <CampoCor rotulo="Texto suave" valor={tema.suave ?? TEMA_NEUTRO.suave} aoMudar={(v) => void trocar(documento, '/tema/suave', v, 'cor do texto suave')} />
         </Secao>
         {nClipes > 0 && <SecaoLoudness documento={documento} doc={doc} />}
         {erro && <Secao titulo="Não deu para montar o vídeo"><div className="texto-livre" style={{color: 'var(--erro)'}}>{erro}</div></Secao>}
@@ -178,6 +179,8 @@ const PropsBloco: React.FC<{documento: string; caminho: string; b: BlocoCenas; f
     return (
       <div className="painel">
         <CabecalhoInspector icone={<Icone />} familia={t.familia} nome={[t.nome, resumoBloco(b, 28)].filter(Boolean).join(' · ')} sub={sub} dica={b.id} menu={menu} />
+        <MudancasNoInspetor documento={documento} objeto={caminho}
+          formatar={(campo, v) => (typeof v === 'number' && ['x', 'y', 'largura'].includes(campo) ? `${numeroBr(v * 100, 1)} %` : undefined)} />
         <div className="insp-corpo">
           <Secao titulo="Conteúdo" chave="cenas:conteudo">
             {(b.tipo === 'titulo' || b.tipo === 'texto') && <CampoTexto rotulo="Texto" multilinha valor={b.texto ?? ''} aoMudar={campo('texto', 'texto')} />}

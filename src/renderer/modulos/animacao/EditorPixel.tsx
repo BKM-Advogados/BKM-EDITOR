@@ -6,8 +6,9 @@ import {
   codificarCelulas, corDaCelula, decodificarCelulas, EFEITOS_PIXEL, gradeVazia, lerGrade,
   type EfeitoPixel, type GradePixel,
 } from "../../../nucleo/animacao-pixel";
-import type {CamadaAnimacao} from "../../../nucleo/animacao";
+import type {CamadaAnimacao, TemaAnimacao} from "../../../nucleo/animacao";
 import {aplicar} from "../../estado/loja";
+import {CampoSelecao} from "../../componentes/Campos";
 
 type Ferramenta = "lapis" | "borracha" | "gotas" | "balde";
 
@@ -15,7 +16,10 @@ export const EditorPixel: React.FC<{
   documento: string;
   camada: CamadaAnimacao;
   origem: string;
-}> = ({documento, camada, origem}) => {
+  tamanho?: number; // lado do desenho em px de tela (o editor grande usa mais)
+  tema?: TemaAnimacao; // as cores do kit, para a paleta
+  aoAbrirGrande?: () => void;
+}> = ({documento, camada, origem, tamanho = 280, tema, aoAbrirGrande}) => {
   // grade inválida (JSON editado à mão ou aplicar_patch) não derruba o editor: vale a consertada, ou uma vazia
   const grade = React.useMemo(() => lerGrade(camada.grade).grade ?? gradeVazia(16, 16), [camada.grade]);
   const [ferramenta, setFerramenta] = useState<Ferramenta>("lapis");
@@ -33,14 +37,19 @@ export const EditorPixel: React.FC<{
     if (!cv) return;
     const ctx = cv.getContext("2d");
     if (!ctx) return;
-    const zoom = Math.max(8, Math.floor(280 / Math.max(colunas, linhas)));
+    const zoom = Math.max(8, Math.floor(tamanho / Math.max(colunas, linhas)));
+    // xadrez e grade nas cores da casca (tema escuro ou claro), lidas dos tokens
+    const css = getComputedStyle(cv);
+    const tom = (v: string, reserva: string) => css.getPropertyValue(v).trim() || reserva;
+    const xadrezA = tom("--fundo-3", "gray");
+    const xadrezB = tom("--fundo-4", "dimgray");
     cv.width = colunas * zoom;
     cv.height = linhas * zoom;
 
     // Fundo quadriculado transparente
     for (let l = 0; l < linhas; l++) {
       for (let c = 0; c < colunas; c++) {
-        ctx.fillStyle = (c + l) % 2 === 0 ? "#1c2128" : "#24292f";
+        ctx.fillStyle = (c + l) % 2 === 0 ? xadrezA : xadrezB;
         ctx.fillRect(c * zoom, l * zoom, zoom, zoom);
       }
     }
@@ -58,7 +67,7 @@ export const EditorPixel: React.FC<{
     }
 
     // Linhas de grade sutis
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+    ctx.strokeStyle = tom("--borda", "gray");
     ctx.lineWidth = 1;
     for (let c = 0; c <= colunas; c++) {
       ctx.beginPath();
@@ -72,7 +81,7 @@ export const EditorPixel: React.FC<{
       ctx.lineTo(colunas * zoom, l * zoom);
       ctx.stroke();
     }
-  }, [grade, colunas, linhas, indices]);
+  }, [grade, colunas, linhas, indices, tamanho]);
 
   const aplicarNovaGrade = useCallback((nova: GradePixel) => {
     // "add" e não "replace": a camada pixel nova ainda não tem o campo `grade` (replace falha em campo que não existe)
@@ -155,6 +164,15 @@ export const EditorPixel: React.FC<{
     aplicarNovaGrade({...grade, paleta});
   };
 
+  // cor do kit: entra na paleta da grade (se ainda não estiver) e vira a cor ativa
+  const usarCorDoKit = (cor: string) => {
+    const c = cor.toUpperCase();
+    const i = grade.paleta.findIndex((x) => x.toUpperCase() === c);
+    if (i >= 0) return setCorAtiva(i);
+    aplicarNovaGrade({...grade, paleta: [...grade.paleta, c]});
+    setCorAtiva(grade.paleta.length);
+  };
+
   const limparTudo = () => {
     aplicarNovaGrade(gradeVazia(colunas, linhas, grade.paleta));
   };
@@ -163,34 +181,36 @@ export const EditorPixel: React.FC<{
     <div className="editor-pixel">
       <div className="ep-barra-ferramentas">
         <button
-          className={`bt-icone${ferramenta === "lapis" ? " ativo" : ""}`}
+          className={`bti${ferramenta === "lapis" ? " ligado" : ""}`} aria-label="Lápis" aria-pressed={ferramenta === "lapis"}
           onClick={() => setFerramenta("lapis")}
           title="Lápis (desenha com a cor ativa)"
         >
           <Pencil size={15} />
         </button>
         <button
-          className={`bt-icone${ferramenta === "borracha" ? " ativo" : ""}`}
+          className={`bti${ferramenta === "borracha" ? " ligado" : ""}`} aria-label="Borracha" aria-pressed={ferramenta === "borracha"}
           onClick={() => setFerramenta("borracha")}
           title="Borracha (apaga para transparente)"
         >
           <Eraser size={15} />
         </button>
         <button
-          className={`bt-icone${ferramenta === "gotas" ? " ativo" : ""}`}
+          className={`bti${ferramenta === "gotas" ? " ligado" : ""}`} aria-label="Conta-gotas" aria-pressed={ferramenta === "gotas"}
           onClick={() => setFerramenta("gotas")}
           title="Conta-gotas (pega a cor da célula)"
         >
           <Pipette size={15} />
         </button>
         <button
-          className={`bt-icone${ferramenta === "balde" ? " ativo" : ""}`}
+          className={`bti${ferramenta === "balde" ? " ligado" : ""}`} aria-label="Balde" aria-pressed={ferramenta === "balde"}
           onClick={() => setFerramenta("balde")}
           title="Balde (preenchimento contíguo)"
         >
           <PaintBucket size={15} />
         </button>
-        <button className="bt-icone fantasma" onClick={limparTudo} title="Limpar grade">
+        <span className="esp" />
+        {aoAbrirGrande && <button className="bt mini" onClick={aoAbrirGrande} title="Desenhar num editor grande">Editor grande</button>}
+        <button className="bti" onClick={limparTudo} title="Limpar a grade" aria-label="Limpar a grade">
           <RefreshCw size={14} />
         </button>
       </div>
@@ -214,12 +234,21 @@ export const EditorPixel: React.FC<{
           </div>
         ))}
         {grade.paleta.length < 62 && (
-          <button className="bt-icone ep-add-cor" onClick={adicionarCor} title="Adicionar cor">
+          <button className="bti ep-add-cor" onClick={adicionarCor} title="Adicionar cor" aria-label="Adicionar cor">
             <Plus size={13} />
           </button>
         )}
       </div>
 
+      {tema && (
+        <div className="ep-paleta ep-kit" role="group" aria-label="Cores do kit">
+          <span className="rotulo">Do kit</span>
+          {(["fundo", "texto", "destaque", "suave"] as const).map((k) => (
+            <button key={k} type="button" className="ep-cor-kit" style={{backgroundColor: tema[k]}} title={`${k} do kit · ${tema[k]}`} aria-label={`Usar ${k} do kit`}
+              onClick={() => usarCorDoKit(tema[k])} />
+          ))}
+        </div>
+      )}
       <div className="ep-canvas-area" onMouseLeave={aoSubirMouse}>
         <canvas
           ref={canvasRef}
@@ -230,22 +259,8 @@ export const EditorPixel: React.FC<{
         />
       </div>
 
-      <div className="ep-efeitos">
-        <label className="rot">Efeito de revelação</label>
-        <select
-          className="campo"
-          value={camada.efeito ?? "aleatorio"}
-          onChange={(e) =>
-            aplicar(documento, [{op: "replace", path: `${origem}/efeito`, value: e.target.value as EfeitoPixel}], "trocar efeito pixel")
-          }
-        >
-          {EFEITOS_PIXEL.map((ef) => (
-            <option key={ef.id} value={ef.id}>
-              {ef.nome}
-            </option>
-          ))}
-        </select>
-      </div>
+      <CampoSelecao rotulo="Revelação" valor={(camada.efeito ?? "aleatorio") as EfeitoPixel} opcoes={EFEITOS_PIXEL.map((ef): [EfeitoPixel, string] => [ef.id, ef.nome])}
+        aoMudar={(v) => aplicar(documento, [{op: "add", path: `${origem}/efeito`, value: v}], "trocar efeito pixel")} />
     </div>
   );
 };

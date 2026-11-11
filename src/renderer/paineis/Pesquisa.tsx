@@ -124,6 +124,31 @@ const TextoFonte: React.FC<{fonte: Fonte; destaque?: {inicio: number; fim: numbe
   );
 };
 
+/** Título que se lê: nome de arquivo ("Del5452compilado", "lei_14020-2020.pdf") vira palavras, com o órgão ou o site na
+ *  frente; sem título, o site e o caminho do endereço. */
+export const tituloLegivel = (f: Pick<Fonte, 'titulo' | 'url' | 'url_final' | 'orgao'>): string => {
+  const t = f.titulo?.trim();
+  let site = '';
+  try {
+    site = new URL(f.url_final ?? f.url).hostname.replace(/^www\./, '');
+  } catch {
+    site = f.url;
+  }
+  if (t && /\s/.test(t)) return t;
+  const cru = t || (() => {
+    try {
+      return decodeURIComponent(new URL(f.url_final ?? f.url).pathname.split('/').filter(Boolean).pop() ?? '');
+    } catch {
+      return '';
+    }
+  })();
+  const palavras = cru.replace(/\.(pdf|html?|php|aspx?|docx?|txt)$/i, '').replace(/[_+-]+/g, ' ')
+    .replace(/([a-zà-ú])([A-Z\d])/g, '$1 $2').replace(/(\d)([A-Za-zÀ-ú])/g, '$1 $2').replace(/\s+/g, ' ').trim();
+  if (!palavras) return f.orgao || site;
+  const frase = palavras.charAt(0).toUpperCase() + palavras.slice(1);
+  return `${f.orgao || site} · ${frase}`;
+};
+
 /** "baixada · 1,4 MB"; se o site respondeu fora do normal, diz o código (a fonte foi gravada assim mesmo). */
 const baixada = (f: Fonte) => {
   const t = tamanho(f.bytes);
@@ -147,7 +172,7 @@ const CartaoFonte: React.FC<{f: Fonte; nFatos: number; aberto: boolean; destaque
         <span className="esp" />
         <span className="rotulo" title="Quando o texto foi baixado">acessado em {quando(f.acessado_em)}</span>
       </div>
-      <div className="pesq-titulo">{f.titulo || f.url}</div>
+      <div className="pesq-titulo" title={f.titulo || f.url}>{tituloLegivel(f)}</div>
       {f.orgao && <div className="rotulo">{f.orgao}</div>}
       <div className="pesq-url" title={f.url_final && f.url_final !== f.url ? `${f.url}\nfoi para ${f.url_final}` : f.url}>{f.url_final ?? f.url}</div>
       {f.sinais_vigencia.length > 0 && (
@@ -200,7 +225,7 @@ const CartaoFato: React.FC<{f: Fato; fonte?: Fonte; usos: Uso[]; aberto: boolean
       </div>
       <div className="pesq-afirmacao">{f.afirmacao}</div>
       <div className="rotulo">
-        {[f.localizador, fonte ? `${fonte.id} · ${fonte.titulo || fonte.url}` : `fonte ${f.fonte_id} (não está na lista)`].filter(Boolean).join(' · ')}
+        {[f.localizador, fonte ? `${fonte.id} · ${tituloLegivel(fonte)}` : `fonte ${f.fonte_id} (não está na lista)`].filter(Boolean).join(' · ')}
       </div>
       <blockquote className="pesq-trecho">{f.trecho}</blockquote>
       {f.digitos.faltando.length > 0 && (

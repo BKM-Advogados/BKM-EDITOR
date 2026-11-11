@@ -8,6 +8,7 @@ import {amostrasDaMarca, avisoDeContraste, ehReferenciaCor, nomeDaCor, resolverC
 import {avisar} from '../estado/loja';
 import {usarPaleta} from '../estado/paleta';
 import {BotaoMenu, type ItemMenu} from './Menu';
+import {Caixa, Escolha} from './Controles';
 
 /** Número no jeito brasileiro (vírgula decimal), sem casas sobrando. */
 export const numeroBr = (n: number, casas = 3) => String(Number(n.toFixed(casas))).replace('.', ',');
@@ -18,7 +19,7 @@ export const copiar = (texto: string, oQue = 'Copiado') =>
 
 /** Linha de campo: [ponto "difere do padrão"] [rótulo] [valor]. Toda linha tem as três células. */
 export const LinhaCampo: React.FC<{rotulo: React.ReactNode; children: React.ReactNode; difere?: boolean; aoRedefinir?: () => void; padrao?: string;
-  como?: 'label' | 'div'; alta?: boolean; dica?: string}> = ({rotulo, children, difere, aoRedefinir, padrao, como = 'label', alta, dica}) => {
+  como?: 'label' | 'div'; alta?: boolean; dica?: string; marcador?: React.ReactNode}> = ({rotulo, children, difere, aoRedefinir, padrao, como = 'label', alta, dica, marcador}) => {
   const Tag = como;
   return (
     <Tag className={`linha-campo${alta ? ' alta' : ''}`} title={dica}>
@@ -31,6 +32,7 @@ export const LinhaCampo: React.FC<{rotulo: React.ReactNode; children: React.Reac
               aoRedefinir?.();
             }} />
         )}
+        {!difere && marcador}
       </span>
       <span className="rot">{rotulo}</span>
       {children}
@@ -62,7 +64,7 @@ export const CampoTexto: React.FC<{rotulo: string; valor: string; aoMudar: (v: s
 
 /** Número em campo de texto (sem as setinhas nativas), alinhado à direita, com a unidade dentro do campo. */
 export const CampoNumero: React.FC<{rotulo: string; valor: number | undefined; aoMudar: (v: number) => void; passo?: number; padrao?: number; unidade?: string;
-  aoRedefinir?: () => void; dica?: string}> = ({rotulo, valor, aoMudar, padrao, unidade, aoRedefinir, dica}) => {
+  aoRedefinir?: () => void; dica?: string; marcador?: React.ReactNode}> = ({rotulo, valor, aoMudar, padrao, unidade, aoRedefinir, dica, marcador}) => {
   const texto = valor === undefined ? '' : numeroBr(valor);
   const [v, setV] = useState(texto);
   useEffect(() => setV(texto), [texto]);
@@ -73,7 +75,7 @@ export const CampoNumero: React.FC<{rotulo: string; valor: number | undefined; a
   };
   const difere = padrao !== undefined && valor !== undefined && valor !== padrao;
   return (
-    <LinhaCampo rotulo={rotulo} dica={dica} difere={difere} padrao={padrao !== undefined ? `${numeroBr(padrao)}${unidade ? ` ${unidade}` : ''}` : undefined}
+    <LinhaCampo rotulo={rotulo} dica={dica} marcador={marcador} difere={difere} padrao={padrao !== undefined ? `${numeroBr(padrao)}${unidade ? ` ${unidade}` : ''}` : undefined}
       aoRedefinir={aoRedefinir ?? (padrao !== undefined ? () => aoMudar(padrao) : undefined)}>
       <div className="campo num">
         <input type="text" inputMode="decimal" value={v} placeholder={padrao !== undefined ? numeroBr(padrao) : ''} onChange={(e) => setV(e.target.value)}
@@ -86,11 +88,11 @@ export const CampoNumero: React.FC<{rotulo: string; valor: number | undefined; a
 
 export const CampoDeslizante: React.FC<{rotulo: string; valor: number; min: number; max: number; passo: number; unidade?: string; aoMudar: (v: number) => void;
   aoVer?: (v: number) => void; formatar?: (v: number) => string; padrao?: number;
-  aoFimSemMudar?: () => void}> = ({rotulo, valor, min, max, passo, unidade, aoMudar, aoVer, formatar, padrao, aoFimSemMudar}) => {
+  aoFimSemMudar?: () => void; marcador?: React.ReactNode}> = ({rotulo, valor, min, max, passo, unidade, aoMudar, aoVer, formatar, padrao, aoFimSemMudar, marcador}) => {
   const [v, setV] = useState(valor);
   useEffect(() => setV(valor), [valor]);
   return (
-    <LinhaCampo rotulo={rotulo} difere={padrao !== undefined && valor !== padrao} padrao={padrao !== undefined ? (formatar?.(padrao) ?? numeroBr(padrao, 2)) : undefined}
+    <LinhaCampo rotulo={rotulo} marcador={marcador} difere={padrao !== undefined && valor !== padrao} padrao={padrao !== undefined ? (formatar?.(padrao) ?? numeroBr(padrao, 2)) : undefined}
       aoRedefinir={padrao !== undefined ? () => aoMudar(padrao) : undefined}>
       <div className="desliza valor">
         <input type="range" min={min} max={max} step={passo} value={v} aria-label={rotulo}
@@ -114,7 +116,7 @@ const ContaGotas = (window as unknown as {EyeDropper?: ConstrutorConta}).EyeDrop
  *  aberto (`paleta`, por padrão a da área), mostra as cores dele como amostras com nome: clicar numa grava a referência
  *  ("@destaque", na imagem) ou o valor. `contra` é a cor do fundo do texto: abaixo de 4,5:1 o campo avisa. */
 export const CampoCor: React.FC<{rotulo: string; valor: string; aoMudar: (v: string) => void; aoVer?: (v: string) => void; padrao?: string;
-  paleta?: PaletaAtiva | false; contra?: string}> = ({rotulo, valor, aoMudar, aoVer, padrao, paleta, contra}) => {
+  paleta?: PaletaAtiva | false; contra?: string; marcador?: React.ReactNode}> = ({rotulo, valor, aoMudar, aoVer, padrao, paleta, contra, marcador}) => {
   const seletor = useRef<HTMLInputElement>(null);
   const atual = useRef({valor, aoMudar});
   atual.current = {valor, aoMudar};
@@ -145,7 +147,7 @@ export const CampoCor: React.FC<{rotulo: string; valor: string; aoMudar: (v: str
   const amostras = pal ? amostrasDaMarca({cores: pal.cores}) : [];
   return (
     <>
-      <LinhaCampo rotulo={rotulo} como="div" difere={difere} padrao={padrao} aoRedefinir={padrao !== undefined ? () => aoMudar(padrao) : undefined}>
+      <LinhaCampo rotulo={rotulo} como="div" marcador={marcador} difere={difere} padrao={padrao} aoRedefinir={padrao !== undefined ? () => aoMudar(padrao) : undefined}>
         <div className="campo campo-cor">
           <label className="amostra" title="Escolher a cor">
             <span style={{background: CSS.supports('color', lida(texto)) ? lida(texto) : lida(valor)}} />
@@ -185,13 +187,12 @@ export const CampoCor: React.FC<{rotulo: string; valor: string; aoMudar: (v: str
   );
 };
 
-export const CampoSelecao = <T extends string>({rotulo, valor, opcoes, aoMudar, padrao}: {rotulo: string; valor: T; opcoes: [T, string][]; aoMudar: (v: T) => void; padrao?: T}) => (
-  <LinhaCampo rotulo={rotulo} difere={padrao !== undefined && valor !== padrao} padrao={opcoes.find(([v]) => v === padrao)?.[1]}
+export const CampoSelecao = <T extends string>({rotulo, valor, opcoes, aoMudar, padrao, marcador}: {rotulo: string; valor: T; opcoes: [T, string][]; aoMudar: (v: T) => void; padrao?: T;
+  marcador?: React.ReactNode}) => (
+  <LinhaCampo rotulo={rotulo} marcador={marcador} difere={padrao !== undefined && valor !== padrao} padrao={opcoes.find(([v]) => v === padrao)?.[1]}
     aoRedefinir={padrao !== undefined ? () => aoMudar(padrao) : undefined}>
-    <select className="campo" value={valor} onChange={(e) => e.target.value !== valor && aoMudar(e.target.value as T)}>
-      {!opcoes.some(([v]) => v === valor) && <option value={valor}>{valor}</option>}
-      {opcoes.map(([v, nome]) => <option key={v} value={v}>{nome}</option>)}
-    </select>
+    <Escolha valor={valor} rotulo={rotulo} aoMudar={aoMudar}
+      opcoes={[...(opcoes.some(([v]) => v === valor) ? [] : [[valor, valor] as [T, string]]), ...opcoes]} />
   </LinhaCampo>
 );
 
@@ -241,12 +242,11 @@ export const CabecalhoInspector: React.FC<{icone: React.ReactNode; familia?: 'te
   </div>
 );
 
-/** Liga/desliga (mudo, ducking): caixa de marcar na cor do acento, com o rótulo à esquerda como os outros campos. */
+/** Liga/desliga (mudo, ducking): caixa de marcar da casa, com o rótulo à esquerda como os outros campos. */
 export const CampoInterruptor: React.FC<{rotulo: string; valor: boolean; aoMudar: (v: boolean) => void; dica?: string; texto?: string}> = ({rotulo, valor, aoMudar, dica, texto}) => (
-  <LinhaCampo rotulo={rotulo} dica={dica}>
+  <LinhaCampo rotulo={rotulo} dica={dica} como="div">
     <span className="valor interruptor">
-      <input type="checkbox" checked={valor} onChange={(e) => aoMudar(e.target.checked)} aria-label={rotulo} />
-      {texto && <span className="ler">{texto}</span>}
+      <Caixa marcado={valor} aoMudar={aoMudar} rotulo={rotulo}>{texto && <span className="ler">{texto}</span>}</Caixa>
     </span>
   </LinhaCampo>
 );

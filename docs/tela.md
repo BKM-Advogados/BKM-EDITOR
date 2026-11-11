@@ -24,7 +24,7 @@ Este documento conversa com `docs/desempenho.md` (orçamentos de RAM e GPU) e co
    Os layouts são guardados por **área × faixa** [B §1].
 5. **Biblioteca de painéis: dockview 8.8.3, com a versão exata fixada e só os recursos MIT.** O plano B é o flexlayout-react. Os presets de layout ficam escritos em código, com `addPanel`, e não como blobs JSON. Assim dá para trocar de biblioteca sem refazer os layouts [B §3].
 6. **Atalhos unificados**, com Premiere como base no tempo, Photoshop no 2D e Blender (no keymap Industry) e Maya no 3D. Os verbos comuns usam as mesmas teclas em toda parte. A tabela completa está na seção 6.
-   - O terminal em foco recebe quase tudo. O app só segura Alt+1…4, Ctrl+PgUp/PgDn, Ctrl+', Ctrl+Shift+', Ctrl+Shift+P, F3 e F11.
+   - O terminal em foco recebe quase tudo. O app só segura Alt+1…6, Ctrl+PgUp/PgDn, Ctrl+', Ctrl+Shift+', Ctrl+Shift+P, F3 e F11.
    - As teclas de símbolo são lidas pela posição física, por causa do teclado ABNT2.
 7. **Tema escuro em cinza neutro** (croma zero, escala `gray` dark da Radix). Cor só aparece em marcas pequenas, e cada cor tem um significado:
    - azul: seleção e foco;
@@ -464,9 +464,9 @@ Abas de painel: 28 px (C) / 30 px (P).
    campo de texto em foco › terminal em foco › painel em foco › área › global
    ```
 
-   - **Num campo de texto**, valem as teclas nativas do campo (inclusive Ctrl+Z do próprio campo) e só Esc (sai do campo), Enter, Alt+1…4, Ctrl+S e F3.
-   - **Com o terminal em foco, tudo vai para o `claude`** (Tab, Shift+Tab, Esc, Esc Esc, Ctrl+B, Ctrl+C, Ctrl+R e o resto [B42]). O app só segura **Alt+1…4, Ctrl+PgUp/PgDn, Ctrl+', Ctrl+Shift+', Ctrl+Shift+P, F3 e F11**, como o `commandsToSkipShell` do VS Code [B37]. Para copiar no terminal, use Ctrl+Shift+C ou a seleção [inferência].
-2. **Mesmo verbo, mesma tecla, em todas as áreas:** Espaço, J/K/L, ←/→, Ctrl+Z, Delete, Ctrl+D, Ctrl+G, F (enquadrar), Ctrl+0 (ajustar), Shift+A (adicionar), M (comentar), F3 (comandos), Alt+1…4. Só as **teclas de ferramenta** mudam por área, como em qualquer programa com modos [A §6.2].
+   - **Num campo de texto**, valem as teclas nativas do campo (inclusive Ctrl+Z do próprio campo) e só Esc (sai do campo), Enter, Alt+1…6, Ctrl+S e F3.
+   - **Com o terminal em foco, tudo vai para o `claude`** (Tab, Shift+Tab, Esc, Esc Esc, Ctrl+B, Ctrl+C, Ctrl+R e o resto [B42]). O app só segura **Alt+1…6, Ctrl+PgUp/PgDn, Ctrl+', Ctrl+Shift+', Ctrl+Shift+P, F3 e F11**, como o `commandsToSkipShell` do VS Code [B37]. Para copiar no terminal, use Ctrl+Shift+C ou a seleção [inferência].
+2. **Mesmo verbo, mesma tecla, em todas as áreas:** Espaço, J/K/L, ←/→, Ctrl+Z, Delete, Ctrl+D, Ctrl+G, F (enquadrar), Ctrl+0 (ajustar), Shift+A (adicionar), M (comentar), F3 (comandos), Alt+1…6. Só as **teclas de ferramenta** mudam por área, como em qualquer programa com modos [A §6.2].
 3. **Como o app lê a tecla:**
    - **Letras pela tecla lógica** (`KeyboardEvent.key`): V é V em qualquer layout.
    - **Símbolos, teclado numérico e F1–F12 pela tecla física** (`KeyboardEvent.code`).
@@ -475,7 +475,7 @@ Abas de painel: 28 px (C) / 30 px (P).
 4. **ABNT2:** acento grave, agudo, til, circunflexo e trema são teclas mortas e não servem como atalho padrão [A §4][A8].
    - O "Ctrl+`" do VS Code vira **Ctrl+'**: é a mesma tecla física (`Backquote`), que no ABNT2 tem ' e ".
    - A barra invertida fica entre o Shift esquerdo e o Z.
-5. **macOS:** Cmd no lugar de Ctrl. **Alt+1…4 vira Cmd+1…4.** Nunca usar Cmd+H/M/Q para ações do app. Ctrl+Espaço (maximizar) fica em aberto no macOS, porque troca a fonte de entrada [A §10 D6].
+5. **macOS:** Cmd no lugar de Ctrl. **Alt+1…6 vira Cmd+1…6.** Nunca usar Cmd+H/M/Q para ações do app. Ctrl+Espaço (maximizar) fica em aberto no macOS, porque troca a fonte de entrada [A §10 D6].
 6. **Mapa num JSON** (`atalhos.json` no perfil), editável à mão ou pelo terminal. Paleta, menus e atalhos usam o **mesmo registro de comandos**, com ids como `ui.area.video`, `ui.layout.redefinir` e `tempo.cortar` [B §10].
    - Depois: editor visual e predefinições "Resolve" e "Blender" [A17][A31].
 7. **Por que comentar é M e não C** (C no Figma [B41]): C é a lâmina no Vídeo (Premiere [A7]) e o recorte no Photoshop. M é "marcador" no Premiere e no Resolve [conhecimento prévio], e o comentário é o nosso marcador. Esta decisão substitui o "Ctrl+Shift+M provisório" da pesquisa A (D7): Ctrl+Shift+M passa a ser "comentar a seleção".
@@ -487,7 +487,9 @@ Abas de painel: 28 px (C) / 30 px (P).
 
 | Ação | Windows | macOS | Origem | MVP |
 |---|---|---|---|---|
-| Ir para Vídeo / Imagem / 3D / Efeitos | Alt+1 / 2 / 3 / 4 | Cmd+1…4 | Resolve Shift+n [B31], Blender [A28] [inferência na escolha] | ✔ |
+| Ir para Vídeo / Imagem / Animação / Música / Efeitos / 3D (ordem de uso, visual neutro) | 1…6 · Alt+1…6 | Cmd+1…6 | Resolve Shift+n [B31], Blender [A28] [inferência na escolha] | ✔ |
+| Focar no monitor (esconde os outros painéis) | Ctrl+\\ | Cmd+\\ | Figma "mostrar/esconder a interface" | ✔ |
+| Antes dos efeitos (segurado) | Shift+D | Shift+D | — | ✔ |
 | Área anterior / próxima | Ctrl+PgUp / PgDn | Cmd+Option+← / → [inferência] | Blender [A28] | ✔ |
 | Paleta de comandos | F3 · Ctrl+Shift+P | F3 · Cmd+Shift+P | Blender [A30], VS Code | ✔ |
 | Desfazer / refazer | Ctrl+Z / Ctrl+Shift+Z · Ctrl+Y | Cmd+Z / Cmd+Shift+Z | Photoshop desde 2019 [A24], Blender | ✔ |
@@ -565,6 +567,18 @@ Abas de painel: 28 px (C) / 30 px (P).
 ---
 
 ## 7. Tokens de design
+
+> **Visual neutro (10/11/2026, implementado).** `src/renderer/estilo/tokens.ts` existe e é a fonte única: gera o CSS de
+> `:root` (escuro grafite, o padrão), `:root[data-tema="claro"]` (mesmos nomes), `:root[data-contraste="alto"]` (só
+> reatribui: texto suave mais forte, contorno de campo a 3:1, anel de foco duplo), a densidade compacta
+> (`data-densidade="compacta"`, e "pela janela" na faixa C), o tema do dockview e o `ITheme` do xterm. Nenhum CSS do
+> renderer escreve cor em hexadecimal ou `rgba()` (teste `css-renderer`). Valores de `ux/pesquisa-ux-visual.md` §4: corpo
+> `#202020`, `--fundo-elevado`, `--borda-campo`, fundos de status, `--agente-borda`, `--pino`, as cores de faixa
+> (`--faixa-azul/-ciano/-verde/-lima/-rosa/-areia`, das quais as famílias da linha do tempo são apelidos), raios 3/6/8/12,
+> corpo de 13 px (nada abaixo de 11), controles de 28 px (24 na compacta), traço de ícone 1,6 e sombras só no que flutua.
+> O acento é o azul `#70B8FF` (no claro, `#0B63C5`). A aparência (tema, contraste, densidade, tamanho 90–150% e movimento)
+> fica em Preferências › Aparência e vale para a máquina (`estado/aparencia.ts`). As tabelas abaixo são o desenho
+> original; onde divergirem, valem os tokens.
 
 Uma fonte só, `src/renderer/estilo/tokens.ts`, gera:
 - as variáveis CSS abaixo;
@@ -705,6 +719,12 @@ Os nomes mantêm os do `estilo.css` atual onde já existem, e os valores mudam p
 
 ### 8.1 Seleção
 
+> **Implementado (visual neutro):** a seleção tem uma forma só, contorno de 2 px `--acento` no monitor, na linha do tempo
+> e no arranjo, e barra lateral + fundo nas listas; o branco fica para as alças. "Acabou de mudar pelo agente" fica 30 s:
+> contorno tracejado `--agente` com a etiqueta "Claude mudou · há N s" e o brilho de 1,2 s no monitor, barra violeta na
+> lista, tracejado no bloco da linha do tempo, os campos com "era X" no inspetor, um aviso com Ver e Desfazer e o
+> contador no rodapé (`estado/agente.ts`, `componentes/Agente.tsx`); somem com Esc ou com a próxima edição.
+
 **Uma seleção só no app** (`loja.selecao`), sincronizada entre monitor, Estrutura, linha do tempo, Propriedades e Comentários pelo id do objeto, o mesmo que os comentários usam [A §6.2]. Selecionar em qualquer lugar seleciona em todos.
 
 | Estado | Lista (Estrutura, Histórico) | Monitor 2D / 3D | Linha do tempo |
@@ -723,14 +743,14 @@ Os nomes mantêm os do `estilo.css` atual onde já existem, e os valores mudam p
 
 ### 8.2 Foco
 
-- **O grupo ativo do dockview** (o que recebe as teclas de painel) fica com a aba visível com texto `--texto` e uma **linha de 1 px `--acento` no topo da aba**. Grupos inativos ficam com a aba em `--texto-2`. Assim a pessoa sempre sabe para onde vão J/K/L ou Delete [inferência].
-- **Foco por teclado** (`:focus-visible`): anel de 1 px `--acento` com `outline-offset: -1px` dentro de botões e campos, e de 2 px nas linhas de lista. **Nunca** remover o contorno de foco sem trocar por outro.
+- **O grupo ativo do dockview** (o que recebe as teclas de painel) fica com a aba visível com texto `--texto` e um **sublinhado de 2 px `--acento`** (as abas da frente dos outros grupos, sublinhado `--texto`). Grupos inativos ficam com a aba em `--texto-2`. Assim a pessoa sempre sabe para onde vão J/K/L ou Delete [inferência].
+- **Foco por teclado** (`:focus-visible`): anel de 2 px `--acento` afastado 2 px do controle (WCAG 2.4.13); no alto contraste, anel duplo; 2 px por dentro nas linhas de lista. **Nunca** remover o contorno de foco sem trocar por outro.
 - **Campo em edição:** borda `--acento`, fundo `--fundo-0`. Enter confirma (gera o patch), e Esc cancela e devolve o foco ao painel.
 - **Terminal:**
   - em foco, cursor em bloco cheio e aba com a linha `--acento`;
   - sem foco, cursor em contorno (`cursorInactiveStyle: 'outline'` do xterm) [conhecimento prévio].
 - **Modo comentário:** cursor de pino, borda interna de 2 px `--comentario` no monitor e "Modo comentário · Esc sai" na barra de status.
-- **Tab / Shift+Tab** (esconder painéis) não roubam o Tab do terminal nem dos campos: só valem com foco no monitor, na lista ou na linha do tempo.
+- **Focar no monitor** (esconder os painéis) é **Ctrl+\\** e o botão da barra, não Tab: o Tab fica para a navegação por teclado e para o terminal.
 
 ### 8.3 Botões e controles
 
@@ -793,7 +813,7 @@ Junto com `desempenho.md`, que manda nos números:
 - toda ação do trilho tem dica com a tecla;
 - "Redefinir layout" volta ao preset;
 - o terminal recebe Esc, Ctrl+C, Shift+Tab e Ctrl+B;
-- Alt+1…4 funciona com o terminal em foco.
+- Alt+1…6 funciona com o terminal em foco.
 
 **Fica para depois:**
 - Vídeo paisagem e faixa A afinada (dois terminais lado a lado, Comentários em grupo próprio);

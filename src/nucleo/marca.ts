@@ -33,7 +33,8 @@ export const PASTA_FONTES = 'fontes';
 export const EXTENSOES_FONTE = ['.ttf', '.otf', '.woff', '.woff2'];
 export const EXTENSOES_LOGO = ['.png', '.svg', '.jpg', '.jpeg', '.webp'];
 
-// A BKM ainda não tem manual no repositório: cores sóbrias de espera, para trocar no painel Marca.
+// Kit que já veio de fábrica e saiu (decisão de 10/11/2026): fica só para as imagens antigas que nasceram nele
+// continuarem trocando de kit pelo papel de cada cor (PALETAS_DE_FABRICA) e para os testes.
 export const MARCA_BKM: Marca = {
   formato: 1,
   id: 'bkm',
@@ -54,8 +55,9 @@ export const MARCA_NEUTRO: Marca = {
   notas: 'O tema padrão do Estúdio, igual ao de um vídeo novo sem kit.',
 };
 
-/** Os kits de fábrica, criados na primeira abertura se não existirem. */
-export const MARCAS_INICIAIS: Marca[] = [MARCA_BKM, MARCA_NEUTRO];
+/** Os kits de fábrica, criados na primeira abertura se não existirem: só o Neutro. Kits de escritório (o da BKM
+ *  inclusive) ficam na pasta da pessoa e continuam funcionando, mas não vêm mais de fábrica. */
+export const MARCAS_INICIAIS: Marca[] = [MARCA_NEUTRO];
 
 /** "Escritório Exemplo" → "escritorio-exemplo": o nome da pasta. */
 export const idDeMarca = (nome: string) =>
@@ -240,9 +242,12 @@ const patchDaImagem = (doc: DocImagem, m: Marca): OperacaoPatch[] => {
       const papel = typeof c.fonte === 'string' && ehReferencia(c.fonte) ? undefined : papelDaFonte(c.fonte, c.peso, fontes);
       const nova = papel === 'titulo' ? m.fontes.titulo : papel === 'mono' ? (m.fontes.mono ?? m.fontes.texto) : papel === 'texto' ? m.fontes.texto : undefined;
       if (nova && nova !== c.fonte) ops.push(por(c.fonte, `${base}/fonte`, nova));
-      // sem cor, ou no branco padrão que nenhum kit tem, o texto é o do kit; as outras cores seguem o papel que tinham
+      // sem cor, ou no branco padrão das camadas de texto, o texto é o do kit; as outras cores seguem o papel que tinham.
+      // O branco é também o destaque do Neutro: num texto, vale como texto (é o padrão da camada), não como destaque
       if (c.cor === undefined) ops.push({op: 'add', path: `${base}/cor`, value: '@texto'});
-      else if (typeof c.cor === 'string' && canais(c.cor) === canais('#FFFFFF') && !papelDaCor(c.cor, paletas)) ops.push({op: 'replace', path: `${base}/cor`, value: m.cores.texto});
+      else if (typeof c.cor === 'string' && canais(c.cor) === canais('#FFFFFF') && [undefined, 'destaque'].includes(papelDaCor(c.cor, paletas))) {
+        if (canais(m.cores.texto) !== canais(c.cor)) ops.push({op: 'replace', path: `${base}/cor`, value: m.cores.texto});
+      }
       else cor(c.cor, `${base}/cor`);
     }
     if (c.tipo === 'forma') cor(c.preenchimento, `${base}/preenchimento`);

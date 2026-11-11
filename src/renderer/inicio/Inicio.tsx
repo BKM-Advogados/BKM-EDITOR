@@ -1,28 +1,33 @@
-// Tela inicial: a central que os editores abrem (Resolve, Premiere, CapCut, Clipchamp). À esquerda, começar: o bloco
-// Novo (formato pelo nome do destino, depois o modelo) e o campo "Descreva para o Claude", com o mesmo peso. À
-// direita, continuar: o último projeto com miniatura e a grade de recentes. Clicar no formato marca; clicar no modelo
-// cria; Enter cria com o que está marcado. Nada pergunta fps, codec ou pasta: tudo tem padrão e fica em "Mais opções".
-// Esta tela não carrega o editor (Remotion, Player, dockview): a casca vem depois, com React.lazy.
+// Tela inicial: uma porta de entrada. No alto, o pedido ao Claude (com o tipo, o formato e o kit em fichas); embaixo,
+// "Começar do zero" com os tipos de peça no mesmo peso (Vídeo, Imagem, Animação, Música, 3D e o exemplo), o formato
+// pelo nome do destino e os modelos com miniatura. À direita, Continuar (o último projeto, com Abrir), os Recentes em
+// lista e uma linha discreta de estado (Claude, pasta, máquina), que só vira faixa quando falta algo. Clicar no formato
+// marca; clicar no modelo cria; Enter cria em branco. Nada pergunta fps, codec ou pasta: tudo tem padrão e fica em
+// "Mais opções". Esta tela não carrega o editor (Remotion, Player, dockview): a casca vem depois, com React.lazy.
 import React, {useEffect, useMemo, useState} from 'react';
 import {usarTemExemplo} from '../estado/exemplo';
-import {ArrowUp, BookOpen, Box, Check, ChevronDown, ChevronRight, Copy, Film, FolderOpen, FolderSearch, Image as ImageIcon, MoreHorizontal, Music, Sparkle, Sparkles, Trash2,
-  TriangleAlert, X} from 'lucide-react';
+import {ArrowUp, BookOpen, Box, Check, ChevronDown, ChevronRight, Copy, Film, FolderOpen, FolderSearch, Image as ImageIcon, MoreHorizontal, Music, Settings2, Sparkle, Sparkles,
+  Trash2, TriangleAlert, X} from 'lucide-react';
 import type {Ambiente, ContaClaude, MarcaInfo, NovoProjeto, Preferencias, Recente} from '../../compartilhado/api';
 import type {Modulo} from '../../nucleo/documentos';
 import {MODELOS, type IdModelo} from '../../nucleo/modelos';
 import {FORMATOS_IMAGEM, FORMATOS_VIDEO, TAMANHO_MAX, TAMANHO_MIN, limitarTamanho, type PresetFormato} from '../../nucleo/formatos';
 import {abrirProjeto, avisar, loja, mensagemDe, useLoja} from '../estado/loja';
-import {BotaoMenu} from '../componentes/Menu';
+import {BotaoMenu, type ItemMenu} from '../componentes/Menu';
+import {PainelPreferencias} from '../casca/Preferencias';
 import {pedirTexto} from '../componentes/Dialogo';
 import {IconeEstudio} from '../componentes/Icones';
 import {lerConta} from '../paineis/conversas';
 import './inicio.css';
+import {Escolha} from '../componentes/Controles';
 
-const ABAS: {id: Modulo; nome: string; icone: React.ReactNode}[] = [
-  {id: 'video', nome: 'Vídeo', icone: <Film size={15} />},
-  {id: 'imagem', nome: 'Imagem', icone: <ImageIcon size={15} />},
-  {id: 'animacao', nome: 'Animação', icone: <Sparkles size={15} />},
-  {id: '3d', nome: '3D', icone: <Box size={15} />},
+type Tipo = Modulo; // o que a pessoa quer fazer: a música abre um projeto e vai direto à área Música
+const TIPOS: {id: Tipo; nome: string; desc: string; icone: React.ReactNode}[] = [
+  {id: 'video', nome: 'Vídeo', desc: 'Cenas com título, texto, lista e imagem', icone: <Film size={18} />},
+  {id: 'imagem', nome: 'Imagem', desc: 'Post, capa ou carrossel em páginas', icone: <ImageIcon size={18} />},
+  {id: 'animacao', nome: 'Animação', desc: 'Formas, texto e arte em pixel', icone: <Sparkles size={18} />},
+  {id: 'musica', nome: 'Música', desc: 'Batida ou trilha para o vídeo', icone: <Music size={18} />},
+  {id: '3d', nome: '3D', desc: 'Cena com objetos, luz e câmera', icone: <Box size={18} />},
 ];
 const ICONE_MODULO: Record<Modulo, React.ReactNode> = {
   video: <Film size={18} />,
@@ -92,36 +97,64 @@ const CartaoFormato: React.FC<{f: PresetFormato | null; marcado: boolean; aoMarc
   </button>
 );
 
-const CartaoRecente: React.FC<{r: Recente; grande?: boolean; aoAbrir: () => void; aoDuplicar: () => void; aoEsquecer: () => void}> = ({r, grande, aoAbrir, aoDuplicar, aoEsquecer}) => (
-  <div className={`cartao-recente${grande ? ' grande' : ''}${r.existe ? '' : ' sumiu'}`}>
-    <button className="cr-abrir" onClick={aoAbrir} title={r.existe ? r.raiz : `A pasta não existe mais: ${r.raiz}`}>
-      <span className="cr-mini">
-        {r.miniatura ? <img src={r.miniatura} alt="" /> : <span className="cr-icones">{(r.modulos.length ? r.modulos : (['video'] as Modulo[])).map((m) => <span key={m}>{ICONE_MODULO[m]}</span>)}</span>}
-        {!r.existe && <span className="cr-sumiu"><TriangleAlert size={14} />pasta não encontrada</span>}
+/** Miniatura de modelo: a moldura do formato com as linhas do conteúdo (título, texto), sem foto. */
+const Poster: React.FC<{l: number; a: number; modulo: Modulo}> = ({l, a, modulo}) => {
+  const k = 86 / Math.max(l, a);
+  return (
+    <span className="poster" aria-hidden="true">
+      <span className={`poster-peca ${modulo}`} style={{width: Math.max(24, l * k), height: Math.max(24, a * k)}}>
+        {modulo === '3d' ? <Box size={20} /> : modulo === 'musica' ? <Music size={20} /> : <><i className="l1" /><i className="l2" /><i className="l3" /></>}
       </span>
-      <span className="cr-texto">
-        {grande && <span className="cr-rotulo">Continuar</span>}
-        <span className="cr-nome">{r.nome}</span>
-        <span className="cr-meta">{quando(r.aberto_em)}</span>
-      </span>
+    </span>
+  );
+};
+
+const menuDoRecente = (r: Recente, abrir: () => void, duplicar: () => void, esquecer: () => void): ItemMenu[] => [
+  ...(r.existe ? [
+    {rotulo: 'Abrir', icone: <FolderOpen size={14} />, acao: abrir},
+    {rotulo: 'Duplicar…', icone: <Copy size={14} />, acao: duplicar},
+    {rotulo: 'Mostrar na pasta', icone: <FolderSearch size={14} />, acao: () => window.estudio.mostrarNaPasta(r.raiz)},
+    'sep' as const,
+  ] : []),
+  {rotulo: 'Remover da lista', icone: <Trash2 size={14} />, acao: esquecer},
+];
+
+const nomeDosModulos = (r: Recente) => (r.modulos.length ? r.modulos : (['video'] as Modulo[])).map((m) => TIPOS.find((t) => t.id === m)?.nome ?? m).join(' · ');
+
+const CartaoContinuar: React.FC<{r: Recente; aoAbrir: () => void; aoDuplicar: () => void; aoEsquecer: () => void}> = ({r, aoAbrir, aoDuplicar, aoEsquecer}) => (
+  <div className={`cartao-continuar${r.existe ? '' : ' sumiu'}`}>
+    <button className="cc-mini" onClick={aoAbrir} title={r.existe ? r.raiz : `A pasta não existe mais: ${r.raiz}`} tabIndex={-1}>
+      {r.miniatura ? <img src={r.miniatura} alt="" /> : <Poster l={1080} a={1920} modulo={r.modulos[0] ?? 'video'} />}
+      {!r.existe && <span className="cr-sumiu"><TriangleAlert size={14} />pasta não encontrada</span>}
     </button>
-    <div className="cr-menu">
-      <BotaoMenu titulo="Mais ações" icone={<MoreHorizontal size={15} />} itens={[
-        ...(r.existe ? [
-          {rotulo: 'Abrir', icone: <FolderOpen size={14} />, acao: aoAbrir},
-          {rotulo: 'Duplicar…', icone: <Copy size={14} />, acao: aoDuplicar},
-          {rotulo: 'Mostrar na pasta', icone: <FolderSearch size={14} />, acao: () => window.estudio.mostrarNaPasta(r.raiz)},
-          'sep' as const,
-        ] : []),
-        {rotulo: 'Remover da lista', icone: <Trash2 size={14} />, acao: aoEsquecer},
-      ]} />
+    <div className="cc-pe">
+      <span className="cc-textos">
+        <span className="cc-nome">{r.nome}</span>
+        <span className="cc-meta">{nomeDosModulos(r)} · editado {quando(r.aberto_em)}</span>
+      </span>
+      <BotaoMenu titulo="Mais ações" icone={<MoreHorizontal size={15} />} itens={menuDoRecente(r, aoAbrir, aoDuplicar, aoEsquecer)} />
+      <button className="bt principal" onClick={aoAbrir} disabled={!r.existe}>Abrir</button>
     </div>
   </div>
 );
 
+const LinhaRecente: React.FC<{r: Recente; aoAbrir: () => void; aoDuplicar: () => void; aoEsquecer: () => void}> = ({r, aoAbrir, aoDuplicar, aoEsquecer}) => (
+  <li className={`linha-recente${r.existe ? '' : ' sumiu'}`}>
+    <button className="lr-abrir" onClick={aoAbrir} title={r.existe ? r.raiz : `A pasta não existe mais: ${r.raiz}`}>
+      <span className="lr-icone">{r.miniatura ? <img src={r.miniatura} alt="" /> : ICONE_MODULO[r.modulos[0] ?? 'video']}</span>
+      <span className="lr-textos">
+        <span className="lr-nome">{r.nome}</span>
+        <span className="lr-meta">{nomeDosModulos(r)} · {quando(r.aberto_em)}</span>
+      </span>
+      {!r.existe && <span className="lr-sumiu">pasta não encontrada</span>}
+    </button>
+    <BotaoMenu titulo="Mais ações" icone={<MoreHorizontal size={15} />} itens={menuDoRecente(r, aoAbrir, aoDuplicar, aoEsquecer)} />
+  </li>
+);
+
 export const Inicio: React.FC = () => {
   const aviso = useLoja((e) => e.aviso);
-  const [aba, setAba] = useState<Modulo>('video');
+  const [aba, setAba] = useState<Tipo>('video');
   const temExemplo = usarTemExemplo();
   const [prefs, setPrefs] = useState<Preferencias | null>(null);
   const [ambiente, setAmbiente] = useState<Ambiente | null>(null);
@@ -132,6 +165,7 @@ export const Inicio: React.FC = () => {
   const [larguraInvalida, setLarguraInvalida] = useState(false);
   const [alturaInvalida, setAlturaInvalida] = useState(false);
   const [maisOpcoes, setMaisOpcoes] = useState(false);
+  const [preferencias, setPreferencias] = useState(false);
   const [nome, setNome] = useState('');
   const [pasta, setPasta] = useState('');
   const [pedido, setPedido] = useState('');
@@ -152,14 +186,17 @@ export const Inicio: React.FC = () => {
     carregarRecentes();
   }, []);
 
+  const semFormato = aba === '3d' || aba === 'musica'; // a música não tem formato; ela nasce num projeto de vídeo
   const lista = aba === 'imagem' ? FORMATOS_IMAGEM : FORMATOS_VIDEO;
-  const idFormato = aba === '3d' || aba === 'musica' ? '' : formato[aba]; // frente Música: a música não tem formato
-  const preset = aba === '3d' || aba === 'musica' ? null : lista.find((f) => f.id === idFormato) ?? lista[0];
+  const idFormato = semFormato ? '' : formato[aba as 'video' | 'imagem' | 'animacao'];
+  const preset = semFormato ? null : lista.find((f) => f.id === idFormato) ?? lista[0];
   const tamanho = idFormato === PERSONALIZADO ? livre : preset ? {largura: preset.largura, altura: preset.altura, fps: livre.fps} : undefined;
-  const modelos = MODELOS.filter((m) => m.modulo === aba);
+  const modelos = MODELOS.filter((m) => m.modulo === (aba === 'musica' ? 'video' : aba));
   const branco = modelos[0]?.id;
   const kit = aba !== '3d' ? marcas.find((m) => m.id === marca) : undefined;
-  const chip = aba === '3d' ? 'Cena 3D · Em branco' : `${idFormato === PERSONALIZADO ? `${livre.largura}×${livre.altura}` : preset?.proporcao}${kit ? ` · ${kit.nome}` : ''} · Em branco`;
+  const nomeDoTipo = TIPOS.find((t) => t.id === aba)!.nome;
+  const proporcao = idFormato === PERSONALIZADO ? `${livre.largura}×${livre.altura}` : preset?.proporcao;
+  const chip = semFormato ? nomeDoTipo : `${nomeDoTipo} · ${proporcao}`;
   const claudePronto = Boolean(ambiente?.claude && conta?.instalado);
 
   const criar = async (modelo: IdModelo, pedidoClaude?: {texto: string; rotulo: string; contexto: string}) => {
@@ -167,10 +204,12 @@ export const Inicio: React.FC = () => {
     setOcupado(true);
     try {
       const o: NovoProjeto = {modelo, nome: nome.trim() || undefined, pasta: pasta || undefined,
-        ...(aba !== '3d' && tamanho ? {formato: tamanho, formato_id: idFormato, marca: kit?.id} : {})};
+        ...(aba !== '3d' && tamanho ? {formato: tamanho, formato_id: idFormato, marca: kit?.id} : {}), ...(aba === 'musica' ? {marca: kit?.id} : {})};
       const info = await window.estudio.criarProjeto(o);
       if (pedidoClaude) loja.definir({pedidoClaude});
       await abrirProjeto(info);
+      // Música: o projeto nasce com o vídeo em branco e abre na área Música, nos modelos (Batida, Trilha…)
+      if (aba === 'musica') loja.definir({area: 'musica'});
     } catch (e) {
       avisar(mensagemDe(e), 'erro');
     } finally {
@@ -218,16 +257,21 @@ export const Inicio: React.FC = () => {
       avisar(mensagemDe(e), 'erro');
     }
   };
+  const trocarPasta = async () => {
+    const p = await window.estudio.escolherPasta('Pasta dos projetos do Estúdio');
+    if (p) setPrefs(await window.estudio.gravarPreferencias({pasta_projetos: p}));
+  };
   const mandarAoClaude = () => {
     const t = pedido.trim();
-    if (!t || !claudePronto) return;
+    if (!t || !claudePronto || !branco) return;
     const doc = aba === '3d' ? 'uma cena 3D em branco (documento "cena3d")'
-      : `${aba === 'video' ? 'um vídeo de cenas' : 'uma imagem'} em branco (documento "${aba}", ${tamanho?.largura}×${tamanho?.altura})`;
-    void criar(branco, {texto: t, rotulo: `Projeto novo · ${chip.replace(' · Em branco', '')}`,
+      : aba === 'musica' ? `um vídeo em branco (documento "video", ${tamanho?.largura}×${tamanho?.altura}); o pedido é de música: crie a música com criar_documento (módulo música)`
+      : `${aba === 'video' ? 'um vídeo de cenas' : aba === 'animacao' ? 'uma animação' : 'uma imagem'} em branco (documento "${aba}", ${tamanho?.largura}×${tamanho?.altura})`;
+    void criar(branco, {texto: t, rotulo: `Projeto novo · ${chip}${kit ? ` · ${kit.nome}` : ''}`,
       contexto: `projeto novo, criado agora com ${doc}. Monte o pedido nesse documento pelas ferramentas do MCP "estudio" (o CLAUDE.md da pasta explica o formato). Faça direto, sem perguntar, e diga no fim o que montou.`});
   };
 
-  // Enter cria com o que está marcado (fora de campo de texto e de botão, que já tratam o Enter)
+  // Enter cria em branco com o que está marcado (fora de campo de texto e de botão, que já tratam o Enter)
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => {
       const alvo = e.target as HTMLElement;
@@ -235,7 +279,7 @@ export const Inicio: React.FC = () => {
         e.preventDefault();
         void abrirPasta();
       }
-      if (e.key !== 'Enter' || /INPUT|TEXTAREA|SELECT|BUTTON/.test(alvo.tagName) || document.querySelector('.dialogo-fundo')) return;
+      if (e.key !== 'Enter' || /INPUT|TEXTAREA|SELECT|BUTTON/.test(alvo.tagName) || document.querySelector('.dialogo-fundo') || !branco) return;
       e.preventDefault();
       void criar(branco);
     };
@@ -243,7 +287,6 @@ export const Inicio: React.FC = () => {
     return () => window.removeEventListener('keydown', tecla);
   });
 
-  const primeiraVez = prefs && !prefs.boas_vindas_vista;
   const pastaPadrao = prefs?.pasta_projetos ?? ambiente?.pasta_padrao ?? '';
   const [continuar, ...outros] = recentes ?? [];
   const estadoClaude = useMemo(() => {
@@ -252,170 +295,173 @@ export const Inicio: React.FC = () => {
     if (!conta.logado) return {texto: 'Claude instalado, falta entrar na sua conta (abra um projeto e use "Abrir terminal").', ok: false};
     return {texto: `Claude pronto${conta.email ? ` · ${conta.email}` : ''}`, ok: true};
   }, [ambiente, conta]);
+  // a linha de estado só vira faixa quando falta algo (Claude, Git) ou a pasta está no OneDrive
+  const falta = Boolean((ambiente && conta !== null && !estadoClaude.ok) || (ambiente && !ambiente.git) || /onedrive/i.test(pastaPadrao));
 
   return (
     <div className="inicio-janela">
       <header className="inicio-barra">
         <span className="inicio-marca"><IconeEstudio tamanho={18} />Estúdio</span>
+        <span className="esp" />
+        <button className="bt fantasma" onClick={() => void abrirPasta()}><FolderOpen size={14} />Abrir pasta…<kbd>Ctrl+O</kbd></button>
+        <button className="bt fantasma" onClick={() => setPreferencias(true)}><Settings2 size={14} />Preferências</button>
       </header>
       <main className="inicio">
         <div className="inicio-col comecar">
-          {primeiraVez && (
-            <section className="faixa-primeira" aria-label="Antes de começar">
-              <div className="fp-titulo">Antes de começar</div>
-              <ul>
-                <li className={estadoClaude.ok ? 'ok' : ''}><Sparkle size={14} />{estadoClaude.texto}</li>
-                <li className="ok"><FolderOpen size={14} />Projetos novos ficam em <code title={pastaPadrao}>{pastaPadrao}</code>
-                  <button className="bt fantasma mini" onClick={async () => {
-                    const p = await window.estudio.escolherPasta('Pasta dos projetos do Estúdio');
-                    if (p) setPrefs(await window.estudio.gravarPreferencias({pasta_projetos: p}));
-                  }}>Trocar…</button></li>
-                {ambiente && <li className="ok"><Check size={14} />Perfil desta máquina: {ambiente.perfil.nome === 'leve' ? 'leve (até 8 GB)' : ambiente.perfil.nome === 'padrao' ? 'padrão (até 16 GB)' : 'forte'}</li>}
-                {ambiente && !ambiente.git && <li className="alerta"><TriangleAlert size={14} />Sem o Git instalado, não há pontos de restauração (Ctrl+S). O resto funciona.</li>}
-              </ul>
-              <div className="fp-botoes">
-                <button className="bt principal" onClick={async () => setPrefs(await window.estudio.gravarPreferencias({boas_vindas_vista: true}))}>Pronto</button>
-                {temExemplo && <button className="bt fantasma" onClick={() => void verExemplo()}><BookOpen size={14} />Ver um pronto</button>}
+          <div className="inicio-titulo">
+            <h1>O que vamos fazer hoje?</h1>
+            <p>Descreva a peça para o Claude ou escolha um ponto de partida. Tudo fica salvo na hora.</p>
+          </div>
+
+          <section className={`pedido-claude${claudePronto ? '' : ' desligado'}`} aria-label="Pedir ao Claude">
+            <textarea rows={2} aria-label="Pedido ao Claude"
+              placeholder={claudePronto ? 'Ex.: 5 cenas sobre férias proporcionais, com um número grande na terceira e a frase de fecho no final…'
+                : 'Instale e entre no Claude Code para usar este campo; o resto do Estúdio funciona sem ele'}
+              disabled={!claudePronto || ocupado} value={pedido} onChange={(e) => setPedido(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  mandarAoClaude();
+                }
+              }} />
+            <div className="pc-rodape">
+              <span className="ficha" title="O tipo e o formato escolhidos embaixo">{TIPOS.find((t) => t.id === aba)!.icone}{chip}</span>
+              {aba !== '3d' && (
+                <span className="ficha-kit">
+                  <Escolha className="ficha" valor={marca} rotulo="Kit de marca do projeto novo" aoMudar={setMarca}
+                    opcoes={[['', 'Kit: Neutro'] as [string, string], ...marcas.filter((m) => m.id !== 'neutro').map((m): [string, string] => [m.id, `Kit: ${m.nome}`])]} />
+                </span>
+              )}
+              <span className={`pc-estado${estadoClaude.ok ? ' ok' : ''}`}>{estadoClaude.ok ? 'Claude pronto · sua conta' : estadoClaude.texto}</span>
+              <button className="enviar" disabled={!claudePronto || !pedido.trim() || ocupado} onClick={mandarAoClaude} title="Criar o projeto e mandar ao Claude (Enter)"
+                aria-label="Criar o projeto e mandar ao Claude"><ArrowUp size={16} /></button>
+            </div>
+          </section>
+
+          <div className="linha-secao"><span className="rotulo-secao">Começar do zero</span></div>
+          <div className="grade-tipos" role="radiogroup" aria-label="Tipo de peça">
+            {TIPOS.map((t) => (
+              <button key={t.id} role="radio" aria-checked={aba === t.id} className={`cartao-tipo${aba === t.id ? ' marcado' : ''}`} onClick={() => setAba(t.id)}
+                onDoubleClick={() => branco && void criar(branco)}>
+                <span className="ct-icone">{t.icone}</span>
+                <span className="ct-nome">{t.nome}</span>
+                <span className="ct-desc">{t.desc}</span>
+              </button>
+            ))}
+            {temExemplo && (
+              <button className="cartao-tipo exemplo" onClick={() => void verExemplo()}>
+                <span className="ct-icone"><BookOpen size={18} /></span>
+                <span className="ct-nome">Ver um exemplo</span>
+                <span className="ct-desc">Abre uma cópia para explorar</span>
+              </button>
+            )}
+          </div>
+
+          {!semFormato && (
+            <>
+              <div className="linha-secao"><span className="rotulo-secao">Formato</span><span className="nota">o mesmo documento serve a outros formatos depois</span></div>
+              <div className="grade-formatos">
+                {lista.map((f) => (
+                  <CartaoFormato key={f.id} f={f} marcado={idFormato === f.id} aoMarcar={() => setFormato((x) => ({...x, [aba]: f.id}))}
+                    aoCriar={() => branco && void criar(branco)} />
+                ))}
+                <CartaoFormato f={null} marcado={idFormato === PERSONALIZADO} aoMarcar={() => {
+                  setFormato((x) => ({...x, [aba]: PERSONALIZADO}));
+                  setMaisOpcoes(true);
+                }} aoCriar={() => branco && void criar(branco)} />
               </div>
-            </section>
+            </>
           )}
 
-          <section className="bloco-novo" aria-label="Novo projeto">
-            <div className="bloco-cab">
-              <h2>Novo</h2>
-              <div className="abas-novo" role="tablist">
-                {ABAS.map((a) => (
-                  <button key={a.id} role="tab" aria-selected={aba === a.id} className={aba === a.id ? 'ativa' : ''} onClick={() => setAba(a.id)}>{a.icone}{a.nome}</button>
-                ))}
-              </div>
-            </div>
-
-            {aba !== '3d' && (
-              <>
-                <div className="rotulo-secao">Formato</div>
-                <div className="grade-formatos">
-                  {lista.map((f) => (
-                    <CartaoFormato key={f.id} f={f} marcado={idFormato === f.id} aoMarcar={() => setFormato((x) => ({...x, [aba]: f.id}))}
-                      aoCriar={() => void criar(branco)} />
-                  ))}
-                  <CartaoFormato f={null} marcado={idFormato === PERSONALIZADO} aoMarcar={() => {
-                    setFormato((x) => ({...x, [aba]: PERSONALIZADO}));
-                    setMaisOpcoes(true);
-                  }} aoCriar={() => void criar(branco)} />
-                </div>
-              </>
-            )}
-
-            <div className="rotulo-secao">Modelo</div>
-            <div className="grade-modelos">
-              {modelos.map((m) => (
-                <button key={m.id} className="cartao-modelo principal" disabled={ocupado} onClick={() => void criar(m.id)}>
-                  <span className="cm-poster">{ICONE_MODULO[m.modulo]}</span>
+          <div className="linha-secao"><span className="rotulo-secao">{aba === 'musica' ? 'Começar' : 'Modelos'}</span>
+            <span className="nota">{aba === 'musica' ? 'o projeto abre na Música, com os modelos de batida e trilha' : 'clique para criar · Enter cria em branco'}</span></div>
+          <div className="grade-modelos">
+            {modelos.map((m) => {
+              const f = m.formato_fixo ? FORMATOS_VIDEO.find((x) => x.id === m.formato_fixo) : undefined;
+              const l = f?.largura ?? tamanho?.largura ?? 1920;
+              const a = f?.altura ?? tamanho?.altura ?? 1080;
+              return (
+                <button key={m.id} className="cartao-modelo" disabled={ocupado} onClick={() => void criar(m.id)} title={m.descricao}>
+                  <Poster l={aba === 'musica' ? 1 : l} a={aba === 'musica' ? 1 : a} modulo={aba === 'musica' ? 'musica' : m.modulo} />
                   <span className="cm-texto">
-                    <span className="cm-nome">{m.nome}{!m.formato_fixo && aba !== '3d' && <span className="cm-chip">{chip.replace(' · Em branco', '')}</span>}
-                      {m.formato_fixo && <span className="cm-chip">{FORMATOS_VIDEO.find((f) => f.id === m.formato_fixo)?.proporcao ?? m.formato_fixo}</span>}</span>
-                    <span className="cm-desc">{m.descricao}</span>
+                    <span className="cm-nome">{aba === 'musica' ? 'Música nova' : m.nome}</span>
+                    <span className="cm-desc">{aba === 'musica' ? 'Batida, trilha ou efeito sonoro' : f ? `${f.proporcao} · ${m.descricao}` : m.descricao}</span>
                   </span>
-                  <kbd>Enter</kbd>
                 </button>
-              ))}
-            </div>
+              );
+            })}
+          </div>
 
-            <button className="mais-opcoes" onClick={() => setMaisOpcoes((x) => !x)} aria-expanded={maisOpcoes}>
-              {maisOpcoes ? <ChevronDown size={14} /> : <ChevronRight size={14} />}Mais opções
-            </button>
-            {maisOpcoes && (
-              <div className="painel-opcoes">
-                <label><span>Nome</span><input className="campo" placeholder="Sem título · data e hora" value={nome} onChange={(e) => setNome(e.target.value)} /></label>
-                <label><span>Pasta</span>
+          <button className="mais-opcoes" onClick={() => setMaisOpcoes((x) => !x)} aria-expanded={maisOpcoes}>
+            {maisOpcoes ? <ChevronDown size={14} /> : <ChevronRight size={14} />}Mais opções
+          </button>
+          {maisOpcoes && (
+            <div className="painel-opcoes">
+              <label><span>Nome</span><input className="campo" placeholder="Sem título · data e hora" value={nome} onChange={(e) => setNome(e.target.value)} /></label>
+              <label><span>Pasta</span>
+                <span className="linha-pasta">
+                  <input className="campo" readOnly value={pasta || pastaPadrao} title={pasta || pastaPadrao} />
+                  <button className="bt" onClick={async () => setPasta((await window.estudio.escolherPasta('Onde criar o projeto')) ?? pasta)}>Escolher…</button>
+                </span>
+              </label>
+              {/onedrive/i.test(pasta || pastaPadrao) && <div className="alerta-opcoes"><TriangleAlert size={13} />Pasta dentro do OneDrive: a sincronização pode travar a gravação.</div>}
+              {!semFormato && idFormato === PERSONALIZADO && (
+                <label><span>Tamanho</span>
                   <span className="linha-pasta">
-                    <input className="campo" readOnly value={pasta || pastaPadrao} title={pasta || pastaPadrao} />
-                    <button className="bt" onClick={async () => setPasta((await window.estudio.escolherPasta('Onde criar o projeto')) ?? pasta)}>Escolher…</button>
+                    <CampoTamanho rotulo="Largura" valor={livre.largura} aoMudar={(n) => setLivre((x) => ({...x, largura: n}))} aoInvalidar={setLarguraInvalida} />
+                    <span className="vezes">×</span>
+                    <CampoTamanho rotulo="Altura" valor={livre.altura} aoMudar={(n) => setLivre((x) => ({...x, altura: n}))} aoInvalidar={setAlturaInvalida} />
                   </span>
+                  {(larguraInvalida || alturaInvalida) && <span className="erro-campo">Largura e altura vão de {TAMANHO_MIN} a {TAMANHO_MAX} px.</span>}
                 </label>
-                {/onedrive/i.test(pasta || pastaPadrao) && <div className="alerta-opcoes"><TriangleAlert size={13} />Pasta dentro do OneDrive: a sincronização pode travar a gravação.</div>}
-                {aba !== '3d' && (
-                  <label><span>Marca</span>
-                    <select className="campo" value={marca} onChange={(e) => setMarca(e.target.value)} title="Cores, fonte e logo do kit entram no tema do documento novo">
-                      <option value="">Sem kit (tema neutro)</option>
-                      {marcas.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
-                    </select>
-                  </label>
-                )}
-                {aba !== '3d' && idFormato === PERSONALIZADO && (
-                  <label><span>Tamanho</span>
-                    <span className="linha-pasta">
-                      <CampoTamanho rotulo="Largura" valor={livre.largura} aoMudar={(n) => setLivre((x) => ({...x, largura: n}))} aoInvalidar={setLarguraInvalida} />
-                      <span className="vezes">×</span>
-                      <CampoTamanho rotulo="Altura" valor={livre.altura} aoMudar={(n) => setLivre((x) => ({...x, altura: n}))} aoInvalidar={setAlturaInvalida} />
-                    </span>
-                    {(larguraInvalida || alturaInvalida) && <span className="erro-campo">Largura e altura vão de {TAMANHO_MIN} a {TAMANHO_MAX} px.</span>}
-                  </label>
-                )}
-                {aba === 'video' && (
-                  <label><span>Quadros por segundo</span>
-                    <select className="campo" value={livre.fps} onChange={(e) => setLivre((x) => ({...x, fps: Number(e.target.value)}))}>
-                      {[24, 25, 30, 50, 60].map((n) => <option key={n} value={n}>{n}</option>)}
-                    </select>
-                  </label>
-                )}
-              </div>
-            )}
-          </section>
-
-          <section className={`bloco-claude${claudePronto ? '' : ' desligado'}`} aria-label="Começar com o Claude">
-            <div className="bloco-cab"><h2><Sparkle size={16} className="ic-agente" />Começar conversando</h2></div>
-            <div className="caixa-claude">
-              <textarea rows={2} placeholder={claudePronto ? 'Descreva o vídeo para o Claude… ex.: 5 cenas sobre férias proporcionais, com um número grande na 3ª' : 'Instale e entre no Claude Code para usar este campo'}
-                disabled={!claudePronto || ocupado} value={pedido} onChange={(e) => setPedido(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    mandarAoClaude();
-                  }
-                }} />
-              <div className="cc-rodape">
-                <span className="cm-chip">{chip}</span>
-                <span className={`cc-estado${estadoClaude.ok ? ' ok' : ''}`}>{estadoClaude.texto}</span>
-                <button className="bti enviar" disabled={!claudePronto || !pedido.trim() || ocupado} onClick={mandarAoClaude} title="Criar o projeto e mandar ao Claude (Enter)"><ArrowUp size={16} /></button>
-              </div>
+              )}
+              {aba === 'video' && (
+                <label><span>Quadros por segundo</span>
+                  <Escolha valor={livre.fps} rotulo="Quadros por segundo" aoMudar={(fps) => setLivre((x) => ({...x, fps}))}
+                    opcoes={[24, 25, 30, 50, 60].map((n): [number, string] => [n, String(n)])} />
+                </label>
+              )}
             </div>
-          </section>
+          )}
         </div>
 
         <div className="inicio-col continuar">
           {recentes === null ? <div className="vazio">carregando os recentes…</div> : !continuar ? (
             <section className="sem-recentes">
               <div className="sr-titulo">Nenhum projeto ainda</div>
-              <div className="sr-texto">{temExemplo ? 'Escolha um formato e um modelo ao lado, ou veja um projeto pronto para entender como o Estúdio funciona.'
-                : 'Escolha um formato e um modelo ao lado.'}</div>
-              {temExemplo && <button className="bt" onClick={() => void verExemplo()}><BookOpen size={14} />Ver um pronto</button>}
+              <div className="sr-texto">{temExemplo ? 'Descreva a peça para o Claude, escolha um tipo ao lado, ou veja um exemplo para entender como o Estúdio funciona.'
+                : 'Descreva a peça para o Claude ou escolha um tipo ao lado.'}</div>
             </section>
           ) : (
             <>
-              <CartaoRecente r={continuar} grande aoAbrir={() => void abrir(continuar)} aoDuplicar={() => void duplicar(continuar)} aoEsquecer={() => void esquecer(continuar)} />
+              <div className="linha-secao"><span className="rotulo-secao">Continuar</span></div>
+              <CartaoContinuar r={continuar} aoAbrir={() => void abrir(continuar)} aoDuplicar={() => void duplicar(continuar)} aoEsquecer={() => void esquecer(continuar)} />
               {outros.length > 0 && (
                 <>
-                  <div className="rotulo-secao">Recentes</div>
-                  <div className="grade-recentes">
-                    {outros.map((r) => <CartaoRecente key={r.raiz} r={r} aoAbrir={() => void abrir(r)} aoDuplicar={() => void duplicar(r)} aoEsquecer={() => void esquecer(r)} />)}
-                  </div>
+                  <div className="linha-secao"><span className="rotulo-secao">Recentes</span></div>
+                  <ul className="lista-recentes">
+                    {outros.map((r) => <LinhaRecente key={r.raiz} r={r} aoAbrir={() => void abrir(r)} aoDuplicar={() => void duplicar(r)} aoEsquecer={() => void esquecer(r)} />)}
+                  </ul>
                 </>
               )}
             </>
           )}
-          <div className="inicio-acoes">
-            <button className="bt fantasma" onClick={() => void abrirPasta()}><FolderOpen size={14} />Abrir pasta…<kbd>Ctrl+O</kbd></button>
-            {temExemplo && <button className="bt fantasma" onClick={() => void verExemplo()}><BookOpen size={14} />Ver um pronto</button>}
-          </div>
+          <section className={`estado-inicio${falta ? ' falta' : ''}`} aria-label="Estado">
+            <div className={estadoClaude.ok ? 'ok' : ambiente && conta !== null ? 'alerta' : ''}>{estadoClaude.ok ? <Check size={14} /> : <Sparkle size={14} />}<span>{estadoClaude.texto}</span></div>
+            <div className={/onedrive/i.test(pastaPadrao) ? 'alerta' : ''}><FolderOpen size={14} /><span>Projetos em <code title={pastaPadrao}>{pastaPadrao}</code></span>
+              <button className="bt fantasma mini" onClick={() => void trocarPasta()}>Trocar…</button></div>
+            {ambiente && <div className="ok"><Check size={14} /><span>Esta máquina: perfil {ambiente.perfil.nome === 'leve' ? 'leve (até 8 GB)' : ambiente.perfil.nome === 'padrao' ? 'padrão (até 16 GB)' : 'forte'}</span></div>}
+            {ambiente && !ambiente.git && <div className="alerta"><TriangleAlert size={14} /><span>Sem o Git instalado, não há pontos de restauração (Ctrl+S). O resto funciona.</span></div>}
+          </section>
         </div>
       </main>
       {aviso && (
-        <div className={`inicio-aviso ${aviso.tipo}`} role="status">
+        <div className={`inicio-aviso ${aviso.tipo}`} role="status" aria-live="polite">
           {aviso.tipo === 'erro' && <TriangleAlert size={14} />}<span>{aviso.texto}</span>
-          <button className="bti" onClick={() => loja.definir({aviso: undefined})} title="Fechar"><X size={14} /></button>
+          <button className="bti" onClick={() => loja.definir({aviso: undefined})} title="Fechar" aria-label="Fechar"><X size={14} /></button>
         </div>
       )}
+      {preferencias && <PainelPreferencias aoFechar={() => setPreferencias(false)} />}
     </div>
   );
 };

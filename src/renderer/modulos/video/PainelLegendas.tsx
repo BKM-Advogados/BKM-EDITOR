@@ -21,6 +21,7 @@ import {
 } from './acoes-legendas';
 import {aoQuadro, irPara, msAtual} from './tocador';
 import './legendas.css';
+import {Caixa} from '../../componentes/Controles';
 
 const tempoCurto = (ms: number) => {
   const t = Math.max(0, Math.round(ms / 100)) / 10;
@@ -85,11 +86,11 @@ const ItemLegenda: React.FC<{documento: string; s: SegmentoLegenda; em: number; 
           </span>
         )}
         <span className="acoes-item">
-          <button className="bti" title="Juntar com a próxima" disabled={ultima} onClick={() => void juntarComProxima(documento, s.id)}><Combine /></button>
-          <button className="bti" title={cabeca > em && cabeca < sai ? 'Dividir na cabeça' : 'Dividir no meio'} onClick={() => void dividir(documento, s.id, cabeca > em && cabeca < sai ? cabeca - (em - s.em) : undefined)}>
+          <button aria-label="Juntar com a próxima" className="bti" title="Juntar com a próxima" disabled={ultima} onClick={() => void juntarComProxima(documento, s.id)}><Combine /></button>
+          <button aria-label={cabeca > em && cabeca < sai ? 'Dividir na cabeça' : 'Dividir no meio'} className="bti" title={cabeca > em && cabeca < sai ? 'Dividir na cabeça' : 'Dividir no meio'} onClick={() => void dividir(documento, s.id, cabeca > em && cabeca < sai ? cabeca - (em - s.em) : undefined)}>
             <Scissors />
           </button>
-          <button className="bti" title="Excluir esta legenda" onClick={() => void excluirSegmento(documento, s.id)}><Trash2 /></button>
+          <button aria-label="Excluir esta legenda" className="bti" title="Excluir esta legenda" onClick={() => void excluirSegmento(documento, s.id)}><Trash2 /></button>
         </span>
       </div>
     );
@@ -125,11 +126,11 @@ const CortesFala: React.FC<{documento: string; doc: DocCenas}> = ({documento, do
               <>
                 <div className="lista-cortes">
                   {p.cortes.map((c, i) => (
-                    <label key={i} className="corte">
-                      <input type="checkbox" checked={p.marcados[i]} onChange={(e) => setPropostas((x) => ({...x, [clipe.id]: {...p, marcados: p.marcados.map((m, k) => (k === i ? e.target.checked : m))}}))} />
+                    <div key={i} className="corte">
+                      <Caixa marcado={p.marcados[i]} rotulo="Usar esta proposta" aoMudar={(v) => setPropostas((x) => ({...x, [clipe.id]: {...p, marcados: p.marcados.map((m, k) => (k === i ? v : m))}}))} />
                       <span className="tempo" onClick={() => irPara(tela(clipe, c.de_ms))}>{tempoCurto(tela(clipe, c.de_ms))}</span>
                       <span>{c.motivo === 'preenchimento' ? `"${c.texto}"` : 'pausa'} · −{((c.ate_ms - c.de_ms) / 1000).toFixed(1).replace('.', ',')} s</span>
-                    </label>
+                    </div>
                   ))}
                 </div>
                 <button className="bt principal mini" disabled={ocupado || !marcados.length} onClick={() => {
@@ -318,10 +319,9 @@ export const PainelLegendas: React.FC<{documento: string}> = ({documento}) => {
               <input type="text" className="campo" placeholder="Localizar" value={procurar} onChange={(e) => setProcurar(e.target.value)} aria-label="Localizar nas legendas" />
               <input type="text" className="campo" placeholder="Substituir por" value={troca} onChange={(e) => setTroca(e.target.value)} aria-label="Substituir por" />
               <div className="opcoes">
-                <label><input type="checkbox" checked={caixa} onChange={(e) => setCaixa(e.target.checked)} /> maiúsculas e acentos</label>
-                <label><input type="checkbox" checked={inteira} onChange={(e) => setInteira(e.target.checked)} /> palavra inteira</label>
-                <label title="A troca volta a valer quando as legendas forem geradas de novo, e entra no vocabulário do whisper">
-                  <input type="checkbox" checked={guardar} onChange={(e) => setGuardar(e.target.checked)} /> guardar no dicionário</label>
+                <Caixa marcado={caixa} aoMudar={setCaixa}>maiúsculas e acentos</Caixa>
+                <Caixa marcado={inteira} aoMudar={setInteira}>palavra inteira</Caixa>
+                <Caixa marcado={guardar} aoMudar={setGuardar} dica="A troca volta a valer quando as legendas forem geradas de novo, e entra no vocabulário do whisper">guardar no dicionário</Caixa>
               </div>
               <div className="opcoes">
                 <span>{procurar ? `${achados.size} ${achados.size === 1 ? 'legenda' : 'legendas'}` : ' '}</span>
@@ -334,7 +334,7 @@ export const PainelLegendas: React.FC<{documento: string}> = ({documento}) => {
                   <span>Dicionário do vídeo (vale ao gerar de novo; as siglas da casa, como CLT e FGTS, já valem sempre):</span>
                   {leg!.dicionario!.map((e) => (
                     <span key={e.de} className="entrada">{e.de} → {e.para}
-                      <button className="bti" title="Tirar do dicionário" onClick={() => void tirarDoDicionario(documento, e.de)}><X /></button></span>
+                      <button aria-label="Tirar do dicionário" className="bti" title="Tirar do dicionário" onClick={() => void tirarDoDicionario(documento, e.de)}><X /></button></span>
                   ))}
                 </div>
               )}

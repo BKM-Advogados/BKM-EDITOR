@@ -1,39 +1,66 @@
-/* Diálogo de exportar (componentes/DialogoExportar.tsx): usa a moldura .dialogo da tela inicial (inicio.css) e acrescenta
-   as linhas de opção, os destinos com estimativa, a barra de andamento e a lista de arquivos. */
-.dialogo.exportar { width: min(600px, calc(100vw - 40px)); gap: 10px; }
+/* Diálogo de exportar (componentes/DialogoExportar.tsx): usa a moldura .dialogo (estilo.css) e acrescenta os destinos
+   como cartões com o tamanho estimado, as linhas de opção em segmentados, a prévia grande por destino, os avisos com
+   ação, o resumo com o verbo exato no botão, a barra de andamento e a lista de arquivos. */
+.dialogo.exportar { width: min(620px, calc(100vw - 40px)); gap: 12px; }
+.dialogo.exportar.largo { width: min(920px, calc(100vw - 40px)); }
 .dialogo.exportar .dialogo-titulo { display: flex; align-items: center; gap: 8px; }
-.dialogo.exportar .dialogo-titulo .sub { color: var(--texto-3); font-weight: 400; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dialogo.exportar .dialogo-titulo .sub { color: var(--texto-3); font-weight: 400; font-size: var(--tam-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dialogo.exportar .dialogo-titulo .bti { margin-left: auto; }
 
 .linha-exp { display: grid; grid-template-columns: 92px minmax(0, 1fr); align-items: start; gap: 10px; min-height: 24px; }
-.linha-exp > .rot { color: var(--texto-2); font-size: 12px; padding-top: 4px; }
+.linha-exp > .rot { color: var(--texto-2); font-size: var(--tam-2); padding-top: 5px; }
 .linha-exp > .val { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
-.linha-exp .nota { color: var(--texto-3); font-size: 11px; }
-.linha-exp select.campo { width: auto; min-width: 150px; }
+.linha-exp .nota { color: var(--texto-3); font-size: var(--tam-2); }
+.linha-exp .nota code { font: var(--tam-1) var(--fonte-mono); color: var(--texto-2); }
+.linha-exp .val > .campo:not(.escolha) { flex: 1; min-width: 160px; max-width: 320px; }
 
-.destinos { display: flex; flex-direction: column; gap: 2px; width: 100%; }
-.destinos label { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto auto; align-items: center; gap: 8px; height: 26px; padding: 0 8px; border-radius: 4px; cursor: pointer; }
-.destinos label:hover { background: var(--fundo-3); }
-.destinos label.marcado { background: var(--fundo-3); }
-.destinos label.desligado { opacity: 0.45; cursor: default; }
-.destinos label.desligado:hover { background: none; }
-.destinos input[type="checkbox"] { margin: 0; width: 14px; height: 14px; accent-color: var(--acento); }
-.destinos .medida, .destinos .tam { color: var(--texto-3); font-size: 11px; }
-.destinos .tam { min-width: 64px; text-align: right; }
-.destinos .pers { display: inline-flex; align-items: center; gap: 4px; color: var(--texto-3); font-size: 11px; }
-.destinos .pers input { width: 56px; height: 20px; padding: 0 4px; text-align: right; }
+.exp-colunas { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 18px; align-items: start; }
+@media (max-width: 860px) { .exp-colunas { grid-template-columns: 1fr; } }
+.exp-opcoes { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.exp-pergunta { color: var(--texto-2); font-size: var(--tam-2); }
+.exp-pergunta b { color: var(--texto); }
+.destinos-exp { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.cartao-destino { display: flex; align-items: center; gap: 10px; min-height: 58px; padding: 8px 10px; border: 1px solid var(--borda); border-radius: var(--raio-2);
+  background: var(--fundo-2); cursor: pointer; outline: none; }
+.cartao-destino:hover { border-color: var(--borda-forte); }
+.cartao-destino:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+.cartao-destino.marcado { border-color: var(--acento); background: var(--acento-fundo); }
+.cartao-destino.marcado .caixa-quadro { background: var(--acento); border-color: var(--acento); }
+.cartao-destino.desligado { opacity: 0.45; cursor: default; }
+.quadro-destino { width: 30px; height: 30px; flex: none; display: grid; place-items: center; }
+.quadro-destino > span { display: block; border: 1.5px solid var(--texto-3); border-radius: 2px; }
+.quadro-destino > span.livre { border-style: dashed; }
+.cartao-destino.marcado .quadro-destino > span { border-color: var(--acento); }
+.cd-textos { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.cd-nome { font-weight: var(--peso-forte); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cd-meta { color: var(--texto-2); font-size: var(--tam-2); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.cd-tam { flex: none; color: var(--texto-2); font-size: var(--tam-2); text-align: right; white-space: nowrap; }
+.cartao-destino .pers { display: inline-flex; align-items: center; gap: 4px; color: var(--texto-3); font-size: var(--tam-2); }
+.cartao-destino .pers input { width: 60px; height: 22px; padding: 0 4px; text-align: right; }
+.legenda-destino { display: inline-flex; gap: 6px; align-items: center; }
+.legenda-destino .medida { color: var(--texto-3); font-size: var(--tam-2); }
+
+.previa-exp { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 12px; border-radius: var(--raio-2); background: var(--fundo-1); border: 1px solid var(--borda); }
+.previa-exp .nota { color: var(--texto-3); font-size: var(--tam-2); text-align: center; line-height: 1.4; }
+.previa-oculta { position: absolute; left: -10000px; top: 0; visibility: hidden; pointer-events: none; }
+.aviso-exp { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--raio); background: var(--aviso-fundo); color: var(--texto);
+  font-size: var(--tam-2); }
+.aviso-exp > svg.lucide { color: var(--aviso); flex: none; }
+.aviso-exp > span { flex: 1; min-width: 0; }
+.rodape-exp { display: flex; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px solid var(--borda); }
+.resumo-exp { flex: 1; min-width: 0; color: var(--texto-2); font-size: var(--tam-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.resumo-exp b { color: var(--texto); }
 
 .trecho-campos { display: inline-flex; align-items: center; gap: 6px; color: var(--texto-2); }
 .trecho-campos input.campo { width: 64px; text-align: right; }
-.escolha-exp { display: inline-flex; align-items: center; gap: 6px; color: var(--texto); cursor: pointer; }
-.escolha-exp input { margin: 0; accent-color: var(--acento); }
+
 
 .estimativa-exp { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 6px; background: var(--fundo-1);
-  font-size: 12px; color: var(--texto-2); }
+  font-size: var(--tam-2); color: var(--texto-2); }
 .estimativa-exp b { color: var(--texto); }
 
 .andamento { display: flex; flex-direction: column; gap: 8px; padding: 6px 0; }
-.andamento .texto { display: flex; justify-content: space-between; gap: 12px; color: var(--texto-2); font-size: 12px; min-width: 0; }
+.andamento .texto { display: flex; justify-content: space-between; gap: 12px; color: var(--texto-2); font-size: var(--tam-2); min-width: 0; }
 .andamento .texto b { color: var(--texto); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .barra-andamento { height: 6px; border-radius: 3px; background: var(--fundo-4); overflow: hidden; }
 .barra-andamento > span { display: block; height: 100%; background: var(--acento); transition: width 0.15s; }
@@ -41,32 +68,28 @@
 @keyframes andamento-indefinido { from { margin-left: 0; } to { margin-left: 70%; } }
 
 .arquivos-exp { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.arquivos-exp li { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px; border-radius: 4px; background: var(--fundo-1); font-size: 12px; }
+.arquivos-exp li { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px; border-radius: 4px; background: var(--fundo-1); font-size: var(--tam-2); }
 .arquivos-exp li .nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
 .arquivos-exp li > svg.lucide { color: var(--ok); flex: none; }
-.erro-exp { color: var(--erro); font-size: 12px; line-height: 1.5; }
+.erro-exp { color: var(--erro); font-size: var(--tam-2); line-height: 1.5; }
 
 /* marca d'água por destino: os campos à esquerda e a miniatura de um quadro de verdade à direita, com as zonas da rede
    apagadas por cima (as mesmas classes do monitor, zonas-seguras.css, sem os rótulos) */
-.destinos .md-ico { display: inline-flex; vertical-align: -1px; margin-left: 6px; color: var(--acento); }
+.cartao-destino .md-ico { display: inline-flex; vertical-align: -1px; margin-left: 6px; color: var(--acento); }
 .md-exp { display: flex; align-items: flex-start; gap: 14px; width: 100%; }
 .md-campos { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .md-linha { display: flex; align-items: center; gap: 8px; min-height: 22px; }
-.md-linha .rot2 { width: 62px; flex: none; color: var(--texto-3); font-size: 11px; }
+.md-linha .rot2 { width: 62px; flex: none; color: var(--texto-3); font-size: var(--tam-1); }
 .md-linha input[type="range"] { width: 120px; accent-color: var(--acento); }
-.md-linha .nota { color: var(--texto-3); font-size: 11px; }
+.md-linha .nota { color: var(--texto-3); font-size: var(--tam-1); }
 .md-linha .cantos { display: inline-flex; gap: 2px; }
-.md-linha .cantos .bti { width: 22px; height: 22px; }
+.md-linha .cantos .bti { width: 24px; height: 24px; }
 .miniatura-exp { position: relative; flex: none; border-radius: 4px; overflow: hidden; background: var(--fundo-1); box-shadow: 0 0 0 1px var(--borda); }
-.miniatura-exp .zonas-seguras .zona.coberta { background: rgba(255, 77, 77, 0.16); border: none; }
-.miniatura-exp .zonas-seguras .zona.contorno { border-width: 1px; border-color: rgba(112, 184, 255, 0.55); }
+.miniatura-exp .zonas-seguras .zona.coberta { background: color-mix(in srgb, var(--cabeca) 16%, transparent); border: none; }
+.miniatura-exp .zonas-seguras .zona.contorno { border-width: 1px; border-color: var(--acento-tracejado); }
 
-/* prévia por destino: uma miniatura de cada destino marcado, com os blocos que se sobrepõem no quadro destacados (video-D4) */
-.previa-destinos { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; }
-.previa-destino { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; max-width: 160px; }
-.previa-destino .nota { color: var(--texto-3); font-size: 11px; }
-.previa-destino .erro-exp { font-size: 11px; line-height: 1.35; }
-.miniatura-exp .sobre { position: absolute; border: 1.5px solid var(--erro); background: rgba(255, 77, 77, 0.22); pointer-events: none; }
+/* blocos que se sobrepõem no quadro do destino (video-D4) */
+.miniatura-exp .sobre { position: absolute; border: 1.5px solid var(--erro); background: color-mix(in srgb, var(--erro) 22%, transparent); pointer-events: none; }
 /* frente Fala: a escolha das legendas por destino */
 .legendas-exp { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
 .legendas-exp label { display: inline-flex; gap: 6px; align-items: center; }

@@ -18,6 +18,7 @@ import {alternarLoop, parar, tocarOuPausar, useDocMusica} from './Monitor';
 import {motor, urlDaMidia} from './motor';
 import {CabecaAutomacao, LinhaAutomacao} from './AutomacaoArranjo';
 import type {Envelope} from '../../../nucleo/audio';
+import {corDoCanal} from './estado';
 
 type Arrasto = {id: string; modo: 'mover' | 'ini' | 'fim'; x0: number; db: number; livre: boolean};
 const passo = (b: number, livre: boolean) => (livre ? Math.round(b * 960) / 960 : Math.round(b * 4) / 4);
@@ -74,13 +75,14 @@ const Onda: React.FC<{arquivo: string; corte_s: number; dur_s: number; largura: 
 };
 
 const Clipe: React.FC<{c: ClipeMusicaP; m: ReturnType<typeof resolverMusica>['musica']; px: number; sel: boolean; arrasto: Arrasto | null; titulo: string;
-  aoPegar: (e: React.PointerEvent, c: ClipeMusicaP, modo: Arrasto['modo']) => void; aoMover: (e: React.PointerEvent) => void; aoSoltar: () => void; veio?: boolean}> =
-  ({c, m, px, sel, arrasto, titulo, aoPegar, aoMover, aoSoltar, veio}) => {
+  aoPegar: (e: React.PointerEvent, c: ClipeMusicaP, modo: Arrasto['modo']) => void; aoMover: (e: React.PointerEvent) => void; aoSoltar: () => void; veio?: boolean; cor: string}> =
+  ({c, m, px, sel, arrasto, titulo, aoPegar, aoMover, aoSoltar, veio, cor}) => {
     const {em, dur} = comArrasto(c, arrasto);
     const largura = Math.max(6, dur * px - 1);
     const notas = useMemo(() => (c.padrao ? notasDoClipe(m, c) : []), [c, m]);
     return (
-      <div className={`mclipe${c.audio ? ' audio' : ''}${sel ? ' sel' : ''}${c.mudo ? ' mudo' : ''}`} style={{left: em * px, width: largura}} title={titulo}
+      <div className={`mclipe${c.audio ? ' audio' : ''}${sel ? ' sel' : ''}${c.mudo ? ' mudo' : ''}`} style={{left: em * px, width: largura, '--cor-canal': cor} as React.CSSProperties}
+        title={`${titulo}${c.mudo ? ' (mudo)' : ''}`}
         onPointerDown={(e) => aoPegar(e, c, 'mover')} onPointerMove={aoMover} onPointerUp={aoSoltar} onPointerCancel={aoSoltar} onClick={(e) => e.stopPropagation()}>
         {c.audio && <Onda arquivo={c.audio} corte_s={c.corte_s ?? 0} dur_s={dur * m.seg_por_batida} largura={largura} />}
         {largura > 30 && <span className="txt">{titulo}</span>}
@@ -241,20 +243,21 @@ const Arranjo: React.FC<{doc: DocMusica}> = ({doc}) => {
       <div className="cabecas" ref={cabecas}>
         <div className="cab-regua" title={`${m.bpm} BPM · compasso ${m.compasso[0]}/${m.compasso[1]}`}><span style={{whiteSpace: 'nowrap'}}>{m.bpm} BPM</span>
           <span className="zoom-botoes">
-            <button className="bti" title="Afastar (Ctrl + roda do mouse)" onClick={() => zoomar(1 / 1.3)}><ZoomOut size={12} /></button>
-            <button className="bti" title="Aproximar (Ctrl + roda do mouse)" onClick={() => zoomar(1.3)}><ZoomIn size={12} /></button>
-            <button className="bti" title="Ajustar: a música inteira cabe na largura" onClick={ajustar}><Maximize2 size={12} /></button>
+            <button aria-label="Afastar (Ctrl + roda do mouse)" className="bti" title="Afastar (Ctrl + roda do mouse)" onClick={() => zoomar(1 / 1.3)}><ZoomOut size={12} /></button>
+            <button aria-label="Aproximar (Ctrl + roda do mouse)" className="bti" title="Aproximar (Ctrl + roda do mouse)" onClick={() => zoomar(1.3)}><ZoomIn size={12} /></button>
+            <button aria-label="Ajustar: a música inteira cabe na largura" className="bti" title="Ajustar: a música inteira cabe na largura" onClick={ajustar}><Maximize2 size={12} /></button>
           </span></div>
-        {doc.secoes?.length ? <div className="cab-acordes" style={{color: 'var(--comentario)'}}>Seções</div> : null}
+        {doc.secoes?.length ? <div className="cab-acordes">Seções</div> : null}
         {doc.acordes?.length ? <div className="cab-acordes">Acordes · {doc.tom ?? 'C'} {doc.escala ?? 'maior'}</div> : null}
         {m.canais.map((c, i) => (
-          <div key={c.id} className={`cab-canal${selecao?.tipo === 'canal' && selecao.id === c.id ? ' sel' : ''}`} onClick={() => selecionarMusica({tipo: 'canal', id: c.id})}>
+          <div key={c.id} className={`cab-canal${selecao?.tipo === 'canal' && selecao.id === c.id ? ' sel' : ''}${c.mudo ? ' mudo' : ''}`} style={{'--cor-canal': corDoCanal(i)} as React.CSSProperties}
+            onClick={() => selecionarMusica({tipo: 'canal', id: c.id})}>
             {iconeDoCanal(c, 14)}
             <span className="nome" title={c.id}>{c.nome}</span>
-            <button className={`bti${c.mudo ? ' ligado' : ''}`} title="Mudo" onClick={(e) => (e.stopPropagation(), void campo(`/canais/${i}/mudo`, c.mudo ? undefined : true, `mudo em ${c.nome}`))}>
+            <button className={`bti${c.mudo ? ' ligado' : ''}`} title={c.mudo ? 'Mudo: clique para ouvir' : 'Mudo'} aria-pressed={Boolean(c.mudo)} aria-label="Mudo" onClick={(e) => (e.stopPropagation(), void campo(`/canais/${i}/mudo`, c.mudo ? undefined : true, `mudo em ${c.nome}`))}>
               {c.mudo ? <VolumeX size={12} /> : <Volume2 size={12} />}
             </button>
-            <button className={`bti${c.solo ? ' ligado' : ''}`} title="Solo" onClick={(e) => (e.stopPropagation(), void campo(`/canais/${i}/solo`, c.solo ? undefined : true, `solo em ${c.nome}`))}>S</button>
+            <button className={`bti${c.solo ? ' ligado' : ''}`} title="Solo" aria-pressed={Boolean(c.solo)} aria-label="Solo" onClick={(e) => (e.stopPropagation(), void campo(`/canais/${i}/solo`, c.solo ? undefined : true, `solo em ${c.nome}`))}>S</button>
           </div>
         ))}
         <CabecaAutomacao doc={doc} />
@@ -297,7 +300,7 @@ const Arranjo: React.FC<{doc: DocMusica}> = ({doc}) => {
           {Array.from({length: Math.ceil(total / bpc) + 1}, (_, k) => <span key={`g${k}`} className="grade compasso" style={{left: k * bpc * px}} />)}
           {px >= 14 && Array.from({length: total}, (_, b) => (b % bpc ? <span key={`b${b}`} className="grade" style={{left: b * px}} /> : null))}
           {cortes.map((c) => <span key={c.ms} className="corte" style={{left: c.b * px}}><span>corte {(c.ms / 1000).toFixed(1)} s</span></span>)}
-          {m.canais.map((canal) => (
+          {m.canais.map((canal, ci) => (
             <div key={canal.id} className={`linha-canal${canal.tipo === 'audio' ? '' : ' pintavel'}`}
               onPointerDown={(e) => pintarComeco(e, canal.id, canal.tipo)} onPointerMove={pintarMover} onPointerUp={(e) => void pintarFim(e)} onPointerCancel={() => setPintura(null)}
               onClick={(e) => { if (pintou.current) { pintou.current = false; e.stopPropagation(); } }}
@@ -306,7 +309,7 @@ const Arranjo: React.FC<{doc: DocMusica}> = ({doc}) => {
                 <span className="txt">{doc.padroes.find((x) => x.id === padraoParaPintar(canal.id))?.nome ?? 'sem padrão'} · {Math.round((pintura.b - pintura.a) / bpc)} comp.</span></span>}
               {m.clipes.filter((c) => c.canal === canal.id).map((c) => (
                 <Clipe key={c.id} c={c} m={m} px={px} sel={selecao?.tipo === 'clipe' && selecao.id === c.id} arrasto={arrasto} titulo={nomeDoClipe(c)}
-                  aoPegar={pegar} aoMover={mover} aoSoltar={soltar} veio={Boolean(doc.arranjo.clipes[c.indice]?.origem)} />
+                  aoPegar={pegar} aoMover={mover} aoSoltar={soltar} veio={Boolean(doc.arranjo.clipes[c.indice]?.origem)} cor={corDoCanal(ci)} />
               ))}
             </div>
           ))}

@@ -7,6 +7,7 @@ import type {Comentario, DocImagem, Modulo, OperacaoPatch, ResumoDiario} from '.
 import type {Efeito} from '../../nucleo/efeitos';
 import type {Pesquisa} from '../../nucleo/pesquisa'; // só o tipo: pesquisa.ts usa node:crypto
 import {indicePagina, paginasDe} from '../../nucleo/carrossel';
+import {JANELA_AGENTE_MS, juntarMudancas, mudancasNovas, type MudancaAgente} from './agente';
 import {EstadoDeGravacao, FilaPorChave, JANELA_EDICAO_PROPRIA_MS, mensagemDeFalhaNaEdicao, validadeDoAviso, type Gravacao} from './gravacao'; // frente Casca
 export {VALIDADE_AVISO_MS} from './gravacao';
 
@@ -42,10 +43,12 @@ export type Estado = {
   // "Descreva o vídeo para o Claude" da tela inicial: vai para uma conversa nova quando a casca abrir
   pedidoClaude?: {texto: string; rotulo: string; contexto: string};
   paginaAtiva: Partial<Record<string, string>>; // imagem com várias páginas: id da página ativa, por documento
+  mudancasAgente: MudancaAgente[]; // o que o agente mudou nos últimos 30 s (estado/agente.ts): a tela marca no lugar
+  seqVisto?: number; // o maior seq do diário já lido neste projeto (undefined antes da primeira leitura)
 };
 
 const INICIAL: Estado = {info: null, area: 'video', ativo: {}, docs: {}, props: {}, selecao: null, tempo_ms: 0, comentarios: [], diario: [], modoComentario: false, gravacao: {estado: 'salvo'}, zoomLinha: null,
-  paginaAtiva: {}, pesquisa: null, erroPesquisa: undefined, fatoAberto: undefined}; // os opcionais da pesquisa ficam aqui para a troca de projeto zerá-los
+  paginaAtiva: {}, mudancasAgente: [], seqVisto: undefined, pesquisa: null, erroPesquisa: undefined, fatoAberto: undefined}; // os opcionais da pesquisa ficam aqui para a troca de projeto zerá-los
 let estado: Estado = INICIAL;
 const ouvintes = new Set<() => void>();
 
@@ -137,9 +140,30 @@ export const carregarDiario = async () => {
   const diario = await window.estudio.diario();
   const ultimaAgente = [...diario].reverse().find((d) => d.autor === 'agente');
   const anterior = estado.ultimaMudancaAgente;
-  loja.definir({diario, ultimaMudancaAgente: ultimaAgente?.seq});
+  // o que o agente mudou desde a última leitura vira marca na tela por 30 s (na primeira leitura do projeto, nada)
+  const visto = estado.seqVisto;
+  const agora = Date.now();
+  const novas = mudancasNovas(diario, visto, estado.info?.manifesto.documentos ?? [], agora);
+  const revertidas = new Set(diario.filter((d) => d.desfaz !== undefined).map((d) => d.desfaz!));
+  const mudancasAgente = juntarMudancas(estado.mudancasAgente, novas, revertidas, agora);
+  loja.definir({diario, ultimaMudancaAgente: ultimaAgente?.seq, mudancasAgente, seqVisto: Math.max(visto ?? 0, ...diario.map((d) => d.seq))});
+  if (novas.length) agendarLimpezaAgente();
   if (ultimaAgente && anterior !== undefined && ultimaAgente.seq !== anterior) avisar(`${ultimaAgente.origem || 'IA'}: ${ultimaAgente.rotulo}`, 'agente'); // frente IA: o nome da aba (DeepSeek 1, Claude 2)
 };
+
+// as marcas do agente somem sozinhas depois de 30 s; Esc e a próxima edição da pessoa também tiram
+let limpezaAgente: ReturnType<typeof setTimeout> | undefined;
+const agendarLimpezaAgente = () => {
+  clearTimeout(limpezaAgente);
+  const proxima = Math.min(...estado.mudancasAgente.map((m) => m.em + JANELA_AGENTE_MS));
+  if (!Number.isFinite(proxima)) return;
+  limpezaAgente = setTimeout(() => {
+    const agora = Date.now();
+    loja.definir((e) => ({mudancasAgente: e.mudancasAgente.filter((m) => agora - m.em < JANELA_AGENTE_MS)}));
+    agendarLimpezaAgente();
+  }, Math.max(50, proxima - Date.now() + 20));
+};
+export const dispensarMudancasAgente = () => estado.mudancasAgente.length && loja.definir({mudancasAgente: []});
 
 // Conversas e terminais vivem fora do React (paineis/conversas.ts, paineis/terminais.ts) e carregam só quando alguém
 // abre o painel do Claude; ao trocar ou fechar o projeto, quem estiver carregado se limpa por aqui.
@@ -253,6 +277,7 @@ const fimDaEdicaoPropria = new Map<string, number>(); // documento → quando a 
 
 export const aplicar = (documento: string, patch: OperacaoPatch[], rotulo?: string): Promise<boolean> => {
   if (!patch.length) return Promise.resolve(true);
+  dispensarMudancasAgente(); // a pessoa editou: as marcas do que o Claude mudou saem
   loja.definir({gravacao: gravacao.comecar()});
   return filaDeEdicoes.enfileirar(documento, (esperou) => aplicarNaVez(documento, patch, rotulo, esperou));
 };
@@ -305,24 +330,37 @@ export const alternarNaSelecao = (documento: string, caminho: string) => {
   selecionarVarias(documento, atuais.includes(caminho) ? atuais.filter((c) => c !== caminho) : [...atuais, caminho]);
 };
 
-/** Seleção pedida pela IA (ferramenta selecionar_camadas grava .estudio/selecao.json): a área e o documento vêm para a
- *  frente, com a página da primeira camada num carrossel. */
-const aplicarSelecaoPedida = async () => {
-  const p = await window.estudio.lerJsonOpcional('.estudio/selecao.json').catch(() => null) as {documento?: string; caminhos?: string[]} | null;
-  let entrada = p?.documento ? entradaDe(p.documento) : undefined;
-  if (p?.documento && !entrada) {
-    // documento que o Claude acabou de criar: o pedido pode chegar antes de a tela reler o estudio.json
-    const i = await window.estudio.projetoAtual();
-    if (i && i.raiz === estado.info?.raiz) await abrirProjeto(i);
-    entrada = entradaDe(p.documento);
+/** Seleção pedida pela IA (ferramentas selecionar_camadas e mostrar_documento gravam .estudio/selecao.json): a área e o
+ *  documento vêm para a frente, com a página da primeira camada num carrossel e, se vier, a agulha no tempo pedido.
+ *  Documento que a tela ainda não conhece (criar_documento grava o estudio.json e o selecao.json quase juntos, e este
+ *  pode chegar antes): relê a lista de documentos antes de aplicar, em vez de descartar o pedido em silêncio. */
+export const aplicarSelecaoPedida = async () => {
+  const p = await window.estudio.lerJsonOpcional('.estudio/selecao.json').catch(() => null) as
+    {documento?: string; caminhos?: string[]; tempo_ms?: number; autor?: string} | null;
+  if (!p?.documento) return;
+  let entrada = entradaDe(p.documento);
+  if (!entrada && estado.info) {
+    const info = await window.estudio.projetoAtual().catch(() => null);
+    if (info && info.raiz === estado.info?.raiz) {
+      await abrirProjeto(info);
+      entrada = entradaDe(p.documento);
+    }
   }
-  if (!p || !entrada || !Array.isArray(p.caminhos)) return;
+  if (!entrada) return;
+  const caminhos = Array.isArray(p.caminhos) ? p.caminhos.filter((c): c is string => typeof c === 'string') : [];
   const doc = estado.docs[entrada.id]?.doc as DocImagem | undefined;
-  const m = /^\/paginas\/(\d+)\//.exec(p.caminhos[0] ?? '');
+  const m = /^\/paginas\/(\d+)\//.exec(caminhos[0] ?? '');
   const pagina = doc && m ? paginasDe(doc)[Number(m[1])]?.id : undefined;
-  loja.definir((e) => ({area: entrada.modulo, ativo: {...e.ativo, [entrada.modulo]: entrada.id},
-    ...(pagina ? {paginaAtiva: {...e.paginaAtiva, [entrada.id]: pagina}} : {})}));
-  selecionarVarias(entrada.id, p.caminhos);
+  const modulo = entrada.modulo;
+  const trocou = estado.area !== modulo || estado.ativo[modulo] !== entrada.id;
+  const tempo = typeof p.tempo_ms === 'number' && Number.isFinite(p.tempo_ms) && p.tempo_ms >= 0 ? Math.round(p.tempo_ms) : undefined;
+  loja.definir((e) => ({area: modulo, ativo: {...e.ativo, [modulo]: entrada!.id},
+    ...(modulo === 'video' || modulo === 'imagem' ? {alvoEfeitos: e.area === 'efeitos' ? e.alvoEfeitos : entrada!.id} : {}),
+    ...(pagina ? {paginaAtiva: {...e.paginaAtiva, [entrada!.id]: pagina}} : {}),
+    // a agulha: o tempo pedido; sem ele, a animação e a música trocadas voltam ao começo
+    ...(tempo !== undefined ? {tempo_ms: tempo} : trocou && (modulo === 'animacao' || modulo === 'musica') ? {tempo_ms: 0} : {})}));
+  selecionarVarias(entrada.id, caminhos);
+  if (trocou && p.autor === 'agente') avisar(`Claude abriu ${entrada.titulo}`, 'agente');
 };
 
 export const comentar = async (documento: string, texto: string, alvo: Comentario['alvo']) => {

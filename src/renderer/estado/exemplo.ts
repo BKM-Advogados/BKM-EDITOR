@@ -1,4 +1,4 @@
-// Se a instalação traz o projeto de exemplo (src/nucleo/exemplo.ts): sem ele, "Ver um pronto" não aparece. Pergunta ao
+// Se a instalação traz o projeto de exemplo (src/nucleo/exemplo.ts): sem ele, "Ver um exemplo" não aparece. Pergunta ao
 // processo principal uma vez por janela.
 import {useEffect, useState} from 'react';
 

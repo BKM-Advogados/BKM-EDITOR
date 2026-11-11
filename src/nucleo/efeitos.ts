@@ -50,6 +50,9 @@ const numeroDe = (v: unknown): number | null => {
   return null;
 };
 const entre = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
+/** Cor padrão do efeito Tom (e do pré-ajuste Quente): um âmbar neutro de "quente", que não é cor de cliente. */
+export const TOM_PADRAO = '#E0A060';
+
 const COR_HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 
 /** Valida a pilha de efeitos do documento sem perder a posição de ninguém. Valor em texto numérico ("1.2") vira número; fora
@@ -76,7 +79,7 @@ export const lerEfeitos = (x: unknown): EfeitoLido[] => {
     }
     const lido: Efeito = {id, tipo: d.tipo, valor};
     if (e.ativo === false) lido.ativo = false;
-    if (d.tipo === 'tom') lido.cor = typeof e.cor === 'string' && COR_HEX.test(e.cor.trim()) ? e.cor.trim() : '#C88155';
+    if (d.tipo === 'tom') lido.cor = typeof e.cor === 'string' && COR_HEX.test(e.cor.trim()) ? e.cor.trim() : TOM_PADRAO;
     return {efeito: lido, original: bruto, ...(problemas.length ? {problema: `${id}: ${problemas.join('; ')}`} : {})};
   });
 };
@@ -112,7 +115,7 @@ export const camadas = (efeitos: unknown = []) => efeitosValidos(efeitos).filter
 export const novoEfeito = (tipo: TipoEfeito, existentes: {id: string}[] = []): Efeito => {
   let n = 1;
   while (existentes.some((e) => e.id === `${tipo}-${n}`)) n++;
-  return {id: `${tipo}-${n}`, tipo, valor: definicao(tipo).padrao, ...(tipo === 'tom' ? {cor: '#C88155'} : {})};
+  return {id: `${tipo}-${n}`, tipo, valor: definicao(tipo).padrao, ...(tipo === 'tom' ? {cor: TOM_PADRAO} : {})};
 };
 
 // ---------- granulado (tres-efeitos-D6) ----------

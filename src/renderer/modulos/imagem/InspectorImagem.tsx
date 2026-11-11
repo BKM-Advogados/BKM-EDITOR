@@ -21,6 +21,7 @@ import {renomearPagina} from './acoes';
 import {SecaoFundoDegrade, SecoesAcabamento, usarKitDaImagem} from './Acabamento';
 import {removerFundoDaCamada, voltarAoOriginal} from './removerFundo';
 import {iconeCamada} from './CamadasImagem';
+import {MudancasNoInspetor} from '../../componentes/Agente';
 
 const PESOS: [string, string][] = ['100', '200', '300', '400', '500', '600', '700', '800', '900'].map((p) => [p, p]);
 const TIPOS: Record<CamadaImagem['tipo'], string> = {texto: 'Texto', forma: 'Forma', imagem: 'Imagem'};
@@ -57,6 +58,7 @@ const InspectorCamada: React.FC<{documento: string; caminho: string; c: CamadaIm
           {rotulo: 'Copiar id', icone: <Copy className="i14" />, acao: () => copiar(c.id, 'Id copiado')},
           {rotulo: 'Copiar JSON', icone: <FileJson className="i14" />, acao: () => copiar(JSON.stringify(c, null, 2), 'JSON copiado')},
         ]} />
+      <MudancasNoInspetor documento={documento} objeto={caminho} />
       <div className="insp-corpo">
         <Secao titulo="Camada" chave="imagem:camada">
           <CampoTexto rotulo="Nome" valor={c.nome ?? ''} aoMudar={gravar('nome')} />

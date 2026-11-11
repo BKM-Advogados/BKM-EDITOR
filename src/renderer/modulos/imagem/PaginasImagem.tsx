@@ -1,11 +1,10 @@
 // Barra de páginas do carrossel, entre o monitor e o transporte (como as páginas do Canva e as pranchetas do Figma):
 // miniaturas na ordem, a ativa marcada; clicar vai para a página, PageUp/PageDown também (com o foco na área Imagem),
 // arrastar reordena, dois cliques no nome renomeiam (F2 na miniatura em foco), Delete exclui. À direita: nova página,
-// duplicar, excluir, o menu (renomear, mover, novo carrossel) e "Exportar carrossel" (PNG por página e PDF), que ao
+// duplicar, excluir e o menu (renomear, mover, novo carrossel). Exportar sai pelo diálogo (o botão do monitor), que ao
 // fim oferece "Mostrar na pasta". Uma prancheta só também passa por aqui: a segunda página é o que faz o carrossel.
 import React, {useEffect, useRef, useState} from 'react';
-import {ArrowLeft, ArrowRight, Copy, Download, FolderOpen, LayoutGrid, MoreHorizontal, Pencil, Plus, Trash2} from 'lucide-react';
-import type {ResultadoExportarPaginas} from '../../../compartilhado/api';
+import {ArrowLeft, ArrowRight, Copy, LayoutGrid, MoreHorizontal, Pencil, Plus, Trash2} from 'lucide-react';
 import type {DocImagem} from '../../../nucleo/documentos';
 import {paginaDoAlvo} from '../../../nucleo/carrossel';
 import {FORMATOS_IMAGEM} from '../../../nucleo/formatos';
@@ -14,7 +13,6 @@ import {BotaoMenu, type ItemMenu} from '../../componentes/Menu';
 import {teclaLivre} from '../../componentes/Trilho';
 import {duplicarPagina, excluirPagina, moverPagina, novaPagina, novoCarrossel, renomearPagina} from './acoes';
 import {irParaPagina, usarPaginaAtiva} from './comum';
-import {exportarCarrossel} from './exportarPaginas';
 import {Miniatura} from './Prancheta';
 import './paginas.css';
 
@@ -32,8 +30,6 @@ export const PaginasImagem: React.FC<{documento: string; doc: DocImagem}> = ({do
   const [arrastando, setArrastando] = useState<number | null>(null); // para a classe da miniatura
   const origem = useRef<number | null>(null); // a mesma página, lida na hora de soltar
   const [alvo, setAlvo] = useState<Alvo | null>(null);
-  const [exportando, setExportando] = useState(false);
-  const [ultimo, setUltimo] = useState<ResultadoExportarPaginas | null>(null);
   const rolagem = useRef<HTMLDivElement>(null);
   const p = ativa?.p ?? 0;
   const paginas = ativa?.paginas ?? [];
@@ -85,12 +81,6 @@ export const PaginasImagem: React.FC<{documento: string; doc: DocImagem}> = ({do
     if (para !== de) void moverPagina(documento, de, para);
   };
 
-  const exportar = () => {
-    setExportando(true);
-    setUltimo(null);
-    void exportarCarrossel(documento).then((r) => setUltimo(r && r.ok ? r : null)).finally(() => setExportando(false));
-  };
-  const mostrar = ultimo?.pdf ?? ultimo?.pasta;
 
   const menu: ItemMenu[] = [
     {rotulo: 'Renomear página', icone: <Pencil className="i14" />, tecla: 'F2', acao: () => comecarRenomear(p)},
@@ -151,15 +141,9 @@ export const PaginasImagem: React.FC<{documento: string; doc: DocImagem}> = ({do
       <div className="acoes-pg">
         <div className="linha">
           <button className="bt fantasma mini" onClick={() => void novaPagina(documento)} title="Nova página depois desta"><Plus size={13} /><span className="largo">Página</span></button>
-          <button className="bti" onClick={() => void duplicarPagina(documento)} title="Duplicar esta página"><Copy size={14} /></button>
-          <button className="bti" onClick={() => void excluirPagina(documento)} disabled={n < 2} title={n < 2 ? 'A última página não sai' : 'Excluir esta página (Delete na miniatura)'}><Trash2 size={14} /></button>
+          <button aria-label="Duplicar esta página" className="bti" onClick={() => void duplicarPagina(documento)} title="Duplicar esta página"><Copy size={14} /></button>
+          <button aria-label={n < 2 ? 'A última página não sai' : 'Excluir esta página (Delete na miniatura)'} className="bti" onClick={() => void excluirPagina(documento)} disabled={n < 2} title={n < 2 ? 'A última página não sai' : 'Excluir esta página (Delete na miniatura)'}><Trash2 size={14} /></button>
           <BotaoMenu titulo="Mais ações da página" icone={<MoreHorizontal size={14} />} itens={menu} acima />
-        </div>
-        <div className="linha">
-          <button className="bt fantasma mini" disabled={exportando} onClick={exportar} title={`Exportar ${n} ${n === 1 ? 'página' : 'páginas'}: PNG por página em saidas/<nome>/ e PDF para o LinkedIn`}>
-            <Download size={13} /><span className="largo">{exportando ? 'Exportando…' : 'Exportar carrossel'}</span>
-          </button>
-          {mostrar && <button className="bti" title={`Mostrar na pasta\n${mostrar}`} onClick={() => window.estudio.mostrarNaPasta(ultimo?.pasta ?? mostrar)}><FolderOpen size={14} /></button>}
         </div>
       </div>
     </div>

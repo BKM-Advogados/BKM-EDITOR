@@ -4,6 +4,7 @@ import React, {useEffect, useState} from 'react';
 import {CircleAlert, CircleCheck, Info} from 'lucide-react';
 import {useLoja, type Area} from '../estado/loja';
 import {avisoVivo as vivoEm, restaDoAviso} from '../estado/gravacao';
+import {ContadorAgente} from '../componentes/Agente';
 
 const DICAS: Record<Area, [string[], string][]> = {
   video: [[['V'], 'seleção'], [['M'], 'comentar'], [['Espaço'], 'tocar'], [['←', '→'], 'quadro'], [['J', 'K', 'L'], 'velocidade']],
@@ -19,6 +20,7 @@ export const Rodape: React.FC = () => {
   const area = useLoja((e) => e.area);
   const info = useLoja((e) => e.info);
   const abertos = useLoja((e) => e.comentarios.filter((c) => c.estado === 'aberto').length);
+  const modoComentario = useLoja((e) => e.modoComentario);
   const [memoria, setMemoria] = useState<number | null>(null);
   const [, tique] = useState(0);
   useEffect(() => {
@@ -39,14 +41,16 @@ export const Rodape: React.FC = () => {
   const icone = avisoVivo?.tipo === 'erro' ? <CircleAlert /> : avisoVivo?.tipo === 'ok' ? <CircleCheck /> : <Info />;
   return (
     <footer className="rodape">
+      {modoComentario && <span className="modo-cmt" role="status"><span className="ponto-c" />Modo comentário · clique na peça para comentar · <kbd>Esc</kbd> sai</span>}
       {avisoVivo ? (
-        <span className={`aviso ${avisoVivo.tipo}`} title={avisoVivo.texto}>{icone}{avisoVivo.texto}</span>
+        <span className={`aviso ${avisoVivo.tipo}`} title={avisoVivo.texto} role="status" aria-live="polite">{icone}{avisoVivo.texto}</span>
       ) : (
         <span className="dicas">
           {DICAS[area].map(([teclas, o]) => <span key={o}>{teclas.map((t) => <kbd key={t}>{t}</kbd>)} {o}</span>)}
         </span>
       )}
       <span className="dir">
+        <ContadorAgente />
         {abertos > 0 && <span className="cmt"><span className="ponto-c" />{abertos === 1 ? '1 comentário aberto' : `${abertos} comentários abertos`}</span>}
         {info && !info.claude && <span className="falta" title="Instale o Claude Code (claude.ai/install) para conversar com o Claude">Claude não encontrado</span>}
         <span title="memória de todos os processos do app (conjunto de trabalho); o Claude de cada aba soma à parte">{memoria !== null ? `${memoria} MB` : '…'}</span>

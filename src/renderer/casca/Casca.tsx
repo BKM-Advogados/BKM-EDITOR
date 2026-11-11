@@ -8,15 +8,18 @@ import React, {Suspense, useCallback, useEffect, useRef, useState} from 'react';
 import {usarTemExemplo} from '../estado/exemplo';
 import {DockviewReact, type DockviewApi, type DockviewReadyEvent, type DockviewTheme, type IDockviewPanelHeaderProps, type IDockviewPanelProps} from 'dockview-react';
 import 'dockview-react/dist/styles/dockview.css';
-import {Blend, BookOpen, Box, Check, Copy, Download, Film, FilePlus2, FolderOpen, FolderSearch, History, Home, Image as ImageIcon, Images, LayoutPanelLeft, ListTree,
-  MessageSquare, MessageSquarePlus, MonitorPlay, Music, Palette, Plus, Quote, Rows3, Settings, SlidersHorizontal, Sparkle, Sparkles, Undo2, X} from 'lucide-react';
+import {Blend, BookMarked, BookOpen, Box, Maximize2, Minimize2, Check, Copy, Download, Film, FilePlus2, FolderOpen, FolderSearch, History, Home, Image as ImageIcon, Images, LayoutPanelLeft, ListTree,
+  MessageSquare, MessageSquarePlus, MonitorPlay, Music, Palette, Plus, Rows3, Settings, SlidersHorizontal, Sparkle, Sparkles, Undo2, X} from 'lucide-react';
 import type {Preferencias, Recente} from '../../compartilhado/api';
 import type {Modulo} from '../../nucleo/documentos';
 import {FORMATOS_IMAGEM, FORMATOS_VIDEO} from '../../nucleo/formatos';
-import {abrirProjeto, avisar, criarDocumento, desfazer, fecharProjeto, loja, mensagemDe, quandoVerFato, useLoja, type Area} from '../estado/loja';
+import {abrirProjeto, avisar, criarDocumento, desfazer, dispensarMudancasAgente, fecharProjeto, loja, mensagemDe, quandoVerFato, useLoja, type Area} from '../estado/loja';
 import {pedirTexto} from '../componentes/Dialogo';
+import {IconeEstudio} from '../componentes/Icones';
 import {acaoDeArquivo} from './atalhos';
 import {SeloSalvo} from './SeloSalvo';
+import {faixaAtual, gravarLayout, layoutPadrao, lerLayout, type Faixa, type Orientacao} from './arranjos';
+import {PainelPreferencias} from './Preferencias';
 import {Midia} from '../paineis/Midia'; // frente Casca (rodada 3): painel de mídia
 import type {PaineisDoModulo} from './contrato';
 import {PaineisVideo} from '../modulos/video/paineis';
@@ -33,6 +36,7 @@ import {FaixaTransicao} from '../modulos/musica/FaixaTransicao';
 import {observarMusica} from '../modulos/musica/estado';
 import {exportarMusica} from '../modulos/musica/acoes';
 import {PainelMarca} from './PainelMarca';
+import {usarAparencia} from '../estado/aparencia';
 import './casca.css';
 
 // o 3D (Three.js) e o terminal (xterm.js) só carregam quando alguém abre: a memória do app parado fica menor
@@ -40,13 +44,14 @@ const Terminal = React.lazy(() => import('../paineis/Terminal').then((m) => ({de
 const carregar3d = () => import('../modulos/tres/paineis').then((m) => m.PaineisTres);
 let Paineis3d: PaineisDoModulo | null = null;
 
-const AREAS: {id: Area; nome: string; icone: React.ReactNode; atalho: string}[] = [
+// na ordem de uso (as menos usadas, Efeitos e 3D, no fim); as teclas 1 a 6 (e Alt+1 a 6) seguem esta ordem
+export const AREAS: {id: Area; nome: string; icone: React.ReactNode; atalho: string}[] = [
   {id: 'video', nome: 'Vídeo', icone: <Film size={15} />, atalho: '1'},
   {id: 'imagem', nome: 'Imagem', icone: <ImageIcon size={15} />, atalho: '2'},
-  {id: '3d', nome: '3D', icone: <Box size={15} />, atalho: '3'},
-  {id: 'efeitos', nome: 'Efeitos', icone: <Blend size={15} />, atalho: '4'},
-  {id: 'musica', nome: 'Música', icone: <Music size={15} />, atalho: '5'}, // frente Música
-  {id: 'animacao', nome: 'Animação', icone: <Sparkles size={15} />, atalho: '6'},
+  {id: 'animacao', nome: 'Animação', icone: <Sparkles size={15} />, atalho: '3'},
+  {id: 'musica', nome: 'Música', icone: <Music size={15} />, atalho: '4'}, // frente Música
+  {id: 'efeitos', nome: 'Efeitos', icone: <Blend size={15} />, atalho: '5'},
+  {id: '3d', nome: '3D', icone: <Box size={15} />, atalho: '6'},
 ];
 
 const Carregando: React.FC = () => <div className="vazio">carregando…</div>;
@@ -77,9 +82,11 @@ const PorArea: React.FC<{parte: 'Lista' | 'Monitor' | 'Inspector' | 'Linha'}> = 
 // sustentam a área não têm ×; os outros mostram o × ao passar o mouse.
 const ICONES_ABA: Record<string, React.ReactNode> = {
   monitor: <MonitorPlay size={14} />, linha: <Rows3 size={14} />, lista: <ListTree size={14} />, inspector: <SlidersHorizontal size={14} />,
-  comentarios: <MessageSquare size={14} />, historico: <History size={14} />, pesquisa: <Quote size={14} />, midia: <Images size={14} />, terminal: <Sparkle size={14} />,
+  comentarios: <MessageSquare size={14} />, historico: <History size={14} />, pesquisa: <BookMarked size={14} />, midia: <Images size={14} />, terminal: <Sparkle size={14} />,
 };
 const ESSENCIAIS = new Set(['monitor', 'linha', 'lista', 'inspector', 'terminal']);
+// nome curto das abas de trás num grupo estreito (o inspetor tem ~310 px na tela grande): o nome inteiro fica na dica
+const CURTOS: Record<string, string> = {comentarios: 'Coment.', historico: 'Hist.', pesquisa: 'Pesq.', midia: 'Mídia', inspector: 'Props.'};
 const AbaDoPainel: React.FC<IDockviewPanelHeaderProps> = ({api}) => {
   const [titulo, setTitulo] = useState(api.title ?? '');
   useEffect(() => {
@@ -91,6 +98,7 @@ const AbaDoPainel: React.FC<IDockviewPanelHeaderProps> = ({api}) => {
     <div className={`aba-doca aba-${api.id}`} title={titulo}>
       <span className="aba-icone">{ICONES_ABA[api.id]}</span>
       <span className="aba-titulo">{titulo}</span>
+      {CURTOS[api.id] && <span className="aba-curto" aria-hidden="true">{CURTOS[api.id]}</span>}
       {abertos > 0 && <span className="aba-contador">{abertos}</span>}
       {!ESSENCIAIS.has(api.id) && (
         <span className="aba-x" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => (e.stopPropagation(), api.close())} title="Fechar"><X size={12} /></span>
@@ -98,7 +106,10 @@ const AbaDoPainel: React.FC<IDockviewPanelHeaderProps> = ({api}) => {
     </div>
   );
 };
-const TEMA: DockviewTheme = {name: 'estudio', className: 'dockview-theme-estudio', colorScheme: 'dark', gap: 2};
+const TEMAS: Record<'escuro' | 'claro', DockviewTheme> = {
+  escuro: {name: 'estudio', className: 'dockview-theme-estudio', colorScheme: 'dark', gap: 2},
+  claro: {name: 'estudio-claro', className: 'dockview-theme-estudio', colorScheme: 'light', gap: 2},
+};
 
 const componentes: Record<string, React.FC<IDockviewPanelProps>> = {
   lista: () => <PorArea parte="Lista" />,
@@ -110,69 +121,6 @@ const componentes: Record<string, React.FC<IDockviewPanelProps>> = {
   pesquisa: () => <Pesquisa />,
   midia: () => <Midia />,
   terminal: () => <Suspense fallback={<Carregando />}><Terminal /></Suspense>,
-};
-
-// faixas de layout de docs/tela.md: C (compacta) abaixo de 1600x800, P (padrão) acima; cada área x faixa guarda o seu.
-// No Vídeo, o arranjo depende também do formato: vertical (V) quer o monitor em coluna, horizontal (H) quer largura.
-// A versão na chave sobe quando entra painel novo no arranjo padrão (v6: Pesquisa, v7: Mídia), para os layouts gravados o verem.
-type Faixa = 'C' | 'P';
-type Orientacao = 'V' | 'H';
-const faixaAtual = (): Faixa => (window.innerWidth < 1600 || window.innerHeight < 800 ? 'C' : 'P');
-const CHAVE = (area: Area, faixa: Faixa, o: Orientacao) => `estudio:layout:v7:${area}:${faixa}${area === 'video' ? `:${o}` : ''}`;
-const lerLayout = (area: Area, faixa: Faixa, o: Orientacao) => {
-  try {
-    const t = localStorage.getItem(CHAVE(area, faixa, o));
-    return t ? JSON.parse(t) : null;
-  } catch {
-    return null;
-  }
-};
-const gravarLayout = (area: Area, faixa: Faixa, o: Orientacao, api: DockviewApi) => {
-  try {
-    localStorage.setItem(CHAVE(area, faixa, o), JSON.stringify(api.toJSON()));
-  } catch {
-    /* sem armazenamento: volta ao arranjo padrão na próxima vez */
-  }
-};
-
-// O terminal fica sempre na coluna da direita: embaixo é da linha do tempo, e altura é o que falta em notebook.
-const layoutPadrao = (api: DockviewApi, area: Area, faixa: Faixa, o: Orientacao) => {
-  const temLinha = area === 'video' || area === 'efeitos' || area === 'musica' || area === 'animacao';
-  const W = window.innerWidth;
-  const H = window.innerHeight;
-  const abasDoInspector = (comLista: boolean) => {
-    if (comLista) api.addPanel({id: 'lista', component: 'lista', title: 'Lista', position: {referencePanel: 'inspector', direction: 'within'}});
-    api.addPanel({id: 'comentarios', component: 'comentarios', title: 'Comentários', position: {referencePanel: 'inspector', direction: 'within'}});
-    api.addPanel({id: 'historico', component: 'historico', title: 'Histórico', position: {referencePanel: 'inspector', direction: 'within'}});
-    api.addPanel({id: 'pesquisa', component: 'pesquisa', title: 'Pesquisa', position: {referencePanel: 'inspector', direction: 'within'}});
-    api.getPanel('inspector')?.api.setActive();
-  };
-  api.addPanel({id: 'monitor', component: 'monitor', title: 'Monitor'});
-  if (faixa === 'P') {
-    if (temLinha) api.addPanel({id: 'linha', component: 'linha', title: 'Linha do tempo', position: {direction: 'below'}, initialHeight: 260});
-    api.addPanel({id: 'terminal', component: 'terminal', title: 'Claude', position: {direction: 'right'}, initialWidth: o === 'H' && area === 'video' ? 480 : 600});
-    api.addPanel({id: 'lista', component: 'lista', title: 'Lista', position: {referencePanel: 'monitor', direction: 'left'}, initialWidth: 260});
-    api.addPanel({id: 'inspector', component: 'inspector', title: 'Propriedades', position: {referencePanel: 'monitor', direction: 'right'}, initialWidth: 310});
-    abasDoInspector(false);
-  } else if (area === 'video' && o === 'V') {
-    // vídeo vertical: o monitor numa coluna de altura total; à direita, propriedades e terminal em cima e a linha embaixo
-    api.addPanel({id: 'terminal', component: 'terminal', title: 'Claude', position: {direction: 'right'}, initialWidth: Math.max(620, W - 380)});
-    api.addPanel({id: 'linha', component: 'linha', title: 'Linha do tempo', position: {referencePanel: 'terminal', direction: 'below'}, initialHeight: Math.max(200, Math.round(H * 0.34))});
-    api.addPanel({id: 'inspector', component: 'inspector', title: 'Propriedades', position: {referencePanel: 'terminal', direction: 'left'}, initialWidth: 300});
-    abasDoInspector(true);
-  } else {
-    // vídeo horizontal, imagem, 3D e efeitos: monitor largo; à direita o terminal em cima e, embaixo dele, lista e propriedades
-    if (temLinha) api.addPanel({id: 'linha', component: 'linha', title: 'Linha do tempo', position: {referencePanel: 'monitor', direction: 'below'}, initialHeight: area === 'musica' ? Math.max(230, Math.round(H * 0.4)) : 200}); // o arranjo da Música tem uma linha por canal e a da automação
-    api.addPanel({id: 'terminal', component: 'terminal', title: 'Claude', position: {direction: 'right'}, initialWidth: Math.min(620, Math.round(W * 0.42))});
-    api.addPanel({id: 'lista', component: 'lista', title: 'Lista', position: {referencePanel: 'terminal', direction: 'below'}, initialHeight: Math.round(H * 0.5)});
-    api.addPanel({id: 'inspector', component: 'inspector', title: 'Propriedades', position: {referencePanel: 'lista', direction: 'right'}});
-    abasDoInspector(false);
-  }
-  // frente Casca (rodada 3): o painel de mídia é uma aba ao lado da Lista (nas três disposições a Lista existe); a aba que estava
-  // à frente continua à frente
-  api.addPanel({id: 'midia', component: 'midia', title: 'Mídia', position: {referencePanel: 'lista', direction: 'within'}});
-  api.getPanel('lista')?.api.setActive();
-  api.getPanel('inspector')?.api.setActive();
 };
 
 const TITULOS: Record<Area, string> = {video: 'Cenas e blocos', imagem: 'Camadas', '3d': 'Objetos', efeitos: 'Pilha de efeitos', musica: 'Canais', animacao: 'Camadas'};
@@ -194,41 +142,6 @@ const exportarArea = () => {
   if (modulo === 'musica') return void exportarMusica({formato: 'wav'}); // frente Música: WAV a −14 LUFS em saidas/; outros formatos no botão Exportar do transporte
   if (!id || !modulo || modulo === '3d') return avisar(e.area === '3d' ? 'A cena 3D ainda não exporta.' : 'Nada para exportar nesta área.', 'info');
   abrirDialogoExportar(id);
-};
-
-// ---------- preferências ----------
-const PainelPreferencias: React.FC<{aoFechar: () => void}> = ({aoFechar}) => {
-  const [p, setP] = useState<Preferencias | null>(null);
-  useEffect(() => void window.estudio.preferencias().then(setP), []);
-  const gravar = async (m: Partial<Preferencias>) => setP(await window.estudio.gravarPreferencias(m));
-  return (
-    <div className="dialogo-fundo" onPointerDown={(e) => e.target === e.currentTarget && aoFechar()} onKeyDown={(e) => e.key === 'Escape' && aoFechar()}>
-      <div className="dialogo" role="dialog" aria-label="Preferências">
-        <div className="dialogo-titulo">Preferências</div>
-        {!p ? <div className="vazio">carregando…</div> : (
-          <>
-            <label className="dialogo-campo"><span>Pasta dos projetos novos</span>
-              <span style={{display: 'flex', gap: 6}}>
-                <input className="campo" readOnly value={p.pasta_projetos} title={p.pasta_projetos} />
-                <button className="bt" onClick={async () => {
-                  const pasta = await window.estudio.escolherPasta('Pasta dos projetos do Estúdio');
-                  if (pasta) void gravar({pasta_projetos: pasta});
-                }}>Trocar…</button>
-              </span>
-            </label>
-            {/onedrive/i.test(p.pasta_projetos) && <div className="dialogo-texto" style={{color: 'var(--aviso)'}}>Pasta dentro do OneDrive: a sincronização pode travar a gravação.</div>}
-            <label className="dialogo-campo"><span>Ao iniciar o Estúdio</span>
-              <select className="campo" value={p.ao_iniciar} onChange={(e) => void gravar({ao_iniciar: e.target.value as Preferencias['ao_iniciar']})}>
-                <option value="inicio">Mostrar a tela inicial</option>
-                <option value="ultimo">Abrir o último projeto</option>
-              </select>
-            </label>
-          </>
-        )}
-        <div className="dialogo-botoes"><button className="bt principal" onClick={aoFechar} autoFocus>Fechar</button></div>
-      </div>
-    </div>
-  );
 };
 
 /** Nome do projeto na barra: um clique vira campo; Enter grava, Esc desiste. */
@@ -260,6 +173,7 @@ const NomeProjeto: React.FC<{nome: string; raiz?: string}> = ({nome, raiz}) => {
 
 export const Casca: React.FC = () => {
   const temExemplo = usarTemExemplo();
+  const aparenciaAtual = usarAparencia();
   const area = useLoja((e) => e.area);
   const info = useLoja((e) => e.info);
   const modoComentario = useLoja((e) => e.modoComentario);
@@ -279,6 +193,8 @@ export const Casca: React.FC = () => {
     faixa.current = faixaAtual();
     document.documentElement.dataset.faixa = faixa.current;
     const o = orientacaoDe(loja.get());
+    if (d.hasMaximizedGroup()) d.exitMaximizedGroup();
+    setFocado(false);
     d.clear();
     const salvo = padrao ? null : lerLayout(a, faixa.current, o);
     try {
@@ -329,6 +245,19 @@ export const Casca: React.FC = () => {
     p.api.setActive();
   }), []);
 
+  // "N mudanças do Claude" no rodapé: o Histórico vem para a frente (volta ao grupo do inspetor se tinha sido fechado)
+  useEffect(() => {
+    const ver = () => {
+      const d = api.current;
+      if (!d) return;
+      const p = d.getPanel('historico') ?? d.addPanel({id: 'historico', component: 'historico', title: 'Histórico',
+        ...(d.getPanel('inspector') ? {position: {referencePanel: 'inspector', direction: 'within' as const}} : {})});
+      p.api.setActive();
+    };
+    window.addEventListener('estudio:ver-historico', ver);
+    return () => window.removeEventListener('estudio:ver-historico', ver);
+  }, []);
+
   // o painel de mídia fechado volta pelo menu do projeto, ao lado da Lista (ou do inspetor, se a Lista não estiver)
   const abrirMidia = () => {
     const d = api.current;
@@ -337,6 +266,19 @@ export const Casca: React.FC = () => {
     const p = d.getPanel('midia') ?? d.addPanel({id: 'midia', component: 'midia', title: 'Mídia', ...(d.getPanel(ref) ? {position: {referencePanel: ref, direction: 'within' as const}} : {})});
     p.api.setActive();
   };
+
+  // "Focar no monitor" (Ctrl+\, como o "esconder a interface" do Figma): o grupo do monitor ocupa a doca; de novo, volta
+  const [focado, setFocado] = useState(false);
+  const alternarFoco = () => {
+    const d = api.current;
+    const m = d?.getPanel('monitor');
+    if (!d || !m) return;
+    if (d.hasMaximizedGroup()) d.exitMaximizedGroup();
+    else d.maximizeGroup(m);
+    setFocado(d.hasMaximizedGroup());
+  };
+  const alternarFocoRef = useRef(alternarFoco);
+  alternarFocoRef.current = alternarFoco;
 
   const marcarVersao = async () => {
     const r = await window.estudio.marcarVersao();
@@ -386,6 +328,9 @@ export const Casca: React.FC = () => {
       } else if (ev.ctrlKey && !ev.altKey && !ev.shiftKey && k === 's') {
         ev.preventDefault();
         void marcarVersao();
+      } else if (ev.ctrlKey && !ev.altKey && !ev.shiftKey && (ev.code === 'Backslash' || ev.code === 'IntlBackslash')) {
+        ev.preventDefault();
+        alternarFocoRef.current();
       } else if (ev.ctrlKey && ev.shiftKey && !ev.altKey && k === 'e') {
         ev.preventDefault();
         exportarArea();
@@ -400,6 +345,7 @@ export const Casca: React.FC = () => {
         loja.definir({modoComentario: false});
       } else if (ev.key === 'Escape') {
         loja.definir({modoComentario: false, comentarioAberto: undefined});
+        dispensarMudancasAgente();
       }
     };
     window.addEventListener('keydown', tecla, true);
@@ -448,10 +394,10 @@ export const Casca: React.FC = () => {
   const podeExportar = Boolean(docAtivo && docAtivo.modulo !== '3d');
 
   return (
-    <div className="casca">
+    <div className={`casca${modoComentario ? ' modo-comentario' : ''}`}>
       <header className="barra">
         <button className="marca" onPointerDown={(e) => e.stopPropagation()} onClick={() => setMenu((m) => !m)} title="Menu do Estúdio">
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="9" height="9" rx="2" fill="none" stroke="var(--acento)" strokeWidth="1.5" /><rect x="5.5" y="5.5" width="9" height="9" rx="2" fill="none" stroke="var(--agente)" strokeWidth="1.5" /></svg>
+          <IconeEstudio />
           Estúdio
         </button>
         {menu && (
@@ -462,8 +408,9 @@ export const Casca: React.FC = () => {
               <span className="menu-linha">
                 <button onClick={() => novoDocumento('video')}><Film size={13} />Vídeo</button>
                 <button onClick={() => novoDocumento('imagem')}><ImageIcon size={13} />Imagem</button>
-                <button onClick={() => novoDocumento('3d')}><Box size={13} />3D</button>
                 <button onClick={() => novoDocumento('animacao')}><Sparkles size={13} />Animação</button>
+                <button onClick={() => (setMenu(false), loja.definir({area: 'musica'}))} title="Abre a área Música, com os modelos (Batida, Trilha…)"><Music size={13} />Música</button>
+                <button onClick={() => novoDocumento('3d')}><Box size={13} />3D</button>
               </span>
             </div>
             <hr />
@@ -478,7 +425,7 @@ export const Casca: React.FC = () => {
             <button onClick={item(() => void duplicar())}><Copy size={14} />Duplicar projeto…</button>
             <button onClick={item(() => window.estudio.mostrarNaPasta())}><FolderSearch size={14} />Mostrar na pasta</button>
             <button onClick={item(() => void marcarVersao())}><Check size={14} />Marcar ponto de restauração<kbd>Ctrl+S</kbd></button>
-            {temExemplo && <button onClick={item(() => void window.estudio.abrirExemplo().then(abrirProjeto).catch((e: Error) => avisar(mensagemDe(e), 'erro')))}><BookOpen size={14} />Ver um pronto</button>}
+            {temExemplo && <button onClick={item(() => void window.estudio.abrirExemplo().then(abrirProjeto).catch((e: Error) => avisar(mensagemDe(e), 'erro')))}><BookOpen size={14} />Ver um exemplo</button>}
             <hr />
             <button onClick={item(abrirMidia)}><Images size={14} />Mídia do projeto</button>
             <button onClick={item(() => setMarca(true))}><Palette size={14} />Marca…</button>
@@ -502,11 +449,14 @@ export const Casca: React.FC = () => {
           ))}
         </nav>
         <div className="acoes">
-          <button className={`bt fantasma${modoComentario ? ' ligado' : ''}`} onClick={() => loja.definir((s) => ({modoComentario: !s.modoComentario}))} title="Comentar na tela (M)">
-            <MessageSquarePlus size={15} />Comentar<kbd>M</kbd>
+          <button className={`bti${modoComentario ? ' ligado' : ''}`} onClick={() => loja.definir((s) => ({modoComentario: !s.modoComentario}))} title="Comentar na tela (M)"
+            aria-label="Comentar na tela" aria-pressed={modoComentario}>
+            <MessageSquarePlus size={15} />
           </button>
-          <button className="bt fantasma" onClick={() => void desfazer()} title="Desfazer a sua última edição (Ctrl+Z)"><Undo2 size={15} /></button>
-          <button className="bt exportar" disabled={!podeExportar} onClick={exportarArea}
+          <button className={`bti${focado ? ' ligado' : ''}`} onClick={alternarFoco} title={focado ? 'Mostrar os painéis de novo (Ctrl+\\)' : 'Focar no monitor: esconde os outros painéis (Ctrl+\\)'}
+            aria-label={focado ? 'Mostrar os painéis' : 'Focar no monitor'} aria-pressed={focado}>{focado ? <Minimize2 size={15} /> : <Maximize2 size={15} />}</button>
+          <button className="bti" onClick={() => void desfazer()} title="Desfazer a sua última edição (Ctrl+Z)" aria-label="Desfazer"><Undo2 size={15} /></button>
+          <button className="bt principal exportar" disabled={!podeExportar} onClick={exportarArea}
             title={podeExportar ? (docAtivo!.modulo === 'musica' ? 'Exportar a música em WAV para a pasta saidas (M4A, Opus, MIDI e stems: botão Exportar do transporte) (Ctrl+Shift+E)'
               : `Exportar ${docAtivo!.modulo === 'video' ? 'o vídeo' : docAtivo!.modulo === 'animacao' ? 'a animação' : 'a imagem'} para a pasta saidas… (Ctrl+Shift+E)`)
             : area === '3d' ? 'A cena 3D ainda não exporta' : 'Nada para exportar nesta área'}>
@@ -516,7 +466,7 @@ export const Casca: React.FC = () => {
       </header>
       <FaixaTransicao />
       <div className="doca">
-        <DockviewReact theme={TEMA} components={componentes} defaultTabComponent={AbaDoPainel} onReady={pronto} />
+        <DockviewReact theme={TEMAS[aparenciaAtual.tema]} components={componentes} defaultTabComponent={AbaDoPainel} onReady={pronto} />
       </div>
       <Rodape />
       {preferencias && <PainelPreferencias aoFechar={() => setPreferencias(false)} />}

@@ -1,5 +1,5 @@
 // Kit de marca e fontes próprias (itens 11 e 12 da Ordem sugerida, 06/11/2026): a pasta de kits, aplicar ao documento,
-// os kits de fábrica (bkm e neutro), o projeto novo com kit, as fontes de arquivo no carregador e no servidor de mídia.
+// o kit de fábrica (só o neutro), o projeto novo com kit, as fontes de arquivo no carregador e no servidor de mídia.
 import {copyFileSync, existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
@@ -8,7 +8,7 @@ import {afterAll, describe, expect, it} from 'vitest';
 import {novoDocCenas, TEMA_NEUTRO, type DocCenas} from '../src/nucleo/cenas';
 import {aplicarMarcaAoPlano, claudeMd, gravarPlano, novoDocImagem, planoDoProjeto} from '../src/nucleo/criar-projeto';
 import type {DocImagem} from '../src/nucleo/documentos';
-import {idDeMarca, inferirFonte, MARCA_NEUTRO, MARCAS_INICIAIS, marcaDoDocumento, marcaDoKit, normalizarMarca, patchDaMarca, temaDaMarca} from '../src/nucleo/marca';
+import {idDeMarca, inferirFonte, MARCA_BKM, MARCA_NEUTRO, MARCAS_INICIAIS, marcaDoDocumento, marcaDoKit, normalizarMarca, patchDaMarca, temaDaMarca} from '../src/nucleo/marca';
 import {fontesDoProjeto, PastaMarcas} from '../src/nucleo/pasta-marcas';
 import {Projeto} from '../src/nucleo/projeto';
 import {fonte, listarFontes, registrarFontesDeArquivo} from '../src/composicoes/fontes';
@@ -31,8 +31,8 @@ const bruto = (origem: string, caminho: string) => new Promise<number>((ok, erro
 });
 
 describe('kit de marca', () => {
-  it('os de fábrica são o bkm e o neutro', () => {
-    expect(MARCAS_INICIAIS.map((m) => m.id)).toEqual(['bkm', 'neutro']);
+  it('o de fábrica é só o neutro', () => {
+    expect(MARCAS_INICIAIS.map((m) => m.id)).toEqual(['neutro']);
   });
 
   it('o neutro dá exatamente o tema neutro, com o id do kit', () => {
@@ -46,14 +46,15 @@ describe('kit de marca', () => {
     marcas.gravar(KIT_TESTE);
     copyFileSync(LOGO, path.join(marcas.pastaDe('teste'), 'logo.png'));
     marcas.garantir();
-    expect(marcas.listar().map((m) => m.id)).toEqual(['bkm', 'neutro', 'teste']);
+    expect(marcas.listar().map((m) => m.id)).toEqual(['neutro', 'teste']);
     const teste = marcas.ler('teste');
     expect(teste.logo).toBe('logo.png');
     expect(existsSync(path.join(teste.pasta, 'logo.png'))).toBe(true);
-    expect(existsSync(path.join(PASTA, 'bkm', 'marca.json'))).toBe(true);
+    expect(existsSync(path.join(PASTA, 'neutro', 'marca.json'))).toBe(true);
+    expect(existsSync(path.join(PASTA, 'bkm'))).toBe(false); // o kit da BKM não vem mais de fábrica
     marcas.garantir(); // de novo não muda nada
-    expect(marcas.listar()).toHaveLength(3);
-    expect(readdirSync(PASTA).sort()).toEqual(['bkm', 'neutro', 'teste']);
+    expect(marcas.listar()).toHaveLength(2);
+    expect(readdirSync(PASTA).sort()).toEqual(['neutro', 'teste']);
   });
 
   it('cria, grava, relê e duplica (a cópia leva o logo)', () => {
@@ -65,7 +66,7 @@ describe('kit de marca', () => {
     expect(copia.id).toBe('teste-copia');
     expect(copia.cores.terracota).toBe('#C88155');
     expect(existsSync(path.join(copia.pasta, 'logo.png'))).toBe(true);
-    expect(marcas.listar().map((m) => m.id)).toEqual(['bkm', 'neutro', 'escritorio-teste', 'teste', 'teste-copia']);
+    expect(marcas.listar().map((m) => m.id)).toEqual(['neutro', 'escritorio-teste', 'teste', 'teste-copia']);
     expect(() => marcas.ler('nao-existe')).toThrow(/não achado/);
   });
 
@@ -131,6 +132,7 @@ describe('kit de marca', () => {
   });
 
   it('projeto novo com kit já nasce no tema do kit, com logo e fontes copiados', () => {
+    marcas.gravar(MARCA_BKM); // kit de escritório que a pessoa já tinha na pasta: continua funcionando
     const bkm = aplicarMarcaAoPlano(planoDoProjeto({nome: 'N', modelo: 'video-branco'}), marcas.ler('bkm'));
     expect(JSON.parse(bkm.arquivos['video/video.json']).tema).toEqual({fundo: '#101826', texto: '#F2EEE6', destaque: '#C9A961', suave: '#A5ADBA', fonte: 'Inter', marca: 'bkm',
       assinatura: 'bkmadvogados.com.br'});

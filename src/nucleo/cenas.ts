@@ -54,7 +54,9 @@ export type DocCenas = {tipo: 'cenas'; formato: Formato; tema: TemaCenas; cenas:
   teleprompter?: Teleprompter; // frente Som (rodada 3): o texto que a pessoa lê ao gravar a narração (gravacao.ts)
 };
 
-export const TEMA_NEUTRO: TemaCenas = {fundo: '#111418', texto: '#F2F2F2', destaque: '#70B8FF', suave: '#A3ABB5', fonte: 'Inter'};
+// destaque branco (o peso é que marca: VideoCenas engrossa o trecho quando o destaque não tem cor); não é o azul de
+// seleção da interface nem cor de cliente
+export const TEMA_NEUTRO: TemaCenas = {fundo: '#111418', texto: '#F2F2F2', destaque: '#FFFFFF', suave: '#A3ABB5', fonte: 'Inter'};
 
 export const DURACAO_CENA_PADRAO = 4000;
 const DURACAO_MIN = 300;

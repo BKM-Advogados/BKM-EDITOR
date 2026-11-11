@@ -3,11 +3,11 @@
    Só na tela: a exportação não leva nada disto. */
 .zonas-seguras { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .zonas-seguras .zona { position: absolute; box-sizing: border-box; }
-.zonas-seguras .zona.coberta { background: repeating-linear-gradient(135deg, rgba(255, 77, 77, 0.22) 0 5px, rgba(255, 77, 77, 0.06) 5px 10px);
-  border: 1px solid rgba(255, 77, 77, 0.7); }
-.zonas-seguras .zona.contorno { border: 1px dashed rgba(112, 184, 255, 0.85); }
+.zonas-seguras .zona.coberta { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--cabeca) 22%, transparent) 0 5px, color-mix(in srgb, var(--cabeca) 6%, transparent) 5px 10px);
+  border: 1px solid color-mix(in srgb, var(--cabeca) 70%, transparent); }
+.zonas-seguras .zona.contorno { border: 1px dashed var(--acento-tracejado); }
 .zonas-seguras .zona > span { position: absolute; left: 4px; top: 3px; max-width: calc(100% - 8px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font: 600 10px/14px var(--fonte); color: #fff; background: rgba(0, 0, 0, 0.6); padding: 0 5px; border-radius: 3px; }
+  font: 600 var(--tam-1)/14px var(--fonte); color: var(--texto); background: var(--vidro); padding: 0 5px; border-radius: var(--raio-1); }
 .zonas-seguras .zona.contorno > span { left: auto; right: 4px; top: auto; bottom: 3px; color: var(--acento); }
 
 /* botão da zona segura no transporte: o ícone liga e desliga, a setinha escolhe a rede */

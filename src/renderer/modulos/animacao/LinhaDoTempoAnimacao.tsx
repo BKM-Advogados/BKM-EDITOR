@@ -1,9 +1,12 @@
 // Linha do tempo da Animação: régua, zoom, cabeça de reprodução, uma linha por camada e losangos por propriedade
-import React, {useCallback, useEffect, useRef, useState} from "react";
+import React, {useCallback, useEffect, useRef, useState, useSyncExternalStore} from "react";
 import {Diamond, Maximize2, Pause, Play, ZoomIn, ZoomOut} from "lucide-react";
 import type {DocAnimacao, PropriedadeAnimavel, QuadroChave} from "../../../nucleo/animacao";
 import {aplicar, selecionar, useLoja} from "../../estado/loja";
 import {alternar, aoQuadro, assinarControle, formatarTempo, irPara, msAtual} from "./tocador";
+import {iconeTipoAnimacao} from "./CamadasAnimacao";
+import {modoAnimar} from "./preajustes";
+import {mudouEm} from "../../estado/agente";
 
 const LARGURA_ROTULO = 140;
 
@@ -13,6 +16,8 @@ export const LinhaDoTempoAnimacao: React.FC = () => {
   const selecao = useLoja((e) => (e.selecao && e.selecao.documento === ativo ? e.selecao.caminho : null));
   const [tempoMs, setTempoMs] = useState(msAtual());
   const [tocando, setTocando] = useState(false);
+  const animando = useSyncExternalStore(modoAnimar.assinar, modoAnimar.get);
+  const mudancas = useLoja((e) => e.mudancasAgente);
   const [zoom, setZoom] = useState(150); // px por segundo
   const [arrastandoCabeca, setArrastandoCabeca] = useState(false);
   const [arrastoK, setArrastoK] = useState<{
@@ -108,112 +113,78 @@ export const LinhaDoTempoAnimacao: React.FC = () => {
     marcas.push(s);
   }
 
+  const ajustar = () => {
+    if (containerRef.current) {
+      const w = containerRef.current.clientWidth - LARGURA_ROTULO - 40;
+      setZoom(Math.max(40, Math.floor(w / Math.max(1, duracaoSeg))));
+    }
+  };
+  const nChaves = camadas.reduce((n, c) => n + Object.values(c.trilhas ?? {}).reduce((m, ks) => m + (ks?.length ?? 0), 0), 0);
+
   return (
-    <div className="painel-lt-animacao" ref={containerRef}>
-      <div className="plt-topo">
-        <div className="plt-controles">
-          <button className="bt-icone" onClick={alternar} title="Reproduzir / Pausar (Espaço)">
-            {tocando ? <Pause size={14} /> : <Play size={14} />}
-          </button>
-          <span className="plt-tempo">{formatarTempo(tempoMs)}</span>
-          <span className="plt-duracao">/ {formatarTempo(duracaoMs)}</span>
-        </div>
-        <div className="plt-zoom">
-          <button className="bt-icone" onClick={() => setZoom((z) => Math.max(40, z - 25))} title="Diminuir Zoom">
-            <ZoomOut size={14} />
-          </button>
-          <button className="bt-icone" onClick={() => setZoom((z) => Math.min(400, z + 25))} title="Aumentar Zoom">
-            <ZoomIn size={14} />
-          </button>
-          <button
-            className="bt-icone"
-            onClick={() => {
-              if (containerRef.current) {
-                const w = containerRef.current.clientWidth - LARGURA_ROTULO - 40;
-                setZoom(Math.max(40, Math.floor(w / Math.max(1, duracaoSeg))));
-              }
-            }}
-            title="Ajustar à Janela"
-          >
-            <Maximize2 size={13} />
-          </button>
+    <div className="painel lt-animacao" ref={containerRef}>
+      <div className="barra-lt">
+        <button className="bti" onClick={alternar} title="Tocar ou pausar  Espaço" aria-label={tocando ? "Pausar" : "Tocar"}>{tocando ? <Pause /> : <Play />}</button>
+        <span className="plt-tempo">{formatarTempo(tempoMs)}</span>
+        <span className="plt-duracao">/ {formatarTempo(duracaoMs)}</span>
+        <button type="button" className={`bt mini modo-animar${animando ? " ligado" : ""}`} aria-pressed={animando} onClick={modoAnimar.alternar}
+          title={animando ? "Modo animar ligado: mexer num valor grava um quadro-chave na agulha. Clique para desligar" : "Modo animar: mexer num valor grava um quadro-chave na agulha (desligado, só as propriedades já animadas ganham quadro-chave)"}>
+          <span className="ponto-animar" />Animar
+        </button>
+        <div className="acoes-lt">
+          <span className="conta">{nChaves === 1 ? "1 quadro-chave" : `${nChaves} quadros-chave`}</span>
+          <button className="bti" onClick={() => setZoom((z) => Math.max(40, z - 25))} title="Diminuir o zoom" aria-label="Diminuir o zoom"><ZoomOut /></button>
+          <button className="bti" onClick={() => setZoom((z) => Math.min(400, z + 25))} title="Aumentar o zoom" aria-label="Aumentar o zoom"><ZoomIn /></button>
+          <button className="bti" onClick={ajustar} title="Ajustar à janela" aria-label="Ajustar à janela"><Maximize2 /></button>
         </div>
       </div>
 
       <div className="plt-area-rolagem">
-        {/* Régua */}
         <div className="plt-linha-regua">
-          <div className="plt-col-rotulo plt-rotulo-regua">Camada</div>
+          <div className="plt-col-rotulo plt-rotulo-regua">Camadas</div>
           <div className="plt-trilha plt-regua" style={{width: larguraTrilha}} onClick={aoClicarTrilha} ref={trilhaRef}>
             {marcas.map((s) => (
               <div key={s} className="plt-marca" style={{left: msParaX(s * 1000)}}>
-                <span className="plt-marca-texto">{s}s</span>
+                <span className="plt-marca-texto">{String(s).replace(".", ",")} s</span>
               </div>
             ))}
-            {/* Cabeça de reprodução na régua */}
-            <div
-              className="plt-cabeca-marcador"
-              style={{left: cabecaX}}
-              onMouseDown={iniciarArrastoCabeca}
-              title="Arrastar cabeça de reprodução"
-            />
+            <div className="plt-cabeca-marcador" style={{left: cabecaX}} onMouseDown={iniciarArrastoCabeca} title="Arraste a agulha" />
           </div>
         </div>
 
-        {/* Linhas das camadas */}
         <div className="plt-corpo">
-          {camadas.map((c, i) => {
+          {[...camadas].map((_, k) => {
+            const i = camadas.length - 1 - k; // a da frente em cima, como na lista
+            const c = camadas[i];
             const caminho = `/camadas/${i}`;
             const selecionada = selecao === caminho;
             const trilhas = c.trilhas ?? {};
-            const propsComTrilha = Object.entries(trilhas).filter(([_, ks]) => ks && ks.length > 0);
-
+            const propsComTrilha = Object.entries(trilhas).filter(([, ks]) => ks && ks.length > 0);
             return (
-              <div
-                key={c.id ?? i}
-                className={`plt-linha-camada${selecionada ? " selecionada" : ""}`}
-                onClick={() => selecionar({documento: ativo, caminho})}
-              >
+              <div key={c.id ?? i} className={`plt-linha-camada${selecionada ? " selecionada" : ""}`} onClick={() => selecionar({documento: ativo, caminho})}>
                 <div className="plt-col-rotulo">
-                  <span className="plt-camada-nome" title={c.nome}>
-                    {c.nome}
-                  </span>
+                  <span className="plt-tipo">{iconeTipoAnimacao(c.tipo)}</span>
+                  <span className="plt-camada-nome" title={c.nome}>{c.nome}</span>
                 </div>
-                <div
-                  className="plt-trilha"
-                  style={{width: larguraTrilha}}
-                  onClick={aoClicarTrilha}
-                >
-                  {/* Losangos dos quadros-chave */}
+                <div className="plt-trilha" style={{width: larguraTrilha}} onClick={aoClicarTrilha}>
                   {propsComTrilha.map(([p, ks]) =>
-                    (ks as QuadroChave[]).map((k, kIdx) => {
-                      const kx = msParaX(k.t_ms);
+                    (ks as QuadroChave[]).map((q, kIdx) => {
+                      const agora = Math.abs(q.t_ms - tempoMs) < 25;
+                      const doClaude = mudouEm(mudancas, ativo, `${caminho}/trilhas/${p}`) || mudouEm(mudancas, ativo, `${caminho}/trilhas`);
                       return (
-                        <div
-                          key={`${p}-${kIdx}`}
-                          className="plt-losango-wrapper"
-                          style={{left: kx}}
+                        <div key={`${p}-${kIdx}`} className={`plt-losango-wrapper${agora ? " agora" : ""}${doClaude ? " agente" : ""}`} style={{left: msParaX(q.t_ms)}}
                           onMouseDown={(e) => {
                             e.stopPropagation();
                             selecionar({documento: ativo, caminho});
-                            irPara(k.t_ms);
-                            setArrastoK({
-                              camadaIdx: i,
-                              prop: p as PropriedadeAnimavel,
-                              kIdx,
-                              origemX: e.clientX,
-                              tMsOriginal: k.t_ms,
-                            });
+                            irPara(q.t_ms);
+                            setArrastoK({camadaIdx: i, prop: p as PropriedadeAnimavel, kIdx, origemX: e.clientX, tMsOriginal: q.t_ms});
                           }}
-                          title={`Quadro-chave (${p}): ${k.t_ms} ms, valor: ${k.valor}, curva: ${k.curva ?? "linear"}`}
-                        >
-                          <Diamond size={10} className="plt-losango-icone" fill="currentColor" />
+                          title={`Quadro-chave de ${p} em ${(q.t_ms / 1000).toFixed(2).replace(".", ",")} s · valor ${q.valor} · curva ${q.curva ?? "linear"}`}>
+                          <Diamond className="plt-losango-icone" fill="currentColor" />
                         </div>
                       );
-                    })
+                    }),
                   )}
-
-                  {/* Linha vertical da cabeça passando pela trilha */}
                   <div className="plt-guia-cabeca" style={{left: cabecaX}} />
                 </div>
               </div>

@@ -8,14 +8,34 @@ Nome provisório. Pasta: `C:\Users\usuario\projetos\estudio` (fora do OneDrive, 
 Repositório: `BKM-Advogados/BKM-EDITOR` (privado). Versões: V1 = tag `v1.0.0` (pacote 0.1.0), V2 = `v2.0.0` (0.2.0),
 V3 = `v3.0.0` (pacote 1.0.0). No Linux a pasta é `~/Projects/estudio`.
 
+## Notas desta versão: visual neutro (10/11/2026)
+
+- **Atalhos das áreas mudaram.** A ordem das áreas segue o uso: **1 Vídeo, 2 Imagem, 3 Animação, 4 Música, 5 Efeitos,
+  6 3D** (as teclas 1 a 6 e Alt+1 a 6 seguem esta ordem; antes eram Vídeo, Imagem, 3D, Efeitos, Música, Animação).
+  Novos: **Ctrl+\\** foca no monitor (esconde os outros painéis; de novo, volta), **Shift+D** segurado mostra o antes dos
+  efeitos.
+- **Visual neutro:** grafite de croma zero, um acento azul (`#70B8FF`) para seleção, foco e a ação principal, e o violeta
+  só para o que o Claude fez. Nenhuma cor de cliente na interface nem nos padrões (efeito Tom e pré-ajuste Quente em
+  âmbar neutro, objeto 3D novo em cinza). O único kit de fábrica é o **Neutro** (destaque branco, marcado pelo peso);
+  kits que já estão na pasta da pessoa continuam funcionando.
+- **Preferências › Aparência:** tema escuro (padrão), claro ou o do sistema, alto contraste, densidade, tamanho da
+  interface (90 a 150%) e reduzir movimento. Os tokens ficam num arquivo só (`src/renderer/estilo/tokens.ts`).
+- **O que o Claude mudou aparece no lugar** por 30 s: contorno violeta no monitor, barra na lista e na linha do tempo,
+  "era X" no inspetor, aviso com Ver e Desfazer; o Histórico agrupa por rodada, com o antes → depois de cada campo.
+- **Tela inicial** com o pedido ao Claude no alto e os tipos de peça (inclui Música) no mesmo peso; **Exportar** com
+  destinos em cartões e o verbo exato no botão; **Música** com cor por canal e mixer com fader; **Animação** no sistema
+  das outras áreas, com seletor de documento, pré-ajustes de entrada e saída, modo animar e editor de pixel grande;
+  **Efeitos** com amostra de cada pré-ajuste; controles próprios no lugar de select e caixa de marcar nativos.
+- Detalhes e decisões em `docs/tela.md` (seções 6 e 7).
+
 ## Novidades da V3 (pacote 1.0.0, 10/11/2026)
 
 - **Linux (Omarchy/Hyprland):** roda e se instala no lançador de aplicativos com `bash scripts/instalar-linux.sh`; em
   gerenciador em mosaico a janela vem sem os botões sobrepostos. Detalhes em `STACKS.md`.
-- **Música (área 5, `docs/musica.md`):** bateria e sintetizadores da casa, passos e piano roll, arranjo com seções e
+- **Música (área 4, `docs/musica.md`):** bateria e sintetizadores da casa, passos e piano roll, arranjo com seções e
   acordes, mixer com delay, reverb, limitador e presets, sidechain, automação de volume desenhada no arranjo, pintar
   clipes, exportar WAV, M4A, Opus, MIDI e stems no alvo de loudness, e ida e volta com o vídeo de cenas.
-- **Animação (área 6, `docs/animacao.md`):** formas, texto, imagem e camada de pixel com quadros-chave e curvas (a cor
+- **Animação (área 3, `docs/animacao.md`):** formas, texto, imagem e camada de pixel com quadros-chave e curvas (a cor
   interpola em OKLab), revelações do pixel (aleatório, decodificar, varredura, do meio, chuva), editor de pixel,
   exportação MP4 e ferramentas para o Claude; modelo "Logo em pixels".
 - **Rodada 3 integrada:** painel Mídia, instância única e gravação segura (Casca); três vias de conversa, cofre de chaves
@@ -62,20 +82,20 @@ O app abre na **tela inicial**:
   pedido. Sem o Claude Code instalado, o campo fica desligado e o resto funciona.
 - **Continuar e Recentes:** o último projeto com miniatura (a foto do monitor ao fechar) e a grade dos outros, com
   Duplicar, Mostrar na pasta e Remover da lista (nunca apaga a pasta).
-- **Ver um pronto:** cópia nova do projeto de exemplo a cada clique (o exemplo nunca é editado no lugar). Só aparece
+- **Ver um exemplo:** cópia nova do projeto de exemplo a cada clique (o exemplo nunca é editado no lugar). Só aparece
   quando a instalação traz o exemplo (`exemplos/<pasta>`, com o nome em `src/nucleo/exemplo.ts`).
 - Na primeira vez, a faixa "Antes de começar" mostra o estado do Claude, a pasta dos projetos, o perfil da máquina e
   avisa se falta o Git.
 
-No editor, o menu do ícone tem Novo projeto (Ctrl+N), Novo neste projeto (vídeo, imagem, 3D), Abrir (Ctrl+O), Abrir
+No editor, o menu do ícone tem Novo projeto (Ctrl+N), Novo neste projeto (vídeo, imagem, animação, música, 3D), Abrir (Ctrl+O), Abrir
 recente, Duplicar projeto, Mostrar na pasta, Marcar ponto de restauração (Ctrl+S), Marca, Preferências e Fechar projeto
 (Ctrl+W, volta à tela inicial). O nome do projeto na barra renomeia com um clique; "Salvo" lembra que tudo grava na
 hora. **Exportar** (Ctrl+Shift+E) abre o diálogo de exportação do documento da área (abaixo). O projeto reabre na área, no
 documento, na seleção e no tempo em que a pessoa parou.
 
 **Kit de marca:** cores, fontes, logo e assinatura de cada escritório ficam em `%USERPROFILE%\Estudio\marcas\<id>\`
-(`marca.json`, `logo.*`, `fontes/*.ttf|otf|woff|woff2`; a pasta troca no painel). Na primeira abertura nascem `bkm`
-(provisório, para trocar) e `neutro`; kits que já estão na pasta ficam como estão. O kit entra em "Mais opções →
+(`marca.json`, `logo.*`, `fontes/*.ttf|otf|woff|woff2`; a pasta troca no painel). Na primeira abertura nasce o `neutro`
+(o único kit de fábrica; destaque branco, marcado pelo peso); kits que já estão na pasta ficam como estão. O kit entra em "Mais opções →
 Marca" ao criar o projeto e em menu → **Marca…** no editor: aplicar ao documento ativo (o `tema` do vídeo; fundo, fonte
 e cor dos textos na imagem), criar, duplicar, editar, importar logo e **fontes próprias** (arquivo), e escolher a fonte
 do vídeo. O logo vai para `midia/` e as fontes para `fontes/` do projeto; a prévia e a exportação carregam as fontes
@@ -145,7 +165,8 @@ Em todas as áreas:
 - **Ctrl+Z** desfaz só as edições da pessoa; **Ctrl+S** marca um ponto de restauração no git do projeto.
 - **Claude:** conversas e terminais em abas; a conversa pode hibernar e retomar (`--resume`). O limite de sessões
   vivas vem da RAM (2 com 8 GB, 4 com 16 GB, 8 acima).
-- **Atalhos:** Alt+1…4 troca de área, Ctrl+' vai à conversa, Espaço/J/K/L e ←/→ no vídeo, M comenta, V seleciona.
+- **Atalhos:** 1…6 ou Alt+1…6 troca de área (Vídeo, Imagem, Animação, Música, Efeitos, 3D), Ctrl+' vai à conversa,
+  Ctrl+\\ foca no monitor, Espaço/J/K/L e ←/→ no vídeo, M comenta, V seleciona.
 
 O agente recebe: `projeto_info`, `estado_do_editor`, `ler_documento`, `aplicar_patch` (com `versao_base` e `test`),
 `criar_documento`, `renomear_projeto`, `listar_comentarios`, `ler_comentario`, `responder_comentario`,
@@ -194,7 +215,7 @@ renderiza um vídeo de cenas de teste em 9:16, 4:5 e 16:9 fora do Electron, em `
   ouvida, e o IPC da limpeza, do medidor, da transcrição e da marca d'água nunca rodou no Electron.
 - **Pesquisa de qualidade** (`tasks/estudio-qualidade-2026-11-07`): defeitos conferidos no código e a barra do que falta.
 - **Onda B** (briefing): importar mídia e painel Mídia, o carrossel narrado como
-  modelo do tipo cenas, um projeto de exemplo neutro para o "Ver um pronto", o Claude que planeja (perguntas e Plano do vídeo
+  modelo do tipo cenas, um projeto de exemplo neutro para o "Ver um exemplo", o Claude que planeja (perguntas e Plano do vídeo
   antes de montar), chip de formato no monitor, primeiros passos e "Salvar como modelo".
 - **Memória (app empacotado, 05/11/2026):** 307 MB parado no vídeo; 547 MB com as quatro áreas e o 3D. A tela inicial
   agora abre sem o editor (falta medir a linha "Início parado").
@@ -212,7 +233,7 @@ src/nucleo        documentos, patch, diário, comentários, formatos, vídeo de 
 src/composicoes   composições Remotion (VideoCenas, CarrosselTema) e o registro
 src/renderer      interface: tela inicial, casca, estado, módulos (video, imagem, tres, efeitos), painéis
 mcp/nucleo.ts     o mesmo MCP por stdio, para usar o projeto fora do app
-exemplos/        projeto de exemplo do "Ver um pronto" (opcional; src/nucleo/exemplo.ts)
+exemplos/        projeto de exemplo do "Ver um exemplo" (opcional; src/nucleo/exemplo.ts)
 testes/fixtures  projeto, roteiro e narração sintéticos dos testes
 scripts/previa-web a interface no navegador com a ponte simulada
 docs/             arquitetura, tela e desempenho

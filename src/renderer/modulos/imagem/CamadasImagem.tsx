@@ -11,9 +11,11 @@ import type {CamadaImagem, DocImagem, OperacaoPatch} from '../../../nucleo/docum
 import {blocoDe, mascaraDe, mascarasEmUso, patchMoverCamada, patchRecortar, patchSoltar, podeRecortar} from '../../../nucleo/acabamento';
 import {caminhoDoAlvo} from '../../../nucleo/carrossel';
 import {patchTravar, travada} from '../../../nucleo/layout-imagem';
-import {alternarNaSelecao, aplicar, avisar, caminhosDaSelecao, documentosDe, loja, selecionar, trocar, useLoja} from '../../estado/loja';
+import {alternarNaSelecao, aplicar, avisar, caminhosDaSelecao, loja, selecionar, trocar, useLoja} from '../../estado/loja';
 import {BotaoMenu, type ItemMenu} from '../../componentes/Menu';
 import {docValido, indiceDe, rotuloCamada, usarDocumentoImagem, usarPaginaAtiva, visivel} from './comum';
+import {SeletorDocumento} from '../../componentes/SeletorDocumento';
+import {mudouEm} from '../../estado/agente';
 
 export const iconeCamada = (c: CamadaImagem) => {
   if (c.tipo === 'texto') return <Type />;
@@ -27,7 +29,7 @@ export const CamadasImagem: React.FC = () => {
   const ativa = usarPaginaAtiva(documento, doc);
   const selecao = useLoja((e) => e.selecao);
   const comentarios = useLoja((e) => e.comentarios);
-  const docs = documentosDe('imagem');
+  const mudancas = useLoja((e) => e.mudancasAgente);
   if (!documento || !doc) return <div className="vazio">Sem imagem ainda: crie no monitor.</div>;
   if (!docValido(doc) || !ativa) return <div className="vazio" style={{color: 'var(--erro)'}}>o documento {documento} não tem a lista "camadas" nem "paginas"</div>;
 
@@ -80,13 +82,7 @@ export const CamadasImagem: React.FC = () => {
 
   return (
     <div className="painel">
-      {docs.length > 1 && (
-        <div className="painel-topo">
-          <select className="campo" value={documento} onChange={(e) => loja.definir((s) => ({ativo: {...s.ativo, imagem: e.target.value}, selecao: null}))}>
-            {docs.map((d) => <option key={d.id} value={d.id}>{d.titulo}</option>)}
-          </select>
-        </div>
-      )}
+      <SeletorDocumento modulo="imagem" />
       <div className="painel-corpo sem-margem">
         {paginas.length > 1 && (
           <div className="lista-titulo" role="button" tabIndex={0} title="Propriedades da página (clique)" style={{marginTop: 2, cursor: 'pointer'}}
@@ -104,7 +100,7 @@ export const CamadasImagem: React.FC = () => {
             const [lo, hi] = blocoDe(camadas, i);
             const menu = ativaL ? menuDe(c, i) : [];
             return (
-              <li key={c.id || i} className={`${selecionadas.has(i) ? 'sel' : ''}${visivel(c) ? '' : ' oculto'}`} tabIndex={0}
+              <li key={c.id || i} className={`${selecionadas.has(i) ? 'sel' : ''}${visivel(c) ? '' : ' oculto'}${mudouEm(mudancas, documento, caminho) ? ' agente' : ''}`} tabIndex={0}
                 onClick={(e) => (e.shiftKey || e.ctrlKey || e.metaKey ? alternarNaSelecao(documento, caminho) : ir())}
                 title={recortada ? `${c.id} · recortada por ${rotuloCamada(camadas[i + 1])}` : mascaras.has(i) ? `${c.id} · máscara de ${rotuloCamada(camadas[mascaras.get(i)!])}` : c.id}
                 style={recortada ? {paddingLeft: 22} : undefined} onKeyDown={(e) => e.key === 'Enter' && ir()}>
@@ -113,19 +109,20 @@ export const CamadasImagem: React.FC = () => {
                 <span className="tipo">{iconeCamada(c)}</span>
                 <span className="nome">{rotuloCamada(c)}</span>
                 {comComentario.has(caminho) && <span className="ponto-c" title="comentário aberto" />}
+                {mudouEm(mudancas, documento, caminho) && <span className="ponto-agente" title="O Claude mudou esta camada" />}
                 {ativaL && (
                   <>
-                    <button className="bti" disabled={hi === camadas.length - 1} title="Subir" onClick={(e) => (e.stopPropagation(), void mover(i, 1))}><ArrowUp className="i14" /></button>
-                    <button className="bti" disabled={lo === 0} title="Descer" onClick={(e) => (e.stopPropagation(), void mover(i, -1))}><ArrowDown className="i14" /></button>
-                    <button className="bti" title="Excluir camada" onClick={(e) => (e.stopPropagation(), void excluir(i))}><Trash2 className="i14" /></button>
+                    <button aria-label="Subir" className="bti" disabled={hi === camadas.length - 1} title="Subir" onClick={(e) => (e.stopPropagation(), void mover(i, 1))}><ArrowUp className="i14" /></button>
+                    <button aria-label="Descer" className="bti" disabled={lo === 0} title="Descer" onClick={(e) => (e.stopPropagation(), void mover(i, -1))}><ArrowDown className="i14" /></button>
+                    <button aria-label="Excluir camada" className="bti" title="Excluir camada" onClick={(e) => (e.stopPropagation(), void excluir(i))}><Trash2 className="i14" /></button>
                     {menu.length > 0 && <span onClick={(e) => e.stopPropagation()}><BotaoMenu titulo="Mais ações da camada" icone={<Ellipsis className="i14" />} itens={menu} /></span>}
                   </>
                 )}
-                <button className={`bti olho${visivel(c) ? '' : ' sempre'}`} title={visivel(c) ? 'Ocultar' : 'Mostrar'}
+                <button aria-label={visivel(c) ? 'Ocultar' : 'Mostrar'} className={`bti olho${visivel(c) ? '' : ' sempre'}`} title={visivel(c) ? 'Ocultar' : 'Mostrar'}
                   onClick={(e) => (e.stopPropagation(), void trocar(documento, `${caminho}/visivel`, visivel(c) ? false : undefined, `${visivel(c) ? 'ocultar' : 'mostrar'} ${c.id}`))}>
                   {visivel(c) ? <Eye className="i14" /> : <EyeOff className="i14" />}
                 </button>
-                <button className={`bti olho${travada(c) ? ' sempre' : ''}`} title={travada(c) ? 'Destravar' : 'Travar: não anda nem muda de tamanho, e a IA não mexe'}
+                <button aria-label={travada(c) ? 'Destravar' : 'Travar: não anda nem muda de tamanho, e a IA não mexe'} className={`bti olho${travada(c) ? ' sempre' : ''}`} title={travada(c) ? 'Destravar' : 'Travar: não anda nem muda de tamanho, e a IA não mexe'}
                   onClick={(e) => (e.stopPropagation(), void aplicar(documento, patchTravar(camadas, base, [i], !travada(c)), `${travada(c) ? 'destravar' : 'travar'} ${c.id}`))}>
                   {travada(c) ? <Lock className="i14" /> : <LockOpen className="i14" />}
                 </button>

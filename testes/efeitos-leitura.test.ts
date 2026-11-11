@@ -35,7 +35,7 @@ describe('pilha de efeitos lida com validação', () => {
     // desligado não entra; camada (vinheta, granulado e tom) não vira filtro e só vale ligada
     expect(filtroCss([{id: 'a', tipo: 'brilho', valor: 1.5, ativo: false}, {id: 'b', tipo: 'vinheta', valor: 0.5}])).toBe('');
     expect(camadas([{id: 'a', tipo: 'vinheta', valor: 7}, {id: 'b', tipo: 'tom', valor: 0.2, cor: 'não é cor'}, {id: 'c', tipo: 'tom', valor: 0.2, ativo: false}]))
-      .toEqual([{id: 'a', tipo: 'vinheta', valor: 1}, {id: 'b', tipo: 'tom', valor: 0.2, cor: '#C88155'}]);
+      .toEqual([{id: 'a', tipo: 'vinheta', valor: 1}, {id: 'b', tipo: 'tom', valor: 0.2, cor: '#E0A060'}]);
     expect(filtroCss()).toBe('');
     expect(filtroCss('brilho')).toBe('');
   });

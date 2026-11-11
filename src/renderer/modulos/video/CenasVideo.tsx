@@ -6,12 +6,15 @@
 import React, {useState} from 'react';
 import {ChevronDown, ChevronRight, CopyPlus, ImagePlay, Plus, Scissors, Trash2} from 'lucide-react';
 import {ehDocCenas, TIPOS_BLOCO_CENAS, type TipoBlocoCenas} from '../../../nucleo/cenas';
-import {documentosDe, loja, selecionar, useLoja} from '../../estado/loja';
+import {documentosDe, selecionar, useLoja} from '../../estado/loja';
 import {numeroBr} from '../../componentes/Campos';
 import {BotaoMenu} from '../../componentes/Menu';
 import {formatarCurto, irPara} from './tocador';
 import {resumoBloco, tipoDe} from './tipos';
 import {adicionarBloco, adicionarCena, dividirNaCabeca, duplicarSelecao, excluirSelecao, movimentoEmTodas, TIPOS_ROTEIRO} from './acoes';
+import {Escolha} from '../../componentes/Controles';
+import {trocarDocumento} from '../../componentes/SeletorDocumento';
+import {mudouEm} from '../../estado/agente';
 
 type Cena = {tipo?: string; nome?: string; tag?: string; titulo?: string; linhas?: {t: string}[]; blocos?: {tipo: string; texto?: string; id?: string}[]};
 type CenaP = {origem?: string; tipo: string; n?: number; t_in: number; t_out: number; blocos?: {origem?: string; em: number}[]};
@@ -20,6 +23,7 @@ const recolhidas = new Set<string>(); // vale enquanto o app está aberto
 
 export const CenasVideo: React.FC = () => {
   const documento = useLoja((e) => e.ativo.video);
+  const mudancas = useLoja((e) => e.mudancasAgente);
   const doc = useLoja((e) => (documento ? e.docs[documento]?.doc : undefined)) as {cenas?: Cena[]} | undefined;
   const montado = useLoja((e) => (documento ? e.props[documento] : undefined));
   const selecao = useLoja((e) => e.selecao);
@@ -62,9 +66,7 @@ export const CenasVideo: React.FC = () => {
     <div className="painel">
       {docs.length > 1 && (
         <div className="painel-topo">
-          <select className="campo" value={documento} onChange={(e) => loja.definir((s) => ({ativo: {...s.ativo, video: e.target.value}, selecao: null, tempo_ms: 0}))}>
-            {docs.map((d) => <option key={d.id} value={d.id}>{d.titulo}</option>)}
-          </select>
+          <Escolha valor={documento} rotulo="Vídeo aberto" aoMudar={(id) => trocarDocumento('video', id)} opcoes={docs.map((d): [string, string] => [d.id, d.titulo])} />
         </div>
       )}
       <div className="barra-lista">
@@ -76,14 +78,16 @@ export const CenasVideo: React.FC = () => {
             return {rotulo: t.nome, icone: <Icone className="i14" />, acao: () => void adicionarBloco(documento, t.tipo)};
           })} />
         <span className="espaco" />
-        <button className="bti" disabled={!deCenas} onClick={() => void dividirNaCabeca(documento)}
+        <button aria-label={deCenas ? 'Dividir a cena na cabeça (lâmina)  Ctrl+K' : 'No carrossel narrado as cenas seguem a narração'} className="bti" disabled={!deCenas} onClick={() => void dividirNaCabeca(documento)}
           title={deCenas ? 'Dividir a cena na cabeça (lâmina)  Ctrl+K' : 'No carrossel narrado as cenas seguem a narração'}><Scissors size={14} /></button>
-        <button className={`bti${imagens.length && imagens.every((b) => b.movimento) ? ' ligado' : ''}`} disabled={!imagens.length} onClick={() => void movimentoEmTodas(documento)}
+        <button aria-label={!imagens.length ? 'Movimento em todas as imagens: o vídeo ainda não tem bloco de imagem'
+            : imagens.every((b) => b.movimento) ? 'Tirar o movimento de todas as imagens'
+            : 'Movimento em todas as imagens (Ken Burns): aproxima, desliza e afasta, alternando, nas que estão paradas'} className={`bti${imagens.length && imagens.every((b) => b.movimento) ? ' ligado' : ''}`} disabled={!imagens.length} onClick={() => void movimentoEmTodas(documento)}
           title={!imagens.length ? 'Movimento em todas as imagens: o vídeo ainda não tem bloco de imagem'
             : imagens.every((b) => b.movimento) ? 'Tirar o movimento de todas as imagens'
             : 'Movimento em todas as imagens (Ken Burns): aproxima, desliza e afasta, alternando, nas que estão paradas'}><ImagePlay size={14} /></button>
-        <button className="bti" disabled={!temSelecao} onClick={() => void duplicarSelecao(documento)} title="Duplicar  Ctrl+D"><CopyPlus size={14} /></button>
-        <button className="bti" disabled={!temSelecao} onClick={() => void excluirSelecao(documento)} title="Excluir  Delete"><Trash2 size={14} /></button>
+        <button aria-label="Duplicar  Ctrl+D" className="bti" disabled={!temSelecao} onClick={() => void duplicarSelecao(documento)} title="Duplicar  Ctrl+D"><CopyPlus size={14} /></button>
+        <button aria-label="Excluir  Delete" className="bti" disabled={!temSelecao} onClick={() => void excluirSelecao(documento)} title="Excluir  Delete"><Trash2 size={14} /></button>
       </div>
       <div className="painel-corpo sem-margem">
         <ul className="lista">
@@ -98,7 +102,7 @@ export const CenasVideo: React.FC = () => {
                 <li className={selecao?.caminho === caminho ? 'sel' : ''} onClick={() => ir(caminho)} tabIndex={0} onKeyDown={tecla(caminho)} style={{paddingLeft: 4}}>
                   {aqui && <span title="A cabeça está nesta cena" style={{position: 'absolute', left: 0, top: 6, bottom: 6, width: 3, borderRadius: 2, background: 'var(--cabeca)'}} />}
                   {c.blocos?.length ? (
-                    <button className="bti" style={{width: 18, height: 18}} title={fechada ? 'Mostrar os blocos' : 'Recolher os blocos'}
+                    <button aria-label={fechada ? 'Mostrar os blocos' : 'Recolher os blocos'} className="bti" style={{width: 18, height: 18}} title={fechada ? 'Mostrar os blocos' : 'Recolher os blocos'}
                       onClick={(e) => (e.stopPropagation(), alternar(chave))}>
                       {fechada ? <ChevronRight className="i12" /> : <ChevronDown className="i12" />}
                     </button>
@@ -113,11 +117,12 @@ export const CenasVideo: React.FC = () => {
                   const t = tipoDe(b.tipo);
                   const Icone = t.icone;
                   return (
-                    <li key={j} className={`sub${selecao?.caminho === cb ? ' sel' : ''}`} onClick={() => ir(cb)} title={b.id} tabIndex={0} onKeyDown={tecla(cb)}>
+                    <li key={j} className={`sub${selecao?.caminho === cb ? ' sel' : ''}${mudouEm(mudancas, documento, cb) ? ' agente' : ''}`} onClick={() => ir(cb)} title={b.id} tabIndex={0} onKeyDown={tecla(cb)}>
                       <span style={{position: 'absolute', left: 14, top: 5, bottom: 5, width: 3, borderRadius: 2, background: `var(--trilha-${t.familia})`}} />
                       <span className="tipo" style={{color: `var(--trilha-${t.familia})`}}><Icone /></span>
                       <span className="nome">{resumoBloco(b) || t.nome}</span>
                       {temComentario(cb) && <span className="ponto-c" title="comentário aberto" />}
+                      {mudouEm(mudancas, documento, cb) && <span className="ponto-agente" title="O Claude mudou este bloco" />}
                       <span className="meta">{t.nome}</span>
                     </li>
                   );

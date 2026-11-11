@@ -12,6 +12,7 @@ import './config-ia.css';
 import './conversa.css'; // o cartão de permissão solto usa o mesmo estilo do da conversa
 
 const mil = (n: number) => (n >= 1000 ? `${(n / 1000).toLocaleString('pt-BR', {maximumFractionDigits: 1})} mil` : String(n));
+import {Caixa, Escolha} from '../componentes/Controles';
 const usd = (n: number) => `US$ ${n.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: n < 1 ? 4 : 2})}`;
 
 const LinhaProvedor: React.FC<{p: EstadoProvedor; aberto: boolean; abrir: () => void}> = ({p, aberto, abrir}) => {
@@ -97,10 +98,8 @@ const LinhaProvedor: React.FC<{p: EstadoProvedor; aberto: boolean; abrir: () => 
             <div className="ia-linha">
               <span className="rot">Modelo</span>
               {modelos.length ? (
-                <select className="campo" value={modelo} onChange={(e) => (setModelo(e.target.value), void configurar({modelo: e.target.value}))}>
-                  {!modelos.includes(modelo) && <option value={modelo}>{modelo || 'escolha'}</option>}
-                  {modelos.map((m) => <option key={m} value={m}>{m}</option>)}
-                </select>
+                <Escolha valor={modelo || undefined} rotulo="Modelo" aoMudar={(m) => (setModelo(m), void configurar({modelo: m}))}
+                  opcoes={[...(modelo && !modelos.includes(modelo) ? [[modelo, modelo] as [string, string]] : []), ...modelos.map((m): [string, string] => [m, m])]} />
               ) : (
                 <input className="campo" placeholder="nome do modelo" value={modelo} onChange={(e) => setModelo(e.target.value)}
                   onBlur={() => modelo !== (p.modelo ?? '') && void configurar({modelo})} />
@@ -139,7 +138,7 @@ const SecaoAppsDeFora: React.FC = () => {
     <div className="ia-apps">
       <div className="ia-uso-titulo">Apps de IA de fora (Claude Desktop, Cursor, Cline, Windsurf…)</div>
       <div className="ia-linha">
-        <label><input type="checkbox" checked={e.ligado} onChange={(ev) => void window.estudio.ia.appsLigar(ev.target.checked, Number(porta)).then(atualizar).catch(falhar)} /> Deixar apps deste PC usarem o projeto aberto</label>
+        <Caixa marcado={e.ligado} aoMudar={(v) => void window.estudio.ia.appsLigar(v, Number(porta)).then(atualizar).catch(falhar)}>Deixar apps deste PC usarem o projeto aberto</Caixa>
         <span className="rot">Porta</span>
         <input className="campo porta" value={porta} onChange={(ev) => setPorta(ev.target.value.replace(/\D/g, ''))}
           onBlur={() => Number(porta) !== e.porta && void window.estudio.ia.appsLigar(e.ligado, Number(porta)).then(atualizar).catch(falhar)} />
@@ -201,7 +200,7 @@ const DialogoConfigIA: React.FC = () => {
   return (
     <div className="dialogo-fundo" onPointerDown={(e) => e.target === e.currentTarget && fecharConfigIA()} onKeyDown={(e) => e.key === 'Escape' && fecharConfigIA()}>
       <div className="dialogo config-ia" role="dialog" aria-modal="true" aria-label="Configurações da IA">
-        <div className="dialogo-titulo">IA: provedores e chaves<button className="bti fechar" onClick={fecharConfigIA} title="Fechar"><X size={14} /></button></div>
+        <div className="dialogo-titulo">IA: provedores e chaves<button aria-label="Fechar" className="bti fechar" onClick={fecharConfigIA} title="Fechar"><X size={14} /></button></div>
         <div className="dialogo-texto">
           Escolha com qual IA conversar. Todas editam pelo mesmo MCP do Estúdio, com o mesmo histórico e o mesmo Reverter.
           {cofreTexto ? ` Chave ${cofreTexto}.` : persistente ? ' A chave fica cifrada neste PC.' : ' Neste PC a chave vale só enquanto o app estiver aberto.'}

@@ -6,7 +6,7 @@ import {existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync, cl
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import jsonpatch, {type Operation} from 'fast-json-patch';
-import {ehDocImagem, type ArquivoComentarios, type Comentario, type EntradaDiario, type EntradaDocumento, type EstadoEditor, type Manifesto, type Modulo, type OperacaoPatch, type ResumoDiario} from './documentos';
+import {ehDocImagem, type ArquivoComentarios, type Comentario, type EntradaDiario, type EntradaDocumento, type EstadoEditor, type Manifesto, type Modulo, type OperacaoPatch, type ResumoDiario, compactarPatch} from './documentos';
 import {ehDocAnimacao} from './animacao';
 import {comNovaTentativa, gravarAtomico, renomearComRetry} from './gravar-seguro';
 import {comATrava, comTrava} from './trava-escrita';
@@ -420,6 +420,9 @@ export class Projeto {
 
   /** O fim do diário para o painel Histórico (CANAL.diario): as últimas `limite` entradas depois de `desde`, sem os
    *  patches, com um resumo do patch e se já foram revertidas. */
+  /** O patch e o inverso compactos de cada entrada já lida (a entrada não muda depois de gravada). */
+  private compactosDoDiario = new Map<number, {patch: OperacaoPatch[]; inverso: OperacaoPatch[]; ops_a_mais?: number}>();
+
   resumoDoDiario(desde = 0, limite = 200): ResumoDiario[] {
     const todas = this.indiceDoDiario();
     const revertidas = revertidasDe(todas);
@@ -436,7 +439,21 @@ export class Projeto {
           const corte = t.indexOf('],"inverso":');
           resumo = corte >= 0 && corte < TAMANHO_DO_RESUMO ? t.slice(0, corte + 1) : `${t.slice(0, TAMANHO_DO_RESUMO)}…`;
         }
-        return {...e, resumo, tem_inverso, revertida: revertidas.has(e.seq)};
+        let compacto = this.compactosDoDiario.get(e.seq);
+        if (!compacto) {
+          compacto = {patch: [], inverso: []};
+          try {
+            const buf = Buffer.alloc(fim - ini);
+            readSync(fd, buf, 0, buf.length, ini);
+            const inteira = JSON.parse(buf.toString('utf-8')) as Partial<EntradaDiario>;
+            const p = compactarPatch(inteira.patch);
+            compacto = {patch: p.ops, inverso: compactarPatch(inteira.inverso).ops, ...(p.a_mais ? {ops_a_mais: p.a_mais} : {})};
+          } catch {
+            /* linha que não se lê: a tela fica só com o resumo */
+          }
+          this.compactosDoDiario.set(e.seq, compacto);
+        }
+        return {...e, resumo, tem_inverso, revertida: revertidas.has(e.seq), ...compacto};
       });
     } finally {
       closeSync(fd);

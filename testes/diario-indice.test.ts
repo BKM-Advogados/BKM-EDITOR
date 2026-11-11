@@ -70,8 +70,10 @@ describe('N7 diário grande', () => {
     expect(lista.find((e) => e.seq === 200)).toMatchObject({revertida: true});
     expect(lista[0].resumo.startsWith('[{"op":"replace","path":"/cor"')).toBe(true);
     expect(lista[0].resumo.endsWith('…')).toBe(true);
-    expect(lista[0]).not.toHaveProperty('patch');
-    expect(lista[0]).not.toHaveProperty('inverso');
+    // o patch e o inverso chegam compactos, só para a tela mostrar o que mudou (a grade de 190 KB vira um texto curto)
+    expect(lista[0].patch).toHaveLength(1);
+    expect(String((lista[0].patch[0] as {value?: unknown}).value).length).toBeLessThanOrEqual(120);
+    expect(String((lista[0].patch[0] as {value?: unknown}).value).endsWith('…')).toBe(true);
   });
 
   it('resumo curto vem inteiro; entrada sem inverso não é revertível; linha fora do formato e quebrada', () => {

@@ -194,6 +194,36 @@ export type ResumoDiario = Omit<EntradaDiario, 'patch' | 'inverso' | 'versao_ant
   resumo: string;
   tem_inverso: boolean;
   revertida: boolean;
+  /** Compactos, só para a tela mostrar o que mudou (Histórico, "o Claude mudou isto"): no máximo MAX_OPS_RESUMO
+   *  operações e valores grandes trocados por um texto curto. Nunca aplique estes patches: o Reverter e o Ctrl+Z leem
+   *  a entrada inteira do diário no processo principal. */
+  patch: OperacaoPatch[];
+  inverso: OperacaoPatch[];
+  ops_a_mais?: number; // quantas operações ficaram de fora do patch compacto
+};
+
+export const MAX_OPS_RESUMO = 20;
+const MAX_VALOR_RESUMO = 120;
+
+/** Um valor do patch para a tela: o próprio, se pequeno; senão um texto curto que diz o que era. */
+export const valorCompacto = (v: unknown): unknown => {
+  if (v === undefined) return v;
+  let t: string;
+  try {
+    t = JSON.stringify(v);
+  } catch {
+    return '‹valor›';
+  }
+  if (t === undefined || t.length <= MAX_VALOR_RESUMO) return v;
+  if (typeof v === 'string') return `${v.slice(0, MAX_VALOR_RESUMO - 1)}…`;
+  return Array.isArray(v) ? `‹lista com ${v.length} itens›` : '‹valor grande›';
+};
+
+/** Patch e inverso de uma entrada do diário, compactos (ver ResumoDiario). */
+export const compactarPatch = (patch: OperacaoPatch[] | undefined, max = MAX_OPS_RESUMO): {ops: OperacaoPatch[]; a_mais: number} => {
+  const lista = (patch ?? []).filter((o) => o.op !== 'test');
+  const ops = lista.slice(0, max).map((o) => ('value' in o ? {...o, value: valorCompacto((o as {value?: unknown}).value)} : o) as OperacaoPatch);
+  return {ops, a_mais: Math.max(0, lista.length - max)};
 };
 
 /** Estado do editor que o agente pode consultar (o app grava em .estudio/estado.json). */

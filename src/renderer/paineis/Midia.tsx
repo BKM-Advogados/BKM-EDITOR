@@ -12,6 +12,7 @@ import {BotaoMenu} from '../componentes/Menu';
 import {carregarMidia, marcarTomada, recarregarMidiaEmBreve, urlDoArquivo, useMidia} from './midia-estado';
 import {destinosDaMidia} from './midia-uso';
 import './midia.css';
+import {Escolha} from '../componentes/Controles';
 
 const ICONE_TIPO: Record<TipoMidia, React.ReactNode> = {
   video: <Film size={12} />, audio: <Music size={12} />, imagem: <ImagemIcone size={12} />, outro: <ArquivoIcone size={12} />,
@@ -196,11 +197,8 @@ export const Midia: React.FC = () => {
         </div>
         <div className="midia-chips" role="group" aria-label="Marca da tomada">
           {MARCAS.map((m) => <button key={m.id} className={`midia-chip${marca === m.id ? ' ligado' : ''}`} aria-pressed={marca === m.id} onClick={() => setMarca(m.id)}>{m.nome}</button>)}
-          <select className="campo midia-ordem" aria-label="Ordem" value={ordem} onChange={(ev) => setOrdem(ev.target.value as typeof ordem)}>
-            <option value="nome">Por nome</option>
-            <option value="recentes">Mais recentes</option>
-            <option value="tamanho">Maiores</option>
-          </select>
+          <span className="midia-ordem"><Escolha valor={ordem} rotulo="Ordem" aoMudar={setOrdem}
+            opcoes={[['nome', 'Por nome'], ['recentes', 'Mais recentes'], ['tamanho', 'Maiores']] as [typeof ordem, string][]} /></span>
         </div>
         {(indice?.pastas.length ?? 0) > 1 && (
           <div className="midia-chips" role="group" aria-label="Pastas">

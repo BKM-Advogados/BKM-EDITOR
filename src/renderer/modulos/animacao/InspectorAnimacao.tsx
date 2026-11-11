@@ -1,28 +1,33 @@
-// Inspetor de propriedades da Animação: valores na cabeça, botão ◆ por propriedade, curvas e editor de pixel
+// Inspetor de propriedades da Animação, no desenho das outras áreas (cabeçalho, seções recolhíveis, linha de campo):
+// valores na agulha, o losango ◆ de quadro-chave na frente de cada propriedade animável, curvas com nome e editor de pixel
 import React, {useEffect, useState} from "react";
-import {Diamond} from "lucide-react";
+import {Clapperboard, Diamond} from "lucide-react";
 import {
   CURVAS, TEMA_ANIMACAO_NEUTRO, valorEm, type CamadaAnimacao, type Curva, type DocAnimacao,
   type PropriedadeAnimavel, type QuadroChave,
 } from "../../../nucleo/animacao";
 import {aplicar, useLoja} from "../../estado/loja";
 import {
-  CampoCor, CampoDeslizante, CampoNumero, CampoTexto, LinhaCampo,
+  CabecalhoInspector, CampoCor, CampoDeslizante, CampoNumero, CampoSelecao, CampoTexto, numeroBr, Secao,
 } from "../../componentes/Campos";
+import {iconeTipoAnimacao, NOME_TIPO_ANIMACAO} from "./CamadasAnimacao";
 import {EditorPixel} from "./EditorPixel";
 import {aoQuadro, msAtual} from "./tocador";
+import {MudancasNoInspetor} from "../../componentes/Agente";
+import {DURACAO_PREAJUSTE_MS, modoAnimar, PREAJUSTES, trilhasComPreajuste} from "./preajustes";
 
 export const InspectorAnimacao: React.FC = () => {
   const ativo = useLoja((e) => e.ativo.animacao);
   const doc = useLoja((e) => (ativo ? (e.docs[ativo]?.doc as DocAnimacao | undefined) : undefined));
   const selecao = useLoja((e) => (e.selecao && e.selecao.documento === ativo ? e.selecao.caminho : null));
   const [tempoMs, setTempoMs] = useState(msAtual());
+  const [grande, setGrande] = useState(false); // editor de pixel grande, num diálogo
 
   useEffect(() => {
     return aoQuadro((ms) => setTempoMs(ms));
   }, []);
 
-  if (!ativo || !doc) return <div className="vazio">Nenhuma animação aberta.</div>;
+  if (!ativo || !doc) return <div className="painel"><div className="vazio">Nenhuma animação aberta.</div></div>;
 
   // Se nenhuma camada selecionada, inspeciona as propriedades da cena / documento
   const matchCamada = selecao?.match(/^\/camadas\/(\d+)$/);
@@ -31,37 +36,22 @@ export const InspectorAnimacao: React.FC = () => {
 
   if (!camada || indiceCamada < 0) {
     return (
-      <div className="inspector-conteudo">
-        <div className="secao-titulo">Cena da Animação</div>
-        <CampoNumero
-          rotulo="Largura"
-          valor={doc.largura}
-          aoMudar={(v) => aplicar(ativo, [{op: "replace", path: "/largura", value: Math.max(16, v)}], "largura da cena")}
-          unidade="px"
-        />
-        <CampoNumero
-          rotulo="Altura"
-          valor={doc.altura}
-          aoMudar={(v) => aplicar(ativo, [{op: "replace", path: "/altura", value: Math.max(16, v)}], "altura da cena")}
-          unidade="px"
-        />
-        <CampoNumero
-          rotulo="Taxa (FPS)"
-          valor={doc.fps}
-          aoMudar={(v) => aplicar(ativo, [{op: "replace", path: "/fps", value: Math.max(1, v)}], "fps da cena")}
-          unidade="qps"
-        />
-        <CampoNumero
-          rotulo="Duração"
-          valor={Math.round(doc.duracao_ms / 1000)}
-          aoMudar={(v) => aplicar(ativo, [{op: "replace", path: "/duracao_ms", value: Math.max(100, v * 1000)}], "duração da cena")}
-          unidade="s"
-        />
-        <CampoCor
-          rotulo="Fundo"
-          valor={doc.fundo}
-          aoMudar={(v) => aplicar(ativo, [{op: "replace", path: "/fundo", value: v}], "fundo da animação")}
-        />
+      <div className="painel">
+        <CabecalhoInspector icone={<Clapperboard />} nome="Animação" sub={`${doc.largura} × ${doc.altura} · ${doc.fps} qps · ${numeroBr(doc.duracao_ms / 1000, 1)} s`} />
+        <div className="insp-corpo">
+          <Secao titulo="Cena">
+            <CampoNumero rotulo="Largura" valor={doc.largura} unidade="px"
+              aoMudar={(v) => aplicar(ativo, [{op: "replace", path: "/largura", value: Math.max(16, v)}], "largura da cena")} />
+            <CampoNumero rotulo="Altura" valor={doc.altura} unidade="px"
+              aoMudar={(v) => aplicar(ativo, [{op: "replace", path: "/altura", value: Math.max(16, v)}], "altura da cena")} />
+            <CampoNumero rotulo="Quadros/s" valor={doc.fps} unidade="qps"
+              aoMudar={(v) => aplicar(ativo, [{op: "replace", path: "/fps", value: Math.max(1, v)}], "fps da cena")} />
+            <CampoNumero rotulo="Duração" valor={Math.round(doc.duracao_ms / 100) / 10} unidade="s"
+              aoMudar={(v) => aplicar(ativo, [{op: "replace", path: "/duracao_ms", value: Math.max(100, Math.round(v * 1000))}], "duração da cena")} />
+            <CampoCor rotulo="Fundo" valor={doc.fundo} aoMudar={(v) => aplicar(ativo, [{op: "replace", path: "/fundo", value: v}], "fundo da animação")} />
+          </Secao>
+          <div className="resumo">Clique numa camada no monitor, na lista ou na linha do tempo para editar.</div>
+        </div>
       </div>
     );
   }
@@ -103,9 +93,9 @@ export const InspectorAnimacao: React.FC = () => {
 
   const mudarValorPropriedade = (prop: PropriedadeAnimavel, novoValor: number | string) => {
     const trilhas = {...(camada.trilhas ?? {})};
-    const lista = trilhas[prop];
-    if (lista && lista.length > 0) {
-      // Se a propriedade já está animada, cria ou atualiza o quadro-chave na cabeça de reprodução
+    const lista = trilhas[prop] ?? [];
+    if (lista.length > 0 || modoAnimar.get()) {
+      // propriedade já animada, ou o modo animar ligado: cria ou atualiza o quadro-chave na cabeça de reprodução
       const k = quadroChaveNoTempo(prop);
       if (k) {
         k.valor = novoValor;
@@ -113,6 +103,7 @@ export const InspectorAnimacao: React.FC = () => {
         lista.push({t_ms: Math.round(tempoMs), valor: novoValor, curva: "suave"});
         lista.sort((a, b) => a.t_ms - b.t_ms);
       }
+      trilhas[prop] = lista;
       aplicar(ativo, [{op: "add", path: `${origem}/trilhas`, value: trilhas}], `animar ${prop}`);
     } else {
       // Altera o valor base da camada
@@ -142,189 +133,125 @@ export const InspectorAnimacao: React.FC = () => {
   const opacidade = Number(valorEm(camada, "opacidade", tempoMs));
   const cor = String(valorEm(camada, "cor", tempoMs, tema));
 
-  const BotaoLosango: React.FC<{prop: PropriedadeAnimavel}> = ({prop}) => {
+  const BotaoLosango = (prop: PropriedadeAnimavel) => {
     const ativoK = Boolean(quadroChaveNoTempo(prop));
     const temTrilha = Boolean(camada.trilhas?.[prop]?.length);
     return (
       <button
         type="button"
         className={`bt-losango${ativoK ? " ativo" : temTrilha ? " animado" : ""}`}
-        onClick={() => alternarQuadroChave(prop)}
-        title={ativoK ? "Remover quadro-chave neste tempo" : "Inserir quadro-chave neste tempo (K)"}
+        onClick={(e) => (e.preventDefault(), alternarQuadroChave(prop))}
+        title={ativoK ? "Tirar o quadro-chave deste tempo" : temTrilha ? "Animado: pôr um quadro-chave neste tempo" : "Pôr um quadro-chave neste tempo (K)"}
+        aria-label={ativoK ? `Tirar o quadro-chave de ${prop}` : `Pôr um quadro-chave de ${prop}`}
+        aria-pressed={ativoK}
       >
-        <Diamond size={11} fill={ativoK ? "currentColor" : "none"} />
+        <Diamond fill={ativoK ? "currentColor" : "none"} />
       </button>
     );
   };
+  const nomeCurva = (c: Curva) => CURVAS.find((x) => x.id === c)?.nome ?? c;
 
   return (
-    <div className="inspector-conteudo">
-      <div className="secao-titulo">
-        <span>{camada.nome} ({camada.tipo})</span>
-      </div>
+    <div className="painel">
+      <CabecalhoInspector icone={iconeTipoAnimacao(camada.tipo)} nome={camada.nome} sub={`${NOME_TIPO_ANIMACAO[camada.tipo]} · ${camada.id}`} />
+      <MudancasNoInspetor documento={ativo} objeto={origem} />
+      <div className="insp-corpo">
+        <Secao titulo="Transformação" acao={<span className="rotulo" title="O losango põe ou tira um quadro-chave no tempo da agulha">◆ = quadro-chave</span>}>
+          <CampoNumero rotulo="Posição X" valor={x} unidade="px" marcador={BotaoLosango("x")} aoMudar={(v) => mudarValorPropriedade("x", v)} />
+          <CampoNumero rotulo="Posição Y" valor={y} unidade="px" marcador={BotaoLosango("y")} aoMudar={(v) => mudarValorPropriedade("y", v)} />
+          <CampoNumero rotulo="Escala" valor={escala} passo={0.1} marcador={BotaoLosango("escala")} aoMudar={(v) => mudarValorPropriedade("escala", v)} />
+          <CampoNumero rotulo="Rotação" valor={rotacao} unidade="°" marcador={BotaoLosango("rotacao")} aoMudar={(v) => mudarValorPropriedade("rotacao", v)} />
+          <CampoDeslizante rotulo="Opacidade" valor={opacidade} min={0} max={1} passo={0.05} formatar={(v) => `${Math.round(v * 100)}%`}
+            marcador={BotaoLosango("opacidade")} aoMudar={(v) => mudarValorPropriedade("opacidade", v)} />
+        </Secao>
 
-      <div className="secao-subtitulo">Transformação</div>
-      <div className="linha-com-losango">
-        <BotaoLosango prop="x" />
-        <CampoNumero rotulo="Posição X" valor={x} aoMudar={(v) => mudarValorPropriedade("x", v)} unidade="px" />
-      </div>
-      <div className="linha-com-losango">
-        <BotaoLosango prop="y" />
-        <CampoNumero rotulo="Posição Y" valor={y} aoMudar={(v) => mudarValorPropriedade("y", v)} unidade="px" />
-      </div>
-      <div className="linha-com-losango">
-        <BotaoLosango prop="escala" />
-        <CampoNumero rotulo="Escala" valor={escala} aoMudar={(v) => mudarValorPropriedade("escala", v)} passo={0.1} />
-      </div>
-      <div className="linha-com-losango">
-        <BotaoLosango prop="rotacao" />
-        <CampoNumero rotulo="Rotação" valor={rotacao} aoMudar={(v) => mudarValorPropriedade("rotacao", v)} unidade="°" />
-      </div>
-      <div className="linha-com-losango">
-        <BotaoLosango prop="opacidade" />
-        <CampoDeslizante
-          rotulo="Opacidade"
-          valor={opacidade}
-          min={0}
-          max={1}
-          passo={0.05}
-          aoMudar={(v) => mudarValorPropriedade("opacidade", v)}
-        />
-      </div>
+        <Secao titulo="Entrar e sair" acao={<span className="rotulo">a partir da agulha</span>}>
+          <div className="preajustes-anim">
+            <span className="rot">Entrada</span>
+            <div className="chips-anim">
+              {PREAJUSTES.map((p) => (
+                <button key={p.id} type="button" className="bt mini" title={`${p.nome} ao entrar: ${DURACAO_PREAJUSTE_MS} ms a partir da agulha`}
+                  onClick={() => aplicar(ativo, [{op: "add", path: `${origem}/trilhas`, value: trilhasComPreajuste(camada, p, "entrada", tempoMs, doc.duracao_ms)}], `entrada: ${p.nome.toLowerCase()}`)}>
+                  {p.nome}
+                </button>
+              ))}
+            </div>
+            <span className="rot">Saída</span>
+            <div className="chips-anim">
+              {PREAJUSTES.map((p) => (
+                <button key={p.id} type="button" className="bt mini" title={`${p.nome} ao sair: termina ${DURACAO_PREAJUSTE_MS} ms depois da agulha`}
+                  onClick={() => aplicar(ativo, [{op: "add", path: `${origem}/trilhas`, value: trilhasComPreajuste(camada, p, "saida", tempoMs, doc.duracao_ms)}], `saída: ${p.nome.toLowerCase()}`)}>
+                  {p.nome}
+                </button>
+              ))}
+            </div>
+          </div>
+        </Secao>
 
-      {camada.tipo === "forma" && (
-        <>
-          <div className="secao-subtitulo">Forma</div>
-          <LinhaCampo rotulo="Tipo de forma">
-            <select
-              className="campo"
-              value={camada.forma ?? "retangulo"}
-              onChange={(e) =>
-                aplicar(ativo, [{op: "add", path: `${origem}/forma`, value: e.target.value as "retangulo" | "elipse"}], "tipo de forma")
-              }
-            >
-              <option value="retangulo">Retângulo</option>
-              <option value="elipse">Elipse</option>
-            </select>
-          </LinhaCampo>
-          <div className="linha-com-losango">
-            <BotaoLosango prop="cor" />
-            <CampoCor rotulo="Cor" valor={cor} aoMudar={(v) => mudarValorPropriedade("cor", v)} />
-          </div>
-          {camada.forma !== "elipse" && (
-            <CampoNumero
-              rotulo="Raio cantos"
-              valor={camada.raio ?? 0}
-              aoMudar={(v) => aplicar(ativo, [{op: "add", path: `${origem}/raio`, value: v}], "raio cantos")}
-              unidade="px"
-            />
-          )}
-          <CampoNumero
-            rotulo="Largura"
-            valor={camada.largura}
-            aoMudar={(v) => aplicar(ativo, [{op: "replace", path: `${origem}/largura`, value: Math.max(10, v)}], "largura")}
-            unidade="px"
-          />
-          <CampoNumero
-            rotulo="Altura"
-            valor={camada.altura}
-            aoMudar={(v) => aplicar(ativo, [{op: "replace", path: `${origem}/altura`, value: Math.max(10, v)}], "altura")}
-            unidade="px"
-          />
-        </>
-      )}
+        {camada.tipo === "forma" && (
+          <Secao titulo="Forma">
+            <CampoSelecao rotulo="Tipo" valor={camada.forma ?? "retangulo"} opcoes={[["retangulo", "Retângulo"], ["elipse", "Elipse"]]}
+              aoMudar={(v) => aplicar(ativo, [{op: "add", path: `${origem}/forma`, value: v}], "tipo de forma")} />
+            <CampoCor rotulo="Cor" valor={cor} marcador={BotaoLosango("cor")} aoMudar={(v) => mudarValorPropriedade("cor", v)} />
+            {camada.forma !== "elipse" && (
+              <CampoNumero rotulo="Cantos" valor={camada.raio ?? 0} unidade="px" aoMudar={(v) => aplicar(ativo, [{op: "add", path: `${origem}/raio`, value: v}], "raio cantos")} />
+            )}
+            <CampoNumero rotulo="Largura" valor={camada.largura} unidade="px"
+              aoMudar={(v) => aplicar(ativo, [{op: "replace", path: `${origem}/largura`, value: Math.max(10, v)}], "largura")} />
+            <CampoNumero rotulo="Altura" valor={camada.altura} unidade="px"
+              aoMudar={(v) => aplicar(ativo, [{op: "replace", path: `${origem}/altura`, value: Math.max(10, v)}], "altura")} />
+          </Secao>
+        )}
 
-      {camada.tipo === "texto" && (
-        <>
-          <div className="secao-subtitulo">Texto</div>
-          <CampoTexto
-            rotulo="Conteúdo"
-            valor={camada.texto ?? ""}
-            aoMudar={(v) => aplicar(ativo, [{op: "add", path: `${origem}/texto`, value: v}], "texto")}
-            multilinha
-          />
-          <div className="linha-com-losango">
-            <BotaoLosango prop="tamanho" />
-            <CampoNumero
-              rotulo="Tamanho"
-              valor={Number(valorEm(camada, "tamanho", tempoMs))}
-              aoMudar={(v) => mudarValorPropriedade("tamanho", v)}
-              unidade="px"
-            />
-          </div>
-          <div className="linha-com-losango">
-            <BotaoLosango prop="cor" />
-            <CampoCor rotulo="Cor" valor={cor} aoMudar={(v) => mudarValorPropriedade("cor", v)} />
-          </div>
-          <LinhaCampo rotulo="Alinhamento">
-            <select
-              className="campo"
-              value={camada.alinhar ?? "centro"}
-              onChange={(e) =>
-                aplicar(ativo, [{op: "add", path: `${origem}/alinhar`, value: e.target.value as "esquerda" | "centro" | "direita"}], "alinhar")
-              }
-            >
-              <option value="esquerda">Esquerda</option>
-              <option value="centro">Centro</option>
-              <option value="direita">Direita</option>
-            </select>
-          </LinhaCampo>
-        </>
-      )}
+        {camada.tipo === "texto" && (
+          <Secao titulo="Texto">
+            <CampoTexto rotulo="Texto" valor={camada.texto ?? ""} multilinha aoMudar={(v) => aplicar(ativo, [{op: "add", path: `${origem}/texto`, value: v}], "texto")} />
+            <CampoNumero rotulo="Tamanho" valor={Number(valorEm(camada, "tamanho", tempoMs))} unidade="px" marcador={BotaoLosango("tamanho")}
+              aoMudar={(v) => mudarValorPropriedade("tamanho", v)} />
+            <CampoCor rotulo="Cor" valor={cor} marcador={BotaoLosango("cor")} aoMudar={(v) => mudarValorPropriedade("cor", v)} />
+            <CampoSelecao rotulo="Alinhar" valor={camada.alinhar ?? "centro"} opcoes={[["esquerda", "Esquerda"], ["centro", "Centro"], ["direita", "Direita"]]}
+              aoMudar={(v) => aplicar(ativo, [{op: "add", path: `${origem}/alinhar`, value: v}], "alinhar")} />
+          </Secao>
+        )}
 
-      {camada.tipo === "pixel" && (
-        <>
-          <div className="secao-subtitulo">Arte em Pixel</div>
-          <div className="linha-com-losango">
-            <BotaoLosango prop="progresso" />
-            <CampoDeslizante
-              rotulo="Progresso"
-              valor={Number(valorEm(camada, "progresso", tempoMs))}
-              min={0}
-              max={1}
-              passo={0.05}
-              aoMudar={(v) => mudarValorPropriedade("progresso", v)}
-            />
-          </div>
-          <div className="linha-com-losango">
-            <BotaoLosango prop="tamanho_pixel" />
-            <CampoNumero
-              rotulo="Tamanho pixel"
-              valor={Number(valorEm(camada, "tamanho_pixel", tempoMs))}
-              aoMudar={(v) => mudarValorPropriedade("tamanho_pixel", v)}
-              unidade="px"
-            />
-          </div>
-          <EditorPixel documento={ativo} camada={camada} origem={origem} />
-        </>
-      )}
+        {camada.tipo === "pixel" && (
+          <Secao titulo="Arte em pixel">
+            <CampoDeslizante rotulo="Revelação" valor={Number(valorEm(camada, "progresso", tempoMs))} min={0} max={1} passo={0.05}
+              formatar={(v) => `${Math.round(v * 100)}%`} marcador={BotaoLosango("progresso")} aoMudar={(v) => mudarValorPropriedade("progresso", v)} />
+            <CampoNumero rotulo="Pixel" valor={Number(valorEm(camada, "tamanho_pixel", tempoMs))} unidade="px" marcador={BotaoLosango("tamanho_pixel")}
+              aoMudar={(v) => mudarValorPropriedade("tamanho_pixel", v)} />
+            <EditorPixel documento={ativo} camada={camada} origem={origem} tema={doc.tema ?? TEMA_ANIMACAO_NEUTRO} aoAbrirGrande={() => setGrande(true)} />
+            {grande && (
+              <div className="dialogo-fundo" onPointerDown={(e) => e.target === e.currentTarget && setGrande(false)} onKeyDown={(e) => e.key === "Escape" && setGrande(false)}>
+                <div className="dialogo editor-grande" role="dialog" aria-label={`Desenhar: ${camada.nome}`}>
+                  <div className="dialogo-titulo">Desenhar · {camada.nome}</div>
+                  <EditorPixel documento={ativo} camada={camada} origem={origem} tema={doc.tema ?? TEMA_ANIMACAO_NEUTRO} tamanho={560} />
+                  <div className="dialogo-botoes"><button className="bt principal" onClick={() => setGrande(false)} autoFocus>Pronto</button></div>
+                </div>
+              </div>
+            )}
+          </Secao>
+        )}
 
-      {/* Curvas de animação das trilhas ativas */}
-      {camada.trilhas && Object.keys(camada.trilhas).length > 0 && (
-        <>
-          <div className="secao-subtitulo">Curvas de Interpolação</div>
-          {Object.entries(camada.trilhas).map(([p, ks]) => {
-            if (!ks || ks.length === 0) return null;
-            const prop = p as PropriedadeAnimavel;
-            const k = ks.find((item) => Math.abs(item.t_ms - tempoMs) < 25) ?? ks[0];
-            return (
-              <LinhaCampo key={prop} rotulo={`Curva (${prop})`}>
-                <select
-                  className="campo"
-                  value={k.curva ?? "suave"}
-                  onChange={(e) => mudarCurvaDoQuadro(prop, e.target.value as Curva)}
-                >
-                  {CURVAS.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.nome}
-                    </option>
-                  ))}
-                </select>
-              </LinhaCampo>
-            );
-          })}
-        </>
-      )}
+        {camada.trilhas && Object.values(camada.trilhas).some((ks) => ks && ks.length > 0) && (
+          <Secao titulo="Curvas">
+            {Object.entries(camada.trilhas).map(([p, ks]) => {
+              if (!ks || ks.length === 0) return null;
+              const prop = p as PropriedadeAnimavel;
+              const k = ks.find((item) => Math.abs(item.t_ms - tempoMs) < 25) ?? ks[0];
+              return (
+                <CampoSelecao key={prop} rotulo={NOME_PROPRIEDADE[prop] ?? prop} valor={k.curva ?? "suave"}
+                  opcoes={CURVAS.map((c): [Curva, string] => [c.id, nomeCurva(c.id)])} aoMudar={(v) => mudarCurvaDoQuadro(prop, v)} />
+              );
+            })}
+          </Secao>
+        )}
+      </div>
     </div>
   );
+};
+
+const NOME_PROPRIEDADE: Partial<Record<PropriedadeAnimavel, string>> = {
+  x: "Posição X", y: "Posição Y", escala: "Escala", rotacao: "Rotação", opacidade: "Opacidade", cor: "Cor", tamanho: "Tamanho",
+  progresso: "Revelação", tamanho_pixel: "Pixel",
 };

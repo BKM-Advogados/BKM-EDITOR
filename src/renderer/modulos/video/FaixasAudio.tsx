@@ -165,7 +165,7 @@ export const FaixasAudio: React.FC<{documento: string; audio: AudioP; x: (ms: nu
                 }}>
                 <Icone />
                 <span className="nome">{f.nome}</span>
-                <button className={`bti${f.mudo ? ' ligado' : ''}`} title={f.mudo ? 'Faixa muda: clique para ouvir' : 'Silenciar a faixa'}
+                <button aria-label={f.mudo ? 'Faixa muda: clique para ouvir' : 'Silenciar a faixa'} className={`bti${f.mudo ? ' ligado' : ''}`} title={f.mudo ? 'Faixa muda: clique para ouvir' : 'Silenciar a faixa'}
                   onClick={(e) => {
                     e.stopPropagation();
                     void trocar(documento, `${f.origem}/mudo`, f.mudo ? undefined : true, `${f.mudo ? 'ouvir' : 'silenciar'} ${f.nome}`);

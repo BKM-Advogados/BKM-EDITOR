@@ -7,7 +7,7 @@
 import type {DocImagem} from '../../../nucleo/documentos';
 import {itensDePintura, type ItemPintura} from '../../../nucleo/acabamento';
 import {resolverMarcaNoDoc} from '../../../nucleo/cor-marca';
-import {camadas as camadasDeEfeito, filtroCss, sementeDoGranulado, svgDoGranulado, type Efeito} from '../../../nucleo/efeitos';
+import {camadas as camadasDeEfeito, filtroCss, sementeDoGranulado, svgDoGranulado, TOM_PADRAO, type Efeito} from '../../../nucleo/efeitos';
 import {FORMATOS_IMAGEM_SAIDA, type FormatoImagem} from '../../../nucleo/exportacao';
 import {avisar, loja} from '../../estado/loja';
 import {PADRAO, esperarFontes, familiaCss, imagemDoBlob, rotuloCamada, urlMidia, visivel} from './comum';
@@ -64,7 +64,7 @@ const desenharTom = (ctx: CanvasRenderingContext2D, e: Efeito, W: number, H: num
   ctx.save();
   ctx.globalCompositeOperation = 'soft-light';
   ctx.globalAlpha = Math.min(1, Math.max(0, e.valor));
-  ctx.fillStyle = e.cor ?? '#C88155';
+  ctx.fillStyle = e.cor ?? TOM_PADRAO;
   ctx.fillRect(0, 0, W, H);
   ctx.restore();
 };

@@ -6,6 +6,8 @@ import type {DocCena3D, Luz3D} from '../../../nucleo/documentos';
 import {aplicar, documentosDe, loja, selecionar, trocar, useLoja} from '../../estado/loja';
 import {indiceEm, luzesDe, novoObjeto, objetosDe, TIPOS, type TipoObjeto} from './comum';
 import {useCena3d} from './lida';
+import {Escolha} from '../../componentes/Controles';
+import {trocarDocumento} from '../../componentes/SeletorDocumento';
 
 const ICONE: Record<TipoObjeto, React.ReactNode> = {
   caixa: <Box size={13} />, esfera: <Circle size={13} />, cilindro: <Cylinder size={13} />, cone: <Cone size={13} />, toro: <Torus size={13} />, plano: <Square size={13} />,
@@ -65,9 +67,9 @@ export const ListaTres: React.FC = () => {
     <div className="painel">
       <div className="painel-topo">
         {docs.length > 1 ? (
-          <select className="campo" value={documento} style={{flex: 1}} onChange={(e) => loja.definir((s) => ({ativo: {...s.ativo, '3d': e.target.value}, selecao: null}))}>
-            {docs.map((d) => <option key={d.id} value={d.id}>{d.titulo}</option>)}
-          </select>
+          <span style={{flex: 1, minWidth: 0, display: 'flex'}}>
+            <Escolha valor={documento} rotulo="Cena aberta" aoMudar={(id) => trocarDocumento('3d', id)} opcoes={docs.map((d): [string, string] => [d.id, d.titulo])} />
+          </span>
         ) : (
           <span className="titulo">{objetos.length} {objetos.length === 1 ? 'objeto' : 'objetos'}</span>
         )}
@@ -76,7 +78,7 @@ export const ListaTres: React.FC = () => {
           <button className={`bt mini${menu ? ' ligado' : ''}`} onClick={() => setMenu((m) => !m)} title="Adicionar primitiva"><Plus size={13} />Adicionar</button>
           {menu && (
             <div style={{position: 'absolute', right: 0, top: 26, zIndex: 10, minWidth: 140, padding: 4, background: 'var(--fundo-2)', border: '1px solid var(--borda-forte)',
-              borderRadius: 'var(--raio-2)', boxShadow: '0 8px 24px rgba(0,0,0,0.5)'}}>
+              borderRadius: 'var(--raio-2)', boxShadow: 'var(--sombra-2)'}}>
               {TIPOS.map((t) => (
                 <button key={t.tipo} className="bt fantasma" style={{width: '100%', justifyContent: 'flex-start'}} onClick={() => void adicionar(t.tipo)}>
                   {ICONE[t.tipo]}{t.nome}

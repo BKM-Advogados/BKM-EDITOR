@@ -1,7 +1,7 @@
 // Aplica a pilha de efeitos a um conteúdo: filtro CSS no conteúdo e camadas (vinheta, granulado, tom) por cima.
 // Serve à composição do Remotion e à prévia da imagem; `quadro` dá a semente do granulado.
 import React from 'react';
-import {efeitosValidos, filtroCss, GRANULADO, sementeDoGranulado, type Efeito} from '../../nucleo/efeitos';
+import {efeitosValidos, filtroCss, GRANULADO, sementeDoGranulado, TOM_PADRAO, type Efeito} from '../../nucleo/efeitos';
 
 const Granulado: React.FC<{forca: number; quadro: number}> = ({forca, quadro}) => {
   const semente = sementeDoGranulado(quadro);
@@ -24,7 +24,7 @@ const Sobreposta: React.FC<{e: Efeito; quadro: number}> = ({e, quadro}) => {
       background: `radial-gradient(ellipse at center, rgba(0,0,0,0) 45%, rgba(0,0,0,${Math.min(1, e.valor)}) 100%)`}} />;
   }
   if (e.tipo === 'granulado') return <Granulado forca={e.valor} quadro={quadro} />;
-  return <div style={{position: 'absolute', inset: 0, pointerEvents: 'none', background: e.cor ?? '#C88155', mixBlendMode: 'soft-light', opacity: e.valor}} />;
+  return <div style={{position: 'absolute', inset: 0, pointerEvents: 'none', background: e.cor ?? TOM_PADRAO, mixBlendMode: 'soft-light', opacity: e.valor}} />;
 };
 
 /** Os efeitos valem na ordem da pilha (tres-efeitos-D5): os filtros seguidos formam um grupo que se aplica a tudo o que já está

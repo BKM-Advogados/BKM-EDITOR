@@ -117,7 +117,7 @@ describe('normalização e resolução', () => {
   it('resolve o tema neutro quando o documento não tem tema', () => {
     const {props} = resolverAnimacao(novaAnimacao(1920, 1080));
     expect(props.composicao).toBe('Animacao');
-    expect(props.tema.destaque).toBe('#70B8FF');
+    expect(props.tema.destaque).toBe('#FFFFFF');
   });
   it('novaAnimacao e novaCamadaAnimacao dão documentos válidos', () => {
     const doc = novaAnimacao(1080, 1920);

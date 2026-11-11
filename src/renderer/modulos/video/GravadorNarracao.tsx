@@ -10,6 +10,7 @@ import {avisar, mensagemDe, trocar, useLoja} from '../../estado/loja';
 import {usarFora} from '../../componentes/Menu';
 import {adicionarClipeAudio} from './acoes-audio';
 import {iniciarGravacao, listarMicrofones, type NivelGravacao, type SessaoGravacao} from './gravador';
+import {Caixa, Escolha} from '../../componentes/Controles';
 
 const CONTAGEM = 3;
 const dbTexto = (v: number) => (v <= -99 ? '−∞' : `${v.toFixed(0).replace('-', '−')} dB`);
@@ -104,7 +105,7 @@ export const GravadorNarracao: React.FC<{documento: string; aoFechar: () => void
         <strong>Gravar narração</strong>
         <span className="espaco" />
         {estado === 'gravando' && <span className="ler" style={{color: 'var(--erro)'}}>● {tempo(decorrido)}</span>}
-        {estado === 'parado' && <button className="bti" title="Fechar" onClick={aoFechar}><X /></button>}
+        {estado === 'parado' && <button aria-label="Fechar" className="bti" title="Fechar" onClick={aoFechar}><X /></button>}
       </div>
       <div className={`prompter${espelhar ? ' espelho' : ''}`} style={{fontSize: `${Math.round((salvo?.tamanho ?? 0.045) * 700)}px`}}>
         {estado === 'contagem' && <div className="contagem">{contagem}</div>}
@@ -122,17 +123,15 @@ export const GravadorNarracao: React.FC<{documento: string; aoFechar: () => void
           <button className="bt fantasma mini" onClick={() => doc && setTexto(textoDasCenas(doc))} title="Usa os títulos, textos e listas das cenas">Texto das cenas</button>
           <label className="meta">Velocidade <input className="campo" type="number" min={PPM_MIN} max={PPM_MAX} step={10} value={ppm}
             onChange={(e) => setPpm(Number(e.target.value) || 150)} style={{width: 56}} /> palavras/min</label>
-          <label className="meta"><input type="checkbox" checked={espelhar} onChange={(e) => setEspelhar(e.target.checked)} /> Espelhar</label>
+          <Caixa marcado={espelhar} aoMudar={setEspelhar} className="meta">Espelhar</Caixa>
         </div>
       )}
       <div className="linha-gravador">
-        <select className="campo" value={dispositivo} onChange={(e) => setDispositivo(e.target.value)} disabled={estado !== 'parado'} title="Microfone">
-          <option value="">Microfone padrão</option>
-          {microfones.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
-        </select>
-        <label className="meta" title="Ouça a própria voz nos fones. Sem fones, o microfone pega o som do alto-falante.">
-          <input type="checkbox" checked={monitor} onChange={(e) => setMonitor(e.target.checked)} /> Ouvir a mim mesmo (fones)
-        </label>
+        <span style={{flex: 1, minWidth: 0, display: 'flex'}}>
+          <Escolha valor={dispositivo} rotulo="Microfone" desligado={estado !== 'parado'} aoMudar={setDispositivo}
+            opcoes={[['', 'Microfone padrão'] as [string, string], ...microfones.map((m): [string, string] => [m.id, m.nome])]} />
+        </span>
+        <Caixa marcado={monitor} aoMudar={setMonitor} className="meta" dica="Ouça a própria voz nos fones. Sem fones, o microfone pega o som do alto-falante.">Ouvir a mim mesmo (fones)</Caixa>
       </div>
       <div className="linha-gravador">
         <div className={`nivel${nivel.cortou ? ' cortou' : ''}`} title={`Pico ${dbTexto(nivel.pico_db)} · voz ${dbTexto(nivel.rms_db)}`}>

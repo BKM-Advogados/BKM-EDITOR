@@ -27,8 +27,7 @@ import {BotaoMenu, usarFora} from '../../componentes/Menu';
 import {Trilho, teclaLivre} from '../../componentes/Trilho';
 import {comValor, definirPrevia, docValido, indiceDe, irParaPagina, paginaAtivaDe, rotuloCamada, usarDocumentoImagem, usarPaginaAtiva, usarPrevia, visivel} from './comum';
 import {novaForma, novaImagem, novoTexto} from './acoes';
-import {exportarPng} from './exportarPng';
-import {exportarPagina} from './exportarPaginas';
+import {abrirDialogoExportar} from '../../componentes/DialogoExportar';
 import {BuscaIcones} from './BuscaIcones';
 import {InserirLinha} from './InserirLinha';
 import {PaginasImagem} from './PaginasImagem';
@@ -36,6 +35,8 @@ import {CamadasDaPagina, FundoPintado} from './Prancheta';
 import {BarraSelecao, type VistaAlvo} from './BarraSelecao';
 import {agruparSelecao, alternarTravaSelecao, desagruparSelecao} from './acoesSelecao';
 import {AjudaDoArrasto, Grade, Margem, Reguas, ROTULOS_GUIAS, usarOpcoesGuias} from './Guias';
+import {mudouEm} from '../../estado/agente';
+import {AvisoAgente, MarcasAgente} from '../../componentes/Agente';
 
 type Geometria = {x: number; y: number; largura: number; altura: number};
 // uma camada no gesto: índice, id (para o test do patch) e a geometria
@@ -86,8 +87,8 @@ const InserirImagem: React.FC<{documento: string; doc: DocImagem; fechar: () => 
     <div ref={caixa} className="flutuante pop-trilho" style={{top: 160}}>
       <input className="campo" autoFocus value={caminho} placeholder="midia/logo.png" title="Caminho do arquivo dentro da pasta do projeto"
         onChange={(e) => setCaminho(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void confirmar()} />
-      <button className="bti ligado" disabled={!caminho.trim()} onClick={() => void confirmar()} title="Inserir"><Check /></button>
-      <button className="bti" onClick={fechar} title="Cancelar"><X /></button>
+      <button aria-label="Inserir" className="bti ligado" disabled={!caminho.trim()} onClick={() => void confirmar()} title="Inserir"><Check /></button>
+      <button aria-label="Cancelar" className="bti" onClick={fechar} title="Cancelar"><X /></button>
     </div>
   );
 };
@@ -101,6 +102,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
   const editavel = useLoja((e) => e.area !== 'efeitos');
   const selecao = useLoja((e) => e.selecao);
   const modoComentario = useLoja((e) => e.modoComentario);
+  const mudancas = useLoja((e) => e.mudancasAgente);
   const comentarios = useLoja((e) => e.comentarios);
   const comentarioAberto = useLoja((e) => e.comentarioAberto);
   const previaEfeitos = useLoja((e) => (e.previaEfeitos && e.previaEfeitos.documento === documento ? e.previaEfeitos.efeitos : undefined));
@@ -123,7 +125,6 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
   const [hover, setHover] = useState<string | null>(null);
   const [balao, setBalao] = useState<{x: number; y: number; caminho?: string} | null>(null);
   const [textoBalao, setTextoBalao] = useState('');
-  const [exportando, setExportando] = useState(false);
   const arrasto = useRef<Arrasto | null>(null);
   const desenho = useRef<{x0: number; y0: number} | null>(null);
   const panoramica = useRef<{x: number; y: number; sl: number; st: number} | null>(null);
@@ -520,11 +521,8 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
     if (caminho) selecionar({documento, caminho});
   };
 
-  // uma prancheta só: o PNG de sempre; carrossel: só a página ativa ("<nome> - 02.png")
-  const exportar = () => {
-    setExportando(true);
-    void (temPaginas(doc) ? exportarPagina(documento, ativa.p) : exportarPng(documento)).finally(() => setExportando(false));
-  };
+  // um caminho só de exportar: o diálogo (lá dentro, o PNG rápido e, num carrossel, "só esta página")
+  const exportar = () => abrirDialogoExportar(documento);
 
   const usar = (f: Ferramenta) => () => {
     setFerramenta(f);
@@ -554,6 +552,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
         <div className="monitor" ref={refMonitor} style={{overflow: 'auto', justifyContent: 'flex-start', alignItems: 'flex-start', padding: `${MARGEM + 8}px ${MARGEM}px ${MARGEM - 8}px`}}
           onPointerDown={(e) => comecarPanoramica(e)} onPointerMove={(e) => durantePanoramica(e)}
           onPointerUp={() => setTimeout(() => (panoramica.current = null), 0)}>
+          <AvisoAgente />
           {w > 0 && h > 0 && <div className="palco xadrez" ref={palco} style={{width: W * escala, height: H * escala, margin: 'auto', cursor}}
             onClick={clicar} onDoubleClick={duploClique} onMouseMove={mover} onMouseLeave={() => {
               setHover(null);
@@ -577,6 +576,8 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
               </CamadaEfeitos>
             </div>
             <div className="sobreposicao">
+              <MarcasAgente caixas={camadas.flatMap((c, i) => (mudouEm(mudancas, documento, `${base}/${i}`) ? [{chave: `${base}/${i}`, x: c.x * escala, y: c.y * escala,
+                w: c.largura * escala, h: c.altura * escala}] : []))} />
               {sobre && <div className="caixa-hover" style={caixaCss(sobre, escala)} />}
               {nova && <div className="caixa-nova" style={{left: nova.x * escala, top: nova.y * escala, width: nova.largura * escala, height: nova.altura * escala}} />}
               {sel && (
@@ -646,9 +647,8 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
             rotulo={<span className="largo">Guias</span>}
             itens={ROTULOS_GUIAS.map(([k, nome]) => ({rotulo: `${opcoesGuias[k] ? '✓ ' : '   '}${nome}`, acao: () => alternarGuia(k)}))} />
           <span className="coords largo" ref={coords} />
-          <button className="bt fantasma" style={{marginLeft: 'auto'}} disabled={exportando} onClick={exportar}
-            title={variasPaginas ? 'Exportar só esta página em PNG, com os efeitos (o carrossel inteiro sai pela barra de páginas)' : 'Exportar PNG em resolução cheia, com os efeitos'}>
-            <Download /><span className="largo">{variasPaginas ? 'Exportar página' : 'Exportar PNG'}</span>
+          <button className="bt fantasma" style={{marginLeft: 'auto'}} onClick={exportar} title="Exportar… (Ctrl+Shift+E): PNG, JPG ou WebP; num carrossel, PNG por página e PDF, ou só esta página">
+            <Download /><span className="largo">Exportar…</span>
           </button>
         </div>
       </div>

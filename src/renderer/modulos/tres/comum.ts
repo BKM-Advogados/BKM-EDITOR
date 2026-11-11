@@ -17,7 +17,7 @@ export const TIPOS: {tipo: TipoObjeto; nome: string}[] = [
 // os mesmos padrões do MeshStandardMaterial, para o JSON sem o campo e a tela concordarem
 export const PADRAO_METALICO = 0;
 export const PADRAO_RUGOSIDADE = 1;
-export const COR_NOVA = '#C88155';
+export const COR_NOVA = '#B4B4B4'; // cinza claro: objeto novo sem cor de cliente nem o azul de seleção
 
 export const GRAU = Math.PI / 180;
 

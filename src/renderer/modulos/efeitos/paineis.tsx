@@ -2,17 +2,18 @@
 // ver src/nucleo/efeitos.ts). O monitor mostra o alvo com os efeitos; no vídeo, o controle deslizante já aparece na
 // prévia enquanto se arrasta, e o patch sai ao soltar.
 import React from 'react';
-import {ArrowDown, ArrowUp, Blend, Copy, GripVertical, Plus, Trash2, TriangleAlert, Wrench} from 'lucide-react';
+import {ArrowDown, ArrowUp, Blend, Copy, GripVertical, Trash2, TriangleAlert, Wrench} from 'lucide-react';
 import type {PaineisDoModulo} from '../../casca/contrato';
 import {aplicar, documentosDe, loja, selecionar, trocar, useLoja} from '../../estado/loja';
 import {SemDocumento} from '../../componentes/SemDocumento';
-import {definicao, EFEITOS, lerEfeitos, novoEfeito, type Efeito, type EfeitoLido} from '../../../nucleo/efeitos';
+import {definicao, EFEITOS, filtroCss, lerEfeitos, novoEfeito, TOM_PADRAO, type Efeito, type EfeitoLido} from '../../../nucleo/efeitos';
 import {comLimiteDeErro} from '../../componentes/LimiteDeErro';
 import {CabecalhoInspector, CampoCor, CampoDeslizante, CampoLeitura, Secao} from '../../componentes/Campos';
 import {MonitorVideo} from '../video/MonitorVideo';
 import {LinhaDoTempo} from '../video/LinhaDoTempo';
 import {PaineisImagem} from '../imagem/paineis';
 import type {OperacaoPatch} from '../../../nucleo/documentos';
+import {Escolha} from '../../componentes/Controles';
 
 // a pilha como está no documento, validada (nucleo/efeitos.ts, lerEfeitos): item com tipo desconhecido aparece na lista
 // como inválido, com o botão de excluir, em vez de derrubar a área (tres-efeitos-D1); valor fora da faixa ou em texto
@@ -38,9 +39,31 @@ const testeDoId = (i: number, l: EfeitoLido): OperacaoPatch[] => {
 
 const PRESETS: {nome: string; efeitos: Omit<Efeito, 'id'>[]}[] = [
   {nome: 'Cinema', efeitos: [{tipo: 'contraste', valor: 1.15}, {tipo: 'saturacao', valor: 0.9}, {tipo: 'vinheta', valor: 0.45}, {tipo: 'granulado', valor: 0.15}]},
-  {nome: 'Quente', efeitos: [{tipo: 'tom', valor: 0.2, cor: '#C88155'}, {tipo: 'brilho', valor: 1.05}]},
+  {nome: 'Quente', efeitos: [{tipo: 'tom', valor: 0.2, cor: TOM_PADRAO}, {tipo: 'brilho', valor: 1.05}]},
   {nome: 'Preto e branco', efeitos: [{tipo: 'saturacao', valor: 0}, {tipo: 'contraste', valor: 1.2}]},
 ];
+
+/** Amostra de 48 px com o efeito aplicado (o filtro CSS de verdade e as camadas de vinheta e tom), numa cena neutra de
+ *  céu, pele e mato: dá para ver o que o efeito faz antes de pôr. */
+export const AmostraEfeito: React.FC<{efeitos: Omit<Efeito, 'id'>[]}> = ({efeitos}) => {
+  const lista = efeitos.map((e, i) => ({...e, id: `amostra-${i}`}));
+  const vinheta = lista.find((e) => e.tipo === 'vinheta');
+  const tom = lista.find((e) => e.tipo === 'tom');
+  const grao = lista.find((e) => e.tipo === 'granulado');
+  return (
+    <span className="amostra-efeito" aria-hidden="true">
+      <span className="cena" style={{filter: filtroCss(lista) || undefined}} />
+      {tom && <span className="camada" style={{background: tom.cor ?? TOM_PADRAO, mixBlendMode: 'soft-light', opacity: tom.valor}} />}
+      {vinheta && <span className="camada vinheta" style={{opacity: vinheta.valor}} />}
+      {grao && <span className="camada grao" style={{opacity: grao.valor}} />}
+    </span>
+  );
+};
+/** Um valor que mostra bem o efeito na amostra (o padrão quase não aparece em 48 px). */
+const valorDeMostra = (tipo: Efeito['tipo']) => {
+  const d = definicao(tipo);
+  return tipo === 'matiz' ? 90 : d.padrao + (d.max - d.padrao) * 0.5;
+};
 
 const adicionar = (alvo: string, total: number, novos: Efeito[]) => {
   const doc = loja.get().docs[alvo]?.doc;
@@ -81,23 +104,23 @@ const Pilha: React.FC = () => {
   return (
     <div className="painel">
       <div className="painel-topo">
-        <select className="campo" value={alvo ?? ''} onChange={(e) => {
-          const d = docs.find((x) => x.id === e.target.value);
-          loja.definir((s) => ({alvoEfeitos: e.target.value, selecao: null, ativo: d ? {...s.ativo, [d.modulo]: d.id} : s.ativo}));
-        }}>
-          {docs.map((d) => <option key={d.id} value={d.id}>{d.modulo === 'video' ? 'Vídeo' : 'Imagem'} · {d.titulo}</option>)}
-        </select>
+        <Escolha valor={alvo ?? undefined} rotulo="Documento cujos efeitos se editam" vazio="Escolha o vídeo ou a imagem"
+          opcoes={docs.map((d): [string, string] => [d.id, `${d.modulo === 'video' ? 'Vídeo' : 'Imagem'} · ${d.titulo}`])}
+          aoMudar={(id) => {
+            const d = docs.find((x) => x.id === id);
+            loja.definir((s) => ({alvoEfeitos: id, selecao: null, ativo: d ? {...s.ativo, [d.modulo]: d.id} : s.ativo}));
+          }} />
       </div>
       <div className="painel-corpo">
         {!alvo ? <SemDocumento modulo="video" compacto /> : (
           <>
             <div className="pre-ajustes">
               {PRESETS.map((p) => (
-                <button key={p.nome} className="anexo-preset" title={p.efeitos.map((e) => definicao(e.tipo).nome).join(' · ')} onClick={() => {
+                <button key={p.nome} className="cartao-efeito" title={`Pôr ${p.nome}: ${p.efeitos.map((e) => definicao(e.tipo).nome).join(' · ')}`} onClick={() => {
                   const novos: Efeito[] = [];
                   for (const e of p.efeitos) novos.push({...novoEfeito(e.tipo, [...idsEmUso(lidos), ...novos]), ...e});
                   adicionar(alvo, lidos.length, novos);
-                }}><Plus size={12} />{p.nome}</button>
+                }}><AmostraEfeito efeitos={p.efeitos} /><span className="nome-efeito">{p.nome}</span></button>
               ))}
             </div>
             {lidos.length === 0 && <div className="vazio">Nenhum efeito. Use um pré-ajuste acima ou adicione abaixo.</div>}
@@ -113,7 +136,7 @@ const Pilha: React.FC = () => {
                         <span className="nome" title={l.problema}>{idNoDocumento(l) ?? `Item ${i + 1}`} (inválido)</span>
                         <span className="valor" title={l.problema}>{l.problema?.replace(/^[^:]+: /, '')}</span>
                         <span className="acoes-efeito">
-                          <button className="bti" title="Excluir este item" onClick={() => remover(i)}><Trash2 size={13} /></button>
+                          <button aria-label="Excluir este item" className="bti" title="Excluir este item" onClick={() => remover(i)}><Trash2 size={13} /></button>
                         </span>
                       </div>
                     </li>
@@ -153,10 +176,10 @@ const Pilha: React.FC = () => {
                       {l.problema && <TriangleAlert size={12} style={{color: 'var(--aviso)'}} aria-label="valor corrigido na leitura" />}
                       <span className="valor">{valorCurto(e)}</span>
                       <span className="acoes-efeito" onClick={(ev) => ev.stopPropagation()}>
-                        <button className="bti" title="Subir (Alt+↑)" disabled={i === 0} onClick={() => mover(i, i - 1)}><ArrowUp size={13} /></button>
-                        <button className="bti" title="Descer (Alt+↓)" disabled={i === lidos.length - 1} onClick={() => mover(i, i + 1)}><ArrowDown size={13} /></button>
-                        <button className="bti" title="Duplicar" onClick={() => duplicar(i)}><Copy size={13} /></button>
-                        <button className="bti" title="Excluir (Delete)" onClick={() => remover(i)}><Trash2 size={13} /></button>
+                        <button aria-label="Subir (Alt+↑)" className="bti" title="Subir (Alt+↑)" disabled={i === 0} onClick={() => mover(i, i - 1)}><ArrowUp size={13} /></button>
+                        <button aria-label="Descer (Alt+↓)" className="bti" title="Descer (Alt+↓)" disabled={i === lidos.length - 1} onClick={() => mover(i, i + 1)}><ArrowDown size={13} /></button>
+                        <button aria-label="Duplicar" className="bti" title="Duplicar" onClick={() => duplicar(i)}><Copy size={13} /></button>
+                        <button aria-label="Excluir (Delete)" className="bti" title="Excluir (Delete)" onClick={() => remover(i)}><Trash2 size={13} /></button>
                       </span>
                     </div>
                     {aberto && (
@@ -169,7 +192,7 @@ const Pilha: React.FC = () => {
                         )}
                         <CampoDeslizante rotulo="Valor" valor={e.valor} min={d.min} max={d.max} passo={d.passo} unidade={d.unidade} padrao={d.padrao} aoVer={(v) => previa(i, v)} aoFimSemMudar={() => loja.definir({previaEfeitos: undefined})}
                           aoMudar={(v) => void trocar(alvo, `/efeitos/${i}/valor`, v, `${d.nome}: ${v}`).then(() => loja.definir({previaEfeitos: undefined}))} />
-                        {e.tipo === 'tom' && <CampoCor rotulo="Cor" valor={e.cor ?? '#C88155'} padrao="#C88155" aoMudar={(c) => void trocar(alvo, `/efeitos/${i}/cor`, c, `cor do ${e.id}`)} />}
+                        {e.tipo === 'tom' && <CampoCor rotulo="Cor" valor={e.cor ?? TOM_PADRAO} padrao={TOM_PADRAO} aoMudar={(c) => void trocar(alvo, `/efeitos/${i}/cor`, c, `cor do ${e.id}`)} />}
                       </div>
                     )}
                   </li>
@@ -179,7 +202,10 @@ const Pilha: React.FC = () => {
             <Secao titulo="Adicionar efeito" chave="efeitos-adicionar" fechadaDePadrao={lidos.length > 0}>
               <div className="grade-adicionar">
                 {EFEITOS.map((d) => (
-                  <button key={d.tipo} className="bt fantasma mini" onClick={() => adicionar(alvo, lidos.length, [novoEfeito(d.tipo, idsEmUso(lidos))])}><Plus size={12} />{d.nome}</button>
+                  <button key={d.tipo} className="cartao-efeito" title={`Pôr ${d.nome}`} onClick={() => adicionar(alvo, lidos.length, [novoEfeito(d.tipo, idsEmUso(lidos))])}>
+                    <AmostraEfeito efeitos={[{tipo: d.tipo, valor: valorDeMostra(d.tipo), ...(d.tipo === 'tom' ? {cor: TOM_PADRAO} : {})}]} />
+                    <span className="nome-efeito">{d.nome}</span>
+                  </button>
                 ))}
               </div>
             </Secao>
@@ -188,6 +214,38 @@ const Pilha: React.FC = () => {
       </div>
     </div>
   );
+};
+
+/** Antes e depois pelo teclado: segurar Shift+D mostra sem os efeitos; soltar volta (o tela.md previa a tecla). */
+const usarAntesDepois = (sem: () => void, com: () => void, ligado: boolean) => {
+  const ref = React.useRef({sem, com});
+  ref.current = {sem, com};
+  React.useEffect(() => {
+    if (!ligado) return;
+    let segurando = false;
+    const baixa = (e: KeyboardEvent) => {
+      const alvo = e.target as HTMLElement;
+      if (/INPUT|TEXTAREA/.test(alvo.tagName) || alvo.isContentEditable || alvo.closest?.('.xterm')) return;
+      if (e.shiftKey && !e.ctrlKey && !e.altKey && e.code === 'KeyD' && !segurando) {
+        e.preventDefault();
+        segurando = true;
+        ref.current.sem();
+      }
+    };
+    const solta = (e: KeyboardEvent) => {
+      if (segurando && (e.code === 'KeyD' || e.key === 'Shift')) {
+        segurando = false;
+        ref.current.com();
+      }
+    };
+    window.addEventListener('keydown', baixa);
+    window.addEventListener('keyup', solta);
+    return () => {
+      window.removeEventListener('keydown', baixa);
+      window.removeEventListener('keyup', solta);
+      if (segurando) ref.current.com();
+    };
+  }, [ligado]);
 };
 
 // inspector da área: o alvo (o que recebe os efeitos), quantos estão ligados e o "antes" segurando o botão
@@ -208,6 +266,7 @@ const InspectorEfeito: React.FC = () => {
   const sub = modulo === 'video' ? `Vídeo ${medidaVideo}${duracao ? ` · ${Math.round(duracao / 1000)} s` : ''}` : `Imagem ${doc?.largura ?? '?'} × ${doc?.altura ?? '?'}`;
   const semEfeitos = () => loja.definir({previaEfeitos: {documento: alvo, efeitos: efeitos.map((x) => ({...x, ativo: false}))}});
   const comEfeitos = () => loja.definir({previaEfeitos: undefined});
+  usarAntesDepois(semEfeitos, comEfeitos, Boolean(efeitos.length));
   return (
     <div className="painel"><div className="painel-corpo">
       <CabecalhoInspector icone={<Blend size={14} />} familia="efeito" nome={titulo ?? alvo} sub={sub} />
@@ -218,7 +277,7 @@ const InspectorEfeito: React.FC = () => {
         </div>}
         <div style={{padding: '4px 10px 6px 18px'}}>
           <button className="bt mini" disabled={!efeitos.length} onPointerDown={semEfeitos} onPointerUp={comEfeitos} onPointerLeave={comEfeitos}
-            title="Segure para ver como fica sem os efeitos">Segure para ver o antes</button>
+            title="Segure (ou segure Shift+D) para ver como fica sem os efeitos">Segure para ver o antes <kbd>Shift</kbd><kbd>D</kbd></button>
         </div>
       </Secao>
       <div className="vazio" style={{textAlign: 'left'}}>Os ajustes de cada efeito abrem na própria pilha: clique no nome.</div>

@@ -18,6 +18,8 @@ import {musica, selecionarMusica, transicaoAberta, useMusica} from './estado';
 import {arranjar, campo, campoEmObjeto, campoFaixa, dividirNaCabeca, encaixar, exportarMusica, gerar, importarMidiDe, licencaDoSom, novaBateria, novoAudio, novoSintetizador,
   pontosDeAutomacao, presetFaixa, progressao, sidechainDaFaixa} from './acoes';
 import {useDocMusica} from './Monitor';
+import {SeletorDocumento} from '../../componentes/SeletorDocumento';
+import {corDoCanal} from './estado';
 
 const InspectorClipe: React.FC<{doc: DocMusica; id: string}> = ({doc, id}) => {
   const m = useMemo(() => resolverMusica(doc).musica, [doc]);
@@ -394,16 +396,20 @@ export const InspectorMusica: React.FC = () => {
 export const ListaMusica: React.FC = () => {
   const {doc} = useDocMusica();
   const s = useMusica((e) => e.selecao);
-  if (!doc) return <div className="vazio">sem música aberta</div>;
+  // com mais de uma música no projeto, o seletor do topo troca a aberta (sem ele, a segunda escondia a primeira)
+  const seletor = <SeletorDocumento modulo="musica" aoTrocar={() => selecionarMusica(null)} />;
+  if (!doc) return <div className="lista-musica">{seletor}<div className="vazio">sem música aberta</div></div>;
   return (
     <div className="lista-musica">
+      {seletor}
       <div className="itens">
         <div className={`item${!s ? ' sel' : ''}`} onClick={() => selecionarMusica(null)}><Music size={14} /><span className="nome">Música inteira</span></div>
-        {doc.canais.map((c) => (
+        {doc.canais.map((c, i) => (
           <React.Fragment key={c.id}>
-            <div className={`item${s?.tipo === 'canal' && s.id === c.id ? ' sel' : ''}`} onClick={() => selecionarMusica({tipo: 'canal', id: c.id})}>
-              {iconeDoCanal(c, 14)}<span className="nome">{c.nome}</span>
-              <span className="ler" style={{fontSize: 10}}>{doc.arranjo.clipes.filter((x) => x.canal === c.id).length}</span>
+            <div className={`item${s?.tipo === 'canal' && s.id === c.id ? ' sel' : ''}`} onClick={() => selecionarMusica({tipo: 'canal', id: c.id})}
+              style={{'--cor-canal': corDoCanal(i)} as React.CSSProperties}>
+              <span className="icone-canal">{iconeDoCanal(c, 14)}</span><span className="nome">{c.nome}</span>{c.mudo && <span className="ler">mudo</span>}
+              <span className="ler" style={{fontSize: "var(--tam-1)"}}>{doc.arranjo.clipes.filter((x) => x.canal === c.id).length}</span>
             </div>
             {doc.padroes.filter((p) => p.canal === c.id).map((p) => (
               <div key={p.id} className={`item sub${s?.tipo === 'padrao' && s.id === p.id ? ' sel' : ''}`}

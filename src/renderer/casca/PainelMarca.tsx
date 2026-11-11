@@ -40,7 +40,7 @@ export const PainelMarca: React.FC<{aoFechar: () => void}> = ({aoFechar}) => {
   const idDoc = area === 'efeitos' ? alvoEfeitos : area === '3d' ? undefined : (ativo as Record<string, string | undefined>)[area];
   const doc = useLoja((e) => (idDoc ? e.docs[idDoc]?.doc : undefined)) as unknown;
   const entrada = info?.manifesto.documentos.find((d) => d.id === idDoc);
-  const recebe = Boolean(entrada && entrada.modulo !== '3d');
+  const recebe = Boolean(entrada && entrada.modulo !== '3d' && entrada.modulo !== 'musica'); // a música não tem tema
   const kitDoDoc = marcaDoDocumento(doc);
 
   const trocarKit = (k: MarcaInfo) => {

@@ -299,6 +299,7 @@ describe('imagem-D14: fonte variável', () => {
   it('importada no kit, vai com a faixa de peso (e o carregador pede "200 800", não "200")', () => {
     const marcas = new PastaMarcas({pasta: () => path.join(tmp, 'marcas-var')});
     marcas.garantir();
+    marcas.gravar(MARCA_BKM); // kit de escritório na pasta da pessoa (não vem mais de fábrica)
     const arquivo = path.join(tmp, 'Variavel-VariableFont_wght.ttf');
     writeFileSync(arquivo, ttfVariavel(200, 800));
     const k = marcas.importarFonte('bkm', arquivo);
@@ -315,6 +316,7 @@ describe('imagem-D13: reaplicar o kit atualiza o logo e as fontes do projeto', (
   it('logo novo com o mesmo nome troca o do projeto e vem listado em "atualizados"; igual não conta', () => {
     const marcas = new PastaMarcas({pasta: () => path.join(tmp, 'marcas-d13')});
     marcas.garantir();
+    marcas.gravar(MARCA_BKM); // kit de escritório na pasta da pessoa (não vem mais de fábrica)
     const logo1 = path.join(tmp, 'logo1.png');
     const logo2 = path.join(tmp, 'logo2.png');
     writeFileSync(logo1, 'logo provisório');

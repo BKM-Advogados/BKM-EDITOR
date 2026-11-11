@@ -3,9 +3,14 @@ import {createRoot} from 'react-dom/client';
 import '@fontsource-variable/inter';
 import '@fontsource/jetbrains-mono/400.css';
 import '@fontsource/jetbrains-mono/600.css';
+import {instalarTokens} from './estilo/tokens';
+import {instalarAparencia} from './estado/aparencia';
 import {App} from './App';
 import './estilo.css';
 // acabamento da imagem (rodada 2, B2): atende a ferramenta remover_fundo do Claude em qualquer área
 import './modulos/imagem/pedidosRemoverFundo';
 
+// tokens e aparência antes do primeiro desenho: a janela já abre no tema e no tamanho escolhidos
+instalarTokens();
+instalarAparencia();
 createRoot(document.getElementById('raiz')!).render(<App />);

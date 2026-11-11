@@ -250,3 +250,14 @@ export const observarMusica = () => {
     largarEntrega();
   };
 };
+
+// ---------- cor por canal (ux/pesquisa-ux-visual.md, item 15) ----------
+// Cada canal ganha uma cor de faixa automática pela ordem (a mesma no arranjo, na lista, no inspetor e no mixer), da paleta
+// de faixa dos tokens, que não coincide com os sinais (âmbar, violeta, vermelho). Não grava nada no documento.
+export const CORES_CANAL = ['var(--faixa-azul)', 'var(--faixa-verde)', 'var(--faixa-rosa)', 'var(--faixa-areia)', 'var(--faixa-ciano)', 'var(--faixa-lima)'];
+export const corDoCanal = (indice: number) => CORES_CANAL[((indice % CORES_CANAL.length) + CORES_CANAL.length) % CORES_CANAL.length];
+/** A cor da faixa do mixer: a do canal que toca nela (faixa sem canal, a do fim da lista). */
+export const corDaFaixa = (canais: {faixa_mixer?: string; id: string}[], faixa: string) => {
+  const i = canais.findIndex((c) => (c.faixa_mixer ?? c.id) === faixa);
+  return corDoCanal(i >= 0 ? i : canais.length);
+};
