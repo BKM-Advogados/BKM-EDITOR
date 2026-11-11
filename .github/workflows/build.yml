@@ -1,5 +1,6 @@
 # Pacotes do Estúdio para Linux, Windows e Mac (docs/portes.md). Cada sistema empacota a si mesmo: npm ci, typecheck,
-# testes e o MCP; depois o pacote e o instalador da plataforma sobem como artifact da execução (14 dias).
+# testes e o MCP; depois o pacote e o instalador da plataforma sobem como artifact da execução (14 dias). A release sai
+# dos artifacts pelo scripts/publicar-release.mjs (docs/atualizacao.md).
 # Roda à mão (Actions › Build › Run workflow), ao subir uma tag v* (git tag v3.1.0 && git push --tags) ou ao subir um branch
 # ci/* (git push origin HEAD:ci/<nome>), que serve para validar um branch antes de ele chegar ao main: o "Run workflow"
 # só existe para o que já está no branch padrão. Não roda a cada push: em repositório privado o minuto do Mac conta 10
@@ -157,9 +158,13 @@ jobs:
           npx electron-forge package --platform "$plataforma" --arch ${{ matrix.arch }}
           npx electron-forge make --skip-package --platform "$plataforma" --arch ${{ matrix.arch }} --targets @electron-forge/maker-zip
 
+      # com o publish do electron-builder.yml, sai também o latest.yml e o .blockmap, que a atualização automática do
+      # Windows lê da release (docs/atualizacao.md); a conferência pega um latest.yml que não bate com o instalador
       - name: Instalador NSIS (Windows)
         if: matrix.alvo == 'win'
-        run: npx electron-builder --prepackaged out/pacote/Estudio-win32-x64 --win nsis --x64 --publish never
+        run: |
+          npx electron-builder --prepackaged out/pacote/Estudio-win32-x64 --win nsis --x64 --publish never
+          node scripts/conferir-latest-yml.mjs out/instalador "$(node -p "require('./package.json').version")"
 
       - name: DMG (Mac)
         if: matrix.alvo == 'mac'
@@ -183,6 +188,8 @@ jobs:
           path: |
             out/pacote/make/zip/**/*.zip
             out/instalador/*.exe
+            out/instalador/*.exe.blockmap
+            out/instalador/latest.yml
             out/instalador/*.dmg
 
       - name: Limpar o keychain (Mac)
