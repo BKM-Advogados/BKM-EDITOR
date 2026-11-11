@@ -51,24 +51,42 @@ export const proporCortes = (todas: PalavraLegenda[], o: OpcoesCortes = {}): Cor
   const preench = new Set(o.preenchimento === false ? [] : ws.filter((p) => ehPreenchimento(p.w)));
   // o preenchimento que não dá para tirar inteiro, longe das vizinhas, vira palavra que fica (e a conta recomeça)
   const ficam = new Set(ws.filter((p) => !preench.has(p)));
+  // primeiro índice de ws com s >= x (ws está ordenada por s)
+  const desde = (x: number) => {
+    let lo = 0;
+    let hi = ws.length;
+    while (lo < hi) {
+      const meio = (lo + hi) >> 1;
+      if (ws[meio].s < x) lo = meio + 1;
+      else hi = meio;
+    }
+    return lo;
+  };
   const cortes: CorteFala[] = [];
+  // a cada volta, todos os preenchimentos "presos" (perto demais das vizinhas) passam a ficar de uma vez; a condição é
+  // monotônica, então o ponto fixo é o mesmo de marcar um por volta, com bem menos voltas
   for (let volta = 0; volta < ws.length + 1; volta++) {
     cortes.length = 0;
     const kept = ws.filter((p) => ficam.has(p));
     let mudou = false;
     const m = Math.max(margem, pausa / 2);
-    for (let i = 0; i + 1 < kept.length && !mudou; i++) {
+    for (let i = 0; i + 1 < kept.length; i++) {
       const a = kept[i];
       const b = kept[i + 1];
-      const dentro = ws.filter((p) => preench.has(p) && !ficam.has(p) && p.s >= a.e && p.e <= b.s);
+      const dentro: PalavraLegenda[] = [];
+      for (let q = desde(a.e); q < ws.length && ws[q].s <= b.s; q++) {
+        const p = ws[q];
+        if (preench.has(p) && !ficam.has(p) && p.e <= b.s) dentro.push(p);
+      }
       const de = a.e + m;
       const ate = b.s - m;
       const presos = dentro.filter((p) => p.s < de || p.e > ate);
       if (presos.length) {
         presos.forEach((p) => ficam.add(p));
         mudou = true;
-        break;
+        continue;
       }
+      if (mudou) continue; // esta volta vai ser refeita: não vale montar corte
       if ((dentro.length || b.s - a.e >= silencioMin) && ate - de >= CORTE_MIN_MS) {
         cortes.push({de_ms: Math.round(de), ate_ms: Math.round(ate), motivo: dentro.length ? 'preenchimento' : 'silencio', ...(dentro.length ? {texto: dentro.map((p) => p.w).join(' ')} : {})});
       }
