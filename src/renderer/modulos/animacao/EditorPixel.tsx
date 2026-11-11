@@ -3,7 +3,7 @@
 import React, {useCallback, useEffect, useRef, useState} from "react";
 import {Eraser, PaintBucket, Pencil, Pipette, Plus, RefreshCw} from "lucide-react";
 import {
-  codificarCelulas, corDaCelula, decodificarCelulas, EFEITOS_PIXEL, gradeVazia,
+  codificarCelulas, corDaCelula, decodificarCelulas, EFEITOS_PIXEL, gradeVazia, lerGrade,
   type EfeitoPixel, type GradePixel,
 } from "../../../nucleo/animacao-pixel";
 import type {CamadaAnimacao} from "../../../nucleo/animacao";
@@ -16,7 +16,8 @@ export const EditorPixel: React.FC<{
   camada: CamadaAnimacao;
   origem: string;
 }> = ({documento, camada, origem}) => {
-  const grade = camada.grade ?? gradeVazia(16, 16);
+  // grade inválida (JSON editado à mão ou aplicar_patch) não derruba o editor: vale a consertada, ou uma vazia
+  const grade = React.useMemo(() => lerGrade(camada.grade).grade ?? gradeVazia(16, 16), [camada.grade]);
   const [ferramenta, setFerramenta] = useState<Ferramenta>("lapis");
   const [corAtiva, setCorAtiva] = useState(0); // índice na paleta
   const [desenhando, setDesenhando] = useState(false);
