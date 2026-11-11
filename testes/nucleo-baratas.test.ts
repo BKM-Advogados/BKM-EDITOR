@@ -13,6 +13,7 @@ import {indiceDaMidia} from '../src/nucleo/midia-disco';
 import {gitignoreComMidiaPesada} from '../src/nucleo/midia-git';
 import {PastaMarcas} from '../src/nucleo/pasta-marcas';
 import {ErroProjeto, Projeto, serializar} from '../src/nucleo/projeto';
+import {texto030} from './fixtures/claude-md-030';
 
 const pastas: string[] = [];
 afterAll(() => pastas.forEach((p) => rmSync(p, {recursive: true, force: true})));
@@ -197,7 +198,7 @@ describe('N16 CLAUDE.md', () => {
     const arq = path.join(destino, 'CLAUDE.md');
     const crlf = (t: string) => t.replace(/\r?\n/g, '\r\n');
     // o texto que a 0.3.0 gravava (desatualizado), com uma linha da pessoa, no fim de linha do Git para Windows
-    const antigo = readFileSync(path.join(__dirname, 'fixtures', 'claude-md-030-video.md'), 'utf-8').replace('## Arquivos\n', '## Arquivos\n\n- usar a foto da Ana\n');
+    const antigo = texto030('video').replace('## Arquivos\n', '## Arquivos\n\n- usar a foto da Ana\n');
     writeFileSync(arq, crlf(antigo));
     expect(regerarClaudeMd(destino)).toBe(true);
     const md = readFileSync(arq, 'utf-8');

@@ -268,7 +268,7 @@ Decisões que vão além do texto do contrato da fase 1, para quem revisa:
   painel mostra o motivo e um "Tentar de novo". A etiqueta do inspetor mostra a afirmação ao lado do id e, clicada,
   traz o painel Pesquisa à frente (`verFato` na loja, `quandoVerFato` na casca). O estilo do painel e das etiquetas
   (`.etiqueta-fato`, inclusive o botão de tirar) mora em `paineis/pesquisa.css`. A chave do layout salvo foi para `v6`.
-  O rótulo da observação na tela é "Observação de quem baixou", como o responsável chama o campo. O texto de cada fonte fica em
+  O rótulo da observação na tela é "Observação de quem baixou". O texto de cada fonte fica em
   memória só na última versão e sai na troca de projeto. Selecionar texto num cartão de fato não dispara o clique. As
   marcas de vigência aparecem pelo rótulo do mapa `ROTULO_VIGENCIA` do painel (pesquisa.ts guarda o pedaço procurado,
   como "(Revogad"; marca nova sem rótulo sai sem o parêntese), o filtro também acha pelo rótulo, e o cartão de fato com

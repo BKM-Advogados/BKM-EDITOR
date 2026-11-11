@@ -11,8 +11,9 @@ export const hashDaLinha = (linha: string): string => {
   return h.toString(16).padStart(8, '0');
 };
 
-/** Linhas antigas do app que citavam um cliente pelo nome (ou o kit dele), guardadas só pelo hash. */
-export const HASHES_DO_TEXTO_ANTIGO: ReadonlySet<string> = new Set(['3fa38a35', '1ab7f9bf', '19b1d28a']);
+/** Linhas antigas do app guardadas só pelo hash: as que citavam um cliente pelo nome (ou o kit dele), a do kit de
+ *  marca com o id do kit de fábrica que saiu e a da observação da fonte com o nome interno antigo do campo. */
+export const HASHES_DO_TEXTO_ANTIGO: ReadonlySet<string> = new Set(['3fa38a35', '1ab7f9bf', '19b1d28a', '07e70874', '18865b10']);
 
 /** A linha foi o app quem escreveu (0.2.0 e 0.3.0)? */
 export const linhaDoTextoAntigo = (linha: string) => LINHAS_DO_TEXTO_ANTIGO.has(linha) || HASHES_DO_TEXTO_ANTIGO.has(hashDaLinha(linha));
@@ -49,7 +50,7 @@ export const LINHAS_DO_TEXTO_ANTIGO: ReadonlySet<string> = new Set([
   '  `clipes[]` com `id`, `arquivo` (em `midia/`), `em` (ms na linha do tempo), `duracao_ms`, `corte_ms`, `volume`,',
   '  `fade_in_ms`, `fade_out_ms` e `mudo`. O que ficar fora do vídeo vira aviso, não erro (detalhe em docs/audio.md do app).',
   '- Kit de marca: `aplicar_marca` põe num documento as cores, a fonte, o logo (`midia/logo-<id>.*`) e as fontes próprias',
-  '  (`fontes/`) de um kit (bkm, neutro ou outro criado no app). No vídeo de cenas isso fica no `tema`: `marca` é o id do', // a versão antiga, com o id do kit de fábrica que saiu, vai pelo hash
+  // aqui vinha a linha que citava o id do kit de fábrica que saiu: ela vale só pelo hash (HASHES_DO_TEXTO_ANTIGO)
   '  kit, e `logo`, `assinatura` e `fontes_arquivos` (cada uma com `familia`, `arquivo` e `peso`) acompanham as cores. Na',
   '  imagem muda o fundo e a fonte e a cor dos textos. `fonte` aceita Inter, Archivo, IBM Plex Sans, IBM Plex Mono ou a',
   '  `familia` de uma fonte própria. Fique nas cores do kit; para outra marca, troque o kit em vez de inventar cores.',
@@ -65,7 +66,7 @@ export const LINHAS_DO_TEXTO_ANTIGO: ReadonlySet<string> = new Set([
   '1. **Ler a fonte.** `ler_fonte` {url, observacao?, titulo?} baixa a página, guarda o texto limpo, o sha256, o nível pelo',
   '   catálogo e as marcas de vigência, e devolve a fonte (`f1`, `f2`…) com o começo do texto. `texto_da_fonte` {fonte_id,',
   '   pagina? ou inicio? e fim?} lê o resto, 6.000 caracteres por página. `anotar_fonte` {fonte_id, observacao} acrescenta',
-  '   à observação da fonte (a "observação de quem baixou": contexto, ressalva, de onde veio); nunca apaga o que havia.',
+  // aqui vinha a linha com o nome interno antigo da observação da fonte: ela vale só pelo hash (HASHES_DO_TEXTO_ANTIGO)
   '2. **Fontes por nível.** Regra jurídica só com fonte de nível 1: Planalto (lei compilada), Câmara, Senado, LexML, Diário',
   '   Oficial da União, TST, STF, STJ, TRT-3, CNJ/DJEN. Governo e agências (MTE, gov.br, Agência Brasil, Agência Senado e',
   '   Câmara) são nível 2 e servem para notícia e contexto. Fora do catálogo vira nível 0. Fato de empresa ou de setor:',

@@ -7,13 +7,14 @@ import {afterAll, describe, expect, it} from 'vitest';
 import {MARCA_CLAUDE_FIM, MARCA_CLAUDE_INICIO, MARCA_IMAGEM_INICIO, claudeMd, claudeMdAtualizado, gravarPlano, planoDoExemplo, planoDoProjeto, regerarClaudeMd} from '../src/nucleo/criar-projeto';
 import {EFEITOS} from '../src/nucleo/efeitos';
 import {HASHES_DO_TEXTO_ANTIGO, hashDaLinha, linhaDoTextoAntigo} from '../src/nucleo/claude-md-antigo';
+import {PALAVRAS_DO_TEXTO_030, texto030} from './fixtures/claude-md-030';
 
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'estudio-claude-md-'));
 afterAll(() => rmSync(tmp, {recursive: true, force: true}));
 const EXEMPLO = path.join(__dirname, 'fixtures', 'projeto'); // no papel do exemplo empacotado (src/nucleo/exemplo.ts)
 
-// o texto que a 0.3.0 gravava, tal como o `claudeMd` do commit 580050c o gerava (sem as marcas), por módulo
-const texto030 = (modulo: 'video' | 'imagem') => readFileSync(path.join(__dirname, 'fixtures', `claude-md-030-${modulo}.md`), 'utf-8');
+// o texto que a 0.3.0 gravava, tal como o `claudeMd` do commit 580050c o gerava (sem as marcas), por módulo: texto030
+// (fixtures/claude-md-030.ts), que devolve as duas palavras que não ficam escritas no repositório
 
 describe('CLAUDE.md do projeto', () => {
   it('a parte do app vem entre as marcas', () => {
@@ -123,9 +124,25 @@ describe('CLAUDE.md do projeto', () => {
   it('as linhas antigas guardadas só pelo hash contam como do app (FNV-1a de 32 bits)', () => {
     expect(hashDaLinha('abc')).toBe('1a47e90b');
     expect(hashDaLinha('')).toBe('811c9dc5');
-    expect(HASHES_DO_TEXTO_ANTIGO.size).toBe(3);
+    expect(HASHES_DO_TEXTO_ANTIGO.size).toBe(5);
     expect(linhaDoTextoAntigo('# Projeto do Estúdio')).toBe(true);
     expect(linhaDoTextoAntigo('- `midia/ana.jpg`: use sempre a foto da Ana nas capas.')).toBe(false);
+  });
+
+  it('legado: as linhas da 0.3.0 com o id do kit que saiu e com o nome interno da observação são do app, pelo hash', () => {
+    const [kit, nome] = Object.values(PALAVRAS_DO_TEXTO_030);
+    const doKit = `  (\`fontes/\`) de um kit (${kit}, neutro ou outro criado no app). No vídeo de cenas isso fica no \`tema\`: \`marca\` é o id do`;
+    const daObservacao = `   à observação da fonte (a "observação do ${nome}": contexto, ressalva, de onde veio); nunca apaga o que havia.`;
+    for (const linha of [doKit, daObservacao]) {
+      expect(linhaDoTextoAntigo(linha)).toBe(true);
+      expect(texto030('video').split('\n')).toContain(linha); // a fixture tem a linha como a 0.3.0 gravava
+    }
+    // com qualquer outra palavra no lugar, a linha não é do app (vai para as anotações, não some)
+    expect(linhaDoTextoAntigo(doKit.replace(kit, 'outro'))).toBe(false);
+    expect(linhaDoTextoAntigo(daObservacao.replace(nome, 'outro'))).toBe(false);
+    // o texto de hoje não cita nenhuma das duas palavras
+    const hoje = claudeMd(['video', 'imagem', '3d']).toLowerCase();
+    for (const p of [kit, nome]) expect(hoje).not.toContain(p);
   });
 
   it('ao abrir, um projeto criado na 0.3.0 ganha o texto novo, e o manifesto decide as seções', () => {

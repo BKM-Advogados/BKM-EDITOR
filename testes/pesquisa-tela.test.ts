@@ -1,5 +1,5 @@
 // Jargão fora da tela (ux/pesquisa-ux-visual.md, item 9): nome de arquivo como título de fonte vira palavras, e o painel
-// não fala mais em "quem baixou".
+// não fala mais no nome interno antigo do campo da observação.
 import fs from 'node:fs';
 import path from 'node:path';
 import {describe, expect, it} from 'vitest';
@@ -14,9 +14,9 @@ describe('painel Pesquisa', () => {
     expect(tituloLegivel({url: 'https://www.tst.jus.br/sumulas/sumula_331'})).toBe('tst.jus.br · Sumula 331');
   });
 
-  it('a observação é "de quem baixou", não do quem baixou', () => {
+  it('a observação é "de quem baixou", sem o nome interno antigo do campo', () => {
     const tsx = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'paineis', 'Pesquisa.tsx'), 'utf8');
-    expect(tsx).not.toMatch(/quem baixou/i);
+    expect(tsx.toLowerCase()).not.toContain(['vix', 'sys'].join('')); // em pedaços: o nome não fica escrito no repositório
     expect(tsx).toContain('Observação de quem baixou');
   });
 });

@@ -484,7 +484,7 @@ const registrarPesquisa = (servidor: McpServer, projeto: Projeto, autor: string,
   }));
 
   servidor.registerTool('anotar_fonte', {
-    description: 'Acrescenta uma linha à observação de quem baixou de uma fonte, com data e autor. Nunca apaga o que já estava.',
+    description: 'Acrescenta uma linha à observação de quem baixou a fonte, com data e autor. Nunca apaga o que já estava.',
     inputSchema: {fonte_id: z.string(), observacao: z.string().min(1)},
   }, seguro(({fonte_id, observacao}: {fonte_id: string; observacao: string}) => {
     fonteDe(projeto, fonte_id);
