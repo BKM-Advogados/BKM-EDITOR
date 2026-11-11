@@ -25,7 +25,7 @@ O documento é um JSON padronizado com esquema determinístico:
   "tema": {
     "fundo": "#111418",
     "texto": "#F2F2F2",
-    "destaque": "#70B8FF",
+    "destaque": "#FFFFFF",
     "suave": "#A3ABB5",
     "fonte": "Inter"
   },

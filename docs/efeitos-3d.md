@@ -13,7 +13,7 @@ correção (um patch, Ctrl+Z desfaz).
 
 - **Efeitos** (`src/nucleo/efeitos.ts`, `lerEfeitos`): valor em texto numérico (`"1.2"`) vira número; fora da faixa do tipo,
   a faixa mais próxima; sem valor, o padrão do tipo; `ativo` que não é booleano é ignorado; cor do `tom` que não é hexadecimal
-  volta a `#C88155`. Tipo que não existe não se desenha: o item aparece na pilha como "(inválido)", com o motivo e o botão
+  volta a `#E0A060` (o âmbar neutro de "quente", `TOM_PADRAO`). Tipo que não existe não se desenha: o item aparece na pilha como "(inválido)", com o motivo e o botão
   Excluir, na mesma posição do documento (os caminhos `/efeitos/i` continuam batendo). `filtroCss` e `camadas` leem a pilha
   assim, então prévia, MP4 e PNG saem iguais: um valor inválido não faz o navegador descartar a cadeia de filtros inteira
   (tres-efeitos-D2). O resolvedor do vídeo de cenas devolve os problemas como avisos ("Efeitos: …").
@@ -39,7 +39,7 @@ quando a seleção ou a versão de um documento muda (a pessoa, o Ctrl+Z ou a IA
 
 **Efeitos.** Os documentos de vídeo (`"tipo": "cenas"`) e de imagem têm o campo `efeitos`, uma lista na ordem de aplicação.
 Cada item é `{"id": "brilho-1", "tipo": "brilho", "valor": 1.2}`, com `"ativo": false` para desligar e, só no tipo `tom`,
-`"cor": "#C88155"`. O `id` é único na lista. O `valor` é sempre um **número** (nunca texto), dentro da faixa do tipo; fora dela a
+`"cor": "#E0A060"`. O `id` é único na lista. O `valor` é sempre um **número** (nunca texto), dentro da faixa do tipo; fora dela a
 tela usa a faixa mais próxima e avisa:
 
 | tipo | faixa | padrão | o que faz |
