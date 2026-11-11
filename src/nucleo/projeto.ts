@@ -77,7 +77,7 @@ export class Projeto {
         }
         if (link) throw fora();
         const pai = path.dirname(atual);
-        if (pai === atual) return abs;
+        if (pai === atual || !dentroDe(this.raiz, pai)) return abs; // nem a pasta do projeto existe ainda: nada a seguir
         atual = pai;
         continue;
       }
