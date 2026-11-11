@@ -62,7 +62,7 @@
   box-shadow: inset 3px 0 0 var(--cor-canal, var(--borda-forte)); }
 .arranjo .cab-canal > svg.lucide { color: var(--cor-canal, var(--texto-2)); }
 .arranjo .cab-canal.mudo .nome { color: var(--texto-3); text-decoration: line-through; }
-.arranjo .cab-canal.sel { background: var(--acento-fraco); }
+.arranjo .cab-canal.sel { background: var(--acento-fundo); }
 .arranjo .cab-canal .nome { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .arranjo .cab-canal .bti { width: 24px; height: 24px; font-size: var(--tam-1); font-weight: var(--peso-forte); }
 .arranjo .rolo { overflow: auto; position: relative; }
@@ -79,7 +79,7 @@
 .mclipe { --cor-canal-v: var(--cor-canal, var(--trilha-audio)); position: absolute; top: 3px; height: 34px; border-radius: var(--raio-1); color: var(--texto); overflow: hidden; cursor: grab;
   background: color-mix(in srgb, var(--cor-canal-v) 30%, var(--fundo-2)); border: 1px solid color-mix(in srgb, var(--cor-canal-v) 70%, transparent); box-shadow: inset 0 2px 0 var(--cor-canal-v); }
 
-.mclipe.sel { border-color: var(--acento); box-shadow: 0 0 0 1px var(--acento), inset 0 2px 0 var(--cor-canal-v); }
+.mclipe.sel { outline: 2px solid var(--acento); outline-offset: -1px; z-index: 2; }
 .mclipe.mudo { opacity: 0.4; background-image: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--texto) 10%, transparent) 6px 8px); }
 .mclipe .txt { position: absolute; left: 4px; top: 2px; right: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
 .mclipe .nota { position: absolute; width: 2px; background: var(--cor-canal-v); opacity: 0.9; pointer-events: none; }
@@ -102,7 +102,7 @@
 .lista-musica .item { display: flex; align-items: center; gap: 6px; min-height: var(--linha-lista); padding: 0 8px; cursor: pointer; border-radius: var(--raio); }
 .lista-musica .icone-canal { display: inline-flex; color: var(--cor-canal, var(--texto-2)); }
 .lista-musica .item:hover { background: var(--fundo-3); }
-.lista-musica .item.sel { background: var(--acento-fundo); }
+.lista-musica .item.sel { background: var(--acento-fundo); box-shadow: inset 2px 0 0 var(--acento); }
 .lista-musica .item.sub { padding-left: 26px; color: var(--texto-2); }
 .lista-musica .item .nome { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lista-musica .rodape-lista { display: flex; gap: 4px; padding: 6px; border-top: 1px solid var(--borda); flex-wrap: wrap; }

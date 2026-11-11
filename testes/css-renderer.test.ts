@@ -125,3 +125,14 @@ describe('modo comentário', () => {
     expect(rodape).toContain('<kbd>Esc</kbd> sai');
   });
 });
+
+describe('seleção com uma forma só', () => {
+  it('monitor, linha do tempo e arranjo marcam a seleção com 2 px no acento (o branco fica para as alças)', () => {
+    const estilo = fs.readFileSync(path.join(RAIZ, 'estilo.css'), 'utf8');
+    const musica = fs.readFileSync(path.join(RAIZ, 'modulos', 'musica', 'musica.css'), 'utf8');
+    expect(estilo).toMatch(/\.sobreposicao \.caixa-sel \{[^}]*border: 2px solid var\(--acento\)/);
+    expect(estilo).toMatch(/\.lt \.bloco\.sel \{ outline: 2px solid var\(--acento\)/);
+    expect(estilo).toMatch(/\.lt \.clipe\.sel \{ outline: 2px solid var\(--acento\)/);
+    expect(musica).toMatch(/\.mclipe\.sel \{ outline: 2px solid var\(--acento\)/);
+  });
+});
