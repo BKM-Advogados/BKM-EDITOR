@@ -1,4 +1,4 @@
-// Regras da Cliente no texto do vídeo (frente Casca, rodada 3): a frase de fecho não é aviso (transversal-D18), "R$500" sem
+// Regras de conteúdo no texto do vídeo (frente Casca, rodada 3): a frase de fecho não é aviso (transversal-D18), "R$500" sem
 // espaço é avisado como "R$ 500" (D19) e o checar_texto lê as legendas do vídeo de cenas (N5).
 import {cpSync, mkdtempSync, rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
@@ -9,13 +9,13 @@ import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import {registrarFerramentas} from '../src/nucleo/ferramentas-mcp';
 import {Projeto} from '../src/nucleo/projeto';
-import {REGRAS_CLIENTE, checarTexto, terminaComUltimaFrase} from '../src/nucleo/regras';
+import {REGRAS_CONTEUDO, checarTexto, terminaComUltimaFrase} from '../src/nucleo/regras';
 
 const termos = (texto: string) => checarTexto(texto).avisos.map((a) => `${a.tipo}:${a.termo}`);
 
 describe('frase de fecho (transversal-D18)', () => {
   it('o fecho que as regras pedem não recebe o aviso de "advogado"', () => {
-    expect(checarTexto(REGRAS_CLIENTE.texto.ultima_frase).avisos).toEqual([]);
+    expect(checarTexto(REGRAS_CONTEUDO.texto.ultima_frase).avisos).toEqual([]);
     expect(termos('Cinco meses sem receber? Ficou com alguma dúvida? Procure um advogado trabalhista.')).not.toContain('oab:advogado');
   });
 

@@ -155,9 +155,9 @@ describe('pesquisa pelo MCP', () => {
     expect((await chamar('texto_da_fonte', {fonte_id: 'f9'})).erro).toBe(true);
 
     // checar_texto: só avisos, sobre o texto dado
-    const checado = (await chamar('checar_texto', {texto: 'Fale com um advogado: na Empresa o prazo é de 30 dias.'})).dado as {avisos: {tipo: string; termo: string}[]};
+    const checado = (await chamar('checar_texto', {texto: 'Fale com um advogado: na Usiminas o prazo é de 30 dias.'})).dado as {avisos: {tipo: string; termo: string}[]};
     expect(checado.avisos).toEqual(expect.arrayContaining([
-      expect.objectContaining({tipo: 'empresa', termo: 'Empresa'}),
+      expect.objectContaining({tipo: 'empresa', termo: 'usiminas'}),
       expect.objectContaining({tipo: 'oab', termo: 'advogado'}),
     ]));
     expect(JSON.stringify(checado)).not.toMatch(/reprov|bloque/);
@@ -184,16 +184,16 @@ describe('pesquisa pelo MCP', () => {
     await cliente.close();
   });
 
-  it('checar_texto no roteiro da Cliente olha as linhas do gancho, as etiquetas e a narração', async () => {
+  it('checar_texto no roteiro do carrossel narrado olha as linhas do gancho, as etiquetas e a narração', async () => {
     const {cliente, chamar} = await conectar(criarRede());
     const lido = (await chamar('ler_documento', {documento: 'carrossel'})).dado as {versao: string};
     await chamar('aplicar_patch', {documento: 'carrossel', versao_base: lido.versao, patch: [
-      {op: 'replace', path: '/cenas/0/linhas/0/t', value: 'Trabalha na Empresa?'},
+      {op: 'replace', path: '/cenas/0/linhas/0/t', value: 'Trabalha na Usiminas?'},
       {op: 'replace', path: '/cenas/0/tag', value: 'Usiminas · MG'},
     ]});
     const r = (await chamar('checar_texto', {documento: 'carrossel'})).dado as {avisos: {tipo: string; termo: string; onde: string}[]; ultima_frase: {frase: string; termina: boolean}};
     expect(r.avisos).toEqual(expect.arrayContaining([
-      expect.objectContaining({tipo: 'empresa', termo: 'Empresa', onde: '/cenas/0/linhas/0/t'}),
+      expect.objectContaining({tipo: 'empresa', termo: 'usiminas', onde: '/cenas/0/linhas/0/t'}),
       expect.objectContaining({tipo: 'empresa', termo: 'usiminas', onde: '/cenas/0/tag'}),
     ]));
     // a narração (video/palavras.json) termina em "Procure um advogado trabalhista.": o fecho certo não avisa (transversal-D18)

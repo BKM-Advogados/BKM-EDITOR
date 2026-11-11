@@ -1,13 +1,13 @@
-// Regras de conteúdo da Cliente para o TEXTO DO VÍDEO (capa, blocos, falas), copiadas à mão de
-// tasks/estudio-pesquisa-e-grosso-2026-11-06/fase-0/regras-cliente.json (perfil 'cliente' do conferir_capa.py do outro-projeto
-// e regras comuns da campanha C2–C8). Tudo aqui é AVISO para a pessoa decidir (D2, 06/11/2026): nada bloqueia, e a
+// Regras de conteúdo para o TEXTO DO VÍDEO (capa, blocos, falas), copiadas à mão de um perfil de regras do
+// conferir_capa.py (outro-projeto) e das regras comuns das campanhas. Tudo aqui é AVISO para a pessoa decidir (D2,
+// 06/11/2026): nada bloqueia, e a
 // saída não tem campo de reprovar. As fontes da pesquisa não passam por aqui: nome, parte, OAB e CNPJ ficam nelas como
 // no original. A comparação é a mesma do conferir_capa.py: sem acento, minúsculas, palavra inteira.
 import {numerosDe, type Fato} from './pesquisa';
 
 export type Regras = {
   empresas: {
-    reprova: string[]; // empregadoras do público da Cliente (nomes da fonte de origem; aqui só avisam)
+    reprova: string[]; // grandes empregadoras do público dos vídeos (aqui só avisam)
     revisar: string[]; // também é palavra comum ("vale a pena"): avisa com nota
   };
   pessoas?: {nomes?: string[]}; // nomes a avisar sempre; além deles, a suspeita de nome próprio
@@ -18,9 +18,9 @@ export type Regras = {
   texto: {ultima_frase: string};
 };
 
-export const REGRAS_CLIENTE: Regras = {
+export const REGRAS_CONTEUDO: Regras = {
   empresas: {
-    reprova: ['Empresa', 'usiminas', 'arcelormittal', 'arcelor', 'samarco', 'csn', 'anglo american', 'anglogold', 'vallourec', 'aperam', 'cbmm', 'kinross', 'jaguar mining'],
+    reprova: ['usiminas', 'arcelormittal', 'arcelor', 'samarco', 'csn', 'anglo american', 'anglogold', 'vallourec', 'aperam', 'cbmm', 'kinross', 'jaguar mining'],
     revisar: ['vale'],
   },
   pessoas: {nomes: []},
@@ -56,9 +56,9 @@ const NAO_E_NOME = new Set(norm(
   + 'hoje ficou procure isso essa esse este esta mas ou que qual saiu sua seu voce depois antes ate entre so '
   + 'justica trabalho tribunal superior supremo federal regional constituicao lei leis sumula decreto codigo '
   + 'consolidacao ministerio publico fundo garantia tempo servico previdencia social carteira seguro desemprego '
-  + 'brasil minas gerais espirito santo Cidade Exemplo vara turma secao orientacao jurisprudencial plano demissao '
+  + 'brasil minas gerais espirito santo vara turma secao orientacao jurisprudencial plano demissao '
   + 'voluntaria caixa economica receita instituto nacional republica estado governo presidencia camara senado '
-  + 'deputados art artigo inciso paragrafo clt fgts inss tst stf stj trt cnj mte ks bkm usina').split(' '));
+  + 'deputados art artigo inciso paragrafo clt fgts inss tst stf stj trt cnj mte bkm usina').split(' '));
 
 // Duas ou mais palavras seguidas com maiúscula ("João da Silva"), tirando as da lista acima.
 const suspeitasDeNome = (texto: string): string[] => {
@@ -83,7 +83,7 @@ const suspeitasDeNome = (texto: string): string[] => {
 
 /** Avisos sobre um texto do vídeo. `onde` diz de onde o texto veio (id do bloco, "fala 3"); com `fatos`, cada número
  * do texto que não aparece em nenhuma afirmação de fato vira aviso 'numero_sem_fato'. Só informa. */
-export const checarTexto = (texto: string, regras: Regras = REGRAS_CLIENTE, opcoes: {onde?: string; fatos?: Fato[]} = {}): {avisos: Aviso[]} => {
+export const checarTexto = (texto: string, regras: Regras = REGRAS_CONTEUDO, opcoes: {onde?: string; fatos?: Fato[]} = {}): {avisos: Aviso[]} => {
   const onde = opcoes.onde ?? 'texto';
   // a frase de fecho que as próprias regras pedem ("Procure um advogado trabalhista.") não é aviso da OAB: sem tirá-la, todo
   // vídeo que fecha certo recebia o aviso de 'advogado' (transversal-D18). Sem o ponto final também vale.
@@ -99,7 +99,7 @@ export const checarTexto = (texto: string, regras: Regras = REGRAS_CLIENTE, opco
   for (const termo of regras.pessoas?.nomes ?? []) if (acha(t, termo)) avisos.push({tipo: 'pessoa', termo, onde});
   for (const termo of suspeitasDeNome(texto)) {
     if (!avisos.some((a) => a.tipo === 'pessoa' && norm(a.termo) === norm(termo))) {
-      avisos.push({tipo: 'pessoa', termo, onde, nota: 'parece nome de pessoa: no vídeo, use a função ("operador de alto-forno")'});
+      avisos.push({tipo: 'pessoa', termo, onde, nota: 'parece nome de pessoa: no vídeo, use a função ("operador de máquinas")'});
     }
   }
   if (opcoes.fatos) {
@@ -112,7 +112,7 @@ export const checarTexto = (texto: string, regras: Regras = REGRAS_CLIENTE, opco
 };
 
 /** O texto (a última fala ou o último bloco) termina com a frase de fecho das regras? */
-export const terminaComUltimaFrase = (texto: string, regras: Regras = REGRAS_CLIENTE): boolean => {
+export const terminaComUltimaFrase = (texto: string, regras: Regras = REGRAS_CONTEUDO): boolean => {
   const limpo = (s: string) => norm(s).replace(/\s+/g, ' ').trim();
   return limpo(texto).endsWith(limpo(regras.texto.ultima_frase));
 };

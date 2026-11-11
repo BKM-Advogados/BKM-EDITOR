@@ -9,7 +9,7 @@ import {
   acharTrecho, conferirDigitos, decodificar, decodificarComAviso, estadoDoFato, hashTexto, limparHtml, nivelDe, normalizar, numerosDe,
   paginar, pesquisaVazia, proximoId, sinaisDeVigencia, tituloDoHtml, TAMANHO_PAGINA,
 } from '../src/nucleo/pesquisa';
-import {checarTexto, REGRAS_CLIENTE, terminaComUltimaFrase} from '../src/nucleo/regras';
+import {checarTexto, REGRAS_CONTEUDO, terminaComUltimaFrase} from '../src/nucleo/regras';
 
 const PASTA = path.join(__dirname, 'fixtures', 'pesquisa');
 const BYTES = new Uint8Array(readFileSync(path.join(PASTA, 'planalto-art477.htm')));
@@ -286,11 +286,11 @@ describe('catálogo, ids e páginas', () => {
   });
 });
 
-describe('regras da Cliente (só avisos)', () => {
+describe('regras de conteúdo (só avisos)', () => {
   it('avisa empresa, OAB, pessoa e número sem fato; nada reprova', () => {
     const fatos = [{afirmacao: 'A empresa tem até 10 dias para pagar a rescisão.'}] as never;
-    const {avisos} = checarTexto('Na Empresa, João da Silva tem 10 dias e 15 dias. Vale a pena: honorários grátis!', REGRAS_CLIENTE, {onde: 'cena-1-texto', fatos});
-    expect(avisos).toContainEqual({tipo: 'empresa', termo: 'Empresa', onde: 'cena-1-texto'});
+    const {avisos} = checarTexto('Na Usiminas, João da Silva tem 10 dias e 15 dias. Vale a pena: honorários grátis!', REGRAS_CONTEUDO, {onde: 'cena-1-texto', fatos});
+    expect(avisos).toContainEqual({tipo: 'empresa', termo: 'usiminas', onde: 'cena-1-texto'});
     expect(avisos.find((a) => a.termo === 'vale')).toMatchObject({tipo: 'empresa', nota: expect.stringContaining('palavra comum')});
     expect(avisos).toContainEqual({tipo: 'oab', termo: 'honorarios', onde: 'cena-1-texto'});
     expect(avisos).toContainEqual({tipo: 'oab', termo: 'gratis', onde: 'cena-1-texto'});
