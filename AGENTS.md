@@ -10,7 +10,8 @@ cada projeto** do Estúdio (o guia `CLAUDE.md`/`AGENTS.md`/`GEMINI.md` e o MCP d
 npm ci                                   # Node 20 ou mais novo; o binário do Electron vem no postinstall dele
 npm run typecheck                        # tsc --noEmit
 npm test                                 # vitest run: cerca de 1.400 testes, também no Windows e no Mac (CI)
-npm run mcp:build                        # dist-mcp/nucleo.cjs (MCP por stdio) e dist-mcp/ponte.cjs
+npm run mcp:build                        # dist-mcp/nucleo.cjs (MCP por stdio), desktop.cjs (Claude Desktop) e ponte.cjs
+npm run mcpb                             # out/mcpb/Estudio-<versão>.mcpb, a extensão do Claude Desktop (depois do mcp:build)
 env -u ELECTRON_RUN_AS_NODE npm run dev  # o app em desenvolvimento (já roda o mcp:build)
 npm run package                          # pacote do sistema atual; pacote:win, pacote:mac, instalador:win, instalador:mac
 bash scripts/instalar-linux.sh           # Linux: instala em ~/.local/opt/Estudio com atalho no lançador
@@ -24,10 +25,12 @@ bash scripts/instalar-linux.sh           # Linux: instala em ~/.local/opt/Estudi
 4. `src/nucleo/`: regras puras e testáveis (documentos, JSON Patch com versão, diário, ferramentas MCP, guia do projeto).
 5. `src/compartilhado/api.ts`: o contrato do IPC entre a interface e o main.
 6. `src/composicoes/`: as composições do Remotion (vídeo de cenas, carrossel, animação).
-7. `mcp/nucleo.ts`: o MCP `estudio` por stdio para IDEs e agentes de fora (`--projeto`, `--ide`, `--origem`).
+7. `mcp/nucleo.ts`: o MCP `estudio` por stdio para IDEs e agentes de fora (`--projeto`, `--ide`, `--origem`);
+   `mcp/desktop.ts` e `mcpb/`: o do Claude Desktop (pelo app aberto ou no projeto escolhido; `docs/claude-desktop.md`).
 8. Um projeto é uma pasta com `estudio.json`, documentos JSON, `midia/`, `.estudio/diario.jsonl` e git próprio.
 9. A pessoa (tela) e o agente (MCP) passam pelo mesmo `aplicar_patch` com `versao_base`; tudo cai no diário com Reverter.
-10. Detalhes: `docs/arquitetura.md`, `docs/ia.md` (MCP e portão), `docs/ide.md`, `docs/portes.md`, `STACKS.md`.
+10. Detalhes: `docs/arquitetura.md`, `docs/ia.md` (MCP e portão), `docs/ide.md`, `docs/harnesses.md`,
+    `docs/claude-desktop.md`, `docs/portes.md`, `STACKS.md`.
 
 ## Armadilhas
 

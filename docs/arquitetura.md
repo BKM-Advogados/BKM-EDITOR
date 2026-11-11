@@ -103,7 +103,7 @@ Um bundle Remotion (Roteiro, Imagem, Cena3D) desenha a prévia, a camada de outr
 
 ## 3. Repositório
 
-Pacote npm único em `C:\Users\usuario\projetos\estudio`, desenvolvido localmente no PC (não no Mac). TypeScript estrito, Electron Forge 7.11 + Vite (do template oficial Remotion + Electron, em `referencia/template-electron` [lido]) e vitest. Os entrypoints extras do Forge (`hosts/pty-host.ts`, `hosts/render-host.ts`) entram em `plugins[0].build` com `target: 'main'`.
+Pacote npm único em `%USERPROFILE%\projetos\estudio`, desenvolvido localmente no PC (não no Mac). TypeScript estrito, Electron Forge 7.11 + Vite (do template oficial Remotion + Electron, em `referencia/template-electron` [lido]) e vitest. Os entrypoints extras do Forge (`hosts/pty-host.ts`, `hosts/render-host.ts`) entram em `plugins[0].build` com `target: 'main'`.
 
 ```
 estudio/
@@ -1077,12 +1077,12 @@ Cada passo termina rodando, com `npm run typecheck` e `npm test` verdes, e com u
 
 Internas, lidas em 05/11/2026:
 
-- `C:\Users\usuario\projetos\estudio\referencia\motor-mac\scripts\preparar_carrossel.py` (constantes, `round`, cortes)
+- `%USERPROFILE%\projetos\estudio\referencia\motor-mac\scripts\preparar_carrossel.py` (constantes, `round`, cortes)
 - `...\referencia\motor-mac\dados\trabalho\<exemplo>\roteiro.json`, `props.json` (chaves de topo) e `pub/narracao.wav`
 - `...\referencia\template-electron\package.json` (Electron 42.11.16, Forge 7.11.1)
-- `C:\Users\usuario\projetos\estudio\package.json`, `src/**` e `testes/resolver.test.ts` (protótipo)
+- `%USERPROFILE%\projetos\estudio\package.json`, `src/**` e `testes/resolver.test.ts` (protótipo)
 - o projeto de exemplo (estrutura e presença do vídeo-fonte da narração)
-- `C:\Users\usuario\projetos\estudio\docs\desempenho.md` (processos, MCP por HTTP, perfis, orçamentos)
+- `%USERPROFILE%\projetos\estudio\docs\desempenho.md` (processos, MCP por HTTP, perfis, orçamentos)
 - Proposta A e proposta B (05/11/2026), com as fontes externas que elas citam.
 
 Externas citadas pelas propostas (não reabertas aqui):

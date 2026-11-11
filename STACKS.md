@@ -2,7 +2,7 @@
 
 > Projeto: **Estúdio** · app de edição de vídeo, imagem, 3D, efeitos/motion, áudio e música.
 > Versão: **V4**, pacote 2.0.0 (11/11/2026; a V3, pacote 1.0.0, saiu em 10/11/2026) · Migração Windows → Linux (Omarchy/Arch) em 09/11/2026.
-> Local no Linux: `~/Projects/estudio` (original: `C:\Users\usuario\projetos\estudio`)
+> Local no Linux: `~/Projects/estudio` (original: `%USERPROFILE%\projetos\estudio`)
 > Portes para Windows e macOS (10/11/2026): auditoria, pacotes e o que falta testar em `docs/portes.md`.
 
 ---

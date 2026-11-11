@@ -4,12 +4,15 @@ App desktop que une edição de **vídeo**, **imagem**, **3D**, **efeitos** e **
 projeto: a pessoa edita na tela, o Claude edita conversando (com a conta da própria pessoa), e as duas mãos passam pelo
 mesmo JSON Patch com versão, diário e desfazer. A tela acompanha o arquivo; o agente vê o que a pessoa mudou.
 
-Nome provisório. Pasta: `C:\Users\usuario\projetos\estudio` (fora do OneDrive, por causa do `node_modules`).
-Repositório: `BKM-Advogados/BKM-EDITOR` (privado). Versões (tag do git → versão do pacote): V1 = `v1.0.0` (0.1.0),
-V2 = `v2.0.0` (0.2.0), V3 = `v3.0.0` (1.0.0), V4 = `v4.0.0` (2.0.0). No Linux a pasta é `~/Projects/estudio`.
+Nome provisório. Pasta: `%USERPROFILE%\projetos\estudio` (fora do OneDrive, por causa do `node_modules`).
+Repositório: `BKM-Advogados/BKM-EDITOR` (público: nada de chave, token ou dado de cliente no código). Versões (tag do git → versão do pacote): V1 = `v1.0.0` (0.1.0),
+V2 = `v2.0.0` (0.2.0), V3 = `v3.0.0` (1.0.0), V4 = `v4.0.0` (2.0.0), `v4.0.1` (2.0.1). No Linux a pasta é `~/Projects/estudio`.
 
-## Na 2.0.1
+## Na 2.0.1 (tag v4.0.1)
 
+- **Claude Desktop (`docs/claude-desktop.md`):** o Estúdio passa a ser operado pelo Claude Desktop sem configurar nada à
+  mão, pela extensão `Estudio-2.0.1.mcpb` da release ou pelo botão **Conectar ao Claude Desktop** em Configurações › IA.
+  Detalhes na seção "Usar pelo Claude Desktop", abaixo.
 - **Qualquer agente abre o projeto (`docs/harnesses.md`):** além do `CLAUDE.md`, cada projeto traz o mesmo guia em
   `AGENTS.md` (Codex, Cursor, VS Code, opencode, Antigravity) e `GEMINI.md` (Gemini CLI), e o MCP `estudio` já ligado no
   arquivo de cada harness, com o nome dele no Histórico. Quem clona o código acha as instruções no `AGENTS.md` da raiz.

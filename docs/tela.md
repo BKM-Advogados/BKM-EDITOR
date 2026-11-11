@@ -929,4 +929,4 @@ Repetidas das pesquisas A e B, com acesso em 05/11/2026. As listas completas est
 - [B48] Radix Colors 3.0.0 — https://github.com/radix-ui/colors
 - [B49] lucide-react 1.68.0 (ISC) — https://registry.npmjs.org/lucide-react/latest
 - [B50] JetBrains Mono (OFL-1.1) — https://github.com/JetBrains/JetBrainsMono
-- Internos: `C:\Users\usuario\OneDrive - Empresa\Área de Trabalho\projs\tasks\pesquisa-editor-video-ia-2026-11-04\relatorio-2-suite-e-terminal.md` (§5.7, estados e chip de contexto); `C:\Users\usuario\projetos\estudio\docs\desempenho.md`; `C:\Users\usuario\projetos\estudio\src\renderer` (Casca.tsx, estilo.css, loja.ts).
+- Internos: `%USERPROFILE%\OneDrive - Empresa\Área de Trabalho\projs\tasks\pesquisa-editor-video-ia-2026-11-04\relatorio-2-suite-e-terminal.md` (§5.7, estados e chip de contexto); `%USERPROFILE%\projetos\estudio\docs\desempenho.md`; `%USERPROFILE%\projetos\estudio\src\renderer` (Casca.tsx, estilo.css, loja.ts).
