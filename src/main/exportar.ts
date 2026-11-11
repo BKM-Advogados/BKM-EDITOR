@@ -2,12 +2,13 @@
 // feito uma vez por sessão no desenvolvimento e vem pronto no app empacotado. A concorrência fica em metade dos núcleos
 // para a interface seguir responsiva em máquina modesta. `prepararRender` (navegador e pacote) roda uma vez por
 // exportação e `renderizarVideo` uma vez por arquivo: o diálogo pede vários destinos de uma tacada, com codec, bitrate,
-// escala, trecho e o sinal de cancelar do Remotion (makeCancelSignal).
+// escala, trecho e o sinal de cancelar do Remotion (makeCancelSignal). O Chrome do render abre no primeiro arquivo e serve
+// a todos (medir e renderizar cada destino), até `encerrarRender` no fim da exportação.
 import os from 'node:os';
 import path from 'node:path';
 import {existsSync, statSync} from 'node:fs';
 import {rm, statfs} from 'node:fs/promises';
-import type {CancelSignal} from '@remotion/renderer';
+import type {CancelSignal, HeadlessBrowser} from '@remotion/renderer';
 import type {Progresso} from '../compartilhado/api';
 import {espacoNecessario, formatarBytes} from '../nucleo/exportacao';
 import {getCompositorPackage} from './compositor-package';
@@ -36,7 +37,27 @@ const servirDe = async (raizApp: string, empacotado: boolean, aviso: (p: Progres
   return pacoteDev;
 };
 
-export type Preparado = {serveUrl: string; browserExecutable: string | null; binariesDirectory: string | null};
+export type Preparado = {serveUrl: string; browserExecutable: string | null; binariesDirectory: string | null;
+  navegador?: {escala: number; aberto: Promise<HeadlessBrowser>}};
+
+/** Fecha o Chrome da exportação, se abriu. */
+export const encerrarRender = async (p: Preparado | null | undefined) => {
+  const navegador = p?.navegador;
+  if (!p || !navegador) return;
+  p.navegador = undefined;
+  await navegador.aberto.then((n) => n.close({silent: true})).catch(() => undefined);
+};
+
+/** O Chrome desta exportação, aberto na primeira vez: sem ele, cada destino abria dois (o selectComposition e o renderMedia).
+ *  A escala vai no Chrome (--force-device-scale-factor), como o renderMedia faz quando abre o dele: outra escala, outro Chrome. */
+const navegadorDe = async (p: Preparado, escala: number) => {
+  if (p.navegador && p.navegador.escala !== escala) await encerrarRender(p);
+  if (!p.navegador) {
+    const {openBrowser} = await import('@remotion/renderer');
+    p.navegador = {escala, aberto: openBrowser('chrome', {browserExecutable: p.browserExecutable, forceDeviceScaleFactor: escala})};
+  }
+  return p.navegador.aberto;
+};
 
 /** Navegador de render pronto e composições empacotadas: a parte que não depende do arquivo que vai sair. */
 export const prepararRender = async (o: {raizApp: string; empacotado: boolean; aviso: (p: Progresso) => void}): Promise<Preparado> => {
@@ -88,7 +109,9 @@ export const discoCheio = (mensagem: string) => /ENOSPC|No space left|\((228|-28
 export const renderizarVideo = async (p: Preparado, r: RenderVideo, aviso: (x: Progresso) => void) => {
   const {renderMedia, selectComposition} = await import('@remotion/renderer');
   const id = r.props.composicao === 'VideoCenas' ? 'VideoCenas' : r.props.composicao === 'Animacao' ? 'Animacao' : 'CarrosselTema';
-  const composition = await selectComposition({serveUrl: p.serveUrl, id, inputProps: r.props, binariesDirectory: p.binariesDirectory, browserExecutable: p.browserExecutable});
+  const puppeteerInstance = await navegadorDe(p, r.escala ?? 1);
+  const composition = await selectComposition({serveUrl: p.serveUrl, id, inputProps: r.props, binariesDirectory: p.binariesDirectory, browserExecutable: p.browserExecutable,
+    puppeteerInstance});
   const quadros = r.quadros ? r.quadros[1] - r.quadros[0] + 1 : composition.durationInFrames;
   aviso({tipo: 'status', mensagem: `Renderizando ${quadros} quadros…`});
   await renderMedia({
@@ -102,6 +125,7 @@ export const renderizarVideo = async (p: Preparado, r: RenderVideo, aviso: (x: P
     inputProps: r.props,
     binariesDirectory: p.binariesDirectory,
     browserExecutable: p.browserExecutable,
+    puppeteerInstance,
     cancelSignal: r.cancelSignal,
     concurrency: Math.max(1, Math.floor(os.cpus().length / 2)),
     onProgress: ({progress}) => aviso({tipo: 'progresso', etapa: 'renderizando', progresso: progress * 100}),
@@ -120,4 +144,11 @@ export const renderizarVideo = async (p: Preparado, r: RenderVideo, aviso: (x: P
 
 /** Um vídeo só, do começo ao fim (preparar e renderizar): o padrão de antes, H.264 no formato do documento. */
 export const exportarVideo = async (o: {raizApp: string; empacotado: boolean; props: Record<string, unknown>; arquivo: string; aviso: (p: Progresso) => void;
-  render?: Omit<RenderVideo, 'props' | 'arquivo'>}) => renderizarVideo(await prepararRender(o), {props: o.props, arquivo: o.arquivo, ...o.render}, o.aviso);
+  render?: Omit<RenderVideo, 'props' | 'arquivo'>}) => {
+  const p = await prepararRender(o);
+  try {
+    return await renderizarVideo(p, {props: o.props, arquivo: o.arquivo, ...o.render}, o.aviso);
+  } finally {
+    await encerrarRender(p);
+  }
+};

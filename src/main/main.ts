@@ -15,7 +15,7 @@ import {argumentosDoRender, destinoDoFormato, estimarExportacao, fontesDaMarcaDa
   type OpcoesExportarImagem, type OpcoesExportarVideo} from '../nucleo/exportacao';
 import {ErroProjeto, Projeto, serializar} from '../nucleo/projeto';
 import {criarRede} from '../nucleo/ferramentas-mcp';
-import {discoCheio, faltaEspaco, prepararRender, renderizarVideo} from './exportar';
+import {discoCheio, encerrarRender, faltaEspaco, prepararRender, renderizarVideo, type Preparado} from './exportar';
 import {registrarIpcMarcas} from './ipc-marcas';
 import {arquivoLivre, registrarExportarPaginas} from './exportar-paginas';
 import {lerJsonDaTela} from './ler-json';
@@ -450,11 +450,13 @@ lidar(CANAL.exportar, async (documento: string, opcoes?: OpcoesExportarVideo): P
     if (x.tipo === 'progresso' && x.progresso !== undefined) janela?.setProgressBar((indice + x.progresso / 100) / planos.length);
   };
   const fontesMarca = fontesDaMarcaDagua(props);
+  let preparado: Preparado | null = null;
   try {
     // dentro do try: a trava de "já há uma exportação" já vale, e a mensagem chega como as outras falhas
     const semEspaco = await faltaEspaco(pasta, estimarExportacao(o, formato, Number(props.duracao_ms) || 0, comAudio).porDestino.map((d) => d.bytes), comAudio);
     if (semEspaco) throw new Error(semEspaco);
-    const preparado = await prepararRender({raizApp: app.getAppPath(), empacotado: app.isPackaged, aviso: avisoDe(0, '')});
+    const pronto = await prepararRender({raizApp: app.getAppPath(), empacotado: app.isPackaged, aviso: avisoDe(0, '')});
+    preparado = pronto;
     for (const [i, plano] of planos.entries()) {
       const args = argumentosDoRender(o, plano.destino, formato, Number(props.duracao_ms) || 0);
       const destino = arquivoLivre(pasta, plano.nome, args.ext);
@@ -469,7 +471,7 @@ lidar(CANAL.exportar, async (documento: string, opcoes?: OpcoesExportarVideo): P
       // marca d'água do destino, se ligada: posicionada no tamanho do destino, em frações (vale com qualquer escala), fora
       // da legenda que vai neste render (a das props do destino, já recalculada acima)
       const marca = marcaDaguaDoDestino(o.marca_dagua?.[plano.destino.id], plano.destino, fontesMarca, o.proporcao_logo, legendasDasProps(propsDestino), o.proporcao_texto);
-      await renderizarVideo(preparado, {
+      await renderizarVideo(pronto, {
         props: {...propsDestino, ...(marca ? {marca_dagua: marca} : {})},
         arquivo: destino, codec: args.codec, videoBitrate: args.videoBitrate, escala: fixo ? args.escala : 1, quadros: args.frameRange, cancelSignal, avisos,
       }, avisoDe(i, path.basename(destino)));
@@ -492,6 +494,7 @@ lidar(CANAL.exportar, async (documento: string, opcoes?: OpcoesExportarVideo): P
     enviar(CANAL.progresso, {tipo: 'status', mensagem: cancelado ? 'Exportação cancelada' : `Falhou: ${mensagem}`});
     return {ok: false, cancelado, mensagem: cancelado ? 'Exportação cancelada' : mensagem, arquivos, pasta, ...(avisos.length ? {avisos} : {})};
   } finally {
+    await encerrarRender(preparado); // o Chrome que serviu a todos os destinos
     cancelarExportacao = null;
     janela?.setProgressBar(-1);
   }
