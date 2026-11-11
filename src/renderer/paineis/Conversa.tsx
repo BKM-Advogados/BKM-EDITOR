@@ -7,7 +7,7 @@ import type {OperacaoPatch} from '../../nucleo/documentos';
 import {FERRAMENTAS_ESTUDIO, normalizarFerramenta} from '../../compartilhado/ferramentas';
 import {mudancasDoResultado} from '../../nucleo/portao';
 import {confirmar} from '../componentes/Dialogo';
-import {avisar, loja, selecionar, useLoja, valorEm} from '../estado/loja';
+import {avisar, loja, selecionar, useLoja, valorEm, type Area} from '../estado/loja';
 import {enviar, estadoConversas, guardarRascunho, lerConta, parar, responderPermissao, trocarModelo, type Anexo, type Bloco, type Conversa as TConversa} from './conversas';
 import './conversa.css';
 
@@ -278,7 +278,15 @@ const ChipAnexo: React.FC<{a: Anexo; tirar?: () => void}> = ({a, tirar}) => (
   </span>
 );
 
-const SUGESTOES = ['Resolva os comentários abertos', 'O que tem neste projeto?', 'Deixe o bloco selecionado um pouco maior'];
+// sugestões da conversa vazia, pela área em que a pessoa está (na Música e na Animação não existe "bloco")
+export const SUGESTOES: Record<Area, string[]> = {
+  video: ['Resolva os comentários abertos', 'Deixe o bloco selecionado um pouco maior', 'Faça um vídeo de 5 cenas sobre férias proporcionais'],
+  imagem: ['Crie um carrossel de 5 páginas sobre este assunto', 'Alinhe as camadas selecionadas ao centro', 'Aplique o kit de marca nesta imagem'],
+  '3d': ['Ponha uma luz quente vindo da esquerda', 'Faça a câmera girar devagar em volta do objeto', 'O que tem nesta cena?'],
+  efeitos: ['Deixe o vídeo com cara de cinema', 'Tire o tom azulado da imagem', 'O que cada efeito da pilha faz?'],
+  musica: ['Deixe a batida mais calma', 'Ponha um baixo seguindo os acordes', 'Faça uma trilha de 20 s para ficar sob a voz'],
+  animacao: ['Faça o logo entrar girando', 'Revele a arte em pixel devagar', 'Ponha o texto subindo depois do logo'],
+};
 
 // ── a conversa ──
 // liberarSessao: fecha o terminal que estiver com esta mesma sessão aberta (duas execuções misturariam o histórico)
@@ -290,6 +298,7 @@ export const Conversa: React.FC<{c: TConversa; abrirTerminal: () => void; libera
   const [tirados, setTirados] = useState<Set<string>>(new Set());
   const [, tique] = useState(0);
   const conta = useConta();
+  const areaAtual = useLoja((e) => e.area);
   const eClaude = c.provedor === 'claude';
   const sugeridos = useAnexos();
   const anexos = sugeridos.filter((a) => !tirados.has(a.chave));
@@ -343,7 +352,7 @@ export const Conversa: React.FC<{c: TConversa; abrirTerminal: () => void; libera
           <div className="vazio-conversa">
             <Sparkle size={22} />
             <p>Converse com {eClaude ? 'o Claude' : nomeIA(c)} sobre este projeto. A IA vê o que você seleciona, lê os comentários e muda os documentos; cada mudança aparece aqui e no Histórico, e dá para reverter.</p>
-            <div className="sugestoes">{SUGESTOES.map((s) => <button key={s} className="anexo" onClick={() => (setTexto(s), caixa.current?.focus())}>{s}</button>)}</div>
+            <div className="sugestoes">{SUGESTOES[areaAtual].map((s) => <button key={s} className="anexo" onClick={() => (setTexto(s), caixa.current?.focus())}>{s}</button>)}</div>
           </div>
         )}
         {c.itens.map((it, i) => {
