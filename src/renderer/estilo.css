@@ -2,7 +2,7 @@
    Superfícies em grafite sem matiz, com degraus visíveis: as barras ficam um degrau ABAIXO do corpo do painel, como no
    VS Code (fundo-1 = barras, fundo-2 = corpo; o docs/tela.md §7 tinha o contrário). Cada cor tem um sentido só: azul =
    seleção, foco e botão principal; violeta = agente; âmbar = comentário; vermelho = cabeça de reprodução. A pessoa não
-   tem cor e o cobre da marca fica fora da interface (é cor de conteúdo). Densidade pensada para 1366×768. */
+   tem cor e nenhuma cor de marca entra na interface (marca é conteúdo). Densidade pensada para 1366×768. */
 :root {
   /* superfícies */
   --fundo-0: #0f0f0f;            /* vão entre painéis, barra de título */
@@ -40,7 +40,6 @@
   --ok: #3dd68c;
   --aviso: #ffa057;
   --erro: #ff9592;
-  --marca: #c88155;              /* cobre do nome do app na barra: conteúdo, não interface (mantido só por compatibilidade) */
 
   /* famílias da linha do tempo (o --trilha-video do tela.md virou --trilha-texto) */
   --trilha-texto: #70b8ff;
@@ -119,7 +118,6 @@ kbd { font: 600 10px/14px var(--fonte-mono); color: var(--texto-2); background: 
 .barra { display: flex; align-items: center; gap: var(--esp-3); padding: 0 var(--esp-2) 0 var(--esp-3); background: var(--fundo-2);
   border-bottom: 1px solid var(--borda); -webkit-app-region: drag; user-select: none; }
 .barra > * { -webkit-app-region: no-drag; }
-.barra .marca { font-weight: 700; letter-spacing: 0.04em; color: var(--marca); }
 .barra .projeto { color: var(--texto-2); max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .areas { display: flex; gap: 2px; margin: 0 auto; background: var(--fundo-0); padding: 3px; border-radius: var(--raio-2); }
 .areas button { display: flex; align-items: center; gap: 6px; border: 0; background: transparent; color: var(--texto-2); padding: 4px 12px;

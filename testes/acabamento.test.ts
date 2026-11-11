@@ -207,10 +207,11 @@ describe('predefinições do kit', () => {
   });
 
   it('o kit da imagem é o da cor de fundo dela; sem nenhum, o primeiro', () => {
-    expect(kitDaImagem({fundo: '#101826'}, MARCAS_INICIAIS)?.id).toBe(MARCA_BKM.id);
-    expect(kitDaImagem({fundo: '#111418'}, MARCAS_INICIAIS)?.id).toBe('neutro');
-    expect(kitDaImagem({fundo: '#171a19'}, [...MARCAS_INICIAIS, KIT_TESTE])?.id).toBe('teste');
-    expect(kitDaImagem({fundo: '#123456'}, MARCAS_INICIAIS)?.id).toBe(MARCAS_INICIAIS[0].id);
+    const kits = [...MARCAS_INICIAIS, MARCA_BKM]; // o kit da BKM não vem mais de fábrica, mas pode estar na pasta da pessoa
+    expect(kitDaImagem({fundo: '#101826'}, kits)?.id).toBe(MARCA_BKM.id);
+    expect(kitDaImagem({fundo: '#111418'}, kits)?.id).toBe('neutro');
+    expect(kitDaImagem({fundo: '#171a19'}, [...kits, KIT_TESTE])?.id).toBe('teste');
+    expect(kitDaImagem({fundo: '#123456'}, kits)?.id).toBe(kits[0].id);
   });
 });
 

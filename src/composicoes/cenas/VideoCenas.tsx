@@ -18,8 +18,16 @@ import {tempoDoBloco} from './continuidade';
 
 const clamp = {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'} as const;
 
+/** Destaque sem matiz (o branco do kit Neutro): a cor quase não muda do texto, então o trecho ganha peso. */
+export const destaqueSemCor = (cor: string) => {
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i.exec(cor.trim());
+  if (!m) return false;
+  const c = m.slice(1, 4).map((x) => parseInt(x, 16));
+  return Math.max(...c) - Math.min(...c) < 16;
+};
+
 const Rico: React.FC<{texto: string; cor: string}> = ({texto, cor}) => (
-  <>{texto.split('**').map((s, i) => (i % 2 ? <b key={i} style={{color: cor, fontWeight: 'inherit'}}>{s}</b> : <React.Fragment key={i}>{s}</React.Fragment>))}</>
+  <>{texto.split('**').map((s, i) => (i % 2 ? <b key={i} style={{color: cor, fontWeight: destaqueSemCor(cor) ? 'bolder' : 'inherit'}}>{s}</b> : <React.Fragment key={i}>{s}</React.Fragment>))}</>
 );
 
 /** Quadros desde o começo da sequência da cena até `ms` (saída). */

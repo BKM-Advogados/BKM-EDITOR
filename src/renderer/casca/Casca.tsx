@@ -492,7 +492,7 @@ export const Casca: React.FC = () => {
             <button onClick={item(() => void duplicar())}><Copy size={14} />Duplicar projeto…</button>
             <button onClick={item(() => window.estudio.mostrarNaPasta())}><FolderSearch size={14} />Mostrar na pasta</button>
             <button onClick={item(() => void marcarVersao())}><Check size={14} />Marcar ponto de restauração<kbd>Ctrl+S</kbd></button>
-            {temExemplo && <button onClick={item(() => void window.estudio.abrirExemplo().then(abrirProjeto).catch((e: Error) => avisar(mensagemDe(e), 'erro')))}><BookOpen size={14} />Ver um pronto</button>}
+            {temExemplo && <button onClick={item(() => void window.estudio.abrirExemplo().then(abrirProjeto).catch((e: Error) => avisar(mensagemDe(e), 'erro')))}><BookOpen size={14} />Ver um exemplo</button>}
             <hr />
             <button onClick={item(abrirMidia)}><Images size={14} />Mídia do projeto</button>
             <button onClick={item(() => setMarca(true))}><Palette size={14} />Marca…</button>

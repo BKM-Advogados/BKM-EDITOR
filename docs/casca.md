@@ -72,7 +72,7 @@ tomada marcada como boa e não use a descartada sem perguntar. Para usar um arqu
 - **transversal-D17.** Tamanho personalizado de 16 a 7680 px: o campo da tela inicial fica vermelho com o limite enquanto o valor é
   inválido e volta ao limite mais perto ao sair dele; `limitarTamanho` (formatos.ts) também vale na criação do documento, pelo MCP
   e pelo app.
-- **transversal-D21.** `scripts/e2e-boas-vindas.mjs` procura "Ver um pronto".
+- **transversal-D21.** `scripts/e2e-boas-vindas.mjs` procura "Ver um exemplo".
 
 ## Regras de conteúdo no texto do vídeo
 

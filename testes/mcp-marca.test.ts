@@ -55,7 +55,7 @@ describe('MCP da marca: cor_da_marca', () => {
     const doc: DocImagem = {...novoDocImagem(1080, 1080), camadas: [{id: 't', nome: 'T', tipo: 'texto', x: 0, y: 0, largura: 10, altura: 10, texto: 'a'}]};
     const r = patchCorDaMarca(doc, 't', 'cor', 'destaque');
     expect(r.avisos[0]).toMatch(/ainda não tem kit/);
-    expect(r.cor).toBe('#70B8FF');
+    expect(r.cor).toBe('#FFFFFF');
   });
 });
 

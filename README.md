@@ -62,7 +62,7 @@ O app abre na **tela inicial**:
   pedido. Sem o Claude Code instalado, o campo fica desligado e o resto funciona.
 - **Continuar e Recentes:** o último projeto com miniatura (a foto do monitor ao fechar) e a grade dos outros, com
   Duplicar, Mostrar na pasta e Remover da lista (nunca apaga a pasta).
-- **Ver um pronto:** cópia nova do projeto de exemplo a cada clique (o exemplo nunca é editado no lugar). Só aparece
+- **Ver um exemplo:** cópia nova do projeto de exemplo a cada clique (o exemplo nunca é editado no lugar). Só aparece
   quando a instalação traz o exemplo (`exemplos/<pasta>`, com o nome em `src/nucleo/exemplo.ts`).
 - Na primeira vez, a faixa "Antes de começar" mostra o estado do Claude, a pasta dos projetos, o perfil da máquina e
   avisa se falta o Git.
@@ -74,8 +74,8 @@ hora. **Exportar** (Ctrl+Shift+E) abre o diálogo de exportação do documento d
 documento, na seleção e no tempo em que a pessoa parou.
 
 **Kit de marca:** cores, fontes, logo e assinatura de cada escritório ficam em `%USERPROFILE%\Estudio\marcas\<id>\`
-(`marca.json`, `logo.*`, `fontes/*.ttf|otf|woff|woff2`; a pasta troca no painel). Na primeira abertura nascem `bkm`
-(provisório, para trocar) e `neutro`; kits que já estão na pasta ficam como estão. O kit entra em "Mais opções →
+(`marca.json`, `logo.*`, `fontes/*.ttf|otf|woff|woff2`; a pasta troca no painel). Na primeira abertura nasce o `neutro`
+(o único kit de fábrica; destaque branco, marcado pelo peso); kits que já estão na pasta ficam como estão. O kit entra em "Mais opções →
 Marca" ao criar o projeto e em menu → **Marca…** no editor: aplicar ao documento ativo (o `tema` do vídeo; fundo, fonte
 e cor dos textos na imagem), criar, duplicar, editar, importar logo e **fontes próprias** (arquivo), e escolher a fonte
 do vídeo. O logo vai para `midia/` e as fontes para `fontes/` do projeto; a prévia e a exportação carregam as fontes
@@ -194,7 +194,7 @@ renderiza um vídeo de cenas de teste em 9:16, 4:5 e 16:9 fora do Electron, em `
   ouvida, e o IPC da limpeza, do medidor, da transcrição e da marca d'água nunca rodou no Electron.
 - **Pesquisa de qualidade** (`tasks/estudio-qualidade-2026-11-07`): defeitos conferidos no código e a barra do que falta.
 - **Onda B** (briefing): importar mídia e painel Mídia, o carrossel narrado como
-  modelo do tipo cenas, um projeto de exemplo neutro para o "Ver um pronto", o Claude que planeja (perguntas e Plano do vídeo
+  modelo do tipo cenas, um projeto de exemplo neutro para o "Ver um exemplo", o Claude que planeja (perguntas e Plano do vídeo
   antes de montar), chip de formato no monitor, primeiros passos e "Salvar como modelo".
 - **Memória (app empacotado, 05/11/2026):** 307 MB parado no vídeo; 547 MB com as quatro áreas e o 3D. A tela inicial
   agora abre sem o editor (falta medir a linha "Início parado").
@@ -212,7 +212,7 @@ src/nucleo        documentos, patch, diário, comentários, formatos, vídeo de 
 src/composicoes   composições Remotion (VideoCenas, CarrosselTema) e o registro
 src/renderer      interface: tela inicial, casca, estado, módulos (video, imagem, tres, efeitos), painéis
 mcp/nucleo.ts     o mesmo MCP por stdio, para usar o projeto fora do app
-exemplos/        projeto de exemplo do "Ver um pronto" (opcional; src/nucleo/exemplo.ts)
+exemplos/        projeto de exemplo do "Ver um exemplo" (opcional; src/nucleo/exemplo.ts)
 testes/fixtures  projeto, roteiro e narração sintéticos dos testes
 scripts/previa-web a interface no navegador com a ponte simulada
 docs/             arquitetura, tela e desempenho

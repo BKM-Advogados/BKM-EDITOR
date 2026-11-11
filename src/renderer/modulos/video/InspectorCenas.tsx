@@ -10,7 +10,7 @@ import {Clapperboard, CopyPlus, Film, FileAudio, FileJson, ImagePlus, Link, Quot
 import {ALVO_LU_MAX, ALVO_LU_MIN, ALVO_LUFS_MAX, ALVO_LUFS_MIN, ALVO_LUFS_PADRAO, DUCKING_PADRAO, PAPEIS, PICO_DBTP_MAX, PICO_DBTP_MIN, PICO_DBTP_PADRAO, type AudioP,
   type ClipeAudio, type ClipeAudioP, type CurvaFade, type FaixaAudio, type FaixaAudioP, type IntensidadeLimpeza, type PapelFaixa} from '../../../nucleo/audio';
 import {INTENSIDADE_PADRAO, INTENSIDADES} from '../../../nucleo/limpeza-voz';
-import {TIPOS_BLOCO_CENAS, type BlocoCenas, type CenaCenas, type DocCenas, type PropsCenas} from '../../../nucleo/cenas';
+import {TEMA_NEUTRO, TIPOS_BLOCO_CENAS, type BlocoCenas, type CenaCenas, type DocCenas, type PropsCenas} from '../../../nucleo/cenas';
 import {FORMATOS_VIDEO, formatoDoVideo, rotuloFormato} from '../../../nucleo/formatos';
 import {avisar, mensagemDe, trocar, useLoja, valorEm, verFato} from '../../estado/loja';
 import {CriarEmMusica, MusicaDoClipe} from '../musica/NoVideo'; // frente Música
@@ -87,7 +87,7 @@ const ResumoVideo: React.FC<{documento: string; doc: DocCenas; titulo: string; d
         <Secao titulo="Cores" chave="cenas:cores">
           <CampoCor rotulo="Fundo" valor={tema.fundo ?? '#111418'} aoMudar={(v) => void trocar(documento, '/tema/fundo', v, 'cor de fundo')} />
           <CampoCor rotulo="Texto" valor={tema.texto ?? '#F2F2F2'} aoMudar={(v) => void trocar(documento, '/tema/texto', v, 'cor do texto')} />
-          <CampoCor rotulo="Destaque" valor={tema.destaque ?? '#70B8FF'} aoMudar={(v) => void trocar(documento, '/tema/destaque', v, 'cor de destaque')} />
+          <CampoCor rotulo="Destaque" valor={tema.destaque ?? TEMA_NEUTRO.destaque} aoMudar={(v) => void trocar(documento, '/tema/destaque', v, 'cor de destaque')} />
           <CampoCor rotulo="Texto suave" valor={tema.suave ?? '#A3ABB5'} aoMudar={(v) => void trocar(documento, '/tema/suave', v, 'cor do texto suave')} />
         </Secao>
         {nClipes > 0 && <SecaoLoudness documento={documento} doc={doc} />}

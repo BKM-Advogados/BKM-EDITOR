@@ -51,7 +51,7 @@ export class PastaMarcas {
     return path.join(this.pasta, id);
   }
 
-  /** Os kits de fábrica que faltarem (bkm e neutro). Kit que já está na pasta, de fábrica ou não, fica como está. */
+  /** Os kits de fábrica que faltarem (hoje só o neutro). Kit que já está na pasta, de fábrica ou não, fica como está. */
   garantir() {
     for (const m of MARCAS_INICIAIS) {
       if (existsSync(path.join(this.pastaDe(m.id), ARQUIVO_MARCA))) continue;

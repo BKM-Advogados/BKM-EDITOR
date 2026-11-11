@@ -86,7 +86,7 @@ export type PropsAnimacao = {
   base_midia?: string;
 };
 
-export const TEMA_ANIMACAO_NEUTRO: TemaAnimacao = {fundo: '#111418', texto: '#F2F2F2', destaque: '#70B8FF', suave: '#A3ABB5', fonte: 'Inter'};
+export const TEMA_ANIMACAO_NEUTRO: TemaAnimacao = {fundo: '#111418', texto: '#F2F2F2', destaque: '#FFFFFF', suave: '#A3ABB5', fonte: 'Inter'}; // o mesmo destaque sem cor do TEMA_NEUTRO
 
 // ---------- cores ----------
 export const ehCorReferencia = (cor: string) => /^@[a-z_]+$/i.test(cor);

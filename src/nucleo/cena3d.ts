@@ -159,7 +159,7 @@ export const novoDoc3d = (): DocCena3D => ({
   ],
   objetos: [
     {id: 'chao', nome: 'Chão', tipo: 'plano', posicao: [0, 0, 0], rotacao: [-90, 0, 0], escala: [8, 8, 1], cor: '#2a2f36'},
-    {id: 'caixa', nome: 'Caixa', tipo: 'caixa', posicao: [0, 0.75, 0], rotacao: [0, 25, 0], escala: [1.5, 1.5, 1.5], cor: '#70B8FF', gira: [0, 20, 0]},
+    {id: 'caixa', nome: 'Caixa', tipo: 'caixa', posicao: [0, 0.75, 0], rotacao: [0, 25, 0], escala: [1.5, 1.5, 1.5], cor: '#B4B4B4', gira: [0, 20, 0]},
   ],
 });
 

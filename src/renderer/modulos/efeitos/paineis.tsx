@@ -6,7 +6,7 @@ import {ArrowDown, ArrowUp, Blend, Copy, GripVertical, Plus, Trash2, TriangleAle
 import type {PaineisDoModulo} from '../../casca/contrato';
 import {aplicar, documentosDe, loja, selecionar, trocar, useLoja} from '../../estado/loja';
 import {SemDocumento} from '../../componentes/SemDocumento';
-import {definicao, EFEITOS, lerEfeitos, novoEfeito, type Efeito, type EfeitoLido} from '../../../nucleo/efeitos';
+import {definicao, EFEITOS, lerEfeitos, novoEfeito, TOM_PADRAO, type Efeito, type EfeitoLido} from '../../../nucleo/efeitos';
 import {comLimiteDeErro} from '../../componentes/LimiteDeErro';
 import {CabecalhoInspector, CampoCor, CampoDeslizante, CampoLeitura, Secao} from '../../componentes/Campos';
 import {MonitorVideo} from '../video/MonitorVideo';
@@ -38,7 +38,7 @@ const testeDoId = (i: number, l: EfeitoLido): OperacaoPatch[] => {
 
 const PRESETS: {nome: string; efeitos: Omit<Efeito, 'id'>[]}[] = [
   {nome: 'Cinema', efeitos: [{tipo: 'contraste', valor: 1.15}, {tipo: 'saturacao', valor: 0.9}, {tipo: 'vinheta', valor: 0.45}, {tipo: 'granulado', valor: 0.15}]},
-  {nome: 'Quente', efeitos: [{tipo: 'tom', valor: 0.2, cor: '#C88155'}, {tipo: 'brilho', valor: 1.05}]},
+  {nome: 'Quente', efeitos: [{tipo: 'tom', valor: 0.2, cor: TOM_PADRAO}, {tipo: 'brilho', valor: 1.05}]},
   {nome: 'Preto e branco', efeitos: [{tipo: 'saturacao', valor: 0}, {tipo: 'contraste', valor: 1.2}]},
 ];
 
@@ -169,7 +169,7 @@ const Pilha: React.FC = () => {
                         )}
                         <CampoDeslizante rotulo="Valor" valor={e.valor} min={d.min} max={d.max} passo={d.passo} unidade={d.unidade} padrao={d.padrao} aoVer={(v) => previa(i, v)} aoFimSemMudar={() => loja.definir({previaEfeitos: undefined})}
                           aoMudar={(v) => void trocar(alvo, `/efeitos/${i}/valor`, v, `${d.nome}: ${v}`).then(() => loja.definir({previaEfeitos: undefined}))} />
-                        {e.tipo === 'tom' && <CampoCor rotulo="Cor" valor={e.cor ?? '#C88155'} padrao="#C88155" aoMudar={(c) => void trocar(alvo, `/efeitos/${i}/cor`, c, `cor do ${e.id}`)} />}
+                        {e.tipo === 'tom' && <CampoCor rotulo="Cor" valor={e.cor ?? TOM_PADRAO} padrao={TOM_PADRAO} aoMudar={(c) => void trocar(alvo, `/efeitos/${i}/cor`, c, `cor do ${e.id}`)} />}
                       </div>
                     )}
                   </li>

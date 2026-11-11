@@ -271,7 +271,7 @@ export const Inicio: React.FC = () => {
               </ul>
               <div className="fp-botoes">
                 <button className="bt principal" onClick={async () => setPrefs(await window.estudio.gravarPreferencias({boas_vindas_vista: true}))}>Pronto</button>
-                {temExemplo && <button className="bt fantasma" onClick={() => void verExemplo()}><BookOpen size={14} />Ver um pronto</button>}
+                {temExemplo && <button className="bt fantasma" onClick={() => void verExemplo()}><BookOpen size={14} />Ver um exemplo</button>}
               </div>
             </section>
           )}
@@ -385,7 +385,7 @@ export const Inicio: React.FC = () => {
               <div className="sr-titulo">Nenhum projeto ainda</div>
               <div className="sr-texto">{temExemplo ? 'Escolha um formato e um modelo ao lado, ou veja um projeto pronto para entender como o Estúdio funciona.'
                 : 'Escolha um formato e um modelo ao lado.'}</div>
-              {temExemplo && <button className="bt" onClick={() => void verExemplo()}><BookOpen size={14} />Ver um pronto</button>}
+              {temExemplo && <button className="bt" onClick={() => void verExemplo()}><BookOpen size={14} />Ver um exemplo</button>}
             </section>
           ) : (
             <>
@@ -402,7 +402,7 @@ export const Inicio: React.FC = () => {
           )}
           <div className="inicio-acoes">
             <button className="bt fantasma" onClick={() => void abrirPasta()}><FolderOpen size={14} />Abrir pasta…<kbd>Ctrl+O</kbd></button>
-            {temExemplo && <button className="bt fantasma" onClick={() => void verExemplo()}><BookOpen size={14} />Ver um pronto</button>}
+            {temExemplo && <button className="bt fantasma" onClick={() => void verExemplo()}><BookOpen size={14} />Ver um exemplo</button>}
           </div>
         </div>
       </main>
