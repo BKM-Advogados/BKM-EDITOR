@@ -18,6 +18,7 @@ import {musica, selecionarMusica, transicaoAberta, useMusica} from './estado';
 import {arranjar, campo, campoEmObjeto, campoFaixa, dividirNaCabeca, encaixar, exportarMusica, gerar, importarMidiDe, licencaDoSom, novaBateria, novoAudio, novoSintetizador,
   pontosDeAutomacao, presetFaixa, progressao, sidechainDaFaixa} from './acoes';
 import {useDocMusica} from './Monitor';
+import {SeletorDocumento} from '../../componentes/SeletorDocumento';
 
 const InspectorClipe: React.FC<{doc: DocMusica; id: string}> = ({doc, id}) => {
   const m = useMemo(() => resolverMusica(doc).musica, [doc]);
@@ -394,9 +395,12 @@ export const InspectorMusica: React.FC = () => {
 export const ListaMusica: React.FC = () => {
   const {doc} = useDocMusica();
   const s = useMusica((e) => e.selecao);
-  if (!doc) return <div className="vazio">sem música aberta</div>;
+  // com mais de uma música no projeto, o seletor do topo troca a aberta (sem ele, a segunda escondia a primeira)
+  const seletor = <SeletorDocumento modulo="musica" aoTrocar={() => selecionarMusica(null)} />;
+  if (!doc) return <div className="lista-musica">{seletor}<div className="vazio">sem música aberta</div></div>;
   return (
     <div className="lista-musica">
+      {seletor}
       <div className="itens">
         <div className={`item${!s ? ' sel' : ''}`} onClick={() => selecionarMusica(null)}><Music size={14} /><span className="nome">Música inteira</span></div>
         {doc.canais.map((c) => (

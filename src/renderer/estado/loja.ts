@@ -305,18 +305,37 @@ export const alternarNaSelecao = (documento: string, caminho: string) => {
   selecionarVarias(documento, atuais.includes(caminho) ? atuais.filter((c) => c !== caminho) : [...atuais, caminho]);
 };
 
-/** Seleção pedida pela IA (ferramenta selecionar_camadas grava .estudio/selecao.json): a área e o documento vêm para a
- *  frente, com a página da primeira camada num carrossel. */
-const aplicarSelecaoPedida = async () => {
-  const p = await window.estudio.lerJson('.estudio/selecao.json').catch(() => null) as {documento?: string; caminhos?: string[]} | null;
-  const entrada = p?.documento ? entradaDe(p.documento) : undefined;
-  if (!p || !entrada || !Array.isArray(p.caminhos)) return;
+/** Seleção pedida pela IA (ferramentas selecionar_camadas e mostrar_documento gravam .estudio/selecao.json): a área e o
+ *  documento vêm para a frente, com a página da primeira camada num carrossel e, se vier, a agulha no tempo pedido.
+ *  Documento que a tela ainda não conhece (criar_documento grava o estudio.json e o selecao.json quase juntos, e este
+ *  pode chegar antes): relê a lista de documentos antes de aplicar, em vez de descartar o pedido em silêncio. */
+export const aplicarSelecaoPedida = async () => {
+  const p = await window.estudio.lerJson('.estudio/selecao.json').catch(() => null) as
+    {documento?: string; caminhos?: string[]; tempo_ms?: number; autor?: string} | null;
+  if (!p?.documento) return;
+  let entrada = entradaDe(p.documento);
+  if (!entrada && estado.info) {
+    const info = await window.estudio.projetoAtual().catch(() => null);
+    if (info && info.raiz === estado.info?.raiz) {
+      await abrirProjeto(info);
+      entrada = entradaDe(p.documento);
+    }
+  }
+  if (!entrada) return;
+  const caminhos = Array.isArray(p.caminhos) ? p.caminhos.filter((c): c is string => typeof c === 'string') : [];
   const doc = estado.docs[entrada.id]?.doc as DocImagem | undefined;
-  const m = /^\/paginas\/(\d+)\//.exec(p.caminhos[0] ?? '');
+  const m = /^\/paginas\/(\d+)\//.exec(caminhos[0] ?? '');
   const pagina = doc && m ? paginasDe(doc)[Number(m[1])]?.id : undefined;
-  loja.definir((e) => ({area: entrada.modulo, ativo: {...e.ativo, [entrada.modulo]: entrada.id},
-    ...(pagina ? {paginaAtiva: {...e.paginaAtiva, [entrada.id]: pagina}} : {})}));
-  selecionarVarias(entrada.id, p.caminhos);
+  const modulo = entrada.modulo;
+  const trocou = estado.area !== modulo || estado.ativo[modulo] !== entrada.id;
+  const tempo = typeof p.tempo_ms === 'number' && Number.isFinite(p.tempo_ms) && p.tempo_ms >= 0 ? Math.round(p.tempo_ms) : undefined;
+  loja.definir((e) => ({area: modulo, ativo: {...e.ativo, [modulo]: entrada!.id},
+    ...(modulo === 'video' || modulo === 'imagem' ? {alvoEfeitos: e.area === 'efeitos' ? e.alvoEfeitos : entrada!.id} : {}),
+    ...(pagina ? {paginaAtiva: {...e.paginaAtiva, [entrada!.id]: pagina}} : {}),
+    // a agulha: o tempo pedido; sem ele, a animação e a música trocadas voltam ao começo
+    ...(tempo !== undefined ? {tempo_ms: tempo} : trocou && (modulo === 'animacao' || modulo === 'musica') ? {tempo_ms: 0} : {})}));
+  selecionarVarias(entrada.id, caminhos);
+  if (trocou && p.autor === 'agente') avisar(`Claude abriu ${entrada.titulo}`, 'agente');
 };
 
 export const comentar = async (documento: string, texto: string, alvo: Comentario['alvo']) => {
