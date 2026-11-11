@@ -40,6 +40,8 @@ describe('padrões de conteúdo neutros', () => {
   });
 
   it('a interface não cita marca de cliente nem usa o cobre como padrão', () => {
+    // o nome do escritório vai montado, para não ficar escrito no repositório
+    const citaMarca = new RegExp(`\\bKS\\b|\\b${['B', 'K', 'M'].join('')}\\b|Ver um pronto`);
     const raiz = path.join(__dirname, '..', 'src', 'renderer');
     const achados: string[] = [];
     const ver = (dir: string) => {
@@ -48,7 +50,7 @@ describe('padrões de conteúdo neutros', () => {
         if (e.isDirectory()) ver(p);
         else if (/\.(tsx?|css)$/.test(e.name)) {
           const t = fs.readFileSync(p, 'utf8');
-          if (/\bKS\b|\bBKM\b|Ver um pronto/.test(t) || /c88155/i.test(t)) achados.push(path.relative(raiz, p));
+          if (citaMarca.test(t) || /c88155/i.test(t)) achados.push(path.relative(raiz, p));
         }
       }
     };

@@ -18,7 +18,7 @@ Estúdio desktop (Electron + React + TypeScript + Remotion), 05/11/2026. O alvo 
 
 ## 1. Máquina-alvo e perfis
 
-**Notebook de referência [inferência]:** Windows 11, 8 GB, Intel Core i5 de 11ª a 13ª geração com Iris Xe ou UHD, SSD, tela 1920×1080 em 125%. Na prática, vale o notebook mais fraco da BKM. Nessa máquina, o Windows e os apps de sempre (Teams, Outlook, navegador) já ocupam boa parte da RAM, e a GPU tira a sua parte da mesma memória [35].
+**Notebook de referência [inferência]:** Windows 11, 8 GB, Intel Core i5 de 11ª a 13ª geração com Iris Xe ou UHD, SSD, tela 1920×1080 em 125%. Na prática, vale o notebook mais fraco do escritório. Nessa máquina, o Windows e os apps de sempre (Teams, Outlook, navegador) já ocupam boa parte da RAM, e a GPU tira a sua parte da mesma memória [35].
 
 O perfil é detectado na inicialização com `os.totalmem()`, `app.getGPUFeatureStatus()` e `app.getGPUInfo('basic')`, e pode ser trocado à mão:
 

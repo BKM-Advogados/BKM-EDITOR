@@ -58,7 +58,7 @@ const NAO_E_NOME = new Set(norm(
   + 'consolidacao ministerio publico fundo garantia tempo servico previdencia social carteira seguro desemprego '
   + 'brasil minas gerais espirito santo vara turma secao orientacao jurisprudencial plano demissao '
   + 'voluntaria caixa economica receita instituto nacional republica estado governo presidencia camara senado '
-  + 'deputados art artigo inciso paragrafo clt fgts inss tst stf stj trt cnj mte bkm usina').split(' '));
+  + 'deputados art artigo inciso paragrafo clt fgts inss tst stf stj trt cnj mte usina').split(' '));
 
 // Duas ou mais palavras seguidas com maiúscula ("João da Silva"), tirando as da lista acima.
 const suspeitasDeNome = (texto: string): string[] => {

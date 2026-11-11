@@ -1,6 +1,6 @@
 # IA de todos os provedores
 
-Frente IA da rodada 3 (branch `ti-bkm/ia-provedores`). Plano completo e pesquisa em
+Frente IA da rodada 3. Plano completo e pesquisa em
 `tasks/estudio-ia-provedores-2026-11-07/` (fora do repositório). Princípios em `tasks/estudio-acompanhamento/principios.md`.
 
 ## O objetivo
