@@ -118,7 +118,7 @@ const fontesDeExemplo: Fonte[] = [
   {id: 'f1', url: 'https://www.planalto.gov.br/ccivil_03/decreto-lei/del5452compilado.htm', titulo: 'Del5452compilado', orgao: 'Presidência da República — Casa Civil, Subchefia para Assuntos Jurídicos',
     nivel: 1, catalogo: 'planalto', acessado_em: new Date(Date.now() - 50 * 60e3).toISOString(), http: 200, bytes: 1512334, sha256: '0'.repeat(64),
     arquivo: 'pesquisa/fontes/f1.txt', sinais_vigencia: ['(Revogad', 'Redação dada pela', '(Incluído'],
-    observacao: '06/11/2026 10:12 · Claude 1: texto compilado da CLT, baixado pelo servidor do escritório (o Planalto recusa o IP do escritório).', autor: 'Claude 1'},
+    observacao: '06/11/2026 10:12 · Claude 1: texto compilado da CLT, baixado por outro servidor (o Planalto recusa o IP do escritório).', autor: 'Claude 1'},
   {id: 'f2', url: 'https://www2.camara.leg.br/legin/fed/declei/1940-1949/decreto-lei-5452-1-maio-1943-415500-publicacaooriginal-1-pe.html',
     titulo: 'Decreto-Lei nº 5.452, de 1º de maio de 1943', orgao: 'Câmara dos Deputados', nivel: 1, catalogo: 'camara-legin',
     acessado_em: new Date(Date.now() - 45 * 60e3).toISOString(), http: 200, bytes: 48211, sha256: '1'.repeat(64), arquivo: 'pesquisa/fontes/f2.txt',

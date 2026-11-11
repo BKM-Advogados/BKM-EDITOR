@@ -1,12 +1,13 @@
-// Ponta a ponta na janela do Estúdio em desenvolvimento (ESTUDIO_DEPURAR_PORTA): seleciona o bloco do 25%, edita no
+// Ponta a ponta na janela do Estúdio em desenvolvimento (ESTUDIO_DEPURAR_PORTA): seleciona o bloco do número, edita no
 // inspector, comenta na tela e confere que tudo virou arquivo e diário; depois muda o roteiro "por fora" (como o agente
-// faz) e confere que a tela acompanha. Fotos em testes/saida/e2e-*.png.
+// faz) e confere que a tela acompanha. Fotos em testes/saida/e2e-*.png. O projeto padrão é uma cópia de
+// testes/fixtures/projeto em testes/saida/projeto (ou o de ESTUDIO_PROJETO).
 import {readFileSync} from 'node:fs';
 import path from 'node:path';
 import {chromium} from 'playwright';
 
 const porta = process.env.ESTUDIO_DEPURAR_PORTA ?? '9471';
-const projeto = process.env.ESTUDIO_PROJETO ?? path.resolve('testes/saida/exemplo');
+const projeto = process.env.ESTUDIO_PROJETO ?? path.resolve('testes/saida/projeto');
 const ler = (rel) => JSON.parse(readFileSync(path.join(projeto, rel), 'utf-8'));
 const navegador = await chromium.connectOverCDP(`http://127.0.0.1:${porta}`);
 const p = navegador.contexts().flatMap((c) => c.pages()).find((x) => /^(http:\/\/localhost:\d+|file:)/.test(x.url()));
@@ -25,15 +26,15 @@ await p.reload();
 await p.waitForSelector('.dockview-theme-estudio', {timeout: 20000});
 await p.waitForTimeout(2500);
 
-// 1. lista → bloco numero (25%) selecionado e a prévia vai ao tempo dele
+// 1. lista → bloco numero (5 anos) selecionado e a prévia vai ao tempo dele
 await p.locator('.dv-tab', {hasText: 'Cenas e blocos'}).first().click();
 await p.locator('.lista li.sub', {hasText: 'numero'}).first().click();
 await p.waitForTimeout(1500);
 const sel = await p.locator('.caixa-sel').count();
-sel ? passo('bloco do 25% selecionado na prévia') : falha('sem caixa de seleção na prévia');
+sel ? passo('bloco do número selecionado na prévia') : falha('sem caixa de seleção na prévia');
 await foto('1-selecao');
 
-// 2. propriedades: y 860 → 900 grava no roteiro e no diário
+// 2. propriedades: y 720 → 900 grava no roteiro e no diário
 await p.locator('.dv-tab', {hasText: 'Propriedades'}).first().click();
 const campoY = p.locator('label.linha-campo', {hasText: /^y$/}).locator('input');
 await campoY.fill('900');
@@ -50,7 +51,7 @@ await p.locator('.palco').click({position: {x: 5, y: 5}});
 await p.keyboard.press('m');
 const palco = await p.locator('.palco').boundingBox();
 await p.mouse.click(palco.x + palco.width * 0.5, palco.y + palco.height * 0.5);
-await p.locator('.balao textarea').fill('o 25% entra cedo demais');
+await p.locator('.balao textarea').fill('o 5 entra cedo demais');
 await p.keyboard.press('Control+Enter');
 await p.waitForTimeout(800);
 const cmts = ler('comentarios.json').comentarios;
@@ -62,11 +63,11 @@ const {Projeto} = await import('../src/nucleo/projeto.ts');
 if (Projeto) {
   const pr = new Projeto(projeto);
   const {versao} = pr.lerJson('video/roteiro.json');
-  pr.aplicarPatch({documento: 'carrossel', versao_base: versao, autor: 'agente', origem: 'e2e', rotulo: 'rótulo do 25% pelo agente',
-    patch: [{op: 'replace', path: '/cenas/2/blocos/1/rotulo', value: 'DE ADICIONAL (AGENTE)'}]});
+  pr.aplicarPatch({documento: 'carrossel', versao_base: versao, autor: 'agente', origem: 'e2e', rotulo: 'rótulo do número pelo agente',
+    patch: [{op: 'replace', path: '/cenas/2/blocos/1/rotulo', value: 'ANOS, PELO MENOS (AGENTE)'}]});
   await p.waitForTimeout(1500);
   const visto = await p.locator('.palco').innerText();
-  visto.includes('DE ADICIONAL (AGENTE)') ? passo('mudança feita por fora apareceu na prévia') : falha('a prévia não acompanhou a mudança de fora');
+  visto.includes('ANOS, PELO MENOS (AGENTE)') ? passo('mudança feita por fora apareceu na prévia') : falha('a prévia não acompanhou a mudança de fora');
   await foto('3-agente');
 }
 

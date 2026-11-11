@@ -1,7 +1,7 @@
 // Teste da transcrição local, fora do Electron: usa o mesmo Transcritor do app (src/main/transcricao.ts) para baixar o
-// whisper.cpp e o modelo (se faltarem) em %USERPROFILE%\Estudio\modelos\whisper\, transcreve a narração do exemplo Cliente C2
-// (72 s, pt-BR) e compara com o palavras.json de referência do exemplo: palavras certas (WER), erro do começo de cada
-// palavra, tempo e pico de memória do whisper-cli.
+// whisper.cpp e o modelo (se faltarem) em %USERPROFILE%\Estudio\modelos\whisper\, transcreve uma narração de verdade
+// (scripts/voz-de-teste.mjs: ESTUDIO_VOZ_TESTE e ESTUDIO_PALAVRAS_TESTE) e compara com o palavras.json de referência dela:
+// palavras certas (WER), erro do começo de cada palavra, tempo e pico de memória do whisper-cli.
 // Uso: npx tsx scripts/transcrever-teste.mjs [base|small|turbo ...]   (padrão: small)
 // Saída em testes/saida/transcrever/ (ignorada pelo git).
 import {execFileSync} from 'node:child_process';
@@ -11,6 +11,7 @@ import {fileURLToPath} from 'node:url';
 import {Projeto} from '../src/nucleo/projeto.ts';
 import {norm} from '../src/nucleo/roteiro/resolver.ts';
 import {MODELOS_WHISPER, Transcritor, extrairAudio, rodarWhisper} from '../src/main/transcricao.ts';
+import {vozDeTeste} from './voz-de-teste.mjs';
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const saida = path.join(raiz, 'testes', 'saida', 'transcrever');
@@ -20,8 +21,9 @@ const modelos = process.argv.slice(2).length ? process.argv.slice(2) : ['small']
 
 rmSync(saida, {recursive: true, force: true});
 mkdirSync(path.join(saida, 'projeto', 'midia'), {recursive: true});
-cpSync(path.join(raiz, 'exemplos', 'exemplo', 'midia', 'video-exemplo.mp4'), path.join(saida, 'projeto', 'midia', 'video-exemplo.mp4'));
-const referencia = JSON.parse(readFileSync(path.join(raiz, 'exemplos', 'exemplo', 'video', 'palavras.json'), 'utf-8'));
+const {voz, palavras: referencia} = vozDeTeste(raiz, {exigirPalavras: true});
+const FONTE = `midia/narracao${path.extname(voz)}`;
+cpSync(voz, path.join(saida, 'projeto', FONTE));
 
 /** Distância de edição por palavra (sem acento, caixa e pontuação) e o alinhamento, para comparar os tempos. */
 const comparar = (ref, hip) => {
@@ -73,7 +75,7 @@ for (const id of modelos) {
   log(`peças prontas: ${pecas.cli}`);
   const wav = path.join(saida, `fala-${id}.wav`);
   const ta = Date.now();
-  await extrairAudio({ffmpeg: pecas.ffmpeg, entrada: projeto.caminho('midia/video-exemplo.mp4'), saida: wav});
+  await extrairAudio({ffmpeg: pecas.ffmpeg, entrada: projeto.caminho(FONTE), saida: wav});
   log(`áudio em WAV 16 kHz mono: ${((Date.now() - ta) / 1000).toFixed(1)} s`);
   const tw = Date.now();
   let vigia;
@@ -88,8 +90,8 @@ for (const id of modelos) {
   log(`${id}: ${JSON.stringify(resultados[id])}`);
   log(`texto: ${palavras.map((p) => p.w).join(' ')}`);
 }
-// o caminho do app inteiro: transcrever() grava midia/video-exemplo.mp4.palavras.json no projeto
-const r = await transcritor.transcrever(projeto, {arquivo: 'midia/video-exemplo.mp4', modelo: modelos[0]}, (p) => p.etapa !== 'transcrevendo' && log(`${p.etapa}: ${p.mensagem}`));
+// o caminho do app inteiro: transcrever() grava midia/narracao.<ext>.palavras.json no projeto
+const r = await transcritor.transcrever(projeto, {arquivo: FONTE, modelo: modelos[0]}, (p) => p.etapa !== 'transcrevendo' && log(`${p.etapa}: ${p.mensagem}`));
 log(`transcrever(): ${JSON.stringify({...r, texto: `${r.texto?.slice(0, 60)}…`})}`);
 writeFileSync(path.join(saida, 'resultados.json'), JSON.stringify(resultados, null, 2));
 console.table(resultados);

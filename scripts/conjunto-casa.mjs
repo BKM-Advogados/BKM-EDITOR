@@ -55,7 +55,7 @@ const transcrever = async (item) => {
 
 const AVISO_TEXTO = [
   '# Corrija o texto abaixo para o que foi dito, palavra por palavra: siglas em caixa alta (FGTS, CLT), números como a',
-  '# legenda escreveria (13º, 40%), nomes como se escrevem (Empresa, Escritório Exemplo). A pontuação e as quebras de linha',
+  '# legenda escreveria (13º, 40%), nomes como se escrevem (empresas, pessoas, cidades). A pontuação e as quebras de linha',
   '# não contam. Palavra que não dá para entender: escreva [?]. Quando terminar, troque "não" por "sim" na linha abaixo.',
   '# conferido: não',
 ];

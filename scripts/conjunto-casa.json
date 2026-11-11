@@ -1,27 +1,19 @@
 {
   "formato": 1,
-  "nota": "Conjunto da casa para medir a transcrição local (régua da Fala: WER < 10%, glossário certo em 95% das ocorrências, começo da palavra a até 100 ms em 90% das palavras). Cerca de 10 min: a voz humana que a casa tem gravada (o Reel do Igor e o vídeo do WhatsApp, com música e celular) e as narrações dos Curtas da Cliente. O C2 fica de fora: o vocabulário do whisper foi afinado nele (docs/legendas.md). A conferência à mão é do responsável (docs/legendas.md, 'Conjunto da casa').",
-  "base": "~/OneDrive - Empresa/Área de Trabalho/projs/tasks/shorts-2026-11-04",
-  "conferencia": "~/OneDrive - Empresa/Área de Trabalho/projs/tasks/estudio-acompanhamento/rodada-3/conjunto-casa",
+  "nota": "Conjunto da casa para medir a transcrição local (régua da Fala: WER < 10%, glossário certo em 95% das ocorrências, começo da palavra a até 100 ms em 90% das palavras). Cerca de 10 min de fala gravada pela casa: vozes humanas (celular, com música) e narrações sintéticas. Ponha aqui as gravações de vocês (base) e a pasta da conferência feita à mão (docs/legendas.md, 'Conjunto da casa'). Fala usada para afinar o vocabulário do whisper não entra.",
+  "base": "~/Estudio/conjunto-casa/midias",
+  "conferencia": "~/Estudio/conjunto-casa/conferencia",
   "amostra_inicios": 12,
   "glossario": [
-    {"termo": "CLT", "caixa": true}, {"termo": "FGTS", "caixa": true}, {"termo": "INSS", "caixa": true}, {"termo": "TST", "caixa": true},
-    {"termo": "TRT", "caixa": true}, {"termo": "STF", "caixa": true}, {"termo": "CTPS", "caixa": true}, {"termo": "PPP", "caixa": true},
-    {"termo": "PDV", "caixa": true}, {"termo": "NR", "caixa": true}, {"termo": "OAB", "caixa": true}, {"termo": "PLR", "caixa": true},
-    {"termo": "Cliente", "caixa": true}, {"termo": "Empresa", "caixa": true}, {"termo": "Escritório Exemplo", "caixa": true}, {"termo": "Fotógrafo", "caixa": true},
+    {"termo": "CLT", "caixa": true}, {"termo": "FGTS", "caixa": true}, {"termo": "INSS", "caixa": true}, {"termo": "TST", "caixa": true}, {"termo": "TRT", "caixa": true}, {"termo": "STF", "caixa": true},
+    {"termo": "CTPS", "caixa": true}, {"termo": "PPP", "caixa": true}, {"termo": "PDV", "caixa": true}, {"termo": "NR", "caixa": true}, {"termo": "OAB", "caixa": true}, {"termo": "PLR", "caixa": true},
     {"termo": "rescisão"}, {"termo": "aviso prévio"}, {"termo": "férias"}, {"termo": "13º"}, {"termo": "horas extras"}, {"termo": "justa causa"},
-    {"termo": "transferência"}, {"termo": "insalubridade"}, {"termo": "periculosidade"}, {"termo": "adicional noturno"}, {"termo": "banco de horas"},
-    {"termo": "seguro-desemprego"}, {"termo": "mineração"}, {"termo": "feriado"}, {"termo": "intervalo"},
-    {"termo": "Cidade Exemplo", "caixa": true}, {"termo": "verbas rescisórias"}, {"termo": "siderurgia"}
+    {"termo": "transferência"}, {"termo": "insalubridade"}, {"termo": "periculosidade"}, {"termo": "adicional noturno"}, {"termo": "banco de horas"}, {"termo": "seguro-desemprego"},
+    {"termo": "feriado"}, {"termo": "intervalo"}, {"termo": "verbas rescisórias"}
   ],
   "itens": [
-    {"id": "igor-reel", "arquivo": "recebidos/reel-igor-rescisao.mp4", "tipo": "voz humana: Reel do Igor, celular, com música", "segundos": 76.0},
-    {"id": "whatsapp", "arquivo": "recebidos/whatsapp-2026-11-04-2005.mp4", "tipo": "voz humana: advogado, vídeo do WhatsApp (480p)", "segundos": 105.7},
-    {"id": "c3", "arquivo": "notebook/c3-curta.mp4", "tipo": "narração sintética: Curta C3 (saúde, insalubridade, PPP)", "segundos": 82.1},
-    {"id": "c4", "arquivo": "notebook/c4-curta.mp4", "tipo": "narração sintética: Curta C4 (o que a Justiça já reconheceu)", "segundos": 81.5},
-    {"id": "c5", "arquivo": "notebook/c5-curta.mp4", "tipo": "narração sintética: Curta C5 (adicional noturno)", "segundos": 76.5},
-    {"id": "c6", "arquivo": "notebook/c6-curta.mp4", "tipo": "narração sintética: Curta C6 (feriado trabalhado)", "segundos": 68.8},
-    {"id": "c7", "arquivo": "notebook/c7-curta.mp4", "tipo": "narração sintética: Curta C7 (banco de horas e intervalos)", "segundos": 66.2},
-    {"id": "c8", "arquivo": "notebook/c8-curta.mp4", "tipo": "narração sintética: Curta C8 (da portaria até o ponto)", "segundos": 79.8}
+    {"id": "voz-1", "arquivo": "vozes/voz-1.mp4", "tipo": "voz humana: celular, com música", "segundos": 0},
+    {"id": "voz-2", "arquivo": "vozes/voz-2.mp4", "tipo": "voz humana: vídeo de mensageiro (480p)", "segundos": 0},
+    {"id": "narracao-1", "arquivo": "narracoes/narracao-1.mp4", "tipo": "narração sintética", "segundos": 0}
   ]
 }

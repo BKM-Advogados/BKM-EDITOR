@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs';
 import path from 'node:path';
 import {chromium} from 'playwright';
 
-const projeto = process.env.ESTUDIO_PROJETO ?? path.resolve('testes/saida/exemplo');
+const projeto = process.env.ESTUDIO_PROJETO ?? path.resolve('testes/saida/projeto');
 const ler = (rel) => JSON.parse(readFileSync(path.join(projeto, rel), 'utf-8'));
 const navegador = await chromium.connectOverCDP(`http://127.0.0.1:${process.env.ESTUDIO_DEPURAR_PORTA ?? '9471'}`);
 const p = navegador.contexts().flatMap((c) => c.pages()).find((x) => /^(http:\/\/localhost:\d+|file:)/.test(x.url()));

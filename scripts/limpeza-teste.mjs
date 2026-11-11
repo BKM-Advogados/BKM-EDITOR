@@ -1,5 +1,5 @@
-// Teste da limpeza de voz com uma voz de verdade, fora do Electron: pega a narração do exemplo da Cliente
-// (exemplos/exemplo/midia/video-exemplo.mp4), soma ruído conhecido (zumbido de 60 Hz com harmônicos, ruído de fundo largo e
+// Teste da limpeza de voz com uma voz de verdade, fora do Electron: pega uma narração de verdade
+// (scripts/voz-de-teste.mjs, ESTUDIO_VOZ_TESTE), soma ruído conhecido (zumbido de 60 Hz com harmônicos, ruído de fundo largo e
 // chiado agudo), limpa nas três intensidades e mede: ruído nas pausas e nível da voz antes e depois (dB com ponderação K,
 // o mesmo número do LUFS) e o resto do ruído somado que sobrou. Confere também o medidor (src/nucleo/loudness.ts) contra
 // o loudnorm do ffmpeg do Remotion no mesmo arquivo. Uso: npx tsx scripts/limpeza-teste.mjs [segundos]
@@ -12,6 +12,7 @@ import {INTENSIDADES, limparVoz, medirRuido} from '../src/nucleo/limpeza-voz.ts'
 import {medirAmostras} from '../src/nucleo/loudness.ts';
 import {decodificarAudio, gravarWav} from '../src/main/ffmpeg-som.ts';
 import {medirArquivo} from '../src/main/loudness.ts';
+import {vozDeTeste} from './voz-de-teste.mjs';
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const saida = path.join(raiz, 'testes', 'saida', 'limpeza');
@@ -24,8 +25,8 @@ const rms = (x) => Math.sqrt(x.reduce((s, v) => s + v * v, 0) / x.length);
 rmSync(saida, {recursive: true, force: true});
 mkdirSync(saida, {recursive: true});
 
-// 1. a voz: narração do exemplo da Cliente, mono como veio (44,1 kHz)
-const fonte = await decodificarAudio(path.join(raiz, 'exemplos', 'exemplo', 'midia', 'video-exemplo.mp4'));
+// 1. a voz: a narração de teste, o primeiro canal como veio
+const fonte = await decodificarAudio(vozDeTeste(raiz).voz);
 const taxa = fonte.taxa;
 const n = Math.min(fonte.canais[0].length, Math.round(segundos * taxa));
 const voz = fonte.canais[0].slice(0, n);

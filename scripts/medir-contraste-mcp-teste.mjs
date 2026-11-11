@@ -14,7 +14,8 @@ import {registrarContrasteMarca} from '../src/main/contraste-marca';
 import {prepararRender} from '../src/main/exportar';
 import {novoDocCenas, resolverCenas} from '../src/nucleo/cenas';
 import {registrarFerramentas} from '../src/nucleo/ferramentas-mcp';
-import {MARCA_CLIENTE, temaDaMarca} from '../src/nucleo/marca';
+import {temaDaMarca} from '../src/nucleo/marca';
+import {KIT_TESTE} from '../testes/fixtures/kit-teste';
 import {Projeto} from '../src/nucleo/projeto';
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -22,11 +23,11 @@ const t0 = Date.now();
 const log = (m) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1).padStart(5)} s] ${m}`);
 const svg = (s) => `data:image/svg+xml;utf8,${encodeURIComponent(s)}`;
 const LOGO = svg('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="200" viewBox="0 0 600 200"><rect width="600" height="200" rx="24" fill="#EDE7DD"/>'
-  + '<text x="40" y="138" font-family="sans-serif" font-size="110" font-weight="800" fill="#F8F5EF">Cliente</text></svg>');
+  + '<text x="40" y="138" font-family="sans-serif" font-size="110" font-weight="800" fill="#F8F5EF">LOGO</text></svg>');
 
 const doc = {
   ...novoDocCenas({largura: 1080, altura: 1920, fps: 30}),
-  tema: {...temaDaMarca(MARCA_CLIENTE, {logo: LOGO, fontes_arquivos: []}), fundo: '#F4F0EA'},
+  tema: {...temaDaMarca(KIT_TESTE, {logo: LOGO, fontes_arquivos: []}), fundo: '#F4F0EA'},
   cenas: [{id: 'a', duracao_ms: 4000, fundo: '#F4F0EA', blocos: [{id: 'a-t', tipo: 'titulo', x: 0.1, y: 0.45, largura: 0.8, em: 0, texto: 'Fundo claro', cor: '#171A19'}]}],
 };
 const pasta = mkdtempSync(path.join(os.tmpdir(), 'estudio-contraste-mcp-'));

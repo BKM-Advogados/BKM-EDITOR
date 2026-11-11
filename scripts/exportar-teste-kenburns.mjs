@@ -13,7 +13,8 @@ import jsonpatch from 'fast-json-patch';
 import {patchMovimentoEmTodas} from '../src/composicoes/cenas/movimento';
 import {novoDocCenas, resolverCenas} from '../src/nucleo/cenas';
 import {argumentosDoRender, configPadraoMarca, fontesDaMarcaDagua, marcaDaguaDoDestino} from '../src/nucleo/exportacao';
-import {MARCA_CLIENTE, temaDaMarca} from '../src/nucleo/marca';
+import {temaDaMarca} from '../src/nucleo/marca';
+import {KIT_TESTE} from '../testes/fixtures/kit-teste';
 import {prepararRender, renderizarVideo} from '../src/main/exportar';
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -34,14 +35,13 @@ const foto = (ceu, sol, morro, n) => svg(`<svg xmlns="http://www.w3.org/2000/svg
   + Array.from({length: 9}, (_, k) => `<path d="M0 ${(k + 1) * 100}H1600" stroke="#fff" stroke-opacity="0.25" stroke-width="3"/>`).join('')
   + `<text x="800" y="560" text-anchor="middle" font-family="sans-serif" font-size="140" font-weight="700" fill="#fff">Foto ${n + 1}</text></svg>`);
 const LOGO = svg('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="200" viewBox="0 0 600 200"><rect width="600" height="200" rx="24" fill="#C88155"/>'
-  + '<text x="40" y="138" font-family="sans-serif" font-size="110" font-weight="800" fill="#F4F0EA">Cliente</text>'
-  + '<text x="230" y="125" font-family="sans-serif" font-size="46" font-weight="600" fill="#F4F0EA">ADVOGADOS</text></svg>');
+  + '<text x="40" y="138" font-family="sans-serif" font-size="110" font-weight="800" fill="#F4F0EA">LOGO</text></svg>');
 
-// 1. três fotos paradas de 1,5 s (a cena inteira) e o kit da Cliente com logo; depois o botão "Movimento em todas as imagens"
+// 1. três fotos paradas de 1,5 s (a cena inteira) e um kit de teste com logo; depois o botão "Movimento em todas as imagens"
 const fotos = [['#3E6FA8', '#F2C46B', '#2E5E3A'], ['#7A4E8C', '#F28C6B', '#3D3A5E'], ['#1F7A8C', '#F5E6A8', '#5E4A2E']].map(([a, b, c], i) => foto(a, b, c, i));
 const parado = {
   ...novoDocCenas({largura: 1080, altura: 1920, fps: 30}),
-  tema: temaDaMarca(MARCA_CLIENTE, {logo: LOGO, fontes_arquivos: []}),
+  tema: temaDaMarca(KIT_TESTE, {logo: LOGO, fontes_arquivos: []}),
   cenas: fotos.map((src, i) => ({id: `c${i + 1}`, duracao_ms: 1500, blocos: [
     {id: `c${i + 1}-imagem`, tipo: 'imagem', em: 0, x: 0, y: 0, largura: 1, altura: 1, ajuste: 'cobrir', src},
   ]})),

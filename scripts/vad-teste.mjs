@@ -1,16 +1,17 @@
 // Medida do detector de voz (VAD) da transcrição local, fora do Electron: o mesmo whisper-cli e o mesmo modelo do app,
 // com e sem o VAD, em quatro áudios: silêncio (ruído rosa a -60 dB), música sintética (acordes, baixo e batida; sem voz
-// cantada), os efeitos do exemplo Cliente C2 em sequência e a narração do C2 depois de 6 s de silêncio e 8 s de música. Conta
-// as palavras inventadas fora da fala e confere se os tempos da narração continuam no relógio do arquivo (erro do começo
-// das palavras contra o palavras.json do exemplo, deslocado de 14 s).
+// cantada), efeitos sonoros sintéticos em sequência e uma narração de verdade (scripts/voz-de-teste.mjs) depois de 6 s de
+// silêncio e 8 s de música. Conta as palavras inventadas fora da fala e confere se os tempos da narração continuam no
+// relógio do arquivo (erro do começo das palavras contra o palavras.json conferido dela, deslocado de 14 s).
 // Uso: npx tsx scripts/vad-teste.mjs [small|base] ['[{"nome": "x", "modo": "passada", "silencio_min_ms": 1000}]'] [--sem-base]
 // (padrão: small; sem VAD, o VAD como filtro, que é o que o app faz, e o VAD numa passada só, em dois ajustes). Saída em testes/saida/vad/ (ignorada pelo git).
 import {execFileSync} from 'node:child_process';
-import {mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
+import {mkdirSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {norm} from '../src/nucleo/roteiro/resolver.ts';
 import {MODELOS_WHISPER, PROMPT_PADRAO, Transcritor, VAD_PADRAO, extrairAudio, ouvirWav, rodarWhisper} from '../src/main/transcricao.ts';
+import {vozDeTeste} from './voz-de-teste.mjs';
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const saida = path.join(raiz, 'testes', 'saida', 'vad');
@@ -76,18 +77,25 @@ for (let i = 0, ant = 0; i < musica.length; i++) {
   musica[i] = acorde + batida + chimbal;
 }
 gravarWav(W('musica.wav'), musica);
-// os efeitos do C2 (whoosh, impacto, carimbo, papel, swell, pop), um depois do outro, com meio segundo entre eles
-const pastaSfx = path.join(raiz, 'exemplos', 'exemplo', 'midia', 'sfx');
-const efeitos = readdirSync(pastaSfx).filter((n) => n.endsWith('.wav')).sort().map((n) => {
-  ff(['-i', path.join(pastaSfx, n), '-ar', String(TAXA), '-ac', '1', '-c:a', 'pcm_s16le', W(`sfx-${n}`)]);
-  return juntar(lerWav(W(`sfx-${n}`)), new Float32Array(TAXA / 2));
-});
+// efeitos sintéticos como os do carrossel narrado (whoosh, impacto, carimbo, papel, swell, pop), um depois do outro, com
+// meio segundo entre eles
+const efeito = (seg, f) => Float32Array.from({length: Math.round(seg * TAXA)}, (_, i) => f(i / TAXA, seg));
+const ruido = () => acaso();
+const efeitos = [
+  efeito(1.2, (t, d) => ruido() * Math.sin(Math.PI * t / d) * 0.5), // whoosh: ruído que sobe e desce
+  efeito(1.5, (t) => Math.sin(2 * Math.PI * (60 - 20 * t) * t) * Math.exp(-3 * t) * 0.8), // impacto grave
+  efeito(0.5, (t) => (ruido() * 0.6 + Math.sin(2 * Math.PI * 140 * t)) * Math.exp(-18 * t) * 0.7), // carimbo
+  efeito(0.9, (t, d) => ruido() * 0.25 * Math.sin(Math.PI * t / d)), // papel deslizando
+  efeito(2.5, (t, d) => Math.sin(2 * Math.PI * 220 * t) * (t / d) * 0.4), // swell
+  efeito(0.3, (t) => Math.sin(2 * Math.PI * 900 * t) * Math.exp(-40 * t) * 0.6), // pop
+].map((x) => juntar(x, new Float32Array(TAXA / 2)));
 gravarWav(W('efeitos.wav'), juntar(...efeitos));
-// a narração do C2 depois de 6 s de silêncio e 8 s de música (os 14 s em que nada deve ser escrito)
-await extrairAudio({ffmpeg: pecas.ffmpeg, entrada: path.join(raiz, 'exemplos', 'exemplo', 'midia', 'video-exemplo.mp4'), saida: W('narracao.wav')});
+// a narração depois de 6 s de silêncio e 8 s de música (os 14 s em que nada deve ser escrito)
+const voz = vozDeTeste(raiz, {exigirPalavras: true});
+await extrairAudio({ffmpeg: pecas.ffmpeg, entrada: voz.voz, saida: W('narracao.wav')});
 gravarWav(W('mistura.wav'), juntar(silencio.subarray(0, 6 * TAXA), musica.subarray(0, 8 * TAXA), lerWav(W('narracao.wav'))));
 const ANTES_MS = 14_000;
-const referencia = JSON.parse(readFileSync(path.join(raiz, 'exemplos', 'exemplo', 'video', 'palavras.json'), 'utf-8')).map((p) => ({...p, s: p.s + ANTES_MS, e: p.e + ANTES_MS}));
+const referencia = voz.palavras.map((p) => ({...p, s: p.s + ANTES_MS, e: p.e + ANTES_MS}));
 
 /** Distância de edição por palavra e o erro do começo das palavras iguais (como em transcrever-teste.mjs). */
 const comparar = (ref, hip) => {

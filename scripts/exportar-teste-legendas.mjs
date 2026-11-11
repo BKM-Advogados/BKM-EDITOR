@@ -1,7 +1,7 @@
-// Teste de ponta a ponta da frente Fala, fora do Electron: os primeiros 15 s da narração real do exemplo Cliente C2 viram
+// Teste de ponta a ponta da frente Fala, fora do Electron: os primeiros 15 s de uma narração de verdade (scripts/voz-de-teste.mjs) viram
 // palavras.json pela transcrição local (o mesmo Transcritor do app: whisper.cpp no PC), as palavras viram legendas no
 // vídeo de cenas, e o Remotion renderiza o MP4 com som e legenda (o mesmo renderMedia do Exportar), uma foto de cada
-// estilo (renderStill) e o SRT e o VTT. Sem o whisper instalado (ou com --sem-whisper), usa o palavras.json do exemplo.
+// estilo (renderStill) e o SRT e o VTT. Sem o whisper instalado (ou com --sem-whisper), usa o palavras.json conferido da voz.
 // Uso: npx tsx scripts/exportar-teste-legendas.mjs [classica|caixa|karaoke|faixa|discreta] [--sem-whisper]
 // Saída em testes/saida/exportar-legendas/ (ignorada pelo git).
 import {copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
@@ -12,6 +12,7 @@ import {novoDocCenas, resolverCenas} from '../src/nucleo/cenas.ts';
 import {legendasDoDocumento, paraSrt, paraVtt, PREDEFINICOES_LEGENDA, requebrar} from '../src/nucleo/legendas.ts';
 import {Projeto} from '../src/nucleo/projeto.ts';
 import {Transcritor} from '../src/main/transcricao.ts';
+import {vozDeTeste} from './voz-de-teste.mjs';
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const saida = path.join(raiz, 'testes', 'saida', 'exportar-legendas');
@@ -24,7 +25,8 @@ const TRECHO_MS = 15_500;
 
 rmSync(saida, {recursive: true, force: true});
 mkdirSync(path.join(publica, 'midia'), {recursive: true});
-copyFileSync(path.join(raiz, 'exemplos', 'exemplo', 'midia', 'video-exemplo.mp4'), path.join(publica, 'midia', 'narracao.mp4'));
+const voz = vozDeTeste(raiz, {exigirPalavras: semWhisper});
+copyFileSync(voz.voz, path.join(publica, 'midia', 'narracao.mp4'));
 const projeto = new Projeto(publica);
 
 // 1. a fala vira palavras.json (só o trecho que o vídeo usa)
@@ -35,15 +37,16 @@ if (!semWhisper && estado.plataforma && estado.ffmpeg) {
   const r = await transcritor.transcrever(projeto, {arquivo: 'midia/narracao.mp4', dur_ms: TRECHO_MS}, (p) => p.etapa !== 'transcrevendo' && log(`${p.etapa}: ${p.mensagem}`));
   log(`transcrito: ${r.n} palavras em ${r.duracao_s} s: "${r.texto}"`);
 } else {
-  const ref = JSON.parse(readFileSync(path.join(raiz, 'exemplos', 'exemplo', 'video', 'palavras.json'), 'utf-8')).filter((p) => p.s < TRECHO_MS);
+  if (!voz.palavras) throw new Error('sem o whisper, ESTUDIO_PALAVRAS_TESTE precisa apontar o palavras.json conferido da voz');
+  const ref = voz.palavras.filter((p) => p.s < TRECHO_MS);
   projeto.gravarTexto('midia/narracao.mp4.palavras.json', JSON.stringify(ref));
-  log(`sem o whisper: ${ref.length} palavras do palavras.json do exemplo`);
+  log(`sem o whisper: ${ref.length} palavras do palavras.json conferido`);
 }
 
 // 2. documento: três cenas (16 s), a narração a partir de 0,5 s e as legendas geradas da transcrição
 const doc = {
   ...novoDocCenas({largura: 720, altura: 1280, fps: 30}),
-  tema: {fundo: '#171A19', texto: '#F4F0EA', destaque: '#C88155', suave: '#A39E95', fonte: 'Inter'}, // as cores da Cliente
+  tema: {fundo: '#171A19', texto: '#F4F0EA', destaque: '#C88155', suave: '#A39E95', fonte: 'Inter'}, // um tema escuro com destaque quente
   cenas: [
     {id: 'c1', duracao_ms: 5000, blocos: [{id: 'c1-t', tipo: 'titulo', x: 0.1, y: 0.3, largura: 0.8, texto: 'Mudar de **cidade**?'}]},
     {id: 'c2', duracao_ms: 5500, blocos: [{id: 'c2-t', tipo: 'texto', x: 0.1, y: 0.32, largura: 0.8, texto: 'Primeira regra: a mudança depende de você'}]},

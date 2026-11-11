@@ -3,7 +3,7 @@
 // renderMedia e confere que o arquivo saiu com faixa de áudio. Depois confere o medidor da tela (a mistura medida pelo
 // núcleo, como o loudness.ts faz) contra o loudnorm do ffmpeg no MP4 e passa o MP4 pela correção de loudness da
 // exportação (src/main/loudness.ts): o arquivo final tem de sair entre −15 e −13 LUFS com pico até −1 dBTP.
-// Uso: npx tsx scripts/exportar-teste-som.mjs [--voz-real]   (--voz-real: a narração do exemplo da Cliente no lugar da
+// Uso: npx tsx scripts/exportar-teste-som.mjs [--voz-real]   (--voz-real: uma narração de verdade, scripts/voz-de-teste.mjs, no lugar da
 // sintética, com picos altos, para a correção precisar do limitador). Saída em testes/saida/exportar-teste/ (ignorada
 // pelo git). Se o Chrome Headless do Remotion não puder rodar neste PC, o script diz onde parou.
 import {existsSync, mkdirSync, rmSync, writeFileSync} from 'node:fs';
@@ -16,6 +16,7 @@ import {medirMistura} from '../src/nucleo/loudness.ts';
 import {decodificarAudio, gravarWav} from '../src/main/ffmpeg-som.ts';
 import {igualarLoudness, medirArquivo} from '../src/main/loudness.ts';
 import {codificarWav, decodificarWav, musicaSintetica, narracaoSintetica, TAXA} from './audio-sintetico.ts';
+import {vozDeTeste} from './voz-de-teste.mjs';
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const vozReal = process.argv.includes('--voz-real');
@@ -30,8 +31,8 @@ mkdirSync(path.join(publica, 'midia'), {recursive: true});
 // 1. mídia sintética (ou a voz do exemplo) e envelopes (o mesmo cálculo da interface, a partir do WAV)
 const fontesWav = {};
 if (vozReal) {
-  const c2 = await decodificarAudio(path.join(raiz, 'exemplos', 'exemplo', 'midia', 'video-exemplo.mp4'));
-  fontesWav['midia/narracao.wav'] = gravarWav([c2.canais[0].slice(0, Math.round(12 * c2.taxa))], c2.taxa);
+  const real = await decodificarAudio(vozDeTeste(raiz).voz);
+  fontesWav['midia/narracao.wav'] = gravarWav([real.canais[0].slice(0, Math.round(12 * real.taxa))], real.taxa);
 } else fontesWav['midia/narracao.wav'] = codificarWav([narracaoSintetica(12)], TAXA);
 fontesWav['midia/musica.wav'] = codificarWav([musicaSintetica(14)], TAXA);
 const envelopes = {};
@@ -41,7 +42,7 @@ for (const [rel, wav] of Object.entries(fontesWav)) {
   envelopes[rel] = envelopeDeAmostras(canais, taxa);
   writeFileSync(path.join(publica, `${rel}.envelope.json`), JSON.stringify(envelopes[rel]));
 }
-log(`mídia e envelopes em ${publica}${vozReal ? ' (narração: os 12 primeiros segundos do exemplo da Cliente)' : ''}`);
+log(`mídia e envelopes em ${publica}${vozReal ? ' (narração: os 12 primeiros segundos da voz de teste)' : ''}`);
 
 // 2. documento: três cenas (12 s), narração a partir de 0,5 s e música do começo ao fim com fade
 const doc = {

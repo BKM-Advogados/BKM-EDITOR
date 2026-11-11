@@ -34,8 +34,8 @@ const fotoPessoa = arg('--foto');
 if (fotoPessoa) copyFileSync(fotoPessoa, path.join(saida, `pessoa${path.extname(fotoPessoa).toLowerCase()}`));
 const SRC_PESSOA = fotoPessoa ? `testes/saida/acabamento/pessoa${path.extname(fotoPessoa).toLowerCase()}` : null;
 
-const FOTO = 'exemplos/exemplo/midia/Cidade Exemplo.jpg';
-const LOGO = 'exemplos/exemplo/midia/logo-exemplo.png';
+const FOTO = 'testes/fixtures/projeto/midia/foto.jpg';
+const LOGO = 'testes/fixtures/projeto/midia/logo.png';
 const DEGRADE_FUNDO = {tipo: 'linear', angulo: 180, paradas: [{cor: '#171A19', posicao: 0}, {cor: '#44352B', posicao: 1}]};
 const capa = [
   {id: 'faixa', nome: 'Faixa', tipo: 'forma', forma: 'retangulo', x: 80, y: 900, largura: 920, altura: 330, raio: 32,
