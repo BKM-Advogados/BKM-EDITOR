@@ -367,8 +367,9 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
     if (!fontesMarca.logo) return;
     const img = new Image();
     img.onload = () => img.naturalWidth > 0 && img.naturalHeight > 0 && setProporcaoLogo(img.naturalWidth / img.naturalHeight);
-    img.src = urlDaMidia(props?.base_midia, fontesMarca.logo);
-  }, [fontesMarca.logo, props?.base_midia]);
+    const raiz = (props?.base_projeto ?? props?.base_midia) as string | undefined; // a animação tem a mídia em <raiz>/midia, mas o logo do kit é da raiz
+    img.src = urlDaMidia(raiz, fontesMarca.logo);
+  }, [fontesMarca.logo, props?.base_projeto, props?.base_midia]);
 
   useEffect(() => {
     if (fase.tipo !== 'exportando') return;
@@ -451,7 +452,7 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
     if (Object.keys(marcas).length) window.estudio.gravarPrefsExportacao({marca_dagua: marcas}).catch(() => undefined);
     const r = await window.estudio.exportarVideo(documento, opcoes);
     setFase({tipo: 'pronto', r});
-    if (r.ok) avisar(`Exportado: ${(r.arquivos ?? []).map(nomeDoArquivo).join(', ')}`, 'ok');
+    if (r.ok) avisar(`Exportado: ${(r.arquivos ?? []).map(nomeDoArquivo).join(', ')}${r.avisos?.length ? `. Atenção: ${r.avisos.join('; ')}` : ''}`, r.avisos?.length ? 'info' : 'ok');
     else avisar(r.cancelado ? 'Exportação cancelada.' : `Exportação: ${r.mensagem}`, r.cancelado ? 'info' : 'erro');
   };
 

@@ -73,7 +73,8 @@ Bateria, Baixo, Pad, Lead, Cama sob a voz, Voz), sem mexer em volume e pan.
 barra do topo e Ctrl+Shift+E (WAV), ou a seção **Exportar** do inspetor da música (formato, stems): WAV de 24 bits, M4A ou
 Opus, no alvo de loudness do documento (padrão −14 LUFS, pico até −1 dBTP), com **Stems** (um WAV por faixa e por retorno)
 ou MIDI. Grava em `saidas/<título>.<formato>` (o título sem a extensão do áudio de onde veio) e os stems em
-`saidas/<título> - stems/`. O rodapé diz o arquivo e o loudness medido; os avisos de licença vêm antes dele.
+`saidas/<título> - stems/`. Como o vídeo e as legendas, nunca por cima: com o nome tomado, sai `<título> (2)` (o
+comprovante e os stems com o mesmo sufixo). O rodapé diz o arquivo e o loudness medido; os avisos de licença vêm antes dele.
 
 **MIDI** (item 26): "+ MIDI…" na lista importa um .mid (um canal por trilha, com o padrão e o clipe); o MIDI da música sai
 pelo Exportar.

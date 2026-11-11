@@ -194,7 +194,8 @@ export type Metricas = {memoria_mb: number; processos: {tipo: string; memoria_mb
 export type Progresso = {tipo: 'status' | 'progresso'; mensagem?: string; etapa?: string; progresso?: number; arquivo?: string; indice?: number; total?: number};
 
 /** Saída da exportação: os arquivos gravados em saidas/ (o primeiro repetido em `arquivo`), a pasta e, se parou antes, por quê. */
-export type ResultadoExportacao = {ok: boolean; arquivo?: string; arquivos?: string[]; pasta?: string; mensagem?: string; cancelado?: boolean};
+/** `avisos`: o que saiu diferente do pedido sem impedir o arquivo (por exemplo, o som fora do alvo de loudness). */
+export type ResultadoExportacao = {ok: boolean; arquivo?: string; arquivos?: string[]; pasta?: string; mensagem?: string; cancelado?: boolean; avisos?: string[]};
 
 /** Login do Claude Code da pessoa, lido de `claude auth status`. chave_api: há ANTHROPIC_API_KEY, que no modo -p tem prioridade. */
 export type ContaClaude = {instalado: boolean; logado: boolean; metodo: string; email?: string; plano?: string; chave_api: boolean};
@@ -243,6 +244,8 @@ export type ApiEstudio = {
   aoPedirMiniatura: (cb: () => Retangulo | null) => () => void;
   lerDocumento: <T = unknown>(documento: string) => Promise<Lido<T>>;
   lerJson: <T = unknown>(caminho: string) => Promise<T>; // qualquer JSON do projeto, só leitura (ex.: palavras da narração)
+  /** O mesmo, para arquivo que pode não existir (transições, seleção pedida pela IA): ausente ou sem projeto, null. */
+  lerJsonOpcional: <T = unknown>(caminho: string) => Promise<T | null>;
   aplicarPatch: (p: {documento: string; versao_base?: string; patch: OperacaoPatch[]; rotulo?: string}) => Promise<{versao: string; seq: number}>;
   desfazer: () => Promise<{ok: boolean; mensagem: string}>;
   propsVideo: (documento: string) => Promise<PropsVideo>;

@@ -42,6 +42,7 @@ const api: ApiEstudio = {
   }),
   lerDocumento: (documento) => ipcRenderer.invoke(CANAL.lerDocumento, documento),
   lerJson: (caminho) => ipcRenderer.invoke(CANAL.lerJson, caminho),
+  lerJsonOpcional: (caminho) => ipcRenderer.invoke(CANAL.lerJson, caminho, {opcional: true}),
   aplicarPatch: (p) => ipcRenderer.invoke(CANAL.aplicarPatch, p),
   desfazer: () => ipcRenderer.invoke(CANAL.desfazer),
   propsVideo: (documento) => ipcRenderer.invoke(CANAL.propsVideo, documento),

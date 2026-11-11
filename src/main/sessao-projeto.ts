@@ -25,6 +25,9 @@ export class SessaoProjeto {
   private pendentes = new Map<string, NodeJS.Timeout>();
   private relogioGit: NodeJS.Timeout | null = null;
   private _temGit = false;
+  private fechada = false;
+  // um git por vez: o Ctrl+S que cai no meio do commit automático espera em vez de bater no index.lock
+  private filaGit: Promise<boolean> = Promise.resolve(true);
 
   constructor(raiz: string, private readonly aoMudar: (arquivo: string) => void) {
     this.projeto = new Projeto(raiz);
@@ -32,6 +35,7 @@ export class SessaoProjeto {
 
   async abrir() {
     this._temGit = await this.prepararGit();
+    if (this.fechada) return; // fechada enquanto o git preparava: não nasce observador órfão
     this.observador = chokidar.watch(this.projeto.raiz, {
       ignored: (p) => IGNORAR.test(p),
       ignoreInitial: true,
@@ -42,14 +46,20 @@ export class SessaoProjeto {
   }
 
   async fechar() {
+    this.fechada = true;
+    for (const t of this.pendentes.values()) clearTimeout(t);
+    this.pendentes.clear();
     await this.observador?.close();
+    this.observador = null;
     if (this.relogioGit) {
       clearTimeout(this.relogioGit);
-      await this.salvarVersao();
+      void this.salvarVersao();
     }
+    await this.filaGit; // inclusive o commit automático que já estava rodando
   }
 
   private avisar(rel: string) {
+    if (this.fechada) return;
     // um arquivo gravado várias vezes em sequência vira um aviso só
     const t = this.pendentes.get(rel);
     if (t) clearTimeout(t);
@@ -71,8 +81,7 @@ export class SessaoProjeto {
   async marcarVersao(mensagem = 'estúdio: ponto de restauração') {
     if (!this._temGit) return false;
     if (this.relogioGit) clearTimeout(this.relogioGit);
-    await this.salvarVersao(mensagem);
-    return true;
+    return this.salvarVersao(mensagem);
   }
 
   private async git(...args: string[]) {
@@ -86,7 +95,11 @@ export class SessaoProjeto {
       return false;
     }
     if (!existsSync(path.join(this.projeto.raiz, '.git'))) {
-      await this.git('init', '-q');
+      try {
+        await this.git('init', '-q');
+      } catch {
+        return false; // pasta só de leitura, sem permissão: abre sem pontos de restauração
+      }
       await this.salvarVersao('estúdio: projeto aberto pela primeira vez');
     }
     return true;
@@ -105,17 +118,25 @@ export class SessaoProjeto {
   }
 
   /** Commit de tudo o que mudou, com os autores tirados do diário. */
-  async salvarVersao(mensagem?: string) {
+  salvarVersao(mensagem?: string): Promise<boolean> {
     this.relogioGit = null;
+    const vez = this.filaGit.then(() => this.commitAgora(mensagem));
+    this.filaGit = vez;
+    return vez;
+  }
+
+  /** true: commitou ou não havia o que commitar; false: o git falhou (index.lock, dubious ownership, disco cheio). */
+  private async commitAgora(mensagem?: string): Promise<boolean> {
     try {
       this.ignorarMidiaPesada();
       await this.git('add', '-A');
       const {stdout} = await this.git('status', '--porcelain');
-      if (!stdout.trim()) return;
+      if (!stdout.trim()) return true;
       const msg = mensagem ?? `estúdio: ${stdout.trim().split('\n').length} arquivo(s) alterado(s)`;
       await this.git('-c', 'user.name=Estudio', '-c', 'user.email=estudio@local', 'commit', '-q', '-m', msg);
+      return true;
     } catch {
-      /* sem git utilizável: o diário continua sendo o histórico */
+      return false; /* sem git utilizável: o diário continua sendo o histórico */
     }
   }
 
@@ -134,8 +155,9 @@ export class SessaoProjeto {
       const rel = this.projeto.arquivoDoDocumento(documento);
       const {doc} = this.projeto.lerJson<DocVideo>(rel);
       if (ehDocAnimacao(doc)) {
+        // as camadas são relativas a midia/; o tema do kit (fontes/…, midia/logo-…) e a marca d'água, à raiz do projeto
         const {props, avisos} = resolverAnimacao(doc, `${base}/midia`);
-        return {props, avisos};
+        return {props: {...props, base_projeto: base}, avisos};
       }
       if (ehDocCenas(doc)) {
         // os envelopes medidos (midia/*.envelope.json) entram nas props: prévia e exportação veem o mesmo ducking

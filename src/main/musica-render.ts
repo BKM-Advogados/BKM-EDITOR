@@ -138,12 +138,23 @@ export const nomeDeSaida = (titulo: string) => titulo.replace(/\.(wav|mp3|m4a|op
 /** Codificação de cada formato com perda: AAC no M4A (o mesmo codificador da exportação do vídeo) e Opus. */
 const CODIFICAR: Record<'m4a' | 'opus', string[]> = {m4a: ['-c:a', 'libfdk_aac', '-b:a', '256k', '-movflags', '+faststart', '-f', 'mp4'] /* o ffmpeg do Remotion não tem o ipod */, opus: ['-c:a', 'libopus', '-b:a', '192k']};
 
-/** A música em arquivo em saidas/ (item 23). */
-export const exportarMusica = async (p: Projeto, id: string, pedido: PedidoExportarMusica,
+/** "saidas/<título>", ou "saidas/<título> (2)"… quando algum dos arquivos que a exportação grava (`sufixos`) já existe: como o
+ *  vídeo, a imagem e as legendas, nada é gravado por cima (no Windows, o arquivo aberto num player nem deixaria). */
+export const baseLivre = (existe: (rel: string) => boolean, titulo: string, sufixos: string[]) => {
+  for (let n = 1; ; n++) {
+    const base = `saidas/${titulo}${n > 1 ? ` (${n})` : ''}`;
+    if (!sufixos.some((s) => existe(`${base}${s}`))) return base;
+  }
+};
+
+/** A música em arquivo em saidas/ (item 23). `sobrescrever`: grava por cima do que tiver o mesmo nome (só se pedido). */
+export const exportarMusica = async (p: Projeto, id: string, pedido: PedidoExportarMusica & {sobrescrever?: boolean},
   o: {binarios?: () => string | null | undefined; janela?: PedirAJanela} = {}): Promise<ResultadoExportarMusica> => {
   const doc = lerMusica(p, id);
   const titulo = nomeDeSaida(pedido.nome?.trim() || p.manifesto().documentos.find((d) => d.id === id)?.titulo || doc.titulo || id);
-  const base = `saidas/${titulo}`;
+  const comStems = pedido.formato !== 'mid' && pedido.stems;
+  const base = pedido.sobrescrever ? `saidas/${titulo}`
+    : baseLivre((rel) => p.existe(rel), titulo, [`.${pedido.formato}`, '.licencas.json', ' - créditos.txt', ...(comStems ? [' - stems'] : [])]);
   if (pedido.formato === 'mid') {
     const r = musicaParaMidi(doc);
     gravarBinario(p, `${base}.mid`, Buffer.from(r.bytes));

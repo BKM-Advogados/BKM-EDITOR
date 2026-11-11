@@ -15,17 +15,20 @@ import {MarcaDagua} from './MarcaDagua';
 
 export type IdComposicao = 'VideoCenas' | 'CarrosselTema' | 'Animacao';
 
-type Props = Record<string, unknown> & {base_midia?: string; tema?: {fontes_arquivos?: FonteArquivo[]}; marca_dagua?: MarcaDaguaP};
+// `base_projeto`: a raiz do projeto no servidor de mídia, quando a composição tem outra base para a própria mídia (a animação
+// usa <raiz>/midia). Os arquivos do tema (fontes/…, midia/logo-…) e a marca d'água são sempre relativos à raiz.
+type Props = Record<string, unknown> & {base_midia?: string; base_projeto?: string; tema?: {fontes_arquivos?: FonteArquivo[]}; marca_dagua?: MarcaDaguaP};
 
 const comFontesDoTema = (Componente: React.FC<Record<string, unknown>>): React.FC<Record<string, unknown>> => {
   const Embrulho: React.FC<Props> = (p) => {
+    const raiz = p.base_projeto ?? p.base_midia;
     const fontes = p.tema?.fontes_arquivos;
     if (Array.isArray(fontes) && fontes.length) {
-      definirBaseMidia(p.base_midia);
+      definirBaseMidia(raiz);
       registrarFontesDeArquivo(fontes.map((f) => deFonteArquivo(f, midia(f.arquivo))));
     }
     // marca d'água da exportação (frente C): por cima de tudo, só quando as props trazem uma
-    if (p.marca_dagua) return React.createElement(React.Fragment, null, React.createElement(Componente, p), React.createElement(MarcaDagua, {m: p.marca_dagua, base_midia: p.base_midia}));
+    if (p.marca_dagua) return React.createElement(React.Fragment, null, React.createElement(Componente, p), React.createElement(MarcaDagua, {m: p.marca_dagua, base_midia: raiz}));
     return React.createElement(Componente, p);
   };
   Embrulho.displayName = Componente.displayName ?? Componente.name;
@@ -35,7 +38,7 @@ const comFontesDoTema = (Componente: React.FC<Record<string, unknown>>): React.F
 export const COMPOSICOES: Record<IdComposicao, React.FC<Record<string, unknown>>> = {
   VideoCenas: comFontesDoTema(VideoCenas as unknown as React.FC<Record<string, unknown>>),
   CarrosselTema: comFontesDoTema(CarrosselTema as unknown as React.FC<Record<string, unknown>>),
-  Animacao: Animacao as unknown as React.FC<Record<string, unknown>>,
+  Animacao: comFontesDoTema(Animacao as unknown as React.FC<Record<string, unknown>>),
 };
 
 /** Id da composição pelas props; o que não for reconhecido é o carrossel narrado (roteiro.json). */

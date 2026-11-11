@@ -8,7 +8,7 @@ import {execFile, spawn, type ChildProcessWithoutNullStreams} from 'node:child_p
 import {randomUUID} from 'node:crypto';
 import readline from 'node:readline';
 import type {ContaClaude, EventoConversa} from '../compartilhado/api';
-import {ambienteLimpo, citarCmd, ehCmd, PATH_COM_LOCAL} from './terminais';
+import {ambienteLimpo, citarCmd, ehCmd, matarArvore, PATH_COM_LOCAL} from './terminais';
 import {cortarResultado} from '../compartilhado/ferramentas';
 
 const OCIOSA_MS = 10 * 60 * 1000;
@@ -101,15 +101,16 @@ export class Conversas {
     return c.sessao;
   }
 
-  fechar(id: number) {
+  /** `agora`: ao fechar o app não há 1,5 s de espera (o processo principal sai antes e o agente ficaria órfão). */
+  fechar(id: number, agora = false) {
     const c = this.conversas.get(id);
     if (!c) return;
-    this.matar(c);
+    this.matar(c, agora);
     this.conversas.delete(id);
   }
 
-  fecharTodas() {
-    for (const id of [...this.conversas.keys()]) this.fechar(id);
+  fecharTodas(o: {agora?: boolean} = {}) {
+    for (const id of [...this.conversas.keys()]) this.fechar(id, o.agora);
   }
 
   private iniciar(c: Conversa) {
@@ -134,7 +135,18 @@ export class Conversas {
     proc.stderr.on('data', (d: Buffer) => {
       erro = (erro + d.toString()).slice(-2000);
     });
-    proc.on('error', (e) => this.o.evento(c.id, {tipo: 'erro', mensagem: e.message}));
+    proc.stdin.on('error', () => undefined); // EPIPE: o claude saiu no meio da escrita; o 'exit' avisa a tela
+    proc.on('error', (e) => {
+      // spawn que falhou (ENOENT) não emite 'exit': sem isto, a conversa conta como viva para sempre
+      if (c.proc === proc) {
+        c.proc = null;
+        c.ocupada = false;
+        c.pedidos.clear();
+        if (c.ocioso) clearTimeout(c.ocioso);
+        c.ocioso = null;
+      }
+      this.o.evento(c.id, {tipo: 'erro', mensagem: e.message});
+    });
     proc.on('exit', (codigo) => {
       if (c.proc !== proc) return; // já foi substituído (hibernou e voltou)
       c.proc = null;
@@ -150,7 +162,7 @@ export class Conversas {
     c.proc?.stdin.write(`${JSON.stringify(o)}\n`);
   }
 
-  private matar(c: Conversa) {
+  private matar(c: Conversa, agora = false) {
     if (c.ocioso) clearTimeout(c.ocioso);
     c.ocioso = null;
     const p = c.proc;
@@ -160,7 +172,8 @@ export class Conversas {
     if (!p) return;
     try {
       p.stdin.end();
-      setTimeout(() => p.exitCode === null && p.kill(), 1500);
+      if (agora) matarArvore(p);
+      else setTimeout(() => matarArvore(p), 1500);
     } catch {
       /* já saiu */
     }

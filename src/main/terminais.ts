@@ -2,9 +2,10 @@
 // instalado da própria pessoa direto no PTY (sem shell no meio, que custaria memória à toa), com o MCP do projeto e um
 // id de sessão dado pelo app: a aba pode hibernar (encerra o processo) e voltar com --resume. O login é o dela, pelo
 // fluxo da Anthropic. Os dados vão à interface por IPC em lotes curtos, para não inundar o renderer.
-import {execFile} from 'node:child_process';
+import {execFile, type ChildProcess} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
 import os from 'node:os';
+import path from 'node:path';
 import type {IPty} from '@lydell/node-pty';
 
 type Saida = {dados: (id: number, d: string) => void; saiu: (id: number, codigo: number) => void};
@@ -39,6 +40,16 @@ export const acharClaude = (): Promise<string | null> =>
       ok(linhas.find((l) => /\.exe$/i.test(l)) ?? linhas.find((l) => /\.cmd$/i.test(l)) ?? null);
     });
   });
+
+/** Encerra o agente e o que ele abriu. No Windows, kill() derrubaria só o primeiro processo: o cmd.exe do .cmd do npm
+ *  (o node do agente ficaria vivo) ou o claude.exe (as ferramentas que ele rodava ficariam). O taskkill vai pelo caminho
+ *  do sistema, nunca por um taskkill.exe da pasta do projeto. */
+export const matarArvore = (p: ChildProcess) => {
+  if (p.exitCode !== null || p.signalCode !== null || !p.pid) return;
+  if (process.platform !== 'win32') return void p.kill();
+  const taskkill = path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'taskkill.exe');
+  execFile(taskkill, ['/pid', String(p.pid), '/T', '/F'], {windowsHide: true}, () => undefined);
+};
 
 /** O .cmd do npm só roda pelo cmd.exe. */
 export const ehCmd = (exe: string) => process.platform === 'win32' && /\.(cmd|bat)$/i.test(exe);

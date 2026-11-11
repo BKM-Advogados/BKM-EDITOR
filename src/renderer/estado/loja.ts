@@ -308,7 +308,7 @@ export const alternarNaSelecao = (documento: string, caminho: string) => {
 /** Seleção pedida pela IA (ferramenta selecionar_camadas grava .estudio/selecao.json): a área e o documento vêm para a
  *  frente, com a página da primeira camada num carrossel. */
 const aplicarSelecaoPedida = async () => {
-  const p = await window.estudio.lerJson('.estudio/selecao.json').catch(() => null) as {documento?: string; caminhos?: string[]} | null;
+  const p = await window.estudio.lerJsonOpcional('.estudio/selecao.json').catch(() => null) as {documento?: string; caminhos?: string[]} | null;
   const entrada = p?.documento ? entradaDe(p.documento) : undefined;
   if (!p || !entrada || !Array.isArray(p.caminhos)) return;
   const doc = estado.docs[entrada.id]?.doc as DocImagem | undefined;

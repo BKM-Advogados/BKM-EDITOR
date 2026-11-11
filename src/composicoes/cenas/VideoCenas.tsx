@@ -134,20 +134,26 @@ const Som: React.FC<{audio?: AudioP; duracao_ms: number}> = ({audio, duracao_ms}
   </>
 );
 
+/** Quadros da cena: de round(t_in) a round(t_out). A última vai até o fim do vídeo, que tem ceil(duração) quadros (Root.tsx):
+ *  sem isso, quando a duração termina antes do meio de um quadro, o último quadro saía só com o fundo do tema. */
+export const quadrosDaCena = (c: {t_in: number; t_out: number}, ultima: boolean, fps: number, totalQuadros: number) => {
+  const q = (ms: number) => Math.round((ms / 1000) * fps);
+  const de = q(c.t_in);
+  return {de, dur: Math.max(1, (ultima ? Math.max(totalQuadros, q(c.t_out)) : q(c.t_out)) - de)};
+};
+
 export const VideoCenas: React.FC<PropsCenas> = (p) => {
   definirBaseMidia(p.base_midia);
   const frame = useCurrentFrame();
-  const {fps} = useVideoConfig();
+  const {fps, durationInFrames} = useVideoConfig();
   const familia = fonte(p.tema.fonte || 'Inter');
-  const q = (ms: number) => Math.round((ms / 1000) * fps);
   return (
     <AbsoluteFill style={{backgroundColor: p.tema.fundo}}>
       <CamadaEfeitos efeitos={p.efeitos} quadro={frame} largura={p.largura} altura={p.altura}>
         {/* o fundo do tema também dentro da camada: os efeitos valem nele (tres-efeitos-D4) */}
         <AbsoluteFill style={{backgroundColor: p.tema.fundo}} />
         {p.cenas.map((c, i) => {
-          const de = q(c.t_in);
-          const dur = Math.max(1, q(c.t_out) - de);
+          const {de, dur} = quadrosDaCena(c, i === p.cenas.length - 1, fps, durationInFrames);
           return (
             <Sequence key={c.id ?? i} from={de} durationInFrames={dur}>
               <Cena c={c} tema={p.tema} familia={familia} />

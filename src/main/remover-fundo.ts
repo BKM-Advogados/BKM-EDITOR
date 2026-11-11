@@ -36,28 +36,46 @@ export const baixarModelo = async (o: {pasta: string; buscar: Buscar; aoProgress
   if (!r.ok || !r.body) throw new Error(`o download do modelo respondeu ${r.status}`);
   const hash = createHash('sha256');
   const saida = createWriteStream(parcial);
+  // como o baixarConferido (transcricao.ts): nunca um 'error' solto que derruba o processo principal, nem um ouvinte
+  // novo a cada espera de 'drain' (download grande passaria de 10 e o Node avisaria vazamento)
+  let erroEscrita: Error | null = null;
+  saida.on('error', (e) => (erroEscrita = e));
+  const dreno = () => new Promise<void>((ok, falha) => {
+    const fim = (e?: Error) => {
+      saida.off('drain', fim);
+      saida.off('error', fim);
+      if (e) falha(e);
+      else ok();
+    };
+    saida.on('drain', fim);
+    saida.on('error', fim);
+  });
   let recebidos = 0;
   let avisado = 0;
+  const leitor = r.body.getReader();
   try {
-    const leitor = r.body.getReader();
     for (;;) {
       const {done, value} = await leitor.read();
       if (done) break;
+      if (erroEscrita) throw erroEscrita;
       recebidos += value.byteLength;
       if (recebidos > m.bytes) throw new Error(`o arquivo veio maior que os ${m.bytes} bytes esperados`);
       hash.update(value);
-      if (!saida.write(value)) await new Promise<void>((ok) => saida.once('drain', () => ok()));
+      if (!saida.write(value)) await dreno();
       if (recebidos - avisado >= m.bytes / 100 || recebidos === m.bytes) {
         avisado = recebidos;
         o.aoProgresso?.(recebidos, m.bytes);
       }
     }
     await new Promise<void>((ok, falha) => saida.end((e?: Error | null) => (e ? falha(e) : ok())));
+    if (erroEscrita) throw erroEscrita;
     const sha = hash.digest('hex');
     if (recebidos !== m.bytes || sha !== m.sha256) throw new Error(`o modelo baixado não confere (${recebidos} bytes, SHA-256 ${sha.slice(0, 12)}…): nada foi instalado`);
     renameSync(parcial, destino);
   } catch (e) {
-    saida.destroy();
+    await leitor.cancel().catch(() => undefined); // não segue baixando por trás
+    // espera o arquivo fechar antes de apagar: aberto pela metade, ele voltaria depois do rmSync (Windows)
+    await new Promise<void>((ok) => (saida.closed ? ok() : (saida.once('close', () => ok()), saida.destroy())));
     rmSync(parcial, {force: true});
     throw e;
   }

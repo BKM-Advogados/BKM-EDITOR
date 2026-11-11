@@ -6,6 +6,9 @@
 //    (o projeto segue aberto no processo principal, a tela o relê), mas não em laço: depois de repetidas quedas seguidas
 //    o app avisa em vez de recarregar de novo.
 
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+
 /** O pedaço do `app` do Electron que a trava usa. */
 export type AppComTrava = {
   requestSingleInstanceLock: () => boolean;
@@ -54,3 +57,30 @@ export const decidirRecarga = (razao: string, recargas: number[], agora: number)
 export const avisoDeQuedaEmLaco = (razao: string): string =>
   `A tela do Estúdio parou ${MAX_RECARGAS + 1} vezes seguidas (${razao}). Tudo o que você editou já está gravado no projeto. ` +
   'Feche o Estúdio e abra de novo; se repetir, feche outros programas para liberar memória.';
+
+// ---------- só a página do app (auditoria do processo principal, P5) ----------
+// Um arquivo solto na janela faz o Chromium navegar para file://…, e a página nova herdaria o preload com window.estudio.
+// A janela só aceita a própria página: o index.html do pacote (comparado pelo caminho, sem depender de como cada lado
+// codifica a URL nem da caixa da letra do drive no Windows) ou a origem do Vite em desenvolvimento.
+
+export type PaginaDoApp = {dev?: string; indexHtml: string; windows?: boolean};
+
+export const ehPaginaDoApp = (url: string | undefined, app: PaginaDoApp): boolean => {
+  try {
+    const u = new URL(url ?? '');
+    if (app.dev) return u.origin === new URL(app.dev).origin;
+    if (u.protocol !== 'file:') return false;
+    const caminho = app.windows ? path.win32 : path.posix;
+    const a = caminho.normalize(fileURLToPath(u, {windows: app.windows ?? process.platform === 'win32'}));
+    const b = caminho.normalize(app.indexHtml);
+    return app.windows ? a.toLowerCase() === b.toLowerCase() : a === b;
+  } catch {
+    return false;
+  }
+};
+
+/** O que a tela pode pedir: o microfone (só áudio, gravação da narração), copiar para a área de transferência e a tela
+ *  cheia da prévia. Câmera, localização, notificações etc. ficam recusadas. */
+export const permissaoLiberada = (permissao: string, detalhes: {mediaTypes?: string[]}): boolean =>
+  ['media', 'clipboard-sanitized-write', 'fullscreen'].includes(permissao)
+  && (permissao !== 'media' || (detalhes.mediaTypes ?? []).every((t) => t === 'audio'));

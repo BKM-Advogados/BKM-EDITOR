@@ -91,6 +91,7 @@ export class ClienteAcp {
   }
 
   private escrever(o: unknown) {
+    if (this.fechado || !this.saida.writable) return; // resposta que chega depois de fechar (permissão cancelada ao matar)
     const l = JSON.stringify(o);
     this.o.log?.('>', l);
     this.saida.write(`${l}\n`);

@@ -1,23 +1,24 @@
 // Processo principal do Estúdio: uma janela, o projeto aberto, os terminais, o servidor de mídia e a exportação.
 import {app, BrowserWindow, dialog, ipcMain, net, safeStorage, shell, type IpcMainInvokeEvent} from 'electron';
 import {execFile} from 'node:child_process';
-import {copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
+import {copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {CANAL, type InfoProjeto, type Metricas, type NovoProjeto, type Perfil, type Preferencias, type Progresso, type ResultadoExportacao, type Retangulo} from '../compartilhado/api';
 import {contaClaude} from './conversa';
 import type {Comentario, EstadoEditor, Manifesto, Modulo, OperacaoPatch} from '../nucleo/documentos';
-import {aplicarMarcaAoPlano, dentroDoOneDrive, documentoNovo, gravarPlano, nomeDePasta, nomePadrao, pastaLivre, planoDoExemplo, planoDoProjeto, regerarClaudeMd} from '../nucleo/criar-projeto';
+import {aplicarMarcaAoPlano, dentroDoOneDrive, documentoNovo, gravarPlano, nomePadrao, pastaLivre, planoDoExemplo, planoDoProjeto, regerarClaudeMd} from '../nucleo/criar-projeto';
 import {EXEMPLO} from '../nucleo/exemplo';
 import {MODELOS} from '../nucleo/modelos';
 import {FORMATO_PADRAO, type Formato} from '../nucleo/formatos';
-import {argumentosDoRender, destinoDoFormato, fontesDaMarcaDagua, FORMATOS_IMAGEM_SAIDA, legendasDasProps, marcaDaguaDoDestino, nomesDosArquivos, type OpcoesExportarImagem,
-  type OpcoesExportarVideo} from '../nucleo/exportacao';
+import {argumentosDoRender, destinoDoFormato, estimarExportacao, fontesDaMarcaDagua, FORMATOS_IMAGEM_SAIDA, legendasDasProps, marcaDaguaDoDestino, nomesDosArquivos,
+  type OpcoesExportarImagem, type OpcoesExportarVideo} from '../nucleo/exportacao';
 import {ErroProjeto, Projeto, serializar} from '../nucleo/projeto';
 import {criarRede} from '../nucleo/ferramentas-mcp';
-import {prepararRender, renderizarVideo} from './exportar';
+import {discoCheio, encerrarRender, faltaEspaco, prepararRender, renderizarVideo, type Preparado} from './exportar';
 import {registrarIpcMarcas} from './ipc-marcas';
-import {registrarExportarPaginas} from './exportar-paginas';
+import {arquivoLivre, registrarExportarPaginas} from './exportar-paginas';
+import {lerJsonDaTela} from './ler-json';
 import {McpHttp} from './mcp-http';
 import {Memoria} from './memoria';
 import {ServidorMidia} from './servidor-midia';
@@ -35,7 +36,7 @@ import {registrarContrasteMarca} from './contraste-marca';
 import {apagarLimposSemUso, registrarIpcLimpeza} from './limpeza-voz';
 import {registrarIpcLoudness} from './loudness';
 import {registrarRemoverFundo} from './remover-fundo';
-import {avisoDeQuedaEmLaco, decidirRecarga, garantirInstanciaUnica, trazerParaFrente} from './janela-segura'; // frente Casca
+import {avisoDeQuedaEmLaco, decidirRecarga, ehPaginaDoApp, garantirInstanciaUnica, permissaoLiberada, trazerParaFrente} from './janela-segura'; // frente Casca
 import {registrarIpcMidia} from './ipc-midia'; // frente Casca: painel de mídia
 import {lojaDeSenhasLinux} from './loja-de-senhas'; // frente IA
 import {criarSessoesIA, fecharAppsDeFora, iniciarAppsDeFora, perguntarAPessoa, registrarIpcIa, retomadaDe} from './ipc-ia'; // frente IA
@@ -75,7 +76,8 @@ const midia = new ServidorMidia();
 // dos JSON e sobe o .git do projeto
 const memoria = new Memoria(app.getPath('userData'), path.join(app.getPath('home'), 'Estudio'));
 let mcpHttp: McpHttp | null = null;
-const enviar = (canal: string, ...a: unknown[]) => janela?.webContents.send(canal, ...a);
+// com a janela já destruída (a espera do commit ao fechar o app), webContents.send lançaria "Object has been destroyed"
+const enviar = (canal: string, ...a: unknown[]) => janela && !janela.isDestroyed() && janela.webContents.send(canal, ...a);
 const terminais = new Terminais({dados: (id, d) => enviar(CANAL.terminalDados, id, d), saiu: (id, c) => enviar(CANAL.terminalSaiu, id, c)});
 // teste da conversa sem login: ESTUDIO_CLAUDE_FALSO aponta para um claude falso (testes/fixtures/claude-falso.mjs),
 // rodado pelo próprio Electron em modo Node
@@ -90,8 +92,11 @@ const recursos = (rel: string) => (app.isPackaged ? path.join(process.resourcesP
 const pastaDoExemplo = () => recursos(path.join('exemplos', EXEMPLO.pasta));
 const temExemplo = () => existsSync(path.join(pastaDoExemplo(), 'estudio.json'));
 
+const paginaDoApp = (url?: string) => ehPaginaDoApp(url, {dev: MAIN_WINDOW_VITE_DEV_SERVER_URL || undefined,
+  indexHtml: path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`), windows: process.platform === 'win32'});
+// a mesma janela não basta: uma página que entrasse no lugar do app (P5) herdaria o preload; o quadro tem de ser o do app
 const confiavel = (e: IpcMainInvokeEvent | Electron.IpcMainEvent) => {
-  if (!janela || e.sender.id !== janela.webContents.id) throw new Error('chamada de IPC de origem desconhecida');
+  if (!janela || e.sender.id !== janela.webContents.id || !paginaDoApp(e.senderFrame?.url)) throw new Error('chamada de IPC de origem desconhecida');
 };
 const exigirProjeto = () => {
   if (!sessao) throw new ErroProjeto('nenhum projeto aberto', 'nao_achado');
@@ -141,6 +146,15 @@ const guardarMiniatura = async () => {
 };
 
 // ---------- abrir, fechar, criar ----------
+// uma troca de projeto por vez (duplo clique no recente, clique enquanto o projeto inicial abre): sem isso o abrir() que
+// ainda esperava o git criava um observador que ninguém mais fechava. Só nos handlers: as funções chamam umas às outras.
+let filaProjeto: Promise<unknown> = Promise.resolve();
+const emFila = <T>(f: () => Promise<T>): Promise<T> => {
+  const vez = filaProjeto.then(() => f());
+  filaProjeto = vez.catch(() => undefined);
+  return vez;
+};
+
 const fecharSessao = async () => {
   cancelarFala(); // frente Fala: o whisper para junto com o projeto (transversal-N4)
   await guardarMiniatura().catch(() => undefined);
@@ -158,7 +172,7 @@ const abrirProjeto = async (raiz: string) => {
   if (!existsSync(path.join(raiz, 'estudio.json'))) throw new Error(`Esta pasta não é um projeto do Estúdio (falta o estudio.json): ${raiz}`);
   const manifesto = new Projeto(raiz).manifesto(); // confere antes de fechar o que está aberto
   await fecharSessao();
-  sessao = new SessaoProjeto(raiz, (arquivo) => {
+  const nova = new SessaoProjeto(raiz, (arquivo) => {
     if (arquivo === 'estudio.json') {
       try {
         tituloDaJanela(sessao?.projeto.manifesto().nome);
@@ -169,12 +183,18 @@ const abrirProjeto = async (raiz: string) => {
     }
     enviar(CANAL.mudou, {arquivo});
   });
-  midia.servir(raiz);
-  regerarClaudeMd(raiz); // o Claude conhece os campos desta versão também nos projetos criados antes dela
-  sessao.projeto.adicionarAjuste(somAcompanhaCenas); // frente Som: a narração presa às cenas (som-com-cenas.ts)
-  apagarLimposSemUso(sessao.projeto); // frente Som: as versões limpas da voz que nem documento nem diário citam (limpeza-voz.ts)
-  aoAbrirMusica(sessao.projeto); // frente Música: renders que faltam (pasta clonada) e os que sobraram (ipc-musica.ts)
-  await sessao.abrir();
+  sessao = nova;
+  try {
+    midia.servir(raiz);
+    regerarClaudeMd(raiz); // o Claude conhece os campos desta versão também nos projetos criados antes dela
+    nova.projeto.adicionarAjuste(somAcompanhaCenas); // frente Som: a narração presa às cenas (som-com-cenas.ts)
+    apagarLimposSemUso(nova.projeto); // frente Som: as versões limpas da voz que nem documento nem diário citam (limpeza-voz.ts)
+    aoAbrirMusica(nova.projeto); // frente Música: renders que faltam (pasta clonada) e os que sobraram (ipc-musica.ts)
+    await nova.abrir();
+  } catch (e) {
+    await fecharSessao(); // nada de projeto meio aberto (mídia e MCP servindo, sem observador)
+    throw e;
+  }
   memoria.lembrar(raiz, manifesto.nome);
   tituloDaJanela(manifesto.nome);
   avisoAbertura = dentroDoOneDrive(raiz)
@@ -196,13 +216,6 @@ const criarProjeto = async (o: NovoProjeto) => {
   return abrirProjeto(destino);
 };
 
-/** Arquivo que ainda não existe em `pasta`: "Nome.mp4", "Nome (2).mp4"... */
-const arquivoLivre = (pasta: string, nome: string, ext: string) => {
-  const base = nomeDePasta(nome) || 'saida';
-  let p = path.join(pasta, `${base}.${ext}`);
-  for (let n = 2; existsSync(p); n++) p = path.join(pasta, `${base} (${n}).${ext}`);
-  return p;
-};
 const tituloDoDocumento = (p: Projeto, id: string) => p.manifesto().documentos.find((d) => d.id === id)?.titulo ?? id;
 
 const criarJanela = () => {
@@ -225,6 +238,17 @@ const criarJanela = () => {
     if (url.startsWith('https://')) void shell.openExternal(url);
     return {action: 'deny'};
   });
+  // a janela só mostra o app: um arquivo solto nela (o Chromium navega para file://…) ou um link sem target não trocam a
+  // página, que levaria junto o preload com window.estudio. A própria página passa (location.reload, recarga do Vite).
+  janela.webContents.on('will-navigate', (e, url) => {
+    if (paginaDoApp(url)) return;
+    e.preventDefault();
+    if (url.startsWith('https://')) void shell.openExternal(url);
+  });
+  // câmera, localização, notificações etc.: a tela só usa o microfone (gravação da narração), a área de transferência e a
+  // tela cheia da prévia
+  janela.webContents.session.setPermissionRequestHandler((wc, permissao, ok, d) =>
+    ok(wc === janela?.webContents && paginaDoApp(d.requestingUrl) && permissaoLiberada(permissao, 'mediaTypes' in d ? d : {})));
   // recarregar a página (Ctrl+R) ou perder o renderer faz a interface esquecer as abas: fecha os terminais para não
   // sobrar claude órfão gastando memória por trás
   const largarTerminais = () => {
@@ -232,9 +256,9 @@ const criarJanela = () => {
     conversas.fecharTodas();
     mcpHttp?.esquecerTudo();
   };
-  janela.webContents.on('did-start-navigation', (d) => {
-    if (d.isMainFrame && !d.isSameDocument) largarTerminais();
-  });
+  // did-navigate (a página nova entrou) e não did-start-navigation: este vem ANTES do will-navigate, e um arquivo solto na
+  // janela, mesmo barrado lá, derrubaria todas as conversas
+  janela.webContents.on('did-navigate', () => largarTerminais());
   // frente Casca (transversal-D6): o renderer que cai (falta de memória no perfil leve) recarrega a janela em vez de ficar
   // branca; o projeto segue aberto aqui e a tela o relê. Depois de quedas em laço, avisa em vez de recarregar de novo.
   let recargas: number[] = [];
@@ -256,6 +280,7 @@ const criarJanela = () => {
     void guardarMiniatura().catch(() => undefined).finally(() => janela?.close());
   });
   janela.once('ready-to-show', () => janela?.show());
+  janela.once('closed', () => (janela = null));
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) void janela.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   else void janela.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
 };
@@ -268,21 +293,21 @@ const lidar = <A extends unknown[], R>(canal: string, f: (...a: A) => R | Promis
 
 lidar(CANAL.abrirPasta, async () => {
   const r = await dialog.showOpenDialog(janela!, {properties: ['openDirectory'], title: 'Abrir projeto do Estúdio'});
-  return r.canceled || !r.filePaths[0] ? null : abrirProjeto(r.filePaths[0]);
+  return r.canceled || !r.filePaths[0] ? null : emFila(() => abrirProjeto(r.filePaths[0]));
 });
 // o exemplo sempre em cópia nova: editar não estraga o "ver um pronto" da próxima vez
 lidar(CANAL.temExemplo, () => temExemplo());
-lidar(CANAL.abrirExemplo, () => {
+lidar(CANAL.abrirExemplo, () => emFila(() => {
   if (!temExemplo()) throw new Error('Esta instalação não traz um projeto de exemplo.');
   const destino = pastaLivre(memoria.prefs().pasta_projetos, EXEMPLO.nome);
   gravarPlano(destino, planoDoExemplo(EXEMPLO.nome), pastaDoExemplo());
   return abrirProjeto(destino);
-});
-lidar(CANAL.abrirProjeto, (raiz: string) => abrirProjeto(raiz));
+}));
+lidar(CANAL.abrirProjeto, (raiz: string) => emFila(() => abrirProjeto(raiz)));
 lidar(CANAL.projetoAtual, () => info());
-lidar(CANAL.criarProjeto, (o: NovoProjeto) => criarProjeto(o));
-lidar(CANAL.fecharProjeto, () => fecharSessao());
-lidar(CANAL.duplicarProjeto, async (o: {raiz?: string; nome: string}) => {
+lidar(CANAL.criarProjeto, (o: NovoProjeto) => emFila(() => criarProjeto(o)));
+lidar(CANAL.fecharProjeto, () => emFila(() => fecharSessao()));
+lidar(CANAL.duplicarProjeto, (o: {raiz?: string; nome: string}) => emFila(async () => {
   const origem = o.raiz ?? exigirProjeto().raiz;
   if (!existsSync(path.join(origem, 'estudio.json'))) throw new Error(`a pasta do projeto não existe mais: ${origem}`);
   if (sessao && path.resolve(sessao.projeto.raiz) === path.resolve(origem)) await sessao.marcarVersao('estúdio: antes de duplicar');
@@ -293,7 +318,7 @@ lidar(CANAL.duplicarProjeto, async (o: {raiz?: string; nome: string}) => {
   const arq = path.join(destino, 'estudio.json');
   writeFileSync(arq, serializar({...(JSON.parse(readFileSync(arq, 'utf-8')) as Manifesto), nome}), 'utf-8');
   return abrirProjeto(destino);
-});
+}));
 lidar(CANAL.renomearProjeto, (nome: string) => {
   const m = exigirProjeto().renomear(nome);
   memoria.lembrar(sessao!.projeto.raiz, m.nome);
@@ -318,7 +343,9 @@ lidar(CANAL.escolherPasta, async (titulo?: string) => {
 lidar(CANAL.marcarVersao, async () => {
   exigirProjeto();
   const ok = await sessao!.marcarVersao();
-  return ok ? {ok, mensagem: 'Ponto de restauração criado'} : {ok, mensagem: 'Sem o Git instalado não há pontos de restauração; o histórico continua no diário'};
+  if (ok) return {ok, mensagem: 'Ponto de restauração criado'};
+  return {ok, mensagem: sessao?.temGit ? 'O Git não conseguiu criar o ponto de restauração agora; o histórico continua no diário'
+    : 'Sem o Git instalado não há pontos de restauração; o histórico continua no diário'};
 });
 lidar(CANAL.escolherMidia, async (tipo: 'imagem' | 'audio' | 'video') => {
   const p = exigirProjeto();
@@ -343,7 +370,8 @@ lidar(CANAL.lerDocumento, (documento: string) => {
   const p = exigirProjeto();
   return p.lerJson(p.arquivoDoDocumento(documento));
 });
-lidar(CANAL.lerJson, (caminho: string) => exigirProjeto().lerJson(caminho).doc);
+// opcional (transições, seleção pedida pela IA): ausente, ou sem projeto aberto, é null e não um erro no log a cada abertura
+lidar(CANAL.lerJson, (caminho: string, o?: {opcional?: boolean}) => lerJsonDaTela(sessao?.projeto ?? null, caminho, o));
 lidar(CANAL.aplicarPatch, (o: {documento: string; versao_base?: string; patch: OperacaoPatch[]; rotulo?: string}) => {
   const r = exigirProjeto().aplicarPatch({...o, autor: 'pessoa', origem: 'interface'});
   return {versao: r.versao, seq: r.entrada.seq};
@@ -409,10 +437,12 @@ lidar(CANAL.exportar, async (documento: string, opcoes?: OpcoesExportarVideo): P
   const pasta = p.caminho('saidas');
   mkdirSync(pasta, {recursive: true});
   const planos = nomesDosArquivos(o.nome?.trim() || tituloDoDocumento(p, documento), o.destinos, formato);
+  const comAudio = fixo || Boolean(['audio', 'trilha', 'narracao', 'sons'].some((k) => (Array.isArray(props[k]) ? (props[k] as unknown[]).length > 0 : Boolean(props[k]))));
   const {makeCancelSignal} = await import('@remotion/renderer');
   const {cancelSignal, cancel} = makeCancelSignal();
   cancelarExportacao = cancel;
   const arquivos: string[] = [];
+  const avisos: string[] = [];
   let parcial: string | undefined;
   // o andamento de cada arquivo vai à interface com o nome dele; a barra de tarefas mostra o andamento geral
   const avisoDe = (indice: number, arquivo: string) => (x: Progresso) => {
@@ -420,8 +450,13 @@ lidar(CANAL.exportar, async (documento: string, opcoes?: OpcoesExportarVideo): P
     if (x.tipo === 'progresso' && x.progresso !== undefined) janela?.setProgressBar((indice + x.progresso / 100) / planos.length);
   };
   const fontesMarca = fontesDaMarcaDagua(props);
+  let preparado: Preparado | null = null;
   try {
-    const preparado = await prepararRender({raizApp: app.getAppPath(), empacotado: app.isPackaged, aviso: avisoDe(0, '')});
+    // dentro do try: a trava de "já há uma exportação" já vale, e a mensagem chega como as outras falhas
+    const semEspaco = await faltaEspaco(pasta, estimarExportacao(o, formato, Number(props.duracao_ms) || 0, comAudio).porDestino.map((d) => d.bytes), comAudio);
+    if (semEspaco) throw new Error(semEspaco);
+    const pronto = await prepararRender({raizApp: app.getAppPath(), empacotado: app.isPackaged, aviso: avisoDe(0, '')});
+    preparado = pronto;
     for (const [i, plano] of planos.entries()) {
       const args = argumentosDoRender(o, plano.destino, formato, Number(props.duracao_ms) || 0);
       const destino = arquivoLivre(pasta, plano.nome, args.ext);
@@ -436,9 +471,9 @@ lidar(CANAL.exportar, async (documento: string, opcoes?: OpcoesExportarVideo): P
       // marca d'água do destino, se ligada: posicionada no tamanho do destino, em frações (vale com qualquer escala), fora
       // da legenda que vai neste render (a das props do destino, já recalculada acima)
       const marca = marcaDaguaDoDestino(o.marca_dagua?.[plano.destino.id], plano.destino, fontesMarca, o.proporcao_logo, legendasDasProps(propsDestino), o.proporcao_texto);
-      await renderizarVideo(preparado, {
+      await renderizarVideo(pronto, {
         props: {...propsDestino, ...(marca ? {marca_dagua: marca} : {})},
-        arquivo: destino, codec: args.codec, videoBitrate: args.videoBitrate, escala: fixo ? args.escala : 1, quadros: args.frameRange, cancelSignal,
+        arquivo: destino, codec: args.codec, videoBitrate: args.videoBitrate, escala: fixo ? args.escala : 1, quadros: args.frameRange, cancelSignal, avisos,
       }, avisoDe(i, path.basename(destino)));
       arquivos.push(destino);
       parcial = undefined;
@@ -450,15 +485,16 @@ lidar(CANAL.exportar, async (documento: string, opcoes?: OpcoesExportarVideo): P
         }
       }
     }
-    enviar(CANAL.progresso, {tipo: 'status', mensagem: `Exportado: ${arquivos.map((a) => path.relative(p.raiz, a)).join(', ')}`});
-    return {ok: true, arquivo: arquivos[0], arquivos, pasta};
+    enviar(CANAL.progresso, {tipo: 'status', mensagem: `Exportado: ${arquivos.map((a) => path.relative(p.raiz, a)).join(', ')}${avisos.length ? `. Atenção: ${avisos.join('; ')}` : ''}`});
+    return {ok: true, arquivo: arquivos[0], arquivos, pasta, ...(avisos.length ? {avisos} : {})};
   } catch (e) {
-    const mensagem = (e as Error).message;
+    const mensagem = discoCheio((e as Error).message) ? 'o disco encheu durante a exportação; libere espaço e tente de novo' : (e as Error).message;
     const cancelado = /cancel/i.test(mensagem);
     if (parcial) rmSync(parcial, {force: true}); // o arquivo pela metade não fica em saidas/
     enviar(CANAL.progresso, {tipo: 'status', mensagem: cancelado ? 'Exportação cancelada' : `Falhou: ${mensagem}`});
-    return {ok: false, cancelado, mensagem: cancelado ? 'Exportação cancelada' : mensagem, arquivos, pasta};
+    return {ok: false, cancelado, mensagem: cancelado ? 'Exportação cancelada' : mensagem, arquivos, pasta, ...(avisos.length ? {avisos} : {})};
   } finally {
+    await encerrarRender(preparado); // o Chrome que serviu a todos os destinos
     cancelarExportacao = null;
     janela?.setProgressBar(-1);
   }
@@ -497,7 +533,10 @@ ipcMain.on(CANAL.gravarEstado, (e, estado: Omit<EstadoEditor, 'atualizado_em'>) 
 ipcMain.on(CANAL.mostrarNaPasta, (e, caminho?: string) => {
   confiavel(e);
   const alvo = caminho ?? sessao?.projeto.raiz;
-  if (alvo && existsSync(alvo)) void shell.openPath(alvo);
+  if (!alvo || !existsSync(alvo)) return;
+  // openPath abre com o programa padrão, e no Windows isso executa .exe/.bat/.lnk: arquivo só é mostrado na pasta
+  if (statSync(alvo).isDirectory()) void shell.openPath(alvo);
+  else shell.showItemInFolder(alvo);
 });
 ipcMain.on(CANAL.terminalEscrever, (e, id: number, d: string) => (confiavel(e), terminais.escrever(id, d)));
 ipcMain.on(CANAL.terminalTamanho, (e, id: number, c: number, l: number) => (confiavel(e), terminais.tamanho(id, c, l)));
@@ -546,15 +585,15 @@ app.on('ready', async () => {
   claude = await terminais.preparar();
   criarJanela();
   const inicial = process.env.ESTUDIO_PROJETO ? path.resolve(process.env.ESTUDIO_PROJETO) : memoria.prefs().ao_iniciar === 'ultimo' ? memoria.ultimo() : null;
-  if (inicial) await abrirProjeto(inicial).catch(() => undefined);
+  if (inicial) await emFila(() => abrirProjeto(inicial)).catch(() => undefined);
 });
 
-app.on('window-all-closed', () => {
-  void fecharAppsDeFora(); // frente IA
+app.on('window-all-closed', async () => {
   terminais.fecharTodos();
-  conversas.fecharTodas();
+  conversas.fecharTodas({agora: true}); // sem os 1,5 s: o processo principal sairia antes e o agente ficaria órfão
   mcpHttp?.esquecerTudo();
-  void sessao?.fechar();
+  // o commit da última edição (relógio de 8 s) antes de sair, com teto para nunca prender o fechamento
+  await Promise.race([Promise.allSettled([fecharAppsDeFora(), sessao?.fechar()]), new Promise((ok) => setTimeout(ok, 5000))]);
   midia.parar();
   app.quit();
 });

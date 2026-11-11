@@ -57,7 +57,7 @@ describe('opções do diálogo → renderMedia', () => {
 describe('estimativa de tamanho', () => {
   it('bitrate × duração, com o áudio quando há', () => {
     expect(estimarBytes(6000, 10000, false)).toBe(7_500_000);
-    expect(estimarBytes(6000, 10000, true)).toBe(7_660_000);
+    expect(estimarBytes(6000, 10000, true)).toBe(7_900_000);
     expect(formatarBytes(7_660_000)).toBe('7,3 MB');
     expect(formatarBytes(500_000)).toBe('488 KB');
     expect(formatarBytes(2 * 1024 ** 3)).toBe('2,00 GB');

@@ -14,7 +14,7 @@ import {CANAL, type ResultadoLimpezaVoz} from '../compartilhado/api';
 import type {IntensidadeLimpeza} from '../nucleo/audio';
 import {INTENSIDADES, LimpezaCancelada, limparVoz, type ControleLimpeza} from '../nucleo/limpeza-voz';
 import {ErroProjeto, PASTA_INTERNA, type Projeto} from '../nucleo/projeto';
-import {decodificarAudio, gravarWav} from './ffmpeg-som';
+import {decodificarAudio, gravarWav, medirEntrada} from './ffmpeg-som';
 import {arquivoDoEnvelope, gravarEnvelope} from './ipc-audio';
 
 /** midia/narracao.wav → midia/narracao.wav.limpo.wav (média, o padrão); leve e forte levam o nome no fim, para cada
@@ -96,10 +96,34 @@ export const apagarLimposSemUso = (p: Projeto): string[] => {
   }
 };
 
+/** Teto da limpeza, em amostras somadas dos canais: 20 min de estéreo a 48 kHz (ou 40 de mono). A limpeza segura o arquivo
+ *  inteiro na memória (o original, a saída e o WAV): 10 min de estéreo já passam de 1 GB de pico, e acima do teto a
+ *  máquina de 8 GB troca para o disco ou o app cai. O processamento em pedaços fica para depois (auditoria de render, R7). */
+export const MAX_AMOSTRAS_LIMPEZA = 20 * 60 * 48000 * 2;
+
+const minutos = (s: number) => {
+  const m = Math.round(s / 60);
+  return m >= 60 ? `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min` : `${Math.max(1, m)} min`;
+};
+const nomeDosCanais = (n: number) => (n === 1 ? 'mono' : n === 2 ? 'estéreo' : `${n} canais`);
+
+/** O áudio passa do teto da limpeza? Devolve a mensagem para a pessoa, ou null. Sem a duração (o ffmpeg não sabe), segue. */
+export const excedeLimpeza = (e: {duracao_s: number | null; taxa?: number; canais?: number}): string | null => {
+  if (!e.duracao_s || !e.taxa) return null;
+  const canais = Math.max(1, e.canais ?? 2);
+  if (e.duracao_s * e.taxa * canais <= MAX_AMOSTRAS_LIMPEZA) return null;
+  const teto = MAX_AMOSTRAS_LIMPEZA / (e.taxa * canais);
+  return `Este áudio tem ${minutos(e.duracao_s)} em ${nomeDosCanais(canais)}, e a limpeza de voz aceita até ${minutos(teto)} nesse formato `
+    + '(ela segura o arquivo inteiro na memória). Divida a gravação em partes menores e limpe cada uma.';
+};
+
 /** Limpa `arquivo` (caminho no projeto) e grava o .limpo.wav e o envelope dele; devolve o caminho no projeto. */
 export const limparArquivo = async (p: Projeto, arquivo: string, intensidade: IntensidadeLimpeza, ctrl: ControleLimpeza & {binarios?: string | null} = {}) => {
   if (typeof arquivo !== 'string' || !p.existe(arquivo)) throw new ErroProjeto(`o arquivo de áudio não está no projeto: ${String(arquivo)}`, 'nao_achado');
   if (!(intensidade in INTENSIDADES)) throw new ErroProjeto(`intensidade de limpeza desconhecida: ${String(intensidade)} (vale leve, media ou forte)`);
+  // antes de decodificar: o arquivo longo demais é recusado sem ocupar a memória
+  const longo = excedeLimpeza(await medirEntrada(p.caminho(arquivo), {binarios: ctrl.binarios, cancelado: ctrl.cancelado}));
+  if (longo) throw new ErroProjeto(longo);
   const fonte = await decodificarAudio(p.caminho(arquivo), {binarios: ctrl.binarios, cancelado: ctrl.cancelado});
   if (!fonte.canais[0]?.length) throw new ErroProjeto(`${arquivo} não tem som para limpar`);
   const r = await limparVoz(fonte.canais, fonte.taxa, intensidade, ctrl);

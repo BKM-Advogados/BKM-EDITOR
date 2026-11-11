@@ -11,7 +11,7 @@ Estúdio desktop (Electron + React + TypeScript + Remotion), 05/11/2026. O alvo 
 - **O MCP `nucleo` por HTTP local, não por stdio.** No stdio, cada aba sobe um processo `nucleo` a mais. Por HTTP, nenhuma aba sobe processo extra. O Claude Code aceita `type: "http"` com `headers` e expansão `${VAR}` no `.mcp.json` [18].
 - **Orçamento por estado, com números.** No perfil leve, sem contar o `claude`: 300 MB parado, 500 MB editando vídeo, 600 a 650 MB com Imagem ou 3D, 1,4 GB exportando. A UI fica interativa em até 1,2 s na segunda abertura. Os tetos reprovam no teste automático (seção 6).
 - **GPU é um recurso contado.** O Chromium limitava os contextos WebGL a 16 por processo de renderer, perdendo o mais antigo ao passar disso, segundo a mudança de 2013. Um engenheiro do Chromium disse em 2021 que não há plano de subir o limite, mas não achei documento atual que confirme o 16 [14]. O app fixa um teto bem menor: **no máximo 4 contextos vivos, 3 no perfil leve**, todos criados por um registro central. A GPU integrada usa a RAM do sistema, em geral até metade dela [35]. Então textura também conta no orçamento de RAM.
-- **Exportação no PC fraco:** concurrency 2, caches com tamanho fixo (o cache de quadros do `OffthreadVideo` pode chegar a 50% da memória disponível [20]) e `disallowParallelEncoding` ligado à mão no perfil leve. A partir da 4.0.533, o Remotion deixou de desligar a codificação paralela sozinho conforme a memória [19]. A prévia pausa durante o export.
+- **Exportação no PC fraco (proposta; o que o código faz hoje está na seção 4.8):** concurrency 2, caches com tamanho fixo (o cache de quadros do `OffthreadVideo` pode chegar a 50% da memória disponível [20]) e `disallowParallelEncoding` ligado à mão no perfil leve. A partir da 4.0.533, o Remotion deixou de desligar a codificação paralela sozinho conforme a memória [19]. A prévia pausa durante o export.
 - **O app mede a si mesmo:** marcas de tempo (`performance.mark`), `app.getAppMetrics()` e um selo de RAM na barra de status. Um teste com Playwright em modo Electron reprova o build que passar do teto [3][4][36].
 
 ---
@@ -195,6 +195,19 @@ A conta da Imagem que sustenta E3: uma camada RGBA de 4096² tem 64 MB. Dez cama
 
 ### 4.8 Exportação
 
+**Como está no código (`src/main/exportar.ts`, 10/11/2026).** A proposta abaixo ainda não entrou inteira. Hoje:
+- o render roda no processo principal (o plano B; não há render-host), uma exportação por vez, com `cancelSignal` e `onProgress`;
+- `concurrency` é metade dos núcleos (`os.cpus().length / 2`, no mínimo 1), em todos os perfis; numa máquina de 8 núcleos,
+  são 4 abas do Chrome;
+- os caches (`offthreadVideoCacheSizeInBytes`, `mediaCacheSizeInBytes`) e o `disallowParallelEncoding` ficam no padrão do
+  Remotion;
+- um Chrome por exportação: abre no primeiro arquivo e serve a todos os destinos (medir e renderizar), e fecha no fim;
+- antes de renderizar, o espaço livre é conferido (`faltaEspaco`); depois, o loudness corrige o som no lugar e, se falhar,
+  o vídeo fica como saiu do render, com um aviso;
+- a prévia não pausa sozinha durante a exportação.
+
+A proposta:
+
 - **Um render por vez,** no render-host, com `cancelSignal` e `onProgress` [19].
 - **Perfil leve:** `concurrency: 2` (o padrão é metade das threads de CPU [19]), ou 1 se `os.freemem()` estiver abaixo de 2 GB ou se houver WebGL na composição. `offthreadVideoCacheSizeInBytes` e `mediaCacheSizeInBytes` fixos em 256 MB: o primeiro tem padrão de até 50% da memória disponível no início do render [20]; o padrão do segundo não está documentado nas páginas consultadas, e fixar o valor evita depender dele. `disallowParallelEncoding: true` [19][20].
 - **Codificação:** `hardwareAcceleration: 'if-possible'` (valores: `disabled`, o padrão, `if-possible` e `required`) [23]. No macOS usa VideoToolbox; no Windows e no Linux só há NVENC, que exige NVIDIA e vale para H.264 e H.265 [23]. Com `hardwareAcceleration`, não se usa `crf`; usa-se `videoBitrate` [19]. Num notebook Intel, a codificação é x264 na CPU. "Exportar rascunho" usa `scale: 0.5` e um `x264Preset` rápido.
@@ -296,7 +309,7 @@ expect(kb / 1024).toBeLessThan(orcamento.leve.E1.teto_mb);
 - Imagem em resolução de trabalho, com exportação PNG em Worker.
 - Efeitos: um contexto WebGL2 compartilhado entre Imagem e Efeitos; motor CSS no vídeo.
 - Terminal: scrollback de 2.000 linhas, WebGL só na aba visível (ou DOM), controle de fluxo com ACK, `claude` direto no PTY, até 2 sessões vivas, hibernação manual.
-- Export com concurrency 2, caches de 256 MB, `disallowParallelEncoding`, cancelar e prévia pausada.
+- Export com concurrency 2, caches de 256 MB, `disallowParallelEncoding`, cancelar e prévia pausada. (Entrou só o cancelar; o resto está em "Como está no código", seção 4.8.)
 - Módulo `perf` com marcas, selo de RAM e log JSONL.
 - Teste Playwright com partida, E1, E2, E4, export de 10 s, vazamento do 3D e rajada no terminal, tudo sobre o `orcamento.json`.
 
