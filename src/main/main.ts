@@ -256,6 +256,9 @@ const criarJanela = () => {
     terminais.fecharTodos();
     conversas.fecharTodas();
     mcpHttp?.esquecerTudo();
+    // o esquecerTudo revoga também o token do MCP da IDE, que não é aba da tela (e o did-navigate do primeiro
+    // carregamento pode vir depois de o projeto inicial abrir): ele segue passando pelo app com um token novo
+    sessao?.publicarMcp(mcpHttp?.novaConexao(midia.origem, 'mcp'));
   };
   // did-navigate (a página nova entrou) e não did-start-navigation: este vem ANTES do will-navigate, e um arquivo solto na
   // janela, mesmo barrado lá, derrubaria todas as conversas

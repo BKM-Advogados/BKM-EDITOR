@@ -53,7 +53,7 @@ export class SessaoProjeto {
    *  está aberto aqui (src/nucleo/mcp-app.ts). `headers` traz o token que o McpHttp deu para isso. */
   publicarMcp(c: {url: string; headers: {Authorization: string}} | undefined) {
     const token = /^Bearer\s+(\S+)$/.exec(c?.headers.Authorization ?? '')?.[1];
-    if (!c || !token) return;
+    if (!c || !token || this.fechada) return; // fechando: o arquivo já saiu e não volta
     try {
       publicarMcpApp(this.projeto.raiz, {url: c.url, token});
       this.tokenMcp = token;
