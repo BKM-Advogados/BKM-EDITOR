@@ -5,6 +5,7 @@ import {spawn, spawnSync} from 'node:child_process';
 import {existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync} from 'node:fs';
 import os, {tmpdir} from 'node:os';
 import path from 'node:path';
+import {pathToFileURL} from 'node:url';
 import {afterAll, describe, expect, it} from 'vitest';
 import {GITIGNORE, gitignoreComRegrasInternas} from '../src/nucleo/criar-projeto';
 import {ErroProjeto, Projeto, serializar} from '../src/nucleo/projeto';
@@ -23,12 +24,17 @@ const projetoMinimo = () => {
   return {pasta, p: new Projeto(pasta), lock: path.join(pasta, '.estudio', 'escrita.lock')};
 };
 
+// o node deste processo com o carregador do tsx (o node_modules/.bin/tsx é um script de shell, que no Windows só roda
+// pelo tsx.cmd); a URL do carregador vale em qualquer sistema e não depende da pasta atual
+const CARREGADOR_TSX = pathToFileURL(path.join(RAIZ, 'node_modules', 'tsx', 'dist', 'loader.mjs')).href;
+
 const escritor = (pasta: string, n: number, modo: string, nome: string) =>
   new Promise<{ok: number; conflitos: number; outros: number}>((res, rej) => {
-    const c = spawn(path.join(RAIZ, 'node_modules', '.bin', 'tsx'), [path.join(__dirname, 'fixtures', 'corrida-escrita.ts'), pasta, String(n), modo, nome],
-      {stdio: ['ignore', 'pipe', 'inherit']});
+    const c = spawn(process.execPath, ['--import', CARREGADOR_TSX, path.join(__dirname, 'fixtures', 'corrida-escrita.ts'), pasta, String(n), modo, nome],
+      {stdio: ['ignore', 'pipe', 'inherit'], windowsHide: true});
     let out = '';
     c.stdout.on('data', (d) => (out += d));
+    c.on('error', rej); // sem isto, um filho que não sobe deixava o teste parado até o limite de 120 s
     c.on('exit', (code) => (code === 0 ? res(JSON.parse(out)) : rej(new Error(`saiu ${code}`))));
   });
 
