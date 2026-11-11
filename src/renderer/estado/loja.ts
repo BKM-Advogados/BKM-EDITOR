@@ -227,7 +227,7 @@ export const criarDocumento = async (modulo: Modulo, formato?: {largura: number;
     const info = await window.estudio.projetoAtual();
     if (info) await abrirProjeto(info);
     loja.definir((e) => ({area: modulo, ativo: {...e.ativo, [modulo]: entrada.id}, selecao: null, tempo_ms: 0, ...(modulo === 'video' ? {alvoEfeitos: entrada.id} : {})}));
-    avisar(`${entrada.titulo} criado`, 'ok');
+    avisar(`Novo documento: ${entrada.titulo}`, 'ok');
     return entrada;
   } catch (e) {
     avisar(mensagemDe(e), 'erro');

@@ -27,23 +27,23 @@ const InspectorObjeto: React.FC<{documento: string; caminho: string; o: Objeto3D
   return (
     <>
       <Secao titulo="Objeto" acao={<Id id={o.id} />}>
-        <CampoTexto rotulo="nome" valor={o.nome ?? ''} aoMudar={(t) => gravar('nome', t)} invalido={(t) => (t.trim() ? null : 'o nome não pode ficar vazio')} />
-        <CampoEscolha<TipoObjeto> rotulo="tipo" valor={o.tipo} opcoes={OPCOES_TIPO} aoMudar={(t) => gravar('tipo', t)} />
+        <CampoTexto rotulo="Nome" valor={o.nome ?? ''} aoMudar={(t) => gravar('nome', t)} invalido={(t) => (t.trim() ? null : 'o nome não pode ficar vazio')} />
+        <CampoEscolha<TipoObjeto> rotulo="Tipo" valor={o.tipo} opcoes={OPCOES_TIPO} aoMudar={(t) => gravar('tipo', t)} />
       </Secao>
       <Secao titulo="Transformação">
-        <CampoVetor rotulo="posição" valor={o.posicao} aoMudar={(v) => gravar('posicao', v)} />
-        <CampoVetor rotulo="rotação (°)" valor={o.rotacao} passo={5} aoMudar={(v) => gravar('rotacao', v)} />
-        <CampoVetor rotulo="escala" valor={o.escala} padrao={[1, 1, 1]} aoMudar={(v) => gravar('escala', v)} />
+        <CampoVetor rotulo="Posição" valor={o.posicao} aoMudar={(v) => gravar('posicao', v)} />
+        <CampoVetor rotulo="Rotação (°)" valor={o.rotacao} passo={5} aoMudar={(v) => gravar('rotacao', v)} />
+        <CampoVetor rotulo="Escala" valor={o.escala} padrao={[1, 1, 1]} aoMudar={(v) => gravar('escala', v)} />
       </Secao>
       <Secao titulo="Material">
-        <CampoCorAoSoltar rotulo="cor" valor={o.cor ?? ''} aoVer={(c) => ajustarAoVivo(o.id, {cor: c})} aoMudar={(c) => gravar('cor', c)} />
-        <CampoDeslizante rotulo="metálico" valor={o.metalico ?? PADRAO_METALICO} min={0} max={1} passo={0.01}
+        <CampoCorAoSoltar rotulo="Cor" valor={o.cor ?? ''} aoVer={(c) => ajustarAoVivo(o.id, {cor: c})} aoMudar={(c) => gravar('cor', c)} />
+        <CampoDeslizante rotulo="Metálico" valor={o.metalico ?? PADRAO_METALICO} min={0} max={1} passo={0.01}
           aoVer={(v) => ajustarAoVivo(o.id, {metalico: v})} aoMudar={(v) => gravar('metalico', v)} />
-        <CampoDeslizante rotulo="rugosidade" valor={o.rugosidade ?? PADRAO_RUGOSIDADE} min={0} max={1} passo={0.01}
+        <CampoDeslizante rotulo="Rugosidade" valor={o.rugosidade ?? PADRAO_RUGOSIDADE} min={0} max={1} passo={0.01}
           aoVer={(v) => ajustarAoVivo(o.id, {rugosidade: v})} aoMudar={(v) => gravar('rugosidade', v)} />
       </Secao>
       <Secao titulo="Prévia animada">
-        <CampoVetor rotulo="gira (°/s)" valor={o.gira} passo={5} aoMudar={(v) => gravar('gira', v)} />
+        <CampoVetor rotulo="Gira (°/s)" valor={o.gira} passo={5} aoMudar={(v) => gravar('gira', v)} />
       </Secao>
     </>
   );
@@ -62,10 +62,10 @@ const InspectorLuz: React.FC<{documento: string; doc: DocCena3D; caminho: string
   };
   return (
     <Secao titulo="Luz" acao={<Id id={l.id} />}>
-      <CampoEscolha<Luz3D['tipo']> rotulo="tipo" valor={l.tipo} opcoes={TIPOS_LUZ} aoMudar={trocarTipo} />
-      <CampoCorAoSoltar rotulo="cor" valor={l.cor ?? ''} aoMudar={(c) => gravar('cor', c)} />
-      <CampoNumero rotulo="intensidade" valor={l.intensidade} passo={0.1} aoMudar={(n) => gravar('intensidade', n)} />
-      {l.tipo !== 'ambiente' && <CampoVetor rotulo="posição" valor={l.posicao} aoMudar={(v) => gravar('posicao', v)} />}
+      <CampoEscolha<Luz3D['tipo']> rotulo="Tipo" valor={l.tipo} opcoes={TIPOS_LUZ} aoMudar={trocarTipo} />
+      <CampoCorAoSoltar rotulo="Cor" valor={l.cor ?? ''} aoMudar={(c) => gravar('cor', c)} />
+      <CampoNumero rotulo="Intensidade" valor={l.intensidade} passo={0.1} aoMudar={(n) => gravar('intensidade', n)} />
+      {l.tipo !== 'ambiente' && <CampoVetor rotulo="Posição" valor={l.posicao} aoMudar={(v) => gravar('posicao', v)} />}
     </Secao>
   );
 };
@@ -80,18 +80,18 @@ const InspectorCena: React.FC<{documento: string; doc: DocCena3D}> = ({documento
   return (
     <>
       <Secao titulo="Cena">
-        <CampoCorAoSoltar rotulo="fundo" valor={doc.fundo ?? ''} aoMudar={(c) => void trocar(documento, '/fundo', c, 'fundo da cena')} />
-        <CampoLeitura rotulo="objetos">{objetosDe(doc).length}</CampoLeitura>
-        <CampoLeitura rotulo="luzes">{luzesDe(doc).length}</CampoLeitura>
+        <CampoCorAoSoltar rotulo="Fundo" valor={doc.fundo ?? ''} aoMudar={(c) => void trocar(documento, '/fundo', c, 'fundo da cena')} />
+        <CampoLeitura rotulo="Objetos">{objetosDe(doc).length}</CampoLeitura>
+        <CampoLeitura rotulo="Luzes">{luzesDe(doc).length}</CampoLeitura>
       </Secao>
       <Secao titulo="Câmera">
-        <CampoNumero key={chaveFov} rotulo="fov (°)" valor={camera?.fov} passo={1} aoMudar={(n) => {
+        <CampoNumero key={chaveFov} rotulo="Ângulo (°)" valor={camera?.fov} passo={1} aoMudar={(n) => {
           if (n > 1 && n < 179) return gravarCamera('fov', n);
           avisar('O campo de visão vai de 1° a 179°: o valor não foi gravado.', 'erro');
           setChaveFov((k) => k + 1); // o campo volta ao valor que está no documento
         }} />
-        <CampoVetor rotulo="posição" valor={camera?.posicao} aoMudar={(v) => gravarCamera('posicao', v)} />
-        <CampoVetor rotulo="alvo" valor={camera?.alvo} aoMudar={(v) => gravarCamera('alvo', v)} />
+        <CampoVetor rotulo="Posição" valor={camera?.posicao} aoMudar={(v) => gravarCamera('posicao', v)} />
+        <CampoVetor rotulo="Alvo" valor={camera?.alvo} aoMudar={(v) => gravarCamera('alvo', v)} />
         <button className="bt" style={{width: "100%", justifyContent: "center", marginTop: 4}} onClick={() => void usarVistaComoCamera(documento)}>
           <Camera size={14} />Usar a vista atual como câmera
         </button>

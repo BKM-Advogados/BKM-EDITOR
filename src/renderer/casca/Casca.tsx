@@ -378,7 +378,7 @@ export const Casca: React.FC = () => {
   }, [menu, info?.raiz]);
   const novoDocumento = (m: Modulo) => {
     setMenu(false);
-    const f = m === 'video' ? FORMATOS_VIDEO.find((x) => x.id === prefs?.formato_video) ?? FORMATOS_VIDEO[0]
+    const f = m === 'video' || m === 'animacao' ? FORMATOS_VIDEO.find((x) => x.id === prefs?.formato_video) ?? FORMATOS_VIDEO[0]
       : m === 'imagem' ? FORMATOS_IMAGEM.find((x) => x.id === prefs?.formato_imagem) ?? FORMATOS_IMAGEM[0] : undefined;
     void criarDocumento(m, f ? {largura: f.largura, altura: f.altura, fps: 30} : undefined);
   };
