@@ -111,6 +111,20 @@ A ponte `window.estudio` é simulada em memória (`scripts/previa-web/ponte.ts`)
 vídeo de cenas e editar, sem disco e sem o Claude de verdade; a exportação é simulada (o diálogo mostra um andamento de
 mentira e nada é gravado).
 
+## Usar pelo Claude Desktop (2.0.1)
+
+O Estúdio também é operado pelo **Claude Desktop**, sem configurar nada à mão. Instale o Estúdio e depois faça uma de
+duas coisas: instale a extensão `Estudio-<versão>.mcpb` da release no Claude Desktop (Configurações › Extensões), ou
+clique em **Conectar ao Claude Desktop** em Configurações › IA do Estúdio. Em seguida, reinicie o Claude Desktop.
+
+Com o app aberto num projeto, o Claude Desktop trabalha nele: a tela acompanha, tudo entra no Histórico como "Claude
+Desktop" com Reverter, e as ações sensíveis pedem permissão na tela do app. Com o app fechado, o Claude lista os
+projetos (os recentes e a pasta `Estudio`) e trabalha no que for escolhido.
+
+A extensão é um lançador fino, que roda o MCP do próprio Estúdio instalado e por isso se atualiza junto com o app. Um
+`.mcpb` só serve a Windows, Mac e Linux. Ele sai do `npm run mcpb` e do CI (artifact `estudio-claude-desktop`).
+Detalhes, limites e como remover: `docs/claude-desktop.md`.
+
 ## Começar
 
 O app abre na **tela inicial**:

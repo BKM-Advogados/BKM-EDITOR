@@ -139,6 +139,10 @@ export const CANAL = {
   iaAppsNovo: 'estudio:ia-apps-novo',
   iaAppsConfigs: 'estudio:ia-apps-configs',
   iaAppsRevogar: 'estudio:ia-apps-revogar',
+  // Claude Desktop (src/main/claude-desktop.ts, docs/claude-desktop.md)
+  iaClaudeDesktop: 'estudio:ia-claude-desktop',
+  iaClaudeDesktopConectar: 'estudio:ia-claude-desktop-conectar',
+  iaClaudeDesktopDesconectar: 'estudio:ia-claude-desktop-desconectar',
   iaGuardar: 'estudio:ia-guardar',
   iaGuardadas: 'estudio:ia-guardadas',
   iaApagarGuardada: 'estudio:ia-apagar-guardada',
@@ -410,6 +414,10 @@ export type ApiEstudio = {
     appsNovo: (nome: string) => Promise<{id: string; configs: ConfigsDoApp}>;
     appsConfigs: (id: string) => Promise<ConfigsDoApp>;
     appsRevogar: (id: string) => Promise<EstadoAppsDeFora>;
+    /** Claude Desktop: a entrada "estudio" no claude_desktop_config.json (estado, gravar e tirar). */
+    claudeDesktop: () => Promise<EstadoClaudeDesktop>;
+    claudeDesktopConectar: () => Promise<EstadoClaudeDesktop>;
+    claudeDesktopDesconectar: () => Promise<EstadoClaudeDesktop>;
     /** Conversas guardadas por projeto (F6): gravar a conversa aberta, listar as guardadas e apagar uma. */
     guardar: (id: number, c: {titulo: string; itens: unknown[]; uso?: unknown}) => Promise<string | null>;
     guardadas: () => Promise<ConversaGuardadaTela[]>;
@@ -511,6 +519,11 @@ export type PedidoPortaoTela = {id: string; origem: string; ferramenta: string; 
 export type ResultadoReverter = {ok: true; seq: number; rotulo: string} | {ok: false; mensagem: string; mudou_depois?: boolean};
 /** Apps de IA de fora (padrão Screenpipe): a porta fixa só em 127.0.0.1 e os apps com token próprio. */
 export type EstadoAppsDeFora = {ligado: boolean; porta: number; ouvindo: boolean; erro?: string; apps: {id: string; nome: string; criado_em: string}[]};
+/** Claude Desktop (docs/claude-desktop.md): o arquivo de configuração dele, a situação da entrada "estudio" nele
+ *  (conectado, desatualizado: do Estúdio, mas de outro caminho; manual: posta por outra pessoa ou programa), se o Claude
+ *  Desktop e a extensão .mcpb estão neste PC e se o app roda de uma cópia temporária do macOS. */
+export type EstadoClaudeDesktop = {arquivo: string; situacao: 'conectado' | 'desatualizado' | 'manual' | 'desconectado' | 'ilegivel';
+  claude_encontrado: boolean; extensao: boolean; translocado: boolean; aviso?: string};
 /** A configuração pronta para colar no app de fora, por HTTP e por stdio (com a ponte do próprio Estúdio). */
 export type ConfigsDoApp = {http: string; stdio: string};
 /** Projetos prontos para IDE: a opção, o comando t3 (null fora do PATH) e o que a última abertura escreveu neste projeto. */

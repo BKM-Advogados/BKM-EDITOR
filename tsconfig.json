@@ -15,6 +15,6 @@
     "noUnusedLocals": true,
     "types": ["node"]
   },
-  "include": ["src", "mcp", "testes", "scripts", "forge.env.d.ts", "forge.config.ts", "vite.*.ts", "vitest.config.ts"],
+  "include": ["src", "mcp", "mcpb", "testes", "scripts", "forge.env.d.ts", "forge.config.ts", "vite.*.ts", "vitest.config.ts"],
   "exclude": ["remotion.config.ts", "out", ".vite", "referencia", "node_modules"]
 }

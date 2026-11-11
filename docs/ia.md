@@ -120,6 +120,10 @@ Envolve o `registerTool`: toda ferramenta registrada depois dele passa por ele, 
     ferramenta e o cartão do portão que esperava a pessoa.
 - Se um dia a fuse `RunAsNode` do Electron for desligada, a ponte stdio para de funcionar. A configuração HTTP
   continua.
+- **Claude Desktop** (2.0.1): não precisa mais desta seção. O app publica um arquivo de descoberta com um token só do
+  Claude Desktop, e a extensão `.mcpb` ou o botão "Conectar ao Claude Desktop" fazem o resto, com a origem "Claude
+  Desktop" e o mesmo portão. A configuração stdio antiga, com a ponte, segue funcionando, e o botão a troca pela nova.
+  Detalhes em `docs/claude-desktop.md`.
 - **IDE de agentes** (T3 Code, Claude Code, Cursor): cada projeto leva um `.mcp.json` com o MCP por stdio, sem token e sem
   o app aberto, e o agente vê o vídeo por `ver_quadro`, `ver_cenas` e `ver_trecho`. Detalhes em `docs/ide.md`.
 
@@ -168,6 +172,7 @@ O pedido de navegação é o `.estudio/selecao.json` (`{documento, caminhos, tem
 | `testes/diario.test.ts` | linha quebrada, seq pelo fim do arquivo, reverter, Ctrl+Z depois de reabrir |
 | `testes/portao.test.ts` | portão, seq no resultado, reverter de outra aba, limite do listar, avisos do resolvedor |
 | `testes/apps-de-fora.test.ts` | porta fixa, token por app, Origin e Host, ponte stdio, revogar |
+| `testes/claude-desktop.test.ts`, `testes/claude-desktop-mcp.test.ts` | Claude Desktop: três sistemas, mesclagem do config, descoberta, lançador, manifesto, ponta a ponta com o `.mcpb` |
 | `testes/prova-acp-qwen.test.ts` | opcional: o Qwen Code real dirigido pela API falsa |
 | `testes/narracao-chaves.test.ts` | chave do Google Cloud TTS (aceita, recusada, API desativada, sem rede), estado sem a chave, stdio pelo ambiente |
 
