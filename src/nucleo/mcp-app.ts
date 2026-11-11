@@ -108,7 +108,12 @@ export const pedidoNaoSaiu = (codigo: string | undefined, conectou: boolean) => 
 
 export type CriarConexao = NonNullable<http.RequestOptions['createConnection']>;
 
-const postar = (c: ConexaoApp, corpo: string, quem: ConversaIde | undefined, prazo: number, criarConexao?: CriarConexao) =>
+/** O que o repasse precisa da conexão: o endereço e o token (o MCP do Claude Desktop usa a descoberta, claude-desktop.ts). */
+export type DestinoApp = Pick<ConexaoApp, 'url' | 'token'>;
+
+class Cancelado extends Error {}
+
+const postar = (c: DestinoApp, corpo: string, quem: ConversaIde | undefined, prazo: number, criarConexao?: CriarConexao, sinal?: AbortSignal) =>
   new Promise<Resposta>((ok, falhou) => {
     // conexão nova a cada chamada (sem o keep-alive do agente padrão): numa conexão reaproveitada, o app que fechou
     // derruba o pedido já escrito (ECONNRESET) e não há como saber se ele chegou; numa nova, o "connect" diz isso
@@ -128,7 +133,11 @@ const postar = (c: ConexaoApp, corpo: string, quem: ConversaIde | undefined, pra
       else s.once('connect', () => (conectou = true));
     });
     const relogio = setTimeout(() => req.destroy(new PrazoEstourado()), prazo);
-    req.on('close', () => clearTimeout(relogio));
+    // o cliente desistiu (Parar no Claude Desktop): a conexão fecha e o app cancela a ferramenta e o cartão do portão
+    const cancelar = () => req.destroy(new Cancelado());
+    if (sinal?.aborted) cancelar();
+    else sinal?.addEventListener('abort', cancelar, {once: true});
+    req.on('close', () => (clearTimeout(relogio), sinal?.removeEventListener('abort', cancelar)));
     req.on('error', (e) => falhou(pedidoNaoSaiu((e as NodeJS.ErrnoException).code, conectou) ? new SemConexao(e.message) : e));
     req.end(corpo);
   });
@@ -137,13 +146,14 @@ const erroJsonRpc = (id: unknown, message: string): JSONRPCMessage => ({jsonrpc:
 
 /** Repassa uma mensagem JSON-RPC ao app. Devolve a resposta; null quando o app não a atende (fechou antes de a conexão
  *  abrir, ou está sem projeto) e a chamada deve rodar aqui; 'recusado' quando o app vivo recusou o token (401). Nos dois, o pedido não rodou no app. */
-export const encaminharAoApp = async (c: ConexaoApp, msg: JSONRPCMessage, quem?: ConversaIde,
-  prazo = PRAZO_DO_APP_MS, criarConexao?: CriarConexao): Promise<JSONRPCMessage | null | 'recusado'> => {
+export const encaminharAoApp = async (c: DestinoApp, msg: JSONRPCMessage, quem?: ConversaIde,
+  prazo = PRAZO_DO_APP_MS, criarConexao?: CriarConexao, sinal?: AbortSignal): Promise<JSONRPCMessage | null | 'recusado'> => {
   const id = (msg as {id?: unknown}).id;
   let r: Resposta;
   try {
-    r = await postar(c, JSON.stringify(msg), quem, prazo, criarConexao);
+    r = await postar(c, JSON.stringify(msg), quem, prazo, criarConexao, sinal);
   } catch (e) {
+    if (e instanceof Cancelado) return erroJsonRpc(id, 'cancelado por quem pediu');
     if (e instanceof PrazoEstourado) {
       return erroJsonRpc(id, `o Estúdio aberto neste projeto não respondeu em ${Math.round(prazo / 60000)} min; nada foi gravado por aqui. `
         + 'Se a pessoa permitiu no app depois disso, confira com listar_mudancas antes de repetir');
