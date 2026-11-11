@@ -364,7 +364,8 @@ lidar(CANAL.novoComentario, (c: Pick<Comentario, 'documento' | 'texto' | 'alvo'>
 lidar(CANAL.responder, (id: string, texto: string) => exigirProjeto().responder(id, 'pessoa', texto));
 lidar(CANAL.resolverComentario, (id: string) => exigirProjeto().resolver(id, 'pessoa'));
 lidar(CANAL.reabrir, (id: string) => exigirProjeto().reabrir(id));
-lidar(CANAL.diario, (desde?: number) => exigirProjeto().diario(desde ?? 0, {tolerante: true}).slice(-200)); // frente IA: transversal-D2
+// frente IA (transversal-D2); auditoria N7: o fim do diário pelo índice leve, sem os patches (Projeto.resumoDoDiario)
+lidar(CANAL.diario, (desde?: number) => exigirProjeto().resumoDoDiario(desde ?? 0));
 // pesquisa (docs/pesquisa.md): a interface só lê; o Claude grava pelo MCP e o observador da pasta avisa a tela
 lidar(CANAL.pesquisa, () => exigirProjeto().pesquisa());
 // o texto de uma fonte passa de 600 KB (a CLT inteira): lido sem travar o processo principal

@@ -1,6 +1,6 @@
 // Contrato entre a interface (renderer) e o processo principal. O preload expõe só isto em window.estudio; a interface
 // não tem acesso a Node nem ao disco.
-import type {Comentario, EntradaDiario, EntradaDocumento, EstadoEditor, Manifesto, Modulo, OperacaoPatch} from '../nucleo/documentos';
+import type {Comentario, EntradaDocumento, EstadoEditor, Manifesto, Modulo, OperacaoPatch, ResumoDiario} from '../nucleo/documentos';
 import type {IdModelo} from '../nucleo/modelos';
 import type {Formato} from '../nucleo/formatos';
 import type {Envelope, IntensidadeLimpeza, LimpezaClipe} from '../nucleo/audio';
@@ -251,7 +251,7 @@ export type ApiEstudio = {
   responder: (id: string, texto: string) => Promise<Comentario>;
   resolverComentario: (id: string) => Promise<Comentario>;
   reabrir: (id: string) => Promise<Comentario>;
-  diario: (desde?: number) => Promise<EntradaDiario[]>;
+  diario: (desde?: number) => Promise<ResumoDiario[]>;
   gravarEstado: (e: Omit<EstadoEditor, 'atualizado_em'>) => void;
   aoMudar: (cb: (m: Mudanca) => void) => () => void;
   terminal: {

@@ -6,7 +6,7 @@ import {existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync, cl
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import jsonpatch, {type Operation} from 'fast-json-patch';
-import type {ArquivoComentarios, Comentario, EntradaDiario, EntradaDocumento, EstadoEditor, Manifesto, OperacaoPatch} from './documentos';
+import type {ArquivoComentarios, Comentario, EntradaDiario, EntradaDocumento, EstadoEditor, Manifesto, OperacaoPatch, ResumoDiario} from './documentos';
 import {comNovaTentativa, gravarAtomico, renomearComRetry} from './gravar-seguro';
 import {comATrava, comTrava} from './trava-escrita';
 import {ARQUIVO_PESQUISA, caminhoTextoFonte, lerPesquisa, pesquisaVazia, type Pesquisa} from './pesquisa';
@@ -338,6 +338,83 @@ export class Projeto {
     }
   }
 
+  // ---------- índice leve do diário (auditoria do núcleo, N7) ----------
+  // O diário passa de dezenas de MB com as edições grandes do agente. O Ctrl+Z, o Reverter e o Histórico usam este
+  // índice: o que cada entrada é (seq, autor, documento, desfaz…) e onde ela está no arquivo, sem os patches. Ele cresce
+  // pelo que entrou no fim do arquivo (também o que o outro processo gravou) e se refaz se o arquivo encolher ou for
+  // trocado. A entrada inteira se lê pelo lugar dela, só quando vai ser revertida.
+  private indice: {dev: number; ino: number; fim: number; entradas: EntradaLeve[]} | null = null;
+
+  private indiceDoDiario(): EntradaLeve[] {
+    const abs = this.caminho(this.arquivoDiario());
+    if (!existsSync(abs)) {
+      this.indice = null;
+      return [];
+    }
+    const fd = openSync(abs, 'r');
+    try {
+      const st = fstatSync(fd);
+      let ix = this.indice;
+      if (ix && (ix.dev !== st.dev || ix.ino !== st.ino || st.size < ix.fim || !continuaIgual(fd, ix))) ix = null;
+      ix ??= {dev: st.dev, ino: st.ino, fim: 0, entradas: []};
+      if (st.size > ix.fim) {
+        const buf = Buffer.allocUnsafe(st.size - ix.fim);
+        const lidos = lerTudo(fd, buf, ix.fim);
+        let pos = 0;
+        for (let nl = buf.indexOf(0x0a); nl >= 0 && nl < lidos; nl = buf.indexOf(0x0a, pos)) {
+          const e = entradaLeve(buf, pos, nl, ix.fim);
+          if (e) ix.entradas.push(e);
+          pos = nl + 1;
+        }
+        ix.fim += pos; // a linha que outro processo ainda está escrevendo fica para a próxima vez
+      }
+      this.indice = ix;
+      return ix.entradas;
+    } finally {
+      closeSync(fd);
+    }
+  }
+
+  /** A entrada inteira (com patch e inverso), lida do lugar dela no arquivo. */
+  private lerEntrada(e: EntradaLeve): EntradaDiario | null {
+    const fd = openSync(this.caminho(this.arquivoDiario()), 'r');
+    try {
+      const buf = Buffer.alloc(e.fim - e.ini);
+      readSync(fd, buf, 0, buf.length, e.ini);
+      const lida = JSON.parse(buf.toString('utf-8')) as EntradaDiario;
+      return lida?.seq === e.seq ? lida : null;
+    } catch {
+      return null;
+    } finally {
+      closeSync(fd);
+    }
+  }
+
+  /** O fim do diário para o painel Histórico (CANAL.diario): as últimas `limite` entradas depois de `desde`, sem os
+   *  patches, com um resumo do patch e se já foram revertidas. */
+  resumoDoDiario(desde = 0, limite = 200): ResumoDiario[] {
+    const todas = this.indiceDoDiario();
+    const revertidas = revertidasDe(todas);
+    const ultimas = todas.filter((e) => e.seq > desde).slice(-limite);
+    if (!ultimas.length) return [];
+    const fd = openSync(this.caminho(this.arquivoDiario()), 'r');
+    try {
+      return ultimas.map(({ini, fim, patchIni, tem_inverso, ...e}) => {
+        let resumo = '';
+        if (patchIni >= 0) {
+          const buf = Buffer.alloc(Math.min(TAMANHO_DO_RESUMO + 16, fim - patchIni));
+          readSync(fd, buf, 0, buf.length, patchIni);
+          const t = buf.toString('utf-8');
+          const corte = t.indexOf('],"inverso":');
+          resumo = corte >= 0 && corte < TAMANHO_DO_RESUMO ? t.slice(0, corte + 1) : `${t.slice(0, TAMANHO_DO_RESUMO)}…`;
+        }
+        return {...e, resumo, tem_inverso, revertida: revertidas.has(e.seq)};
+      });
+    } finally {
+      closeSync(fd);
+    }
+  }
+
   registrar(e: EntradaDiario) {
     const abs = this.caminhoParaGravar(this.arquivoDiario());
     mkdirSync(path.dirname(abs), {recursive: true});
@@ -365,7 +442,7 @@ export class Projeto {
   /** As entradas já revertidas. Lidas de trás para a frente: um desfazer revertido depois (refazer) não conta, e a
    *  entrada que ele desfazia volta a valer (A, desfaz A, refaz: A não está revertida). */
   revertidas(): Set<number> {
-    return revertidasDe(this.diario(0, {tolerante: true}));
+    return revertidasDe(this.indiceDoDiario());
   }
 
   /**
@@ -380,11 +457,13 @@ export class Projeto {
 
   private reverterSemTrava(seq: number, o: {autor: string; origem: string; forcar?: boolean}):
     {ok: true; seq: number; rotulo: string} | {ok: false; mensagem: string; mudou_depois?: boolean} {
-    const todas = this.diario(0, {tolerante: true});
-    const e = todas.find((x) => x.seq === seq);
-    if (!e) return {ok: false, mensagem: `não há a mudança #${seq} no histórico`};
+    const todas = this.indiceDoDiario();
+    const leve = todas.find((x) => x.seq === seq);
+    if (!leve) return {ok: false, mensagem: `não há a mudança #${seq} no histórico`};
     if (revertidasDe(todas).has(seq)) return {ok: false, mensagem: `a mudança #${seq} já foi revertida`};
-    if (!e.inverso?.length) return {ok: false, mensagem: `a mudança #${seq} não tem o que reverter`};
+    if (!leve.tem_inverso) return {ok: false, mensagem: `a mudança #${seq} não tem o que reverter`};
+    const e = this.lerEntrada(leve);
+    if (!e?.inverso?.length) return {ok: false, mensagem: `a mudança #${seq} não tem o que reverter`};
     const alvo = this.arquivoDaEntrada(e.documento);
     if (!alvo) return {ok: false, mensagem: `o arquivo da mudança #${seq} (${e.documento}) não está mais no projeto`};
     let atual: string;
@@ -419,16 +498,17 @@ export class Projeto {
   }
 
   private desfazerUltimaSemTrava(o: {autor: string; origem: string; como: {autor: string; origem: string}}) {
-    const todas = this.diario(0, {tolerante: true});
+    const todas = this.indiceDoDiario();
     const revertidas = revertidasDe(todas);
     const existe = new Map<string, boolean>();
     const ultima = todas.findLast((e) => {
-      if (e.autor !== o.autor || e.origem !== o.origem || e.desfaz !== undefined || revertidas.has(e.seq) || !e.inverso?.length) return false;
+      if (e.autor !== o.autor || e.origem !== o.origem || e.desfaz !== undefined || revertidas.has(e.seq) || !e.tem_inverso) return false;
       if (!existe.has(e.documento)) existe.set(e.documento, this.arquivoDaEntrada(e.documento) !== null);
       return existe.get(e.documento)!;
     });
     if (!ultima) return {ok: false as const, mensagem: 'nada para desfazer'};
-    return {...this.reverterSemTrava(ultima.seq, o.como), alvo: ultima};
+    const {ini: _i, fim: _f, patchIni: _p, tem_inverso: _t, ...alvo} = ultima;
+    return {...this.reverterSemTrava(ultima.seq, o.como), alvo};
   }
 
   // ---------- comentários ----------
@@ -588,8 +668,81 @@ const resumirPatch = (patch: OperacaoPatch[]) => {
   return `${ops.length} mudanças (${ops[0].path}…)`;
 };
 
+/** O que o índice do diário guarda de cada entrada: o lugar dela no arquivo (`ini`–`fim`, sem a quebra de linha) e
+ *  onde começa o patch (para o resumo do Histórico), sem o patch e o inverso. */
+type EntradaLeve = Omit<EntradaDiario, 'patch' | 'inverso' | 'versao_antes' | 'versao_depois'> & {ini: number; fim: number; patchIni: number; tem_inverso: boolean};
+
+const TAMANHO_DO_RESUMO = 800;
+const CHAVE_PATCH = Buffer.from(',"patch":');
+const CHAVE_INVERSO_VAZIO = Buffer.from('"inverso":[]');
+
+/** Uma linha do diário (bytes `a`–`b` de `buf`, que começa em `base` no arquivo) no índice. Lê só o começo (seq, autor,
+ *  documento, rótulo…) e o fim (desfaz, transicao), que o JSON.stringify do registro escreve antes do patch e depois do
+ *  inverso; o patch e o inverso, que são quase tudo, não passam pelo JSON.parse. Linha fora desse formato (à mão, de
+ *  outra versão) é lida inteira; linha quebrada fica de fora. */
+const entradaLeve = (buf: Buffer, a: number, b: number, base: number): EntradaLeve | null => {
+  while (b > a && (buf[b - 1] === 0x0d || buf[b - 1] === 0x20)) b--;
+  if (b <= a) return null;
+  const leve = (e: Partial<EntradaDiario> | null, patchIni: number, temInverso: boolean): EntradaLeve | null => {
+    if (!e || typeof e.seq !== 'number') return null;
+    const {patch: _p, inverso: _i, versao_antes: _a, versao_depois: _d, ...resto} = e;
+    return {...(resto as Omit<EntradaLeve, 'ini' | 'fim' | 'patchIni' | 'tem_inverso'>), ini: base + a, fim: base + b, patchIni, tem_inverso: temInverso};
+  };
+  const k = buf.indexOf(CHAVE_PATCH, a);
+  const fecha = buf.lastIndexOf(0x5d, b - 1); // o "]" do inverso, a última lista da linha
+  if (k >= 0 && k < b && fecha > k) {
+    try {
+      const comeco = JSON.parse(`${buf.toString('utf-8', a, k)}}`) as Partial<EntradaDiario>;
+      const resto = buf.toString('utf-8', fecha + 1, b);
+      const fim = resto === '}' ? {} : resto.startsWith(',') ? JSON.parse(`{${resto.slice(1)}`) as Partial<EntradaDiario> : null;
+      if (fim && typeof comeco.seq === 'number') {
+        const vazio = fecha + 1 - CHAVE_INVERSO_VAZIO.length;
+        const temInverso = !(vazio > k && buf.compare(CHAVE_INVERSO_VAZIO, 0, CHAVE_INVERSO_VAZIO.length, vazio, fecha + 1) === 0);
+        const e = Object.assign(comeco, fim) as EntradaLeve; // versao_antes e versao_depois ficam: são curtas
+        e.ini = base + a;
+        e.fim = base + b;
+        e.patchIni = base + k + CHAVE_PATCH.length;
+        e.tem_inverso = temInverso;
+        return e;
+      }
+    } catch {
+      /* fora do formato: lê inteira */
+    }
+  }
+  try {
+    const e = JSON.parse(buf.toString('utf-8', a, b)) as EntradaDiario;
+    return leve(e, -1, Array.isArray(e?.inverso) && e.inverso.length > 0);
+  } catch {
+    return null;
+  }
+};
+
+/** Lê `buf.length` bytes a partir de `posicao` (readSync pode devolver menos de uma vez); devolve quantos leu. */
+const lerTudo = (fd: number, buf: Buffer, posicao: number) => {
+  let lidos = 0;
+  while (lidos < buf.length) {
+    const n = readSync(fd, buf, lidos, buf.length - lidos, posicao + lidos);
+    if (n <= 0) break;
+    lidos += n;
+  }
+  return lidos;
+};
+
+/** O índice ainda vale para o arquivo: a última entrada indexada continua onde estava (o arquivo não foi reescrito no lugar). */
+const continuaIgual = (fd: number, ix: {fim: number; entradas: EntradaLeve[]}) => {
+  if (ix.fim === 0) return true;
+  const nl = Buffer.alloc(1);
+  readSync(fd, nl, 0, 1, ix.fim - 1);
+  if (nl[0] !== 0x0a) return false;
+  const ultima = ix.entradas.at(-1);
+  if (!ultima) return true;
+  const buf = Buffer.alloc(ultima.fim - ultima.ini);
+  readSync(fd, buf, 0, buf.length, ultima.ini);
+  return entradaLeve(buf, 0, buf.length, ultima.ini)?.seq === ultima.seq;
+};
+
 /** Seqs revertidos, de trás para a frente: entrada já revertida não conta (um desfazer revertido é um refazer). */
-const revertidasDe = (todas: EntradaDiario[]): Set<number> => {
+const revertidasDe = (todas: {seq: number; desfaz?: number}[]): Set<number> => {
   const s = new Set<number>();
   for (let i = todas.length - 1; i >= 0; i--) {
     const e = todas[i];

@@ -187,6 +187,15 @@ export type EntradaDiario = {
   transicao?: string; // frente Música: feita durante a transição (levar_para), para o histórico agrupar e "Reverter tudo"
 };
 
+/** Uma entrada do diário como o painel Histórico a recebe (CANAL.diario): sem o patch e o inverso, que passam de 100 KB
+ *  nas edições grandes do agente. `resumo` é o começo do patch (para a dica), `tem_inverso` diz se dá para reverter, e
+ *  `revertida` já vem calculada pelo processo principal (Projeto.resumoDoDiario). */
+export type ResumoDiario = Omit<EntradaDiario, 'patch' | 'inverso' | 'versao_antes' | 'versao_depois'> & {
+  resumo: string;
+  tem_inverso: boolean;
+  revertida: boolean;
+};
+
 /** Estado do editor que o agente pode consultar (o app grava em .estudio/estado.json). */
 export type EstadoEditor = {
   area: 'video' | 'imagem' | '3d' | 'efeitos' | 'musica' | 'animacao';
