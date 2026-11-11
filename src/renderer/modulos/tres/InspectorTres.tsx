@@ -92,7 +92,7 @@ const InspectorCena: React.FC<{documento: string; doc: DocCena3D}> = ({documento
         }} />
         <CampoVetor rotulo="posição" valor={camera?.posicao} aoMudar={(v) => gravarCamera('posicao', v)} />
         <CampoVetor rotulo="alvo" valor={camera?.alvo} aoMudar={(v) => gravarCamera('alvo', v)} />
-        <button className="bt principal" style={{width: '100%', justifyContent: 'center', marginTop: 4}} onClick={() => void usarVistaComoCamera(documento)}>
+        <button className="bt" style={{width: "100%", justifyContent: "center", marginTop: 4}} onClick={() => void usarVistaComoCamera(documento)}>
           <Camera size={14} />Usar a vista atual como câmera
         </button>
       </Secao>
