@@ -27,8 +27,7 @@ import {BotaoMenu, usarFora} from '../../componentes/Menu';
 import {Trilho, teclaLivre} from '../../componentes/Trilho';
 import {comValor, definirPrevia, docValido, indiceDe, irParaPagina, paginaAtivaDe, rotuloCamada, usarDocumentoImagem, usarPaginaAtiva, usarPrevia, visivel} from './comum';
 import {novaForma, novaImagem, novoTexto} from './acoes';
-import {exportarPng} from './exportarPng';
-import {exportarPagina} from './exportarPaginas';
+import {abrirDialogoExportar} from '../../componentes/DialogoExportar';
 import {BuscaIcones} from './BuscaIcones';
 import {InserirLinha} from './InserirLinha';
 import {PaginasImagem} from './PaginasImagem';
@@ -126,7 +125,6 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
   const [hover, setHover] = useState<string | null>(null);
   const [balao, setBalao] = useState<{x: number; y: number; caminho?: string} | null>(null);
   const [textoBalao, setTextoBalao] = useState('');
-  const [exportando, setExportando] = useState(false);
   const arrasto = useRef<Arrasto | null>(null);
   const desenho = useRef<{x0: number; y0: number} | null>(null);
   const panoramica = useRef<{x: number; y: number; sl: number; st: number} | null>(null);
@@ -523,11 +521,8 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
     if (caminho) selecionar({documento, caminho});
   };
 
-  // uma prancheta só: o PNG de sempre; carrossel: só a página ativa ("<nome> - 02.png")
-  const exportar = () => {
-    setExportando(true);
-    void (temPaginas(doc) ? exportarPagina(documento, ativa.p) : exportarPng(documento)).finally(() => setExportando(false));
-  };
+  // um caminho só de exportar: o diálogo (lá dentro, o PNG rápido e, num carrossel, "só esta página")
+  const exportar = () => abrirDialogoExportar(documento);
 
   const usar = (f: Ferramenta) => () => {
     setFerramenta(f);
@@ -652,9 +647,8 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
             rotulo={<span className="largo">Guias</span>}
             itens={ROTULOS_GUIAS.map(([k, nome]) => ({rotulo: `${opcoesGuias[k] ? '✓ ' : '   '}${nome}`, acao: () => alternarGuia(k)}))} />
           <span className="coords largo" ref={coords} />
-          <button className="bt fantasma" style={{marginLeft: 'auto'}} disabled={exportando} onClick={exportar}
-            title={variasPaginas ? 'Exportar só esta página em PNG, com os efeitos (o carrossel inteiro sai pela barra de páginas)' : 'Exportar PNG em resolução cheia, com os efeitos'}>
-            <Download /><span className="largo">{variasPaginas ? 'Exportar página' : 'Exportar PNG'}</span>
+          <button className="bt fantasma" style={{marginLeft: 'auto'}} onClick={exportar} title="Exportar… (Ctrl+Shift+E): PNG, JPG ou WebP; num carrossel, PNG por página e PDF, ou só esta página">
+            <Download /><span className="largo">Exportar…</span>
           </button>
         </div>
       </div>

@@ -25,7 +25,7 @@ import {OPCOES_LEGENDA_EXPORTACAO, type LegendaNaExportacao} from '../../nucleo/
 import {conjuntoDe, zonasDaMarca, type CantoMarca} from '../../nucleo/zonas-seguras';
 import {avisar, useLoja} from '../estado/loja';
 import {exportarPng, type SaidaPng} from '../modulos/imagem/exportarPng';
-import {exportarCarrossel} from '../modulos/imagem/exportarPaginas';
+import {exportarCarrossel, exportarPagina} from '../modulos/imagem/exportarPaginas';
 import {numeroBr} from './Campos';
 import {Caixa, Escolha, Segmentado} from './Controles';
 import '../modulos/video/zonas-seguras.css';
@@ -621,6 +621,8 @@ const ExportarImagem: React.FC<{documento: string; fechar: () => void}> = ({docu
   // da imagem de uma página só
   const carrossel = temPaginas(doc);
   const nPaginas = doc && carrossel ? paginasDe(doc).length : 0;
+  const idPagina = useLoja((e) => e.paginaAtiva[documento]);
+  const paginaAberta = doc && carrossel ? Math.max(0, paginasDe(doc).findIndex((p) => p.id === idPagina)) : 0;
 
   const exportar = async () => {
     if (!doc) return;
@@ -649,9 +651,12 @@ const ExportarImagem: React.FC<{documento: string; fechar: () => void}> = ({docu
     return (
       <Moldura titulo="Exportar carrossel" sub={sub} fechar={fechar} aoEnter={() => void exportar()}>
         <div className="estimativa-exp"><span>Carrossel de <b>{nPaginas}</b> {nPaginas === 1 ? 'página' : 'páginas'}: sai um PNG por página em saidas/{titulo}/ e o PDF <b>{titulo}.pdf</b>, sem margem, para o LinkedIn</span></div>
-        <div className="dialogo-botoes">
+        <div className="rodape-exp">
+          <span className="resumo-exp">Ou só a página aberta, em PNG (rápido)</span>
+          <button className="bt" disabled={!doc} onClick={() => (fechar(), void exportarPagina(documento, paginaAberta))}
+            title={`Exportar só a página ${paginaAberta + 1} em PNG, com os efeitos`}>Só a página {paginaAberta + 1}</button>
           <button className="bt fantasma" onClick={fechar}>Cancelar</button>
-          <button className="bt principal" disabled={!doc} onClick={() => void exportar()} autoFocus>Exportar</button>
+          <button className="bt principal" disabled={!doc} onClick={() => void exportar()} autoFocus><Download size={14} />Exportar {nPaginas} PNG + PDF</button>
         </div>
       </Moldura>
     );
@@ -678,7 +683,7 @@ const ExportarImagem: React.FC<{documento: string; fechar: () => void}> = ({docu
       <div className="estimativa-exp"><span>Sai <b>{nome.trim() || titulo}.{f.ext}</b> em saidas/, com a pilha de efeitos</span></div>
       <div className="dialogo-botoes">
         <button className="bt fantasma" onClick={fechar}>Cancelar</button>
-        <button className="bt principal" disabled={!doc} onClick={() => void exportar()} autoFocus>Exportar</button>
+        <button className="bt principal" disabled={!doc} onClick={() => void exportar()} autoFocus><Download size={14} />Exportar {f.nome}</button>
       </div>
     </Moldura>
   );
