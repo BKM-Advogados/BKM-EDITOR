@@ -189,7 +189,9 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
   };
   useEffect(() => {
     const q = requestAnimationFrame(() => medirSel.current());
-    return () => cancelAnimationFrame(q);
+    // o player redimensiona a composição depois da gente (o ResizeObserver dele): mede de novo quando ele terminou
+    const t = setTimeout(() => medirSel.current(), 200);
+    return () => (cancelAnimationFrame(q), clearTimeout(t));
   }, [selecao, escala, props, documento, tempoParado]);
   useEffect(() => {
     let q = 0;
