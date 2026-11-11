@@ -1,10 +1,12 @@
 // Linha do tempo da Animação: régua, zoom, cabeça de reprodução, uma linha por camada e losangos por propriedade
-import React, {useCallback, useEffect, useRef, useState} from "react";
+import React, {useCallback, useEffect, useRef, useState, useSyncExternalStore} from "react";
 import {Diamond, Maximize2, Pause, Play, ZoomIn, ZoomOut} from "lucide-react";
 import type {DocAnimacao, PropriedadeAnimavel, QuadroChave} from "../../../nucleo/animacao";
 import {aplicar, selecionar, useLoja} from "../../estado/loja";
 import {alternar, aoQuadro, assinarControle, formatarTempo, irPara, msAtual} from "./tocador";
 import {iconeTipoAnimacao} from "./CamadasAnimacao";
+import {modoAnimar} from "./preajustes";
+import {mudouEm} from "../../estado/agente";
 
 const LARGURA_ROTULO = 140;
 
@@ -14,6 +16,8 @@ export const LinhaDoTempoAnimacao: React.FC = () => {
   const selecao = useLoja((e) => (e.selecao && e.selecao.documento === ativo ? e.selecao.caminho : null));
   const [tempoMs, setTempoMs] = useState(msAtual());
   const [tocando, setTocando] = useState(false);
+  const animando = useSyncExternalStore(modoAnimar.assinar, modoAnimar.get);
+  const mudancas = useLoja((e) => e.mudancasAgente);
   const [zoom, setZoom] = useState(150); // px por segundo
   const [arrastandoCabeca, setArrastandoCabeca] = useState(false);
   const [arrastoK, setArrastoK] = useState<{
@@ -123,6 +127,10 @@ export const LinhaDoTempoAnimacao: React.FC = () => {
         <button className="bti" onClick={alternar} title="Tocar ou pausar  Espaço" aria-label={tocando ? "Pausar" : "Tocar"}>{tocando ? <Pause /> : <Play />}</button>
         <span className="plt-tempo">{formatarTempo(tempoMs)}</span>
         <span className="plt-duracao">/ {formatarTempo(duracaoMs)}</span>
+        <button type="button" className={`bt mini modo-animar${animando ? " ligado" : ""}`} aria-pressed={animando} onClick={modoAnimar.alternar}
+          title={animando ? "Modo animar ligado: mexer num valor grava um quadro-chave na agulha. Clique para desligar" : "Modo animar: mexer num valor grava um quadro-chave na agulha (desligado, só as propriedades já animadas ganham quadro-chave)"}>
+          <span className="ponto-animar" />Animar
+        </button>
         <div className="acoes-lt">
           <span className="conta">{nChaves === 1 ? "1 quadro-chave" : `${nChaves} quadros-chave`}</span>
           <button className="bti" onClick={() => setZoom((z) => Math.max(40, z - 25))} title="Diminuir o zoom" aria-label="Diminuir o zoom"><ZoomOut /></button>
@@ -162,8 +170,9 @@ export const LinhaDoTempoAnimacao: React.FC = () => {
                   {propsComTrilha.map(([p, ks]) =>
                     (ks as QuadroChave[]).map((q, kIdx) => {
                       const agora = Math.abs(q.t_ms - tempoMs) < 25;
+                      const doClaude = mudouEm(mudancas, ativo, `${caminho}/trilhas/${p}`) || mudouEm(mudancas, ativo, `${caminho}/trilhas`);
                       return (
-                        <div key={`${p}-${kIdx}`} className={`plt-losango-wrapper${agora ? " agora" : ""}`} style={{left: msParaX(q.t_ms)}}
+                        <div key={`${p}-${kIdx}`} className={`plt-losango-wrapper${agora ? " agora" : ""}${doClaude ? " agente" : ""}`} style={{left: msParaX(q.t_ms)}}
                           onMouseDown={(e) => {
                             e.stopPropagation();
                             selecionar({documento: ativo, caminho});

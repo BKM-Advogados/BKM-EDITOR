@@ -1,7 +1,7 @@
 // Monitor da Animação: Remotion Player com seleção e arrasto de camadas (atualiza ou cria quadro-chave na cabeça), no
 // mesmo desenho dos outros monitores (entorno cinza, caixa de seleção da casa e o transporte de sempre). Exportar fica
 // só na barra, como nas outras áreas.
-import React, {useCallback, useEffect, useRef, useState} from "react";
+import React, {useCallback, useEffect, useRef, useState, useSyncExternalStore} from "react";
 import {Player, type PlayerRef} from "@remotion/player";
 import {Pause, Play, Repeat2, SkipBack, SkipForward, StepBack, StepForward} from "lucide-react";
 import {Animacao} from "../../../composicoes/animacao/Animacao";
@@ -15,12 +15,14 @@ import {
 } from "./tocador";
 import {mudouEm} from "../../estado/agente";
 import {AvisoAgente, MarcasAgente} from "../../componentes/Agente";
+import {modoAnimar} from "./preajustes";
 
 export const MonitorAnimacao: React.FC = () => {
   const ativo = useLoja((e) => e.ativo.animacao);
   const doc = useLoja((e) => (ativo ? (e.docs[ativo]?.doc as DocAnimacao | undefined) : undefined));
   const selecao = useLoja((e) => (e.selecao && e.selecao.documento === ativo ? e.selecao.caminho : null));
   const mudancas = useLoja((e) => e.mudancasAgente);
+  const animando = useSyncExternalStore(modoAnimar.assinar, modoAnimar.get);
   const [tempoMs, setTempoMs] = useState(msAtual());
   const [tocando, setTocando] = useState(false);
   const [repetir, setRepetir] = useState(true);
@@ -128,7 +130,7 @@ export const MonitorAnimacao: React.FC = () => {
 
     // Se tem trilha, cria ou atualiza quadro-chave na cabeça de reprodução
     const trilhas = {...(camada.trilhas ?? {})};
-    if (trilhas.x || trilhas.y) {
+    if (trilhas.x || trilhas.y || modoAnimar.get()) {
       const listaX = [...(trilhas.x ?? [])];
       const listaY = [...(trilhas.y ?? [])];
       const kx = listaX.find((item) => Math.abs(item.t_ms - tempoMs) < 25);
@@ -197,7 +199,7 @@ export const MonitorAnimacao: React.FC = () => {
   return (
     <div className="painel">
       <div className="monitor-grade sem-trilho">
-        <div className="monitor monitor-animacao" ref={containerRef}>
+        <div className={`monitor monitor-animacao${animando ? " animando" : ""}`} ref={containerRef}>
           <AvisoAgente />
           <div className="palco" style={{width: doc.largura * escala, height: doc.altura * escala}}>
             <div className="pma-palco" style={{width: doc.largura, height: doc.altura, transform: `scale(${escala})`, transformOrigin: "top left"}}>

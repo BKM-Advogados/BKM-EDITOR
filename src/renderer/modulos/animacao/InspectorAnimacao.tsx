@@ -3,7 +3,7 @@
 import React, {useEffect, useState} from "react";
 import {Clapperboard, Diamond} from "lucide-react";
 import {
-  CURVAS, valorEm, type CamadaAnimacao, type Curva, type DocAnimacao,
+  CURVAS, TEMA_ANIMACAO_NEUTRO, valorEm, type CamadaAnimacao, type Curva, type DocAnimacao,
   type PropriedadeAnimavel, type QuadroChave,
 } from "../../../nucleo/animacao";
 import {aplicar, useLoja} from "../../estado/loja";
@@ -14,12 +14,14 @@ import {iconeTipoAnimacao, NOME_TIPO_ANIMACAO} from "./CamadasAnimacao";
 import {EditorPixel} from "./EditorPixel";
 import {aoQuadro, msAtual} from "./tocador";
 import {MudancasNoInspetor} from "../../componentes/Agente";
+import {DURACAO_PREAJUSTE_MS, modoAnimar, PREAJUSTES, trilhasComPreajuste} from "./preajustes";
 
 export const InspectorAnimacao: React.FC = () => {
   const ativo = useLoja((e) => e.ativo.animacao);
   const doc = useLoja((e) => (ativo ? (e.docs[ativo]?.doc as DocAnimacao | undefined) : undefined));
   const selecao = useLoja((e) => (e.selecao && e.selecao.documento === ativo ? e.selecao.caminho : null));
   const [tempoMs, setTempoMs] = useState(msAtual());
+  const [grande, setGrande] = useState(false); // editor de pixel grande, num diálogo
 
   useEffect(() => {
     return aoQuadro((ms) => setTempoMs(ms));
@@ -90,9 +92,9 @@ export const InspectorAnimacao: React.FC = () => {
 
   const mudarValorPropriedade = (prop: PropriedadeAnimavel, novoValor: number | string) => {
     const trilhas = {...(camada.trilhas ?? {})};
-    const lista = trilhas[prop];
-    if (lista && lista.length > 0) {
-      // Se a propriedade já está animada, cria ou atualiza o quadro-chave na cabeça de reprodução
+    const lista = trilhas[prop] ?? [];
+    if (lista.length > 0 || modoAnimar.get()) {
+      // propriedade já animada, ou o modo animar ligado: cria ou atualiza o quadro-chave na cabeça de reprodução
       const k = quadroChaveNoTempo(prop);
       if (k) {
         k.valor = novoValor;
@@ -100,6 +102,7 @@ export const InspectorAnimacao: React.FC = () => {
         lista.push({t_ms: Math.round(tempoMs), valor: novoValor, curva: "suave"});
         lista.sort((a, b) => a.t_ms - b.t_ms);
       }
+      trilhas[prop] = lista;
       aplicar(ativo, [{op: "add", path: `${origem}/trilhas`, value: trilhas}], `animar ${prop}`);
     } else {
       // Altera o valor base da camada
@@ -161,6 +164,29 @@ export const InspectorAnimacao: React.FC = () => {
             marcador={BotaoLosango("opacidade")} aoMudar={(v) => mudarValorPropriedade("opacidade", v)} />
         </Secao>
 
+        <Secao titulo="Entrar e sair" acao={<span className="rotulo">a partir da agulha</span>}>
+          <div className="preajustes-anim">
+            <span className="rot">Entrada</span>
+            <div className="chips-anim">
+              {PREAJUSTES.map((p) => (
+                <button key={p.id} type="button" className="bt mini" title={`${p.nome} ao entrar: ${DURACAO_PREAJUSTE_MS} ms a partir da agulha`}
+                  onClick={() => aplicar(ativo, [{op: "add", path: `${origem}/trilhas`, value: trilhasComPreajuste(camada, p, "entrada", tempoMs, doc.duracao_ms)}], `entrada: ${p.nome.toLowerCase()}`)}>
+                  {p.nome}
+                </button>
+              ))}
+            </div>
+            <span className="rot">Saída</span>
+            <div className="chips-anim">
+              {PREAJUSTES.map((p) => (
+                <button key={p.id} type="button" className="bt mini" title={`${p.nome} ao sair: termina ${DURACAO_PREAJUSTE_MS} ms depois da agulha`}
+                  onClick={() => aplicar(ativo, [{op: "add", path: `${origem}/trilhas`, value: trilhasComPreajuste(camada, p, "saida", tempoMs, doc.duracao_ms)}], `saída: ${p.nome.toLowerCase()}`)}>
+                  {p.nome}
+                </button>
+              ))}
+            </div>
+          </div>
+        </Secao>
+
         {camada.tipo === "forma" && (
           <Secao titulo="Forma">
             <CampoSelecao rotulo="Tipo" valor={camada.forma ?? "retangulo"} opcoes={[["retangulo", "Retângulo"], ["elipse", "Elipse"]]}
@@ -193,7 +219,16 @@ export const InspectorAnimacao: React.FC = () => {
               formatar={(v) => `${Math.round(v * 100)}%`} marcador={BotaoLosango("progresso")} aoMudar={(v) => mudarValorPropriedade("progresso", v)} />
             <CampoNumero rotulo="Pixel" valor={Number(valorEm(camada, "tamanho_pixel", tempoMs))} unidade="px" marcador={BotaoLosango("tamanho_pixel")}
               aoMudar={(v) => mudarValorPropriedade("tamanho_pixel", v)} />
-            <EditorPixel documento={ativo} camada={camada} origem={origem} />
+            <EditorPixel documento={ativo} camada={camada} origem={origem} tema={doc.tema ?? TEMA_ANIMACAO_NEUTRO} aoAbrirGrande={() => setGrande(true)} />
+            {grande && (
+              <div className="dialogo-fundo" onPointerDown={(e) => e.target === e.currentTarget && setGrande(false)} onKeyDown={(e) => e.key === "Escape" && setGrande(false)}>
+                <div className="dialogo editor-grande" role="dialog" aria-label={`Desenhar: ${camada.nome}`}>
+                  <div className="dialogo-titulo">Desenhar · {camada.nome}</div>
+                  <EditorPixel documento={ativo} camada={camada} origem={origem} tema={doc.tema ?? TEMA_ANIMACAO_NEUTRO} tamanho={560} />
+                  <div className="dialogo-botoes"><button className="bt principal" onClick={() => setGrande(false)} autoFocus>Pronto</button></div>
+                </div>
+              </div>
+            )}
           </Secao>
         )}
 

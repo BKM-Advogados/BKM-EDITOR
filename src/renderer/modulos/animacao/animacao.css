@@ -42,6 +42,7 @@
 .plt-linha-camada.selecionada .plt-losango-wrapper { color: var(--texto); }
 .plt-losango-wrapper.agora { color: var(--acento); }
 .plt-losango-wrapper.agora svg.lucide { width: 13px; height: 13px; }
+.plt-losango-wrapper.agente { color: var(--agente); }
 .plt-losango-wrapper:hover { color: var(--texto); }
 
 /* losango de quadro-chave na frente da linha do inspetor */
@@ -64,3 +65,20 @@
 .ep-canvas-area { display: flex; justify-content: center; align-items: center; padding: 8px; background: var(--entorno-monitor); border-radius: var(--raio); }
 .ep-canvas { image-rendering: pixelated; cursor: crosshair; box-shadow: 0 0 0 1px var(--borda-forte); max-width: 100%; }
 .editor-pixel .linha-campo { padding-left: 0; padding-right: 0; }
+
+/* entrar e sair (pré-ajustes) e o modo animar */
+.preajustes-anim { display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: start; gap: 6px 8px; padding: 4px 10px 6px 18px; }
+.preajustes-anim .rot { color: var(--texto-2); font-size: var(--tam-2); padding-top: 4px; }
+.chips-anim { display: flex; flex-wrap: wrap; gap: 4px; }
+.modo-animar { margin-left: 8px; }
+.modo-animar .ponto-animar { width: 8px; height: 8px; border-radius: 50%; background: var(--icone-inativo); }
+.modo-animar.ligado { color: var(--texto); }
+.modo-animar.ligado .ponto-animar { background: var(--cabeca); }
+.monitor-animacao.animando { box-shadow: inset 0 0 0 2px var(--cabeca); }
+
+/* cores do kit e o editor grande */
+.ep-kit { gap: 6px; }
+.ep-kit .rotulo { margin-right: 2px; }
+.ep-cor-kit { width: 24px; height: 24px; border-radius: var(--raio-1); border: 0; padding: 0; cursor: pointer; box-shadow: inset 0 0 0 1px var(--borda-forte); }
+.dialogo.editor-grande { width: min(680px, calc(100vw - 40px)); }
+.dialogo.editor-grande .editor-pixel { padding: 0; }
