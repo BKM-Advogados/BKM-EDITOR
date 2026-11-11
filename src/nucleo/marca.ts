@@ -90,7 +90,7 @@ export const normalizarMarca = (x: unknown, idPadrao = 'marca'): Marca => {
   const titulo = (texto(fontes.titulo) && nomeDeFamilia(texto(fontes.titulo)!)) || MARCA_NEUTRO.fontes.titulo;
   const textoFonte = texto(fontes.texto) && nomeDeFamilia(texto(fontes.texto)!);
   const mono = texto(fontes.mono) && nomeDeFamilia(texto(fontes.mono)!);
-  const logo = texto(o.logo);
+  const logo = texto(o.logo)?.replace(/^.*[\\/]/, ''); // o logo fica sempre na raiz do kit: sem pasta, sem "../"
   const assinatura = texto(o.assinatura);
   const notas = texto(o.notas);
   return {

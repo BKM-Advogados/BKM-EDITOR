@@ -20,7 +20,8 @@ import {arquivosDaMarca, patchDaMarca, temaDaMarca} from './marca';
 import {linhaDoTextoAntigo} from './claude-md-antigo';
 import {REGRAS_MIDIA_PESADA} from './midia-git';
 import type {MarcaLida} from './pasta-marcas';
-import {serializar} from './projeto';
+import {dentroDe, semBom, serializar} from './projeto';
+import {gravarAtomico} from './gravar-seguro';
 
 // o texto baixado de cada fonte (pesquisa/fontes/<id>.txt) fica fora do git: é grande e se baixa de novo pela url
 // vídeo e áudio sem perda em midia/ também ficam de fora (transversal-D7, midia-git.ts); o que passa de 25 MB entra na regra
@@ -381,12 +382,15 @@ export const claudeMdAtualizado = (atual: string | null, modulos: Modulo[]): str
  *  um CLAUDE.md que não dá para atualizar não impede abrir o projeto. */
 export const regerarClaudeMd = (raiz: string): boolean => {
   try {
-    const manifesto = JSON.parse(readFileSync(path.join(raiz, 'estudio.json'), 'utf-8')) as Manifesto;
+    const manifesto = JSON.parse(semBom(readFileSync(path.join(raiz, 'estudio.json'), 'utf-8'))) as Manifesto;
     const modulos = [...new Set((manifesto.documentos ?? []).map((d) => d.modulo))];
     const arq = path.join(raiz, 'CLAUDE.md');
-    const novo = claudeMdAtualizado(existsSync(arq) ? readFileSync(arq, 'utf-8') : null, modulos);
+    const atual = existsSync(arq) ? readFileSync(arq, 'utf-8') : null;
+    // o CLAUDE.md em CRLF (core.autocrlf do Git para Windows) continua CRLF: compara e grava no fim de linha dele
+    const crlf = Boolean(atual?.includes('\r\n'));
+    const novo = claudeMdAtualizado(crlf ? atual!.replace(/\r\n/g, '\n') : atual, modulos);
     if (novo === null) return false;
-    writeFileSync(arq, novo, 'utf-8');
+    gravarAtomico(arq, crlf ? novo.replace(/\n/g, '\r\n') : novo); // o arquivo tem texto da pessoa: nunca meio gravado
     return true;
   } catch {
     return false;
@@ -440,7 +444,9 @@ export const planoDoProjeto = (o: OpcoesProjeto): Plano => {
  *  O que o kit cita mas não está na pasta dele (`existe`) fica de fora, para o tema não apontar para arquivo que não há. */
 export const aplicarMarcaAoPlano = (plano: Plano, marca: MarcaLida, existe: (p: string) => boolean = existsSync): Plano => {
   const tudo = arquivosDaMarca(marca);
-  const copiar = tudo.copiar.filter((c) => existe(path.join(marca.pasta, c.de))).map((c) => ({de: path.join(marca.pasta, c.de), para: c.para}));
+  // só o que está dentro da pasta do kit (um marca.json com "../" não traz arquivo de fora para o projeto)
+  const copiar = tudo.copiar.filter((c) => dentroDe(marca.pasta, path.join(marca.pasta, c.de)) && existe(path.join(marca.pasta, c.de)))
+    .map((c) => ({de: path.join(marca.pasta, c.de), para: c.para}));
   const presentes = new Set(copiar.map((c) => c.para));
   const tema = temaDaMarca(marca, {logo: tudo.logo && presentes.has(tudo.logo) ? tudo.logo : undefined, fontes_arquivos: tudo.fontes_arquivos.filter((f) => presentes.has(f.arquivo))});
   for (const e of plano.manifesto.documentos) {
