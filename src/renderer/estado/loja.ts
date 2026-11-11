@@ -309,7 +309,13 @@ export const alternarNaSelecao = (documento: string, caminho: string) => {
  *  frente, com a página da primeira camada num carrossel. */
 const aplicarSelecaoPedida = async () => {
   const p = await window.estudio.lerJsonOpcional('.estudio/selecao.json').catch(() => null) as {documento?: string; caminhos?: string[]} | null;
-  const entrada = p?.documento ? entradaDe(p.documento) : undefined;
+  let entrada = p?.documento ? entradaDe(p.documento) : undefined;
+  if (p?.documento && !entrada) {
+    // documento que o Claude acabou de criar: o pedido pode chegar antes de a tela reler o estudio.json
+    const i = await window.estudio.projetoAtual();
+    if (i && i.raiz === estado.info?.raiz) await abrirProjeto(i);
+    entrada = entradaDe(p.documento);
+  }
   if (!p || !entrada || !Array.isArray(p.caminhos)) return;
   const doc = estado.docs[entrada.id]?.doc as DocImagem | undefined;
   const m = /^\/paginas\/(\d+)\//.exec(p.caminhos[0] ?? '');
