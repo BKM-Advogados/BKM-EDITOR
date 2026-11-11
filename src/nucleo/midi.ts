@@ -138,6 +138,7 @@ export const gravarMidi = (a: ArquivoMidi): Uint8Array => {
     if (t.nome) evs.push(meta(0, 0x03, bytesDe(t.nome)));
     if (t.programa !== undefined) evs.push({tick: 0, ordem: 1, dados: [0xc0 | t.canal, t.programa & 0x7f]});
     for (const n of t.notas) {
+      if (!(n.nota >= 0 && n.nota <= 127)) continue; // & 0x7f daria a volta (130 viraria 2): quem chama avisa
       const forca = Math.min(127, Math.max(1, Math.round(n.forca)));
       evs.push({tick: n.tick, ordem: 3, dados: [0x90 | t.canal, n.nota & 0x7f, forca]});
       evs.push({tick: n.tick + Math.max(1, n.dur), ordem: 2, dados: [0x80 | t.canal, n.nota & 0x7f, 0]}); // a que termina sai antes da que começa no mesmo tick

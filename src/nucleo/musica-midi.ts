@@ -42,6 +42,7 @@ export const musicaParaMidi = (doc: DocMusica): {bytes: Uint8Array; trilhas: num
   const tick = (batidas: number) => Math.round(batidas * PPQ_MUSICA);
   const trilhas: TrilhaMidi[] = [];
   let proximo = 0;
+  let foraDaFaixa = 0;
   for (const canal of m.canais) {
     if (canal.tipo === 'audio') {
       if (m.clipes.some((c) => c.canal === canal.id)) avisos.push(`o canal de áudio "${canal.nome}" não vai para o MIDI`);
@@ -66,12 +67,18 @@ export const musicaParaMidi = (doc: DocMusica): {bytes: Uint8Array; trilhas: num
         const n = ev.nota;
         const nota = bateria ? (n.peca ? NOTA_GM_DA_PECA[n.peca] : undefined) : n.nota;
         if (nota === undefined) continue;
+        // fora de 0 a 127 o MIDI daria a volta (140 viraria um Dó grave): fica de fora, com aviso
+        if (!Number.isInteger(nota) || nota < 0 || nota > 127) {
+          foraDaFaixa++;
+          continue;
+        }
         const dur = bateria ? 0.25 : Math.min(n.dur ?? 0.25, Math.max(1 / 16, fim - em));
         notas.push({tick: tick(em), dur: Math.max(1, tick(dur)), nota, forca: n.forca ?? 100});
       }
     }
     trilhas.push({nome: canal.nome, canal: numero, ...(bateria ? {} : {programa: PROGRAMA_DO_PRESET[canal.preset]}), notas});
   }
+  if (foraDaFaixa) avisos.push(`${foraDaFaixa} nota(s) fora de 0 a 127 ficaram de fora do MIDI`);
   const marcadores = (doc.secoes ?? []).map((s) => ({tick: tick(s.em), texto: s.nome}));
   const arquivo: ArquivoMidi = {ppq: PPQ_MUSICA, bpm: m.bpm, compasso: m.compasso, trilhas, marcadores};
   return {bytes: gravarMidi(arquivo), trilhas: trilhas.length, notas: trilhas.reduce((s, t) => s + t.notas.length, 0), avisos};

@@ -326,9 +326,10 @@ describe('editar: texto, juntar, dividir, localizar e substituir', () => {
     expect(localizar(segs, 'nao')).toEqual(['leg-1', 'leg-2', 'leg-3']);
     expect(localizar(segs, 'não', {palavra_inteira: true})).toEqual(['leg-1', 'leg-2']);
     expect(localizar(segs, 'NAO', {caixa: true})).toEqual(['leg-2']);
+    // substituir acha o mesmo que localizar (C5): "NAO" também é trocado
     const r = substituirEmLote(segs, 'não', 'nunca', {palavra_inteira: true});
-    expect(r.trocas).toBe(2);
-    expect(r.segmentos.map((s) => s.texto)).toEqual(['Você nunca é obrigado', 'NAO é obrigado nunca', 'nãozinho']);
+    expect(r.trocas).toBe(3);
+    expect(r.segmentos.map((s) => s.texto)).toEqual(['Você nunca é obrigado', 'nunca é obrigado nunca', 'nãozinho']);
     expect(r.segmentos[0].palavras![1]).toEqual({w: 'nunca', s: 1300, e: 1500});
     expect(substituirEmLote(segs, 'obrigado', '', {}).segmentos[0].texto).toBe('Você não é');
   });

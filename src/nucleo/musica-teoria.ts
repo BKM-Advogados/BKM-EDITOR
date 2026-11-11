@@ -31,11 +31,13 @@ export const escalaDe = (tom = 'C', escala: Escala = 'maior') => {
 export const naEscala = (midi: number, tom?: string, escala?: Escala) => escalaDe(tom, escala).includes(((midi % 12) + 12) % 12);
 
 /** A nota da escala mais perto (para cima no empate): "travar na escala". */
-export const encaixarNaEscala = (midi: number, tom?: string, escala?: Escala) => {
+export const encaixarNaEscala = (entrada: number, tom?: string, escala?: Escala) => {
   const pcs = escalaDe(tom, escala);
+  // sempre dentro de 0 a 127 (a faixa do MIDI): perto da ponta, a nota da escala do outro lado vale
+  const midi = Math.max(0, Math.min(127, entrada));
   for (let d = 0; d < 12; d++) {
-    if (pcs.includes((((midi + d) % 12) + 12) % 12)) return midi + d;
-    if (pcs.includes((((midi - d) % 12) + 12) % 12)) return midi - d;
+    if (midi + d <= 127 && pcs.includes((((midi + d) % 12) + 12) % 12)) return midi + d;
+    if (midi - d >= 0 && pcs.includes((((midi - d) % 12) + 12) % 12)) return midi - d;
   }
   return midi;
 };
