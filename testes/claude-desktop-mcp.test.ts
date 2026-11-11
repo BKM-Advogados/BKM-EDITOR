@@ -14,7 +14,7 @@ import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import {ElicitRequestSchema} from '@modelcontextprotocol/sdk/types.js';
 import {arquivoDescoberta, descobertaViva, instalacoesPadrao, pastaDadosEstudio, type Descoberta, type Sistema} from '../src/nucleo/claude-desktop';
-import {criarServidorDesktop, SEM_PORTAO, SEM_PROJETO} from '../src/nucleo/mcp-desktop';
+import {criarServidorDesktop, SEM_PORTAO, SEM_PROJETO, type Registrar} from '../src/nucleo/mcp-desktop';
 import {registrarFerramentas} from '../src/nucleo/ferramentas-mcp';
 import {McpHttp, type Perguntador} from '../src/main/mcp-http';
 import {criarClaudeDesktop} from '../src/main/claude-desktop';
@@ -170,8 +170,7 @@ describe('MCP do Claude Desktop com o app aberto (descoberta, sem token colado)'
 
 // revisão da 2.0.1: o Claude Desktop nunca grava num projeto que não escolheu, nem sem dizer que o projeto mudou
 describe('o projeto certo', () => {
-  const registrar = (s: Parameters<typeof registrarFerramentas>[0], projeto: Projeto, origem: string, portao?: Parameters<typeof registrarFerramentas>[5]) =>
-    registrarFerramentas(s, projeto, 'agente', origem, undefined, undefined, portao);
+  const registrar: Registrar = (s, projeto, origem, portao) => registrarFerramentas(s, projeto, 'agente', origem, undefined, undefined, portao);
 
   it('escolheu Gama com o app fechado; a pessoa abre Alfa no app: recusa, sem gravar em nenhum dos dois', async () => {
     const gama = novoProjeto('Gama');
