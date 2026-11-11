@@ -82,7 +82,9 @@ de `@destaque` para `#FF0000` o meio parte do destaque do kit, não do preto.
 
 A camada `pixel` contém uma grade `{colunas, linhas, paleta, celulas}` codificada em formato compacto (Base 62, onde `.` indica transparência).
 Colunas e linhas são inteiros de 1 a 1024 (o `pixelizar_imagem` gera até 128); uma grade fora disso (ou sem `celulas`) é
-descartada pelo resolvedor com aviso.
+descartada pelo resolvedor com aviso: a camada não aparece na prévia nem na exportação, e a tela diz isso (aviso no pé do
+monitor com o nome e o motivo de cada camada, e um ⚠ na lista de camadas; `camadasDescartadas` em `src/nucleo/animacao.ts`).
+O documento não é alterado.
 
 ### Revelações Determinísticas
 

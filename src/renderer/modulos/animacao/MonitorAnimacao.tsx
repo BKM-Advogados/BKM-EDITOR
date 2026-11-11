@@ -10,6 +10,7 @@ import {resolverAnimacao, valorEm} from "../../../nucleo/animacao";
 import {aplicar, avisar, selecionar, useLoja} from "../../estado/loja";
 import {SemDocumento} from "../../componentes/SemDocumento";
 import {BotaoTelaCheia} from "../../componentes/TelaCheia";
+import {AvisoCamadasDescartadas} from "./AvisoDescartadas";
 import {
   alternar, alternarRepetir, aoQuadro, assinarControle, definirFps, formatarTempo,
   irPara, msAtual, registrarPlayer,
@@ -202,6 +203,7 @@ export const MonitorAnimacao: React.FC = () => {
       <div className="monitor-grade sem-trilho">
         <div className={`monitor monitor-animacao${animando ? " animando" : ""}`} ref={containerRef}>
           <AvisoAgente />
+          <AvisoCamadasDescartadas documento={ativo} doc={doc} />
           <div className="palco" style={{width: doc.largura * escala, height: doc.altura * escala}}>
             <div className="pma-palco" style={{width: doc.largura, height: doc.altura, transform: `scale(${escala})`, transformOrigin: "top left"}}>
               <Player

@@ -82,3 +82,16 @@
 .ep-cor-kit { width: 24px; height: 24px; border-radius: var(--raio-1); border: 0; padding: 0; cursor: pointer; box-shadow: inset 0 0 0 1px var(--borda-forte); }
 .dialogo.editor-grande { width: min(680px, calc(100vw - 40px)); }
 .dialogo.editor-grande .editor-pixel { padding: 0; }
+
+/* camadas que a validação recusa (AvisoDescartadas.tsx): aviso no pé do monitor e marca na lista */
+.aviso-descartadas { position: absolute; left: 12px; bottom: 12px; z-index: 20; display: flex; gap: 8px; align-items: flex-start; max-width: min(560px, calc(100% - 24px));
+  padding: 8px 12px; background: var(--aviso-fundo); border: 1px solid var(--aviso); border-radius: var(--raio-2); box-shadow: var(--sombra-2);
+  color: var(--texto); font-size: var(--tam-2); line-height: 1.4; }
+.aviso-descartadas > svg.lucide { color: var(--aviso); flex: none; margin-top: 2px; }
+.aviso-descartadas .texto { min-width: 0; }
+.aviso-descartadas ul { margin: 2px 0; padding-left: 16px; }
+.aviso-descartadas li { overflow-wrap: anywhere; }
+.aviso-descartadas .resto { color: var(--texto-2); }
+.aviso-descartadas button.link { border: 0; padding: 0; background: none; color: var(--texto); font: inherit; font-weight: var(--peso-forte); text-decoration: underline; cursor: pointer; }
+.lista li .aviso-camada { display: inline-flex; flex: none; color: var(--aviso); }
+.lista li.descartada .nome { color: var(--texto-2); }

@@ -3,7 +3,7 @@
 // animar, pixelizar_imagem…), e os dois passam pelo mesmo JSON Patch com diário. Este arquivo é TypeScript puro (sem
 // Remotion, sem DOM): tipos, validação com calma, curvas, interpolação de valores (inclusive de cor em OKLab) e a
 // resolução do documento para as props da composição. A arte em pixel fica em animacao-pixel.ts.
-import {lerGrade, type EfeitoPixel, type GradePixel} from './animacao-pixel';
+import {lerGrade, MAX_LADO_GRADE_DOCUMENTO, type EfeitoPixel, type GradePixel} from './animacao-pixel';
 import {limitarTamanho} from './formatos';
 
 // ---------- tipos ----------
@@ -357,6 +357,30 @@ const normalizar = (x: unknown, avisos: string[]): DocAnimacao => {
     ...(o.tema && typeof o.tema === 'object' ? {tema: o.tema as TemaAnimacao} : {}),
     camadas,
   };
+};
+
+/** Uma camada de pixel cuja grade a validação recusa: ela some da prévia e da exportação. */
+export type CamadaDescartada = {indice: number; id: string; nome: string; motivo: string};
+
+/** As camadas de pixel com grade recusada (fora do teto de MAX_LADO_GRADE_DOCUMENTO por lado, colunas e linhas que não
+ *  são inteiros, sem células), com o motivo em português, para a tela avisar em vez de a camada sumir em silêncio. Só
+ *  lê: o documento fica como está (consertar a grade é com a pessoa ou com o Claude). */
+export const camadasDescartadas = (doc: unknown): CamadaDescartada[] => {
+  const camadas = doc && typeof doc === 'object' && Array.isArray((doc as {camadas?: unknown}).camadas) ? (doc as {camadas: unknown[]}).camadas : [];
+  const out: CamadaDescartada[] = [];
+  camadas.forEach((c, indice) => {
+    const l = (c && typeof c === 'object' ? c : {}) as Record<string, unknown>;
+    if (l.grade === undefined) return;
+    const lida = lerGrade(l.grade);
+    if (lida.grade) return;
+    const g = (l.grade && typeof l.grade === 'object' ? l.grade : {}) as Record<string, unknown>;
+    const inteiro = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 1;
+    const motivo = inteiro(g.colunas) && inteiro(g.linhas) && (g.colunas > MAX_LADO_GRADE_DOCUMENTO || g.linhas > MAX_LADO_GRADE_DOCUMENTO)
+      ? `grade de ${g.colunas}×${g.linhas}, acima do máximo de ${MAX_LADO_GRADE_DOCUMENTO} por lado`
+      : `grade inválida: ${lida.problema}`;
+    out.push({indice, id: typeof l.id === 'string' ? l.id : 'camada', nome: typeof l.nome === 'string' && l.nome.trim() ? l.nome : typeof l.id === 'string' ? l.id : 'Camada', motivo});
+  });
+  return out;
 };
 
 /** Lê um documento com calma: campo fora do lugar volta ao padrão, nunca derruba o app. */

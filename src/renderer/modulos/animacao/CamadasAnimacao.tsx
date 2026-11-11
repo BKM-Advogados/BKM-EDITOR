@@ -3,7 +3,7 @@
 // projeto, o seletor do topo troca a aberta, como na Imagem (sem ele, a segunda animação escondia a primeira).
 import React, {useState} from "react";
 import {
-  ArrowDown, ArrowUp, Copy, Ellipsis, Eye, EyeOff, Grid, Image as ImageIcon, Lock, LockOpen, Plus, Square, Trash2, Type,
+  ArrowDown, ArrowUp, Copy, Ellipsis, Eye, EyeOff, Grid, Image as ImageIcon, Lock, LockOpen, Plus, Square, Trash2, TriangleAlert, Type,
 } from "lucide-react";
 import type {CamadaAnimacao, DocAnimacao, TipoCamadaAnimacao} from "../../../nucleo/animacao";
 import {idLivreAnimacao, novaCamadaAnimacao} from "../../../nucleo/animacao";
@@ -11,6 +11,7 @@ import {aplicar, selecionar, useLoja} from "../../estado/loja";
 import {BotaoMenu} from "../../componentes/Menu";
 import {SeletorDocumento} from "../../componentes/SeletorDocumento";
 import {mudouEm} from "../../estado/agente";
+import {descartadasDe} from "./AvisoDescartadas";
 
 export const iconeTipoAnimacao = (tipo: TipoCamadaAnimacao) => {
   switch (tipo) {
@@ -41,6 +42,7 @@ export const CamadasAnimacao: React.FC = () => {
   }
 
   const camadas = doc.camadas ?? [];
+  const descartadas = new Map(descartadasDe(doc).map((d) => [d.indice, d.motivo]));
 
   const adicionarCamada = (tipo: TipoCamadaAnimacao) => {
     const id = idLivreAnimacao(doc, tipo);
@@ -114,8 +116,9 @@ export const CamadasAnimacao: React.FC = () => {
             const sel = selecao === caminho;
             const visivel = c.visivel !== false;
             const travada = c.travada === true;
+            const descarte = descartadas.get(i);
             return (
-              <li key={c.id ?? i} className={`${sel ? "sel" : ""}${visivel ? "" : " oculto"}${mudouEm(mudancas, ativo, caminho) ? " agente" : ""}`} tabIndex={0}
+              <li key={c.id ?? i} className={`${sel ? "sel" : ""}${visivel ? "" : " oculto"}${mudouEm(mudancas, ativo, caminho) ? " agente" : ""}${descarte ? " descartada" : ""}`} tabIndex={0}
                 onClick={() => selecionar({documento: ativo, caminho})} onKeyDown={(e) => e.key === "Enter" && selecionar({documento: ativo, caminho})}>
                 <span className="tipo">{iconeTipoAnimacao(c.tipo)}</span>
                 {editandoNome === c.id ? (
@@ -129,6 +132,7 @@ export const CamadasAnimacao: React.FC = () => {
                 ) : (
                   <span className="nome" title="Clique duplo para renomear" onDoubleClick={parar(() => (setEditandoNome(c.id), setNomeTemp(c.nome)))}>{c.nome}</span>
                 )}
+                {descarte && <span className="aviso-camada" role="img" aria-label={`Não aparece: ${descarte}`} title={`Não aparece na prévia nem na exportação: ${descarte}`}><TriangleAlert className="i14" /></span>}
                 {mudouEm(mudancas, ativo, caminho) && <span className="ponto-agente" title="O Claude mudou esta camada" />}
                 {sel && (
                   <>
