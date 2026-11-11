@@ -113,30 +113,41 @@ export const ordemAleatoria = (n: number, semente: number): number[] => {
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
-/** Quando (de 0 a 1 do progresso) a célula i, na coluna c e linha l, entra nos efeitos de frente fixa: aleatório e
- *  decodificar (pela ordem embaralhada), varredura, varredura para baixo e meio. É o único lugar das fórmulas: revelar e
- *  revelarRGBA usam esta função, então mudar a geometria de um efeito é mudar só aqui. */
+/** Quanto do progresso a célula do `decodificar` leva para assentar na cor final, depois de entrar. */
+const ASSENTAR = Math.max(0.05, 0.25);
+
+/**
+ * Quando (de 0 a 1 do progresso) a célula i, na coluna c e linha l, entra nos efeitos de frente fixa: aleatório e
+ * decodificar (pela ordem embaralhada), varredura, varredura para baixo e meio. É o único lugar das fórmulas: revelar e
+ * revelarRGBA usam esta função, então mudar a geometria de um efeito é mudar só aqui.
+ *
+ * Uma regra para todos: a célula entra em `(posição + 0,5) / (alcance + 1)`, com a posição em passos de célula a partir
+ * da primeira que entra; é como se a frente revelasse a célula ao passar pelo centro dela. Todo limiar fica dentro de
+ * (0, 1): nada aparece em 0, a grade fica cheia antes do último quadro, sem NaN (o denominador é ≥ 1) e com a frente
+ * em velocidade constante. No `meio` a posição é a distância ao centro (o raio cresce em ritmo constante). O
+ * `decodificar` entra até 3/4 do progresso, para cada célula ter tempo de assentar na cor final antes do fim.
+ */
 export const limiarDaCelula = (efeito: EfeitoPixel | undefined, i: number, c: number, l: number, colunas: number, linhas: number, ordem: ArrayLike<number>, n: number) => {
   switch (efeito) {
     case 'aleatorio':
+      return (ordem[i] + 0.5) / n;
     case 'decodificar':
-      return ordem[i] / n;
+      return ((ordem[i] + 0.5) / n) * (1 - ASSENTAR);
     case 'varredura':
-      return c / colunas;
+      return (c + 0.5) / colunas;
     case 'varredura-baixo':
-      return l / linhas;
+      return (l + 0.5) / linhas;
     case 'meio': {
       const cx = (colunas - 1) / 2;
       const cy = (linhas - 1) / 2;
-      return Math.hypot(c - cx, l - cy) / Math.hypot(cx, cy);
+      const dMin = Math.hypot(colunas % 2 ? 0 : 0.5, linhas % 2 ? 0 : 0.5); // a distância da célula mais perto do centro
+      const alcance = Math.hypot(cx, cy) - dMin;
+      return (Math.hypot(c - cx, l - cy) - dMin + 0.5) / (alcance + 1);
     }
     default:
       return 0;
   }
 };
-
-/** Quanto do progresso a célula do `decodificar` leva para assentar na cor final, depois de entrar. */
-const ASSENTAR = Math.max(0.05, 0.25);
 
 /** Lados inteiros da grade (grade torta não derruba quem desenha). */
 const ladosDe = (grade: GradePixel) => ({

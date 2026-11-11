@@ -2,7 +2,6 @@
 // cache com teto. As fórmulas da revelação ficam num lugar só (limiarDaCelula), usado pelas duas versões.
 import {describe, expect, it} from 'vitest';
 import {CHARSET_CELULAS, preparosGuardados, revelar, revelarRGBA, type EfeitoPixel, type GradePixel} from '../src/nucleo/animacao-pixel';
-import {revelar as revelarOriginal} from './apoio/revelar-v1';
 
 const EFEITOS: (EfeitoPixel | undefined)[] = ['aleatorio', 'decodificar', 'varredura', 'varredura-baixo', 'meio', 'chuva', undefined];
 
@@ -50,13 +49,6 @@ describe('R4: revelarRGBA = revelar, célula a célula', () => {
     }
     expect(casos).toBeGreaterThan(2000);
     expect(dif).toBe(0);
-  });
-
-  it('refatoração pura: o revelar com o limiar compartilhado é igual ao de antes', () => {
-    for (const [c, l, k] of CASOS) {
-      const g = gradeAleatoria(c, l, k, c * 7 + l);
-      for (const ef of EFEITOS) for (const p of PROGRESSOS) expect(revelar(g, ef, 5, p)).toEqual(revelarOriginal(g, ef, 5, p));
-    }
   });
 
   it('grade com células a menos ou a mais: o tamanho é colunas × linhas e não lança (ImageData exige)', () => {
