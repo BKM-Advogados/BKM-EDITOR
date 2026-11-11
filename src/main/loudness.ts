@@ -52,46 +52,85 @@ export type ResultadoLoudness = {antes: MedidaLoudnorm; depois: MedidaLoudnorm; 
   modo?: string};
 
 const noAlvo = (m: MedidaLoudnorm, alvo: number, pico: number) => Math.abs(m.i - alvo) <= TOLERANCIA_LU && m.tp <= pico;
+const erroDe = (m: MedidaLoudnorm, alvo: number, pico: number) => Math.abs(m.i - alvo) + Math.max(0, m.tp - pico) * 2;
+// o que o loudnorm aceita: I de −70 a −5 LUFS e TP de −9 a 0 dBTP (fora disso o ffmpeg nem começa: "Numerical result out of range")
+const limitarI = (v: number) => Math.min(-5, Math.max(-70, v));
+const limitarTP = (v: number) => Math.min(0, Math.max(-9, v));
+// com menos de 3 s o loudnorm não tem o modo dinâmico e o linear para no pico: o som curto ganha silêncio no fim (apad), que
+// não conta no loudness (porta de −70 LUFS) e sai cortado de volta (atrim)
+const CURTO_S = 3.5;
+const esperar = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
 
-/** Corrige o loudness de um arquivo já exportado até o alvo, no lugar. Devolve null quando o vídeo não tem som. */
-export const corrigirArquivo = async (arquivo: string, o: Parar & {binarios?: string | null; alvo_lufs?: number; pico_dbtp?: number; aviso?: (p: Progresso) => void}): Promise<ResultadoLoudness | null> => {
+/** Troca o arquivo pelo corrigido. No Windows o antivírus pode segurar o arquivo recém-gravado por um instante (EPERM/EBUSY). */
+const trocar = async (de: string, para: string) => {
+  for (let k = 0; ; k++) {
+    try {
+      return renameSync(de, para);
+    } catch (e) {
+      const codigo = (e as NodeJS.ErrnoException).code;
+      if (k >= 4 || (codigo !== 'EPERM' && codigo !== 'EBUSY' && codigo !== 'EACCES')) throw e;
+      await esperar(250 * (k + 1));
+    }
+  }
+};
+
+/** Corrige o loudness de um arquivo já exportado até o alvo, no lugar. Devolve null quando o vídeo não tem som. Quando
+ *  nenhuma tentativa chega ao alvo, fica a mais próxima (ou o original, se ele já era o mais próximo) com `no_alvo: false`.
+ *  Erro numa tentativa depois de outra ter dado certo não perde a que deu certo. O original só é trocado no fim. */
+export const corrigirArquivo = async (arquivo: string, o: Parar & {binarios?: string | null; alvo_lufs?: number; pico_dbtp?: number; duracao_s?: number;
+  aviso?: (p: Progresso) => void}): Promise<ResultadoLoudness | null> => {
   const alvo = o.alvo_lufs ?? ALVO_LUFS_PADRAO;
   const pico = o.pico_dbtp ?? PICO_DBTP_PADRAO;
-  const antes = await medirArquivo(arquivo, o).catch(() => null);
+  const antes = await medirArquivo(arquivo, o).catch((e: Error) => {
+    if (e.message === 'cancelado') throw e; // cancelar não é "sem som"
+    return null;
+  });
   if (!antes) return null;
   if (noAlvo(antes, alvo, pico)) return {antes, depois: antes, alvo_lufs: alvo, pico_dbtp: pico, ajustado: false, tentativas: 0, no_alvo: true};
   const {f, audio} = formatoDe(arquivo);
   const tmp = `${arquivo}.${process.pid}.tmp`;
-  let melhor: {m: MedidaLoudnorm; arquivo: string; modo?: string} | null = null;
+  const curto = o.duracao_s !== undefined && o.duracao_s > 0 && o.duracao_s < CURTO_S;
+  let melhor: {m: MedidaLoudnorm; arquivo: string | null; modo?: string} = {m: antes, arquivo: null}; // null: o original
   let iAlvo = alvo;
-  let tpAlvo = pico - 0.5; // folga para o codificador, que sobe um pouco o pico verdadeiro
+  let tpAlvo = limitarTP(pico - 0.5); // folga para o codificador, que sobe um pouco o pico verdadeiro
   let tentativas = 0;
   try {
     for (; tentativas < TENTATIVAS; ) {
       tentativas++;
       o.aviso?.({tipo: 'status', mensagem: `Igualando o loudness a ${alvo} LUFS (de ${antes.i.toFixed(1)})…`});
-      const filtro = `loudnorm=I=${iAlvo.toFixed(2)}:TP=${tpAlvo.toFixed(2)}:LRA=${lra(antes)}:measured_I=${antes.i}:measured_TP=${antes.tp}`
-        + `:measured_LRA=${antes.lra}:measured_thresh=${antes.thresh}:offset=${antes.offset}:linear=true:print_format=json,aresample=${TAXA}`;
+      const filtro = `${curto ? 'apad=pad_dur=3,' : ''}loudnorm=I=${iAlvo.toFixed(2)}:TP=${tpAlvo.toFixed(2)}:LRA=${lra(antes)}:measured_I=${antes.i}`
+        + `:measured_TP=${antes.tp}:measured_LRA=${antes.lra}:measured_thresh=${antes.thresh}:offset=${antes.offset}:linear=true:print_format=json,`
+        + `aresample=${TAXA}${curto ? `,atrim=end=${o.duracao_s!.toFixed(3)}` : ''}`;
       const saida = `${tmp}.${tentativas}`;
-      // -shortest: no modo dinâmico o loudnorm completa o último pedaço de 100 ms, e o som passaria do fim do vídeo
-      const passada = await rodarFfmpeg(['-y', '-i', arquivo, '-map', '0:v?', '-map', '0:a:0', '-c:v', 'copy', '-af', filtro, '-ar', String(TAXA), ...audio, '-shortest',
-        '-f', f, saida], o);
-      const m = await medirArquivo(saida, o);
-      if (!m) throw new Error('o arquivo corrigido saiu sem som');
-      const erro = (x: MedidaLoudnorm) => Math.abs(x.i - alvo) + Math.max(0, x.tp - pico) * 2;
-      if (!melhor || erro(m) < erro(melhor.m)) {
-        if (melhor) rmSync(melhor.arquivo, {force: true});
+      let passada: {erro: string};
+      let m: MedidaLoudnorm | null;
+      try {
+        // -shortest: no modo dinâmico o loudnorm completa o último pedaço de 100 ms, e o som passaria do fim do vídeo
+        passada = await rodarFfmpeg(['-y', '-i', arquivo, '-map', '0:v?', '-map', '0:a:0', '-c:v', 'copy', '-af', filtro, '-ar', String(TAXA), ...audio, '-shortest',
+          '-f', f, saida], o);
+        m = await medirArquivo(saida, o);
+        if (!m) throw new Error('o arquivo corrigido saiu sem som');
+      } catch (e) {
+        rmSync(saida, {force: true});
+        if ((e as Error).message === 'cancelado' || !melhor.arquivo) throw e;
+        break; // uma tentativa anterior deu certo: fica com ela
+      }
+      if (erroDe(m, alvo, pico) < erroDe(melhor.m, alvo, pico)) {
+        if (melhor.arquivo) rmSync(melhor.arquivo, {force: true});
         melhor = {m, arquivo: saida, modo: lerLoudnorm(passada.erro)?.tipo};
       } else rmSync(saida, {force: true});
       if (noAlvo(m, alvo, pico)) break;
-      // compensa o que faltou e tenta de novo a partir do original
-      iAlvo += alvo - m.i;
-      if (m.tp > pico) tpAlvo -= m.tp - pico + 0.3;
+      // compensa o que faltou e tenta de novo a partir do original, dentro do que o loudnorm aceita
+      const iNovo = limitarI(iAlvo + alvo - m.i);
+      const tpNovo = m.tp > pico ? limitarTP(tpAlvo - (m.tp - pico + 0.3)) : tpAlvo;
+      if (iNovo === iAlvo && tpNovo === tpAlvo) break; // nada mais a pedir: fica a melhor
+      iAlvo = iNovo;
+      tpAlvo = tpNovo;
     }
-    renameSync(melhor!.arquivo, arquivo);
-    const depois = melhor!.m;
+    if (melhor.arquivo) await trocar(melhor.arquivo, arquivo);
+    const depois = melhor.m;
     o.aviso?.({tipo: 'status', mensagem: `Loudness: ${depois.i.toFixed(1)} LUFS, pico ${depois.tp.toFixed(1)} dBTP (alvo ${alvo} LUFS, pico até ${pico})`});
-    return {antes, depois, alvo_lufs: alvo, pico_dbtp: pico, ajustado: true, tentativas, no_alvo: noAlvo(depois, alvo, pico), modo: melhor!.modo};
+    return {antes, depois, alvo_lufs: alvo, pico_dbtp: pico, ajustado: melhor.arquivo !== null, tentativas, no_alvo: noAlvo(depois, alvo, pico), modo: melhor.modo};
   } finally {
     for (let k = 1; k <= TENTATIVAS; k++) rmSync(`${tmp}.${k}`, {force: true});
   }
@@ -101,14 +140,16 @@ export const corrigirArquivo = async (arquivo: string, o: Parar & {binarios?: st
  *  (composição CarrosselTema, narração em `props.audio`) sai no alvo padrão da casa, −14 LUFS e −1 dBTP (som-D5: antes saía como a
  *  narração foi gravada, a −26 LUFS, por exemplo). O ganho é um só para o arquivo inteiro, então a narração e os efeitos
  *  mantêm a diferença entre eles; os efeitos do carrossel têm volume fixo, pensado para uma narração perto de −20 LUFS. */
-export const igualarLoudness = async (o: {arquivo: string; props: Record<string, unknown>; binarios?: string | null; cancelSignal?: CancelSignal; aviso?: (p: Progresso) => void}) => {
+export const igualarLoudness = async (o: {arquivo: string; props: Record<string, unknown>; binarios?: string | null; cancelSignal?: CancelSignal; duracao_s?: number;
+  aviso?: (p: Progresso) => void}) => {
   if (o.props.composicao === 'CarrosselTema') {
     if (typeof o.props.audio !== 'string' || !o.props.audio) return null;
-    return corrigirArquivo(o.arquivo, {binarios: o.binarios, cancelSignal: o.cancelSignal, aviso: o.aviso});
+    return corrigirArquivo(o.arquivo, {binarios: o.binarios, cancelSignal: o.cancelSignal, duracao_s: o.duracao_s, aviso: o.aviso});
   }
   const audio = o.props.audio as AudioP | undefined;
   if (o.props.composicao !== 'VideoCenas' || !audio?.faixas?.some((f) => !f.mudo && f.clipes.some((c) => !c.mudo && !c.fora))) return null;
-  return corrigirArquivo(o.arquivo, {binarios: o.binarios, cancelSignal: o.cancelSignal, aviso: o.aviso, alvo_lufs: audio.alvo_lufs, pico_dbtp: audio.pico_dbtp});
+  return corrigirArquivo(o.arquivo, {binarios: o.binarios, cancelSignal: o.cancelSignal, duracao_s: o.duracao_s, aviso: o.aviso, alvo_lufs: audio.alvo_lufs,
+    pico_dbtp: audio.pico_dbtp});
 };
 
 // ---------- medidor da tela ----------

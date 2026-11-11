@@ -5,10 +5,11 @@
 // escala, trecho e o sinal de cancelar do Remotion (makeCancelSignal).
 import os from 'node:os';
 import path from 'node:path';
-import {existsSync} from 'node:fs';
-import {rm} from 'node:fs/promises';
+import {existsSync, statSync} from 'node:fs';
+import {rm, statfs} from 'node:fs/promises';
 import type {CancelSignal} from '@remotion/renderer';
 import type {Progresso} from '../compartilhado/api';
+import {espacoNecessario, formatarBytes} from '../nucleo/exportacao';
 import {getCompositorPackage} from './compositor-package';
 import {getPackagedBrowserPaths} from './packaged-browser';
 
@@ -61,7 +62,27 @@ export type RenderVideo = {
   escala?: number; // `scale` do renderMedia: para a composição de tamanho fixo (o vídeo de cenas recebe largura e altura nas props)
   quadros?: [number, number] | null; // trecho em quadros, inclusivo nas duas pontas
   cancelSignal?: CancelSignal;
+  avisos?: string[]; // recebe o que saiu diferente do pedido sem impedir o arquivo (o loudness fora do alvo ou não corrigido)
 };
+
+/** Falta espaço para a exportação? Devolve a mensagem para a pessoa, ou null. Sem como medir (statfs falhou), segue. */
+export const faltaEspaco = async (pasta: string, bytes: number[], comAudio: boolean, tmp = os.tmpdir()) => {
+  try {
+    const mesmoDisco = statSync(pasta).dev === statSync(tmp).dev;
+    const precisa = espacoNecessario(bytes, comAudio, mesmoDisco);
+    for (const [dir, n] of [[pasta, precisa.saidas], [tmp, precisa.temporarios]] as const) {
+      if (n <= 0) continue;
+      const {bavail, bsize} = await statfs(dir);
+      const livre = bavail * bsize;
+      if (livre < n) return `pouco espaço em disco em ${dir}: há ${formatarBytes(livre)} livres e a exportação precisa de cerca de ${formatarBytes(n)}`;
+    }
+  } catch {
+    /* statfs indisponível (unidade de rede, por exemplo): não bloqueia */
+  }
+  return null;
+};
+/** O erro é de disco cheio? (Node: ENOSPC; ffmpeg: "No space left on device", saída 228 no Linux e no Mac) */
+export const discoCheio = (mensagem: string) => /ENOSPC|No space left|\((228|-28|4294967268)\)/i.test(mensagem);
 
 /** Um arquivo: escolhe a composição pelas props, mede e renderiza. O andamento sai em `aviso` (etapa "renderizando"). */
 export const renderizarVideo = async (p: Preparado, r: RenderVideo, aviso: (x: Progresso) => void) => {
@@ -85,7 +106,15 @@ export const renderizarVideo = async (p: Preparado, r: RenderVideo, aviso: (x: P
     concurrency: Math.max(1, Math.floor(os.cpus().length / 2)),
     onProgress: ({progress}) => aviso({tipo: 'progresso', etapa: 'renderizando', progresso: progress * 100}),
   });
-  await (await import('./loudness')).igualarLoudness({arquivo: r.arquivo, props: r.props, binarios: p.binariesDirectory, cancelSignal: r.cancelSignal, aviso}); // frente Som
+  // frente Som. O render já está pronto: se a correção do loudness falhar, o vídeo fica como saiu do render e a pessoa é avisada
+  try {
+    const l = await (await import('./loudness')).igualarLoudness({arquivo: r.arquivo, props: r.props, binarios: p.binariesDirectory, cancelSignal: r.cancelSignal,
+      duracao_s: quadros / composition.fps, aviso});
+    if (l && !l.no_alvo) r.avisos?.push(`${path.basename(r.arquivo)}: o som ficou em ${l.depois.i.toFixed(1)} LUFS e pico ${l.depois.tp.toFixed(1)} dBTP (alvo ${l.alvo_lufs} LUFS, pico até ${l.pico_dbtp})`);
+  } catch (e) {
+    if ((e as Error).message === 'cancelado') throw e;
+    r.avisos?.push(`${path.basename(r.arquivo)}: saiu sem a correção de loudness (${discoCheio((e as Error).message) ? 'o disco encheu' : (e as Error).message})`);
+  }
   return r.arquivo;
 };
 

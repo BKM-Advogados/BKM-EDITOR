@@ -451,7 +451,7 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
     if (Object.keys(marcas).length) window.estudio.gravarPrefsExportacao({marca_dagua: marcas}).catch(() => undefined);
     const r = await window.estudio.exportarVideo(documento, opcoes);
     setFase({tipo: 'pronto', r});
-    if (r.ok) avisar(`Exportado: ${(r.arquivos ?? []).map(nomeDoArquivo).join(', ')}`, 'ok');
+    if (r.ok) avisar(`Exportado: ${(r.arquivos ?? []).map(nomeDoArquivo).join(', ')}${r.avisos?.length ? `. Atenção: ${r.avisos.join('; ')}` : ''}`, r.avisos?.length ? 'info' : 'ok');
     else avisar(r.cancelado ? 'Exportação cancelada.' : `Exportação: ${r.mensagem}`, r.cancelado ? 'info' : 'erro');
   };
 

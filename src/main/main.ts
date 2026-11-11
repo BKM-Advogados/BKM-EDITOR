@@ -11,11 +11,11 @@ import {aplicarMarcaAoPlano, dentroDoOneDrive, documentoNovo, gravarPlano, nomeD
 import {EXEMPLO} from '../nucleo/exemplo';
 import {MODELOS} from '../nucleo/modelos';
 import {FORMATO_PADRAO, type Formato} from '../nucleo/formatos';
-import {argumentosDoRender, destinoDoFormato, fontesDaMarcaDagua, FORMATOS_IMAGEM_SAIDA, legendasDasProps, marcaDaguaDoDestino, nomesDosArquivos, type OpcoesExportarImagem,
-  type OpcoesExportarVideo} from '../nucleo/exportacao';
+import {argumentosDoRender, destinoDoFormato, estimarExportacao, fontesDaMarcaDagua, FORMATOS_IMAGEM_SAIDA, legendasDasProps, marcaDaguaDoDestino, nomesDosArquivos,
+  type OpcoesExportarImagem, type OpcoesExportarVideo} from '../nucleo/exportacao';
 import {ErroProjeto, Projeto, serializar} from '../nucleo/projeto';
 import {criarRede} from '../nucleo/ferramentas-mcp';
-import {prepararRender, renderizarVideo} from './exportar';
+import {discoCheio, faltaEspaco, prepararRender, renderizarVideo} from './exportar';
 import {registrarIpcMarcas} from './ipc-marcas';
 import {registrarExportarPaginas} from './exportar-paginas';
 import {lerJsonDaTela} from './ler-json';
@@ -444,10 +444,12 @@ lidar(CANAL.exportar, async (documento: string, opcoes?: OpcoesExportarVideo): P
   const pasta = p.caminho('saidas');
   mkdirSync(pasta, {recursive: true});
   const planos = nomesDosArquivos(o.nome?.trim() || tituloDoDocumento(p, documento), o.destinos, formato);
+  const comAudio = fixo || Boolean(['audio', 'trilha', 'narracao', 'sons'].some((k) => (Array.isArray(props[k]) ? (props[k] as unknown[]).length > 0 : Boolean(props[k]))));
   const {makeCancelSignal} = await import('@remotion/renderer');
   const {cancelSignal, cancel} = makeCancelSignal();
   cancelarExportacao = cancel;
   const arquivos: string[] = [];
+  const avisos: string[] = [];
   let parcial: string | undefined;
   // o andamento de cada arquivo vai à interface com o nome dele; a barra de tarefas mostra o andamento geral
   const avisoDe = (indice: number, arquivo: string) => (x: Progresso) => {
@@ -456,6 +458,9 @@ lidar(CANAL.exportar, async (documento: string, opcoes?: OpcoesExportarVideo): P
   };
   const fontesMarca = fontesDaMarcaDagua(props);
   try {
+    // dentro do try: a trava de "já há uma exportação" já vale, e a mensagem chega como as outras falhas
+    const semEspaco = await faltaEspaco(pasta, estimarExportacao(o, formato, Number(props.duracao_ms) || 0, comAudio).porDestino.map((d) => d.bytes), comAudio);
+    if (semEspaco) throw new Error(semEspaco);
     const preparado = await prepararRender({raizApp: app.getAppPath(), empacotado: app.isPackaged, aviso: avisoDe(0, '')});
     for (const [i, plano] of planos.entries()) {
       const args = argumentosDoRender(o, plano.destino, formato, Number(props.duracao_ms) || 0);
@@ -473,7 +478,7 @@ lidar(CANAL.exportar, async (documento: string, opcoes?: OpcoesExportarVideo): P
       const marca = marcaDaguaDoDestino(o.marca_dagua?.[plano.destino.id], plano.destino, fontesMarca, o.proporcao_logo, legendasDasProps(propsDestino), o.proporcao_texto);
       await renderizarVideo(preparado, {
         props: {...propsDestino, ...(marca ? {marca_dagua: marca} : {})},
-        arquivo: destino, codec: args.codec, videoBitrate: args.videoBitrate, escala: fixo ? args.escala : 1, quadros: args.frameRange, cancelSignal,
+        arquivo: destino, codec: args.codec, videoBitrate: args.videoBitrate, escala: fixo ? args.escala : 1, quadros: args.frameRange, cancelSignal, avisos,
       }, avisoDe(i, path.basename(destino)));
       arquivos.push(destino);
       parcial = undefined;
@@ -485,14 +490,14 @@ lidar(CANAL.exportar, async (documento: string, opcoes?: OpcoesExportarVideo): P
         }
       }
     }
-    enviar(CANAL.progresso, {tipo: 'status', mensagem: `Exportado: ${arquivos.map((a) => path.relative(p.raiz, a)).join(', ')}`});
-    return {ok: true, arquivo: arquivos[0], arquivos, pasta};
+    enviar(CANAL.progresso, {tipo: 'status', mensagem: `Exportado: ${arquivos.map((a) => path.relative(p.raiz, a)).join(', ')}${avisos.length ? `. Atenção: ${avisos.join('; ')}` : ''}`});
+    return {ok: true, arquivo: arquivos[0], arquivos, pasta, ...(avisos.length ? {avisos} : {})};
   } catch (e) {
-    const mensagem = (e as Error).message;
+    const mensagem = discoCheio((e as Error).message) ? 'o disco encheu durante a exportação; libere espaço e tente de novo' : (e as Error).message;
     const cancelado = /cancel/i.test(mensagem);
     if (parcial) rmSync(parcial, {force: true}); // o arquivo pela metade não fica em saidas/
     enviar(CANAL.progresso, {tipo: 'status', mensagem: cancelado ? 'Exportação cancelada' : `Falhou: ${mensagem}`});
-    return {ok: false, cancelado, mensagem: cancelado ? 'Exportação cancelada' : mensagem, arquivos, pasta};
+    return {ok: false, cancelado, mensagem: cancelado ? 'Exportação cancelada' : mensagem, arquivos, pasta, ...(avisos.length ? {avisos} : {})};
   } finally {
     cancelarExportacao = null;
     janela?.setProgressBar(-1);

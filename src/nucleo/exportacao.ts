@@ -52,10 +52,10 @@ export const FORMATOS_IMAGEM_SAIDA: {id: FormatoImagem; nome: string; ext: strin
 ];
 
 // bitrate de vídeo em kbps para 1080p a 30 qps (o YouTube recomenda 8 Mbps para 1080p30 em SDR e 12 para 1080p60; o
-// Instagram pede no mínimo 3,5 Mbps); o áudio AAC do Remotion sai a 128 kbps
+// Instagram pede no mínimo 3,5 Mbps); o áudio sai a 320 kbps: é o padrão do AAC do Remotion e o que a correção do loudness regrava
 const KBPS_1080P: Record<QualidadeVideo, number> = {alta: 12000, media: 6000, leve: 2500};
 const PIXELS_1080P = 1920 * 1080;
-export const KBPS_AUDIO = 128;
+export const KBPS_AUDIO = 320;
 
 /** Bitrate de vídeo (kbps) para o tamanho e os quadros por segundo de saída: proporcional aos pixels, metade a mais acima
  *  de 40 qps; H.265 e VP9 chegam à mesma qualidade com cerca de 35% menos. Nunca abaixo de 300 kbps. */
@@ -193,6 +193,21 @@ export const estimarExportacao = (o: OpcoesExportarVideo, formato: Formato, dura
     return {destino: d, largura: a.largura, altura: a.altura, bytes: estimarBytes(Number.parseInt(a.videoBitrate, 10), a.duracaoMs, comAudio)};
   });
   return {porDestino, total: porDestino.reduce((s, x) => s + x.bytes, 0)};
+};
+
+/** Espaço livre que a exportação pede antes de começar, em bytes, pelos tamanhos estimados de cada arquivo. Em saidas/ ficam
+ *  todos os arquivos e, durante a correção do loudness do maior, mais duas cópias dele (o original, a melhor tentativa e a
+ *  atual). Na pasta temporária, durante o render, o Remotion guarda o vídeo sem som do maior e os sons já preparados; ela
+ *  esvazia antes do loudness. `mesmoDisco`: as duas pastas no mesmo volume (o comum no Windows, tudo em C:), e vale o pior
+ *  dos dois momentos. A folga cobre o bitrate variável; os 100 MB, o resto do sistema. */
+export const FOLGA_ESPACO = 1.15;
+export const espacoNecessario = (bytes: number[], comAudio: boolean, mesmoDisco: boolean) => {
+  const total = bytes.reduce((s, b) => s + b, 0);
+  const maior = bytes.reduce((m, b) => Math.max(m, b), 0);
+  const noLoudness = Math.round((total + (comAudio ? 2 * maior : 0)) * FOLGA_ESPACO);
+  const temporarios = Math.round(maior * FOLGA_ESPACO) + 300e6;
+  if (!mesmoDisco) return {saidas: noLoudness + 100e6, temporarios};
+  return {saidas: Math.max(noLoudness, Math.round(total * FOLGA_ESPACO) + temporarios) + 100e6, temporarios: 0};
 };
 
 // ---------- marca d'água por destino ----------
