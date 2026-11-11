@@ -1,7 +1,7 @@
 // A janela só mostra o app (auditoria do processo principal, P5): o will-navigate, o confiavel do IPC e as permissões
 // aceitam só a própria página (o index.html do pacote ou a origem do Vite), e a tela só pede microfone, copiar e tela cheia.
 import {pathToFileURL} from 'node:url';
-import {describe, expect, it} from 'vitest';
+import {afterEach, describe, expect, it} from 'vitest';
 import {ehPaginaDoApp, permissaoLiberada} from '../src/main/janela-segura';
 
 describe('só a página do app (P5)', () => {
@@ -28,6 +28,37 @@ describe('só a página do app (P5)', () => {
     expect(ehPaginaDoApp('file:///c:/program%20files/est%C3%BAdio/resources/app.asar/.vite/renderer/main_window/index.html', windows)).toBe(true);
     expect(ehPaginaDoApp('file:///C:/Program Files/Estúdio/resources/app.asar/.vite/renderer/main_window/index.html', windows)).toBe(true);
     expect(ehPaginaDoApp('file:///C:/Users/pessoa/Desktop/foto.jpg', windows)).toBe(false);
+  });
+
+  describe('sem o indicador, segue o sistema (process.platform simulado)', () => {
+    const real = process.platform;
+    const como = (p: NodeJS.Platform) => Object.defineProperty(process, 'platform', {value: p, configurable: true});
+    afterEach(() => como(real));
+    const winHtml = 'D:\\a\\Estudio\\resources\\app.asar\\.vite\\renderer\\main_window\\index.html';
+
+    it('Windows: letra da unidade, barras, caixa, prefixo \\\\?\\ e UNC', () => {
+      como('win32');
+      const app = {indexHtml: winHtml};
+      expect(ehPaginaDoApp('file:///D:/a/Estudio/resources/app.asar/.vite/renderer/main_window/index.html#/video', app)).toBe(true);
+      expect(ehPaginaDoApp('file:///d:/A/ESTUDIO/resources/app.asar/.vite/renderer/main_window/index.html?x=1', app)).toBe(true);
+      expect(ehPaginaDoApp('file:///D:/a/Estudio/resources/app.asar/.vite/renderer/main_window/./sub/../index.html', app)).toBe(true);
+      expect(ehPaginaDoApp('file:///D:/a/Estudio/resources/app.asar/.vite/renderer/main_window/index.html', {indexHtml: `\\\\?\\${winHtml}`})).toBe(true);
+      expect(ehPaginaDoApp('file:///D:/a/Estudio/resources/app.asar/.vite/renderer/main_window/index.html', {indexHtml: winHtml.replaceAll('\\', '/')})).toBe(true);
+      expect(ehPaginaDoApp('file:///C:/a/Estudio/resources/app.asar/.vite/renderer/main_window/index.html', app)).toBe(false);
+      expect(ehPaginaDoApp('file:///D:/a/Estudio/resources/app.asar/.vite/renderer/outra/index.html', app)).toBe(false);
+      const unc = {indexHtml: '\\\\servidor\\apps\\Estudio\\resources\\app.asar\\.vite\\renderer\\main_window\\index.html'};
+      expect(ehPaginaDoApp('file://servidor/apps/Estudio/resources/app.asar/.vite/renderer/main_window/index.html', unc)).toBe(true);
+      expect(ehPaginaDoApp('file:///D:/a/Estudio/resources/app.asar/.vite/renderer/main_window/index.html', {indexHtml: `\\\\?\\UNC\\servidor\\apps${winHtml.slice(2)}`})).toBe(false);
+      expect(ehPaginaDoApp('file://servidor/apps/a/Estudio/resources/app.asar/.vite/renderer/main_window/index.html', {indexHtml: `\\\\?\\UNC\\servidor\\apps${winHtml.slice(2)}`})).toBe(true);
+    });
+
+    it('Mac: caminho do .app, acento composto ou decomposto, e a caixa conta', () => {
+      como('darwin');
+      const app = {indexHtml: '/Users/pessoa/Área de Trabalho/Estudio.app/Contents/Resources/app.asar/.vite/renderer/main_window/index.html'.normalize('NFD')};
+      expect(ehPaginaDoApp('file:///Users/pessoa/%C3%81rea%20de%20Trabalho/Estudio.app/Contents/Resources/app.asar/.vite/renderer/main_window/index.html#/x', app)).toBe(true);
+      expect(ehPaginaDoApp('file:///Users/pessoa/%C3%81rea%20de%20Trabalho/Estudio.app/Contents/Resources/app.asar/.vite/renderer/main_window/INDEX.html', app)).toBe(false);
+      expect(ehPaginaDoApp('file:///Users/pessoa/Downloads/foto.png', app)).toBe(false);
+    });
   });
 
   it('em desenvolvimento vale a origem do Vite (a recarga dele passa), e só ela', () => {

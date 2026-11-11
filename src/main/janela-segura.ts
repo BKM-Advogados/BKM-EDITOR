@@ -66,15 +66,24 @@ export const avisoDeQuedaEmLaco = (razao: string): string =>
 
 export type PaginaDoApp = {dev?: string; indexHtml: string; windows?: boolean};
 
+/** Caminho absoluto comparável: no Windows com a letra da unidade (um "\x\y" ganha a da pasta atual, como o
+ *  pathToFileURL faz), barras invertidas, sem o prefixo "\\?\" e sem diferenciar maiúsculas; em todos, acentos em NFC
+ *  (o macOS pode devolver o nome decomposto). */
+const caminhoComparavel = (p: string, windows: boolean) => {
+  if (!windows) return path.posix.resolve(p).normalize('NFC');
+  const semPrefixo = p.replace(/^[\\/]{2}\?[\\/](?:UNC[\\/])?/i, (m) => (/UNC/i.test(m) ? '\\\\' : ''));
+  return path.win32.resolve(semPrefixo).normalize('NFC').toLowerCase();
+};
+
 export const ehPaginaDoApp = (url: string | undefined, app: PaginaDoApp): boolean => {
   try {
     const u = new URL(url ?? '');
     if (app.dev) return u.origin === new URL(app.dev).origin;
     if (u.protocol !== 'file:') return false;
-    const caminho = app.windows ? path.win32 : path.posix;
-    const a = caminho.normalize(fileURLToPath(u, {windows: app.windows ?? process.platform === 'win32'}));
-    const b = caminho.normalize(app.indexHtml);
-    return app.windows ? a.toLowerCase() === b.toLowerCase() : a === b;
+    // uma decisão só de sistema para ler a URL e para comparar (antes, a URL seguia o process.platform e a comparação
+    // seguia o app.windows: sem ele no Windows, "D:\…" era comparado com "/…" e a página do app era recusada)
+    const windows = app.windows ?? process.platform === 'win32';
+    return caminhoComparavel(fileURLToPath(u, {windows}), windows) === caminhoComparavel(app.indexHtml, windows);
   } catch {
     return false;
   }
