@@ -23,14 +23,23 @@ export const versaoDe = (texto: string) => createHash('sha256').update(texto).di
 
 export const serializar = (doc: unknown) => `${JSON.stringify(doc, null, 2)}\n`;
 
+/** `alvo` está dentro de `base` (ou é a própria base)? Só pelo texto do caminho; "..notas.json" é nome legítimo. */
+export const dentroDe = (base: string, alvo: string) => {
+  const rel = path.relative(base, alvo);
+  return rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel);
+};
+
+/** Arquivos internos que entram no diário sem ser documento do manifesto: o Reverter e o Ctrl+Z voltam as mudanças
+ *  deles pelo patch inverso (sem ajustes de módulo nem trava de camada). O aplicar_patch do MCP continua sem acesso. */
+const ARQUIVOS_INTERNOS = new Set(['pesquisa/pesquisa.json', 'midia/marcas.json', '.estudio/exportacao.json']);
+
 export class Projeto {
   constructor(readonly raiz: string) {}
 
   /** Caminho absoluto de um arquivo do projeto; recusa sair da pasta. */
   caminho(rel: string): string {
     const abs = path.resolve(this.raiz, rel);
-    const dentro = path.relative(this.raiz, abs);
-    if (dentro.startsWith('..') || path.isAbsolute(dentro)) throw new ErroProjeto(`caminho fora do projeto: ${rel}`, 'caminho');
+    if (!dentroDe(this.raiz, abs)) throw new ErroProjeto(`caminho fora do projeto: ${rel}`, 'caminho');
     return abs;
   }
 
@@ -123,18 +132,32 @@ export class Projeto {
     desfaz?: number; // frente IA: a entrada que esta reverte
     transicao?: string; // frente Música: sem ele, vale a transição aberta cujo destino é este arquivo
   }): {versao: string; entrada: EntradaDiario} {
-    const rel = this.arquivoDoDocumento(entrada.documento);
+    return this.aplicarNoArquivo(this.arquivoDoDocumento(entrada.documento), entrada, true);
+  }
+
+  /** O arquivo de uma entrada do diário: documento do manifesto ou um dos arquivos internos (null se não há mais). */
+  private arquivoDaEntrada(documento: string): {rel: string; interno: boolean} | null {
+    const rel = documento.split('\\').join('/');
+    if (ARQUIVOS_INTERNOS.has(rel)) return {rel, interno: true};
+    try {
+      return {rel: this.arquivoDoDocumento(documento), interno: false};
+    } catch {
+      return null;
+    }
+  }
+
+  private aplicarNoArquivo(rel: string, entrada: Parameters<Projeto['aplicarPatch']>[0], documento: boolean): {versao: string; entrada: EntradaDiario} {
     const {doc, versao} = this.lerJson<unknown>(rel);
     if (entrada.versao_base && entrada.versao_base !== versao) {
       throw new ErroProjeto(`o documento mudou (versão ${versao}, esperada ${entrada.versao_base}); leia de novo e refaça o patch`, 'conflito');
     }
     const erro = jsonpatch.validate(entrada.patch as Operation[], doc);
     if (erro) throw new ErroProjeto(`patch inválido: ${erro.name} em ${erro.operation?.path ?? '?'}: ${erro.message.split('\n')[0]}`);
-    const trava = motivoDaTrava(doc, entrada.patch, entrada.autor); // camada travada na imagem (rodada 3, B2)
+    const trava = documento ? motivoDaTrava(doc, entrada.patch, entrada.autor) : null; // camada travada na imagem (rodada 3, B2)
     if (trava) throw new ErroProjeto(trava, 'patch');
     // ajustes de módulos (frente Som: o som acompanha as cenas) somam operações ao patch na mesma gravação: o diário fica com uma entrada só
     let patch = entrada.patch;
-    for (const ajuste of this.ajustes) {
+    for (const ajuste of documento ? this.ajustes : []) {
       try {
         patch = [...patch, ...ajuste(doc, patch)];
       } catch {
@@ -164,7 +187,7 @@ export class Projeto {
       inverso: jsonpatch.compare(depois as object, doc as object) as OperacaoPatch[],
       ...(entrada.desfaz !== undefined ? {desfaz: entrada.desfaz} : {}),
     };
-    const transicao = entrada.transicao ?? this.transicaoAbertaPara(rel); // frente Música
+    const transicao = entrada.transicao ?? (documento ? this.transicaoAbertaPara(rel) : undefined); // frente Música
     if (transicao) registro.transicao = transicao;
     this.registrar(registro);
     return {versao: versaoDepois, entrada: registro};
@@ -262,33 +285,42 @@ export class Projeto {
   }
 
   // ---------- reverter e desfazer pelo diário (frente IA, rodada 3) ----------
-  /** As entradas já revertidas: alguma entrada posterior tem desfaz apontando para elas. */
+  /** As entradas já revertidas. Lidas de trás para a frente: um desfazer revertido depois (refazer) não conta, e a
+   *  entrada que ele desfazia volta a valer (A, desfaz A, refaz: A não está revertida). */
   revertidas(): Set<number> {
-    return new Set(this.diario(0, {tolerante: true}).filter((e) => e.desfaz !== undefined).map((e) => e.desfaz!));
+    return revertidasDe(this.diario(0, {tolerante: true}));
   }
 
   /**
    * Aplica o inverso de uma entrada. Antes, confere que os valores trocados por ela ainda estão lá (test); se alguém
    * mudou depois, devolve mudou_depois e não grava, a não ser com forcar. Entrada sem "replace" só reverte sem pergunta
-   * se for a última do documento.
+   * se for a última do documento. Se o documento está como a entrada o deixou, reverte sem conferir nada.
    */
   reverter(seq: number, o: {autor: string; origem: string; forcar?: boolean}):
     {ok: true; seq: number; rotulo: string} | {ok: false; mensagem: string; mudou_depois?: boolean} {
     const todas = this.diario(0, {tolerante: true});
     const e = todas.find((x) => x.seq === seq);
     if (!e) return {ok: false, mensagem: `não há a mudança #${seq} no histórico`};
-    if (todas.some((x) => x.desfaz === seq)) return {ok: false, mensagem: `a mudança #${seq} já foi revertida`};
+    if (revertidasDe(todas).has(seq)) return {ok: false, mensagem: `a mudança #${seq} já foi revertida`};
     if (!e.inverso?.length) return {ok: false, mensagem: `a mudança #${seq} não tem o que reverter`};
+    const alvo = this.arquivoDaEntrada(e.documento);
+    if (!alvo) return {ok: false, mensagem: `o arquivo da mudança #${seq} (${e.documento}) não está mais no projeto`};
+    let atual: string;
+    try {
+      atual = this.lerJson<unknown>(alvo.rel).versao;
+    } catch (erro) {
+      return {ok: false, mensagem: (erro as Error).message};
+    }
+    const intacto = atual === e.versao_depois; // ninguém mexeu desde esta entrada (o Ctrl+Z logo depois)
     const depois = todas.filter((x) => x.seq > seq && x.documento === e.documento);
-    const trocas = e.patch.filter((op) => op.op === 'replace') as {op: 'replace'; path: string; value: unknown}[];
-    const soTrocas = trocas.length === e.patch.length;
-    if (!o.forcar && depois.length && !soTrocas) {
+    const soTrocas = e.patch.every((op) => op.op === 'replace');
+    if (!o.forcar && !intacto && depois.length && !soTrocas) {
       return {ok: false, mudou_depois: true, mensagem: `o documento mudou depois da mudança #${seq}; reverter agora pode desfazer o que veio depois`};
     }
-    const testes: OperacaoPatch[] = o.forcar ? [] : trocas.map((t) => ({op: 'test', path: t.path, value: t.value}) as OperacaoPatch);
+    const testes: OperacaoPatch[] = o.forcar || intacto ? [] : trocasFinais(e.patch).map((t) => ({op: 'test', path: t.path, value: t.value}) as OperacaoPatch);
     try {
-      const r = this.aplicarPatch({documento: e.documento, patch: [...testes, ...e.inverso], autor: o.autor, origem: o.origem,
-        rotulo: `reverter: ${e.rotulo}`, desfaz: seq});
+      const r = this.aplicarNoArquivo(alvo.rel, {documento: e.documento, patch: [...testes, ...e.inverso], autor: o.autor, origem: o.origem,
+        rotulo: `reverter: ${e.rotulo}`, desfaz: seq, ...(intacto ? {versao_base: atual} : {})}, !alvo.interno);
       return {ok: true, seq: r.entrada.seq, rotulo: r.entrada.rotulo};
     } catch (erro) {
       if (testes.length && /test/i.test((erro as Error).message)) {
@@ -298,11 +330,17 @@ export class Projeto {
     }
   }
 
-  /** Ctrl+Z: a última entrada desse autor e dessa origem que ainda não foi revertida (transversal-D1: vale depois de reabrir). */
+  /** Ctrl+Z: a última entrada desse autor e dessa origem que ainda não foi revertida (transversal-D1: vale depois de
+   *  reabrir). Pula a que não tem o que reverter e a de arquivo que saiu do projeto, para não ficar preso nelas. */
   desfazerUltima(o: {autor: string; origem: string; como: {autor: string; origem: string}}) {
-    const revertidas = this.revertidas();
-    const minhas = this.diario(0, {tolerante: true}).filter((e) => e.autor === o.autor && e.origem === o.origem && e.desfaz === undefined && !revertidas.has(e.seq));
-    const ultima = minhas[minhas.length - 1];
+    const todas = this.diario(0, {tolerante: true});
+    const revertidas = revertidasDe(todas);
+    const existe = new Map<string, boolean>();
+    const ultima = todas.findLast((e) => {
+      if (e.autor !== o.autor || e.origem !== o.origem || e.desfaz !== undefined || revertidas.has(e.seq) || !e.inverso?.length) return false;
+      if (!existe.has(e.documento)) existe.set(e.documento, this.arquivoDaEntrada(e.documento) !== null);
+      return existe.get(e.documento)!;
+    });
     if (!ultima) return {ok: false as const, mensagem: 'nada para desfazer'};
     return {...this.reverter(ultima.seq, o.como), alvo: ultima};
   }
@@ -454,6 +492,23 @@ const resumirPatch = (patch: OperacaoPatch[]) => {
   if (ops.length === 1) return `${ops[0].op} ${ops[0].path}`;
   return `${ops.length} mudanças (${ops[0].path}…)`;
 };
+
+/** Seqs revertidos, de trás para a frente: entrada já revertida não conta (um desfazer revertido é um refazer). */
+const revertidasDe = (todas: EntradaDiario[]): Set<number> => {
+  const s = new Set<number>();
+  for (let i = todas.length - 1; i >= 0; i--) {
+    const e = todas[i];
+    if (!s.has(e.seq) && e.desfaz !== undefined) s.add(e.desfaz);
+  }
+  return s;
+};
+
+const tocam = (a: string, b: string) => a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
+
+/** Os "replace" cujo valor ainda deve estar no documento depois do patch: nenhuma operação seguinte do mesmo patch mexe
+ *  no mesmo caminho, num de dentro dele ou num que o contém. */
+const trocasFinais = (patch: OperacaoPatch[]) =>
+  patch.flatMap((op, i) => (op.op === 'replace' && !patch.slice(i + 1).some((d) => tocam(d.path, op.path) || (d.from !== undefined && tocam(d.from, op.path))) ? [op] : []));
 
 /** Entradas do diário num pedaço de texto; pulaPrimeira: o pedaço começa no meio de uma linha. Linha quebrada é pulada. */
 const lerLinhas = (texto: string, pulaPrimeira = false): EntradaDiario[] => {
