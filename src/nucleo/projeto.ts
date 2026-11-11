@@ -72,6 +72,7 @@ export class Projeto {
    *  exceção, saidas/ das exportações do app, está em pastaDeSaidas. */
   caminhoParaGravar(rel: string): string {
     const abs = this.caminho(rel);
+    if (/^saidas(\/|\\|$)/.test(rel)) return abs; // exportação (legendas, música) segue a exceção de pastaDeSaidas
     const fora = () => new ErroProjeto(`${rel} passa por um link simbólico para fora do projeto: por ele só se lê, não se grava`, 'caminho');
     for (let atual = abs; ;) {
       let real: string;

@@ -81,9 +81,9 @@ describe('saidas/ por link para outro disco: a exceção das exportações (Proj
     expect(readdirSync(fora)).toEqual(['capa - 03.png']);
   });
 
-  it('o resto continua pela regra dos links: gravar arquivo em saidas/ pelo projeto é recusado', () => {
+  it('legendas e música exportadas pelo projeto também gravam em saidas/ ligada a outro disco (mesma exceção)', () => {
     const {p, fora} = comSaidasFora();
-    expect(() => p.gravarTexto('saidas/video.srt', '1')).toThrow(/link simbólico/);
-    expect(readdirSync(fora)).toEqual([]);
+    p.gravarTexto('saidas/video.srt', '1');
+    expect(readdirSync(fora)).toEqual(['video.srt']);
   });
 });
