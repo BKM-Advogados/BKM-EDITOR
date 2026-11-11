@@ -149,14 +149,14 @@ export const origemMarcada = (png: Buffer): string | null => {
 /** Grava o PNG (data URL) ao lado do original, em midia/ (caminhoSemFundo), com a marca da origem; devolve o caminho
  *  no projeto. O mesmo original grava por cima do recorte dele; arquivo de outro original, ou que não é recorte do
  *  Estúdio, nunca é sobrescrito: o recorte vai para "-2", "-3"… Nunca escreve no original. */
-export const gravarSemFundo = (projeto: Pick<Projeto, 'caminho'>, src: string, png: string) => {
+export const gravarSemFundo = (projeto: Pick<Projeto, 'caminho' | 'caminhoParaGravar'>, src: string, png: string) => {
   const base = caminhoSemFundo(src);
   const chave = chaveDoOriginal(src);
   if (chaveDoOriginal(base) === chave) throw new ErroProjeto('o arquivo sem fundo não pode ser o original', 'caminho');
   const bytes = marcarOrigem(Buffer.from(png.replace(/^data:image\/png;base64,/, ''), 'base64'), src);
   for (let n = 1; n <= 99; n++) {
     const rel = n === 1 ? base : base.replace(/\.sem-fundo\.png$/, `-${n}.sem-fundo.png`);
-    const abs = projeto.caminho(rel);
+    const abs = projeto.caminhoParaGravar(rel);
     if (existsSync(abs) && origemMarcada(readFileSync(abs)) !== chave) continue;
     mkdirSync(path.dirname(abs), {recursive: true});
     writeFileSync(abs, bytes);

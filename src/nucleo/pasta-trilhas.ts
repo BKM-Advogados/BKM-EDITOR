@@ -120,10 +120,11 @@ export const importarTrilha = (p: Projeto, pastaDasTrilhas: string, caminho: str
   const midia = p.caminho('midia');
   const destino = copiaExistente(midia, caminho, ext) ?? arquivoLivre(midia, path.basename(caminho, path.extname(caminho)), ext);
   if (!existsSync(destino)) {
+    p.caminhoParaGravar(path.relative(p.raiz, destino)); // midia/ ligada para fora por link: só leitura, não copia para lá
     mkdirSync(path.dirname(destino), {recursive: true});
     copyFileSync(caminho, destino);
   }
   const fichaOrigem = arquivoDaFicha(caminho);
-  if (ficha.ficha && !existsSync(arquivoDaFicha(destino))) copyFileSync(fichaOrigem, arquivoDaFicha(destino));
+  if (ficha.ficha && !existsSync(arquivoDaFicha(destino))) copyFileSync(fichaOrigem, p.caminhoParaGravar(path.relative(p.raiz, arquivoDaFicha(destino))));
   return path.relative(p.raiz, destino).split(path.sep).join('/');
 };

@@ -59,7 +59,7 @@ const fontesDe = async (p: Projeto, doc: DocMusica, binarios?: string | null) =>
 };
 
 const gravarBinario = (p: Projeto, rel: string, dados: Buffer) => {
-  const abs = p.caminho(rel);
+  const abs = p.caminhoParaGravar(rel);
   mkdirSync(path.dirname(abs), {recursive: true});
   const tmp = `${abs}.${process.pid}.tmp`;
   writeFileSync(tmp, dados);
@@ -177,7 +177,7 @@ export const exportarMusica = async (p: Projeto, id: string, pedido: PedidoExpor
     gravarBinario(p, `${base}.${process.pid}.tmp.wav`, buf(e.mistura));
     const destino = `${base}.${pedido.formato}`;
     try {
-      await rodarFfmpeg(['-y', '-i', tmp, ...CODIFICAR[pedido.formato], p.caminho(destino)], {binarios: o.binarios?.()});
+      await rodarFfmpeg(['-y', '-i', tmp, ...CODIFICAR[pedido.formato], p.caminhoParaGravar(destino)], {binarios: o.binarios?.()});
     } finally {
       rmSync(tmp, {force: true});
     }
@@ -231,7 +231,11 @@ export const apagarRendersSemUso = (p: Projeto, manter: string[] = []): string[]
     const rel = `midia/musica/${nome}`;
     const wav = rel.endsWith('.wav.envelope.json') ? rel.slice(0, -'.envelope.json'.length) : rel.replace(/\.json$/, '.wav');
     if (!ehRenderDeMusica(wav) || citados.has(wav)) continue;
-    rmSync(p.caminho(rel), {force: true});
+    try {
+      rmSync(p.caminhoParaGravar(rel), {force: true});
+    } catch {
+      continue; // midia/musica ligada para fora por link: só leitura
+    }
     apagados.push(rel);
   }
   return apagados;

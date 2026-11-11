@@ -23,7 +23,7 @@ export const emendarArquivo = async (projeto: Projeto, o: PedidoEmenda & {binari
   if (problemas.length) throw new ErroProjeto(`cortes recusados: ${problemas.join('; ')}`, 'patch');
   const saida = emendarCanais(canais, taxa, cortes);
   const destino = arquivoCortado(o.fonte, cortes);
-  const abs = projeto.caminho(destino);
+  const abs = projeto.caminhoParaGravar(destino);
   mkdirSync(path.dirname(abs), {recursive: true});
   const tmp = `${abs}.${process.pid}.tmp`; // o observador da pasta ignora .tmp: a interface só vê o arquivo inteiro
   writeFileSync(tmp, gravarWav(saida, taxa));

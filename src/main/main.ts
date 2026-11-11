@@ -363,6 +363,7 @@ lidar(CANAL.escolherMidia, async (tipo: 'imagem' | 'audio' | 'video') => {
   if (!dentro.startsWith('..') && !path.isAbsolute(dentro)) return dentro.split(path.sep).join('/');
   const ext = path.extname(arq).slice(1).toLowerCase();
   const destino = arquivoLivre(p.caminho('midia'), path.basename(arq, path.extname(arq)), ext);
+  p.caminhoParaGravar(path.relative(p.raiz, destino)); // midia/ ligada para fora por link: só leitura, não copia para lá
   mkdirSync(path.dirname(destino), {recursive: true});
   copyFileSync(arq, destino);
   return path.relative(p.raiz, destino).split(path.sep).join('/');

@@ -83,8 +83,8 @@ export const apagarLimposSemUso = (p: Projeto): string[] => {
     for (const rel of candidatos) {
       if (textos.some((t) => t.includes(JSON.stringify(rel)))) continue;
       try {
-        rmSync(p.caminho(rel), {force: true});
-        rmSync(p.caminho(arquivoDoEnvelope(rel)), {force: true});
+        rmSync(p.caminhoParaGravar(rel), {force: true});
+        rmSync(p.caminhoParaGravar(arquivoDoEnvelope(rel)), {force: true});
         apagados.push(rel);
       } catch {
         /* arquivo preso (tocando em outro programa): fica para a próxima abertura */
@@ -128,7 +128,7 @@ export const limparArquivo = async (p: Projeto, arquivo: string, intensidade: In
   if (!fonte.canais[0]?.length) throw new ErroProjeto(`${arquivo} não tem som para limpar`);
   const r = await limparVoz(fonte.canais, fonte.taxa, intensidade, ctrl);
   const destino = arquivoLimpo(arquivo, intensidade);
-  const abs = p.caminho(destino);
+  const abs = p.caminhoParaGravar(destino);
   garantirForaDoGit(p); // antes do WAV: o commit automático nunca chega a vê-lo
   mkdirSync(path.dirname(abs), {recursive: true});
   const tmp = `${abs}.${process.pid}.tmp`; // o observador da pasta ignora .tmp: a interface só vê o arquivo inteiro

@@ -19,7 +19,7 @@ export const salvarTomada = (p: Projeto, dados: ArrayBuffer | Uint8Array): strin
   if (c.taxa !== TAXA_GRAVACAO) throw new ErroProjeto(`tomada recusada: ${c.taxa} Hz (a gravação é de ${TAXA_GRAVACAO} Hz)`);
   if (c.amostras < 1) throw new ErroProjeto('tomada recusada: o WAV não tem som');
   const rel = nomeDaTomada((r) => p.existe(r));
-  const destino = p.caminho(rel);
+  const destino = p.caminhoParaGravar(rel); // midia/ ligada para fora por link: só leitura
   mkdirSync(path.dirname(destino), {recursive: true});
   const tmp = `${destino}.${process.pid}.tmp`; // o observador da pasta ignora .tmp: a interface só vê o arquivo inteiro
   writeFileSync(tmp, bytes);

@@ -132,7 +132,7 @@ export const atualizarLigados = (p: Projeto, idMusica: string) => {
     if (!ehRenderDeMusica(a) || tocados.has(a) || a === render.arquivo) continue;
     for (const rel of [a, medidaDoRender(a), `${a}.envelope.json`]) {
       try {
-        rmSync(p.caminho(rel), {force: true});
+        rmSync(p.caminhoParaGravar(rel), {force: true});
       } catch {
         /* preso por outro programa: a faxina da abertura tira depois */
       }
