@@ -73,14 +73,15 @@ describe('ponte stdio', () => {
     const m = await montar();
     aberto = m;
     m.mandar({jsonrpc: '2.0', id: 1, method: 'tools/call', params: {name: 'transcrever', arguments: {}}});
-    await esperar(300);
+    await ate(() => m.chegadas.some((c) => c.id === 1), 5000); // a ponte já está de pé e a lenta, em curso
     const enviado = Date.now() - m.t0;
     m.mandar({jsonrpc: '2.0', method: 'notifications/initialized'});
     m.mandar({jsonrpc: '2.0', id: 2, method: 'ping'});
     await ate(() => m.saidas.some((s) => s.id === 2));
     const ping = m.chegadas.find((c) => c.metodo === 'ping')!;
-    expect(ping.ms - enviado).toBeLessThan(500);
-    expect(m.chegadas.find((c) => c.metodo === 'notifications/initialized')!.ms - enviado).toBeLessThan(500);
+    // a lenta leva 3 s: antes, o ping só chegava depois dela; com folga para a máquina carregada
+    expect(ping.ms - enviado).toBeLessThan(1500);
+    expect(m.chegadas.find((c) => c.metodo === 'notifications/initialized')!.ms - enviado).toBeLessThan(1500);
     expect(m.saidas.find((s) => s.id === 2)).toMatchObject({result: {}});
     expect(m.saidas.some((s) => s.id === 1)).toBe(false); // a lenta ainda não voltou
   });
