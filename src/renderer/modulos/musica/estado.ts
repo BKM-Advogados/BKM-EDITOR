@@ -31,6 +31,7 @@ export type EstadoMusica = {
   avisos: string[];
   autoAberta?: boolean; // a linha de automação de volume no pé do arranjo
   autoAlvo?: string; // 'master' ou o id de uma faixa do mixer
+  escolhendoModelo?: boolean; // o monitor mostra os modelos para criar outra música, com uma já aberta
   focoNotas: boolean; // o piano roll tem notas selecionadas ou o teclado ligado: Delete, setas e letras são dele
 };
 
@@ -220,6 +221,7 @@ export const observarMusica = () => {
   // o relógio armado na troca é cancelado ao desmontar: 300 ms depois de fechar o projeto não há mais o que ler
   let relogio: ReturnType<typeof setTimeout> | undefined;
   const largarTroca = quandoTrocarProjeto(() => {
+    musica.definir({escolhendoModelo: false});
     clearTimeout(relogio);
     relogio = setTimeout(comecar, 300);
   });

@@ -397,7 +397,8 @@ export const ListaMusica: React.FC = () => {
   const {doc} = useDocMusica();
   const s = useMusica((e) => e.selecao);
   // com mais de uma música no projeto, o seletor do topo troca a aberta (sem ele, a segunda escondia a primeira)
-  const seletor = <SeletorDocumento modulo="musica" aoTrocar={() => selecionarMusica(null)} />;
+  const seletor = <SeletorDocumento modulo="musica" aoTrocar={() => (selecionarMusica(null), musica.definir({escolhendoModelo: false}))}
+    novo={doc ? {rotulo: 'Nova música…', acao: () => (loja.definir({area: 'musica'}), musica.definir({escolhendoModelo: true}))} : undefined} />;
   if (!doc) return <div className="lista-musica">{seletor}<div className="vazio">sem música aberta</div></div>;
   return (
     <div className="lista-musica">

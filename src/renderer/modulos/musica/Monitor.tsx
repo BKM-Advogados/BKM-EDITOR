@@ -11,7 +11,7 @@ import {ESTILOS} from '../../../nucleo/musica-estilos';
 import type {DocCenas} from '../../../nucleo/cenas';
 import type {PropsVideo} from '../../../compartilhado/api';
 import type {AudioP} from '../../../nucleo/audio';
-import {criarDocumento, useLoja} from '../../estado/loja';
+import {useLoja} from '../../estado/loja';
 import {MODELOS_MUSICA} from '../../../nucleo/musica-modelos';
 import {numeroBr} from '../../componentes/Campos';
 import {corDaFaixa, corDoCanal, docMusica, musica, selecionarMusica, transicaoAberta, useMusica} from './estado';
@@ -361,29 +361,36 @@ const Mixer: React.FC<{doc: DocMusica}> = ({doc}) => {
   );
 };
 
+/** Os modelos para começar uma música: a tela da área sem música e, com uma aberta, a de criar outra (menu › Novo neste
+ *  projeto › Música, ou "Nova música" na lista). */
+const ModelosMusica: React.FC<{aberta?: string}> = ({aberta}) => (
+  <div className="musica-vazio">
+    <div className="titulo-vazio">{aberta ? 'Nova música neste projeto' : 'Este projeto ainda não tem música'}</div>
+    <div>Comece por um modelo pronto (dá para mudar tudo depois) ou por uma música vazia:</div>
+    <div className="modelos-musica">
+      {MODELOS_MUSICA.filter((x) => x.id !== 'vazio').map((x) => (
+        <button key={x.id} className={`musica-modelo${x.id === 'batida' ? ' destaque' : ''}`} onClick={() => void novaMusicaDoModelo(x.id)}>
+          <b>{x.nome}</b><span>{x.descricao}</span>
+        </button>
+      ))}
+      <button className="musica-modelo" onClick={() => void novaMusicaDoModelo('vazio')}><b>Música vazia</b><span>sem canais: ponha bateria, instrumento ou áudio você mesmo</span></button>
+    </div>
+    {aberta
+      ? <button className="bt" onClick={() => musica.definir({escolhendoModelo: false})}>Voltar para “{aberta}”</button>
+      : <div className="dica-vazia">Dentro de um vídeo: selecione um clipe de música e clique em "Editar em Música", ou uma faixa e "Criar em Música".</div>}
+  </div>
+);
+
 export const MonitorMusica: React.FC = () => {
   const {id, doc} = useDocMusica();
   const aba = useMusica((e) => e.aba);
   const avisos = useMusica((e) => e.avisos);
   const verVideo = useMusica((e) => e.verVideo);
+  const escolhendo = useMusica((e) => e.escolhendoModelo);
+  const tituloAberta = useLoja((e) => e.info?.manifesto.documentos.find((d) => d.id === id)?.titulo);
   useMotorVivo(id, doc);
-  if (!doc) {
-    return (
-      <div className="musica-vazio">
-        <div className="titulo-vazio">Este projeto ainda não tem música</div>
-        <div>Comece por um modelo pronto (dá para mudar tudo depois) ou por uma música vazia:</div>
-        <div className="modelos-musica">
-          {MODELOS_MUSICA.filter((x) => x.id !== 'vazio').map((x) => (
-            <button key={x.id} className={`musica-modelo${x.id === 'batida' ? ' destaque' : ''}`} onClick={() => void novaMusicaDoModelo(x.id)}>
-              <b>{x.nome}</b><span>{x.descricao}</span>
-            </button>
-          ))}
-          <button className="musica-modelo" onClick={() => void criarDocumento('musica')}><b>Música vazia</b><span>sem canais: ponha bateria, instrumento ou áudio você mesmo</span></button>
-        </div>
-        <div className="dica-vazia">Dentro de um vídeo: selecione um clipe de música e clique em "Editar em Música", ou uma faixa e "Criar em Música".</div>
-      </div>
-    );
-  }
+  if (!doc) return <ModelosMusica />;
+  if (escolhendo) return <ModelosMusica aberta={tituloAberta ?? 'a música aberta'} />;
   const temAberta = Boolean(transicaoAberta());
   return (
     <div className="musica-monitor">

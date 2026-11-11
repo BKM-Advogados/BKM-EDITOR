@@ -33,7 +33,7 @@ import {Pesquisa} from '../paineis/Pesquisa';
 import {Rodape} from './Rodape';
 import {PaineisMusica} from '../modulos/musica/paineis'; // frente Música
 import {FaixaTransicao} from '../modulos/musica/FaixaTransicao';
-import {observarMusica} from '../modulos/musica/estado';
+import {musica, observarMusica} from '../modulos/musica/estado';
 import {exportarMusica} from '../modulos/musica/acoes';
 import {PainelMarca} from './PainelMarca';
 import {usarAparencia} from '../estado/aparencia';
@@ -382,6 +382,12 @@ export const Casca: React.FC = () => {
       : m === 'imagem' ? FORMATOS_IMAGEM.find((x) => x.id === prefs?.formato_imagem) ?? FORMATOS_IMAGEM[0] : undefined;
     void criarDocumento(m, f ? {largura: f.largura, altura: f.altura, fps: 30} : undefined);
   };
+  // a música começa por um modelo: a área mostra os modelos (com uma música já aberta, a tela de criar outra)
+  const novaMusica = () => {
+    setMenu(false);
+    loja.definir({area: 'musica'});
+    if (info?.manifesto.documentos.some((d) => d.modulo === 'musica')) musica.definir({escolhendoModelo: true});
+  };
   const item = (f: () => void) => () => {
     setMenu(false);
     f();
@@ -409,7 +415,7 @@ export const Casca: React.FC = () => {
                 <button onClick={() => novoDocumento('video')}><Film size={13} />Vídeo</button>
                 <button onClick={() => novoDocumento('imagem')}><ImageIcon size={13} />Imagem</button>
                 <button onClick={() => novoDocumento('animacao')}><Sparkles size={13} />Animação</button>
-                <button onClick={() => (setMenu(false), loja.definir({area: 'musica'}))} title="Abre a área Música, com os modelos (Batida, Trilha…)"><Music size={13} />Música</button>
+                <button onClick={novaMusica} title="Abre os modelos da área Música (Batida, Trilha…) para começar uma música"><Music size={13} />Música</button>
                 <button onClick={() => novoDocumento('3d')}><Box size={13} />3D</button>
               </span>
             </div>

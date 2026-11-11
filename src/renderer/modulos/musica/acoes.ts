@@ -196,6 +196,7 @@ export const licencaDoSom = (l: LicencaSom) => fazer((d) => definirLicenca(d, l)
 /** Música nova a partir de um modelo: cria vazia (o mesmo caminho do "Nova música") e aplica o modelo num passo do
  *  diário, que o Ctrl+Z desfaz. */
 export const novaMusicaDoModelo = async (modelo: ModeloMusica) => {
+  musica.definir({escolhendoModelo: false});
   const nome = MODELOS_MUSICA.find((m) => m.id === modelo)?.nome;
   const e = await criarDocumento('musica', undefined, modelo === 'vazio' ? undefined : nome);
   const doc = docMusica();
