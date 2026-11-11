@@ -9,7 +9,7 @@ const tsx = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'inici
 describe('tela inicial', () => {
   it('o pedido ao Claude vem antes de "Começar do zero"', () => {
     expect(tsx.indexOf('className={`pedido-claude')).toBeGreaterThan(0);
-    expect(tsx.indexOf('className={`pedido-claude')).toBeLessThan(tsx.indexOf('Começar do zero'));
+    expect(tsx.indexOf('className={`pedido-claude')).toBeLessThan(tsx.indexOf('>Começar do zero<'));
   });
   it('os tipos incluem a Música e o exemplo aparece uma vez só', () => {
     const tipos = tsx.slice(tsx.indexOf('const TIPOS'), tsx.indexOf('];', tsx.indexOf('const TIPOS')));
