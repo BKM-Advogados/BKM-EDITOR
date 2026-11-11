@@ -1,0 +1,41 @@
+{
+  "$schema": "https://raw.githubusercontent.com/modelcontextprotocol/mcpb/main/schemas/mcpb-manifest-v0.3.schema.json",
+  "manifest_version": "0.3",
+  "name": "estudio",
+  "display_name": "Estúdio",
+  "version": "2.0.1",
+  "description": "Opere o Estúdio (vídeo, imagem, 3D, efeitos, música e animação) pelo Claude Desktop. Precisa do Estúdio instalado.",
+  "long_description": "Liga o Claude Desktop ao Estúdio instalado neste computador. Com o app aberto num projeto, o Claude trabalha nele: cada mudança entra no Histórico com a origem Claude Desktop, tem Reverter, e as ações sensíveis pedem permissão na tela do app. Com o app fechado, o Claude lista os projetos (os recentes e a pasta Estudio) e trabalha no que for escolhido. A extensão não traz as ferramentas: ela acha o Estúdio e roda o MCP do próprio app, que se atualiza junto com ele.",
+  "author": {"name": "BKM Advogados", "url": "https://bkmadvogados.com.br"},
+  "icon": "icon.png",
+  "keywords": ["estudio", "video", "imagem", "remotion", "bkm"],
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/index.js"],
+      "env": {},
+      "platform_overrides": {
+        "linux": {
+          "command": "${HOME}/.local/opt/Estudio/Estudio",
+          "args": ["${__dirname}/server/index.js"],
+          "env": {"ELECTRON_RUN_AS_NODE": "1"}
+        }
+      }
+    }
+  },
+  "tools": [
+    {"name": "listar_projetos", "description": "Projetos do Estúdio neste computador, o aberto no app e o escolhido."},
+    {"name": "escolher_projeto", "description": "Escolhe o projeto em que o Claude trabalha com o Estúdio fechado."},
+    {"name": "projeto_info", "description": "Nome, documentos e pesquisa do projeto."},
+    {"name": "estado_do_editor", "description": "O que a pessoa está vendo agora no app."},
+    {"name": "ler_documento", "description": "Lê um documento do projeto (vídeo, imagem, 3D, efeitos, música, animação)."},
+    {"name": "aplicar_patch", "description": "Muda um documento; a mudança entra no Histórico e tem Reverter."}
+  ],
+  "tools_generated": true,
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {"node": ">=18.0.0"}
+  }
+}
