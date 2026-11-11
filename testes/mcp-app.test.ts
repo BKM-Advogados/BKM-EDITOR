@@ -3,7 +3,7 @@
 // sem projeto, ou um arquivo de um app que morreu) roda ali mesmo, com a trava.
 import {cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import http from 'node:http';
-import type {AddressInfo} from 'node:net';
+import net, {type AddressInfo} from 'node:net';
 import {spawnSync} from 'node:child_process';
 import os, {tmpdir} from 'node:os';
 import path from 'node:path';
@@ -13,7 +13,8 @@ import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import {McpHttp} from '../src/main/mcp-http';
 import {registrarFerramentas} from '../src/nucleo/ferramentas-mcp';
-import {ARQUIVO_MCP_APP, appAberto, type ConexaoApp, origemDaIde, publicarMcpApp, repassarAoAppQuandoAberto, retirarMcpApp} from '../src/nucleo/mcp-app';
+import {ARQUIVO_MCP_APP, appAberto, type ConexaoApp, type CriarConexao, encaminharAoApp, origemDaIde, pedidoNaoSaiu, publicarMcpApp, repassarAoAppQuandoAberto,
+  retirarMcpApp} from '../src/nucleo/mcp-app';
 import {Projeto} from '../src/nucleo/projeto';
 
 let pasta = '';
@@ -179,5 +180,80 @@ describe('repasse do MCP da IDE', () => {
     expect(ultima()).toMatchObject({origem: 'mcp', rotulo: 'cor #444444'});
     expect(JSON.parse(readFileSync(path.join(pasta, new Projeto(pasta).arquivoDoDocumento('cena3d')), 'utf-8')).objetos[0].cor).toBe('#444444');
     await cliente.close();
+  });
+});
+
+describe('conexão com o app que cai: roda na IDE só se o pedido não saiu daqui', () => {
+  const conexao = (url: string): ConexaoApp => ({formato: 1, url, token: 't', pid: process.pid, host: os.hostname(), raiz: pasta, em: ''});
+  const chamada = {jsonrpc: '2.0' as const, id: 7, method: 'tools/call', params: {name: 'aplicar_patch', arguments: {}}};
+  const escutar = async (s: http.Server | net.Server) => {
+    await new Promise<void>((ok) => s.listen(0, '127.0.0.1', ok));
+    return `http://127.0.0.1:${(s.address() as AddressInfo).port}/mcp`;
+  };
+  const fechar = (s: http.Server | net.Server) => new Promise<void>((ok) => s.close(() => ok()));
+  /** Uma conexão que cai com `codigo` antes de abrir (o que o macOS pode dar numa porta que acabou de fechar). */
+  const caiAntes = (codigo: string): CriarConexao => () => {
+    const s = new net.Socket();
+    process.nextTick(() => s.destroy(Object.assign(new Error(`connect ${codigo}`), {code: codigo})));
+    return s;
+  };
+
+  it('a regra: só antes de a conexão abrir, e só recusada ou derrubada', () => {
+    for (const c of ['ECONNREFUSED', 'ECONNRESET', 'EPIPE']) {
+      expect(pedidoNaoSaiu(c, false), c).toBe(true);
+      expect(pedidoNaoSaiu(c, true), c).toBe(false);
+    }
+    expect(pedidoNaoSaiu('ETIMEDOUT', false)).toBe(false);
+    expect(pedidoNaoSaiu(undefined, false)).toBe(false);
+  });
+
+  it('porta fechada: recusada, roda na IDE', async () => {
+    const s = http.createServer();
+    const url = await escutar(s);
+    await fechar(s);
+    expect(await encaminharAoApp(conexao(url), chamada)).toBeNull();
+  });
+
+  it('ECONNRESET ou EPIPE antes de conectar (macOS): roda na IDE', async () => {
+    for (const codigo of ['ECONNRESET', 'EPIPE']) {
+      expect(await encaminharAoApp(conexao('http://127.0.0.1:9/mcp'), chamada, undefined, 5000, caiAntes(codigo)), codigo).toBeNull();
+    }
+    const outro = await encaminharAoApp(conexao('http://127.0.0.1:9/mcp'), chamada, undefined, 5000, caiAntes('EHOSTUNREACH'));
+    expect(outro).toMatchObject({id: 7, error: {message: expect.stringMatching(/não respondeu/)}});
+  });
+
+  it('conectou e caiu no meio (o app pode ter gravado): erro, não roda de novo aqui', async () => {
+    let recebidos = 0;
+    const s = http.createServer((req) => {
+      recebidos++;
+      req.socket.resetAndDestroy(); // derruba com RST depois de ler o pedido
+    });
+    const url = await escutar(s);
+    const r = await encaminharAoApp(conexao(url), chamada);
+    expect(recebidos).toBe(1);
+    expect(r).toMatchObject({id: 7, error: {message: expect.stringMatching(/não respondeu \(.*\); tente de novo/)}});
+    const cru = net.createServer((sock) => sock.once('data', () => sock.resetAndDestroy())); // sem nem passar pelo http
+    const url2 = await escutar(cru);
+    expect(await encaminharAoApp(conexao(url2), chamada)).toMatchObject({id: 7, error: {code: -32000}});
+    await fechar(s);
+    await fechar(cru);
+  });
+
+  it('cada chamada vai por conexão nova: o app que fecha não derruba um pedido já escrito numa conexão velha', async () => {
+    // a falha do CI no Mac Intel ("read ECONNRESET"): a chamada saía por uma conexão keep-alive de antes, que o app já
+    // tinha fechado; caía depois de "conectada" e virava erro em vez de rodar na IDE
+    let conexoes = 0;
+    const s = http.createServer((_req, res) => res.writeHead(200, {'Content-Type': 'application/json', Connection: 'keep-alive'})
+      .end(JSON.stringify({jsonrpc: '2.0', id: 7, result: {content: []}})));
+    s.on('connection', () => conexoes++);
+    const url = await escutar(s);
+    expect(await encaminharAoApp(conexao(url), chamada)).toMatchObject({id: 7, result: {}});
+    expect(await encaminharAoApp(conexao(url), chamada)).toMatchObject({id: 7, result: {}});
+    expect(conexoes).toBe(2);
+    const fechou = fechar(s);
+    s.closeAllConnections();
+    const r = encaminharAoApp(conexao(url), chamada);
+    await fechou;
+    expect(await r).toBeNull();
   });
 });

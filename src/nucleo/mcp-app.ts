@@ -96,39 +96,60 @@ export const PRAZO_DO_APP_MS = ESPERA_DO_CARTAO_MS + 5 * 60 * 1000;
 
 class PrazoEstourado extends Error {}
 
-const postar = (c: ConexaoApp, corpo: string, quem: ConversaIde | undefined, prazo: number) =>
+/** A conexão com o app caiu antes de abrir: o pedido não saiu daqui, e a chamada pode rodar na IDE. */
+class SemConexao extends Error {}
+
+/** Erros que, antes de a conexão abrir, querem dizer "ninguém escuta nesse endereço": recusada (Linux, Windows) ou
+ *  derrubada no aperto de mão (o macOS pode dar ECONNRESET ou EPIPE numa porta que acabou de fechar). */
+const SEM_APP = new Set(['ECONNREFUSED', 'ECONNRESET', 'EPIPE']);
+
+/** O app não recebeu o pedido? Só quando a conexão nem abriu; com ela aberta, o pedido pode ter chegado e gravado. */
+export const pedidoNaoSaiu = (codigo: string | undefined, conectou: boolean) => !conectou && SEM_APP.has(codigo ?? '');
+
+export type CriarConexao = NonNullable<http.RequestOptions['createConnection']>;
+
+const postar = (c: ConexaoApp, corpo: string, quem: ConversaIde | undefined, prazo: number, criarConexao?: CriarConexao) =>
   new Promise<Resposta>((ok, falhou) => {
-    const req = http.request(c.url, {method: 'POST', headers: {'Content-Type': 'application/json', Accept: 'application/json, text/event-stream',
-      Authorization: `Bearer ${c.token}`, 'Content-Length': Buffer.byteLength(corpo),
-      ...(quem ? {[CABECALHO_CONVERSA]: quem.conversa, [CABECALHO_AUTOR]: encodeURIComponent(quem.autor)} : {})}}, (res) => {
+    // conexão nova a cada chamada (sem o keep-alive do agente padrão): numa conexão reaproveitada, o app que fechou
+    // derruba o pedido já escrito (ECONNRESET) e não há como saber se ele chegou; numa nova, o "connect" diz isso
+    let conectou = false;
+    const req = http.request(c.url, {method: 'POST', ...(criarConexao ? {createConnection: criarConexao} : {agent: false}),
+      headers: {'Content-Type': 'application/json', Accept: 'application/json, text/event-stream',
+        Authorization: `Bearer ${c.token}`, 'Content-Length': Buffer.byteLength(corpo),
+        ...(quem ? {[CABECALHO_CONVERSA]: quem.conversa, [CABECALHO_AUTOR]: encodeURIComponent(quem.autor)} : {})}}, (res) => {
       let texto = '';
       res.setEncoding('utf-8');
       res.on('data', (d: string) => (texto += d));
       res.on('end', () => ok({status: res.statusCode ?? 0, tipo: String(res.headers['content-type'] ?? ''), texto}));
       res.on('error', falhou);
     });
+    req.on('socket', (s) => {
+      if (!s.connecting && !s.destroyed) conectou = true;
+      else s.once('connect', () => (conectou = true));
+    });
     const relogio = setTimeout(() => req.destroy(new PrazoEstourado()), prazo);
     req.on('close', () => clearTimeout(relogio));
-    req.on('error', falhou);
+    req.on('error', (e) => falhou(pedidoNaoSaiu((e as NodeJS.ErrnoException).code, conectou) ? new SemConexao(e.message) : e));
     req.end(corpo);
   });
 
 const erroJsonRpc = (id: unknown, message: string): JSONRPCMessage => ({jsonrpc: '2.0', id: id as string | number, error: {code: -32000, message}});
 
-/** Repassa uma mensagem JSON-RPC ao app. Devolve a resposta; null quando o app não a atende (fechou, sem projeto) e a
- *  chamada deve rodar aqui; 'recusado' quando o app vivo recusou o token (401). Nos dois, o pedido não rodou no app. */
+/** Repassa uma mensagem JSON-RPC ao app. Devolve a resposta; null quando o app não a atende (fechou antes de a conexão
+ *  abrir, ou está sem projeto) e a chamada deve rodar aqui; 'recusado' quando o app vivo recusou o token (401). Nos dois, o pedido não rodou no app. */
 export const encaminharAoApp = async (c: ConexaoApp, msg: JSONRPCMessage, quem?: ConversaIde,
-  prazo = PRAZO_DO_APP_MS): Promise<JSONRPCMessage | null | 'recusado'> => {
+  prazo = PRAZO_DO_APP_MS, criarConexao?: CriarConexao): Promise<JSONRPCMessage | null | 'recusado'> => {
   const id = (msg as {id?: unknown}).id;
   let r: Resposta;
   try {
-    r = await postar(c, JSON.stringify(msg), quem, prazo);
+    r = await postar(c, JSON.stringify(msg), quem, prazo, criarConexao);
   } catch (e) {
     if (e instanceof PrazoEstourado) {
       return erroJsonRpc(id, `o Estúdio aberto neste projeto não respondeu em ${Math.round(prazo / 60000)} min; nada foi gravado por aqui. `
         + 'Se a pessoa permitiu no app depois disso, confira com listar_mudancas antes de repetir');
     }
-    if ((e as NodeJS.ErrnoException).code === 'ECONNREFUSED') return null;
+    if (e instanceof SemConexao) return null;
+    // a conexão abriu e caiu no meio: o app pode ter rodado a ferramenta, então não roda de novo aqui
     return erroJsonRpc(id, `o Estúdio aberto neste projeto não respondeu (${(e as Error).message}); tente de novo`);
   }
   if (r.status === 401) return 'recusado';
