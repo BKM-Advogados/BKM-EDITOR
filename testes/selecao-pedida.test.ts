@@ -12,6 +12,7 @@ let noDisco: InfoProjeto;
 let pedido: unknown;
 const estudio = {
   lerJson: vi.fn(async () => pedido),
+  lerJsonOpcional: vi.fn(async () => pedido),
   projetoAtual: vi.fn(async () => noDisco),
   lerDocumento: vi.fn(async () => ({doc: {camadas: []}, versao: '1'})),
   propsVideo: vi.fn(async () => ({props: {}})),
