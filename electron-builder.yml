@@ -28,3 +28,20 @@ nsis:
   uninstallDisplayName: Estúdio
   artifactName: Estudio-Setup-${version}.${ext}
   language: '1046'
+
+# DMG do Mac, montado sobre o Estudio.app que o Electron Forge empacota (e, com as variáveis da Apple, assina e notariza:
+# build/mac.ts). Só sai num Mac (o hdiutil é da Apple):
+#   npm run instalador:mac            →   out/instalador/Estudio-<versão>-<arch>.dmg
+# O electron-builder não assina de novo (identity: null): o .app já vem assinado, ou sem assinatura, do Forge.
+mac:
+  icon: build/icone.icns
+  category: public.app-category.video
+  identity: null
+  target:
+    - target: dmg
+dmg:
+  title: Estúdio ${version}
+  # cor no lugar da imagem de fundo: no macOS 15 o dmgbuild quebra ao gravar o atalho da imagem de fundo
+  # (struct.error 'I' format em mac_alias, backgroundImageAlias; CI de 10/11/2026)
+  backgroundColor: '#111111'
+  artifactName: Estudio-${version}-${arch}.${ext}

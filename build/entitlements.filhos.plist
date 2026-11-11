@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Entitlements dos binários que o app roda como processo filho: o compositor do Remotion (ffmpeg, ffprobe, remotion),
+     o navegador de render (Chrome Headless Shell) e o whisper-cli (build/mac.ts).
+     allow-dyld-environment-variables e disable-library-validation: o ffmpeg do Remotion carrega libavcodec.dylib e as
+     outras pelo nome curto (sem @rpath), achadas pela pasta atual e pelo DYLD_LIBRARY_PATH que o Remotion passa.
+     allow-jit e allow-unsigned-executable-memory: o V8 do navegador de render. -->
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+  <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+  <true/>
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+</dict>
+</plist>

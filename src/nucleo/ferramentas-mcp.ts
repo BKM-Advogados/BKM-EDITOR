@@ -38,6 +38,9 @@ import {registrarMusica} from './mcp-musica'; // frente Música
 import {musicaDoModelo, type ModeloMusica} from './musica-modelos'; // frente Música (item 27)
 import type {DocMusica} from './musica'; // frente Música (item 27)
 import {ARQUIVO_TRANSICOES, lerRegistro, transicaoEmCurso} from './transicoes'; // frente Música
+import {registrarNarracao} from './mcp-narracao'; // narração por IA (docs/narracao.md)
+import type {ServicoNarracao} from './narracao-servico';
+import {registrarPrevia} from './mcp-previa'; // frente IDE: ver_quadro, ver_cenas e ver_trecho (docs/ide.md)
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x, null, 2)}]});
 const erro = (e: unknown) => ({
@@ -149,7 +152,8 @@ const resumirGrades = (doc: unknown) => {
   return {doc: andar(doc, ''), grades, exemplo};
 };
 
-export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, autor: string, origem: string, rede?: Rede, transcritor?: TranscritorMcp, portao?: Portao) => {
+export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, autor: string, origem: string, rede?: Rede, transcritor?: TranscritorMcp, portao?: Portao,
+  narrador?: ServicoNarracao) => {
   // frente IA: tudo o que for registrado daqui em diante passa pelo portão (permissão e mudanças do diário no resultado)
   instalarPortao(servidor, {projeto, origem, portao});
   // documento criado pelo Claude: a tela da pessoa vai até ele por padrão ("mostrar: false" não leva), em mcp-tela.ts
@@ -325,6 +329,8 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   registrarSom(servidor, projeto, autor, origem); // frente Som (rodada 3): dividir, copiar e crossfade de clipe de áudio
   registrarMusica(servidor, projeto, autor, origem); // frente Música: música e ida e volta entre módulos (docs/musica.md)
   registrarTela(servidor, projeto, autor); // mostrar_documento: leva a tela da pessoa a um documento (mcp-tela.ts)
+  registrarNarracao(servidor, projeto, autor, origem, narrador); // narração por IA (docs/narracao.md): vozes, narrar, pronúncias, ajustar cenas à fala
+  registrarPrevia(servidor, projeto); // frente IDE: prévias do vídeo em saidas/previas/ (src/nucleo/mcp-previa.ts)
 };
 
 // ---------- pesquisa: fontes e fatos (src/nucleo/pesquisa.ts, docs/pesquisa.md) ----------

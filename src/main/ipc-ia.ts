@@ -29,6 +29,14 @@ export const definirCofre = (c: Cofre, config?: ConfiguracaoIA) => {
   if (config) configuracao = config;
 };
 
+/** Para a narração por IA (ipc-narracao.ts): o cofre e a soma do mês ficam aqui; a chave nunca sai do processo principal. */
+export const cofreAtual = (): Cofre => cofre;
+export const textoDoCofreAtual = () => {
+  const persistente = cofre instanceof CofreArquivo ? cofre.persistente() : false;
+  return {persistente, texto: textoDoCofre({persistente, plataforma: process.platform, loja: cofre instanceof CofreArquivo ? cofre.loja() : undefined})};
+};
+export const registrarUsoDoMes = (id: string, u: {entrada: number; entrada_cache: number; saida: number}, custo = 0) => configuracao?.registrarUso(id, u, custo);
+
 const ambienteAgente = () => ({...ambienteLimpo(), PATH: PATH_COM_LOCAL()});
 
 export const criarSessoesIA = (o: Pick<OpcoesSessoes, 'evento' | 'vivasTerminal' | 'conexao' | 'claude'>) =>

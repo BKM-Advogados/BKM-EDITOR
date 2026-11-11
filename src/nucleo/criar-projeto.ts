@@ -22,6 +22,8 @@ import {REGRAS_MIDIA_PESADA} from './midia-git';
 import type {MarcaLida} from './pasta-marcas';
 import {dentroDe, semBom, serializar} from './projeto';
 import {gravarAtomico} from './gravar-seguro';
+import {ehNomeReservado} from './nome-de-arquivo';
+import {LINHAS_GITIGNORE_IDE, secaoIde} from './ide'; // frente IDE: a seção "Trabalhando por uma IDE" e os arquivos desta máquina
 
 // o texto baixado de cada fonte (pesquisa/fontes/<id>.txt) fica fora do git: é grande e se baixa de novo pela url
 // vídeo e áudio sem perda em midia/ também ficam de fora (transversal-D7, midia-git.ts); o que passa de 25 MB entra na regra
@@ -31,7 +33,8 @@ import {gravarAtomico} from './gravar-seguro';
  *  ganham estas linhas antes do próximo commit (sessao-projeto.ts). */
 export const REGRAS_GIT_INTERNAS = ['.estudio/mcp*', '.estudio/diario.jsonl', '.estudio/escrita.lock*'];
 
-export const GITIGNORE = `saidas/\n.estudio/estado.json\n.estudio/miniatura.jpg\n${REGRAS_GIT_INTERNAS.join('\n')}\n*.tmp\npesquisa/fontes/\n${REGRAS_MIDIA_PESADA.join('\n')}\n`;
+// o .mcp.json e o .claude/settings.local.json da IDE (caminhos desta máquina, ide.ts) já nascem fora do git
+export const GITIGNORE = `saidas/\n.estudio/estado.json\n.estudio/miniatura.jpg\n${REGRAS_GIT_INTERNAS.join('\n')}\n${LINHAS_GITIGNORE_IDE.join('\n')}\n*.tmp\npesquisa/fontes/\n${REGRAS_MIDIA_PESADA.join('\n')}\n`;
 
 /** O .gitignore com as regras internas que faltam no fim (o mesmo texto se não falta nada). */
 export const gitignoreComRegrasInternas = (texto: string): string => {
@@ -57,7 +60,8 @@ export const nomeDePasta = (nome: string) => {
     .trim()
     .slice(0, 60)
     .replace(/[. ]+$/, '');
-  return /^(con|prn|aux|nul|com\d|lpt\d)$/i.test(limpo) || !limpo ? `Projeto ${limpo}`.trim() : limpo;
+  // nome reservado do Windows, também com extensão ("nul.x", nome-de-arquivo.ts)
+  return ehNomeReservado(limpo) || !limpo ? `Projeto ${limpo}`.trim() : limpo;
 };
 
 /** Pasta que ainda não existe dentro de `raiz`: "Nome", "Nome (2)", "Nome (3)"... */
@@ -294,6 +298,14 @@ export const claudeMd = (modulos: Modulo[]) => {
       '  escreva `texto`, `palavras`, `em` ou `sai` de legenda por `aplicar_patch`. O `estilo` muda por patch: `predefinicao`',
       '  (`classica`, `caixa`, `karaoke`, `faixa`, `discreta`), `posicao` (`baixo`, `meio`, `cima`), `tam`, `maiusculas`,',
       '  `falante`, `cor`, `cor_destaque`, `fundo` e `fonte` (padrão: os do `tema`). Gere com `transcrever`.',
+      '  Narração por IA (opcional): `cenas[i].narracao` {`texto`} é o roteiro falado da cena, diferente do texto da tela;',
+      '  `[pausa]` e `[pausa longa]` fazem pausa. `narracao`, na raiz, é a configuração: `provedor` (`gemini` = Gemini TTS,',
+      '  com a chave do Gemini; `google-tts` = Google Cloud TTS, vozes Chirp 3: HD), `modelo` (só gemini:',
+      '  `gemini-3.8-flash-tts` ou `gemini-3.8-flash-lite-tts`), `voz` (`vozes_narracao`), `estilo` (só gemini: como falar,',
+      '  em linguagem natural), `velocidade` (só google-tts, 0,25 a 2), `folga_ms` (a fala entra depois do começo da cena;',
+      '  padrão 300), `margem_ms` (padrão 500) e `pronuncias` [{de, para}], o dicionário aplicado antes da voz (ex.: RH →',
+      '  erre agá). A fala gerada é um WAV em `midia/narracao/<hash>.wav` num clipe de voz com `narracao_ia` {cena, hash}:',
+      '  não escreva `narracao_ia` nem esses clipes à mão; use `narrar`.',
     );
   }
   if (tem('imagem')) linhas.push(...linhasDaImagem());
@@ -365,6 +377,7 @@ export const claudeMd = (modulos: Modulo[]) => {
   if (tem('video') || tem('imagem') || tem('animacao')) passos.push('`aplicar_marca` troca o kit de marca (cores, fonte, logo e fontes próprias) de um documento.');
   if (tem('video')) {
     passos.push('`transcrever` transcreve a fala no próprio PC: grava `<arquivo>.palavras.json` e, no vídeo de cenas, gera as\n   legendas que faltam. `ler_legendas` mostra as legendas nos tempos da tela e `editar_legenda` corrige texto e tempo.\n   `exportar_legendas` grava SRT e VTT em `saidas/`; `importar_legendas` lê um SRT ou VTT do projeto.');
+    passos.push('Narração por IA: escreva `cenas[i].narracao.texto`, ajuste a voz com `configurar_narracao` e as pronúncias com\n   `pronuncias_narracao`; mostre à pessoa `narrar` com `previa: true` (texto final e custo, sem gastar) e depois\n   gere com `narrar` (cache: só a cena que mudou vai ao Google). `ajustar_cenas_a_fala` faz a cena durar a fala;\n   `transcrever`, depois, cria as legendas.');
     passos.push('`propor_cortes_fala` propõe tirar pausas longas e "ãh" de um clipe de voz e `aplicar_cortes_fala` grava a\n   narração emendada (as legendas vão junto). `preparar_teleprompter` grava o texto que a pessoa lê ao gravar.');
     passos.push('Som: `adicionar_clipe_audio` põe um áudio do projeto numa faixa; `dividir_clipe`, `copiar_clipe` e `crossfade`\n   editam os clipes. `listar_trilhas` mostra a pasta de trilhas da pessoa e `escolher_trilha` traz uma para o vídeo\n   (pede a permissão dela); `creditos_das_musicas` dá os créditos que as licenças pedem.');
     passos.push('`marca_dagua` lê ou muda a marca d\'água de cada destino da exportação; `medir_contraste_marca` confere se ela lê\n   sobre o fundo (só com o app aberto).');
@@ -378,6 +391,7 @@ export const claudeMd = (modulos: Modulo[]) => {
   linhas.push('', '## Como trabalhar', '', ...passos.map((t, i) => `${i + 1}. ${t}`));
   if (tem('musica')) linhas.push(...secaoMusica());
   if (tem('video') || tem('imagem')) linhas.push(...secaoPesquisa());
+  linhas.push(...secaoIde(tem('video') || tem('animacao'))); // frente IDE (docs/ide.md)
   linhas.push('', FIM_DO_TEXTO);
   return [MARCA_CLAUDE_INICIO, ...linhas, MARCA_CLAUDE_FIM, ''].join('\n');
 };

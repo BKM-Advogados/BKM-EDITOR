@@ -13,16 +13,17 @@ import {fileURLToPath} from 'node:url';
 export type AppComTrava = {
   requestSingleInstanceLock: () => boolean;
   quit: () => void;
-  on: (evento: 'second-instance', f: () => void) => unknown;
+  on: (evento: 'second-instance', f: (evento?: unknown, argv?: string[], cwd?: string) => void) => unknown;
 };
 
-/** Pede a trava; sem ela, esta é a segunda instância e sai. Com ela, `aoOutraInstancia` roda quando alguém abre o app de novo. */
-export const garantirInstanciaUnica = (app: AppComTrava, aoOutraInstancia: () => void): boolean => {
+/** Pede a trava; sem ela, esta é a segunda instância e sai. Com ela, `aoOutraInstancia` roda quando alguém abre o app de
+ *  novo, com os argumentos e a pasta da segunda abertura (uma pasta de projeto passada a ela abre na primeira). */
+export const garantirInstanciaUnica = (app: AppComTrava, aoOutraInstancia: (argv: string[], cwd: string) => void): boolean => {
   if (!app.requestSingleInstanceLock()) {
     app.quit();
     return false;
   }
-  app.on('second-instance', aoOutraInstancia);
+  app.on('second-instance', (_e, argv, cwd) => aoOutraInstancia(argv ?? [], cwd ?? ''));
   return true;
 };
 

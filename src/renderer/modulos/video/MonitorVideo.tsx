@@ -6,6 +6,7 @@
 // seleção só muda de estado quando o bloco se mexe e os pinos olham uma janela de meio segundo. No transporte, a zona
 // segura das redes (nucleo/zonas-seguras.ts) liga uma sobreposição por cima do quadro: escolha da interface, fora da
 // exportação.
+import {comando, teclaDeApagar} from '../../teclas';
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore} from 'react';
 import {Player, type PlayerRef} from '@remotion/player';
 import {ChevronDown, Frame, MessageSquarePlus, MousePointer2, Pause, Play, Plus, Repeat2, SkipBack, SkipForward, StepBack, StepForward} from 'lucide-react';
@@ -212,11 +213,12 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
     if (!palco.current) return;
     const k = e.key.toLowerCase();
     // Delete, Ctrl+D e Ctrl+K (lâmina) só na área Vídeo (em Efeitos as mesmas teclas são da pilha de efeitos)
-    const comCtrlD = e.ctrlKey && !e.altKey && !e.shiftKey && k === 'd';
-    const comCtrlK = e.ctrlKey && !e.altKey && !e.shiftKey && k === 'k';
-    if (loja.get().area === 'video' && documento && (e.key === 'Delete' || comCtrlD || comCtrlK) && teclaLivre(new KeyboardEvent('keydown', {key: e.key}), e.target)) {
+    const comCtrlD = comando(e) && !e.altKey && !e.shiftKey && k === 'd';
+    const comCtrlK = comando(e) && !e.altKey && !e.shiftKey && k === 'k';
+    const apagar = teclaDeApagar(e); // no Mac, a tecla "delete" é o Backspace (teclas.ts)
+    if (loja.get().area === 'video' && documento && (apagar || comCtrlD || comCtrlK) && teclaLivre(new KeyboardEvent('keydown', {key: e.key}), e.target)) {
       e.preventDefault();
-      void (e.key === 'Delete' ? excluirSelecao(documento) : comCtrlK ? dividirNaCabeca(documento) : duplicarSelecao(documento));
+      void (apagar ? excluirSelecao(documento) : comCtrlK ? dividirNaCabeca(documento) : duplicarSelecao(documento));
       return;
     }
     if (!teclaLivre(e)) return;

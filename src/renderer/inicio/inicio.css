@@ -4,6 +4,8 @@
 .inicio-janela { height: 100%; display: flex; flex-direction: column; background: var(--fundo-0); color: var(--texto); }
 .inicio-barra { height: var(--barra); flex: none; display: flex; align-items: center; gap: 6px; padding: 0 10px 0 14px; border-bottom: 1px solid var(--borda);
   -webkit-app-region: drag; user-select: none;
+  /* os botões da janela à direita (Windows) ou os semáforos do Mac à esquerda (Window Controls Overlay, plataforma.ts) */
+  padding-left: calc(env(titlebar-area-x, 0px) + 14px);
   padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 8px); }
 .inicio-barra > * { -webkit-app-region: no-drag; }
 .inicio-barra .esp { flex: 1; -webkit-app-region: drag; }

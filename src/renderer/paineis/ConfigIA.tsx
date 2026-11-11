@@ -2,17 +2,19 @@
 // fica o servidor, a chave (só os 4 últimos caracteres aparecem; ela é testada na lista de modelos antes de gravar),
 // o modelo (da lista do próprio endereço), o endereço (no compatível e nos locais) e o provedor padrão. Embaixo, o
 // uso do mês com a composição: tokens de entrada (parte do cache), de saída e o custo estimado pela tabela.
-import React, {useEffect, useState, useSyncExternalStore} from 'react';
-import {CircleAlert, CircleCheck, ExternalLink, KeyRound, RefreshCw, ShieldQuestion, X} from 'lucide-react';
-import type {ConfigsDoApp, EstadoAppsDeFora, EstadoProvedor, UsoDoMes} from '../../compartilhado/api';
+import React, {useEffect, useRef, useState, useSyncExternalStore} from 'react';
+import {AudioLines, CircleAlert, CircleCheck, ExternalLink, KeyRound, RefreshCw, ShieldQuestion, X} from 'lucide-react';
+import type {ConfigsDoApp, EstadoAppsDeFora, EstadoNarracaoIA, EstadoProvedor, UsoDoMes} from '../../compartilhado/api';
 import {copiar} from '../componentes/Campos';
 import {avisar} from '../estado/loja';
 import {estadoConversas, fecharConfigIA, lerProvedores, responderAvulso} from './conversas';
+import {SecaoProjetosIde} from './ConfigIde'; // frente IDE
 import './config-ia.css';
+import {Caixa, Escolha} from '../componentes/Controles';
 import './conversa.css'; // o cartão de permissão solto usa o mesmo estilo do da conversa
 
 const mil = (n: number) => (n >= 1000 ? `${(n / 1000).toLocaleString('pt-BR', {maximumFractionDigits: 1})} mil` : String(n));
-import {Caixa, Escolha} from '../componentes/Controles';
+const NOMES_USO: Record<string, string> = {'gemini-tts': 'Gemini TTS (narração)', 'google-tts': 'Google Cloud TTS (narração)'};
 const usd = (n: number) => `US$ ${n.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: n < 1 ? 4 : 2})}`;
 
 const LinhaProvedor: React.FC<{p: EstadoProvedor; aberto: boolean; abrir: () => void}> = ({p, aberto, abrir}) => {
@@ -120,6 +122,66 @@ const LinhaProvedor: React.FC<{p: EstadoProvedor; aberto: boolean; abrir: () => 
   );
 };
 
+// Narração por IA (docs/narracao.md): o Gemini TTS usa a chave do Gemini das conversas (aqui só o estado dela e o aviso do
+// plano gratuito); o Google Cloud TTS (vozes Chirp 3: HD) tem chave própria, testada na lista de vozes (sem custo) antes de
+// gravar, cifrada como as outras e mostrada só pelos 4 últimos caracteres.
+const PAGINA_CHAVE_TTS = 'https://console.cloud.google.com/apis/credentials';
+const PAGINA_API_TTS = 'https://console.cloud.google.com/apis/library/texttospeech.googleapis.com';
+const SecaoNarracao: React.FC<{foco: boolean; abrirGemini: () => void}> = ({foco, abrirGemini}) => {
+  const [e, setE] = useState<EstadoNarracaoIA | null>(null);
+  const [chave, setChave] = useState('');
+  const [msg, setMsg] = useState<{ok: boolean; texto: string} | null>(null);
+  const [ocupado, setOcupado] = useState(false);
+  const caixa = useRef<HTMLDivElement>(null);
+  const ler = () => void window.estudio.narracao.estado().then(setE).catch(() => setE(null));
+  useEffect(ler, []);
+  useEffect(() => {
+    if (foco) caixa.current?.scrollIntoView({block: 'nearest'});
+  }, [foco, e]);
+  if (!e) return null;
+  const gravar = async () => {
+    setOcupado(true);
+    try {
+      const r = await window.estudio.narracao.gravarChave(chave);
+      setMsg({ok: r.ok, texto: r.mensagem});
+      if (r.ok) setChave('');
+      ler();
+    } finally {
+      setOcupado(false);
+    }
+  };
+  const g = e.gemini;
+  const t = e['google-tts'];
+  return (
+    <div ref={caixa} className={`ia-apps ia-narracao${foco ? ' foco' : ''}`}>
+      <div className="ia-uso-titulo"><AudioLines size={13} /> Narração por IA (a voz do vídeo de cenas)</div>
+      <div className="ia-linha">
+        <span className="ia-nome">Gemini TTS</span>
+        {g.pronto ? <span className="ia-estado pronto"><CircleCheck size={12} />usa a chave do Gemini …{g.final} {g.origem === 'ambiente' ? `(da variável ${g.variavel ?? 'de ambiente'})` : '(neste PC)'}</span>
+          : <span className="ia-estado falta"><CircleAlert size={12} />falta a chave do Gemini</span>}
+        <span className="espaco" />
+        {!g.pronto && <button className="bt mini" onClick={abrirGemini}>Pôr a chave do Gemini</button>}
+      </div>
+      <div className="fraco">Gemini 3.8 Flash TTS e Flash-Lite TTS, pela mesma chave das conversas. No plano gratuito do Gemini, o Google pode usar o texto e o áudio
+        para melhorar os produtos dele; no plano pago, não. O preço da fala dobra em 01/01/2027.</div>
+      <div className="ia-linha">
+        <span className="ia-nome">Google Cloud TTS</span>
+        <KeyRound size={13} />
+        {t.final ? <span>chave …{t.final} {t.origem === 'ambiente' ? `(da variável ${t.variavel ?? 'de ambiente'})` : '(neste PC)'}</span> : <span className="fraco">sem chave</span>}
+        <input className="campo" type="password" placeholder={t.final ? 'trocar a chave' : 'cole a chave aqui'} value={chave} autoComplete="off"
+          onChange={(ev) => setChave(ev.target.value)} onKeyDown={(ev) => ev.key === 'Enter' && chave.trim() && void gravar()} />
+        <button className="bt mini principal" disabled={!chave.trim() || ocupado} onClick={() => void gravar()}>Testar e gravar</button>
+        {t.origem === 'cofre' && <button className="bt mini fantasma" onClick={() => void window.estudio.narracao.apagarChave().then(ler)}>Apagar</button>}
+        <button className="bt mini fantasma" onClick={() => void window.estudio.abrirFonte(PAGINA_CHAVE_TTS)}><ExternalLink size={12} />Onde pego a chave?</button>
+      </div>
+      <div className="fraco">Vozes Chirp 3: HD em português (pt-BR-Chirp3-HD-…). A chave é testada na lista de vozes, que não custa nada. Ative a Cloud Text-to-Speech
+        API no projeto da chave (<button className="link" onClick={() => void window.estudio.abrirFonte(PAGINA_API_TTS)}>abrir</button>). US$ 30 por milhão de caracteres,
+        com 1 milhão grátis por mês.</div>
+      {msg && <div className={`ia-msg${msg.ok ? '' : ' erro'}`}>{msg.texto}</div>}
+    </div>
+  );
+};
+
 // Apps de IA de fora (padrão Screenpipe): ligar a porta só deste PC, criar um app com token próprio, copiar a
 // configuração (HTTP para Cursor, Cline, Windsurf, VS Code; stdio para o Claude Desktop) e revogar. Quem entra por fora
 // passa pelo mesmo portão de permissão e aparece no Histórico com o nome do app.
@@ -208,7 +270,9 @@ const DialogoConfigIA: React.FC = () => {
         <div className="ia-lista">
           {provedores.map((p) => <LinhaProvedor key={p.id} p={p} aberto={aberto === p.id} abrir={() => setAberto((a) => (a === p.id ? undefined : p.id))} />)}
         </div>
+        <SecaoNarracao foco={cfg.foco === 'narracao'} abrirGemini={() => setAberto('gemini')} />
         <SecaoAppsDeFora />
+        <SecaoProjetosIde />
         <div className="ia-uso">
           <div className="ia-uso-titulo">Uso deste mês neste PC</div>
           {linhasUso.length ? (
@@ -216,9 +280,9 @@ const DialogoConfigIA: React.FC = () => {
               <tbody>
                 {linhasUso.map(([id, u]) => (
                   <tr key={id}>
-                    <td>{provedores.find((p) => p.id === id)?.nome ?? id}</td>
-                    <td>{u.turnos} respostas</td>
-                    <td>{mil(u.entrada)} tokens de entrada ({mil(u.cache)} do cache) · {mil(u.saida)} de saída</td>
+                    <td>{provedores.find((p) => p.id === id)?.nome ?? NOMES_USO[id] ?? id}</td>
+                    <td>{u.turnos} {id === 'gemini-tts' || id === 'google-tts' ? 'falas' : 'respostas'}</td>
+                    <td>{id === 'google-tts' ? `${mil(u.entrada)} caracteres` : <>{mil(u.entrada)} tokens de entrada ({mil(u.cache)} do cache) · {mil(u.saida)} de saída</>}</td>
                     <td className="num">{u.custo_usd ? `≈ ${usd(u.custo_usd)}` : '—'}</td>
                   </tr>
                 ))}

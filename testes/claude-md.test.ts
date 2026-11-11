@@ -67,11 +67,20 @@ describe('CLAUDE.md do projeto', () => {
     expect(md).toContain('[-90, 0, 0]');
   });
 
+  it('o vídeo de cenas explica a narração por IA: os campos e as ferramentas (docs/narracao.md)', () => {
+    const video = claudeMd(['video']);
+    for (const c of ['`cenas[i].narracao` {`texto`}', '`provedor`', '`gemini-3.8-flash-tts`', '`estilo`', '`velocidade`', '`folga_ms`', '`margem_ms`', '`pronuncias`', '`narracao_ia`',
+      'midia/narracao/<hash>.wav']) expect(video).toContain(c);
+    for (const f of ['narrar', 'vozes_narracao', 'configurar_narracao', 'pronuncias_narracao', 'ajustar_cenas_a_fala']) expect(video).toContain(`\`${f}\``);
+    expect(video).toContain('`previa: true`');
+    expect(claudeMd(['imagem'])).not.toContain('`narrar`');
+  });
+
   it('a lista de "Como trabalhar" é numerada em sequência', () => {
     const md = claudeMd(['video', 'imagem']);
     const numeros = [...md.split('## Como trabalhar')[1].split('## Pesquisa')[0].matchAll(/^(\d+)\. /gm)].map((m) => Number(m[1]));
     expect(numeros).toEqual(numeros.map((_, i) => i + 1));
-    expect(numeros.length).toBe(16);
+    expect(numeros.length).toBe(17); // + a narração por IA
   });
 
   it('sem arquivo, grava o texto gerado; igual, não grava', () => {

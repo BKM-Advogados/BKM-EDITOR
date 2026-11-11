@@ -1,6 +1,5 @@
 // Processo principal do Estúdio: uma janela, o projeto aberto, os terminais, o servidor de mídia e a exportação.
-import {app, BrowserWindow, dialog, ipcMain, net, safeStorage, shell, type IpcMainInvokeEvent} from 'electron';
-import {execFile} from 'node:child_process';
+import {app, BrowserWindow, dialog, ipcMain, Menu, net, safeStorage, shell, systemPreferences, type IpcMainInvokeEvent} from 'electron';
 import {copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -24,6 +23,9 @@ import {Memoria} from './memoria';
 import {ServidorMidia} from './servidor-midia';
 import {SessaoProjeto} from './sessao-projeto';
 import {Terminais} from './terminais';
+import {decidirPermissao, ehMosaico, opcoesDaBarra, projetoNosArgumentos} from './plataforma'; // portes Windows e Mac
+import {gitDoApp} from './git';
+import {modeloDoMenuDoMac} from './menu-do-app';
 import {registrarIpcAudio} from './ipc-audio';
 import {registrarIpcGravacao} from './ipc-gravacao'; // frente Som (rodada 3)
 import {definirPastaTrilhas} from '../nucleo/pasta-trilhas';
@@ -40,8 +42,13 @@ import {avisoDeQuedaEmLaco, decidirRecarga, ehPaginaDoApp, garantirInstanciaUnic
 import {registrarIpcMidia} from './ipc-midia'; // frente Casca: painel de mídia
 import {lojaDeSenhasLinux} from './loja-de-senhas'; // frente IA
 import {criarSessoesIA, fecharAppsDeFora, iniciarAppsDeFora, perguntarAPessoa, registrarIpcIa, retomadaDe} from './ipc-ia'; // frente IA
+import {registrarIpcNarracao} from './ipc-narracao'; // narração por IA (docs/narracao.md)
 import {aoAbrirMusica, registrarIpcMusica} from './ipc-musica'; // frente Música
 import {criarPonteJanela} from './ponte-janela';
+import {definirServicoPrevia} from '../nucleo/mcp-previa'; // frente IDE: prévias do MCP
+import {criarServicoPrevia} from './previa'; // frente IDE
+import {criarIde} from './ide'; // frente IDE: projetos prontos para IDE de agentes
+import {scriptDoMcp} from '../nucleo/ide'; // frente IDE
 
 // o mesmo id do instalador (electron-builder.yml): a barra de tarefas agrupa a janela com o atalho
 app.setAppUserModelId('br.com.bkmadvogados.estudio');
@@ -54,8 +61,7 @@ const LOJA_DE_SENHAS = process.platform === 'linux' ? lojaDeSenhasLinux(process.
 if (LOJA_DE_SENHAS) app.commandLine.appendSwitch('password-store', LOJA_DE_SENHAS);
 
 // Linux com gerenciador em mosaico: as janelas vêm sem moldura e sem minimizar, e se fecham pelo teclado (Super+W)
-const MOSAICO = process.platform === 'linux'
-  && (!!process.env.HYPRLAND_INSTANCE_SIGNATURE || /hyprland|sway|i3|river|niri/i.test(process.env.XDG_CURRENT_DESKTOP ?? ''));
+const MOSAICO = ehMosaico(process.platform, process.env);
 
 const GB = os.totalmem() / 1024 ** 3;
 const PERFIL: Perfil = GB <= 8.5
@@ -65,12 +71,17 @@ const PERFIL: Perfil = GB <= 8.5
 let janela: BrowserWindow | null = null;
 // frente Casca (transversal-D5): um Estúdio só por pasta de dados. A segunda abertura traz a primeira para a frente e sai.
 // ESTUDIO_VARIAS_INSTANCIAS=1 libera uma instância de desenvolvimento ao lado da instalada.
-const primeiraInstancia = process.env.ESTUDIO_VARIAS_INSTANCIAS === '1' || garantirInstanciaUnica(app, () => trazerParaFrente(janela));
+// A segunda abertura com uma pasta de projeto (arrastada no atalho, "Abrir com") abre a pasta na primeira.
+const primeiraInstancia = process.env.ESTUDIO_VARIAS_INSTANCIAS === '1' || garantirInstanciaUnica(app, (argv, cwd) => {
+  trazerParaFrente(janela);
+  const pasta = projetoNosArgumentos(argv, existsSync, cwd);
+  if (pasta) abrirDeFora(pasta);
+});
 let sessao: SessaoProjeto | null = null;
 let avisoAbertura: string | undefined;
 let claude = false;
-// sem Git não há ponto de restauração (commit inicial, Ctrl+S): a tela inicial avisa
-const gitInstalado = new Promise<boolean>((ok) => execFile('git', ['--version'], {windowsHide: true}, (e) => ok(!e)));
+// sem Git não há ponto de restauração (commit inicial, Ctrl+S): a tela inicial avisa (git.ts: no Mac, só o git de verdade)
+const gitInstalado = gitDoApp().then((g) => g !== null);
 const midia = new ServidorMidia();
 // na pasta da pessoa e não em Documentos: com o OneDrive movendo Documentos, a sincronização trava a gravação atômica
 // dos JSON e sobe o .git do projeto
@@ -89,6 +100,9 @@ const conversas = criarSessoesIA({evento: (id, e) => enviar(CANAL.conversaEvento
     ...(claudeFalso ? {prefixo: [claudeFalso], ambienteExtra: {ELECTRON_RUN_AS_NODE: '1'}} : {})}});
 
 const recursos = (rel: string) => (app.isPackaged ? path.join(process.resourcesPath, rel) : path.join(app.getAppPath(), rel));
+// frente IDE (docs/ide.md): .mcp.json, .claude/settings.local.json e t3.json em cada projeto, com o MCP por stdio deste app
+const ide = criarIde({executavel: process.execPath, script: scriptDoMcp({empacotado: app.isPackaged, recursos: process.resourcesPath, raizApp: app.getAppPath()}),
+  ligado: () => memoria.prefs().projetos_ide !== false});
 const pastaDoExemplo = () => recursos(path.join('exemplos', EXEMPLO.pasta));
 const temExemplo = () => existsSync(path.join(pastaDoExemplo(), 'estudio.json'));
 
@@ -187,6 +201,7 @@ const abrirProjeto = async (raiz: string) => {
   try {
     midia.servir(raiz);
     regerarClaudeMd(raiz); // o Claude conhece os campos desta versão também nos projetos criados antes dela
+    ide.preparar(raiz, nova.projeto); // frente IDE: os arquivos da IDE antes do primeiro commit do projeto novo
     nova.projeto.adicionarAjuste(somAcompanhaCenas); // frente Som: a narração presa às cenas (som-com-cenas.ts)
     apagarLimposSemUso(nova.projeto); // frente Som: as versões limpas da voz que nem documento nem diário citam (limpeza-voz.ts)
     aoAbrirMusica(nova.projeto); // frente Música: renders que faltam (pasta clonada) e os que sobraram (ipc-musica.ts)
@@ -226,10 +241,10 @@ const criarJanela = () => {
     minWidth: 1100,
     minHeight: 640,
     show: false,
-    // barra de título própria (a casca desenha nome, áreas e ações); os botões da janela continuam os do sistema, menos
-    // nos gerenciadores em mosaico (Hyprland/Omarchy, Sway…), que não têm moldura nem minimizar
-    titleBarStyle: 'hidden',
-    ...(MOSAICO ? {} : {titleBarOverlay: {color: '#0f0f0f', symbolColor: '#b4b4b4', height: 36}}),
+    // barra de título própria (a casca desenha nome, áreas e ações); os botões da janela continuam os do sistema (no Mac,
+    // os semáforos à esquerda), menos nos gerenciadores em mosaico (Hyprland/Omarchy, Sway…), que não têm moldura nem
+    // minimizar (plataforma.ts)
+    ...opcoesDaBarra(process.platform, MOSAICO),
     backgroundColor: '#0f0f0f',
     title: 'Estúdio',
     autoHideMenuBar: true,
@@ -248,8 +263,14 @@ const criarJanela = () => {
   });
   // câmera, localização, notificações etc.: a tela só usa o microfone (gravação da narração), a área de transferência e a
   // tela cheia da prévia
-  janela.webContents.session.setPermissionRequestHandler((wc, permissao, ok, d) =>
-    ok(wc === janela?.webContents && paginaDoApp(d.requestingUrl) && permissaoLiberada(permissao, 'mediaTypes' in d ? d : {})));
+  // tela cheia da prévia. No Mac o microfone ainda passa pelo pedido do sistema (Ajustes › Privacidade › Microfone, plataforma.ts)
+  janela.webContents.session.setPermissionRequestHandler((wc, permissao, ok, d) => {
+    const detalhes: {mediaTypes?: string[]} = 'mediaTypes' in d ? d : {};
+    if (!(wc === janela?.webContents && paginaDoApp(d.requestingUrl) && permissaoLiberada(permissao, detalhes))) return ok(false);
+    if (decidirPermissao(process.platform, permissao, detalhes.mediaTypes ?? []) === 'permitir') return ok(true);
+    if (systemPreferences.getMediaAccessStatus('microphone') === 'granted') return ok(true);
+    systemPreferences.askForMediaAccess('microphone').then(ok, () => ok(false));
+  });
   // recarregar a página (Ctrl+R) ou perder o renderer faz a interface esquecer as abas: fecha os terminais para não
   // sobrar claude órfão gastando memória por trás
   const largarTerminais = () => {
@@ -341,7 +362,16 @@ lidar(CANAL.ambiente, async () => ({perfil: PERFIL, git: await gitInstalado, cla
 lidar(CANAL.recentes, () => memoria.recentes());
 lidar(CANAL.esquecerRecente, (raiz: string) => memoria.esquecer(raiz));
 lidar(CANAL.preferencias, () => memoria.prefs());
-lidar(CANAL.gravarPreferencias, (p: Partial<Preferencias>) => memoria.gravarPrefs(p));
+lidar(CANAL.gravarPreferencias, (p: Partial<Preferencias>) => {
+  const r = memoria.gravarPrefs(p);
+  if (p.projetos_ide === true && sessao) ide.preparar(sessao.projeto.raiz, sessao.projeto); // frente IDE: ligar vale já para o projeto aberto
+  return r;
+});
+lidar(CANAL.ideEstado, () => ide.estado(sessao?.projeto.raiz)); // frente IDE
+lidar(CANAL.ideAbrirNoT3, () => {
+  const p = exigirProjeto();
+  return ide.abrirNoT3(p.raiz, p.manifesto().nome);
+});
 lidar(CANAL.escolherPasta, async (titulo?: string) => {
   const r = await dialog.showOpenDialog(janela!, {properties: ['openDirectory', 'createDirectory'], title: titulo ?? 'Escolher pasta'});
   return r.canceled || !r.filePaths[0] ? null : r.filePaths[0];
@@ -563,6 +593,8 @@ const marcas = registrarIpcMarcas({lidar, janela: () => janela, memoria, midia, 
 
 registrarPrefsExportacao(lidar, exigirProjeto); // marca d'água por destino, lembrada no projeto (frente C)
 registrarContrasteMarca(lidar, exigirProjeto, (documento) => (exigirProjeto(), sessao!.propsVideo(documento, midia.base)), (aviso) => prepararRender({raizApp: app.getAppPath(), empacotado: app.isPackaged, aviso})); // contraste 3:1 da marca (frente C)
+// frente IDE: ver_quadro, ver_cenas e ver_trecho pelo MCP do app, com o render da exportação e a mídia do servidor local
+definirServicoPrevia(criarServicoPrevia({preparar: (aviso) => prepararRender({raizApp: app.getAppPath(), empacotado: app.isPackaged, aviso}), comMidia: (_raiz, f) => f(midia.base)}));
 // frente Som (rodada 2): limpeza de voz (limpeza-voz.ts) e medidor de loudness da mistura (loudness.ts)
 registrarIpcLimpeza(lidar, exigirProjeto, enviar);
 registrarIpcLoudness(lidar, exigirProjeto, (documento) => (exigirProjeto(), sessao!.propsVideo(documento, midia.base)));
@@ -578,12 +610,41 @@ registrarIpcIa({lidar, claudeInstalado: () => claude, pasta: path.join(app.getPa
     portaoPedido: CANAL.iaPortaoPedido, portaoResposta: CANAL.iaPortaoResposta, portaoCancelado: CANAL.iaPortaoCancelado, reverter: CANAL.iaReverter,
     apps: CANAL.iaApps, appsLigar: CANAL.iaAppsLigar, appsNovo: CANAL.iaAppsNovo, appsConfigs: CANAL.iaAppsConfigs, appsRevogar: CANAL.iaAppsRevogar,
     guardar: CANAL.iaGuardar, guardadas: CANAL.iaGuardadas, apagarGuardada: CANAL.iaApagarGuardada}});
+// narração por IA (docs/narracao.md): Gemini TTS e Google Cloud TTS com a chave do cofre (depois do registrarIpcIa, que monta o cofre)
+registrarIpcNarracao({lidar, enviar, projeto: exigirProjeto, pasta: path.join(app.getPath('userData'), 'ia'), buscar: (u, i) => net.fetch(String(u), i),
+  ouvir: (canal, f) => ipcMain.on(canal, (e, ...a) => (confiavel(e), f(...a))),
+  canais: {estado: CANAL.narracaoEstado, gravarChave: CANAL.narracaoGravarChave, apagarChave: CANAL.narracaoApagarChave, vozes: CANAL.narracaoVozes,
+    previa: CANAL.narracaoPrevia, gerar: CANAL.narracaoGerar, cancelar: CANAL.narracaoCancelar, andamento: CANAL.narracaoAndamento, amostra: CANAL.narracaoAmostra}});
 // frente Música: ida e volta com o vídeo e o render ligado, feito no Web Worker da janela pela ponte com a janela
 registrarIpcMusica(lidar, exigirProjeto, criarPonteJanela({enviar, temJanela: () => Boolean(janela && !janela.isDestroyed()),
   ouvir: (canal, f) => ipcMain.on(canal, (e, ...a) => (confiavel(e), f(...(a as never[]))))}));
 
+// ---------- abrir uma pasta de projeto vinda de fora (argumento, segunda abertura, ícone do Dock) ----------
+let pastaDeFora: string | null = null;
+function abrirDeFora(pasta: string) {
+  if (!janela) {
+    pastaDeFora = pasta; // o app ainda está abrindo: vale como o projeto inicial
+    return;
+  }
+  // a tela pode estar no início (sem projeto): recarregar faz ela abrir o projeto, como na partida; terminais e conversas
+  // do projeto anterior já foram fechados pelo abrirProjeto
+  emFila(() => abrirProjeto(pasta)).then(() => janela?.webContents.reload(), (e: Error) => {
+    if (janela && !janela.isDestroyed()) void dialog.showMessageBox(janela, {type: 'warning', title: 'Estúdio', message: e.message});
+  });
+}
+// Mac: pasta solta no ícone do Dock ou "Abrir com" (Info.plist, build/mac.ts). Chega antes do ready quando é ela que abre o app.
+app.on('open-file', (e, caminho) => {
+  e.preventDefault();
+  if (existsSync(path.join(caminho, 'estudio.json'))) abrirDeFora(caminho);
+});
+
 app.on('ready', async () => {
   if (!primeiraInstancia) return; // a segunda instância já pediu para sair (garantirInstanciaUnica)
+  // Mac: barra de menu do sistema com Editar (copiar e colar nos campos) e sem Recarregar (menu-do-app.ts)
+  if (process.platform === 'darwin') {
+    app.setAboutPanelOptions({applicationName: 'Estúdio', applicationVersion: app.getVersion(), copyright: 'BKM Advogados'});
+    Menu.setApplicationMenu(Menu.buildFromTemplate(modeloDoMenuDoMac({desenvolvimento: !app.isPackaged})));
+  }
   await midia.iniciar();
   // a rede do ler_fonte no app: net.fetch do Electron (proxy e certificados do sistema), assíncrono, 40 s e 20 MB no máximo
   mcpHttp = new McpHttp(path.join(app.getPath('userData'), 'mcp'), () => sessao?.projeto ?? null, criarRede((url, init) => net.fetch(url, init)),
@@ -592,7 +653,9 @@ app.on('ready', async () => {
   midia.rota((req, res) => mcpHttp!.atender(req, res));
   claude = await terminais.preparar();
   criarJanela();
-  const inicial = process.env.ESTUDIO_PROJETO ? path.resolve(process.env.ESTUDIO_PROJETO) : memoria.prefs().ao_iniciar === 'ultimo' ? memoria.ultimo() : null;
+  // a pasta pedida de fora (variável, argumento, ícone do Dock) vem antes do "abrir o último" das preferências
+  const deFora = process.env.ESTUDIO_PROJETO ? path.resolve(process.env.ESTUDIO_PROJETO) : (pastaDeFora ?? projetoNosArgumentos(process.argv, existsSync));
+  const inicial = deFora ?? (memoria.prefs().ao_iniciar === 'ultimo' ? memoria.ultimo() : null);
   if (inicial) await emFila(() => abrirProjeto(inicial)).catch(() => undefined);
 });
 

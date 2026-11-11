@@ -5,6 +5,7 @@
 // marca; clicar no modelo cria; Enter cria em branco. Nada pergunta fps, codec ou pasta: tudo tem padrão e fica em
 // "Mais opções". Esta tela não carrega o editor (Remotion, Player, dockview): a casca vem depois, com React.lazy.
 import React, {useEffect, useMemo, useState} from 'react';
+import {comando, rotuloDoAtalho} from '../teclas';
 import {usarTemExemplo} from '../estado/exemplo';
 import {ArrowUp, BookOpen, Box, Check, ChevronDown, ChevronRight, Copy, Film, FolderOpen, FolderSearch, Image as ImageIcon, MoreHorizontal, Music, Settings2, Sparkle, Sparkles,
   Trash2, TriangleAlert, X} from 'lucide-react';
@@ -275,7 +276,7 @@ export const Inicio: React.FC = () => {
   useEffect(() => {
     const tecla = (e: KeyboardEvent) => {
       const alvo = e.target as HTMLElement;
-      if (e.ctrlKey && e.key.toLowerCase() === 'o') {
+      if (comando(e) && e.key.toLowerCase() === 'o') {
         e.preventDefault();
         void abrirPasta();
       }
@@ -303,7 +304,7 @@ export const Inicio: React.FC = () => {
       <header className="inicio-barra">
         <span className="inicio-marca"><IconeEstudio tamanho={18} />Estúdio</span>
         <span className="esp" />
-        <button className="bt fantasma" onClick={() => void abrirPasta()}><FolderOpen size={14} />Abrir pasta…<kbd>Ctrl+O</kbd></button>
+        <button className="bt fantasma" onClick={() => void abrirPasta()}><FolderOpen size={14} />Abrir pasta…<kbd>{rotuloDoAtalho('Ctrl+O')}</kbd></button>
         <button className="bt fantasma" onClick={() => setPreferencias(true)}><Settings2 size={14} />Preferências</button>
       </header>
       <main className="inicio">
@@ -451,7 +452,7 @@ export const Inicio: React.FC = () => {
             <div className={/onedrive/i.test(pastaPadrao) ? 'alerta' : ''}><FolderOpen size={14} /><span>Projetos em <code title={pastaPadrao}>{pastaPadrao}</code></span>
               <button className="bt fantasma mini" onClick={() => void trocarPasta()}>Trocar…</button></div>
             {ambiente && <div className="ok"><Check size={14} /><span>Esta máquina: perfil {ambiente.perfil.nome === 'leve' ? 'leve (até 8 GB)' : ambiente.perfil.nome === 'padrao' ? 'padrão (até 16 GB)' : 'forte'}</span></div>}
-            {ambiente && !ambiente.git && <div className="alerta"><TriangleAlert size={14} /><span>Sem o Git instalado, não há pontos de restauração (Ctrl+S). O resto funciona.</span></div>}
+            {ambiente && !ambiente.git && <div className="alerta"><TriangleAlert size={14} /><span>Sem o Git instalado, não há pontos de restauração ({rotuloDoAtalho('Ctrl+S')}). O resto funciona.</span></div>}
           </section>
         </div>
       </main>

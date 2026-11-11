@@ -364,6 +364,12 @@ e 9 CC0; Scott Buckley, Audionautix, Lee Rosevere, HoliznaCC0, Open Goldberg Var
 baixada**: a escolha é do responsável. Depois do ok, baixar só as escolhidas para a pasta de trilhas, gravar a ficha ao lado com o
 `sha256` e conferir. O validador roda o arquivo da proposta inteiro nos testes.
 
+## Narração por IA
+
+A voz gerada pelo Gemini TTS ou pelo Google Cloud TTS (Chirp 3: HD) entra numa faixa de voz como qualquer clipe, com
+`narracao_ia` {cena, hash}, e a música com ducking cai sob ela: o envelope é medido quando o WAV é gravado. O detalhe
+está em `docs/narracao.md`. O "ajustar as cenas à fala" usa a mesma conta da narração presa às cenas, abaixo.
+
 ## A narração presa às cenas (video-D3)
 
 Inserir, duplicar, excluir ou mudar a duração de uma cena **empurra o som que vem depois**, e as legendas que seguem esses clipes vão

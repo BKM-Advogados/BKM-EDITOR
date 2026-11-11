@@ -1,5 +1,6 @@
 import {contextBridge, ipcRenderer, type IpcRendererEvent} from 'electron';
 import {CANAL, type ApiEstudio, type EventoConversa, type Mudanca, type PedidoPortaoTela, type Progresso, type ProgressoTranscricao, type Retangulo} from '../compartilhado/api';
+import type {AndamentoNarracao} from '../nucleo/narracao-servico';
 
 const ouvir = <A extends unknown[]>(canal: string, cb: (...a: A) => void) => {
   const h = (_e: IpcRendererEvent, ...a: A) => cb(...a);
@@ -155,6 +156,22 @@ const api: ApiEstudio = {
     guardar: (id, c) => ipcRenderer.invoke(CANAL.iaGuardar, id, c),
     guardadas: () => ipcRenderer.invoke(CANAL.iaGuardadas),
     apagarGuardada: (s) => ipcRenderer.invoke(CANAL.iaApagarGuardada, s),
+  },
+  // narração por IA (docs/narracao.md)
+  narracao: {
+    estado: () => ipcRenderer.invoke(CANAL.narracaoEstado),
+    gravarChave: (c) => ipcRenderer.invoke(CANAL.narracaoGravarChave, c),
+    apagarChave: () => ipcRenderer.invoke(CANAL.narracaoApagarChave),
+    vozes: (p, atualizar) => ipcRenderer.invoke(CANAL.narracaoVozes, p, atualizar),
+    previa: (documento, o) => ipcRenderer.invoke(CANAL.narracaoPrevia, documento, o),
+    gerar: (documento, o) => ipcRenderer.invoke(CANAL.narracaoGerar, documento, o),
+    cancelar: () => ipcRenderer.send(CANAL.narracaoCancelar),
+    aoAndamento: (cb) => ouvir<[AndamentoNarracao]>(CANAL.narracaoAndamento, cb),
+    amostra: (config) => ipcRenderer.invoke(CANAL.narracaoAmostra, config),
+  },
+  ide: {
+    estado: () => ipcRenderer.invoke(CANAL.ideEstado),
+    abrirNoT3: () => ipcRenderer.invoke(CANAL.ideAbrirNoT3),
   },
   // carrossel em partes (rodada 3, B2)
   exportarPaginasEmPartes: {

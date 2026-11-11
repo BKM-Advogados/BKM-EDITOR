@@ -17,6 +17,7 @@ import {lerEnvelopes} from './ipc-audio';
 import {arquivosDaMidia, gitignoreComMidiaPesada} from '../nucleo/midia-git'; // frente Casca (transversal-D7)
 import {gitignoreComRegrasInternas} from '../nucleo/criar-projeto';
 import {publicarMcpApp, retirarMcpApp} from '../nucleo/mcp-app';
+import {gitDoApp} from './git'; // portes: no Mac o git sem as ferramentas do Xcode abre o instalador da Apple
 
 const exec = promisify(execFile);
 // a trava de escrita (.estudio/escrita.lock) entra e sai a cada gravação: avisar a tela por ela seria um aviso por edição
@@ -32,6 +33,7 @@ export class SessaoProjeto {
   // um git por vez: o Ctrl+S que cai no meio do commit automático espera em vez de bater no index.lock
   private filaGit: Promise<boolean> = Promise.resolve(true);
   private tokenMcp: string | null = null;
+  private exeGit = 'git';
 
   constructor(raiz: string, private readonly aoMudar: (arquivo: string) => void) {
     this.projeto = new Projeto(raiz);
@@ -104,15 +106,13 @@ export class SessaoProjeto {
   }
 
   private async git(...args: string[]) {
-    return exec('git', args, {cwd: this.projeto.raiz, windowsHide: true});
+    return exec(this.exeGit, args, {cwd: this.projeto.raiz, windowsHide: true});
   }
 
   private async prepararGit(): Promise<boolean> {
-    try {
-      await exec('git', ['--version'], {windowsHide: true});
-    } catch {
-      return false;
-    }
+    const git = await gitDoApp();
+    if (!git) return false;
+    this.exeGit = git;
     if (!existsSync(path.join(this.projeto.raiz, '.git'))) {
       try {
         await this.git('init', '-q');
@@ -166,43 +166,49 @@ export class SessaoProjeto {
     }
   }
 
-  /** Os arquivos da raiz de midia/ (o logo e a foto padrão do carrossel narrado saem daí). */
-  private arquivosDaMidia(): string[] {
-    try {
-      return readdirSync(path.join(this.projeto.raiz, 'midia'), {withFileTypes: true}).filter((d) => d.isFile()).map((d) => d.name);
-    } catch {
-      return [];
-    }
-  }
-
-  /** Props da composição do vídeo (VideoCenas ou CarrosselTema) para a prévia e a exportação, com a mídia em `base`. */
+  /** Props da composição do vídeo para a prévia e a exportação, com a mídia em `base` (propsDoVideo, abaixo). */
   propsVideo(documento: string, base: string): PropsVideo {
-    try {
-      const rel = this.projeto.arquivoDoDocumento(documento);
-      const {doc} = this.projeto.lerJson<DocVideo>(rel);
-      if (ehDocAnimacao(doc)) {
-        // as camadas são relativas a midia/; o tema do kit (fontes/…, midia/logo-…) e a marca d'água, à raiz do projeto
-        const {props, avisos} = resolverAnimacao(doc, `${base}/midia`);
-        return {props: {...props, base_projeto: base}, avisos};
-      }
-      if (ehDocCenas(doc)) {
-        // os envelopes medidos (midia/*.envelope.json) entram nas props: prévia e exportação veem o mesmo ducking
-        const {props, avisos} = resolverCenas(doc, {envelopes: lerEnvelopes(this.projeto, doc)});
-        return {props: {...props, base_midia: base}, avisos};
-      }
-      // o carrossel narrado: 1080×1920 a 30 qps até a animação dele aceitar outro formato
-      const r = doc as Roteiro & DocVideo;
-      if (typeof r.palavras !== 'string') return {erro: 'este vídeo não tem "tipo" nem narração (palavras); não sei montá-lo'};
-      const lido = this.projeto.lerJson<unknown>(r.palavras).doc;
-      const palavras = (Array.isArray(lido) ? lido : (lido as {palavras?: unknown} | null)?.palavras) as Palavra[]; // frente Fala: a transcrição na versão 2 traz a lista em `palavras`
-      if (!Array.isArray(palavras) || !palavras.length) return {erro: `a transcrição da narração (${r.palavras}) está vazia`};
-      const {props, trechos, avisos} = resolverRoteiro(r, palavras, padroesDaMidia(this.arquivosDaMidia()));
-      return {
-        props: {...props, ...FORMATO_PADRAO, base_midia: `${base}/midia`, narracao: {src: `${base}/${r.fonte}`, trechos}, efeitos: r.efeitos ?? []},
-        avisos,
-      };
-    } catch (e) {
-      return {erro: e instanceof ErroRoteiro ? e.message : `não deu para montar o vídeo: ${(e as Error).message}`};
-    }
+    return propsDoVideo(this.projeto, documento, base);
   }
 }
+
+/** Props da composição do vídeo (VideoCenas, CarrosselTema ou Animacao) para a prévia e a exportação, com a mídia em `base`.
+ *  Solta da sessão: as prévias do MCP por stdio (src/main/previa.ts) montam as mesmas props sem o app aberto. */
+export const propsDoVideo = (projeto: Projeto, documento: string, base: string): PropsVideo => {
+  try {
+    const rel = projeto.arquivoDoDocumento(documento);
+    const {doc} = projeto.lerJson<DocVideo>(rel);
+    if (ehDocAnimacao(doc)) {
+      // as camadas são relativas a midia/; o tema do kit (fontes/…, midia/logo-…) e a marca d'água, à raiz do projeto
+      const {props, avisos} = resolverAnimacao(doc, `${base}/midia`);
+      return {props: {...props, base_projeto: base}, avisos};
+    }
+    if (ehDocCenas(doc)) {
+      // os envelopes medidos (midia/*.envelope.json) entram nas props: prévia e exportação veem o mesmo ducking
+      const {props, avisos} = resolverCenas(doc, {envelopes: lerEnvelopes(projeto, doc)});
+      return {props: {...props, base_midia: base}, avisos};
+    }
+    // o carrossel narrado: 1080×1920 a 30 qps até a animação dele aceitar outro formato
+    const r = doc as Roteiro & DocVideo;
+    if (typeof r.palavras !== 'string') return {erro: 'este vídeo não tem "tipo" nem narração (palavras); não sei montá-lo'};
+    const lido = projeto.lerJson<unknown>(r.palavras).doc;
+    const palavras = (Array.isArray(lido) ? lido : (lido as {palavras?: unknown} | null)?.palavras) as Palavra[]; // frente Fala: a transcrição na versão 2 traz a lista em `palavras`
+    if (!Array.isArray(palavras) || !palavras.length) return {erro: `a transcrição da narração (${r.palavras}) está vazia`};
+    const {props, trechos, avisos} = resolverRoteiro(r, palavras, padroesDaMidia(arquivosDaRaizDaMidia(projeto.raiz)));
+    return {
+      props: {...props, ...FORMATO_PADRAO, base_midia: `${base}/midia`, narracao: {src: `${base}/${r.fonte}`, trechos}, efeitos: r.efeitos ?? []},
+      avisos,
+    };
+  } catch (e) {
+    return {erro: e instanceof ErroRoteiro ? e.message : `não deu para montar o vídeo: ${(e as Error).message}`};
+  }
+};
+
+/** Os arquivos da raiz de midia/ (o logo e a foto padrão do carrossel narrado saem daí). */
+const arquivosDaRaizDaMidia = (raiz: string): string[] => {
+  try {
+    return readdirSync(path.join(raiz, 'midia'), {withFileTypes: true}).filter((d) => d.isFile()).map((d) => d.name);
+  } catch {
+    return [];
+  }
+};

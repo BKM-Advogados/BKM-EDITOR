@@ -3,6 +3,7 @@
 // arrastar reordena, dois cliques no nome renomeiam (F2 na miniatura em foco), Delete exclui. À direita: nova página,
 // duplicar, excluir e o menu (renomear, mover, novo carrossel). Exportar sai pelo diálogo (o botão do monitor), que ao
 // fim oferece "Mostrar na pasta". Uma prancheta só também passa por aqui: a segunda página é o que faz o carrossel.
+import {teclaDeApagar} from '../../teclas';
 import React, {useEffect, useRef, useState} from 'react';
 import {ArrowLeft, ArrowRight, Copy, LayoutGrid, MoreHorizontal, Pencil, Plus, Trash2} from 'lucide-react';
 import type {DocImagem} from '../../../nucleo/documentos';
@@ -104,7 +105,7 @@ export const PaginasImagem: React.FC<{documento: string; doc: DocImagem}> = ({do
                 if (renomeando !== null) return;
                 if (e.key === 'Enter') ir(i);
                 else if (e.key === 'F2') (e.preventDefault(), comecarRenomear(i));
-                else if (e.key === 'Delete') (e.preventDefault(), void excluirPagina(documento, i));
+                else if (teclaDeApagar(e)) (e.preventDefault(), void excluirPagina(documento, i));
                 else if (e.key === 'ArrowLeft') (e.preventDefault(), ir(Math.max(0, i - 1)));
                 else if (e.key === 'ArrowRight') (e.preventDefault(), ir(Math.min(n - 1, i + 1)));
               }}

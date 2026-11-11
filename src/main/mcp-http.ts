@@ -13,6 +13,7 @@ import {INSTRUCOES_MCP} from '../nucleo/mcp-ia';
 import {autorAceito, CABECALHO_AUTOR, CABECALHO_CONVERSA, conversaValida, origemDaIde} from '../nucleo/mcp-app';
 import type {PedidoPortao, Portao} from '../nucleo/portao';
 import type {Projeto} from '../nucleo/projeto';
+import type {ServicoNarracao} from '../nucleo/narracao-servico';
 
 /** Quem pergunta à pessoa no app (ipc-ia.ts). sempre: a pessoa marcou "Sempre nesta conversa". */
 export type Perguntador = (p: PedidoPortao & {origem: string}) => Promise<{permitir: boolean; sempre?: boolean}>;
@@ -25,6 +26,11 @@ type Aba = {origem: string; arquivo?: string; fixo?: boolean; ide?: boolean};
 let transcritorMcp: TranscritorMcp | undefined;
 export const definirTranscritorMcp = (t: TranscritorMcp) => {
   transcritorMcp = t;
+};
+// narração por IA: o serviço com a chave do cofre chega pelo registro do IPC da narração (ipc-narracao.ts)
+let narradorMcp: ServicoNarracao | undefined;
+export const definirNarradorMcp = (s: ServicoNarracao) => {
+  narradorMcp = s;
 };
 
 export class McpHttp {
@@ -140,7 +146,7 @@ export class McpHttp {
         return r.permitir;
       },
     };
-    registrarFerramentas(servidor, projeto, quem.autor, quem.origem, this.rede, transcritorMcp, portao);
+    registrarFerramentas(servidor, projeto, quem.autor, quem.origem, this.rede, transcritorMcp, portao, narradorMcp);
     const transporte = new StreamableHTTPServerTransport({sessionIdGenerator: undefined, enableJsonResponse: true});
     res.on('close', () => {
       void transporte.close();

@@ -1,6 +1,7 @@
 // Área Efeitos: a pilha de efeitos visuais de um vídeo ou de uma imagem do projeto (a mesma definição vale nos dois,
 // ver src/nucleo/efeitos.ts). O monitor mostra o alvo com os efeitos; no vídeo, o controle deslizante já aparece na
 // prévia enquanto se arrasta, e o patch sai ao soltar.
+import {teclaDeApagar} from '../../teclas';
 import React from 'react';
 import {ArrowDown, ArrowUp, Blend, Copy, GripVertical, Trash2, TriangleAlert, Wrench} from 'lucide-react';
 import type {PaineisDoModulo} from '../../casca/contrato';
@@ -165,7 +166,7 @@ const Pilha: React.FC = () => {
                         mover(i, i + 1);
                       } else if (ev.key === 'Enter') abrir();
                       else if (ev.key.toLowerCase() === 'd') alternar(i, e);
-                      else if (ev.key === 'Delete') remover(i);
+                      else if (teclaDeApagar(ev)) remover(i);
                     }}>
                       <GripVertical size={13} className="alca-arrastar" />
                       <button className={`fx${ligado ? ' ligado' : ''}`} title={`${ligado ? 'Desligar' : 'Ligar'} (D)`} onClick={(ev) => {

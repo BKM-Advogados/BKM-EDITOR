@@ -62,13 +62,32 @@ preenchido onde foi conferido na fonte (DeepSeek `deepseek-flash`, Gemini `gemin
 - Seletor de modelo na caixa da conversa: vale na próxima mensagem. No Claude, o processo volta com `--resume` e
   `--model`. Agente ACP usa o modelo da configuração dele.
 
+### Chaves da narração por IA (docs/narracao.md)
+
+- **Gemini TTS** usa a **mesma chave** do provedor `gemini` (Configurações › IA › Gemini (chave)), com as variáveis
+  `GEMINI_API_KEY` e `GOOGLE_API_KEY` como reserva. Não há chave nova. Na seção "Narração por IA" aparecem o estado dela
+  e o aviso do plano gratuito: sem cobrança, o Google pode usar o texto e o áudio.
+- **Google Cloud TTS** (vozes Chirp 3: HD) tem uma credencial nova no cofre, `google-tts`, com a variável de reserva
+  `GOOGLE_TTS_API_KEY`. O fluxo é o das outras chaves: testar, cifrar e mostrar só os 4 últimos caracteres.
+  - O teste é `GET https://texttospeech.googleapis.com/v1/voices?languageCode=pt-BR`, que não custa nada.
+  - Recusada (400 `API_KEY_INVALID`, 401 ou 403), não grava.
+  - Com a API desativada no projeto da chave (403 `SERVICE_DISABLED`), não grava, e a mensagem diz onde ativar.
+  - Sem rede, grava e avisa.
+- O `google-tts` não entra no catálogo `PROVEDORES` (não é de conversa): a seção própria fica em `ConfigIA.tsx`, e o IPC
+  em `src/main/ipc-narracao.ts`, que lê o cofre por `cofreAtual()` de `ipc-ia.ts`.
+- A chave só vive no processo principal. A tela pede "gerar" e recebe o resultado. O MCP por HTTP recebe o mesmo serviço
+  (`definirNarradorMcp`); o MCP por stdio lê as variáveis de ambiente (`servicoDoAmbiente`).
+- Custo: `custoNarracao` em `precos.ts` (tabela de 10/11/2026). No Gemini conta por tokens de texto e de áudio (25 por
+  segundo), e o preço dobra em 01/01/2027. No Cloud TTS conta por caractere (US$ 30 por milhão, 1 milhão grátis por mês).
+- O uso do mês entra como `gemini-tts` (tokens) e `google-tts` (caracteres).
+
 ## Portão de permissão (`src/nucleo/portao.ts`)
 
 Envolve o `registerTool`: toda ferramenta registrada depois dele passa por ele, de qualquer frente.
 
 - **Classe "cartao"** (pergunta à pessoa antes de rodar):
   - a tabela `CLASSES`: `ler_fonte`, `transcrever`, `remover_fundo`, `exportar_legendas`, `destravar_camadas`,
-    `exportar_musica`, `importar_midi`, `escolher_trilha`;
+    `exportar_musica`, `importar_midi`, `escolher_trilha`, `narrar` e `vozes_narracao` (narração por IA);
   - ou quem declara `annotations: {openWorldHint: true}` (sai do PC ou do projeto) ou `destructiveHint: true` (apaga)
     no `registerTool`.
 - **Classe "livre"**: o resto. Quando muda um documento que já existe, grava no diário e tem Reverter. Criar documento
@@ -76,6 +95,8 @@ Envolve o `registerTool`: toda ferramenta registrada depois dele passa por ele, 
   documento novo aparece na tela da pessoa (veja "A tela da pessoa" abaixo).
 - **Para declarar a classe de uma ferramenta nova**: uma linha em `CLASSES` ou a anotação. Não precisa devolver o
   `seq`: o portão acrescenta ao resultado `{"estudio_mudancas":[{seq, documento, rotulo}]}`.
+- **`livreSe`** na linha de `CLASSES`: o pedido que não sai do PC roda sem cartão. Hoje vale para `narrar` com
+  `previa: true`, que só devolve o texto final e o custo estimado.
 - **Onde aparece o pedido**: na conversa da aba ou, sem conversa (terminal, app de fora), num cartão solto no canto da
   tela. "Sempre nesta conversa" vale para o token. O Parar da conversa cancela. Sem resposta em 10 minutos, o pedido é
   negado.
@@ -99,6 +120,8 @@ Envolve o `registerTool`: toda ferramenta registrada depois dele passa por ele, 
     ferramenta e o cartão do portão que esperava a pessoa.
 - Se um dia a fuse `RunAsNode` do Electron for desligada, a ponte stdio para de funcionar. A configuração HTTP
   continua.
+- **IDE de agentes** (T3 Code, Claude Code, Cursor): cada projeto leva um `.mcp.json` com o MCP por stdio, sem token e sem
+  o app aberto, e o agente vê o vídeo por `ver_quadro`, `ver_cenas` e `ver_trecho`. Detalhes em `docs/ide.md`.
 
 ## Ferramentas MCP da frente (`src/nucleo/mcp-ia.ts`)
 
@@ -146,6 +169,7 @@ O pedido de navegação é o `.estudio/selecao.json` (`{documento, caminhos, tem
 | `testes/portao.test.ts` | portão, seq no resultado, reverter de outra aba, limite do listar, avisos do resolvedor |
 | `testes/apps-de-fora.test.ts` | porta fixa, token por app, Origin e Host, ponte stdio, revogar |
 | `testes/prova-acp-qwen.test.ts` | opcional: o Qwen Code real dirigido pela API falsa |
+| `testes/narracao-chaves.test.ts` | chave do Google Cloud TTS (aceita, recusada, API desativada, sem rede), estado sem a chave, stdio pelo ambiente |
 
 ## Licenças
 

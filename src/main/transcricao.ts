@@ -1,7 +1,8 @@
 // Transcrição local da fala (docs/legendas.md): o whisper.cpp roda no próprio PC, sem serviço externo. O binário e o
 // modelo não vêm no instalador: baixam no primeiro uso para ~/Estudio/modelos/whisper/ (%USERPROFILE% no Windows), com o
-// SHA-256 conferido antes de usar. Só o Windows x64 tem binário pronto; no Linux o whisper-cli vem compilado por quem usa
-// (bin/ da pasta ou o PATH, acharWhisperCli) e os modelos baixam do mesmo jeito. O áudio do clipe sai em WAV 16 kHz mono pelo ffmpeg do compositor do Remotion (o mesmo da
+// SHA-256 conferido antes de usar. Só o Windows x64 tem binário pronto; no Mac o whisper-cli vem dentro do app quando o
+// CI o compila (resources/whisper, docs/portes.md) ou do Homebrew (brew install whisper-cpp); no Linux vem compilado por
+// quem usa (bin/ da pasta ou o PATH, acharWhisperCli). Os modelos baixam do mesmo jeito em todos. O áudio do clipe sai em WAV 16 kHz mono pelo ffmpeg do compositor do Remotion (o mesmo da
 // exportação), o whisper-cli devolve JSON com o tempo de cada pedaço de palavra, e o resultado vira
 // midia/<arquivo>.palavras.json: {versao: 2, fonte, palavras: [{w, s, e, p}] em ms}, com o carimbo do áudio (tamanho, data
 // e sha256) para transcrever de novo quando a tomada é regravada. Com `destino` (o roteiro do carrossel narrado) grava só a lista, o
@@ -21,6 +22,8 @@ import {arquivoDasPalavras, conferirFala, fonteDaFala, palavrasValidas, recusaDo
 import type {Palavra} from '../nucleo/roteiro/resolver';
 import {ErroProjeto, type Projeto} from '../nucleo/projeto';
 import {getCompositorPackage} from '../nucleo/compositor-package';
+import {ambienteDoFfmpeg} from './ffmpeg-som';
+import {caminhoDeBusca} from './plataforma';
 
 // ---------- o que baixa: versões presas, com tamanho e SHA-256 ----------
 // whisper.cpp v1.9.5 (MIT), build b5454 (06/10/2026), a mesma do commit d1be6fd da tag. O SHA-256 é o que o GitHub
@@ -215,28 +218,50 @@ export type Pecas = {pasta: string; cli: string; modelo: string; ffmpeg: string 
 /** O whisper.cpp só publica binário pronto do Windows x64: é o único sistema em que o app baixa o whisper-cli. */
 export const baixaBinario = (plataforma: string = process.platform, arq: string = process.arch) => plataforma === 'win32' && arq === 'x64';
 
-/** O whisper-cli que o app usa: o da pasta do whisper (bin/) e, fora do Windows x64, o primeiro do PATH. No Windows x64
- *  fica só o baixado (o SHA-256 dele foi conferido). Sem nenhum, null. */
-export const acharWhisperCli = (pasta: string, o: {plataforma?: string; arq?: string; PATH?: string; existe?: (a: string) => boolean} = {}): string | null => {
+/** O whisper-cli que vem dentro do app (resources/whisper), quando o empacotamento o recebeu (ESTUDIO_WHISPER_EMBUTIDO,
+ *  forge.config.ts): o CI compila o whisper.cpp no Mac. `raizApp` é a pasta do app (resources/app.asar) ou, no MCP por
+ *  stdio, a própria resources (dist-mcp fica nela). */
+export const whisperEmbutido = (o: {raizApp?: string; empacotado?: boolean; plataforma?: string} = {}): string[] => {
+  if (!o.raizApp) return [];
+  const exe = (o.plataforma ?? process.platform) === 'win32' ? 'whisper-cli.exe' : 'whisper-cli';
+  return [path.join(path.dirname(o.raizApp), 'whisper', exe), path.join(o.raizApp, 'whisper', exe)];
+};
+
+/** O whisper-cli que o app usa: o da pasta do whisper (bin/, onde a pessoa pode pôr o dela), o que vem no app e, fora do
+ *  Windows x64, o primeiro do PATH (com as pastas do Homebrew no Mac, plataforma.ts). No Windows x64 fica só o baixado (o
+ *  SHA-256 dele foi conferido). Sem nenhum, null. */
+export const acharWhisperCli = (pasta: string, o: {plataforma?: string; arq?: string; PATH?: string; existe?: (a: string) => boolean; home?: string;
+  embutidos?: string[]} = {}): string | null => {
   const plataforma = o.plataforma ?? process.platform;
   const existe = o.existe ?? existsSync;
   const exe = plataforma === 'win32' ? 'whisper-cli.exe' : 'whisper-cli';
-  const proprio = path.join(pasta, 'bin', exe);
+  // os caminhos do sistema pedido, não do que roda o teste (o vitest confere o Mac no Windows e vice-versa)
+  const p = plataforma === 'win32' ? path.win32 : path.posix;
+  const proprio = p.join(pasta, 'bin', exe);
   if (existe(proprio)) return proprio;
   if (baixaBinario(plataforma, o.arq ?? process.arch)) return null;
+  for (const e of o.embutidos ?? []) if (existe(e)) return e;
   const sep = plataforma === 'win32' ? ';' : ':';
-  for (const d of (o.PATH ?? process.env.PATH ?? '').split(sep)) {
-    if (d && existe(path.join(d, exe))) return path.join(d, exe);
+  const busca = caminhoDeBusca({plataforma, PATH: o.PATH ?? process.env.PATH, home: o.home ?? os.homedir()});
+  for (const d of busca.split(sep)) {
+    if (d && existe(p.join(d, exe))) return p.join(d, exe);
   }
   return null;
 };
 
-/** O que dizer quando falta o whisper-cli num sistema em que ele não baixa sozinho: compilar o whisper.cpp na versão
- *  presa e pôr o whisper-cli na pasta (ou no PATH). docs/legendas.md, "Linux". */
-export const comoInstalarWhisper = (pasta: string) =>
-  `falta o whisper-cli (whisper.cpp ${WHISPER_VERSAO}): fora do Windows x64 ele não baixa sozinho. Compile o whisper.cpp v1.9.5 `
-  + `(cmake -B build -DBUILD_SHARED_LIBS=OFF && cmake --build build --target whisper-cli) e copie build/bin/whisper-cli para `
-  + `${path.join(pasta, 'bin')} ou para uma pasta do PATH; os modelos baixam sozinhos`;
+/** O que dizer quando falta o whisper-cli num sistema em que ele não baixa sozinho. No Mac, o Homebrew (o app procura em
+ *  /opt/homebrew/bin e /usr/local/bin); no Linux, compilar o whisper.cpp na versão presa e pôr o whisper-cli na pasta (ou
+ *  no PATH). docs/legendas.md, "Linux", e docs/portes.md. */
+export const comoInstalarWhisper = (pasta: string, plataforma: string = process.platform) =>
+  comoInstalarWhisperEm(pasta, plataforma, (plataforma === 'win32' ? path.win32 : path.posix).join(pasta, 'bin'));
+
+const comoInstalarWhisperEm = (pasta: string, plataforma: string, bin: string) =>
+  plataforma === 'darwin'
+    ? `falta o whisper-cli (whisper.cpp): esta cópia do Estúdio não o trouxe. No Terminal, instale pelo Homebrew `
+      + `(brew install whisper-cpp) e abra o Estúdio de novo, ou ponha um whisper-cli compilado em ${bin}; os modelos baixam sozinhos`
+    : `falta o whisper-cli (whisper.cpp ${WHISPER_VERSAO}): fora do Windows x64 ele não baixa sozinho. Compile o whisper.cpp v1.9.5 `
+      + `(cmake -B build -DBUILD_SHARED_LIBS=OFF && cmake --build build --target whisper-cli) e copie build/bin/whisper-cli para `
+      + `${bin} ou para uma pasta do PATH; os modelos baixam sozinhos`;
 
 /** ffmpeg do compositor do Remotion: no app empacotado fica em app.asar.unpacked; no desenvolvimento, no node_modules. */
 export const caminhoFfmpeg = (o: {raizApp?: string; empacotado?: boolean} = {}): string | null => {
@@ -250,6 +275,8 @@ export const caminhoFfmpeg = (o: {raizApp?: string; empacotado?: boolean} = {}):
   const candidatos: string[] = [];
   if (o.empacotado && o.raizApp) candidatos.push(path.join(path.dirname(o.raizApp), 'app.asar.unpacked', 'node_modules', pacote, exe));
   if (o.raizApp) candidatos.push(path.join(o.raizApp, 'node_modules', pacote, exe));
+  // o MCP por stdio do app instalado (dist-mcp/nucleo.cjs) passa a pasta resources como raiz: o ffmpeg fica em app.asar.unpacked
+  if (o.raizApp) candidatos.push(path.join(o.raizApp, 'app.asar.unpacked', 'node_modules', pacote, exe));
   try {
     const exigir = createRequire(path.join(o.raizApp ?? process.cwd(), 'package.json'));
     candidatos.push(path.join(path.dirname(exigir.resolve(`${pacote}/package.json`)), exe));
@@ -263,10 +290,11 @@ export const caminhoFfmpeg = (o: {raizApp?: string; empacotado?: boolean} = {}):
 
 type Rodado = {codigo: number | null; saida: string; erro: string};
 
-const rodar = (exe: string, args: string[], o: {sinal?: AbortSignal; aoErro?: (linha: string) => void; cwd?: string; filho?: (c: ChildProcess) => void}) =>
+const rodar = (exe: string, args: string[], o: {sinal?: AbortSignal; aoErro?: (linha: string) => void; cwd?: string; filho?: (c: ChildProcess) => void;
+  env?: NodeJS.ProcessEnv}) =>
   new Promise<Rodado>((ok, falha) => {
     if (o.sinal?.aborted) return falha(new Cancelado());
-    const c = spawn(exe, args, {windowsHide: true, cwd: o.cwd ?? path.dirname(exe), stdio: ['ignore', 'pipe', 'pipe']});
+    const c = spawn(exe, args, {windowsHide: true, cwd: o.cwd ?? path.dirname(exe), stdio: ['ignore', 'pipe', 'pipe'], ...(o.env ? {env: o.env} : {})});
     o.filho?.(c);
     let saida = '';
     let erro = '';
@@ -299,8 +327,9 @@ export const extrairAudio = async (o: {ffmpeg: string; entrada: string; saida: s
     ...(o.de_ms ? ['-ss', (o.de_ms / 1000).toFixed(3)] : []),
     ...(o.dur_ms ? ['-t', (o.dur_ms / 1000).toFixed(3)] : []),
   ];
+  // no Mac o ffmpeg do Remotion acha as bibliotecas (libavcodec.dylib...) pelo DYLD_LIBRARY_PATH (ffmpeg-som.ts)
   const r = await rodar(o.ffmpeg, ['-hide_banner', '-nostdin', '-y', ...recorte, '-i', o.entrada, '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'pcm_s16le', '-f', 'wav', o.saida],
-    {sinal: o.sinal});
+    {sinal: o.sinal, env: ambienteDoFfmpeg(path.dirname(o.ffmpeg))});
   if (r.codigo !== 0 || !existsSync(o.saida)) throw new Error(`o ffmpeg não conseguiu tirar o áudio de ${path.basename(o.entrada)}: ${r.erro.trim().split('\n').slice(-3).join(' ')}`);
 };
 
@@ -545,7 +574,7 @@ export class Transcritor {
   /** O que está instalado e o que falta, sem baixar nada. */
   estado(modelo: IdModeloWhisper = this.o.modelo ?? MODELO_PADRAO): EstadoTranscricao {
     const m = MODELOS_WHISPER[modelo];
-    const cli = acharWhisperCli(this.pasta);
+    const cli = acharWhisperCli(this.pasta, {embutidos: whisperEmbutido(this.o)});
     const baixa = baixaBinario();
     const arqModelo = path.join(this.pasta, m.arquivo);
     const ffmpeg = caminhoFfmpeg(this.o);
@@ -564,7 +593,7 @@ export class Transcritor {
 
   /** Baixa o que falta (binário e modelo), conferindo o SHA-256; devolve onde estão as peças. */
   async preparar(modelo: IdModeloWhisper, andamento: Andamento = () => undefined, sinal?: AbortSignal): Promise<Pecas> {
-    const achado = acharWhisperCli(this.pasta);
+    const achado = acharWhisperCli(this.pasta, {embutidos: whisperEmbutido(this.o)});
     if (!achado && !baixaBinario()) throw new ErroProjeto(comoInstalarWhisper(this.pasta), 'nao_achado');
     const ffmpeg = caminhoFfmpeg(this.o);
     if (!ffmpeg) throw new ErroProjeto('não achei o ffmpeg do compositor do Remotion (@remotion/compositor): reinstale o app', 'nao_achado');

@@ -4,6 +4,7 @@
 // transcrição local grava ao lado do áudio (src/main/transcricao.ts), quebradas por pausa, pontuação e largura, ou de
 // um SRT/VTT importado. Os estilos são predefinições (posição, tamanho, caixa, destaque) com as cores e a fonte do
 // `tema`, que o kit de marca preenche. Puro: sem disco, para a interface, o processo principal e o MCP usarem igual.
+import {nomeDeArquivo} from './nome-de-arquivo';
 import {papelDe, type AudioCenas, type AudioP, type ClipeAudio, type FaixaAudio} from './audio';
 import type {TemaCenas} from './cenas';
 import {conjuntoDe, zonaSugerida} from './zonas-seguras';
@@ -1164,4 +1165,5 @@ export const nomeLivreDaLegenda = (nome: string, existe: (nome: string) => boole
 };
 
 /** Nome do arquivo de legenda em saidas/: o título do vídeo sem o que o Windows não aceita. */
-export const nomeDoArquivoDeLegenda = (titulo: string, ext: 'srt' | 'vtt') => `${(titulo.replace(/[<>:"/\\|?*\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim() || 'legendas')}.${ext}`;
+export const nomeDoArquivoDeLegenda = (titulo: string, ext: 'srt' | 'vtt') =>
+  `${nomeDeArquivo(titulo.replace(/[<>:"/\\|?*\u0000-\u001f]+/g, ' '), {vazio: 'legendas'})}.${ext}`; // nome-de-arquivo.ts: CON e NUL do Windows

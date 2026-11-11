@@ -144,7 +144,8 @@ describe('o guia do projeto cobre as ferramentas (M13)', () => {
       'escrever_notas', 'editar_notas', 'aplicar_progressao', 'gerar_notas', 'encaixar_no_video', 'exportar_musica', 'importar_midi', 'licencas_do_projeto'].map((n) => [n, ['musica']])),
     ...Object.fromEntries(['transcrever', 'ler_legendas', 'editar_legenda', 'exportar_legendas', 'importar_legendas', 'propor_cortes_fala', 'aplicar_cortes_fala',
       'preparar_teleprompter', 'adicionar_clipe_audio', 'dividir_clipe', 'copiar_clipe', 'crossfade', 'listar_trilhas', 'escolher_trilha', 'creditos_das_musicas',
-      'marca_dagua', 'medir_contraste_marca'].map((n) => [n, ['video']])),
+      'marca_dagua', 'medir_contraste_marca', 'vozes_narracao', 'configurar_narracao', 'pronuncias_narracao', 'narrar', 'ajustar_cenas_a_fala'].map((n) => [n, ['video']])),
+    ...Object.fromEntries(['ver_quadro', 'ver_cenas', 'ver_trecho'].map((n) => [n, ['video', 'animacao']])), // frente IDE: prévias do vídeo
     ...Object.fromEntries(['remover_fundo', 'selecionar_camadas', 'alinhar_camadas', 'distribuir_camadas', 'agrupar_camadas', 'desagrupar_camadas', 'travar_camadas',
       'destravar_camadas', 'buscar_icone', 'inserir_icone', 'inserir_linha', 'fazer_lista', 'ver_marca', 'cor_da_marca', 'fonte_da_marca'].map((n) => [n, ['imagem']])),
     ...Object.fromEntries(['ler_fonte', 'anotar_fonte', 'registrar_fato', 'listar_pesquisa', 'texto_da_fonte', 'checar_texto'].map((n) => [n, ['video', 'imagem']])),

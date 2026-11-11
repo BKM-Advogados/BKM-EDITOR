@@ -1,32 +1,70 @@
-# Estúdio V3
+# Estúdio V4
 
 App desktop que une edição de **vídeo**, **imagem**, **3D**, **efeitos** e **animação** (2D e arte em pixel) num lugar só. Tudo é JSON na pasta do
 projeto: a pessoa edita na tela, o Claude edita conversando (com a conta da própria pessoa), e as duas mãos passam pelo
 mesmo JSON Patch com versão, diário e desfazer. A tela acompanha o arquivo; o agente vê o que a pessoa mudou.
 
 Nome provisório. Pasta: `C:\Users\usuario\projetos\estudio` (fora do OneDrive, por causa do `node_modules`).
-Repositório: `BKM-Advogados/BKM-EDITOR` (privado). Versões: V1 = tag `v1.0.0` (pacote 0.1.0), V2 = `v2.0.0` (0.2.0),
-V3 = `v3.0.0` (pacote 1.0.0). No Linux a pasta é `~/Projects/estudio`.
+Repositório: `BKM-Advogados/BKM-EDITOR` (privado). Versões (tag do git → versão do pacote): V1 = `v1.0.0` (0.1.0),
+V2 = `v2.0.0` (0.2.0), V3 = `v3.0.0` (1.0.0), V4 = `v4.0.0` (2.0.0). No Linux a pasta é `~/Projects/estudio`.
 
-## Notas desta versão: visual neutro (10/11/2026)
+## Novidades da V4 (pacote 2.0.0, 11/11/2026)
 
-- **Atalhos das áreas mudaram.** A ordem das áreas segue o uso: **1 Vídeo, 2 Imagem, 3 Animação, 4 Música, 5 Efeitos,
-  6 3D** (as teclas 1 a 6 e Alt+1 a 6 seguem esta ordem; antes eram Vídeo, Imagem, 3D, Efeitos, Música, Animação).
-  Novos: **Ctrl+\\** foca no monitor (esconde os outros painéis; de novo, volta), **Shift+D** segurado mostra o antes dos
-  efeitos.
-- **Visual neutro:** grafite de croma zero, um acento azul (`#70B8FF`) para seleção, foco e a ação principal, e o violeta
-  só para o que o Claude fez. Nenhuma cor de cliente na interface nem nos padrões (efeito Tom e pré-ajuste Quente em
-  âmbar neutro, objeto 3D novo em cinza). O único kit de fábrica é o **Neutro** (destaque branco, marcado pelo peso);
-  kits que já estão na pasta da pessoa continuam funcionando.
+A V4 junta a reformulação (visual neutro, as três levas de UX e as correções auditadas do núcleo) com a rodada 4
+(narração por IA, projetos prontos para IDE, portes para Windows e Mac e o CI).
+
+**Atalhos das áreas mudaram:**
+
+- A ordem das áreas segue o uso: **1 Vídeo, 2 Imagem, 3 Animação, 4 Música, 5 Efeitos, 6 3D**. As teclas **1 a 6** (fora
+  de campo de texto) e **Alt+1 a 6** (até no terminal) seguem esta ordem; antes eram Vídeo, Imagem, 3D, Efeitos, Música,
+  Animação.
+- Novos: **Ctrl+\\** foca no monitor (esconde os outros painéis; de novo, volta), **Ctrl+F** põe o monitor em tela cheia
+  (Vídeo, Imagem e Animação), **Shift+D** segurado mostra o antes dos efeitos.
+- **No Mac, o Cmd (⌘) faz o papel do Ctrl** em todos os atalhos (⌘S, ⌘Z, ⇧⌘E, ⌘\\…), e os menus mostram os rótulos do
+  Mac; o Ctrl fica para o terminal. A tecla "delete" do Mac apaga a seleção.
+
+**Visual neutro e as três levas de UX (reformulação):**
+
+- Grafite de croma zero, um acento azul (`#70B8FF`) para seleção, foco e a ação principal, e o violeta só para o que o
+  Claude fez. Nenhuma cor de cliente na interface nem nos padrões. O único kit de fábrica é o **Neutro** (destaque branco,
+  marcado pelo peso); kits que já estão na pasta da pessoa continuam funcionando.
 - **Preferências › Aparência:** tema escuro (padrão), claro ou o do sistema, alto contraste, densidade, tamanho da
-  interface (90 a 150%) e reduzir movimento. Os tokens ficam num arquivo só (`src/renderer/estilo/tokens.ts`).
-- **O que o Claude mudou aparece no lugar** por 30 s: contorno violeta no monitor, barra na lista e na linha do tempo,
-  "era X" no inspetor, aviso com Ver e Desfazer; o Histórico agrupa por rodada, com o antes → depois de cada campo.
-- **Tela inicial** com o pedido ao Claude no alto e os tipos de peça (inclui Música) no mesmo peso; **Exportar** com
-  destinos em cartões e o verbo exato no botão; **Música** com cor por canal e mixer com fader; **Animação** no sistema
-  das outras áreas, com seletor de documento, pré-ajustes de entrada e saída, modo animar e editor de pixel grande;
-  **Efeitos** com amostra de cada pré-ajuste; controles próprios no lugar de select e caixa de marcar nativos.
-- Detalhes e decisões em `docs/tela.md` (seções 6 e 7).
+  interface (90 a 150%) e reduzir movimento. Os tokens ficam num arquivo só (`src/renderer/estilo/tokens.ts`), e os
+  controles são da casa (caixa, segmentado, escolha, interruptor) no lugar dos nativos.
+- **"O Claude mudou isto"** no lugar por 30 s: contorno violeta no monitor, barra na lista e na linha do tempo, "era X" no
+  inspetor, aviso com Ver e Desfazer. O **Histórico** agrupa por rodada, com o antes → depois compacto de cada campo.
+- **Tela inicial** com o pedido ao Claude no alto e os tipos de peça no mesmo peso; **Exportar** com destinos em cartões;
+  **Música** com cor por canal, mixer com fader e segunda música pelo menu; **Animação** com seletor de documento (como a
+  Música), pré-ajustes de entrada e saída, modo animar e editor de pixel grande; **Efeitos** com amostra de cada
+  pré-ajuste. Detalhes em `docs/tela.md` (seções 6 e 7).
+
+**Núcleo e segurança (reformulação, auditado e verificado):**
+
+- A janela só aceita a página do app (arquivo solto ou link não troca a página nem herdam o preload), o IPC confere o
+  quadro de origem e só o microfone, a área de transferência e a tela cheia são liberados.
+- **Trava de escrita** (`.estudio/escrita.lock`) em toda gravação do projeto, do app e do MCP; o diário fica fora do commit
+  automático. Link simbólico em `midia/` para fora do projeto só é lido, nunca gravado.
+- **O MCP da IDE passa pelo app quando ele está aberto** (`.estudio/mcp-app.json`): portão de permissão, aviso na tela e
+  um escritor só; cada conversa da IDE grava com a própria origem (`ide-<id>`, "Claude na IDE" no Histórico). Com o app
+  fechado vale a trava.
+- Documento criado pelo Claude aparece na tela por padrão; imagens JPG aceitas nas ferramentas; validações das
+  ferramentas MCP, da exportação e do render conferidas uma a uma (`docs/ia.md`).
+
+**Rodada 4:**
+
+- **Narração por IA (`docs/narracao.md`):** a fala de cada cena (`cenas[i].narracao.texto`) vira voz pelo Gemini TTS (a
+  chave do Gemini das conversas) ou pelo Google Cloud TTS (Chirp 3: HD, chave própria no cofre). Painel no "+ Áudio" da
+  linha do tempo e no inspetor da cena, dicionário de pronúncia, cache por cena em `midia/narracao/`, custo estimado antes
+  de gerar, "Outra tomada", ducking da música e "ajustar as cenas à fala". MCP: `vozes_narracao`, `configurar_narracao`,
+  `pronuncias_narracao`, `narrar` (cartão do portão; a prévia é livre) e `ajustar_cenas_a_fala`.
+- **Projetos prontos para IDE (`docs/ide.md`):** cada projeto leva `.mcp.json`, `.claude/settings.local.json` e `t3.json`
+  e abre no T3 Code, no Claude Code ou no Cursor com o MCP `estudio` ligado. O agente vê o vídeo por `ver_quadro`,
+  `ver_cenas` e `ver_trecho`. A opção e o "Abrir no T3 Code" ficam em Configurações › IA.
+- **Windows e Mac (`docs/portes.md`):** janela com os semáforos do Mac, menu do sistema, PATH, git e microfone por
+  sistema, nomes de arquivo que o Windows aceita, whisper-cli no Mac, pasta solta no ícone do Dock abre o projeto,
+  pacotes de Windows e Mac a partir do Linux.
+- **CI (`.github/workflows/build.yml`):** typecheck, testes e pacotes de Linux, Windows, Mac Apple Silicon e Mac Intel
+  (NSIS e DMG), à mão, por tag `v*` ou por branch `ci/*`. Não depende de `exemplos/`.
 
 ## Novidades da V3 (pacote 1.0.0, 10/11/2026)
 
@@ -53,6 +91,9 @@ V3 = `v3.0.0` (pacote 1.0.0). No Linux a pasta é `~/Projects/estudio`.
 
 **Instalador:** `npm run instalador` gera `Estudio-Setup-<versão>.exe` na raiz do projeto (NSIS, por usuário, com
 atalho na área de trabalho e no Iniciar). O guia para outro PC está em `INSTALAR.md`.
+**Windows e Mac a partir de qualquer sistema:** `npm run pacote:win` e `npm run pacote:mac` (depois de `npm run
+nativos:win` / `nativos:mac`); o DMG e o NSIS saem num Mac e num Windows, ou no CI (`.github/workflows/build.yml`).
+Auditoria, o que já foi testado em cada sistema e a lista de verificação: `docs/portes.md`.
 
 Desenvolvimento:
 
@@ -175,6 +216,11 @@ O agente recebe: `projeto_info`, `estado_do_editor`, `ler_documento`, `aplicar_p
 `checar_texto`. Cada projeto leva um `CLAUDE.md` com o formato dos documentos dele, o que o kit de marca põe no `tema` e a
 seção "Pesquisa" (fontes, fatos e `refs`). A parte escrita pelo app fica entre as marcas `estudio:inicio` e `estudio:fim`
 e é refeita ao abrir o projeto, para valer também nos projetos criados antes; o que estiver fora das marcas fica.
+
+**IDE de agentes** (`docs/ide.md`): cada projeto também leva `.mcp.json`, `.claude/settings.local.json` e `t3.json`, e
+abre direto no T3 Code, no Claude Code ou no Cursor com o MCP `estudio` ligado. Com o app aberto no projeto, as
+gravações passam por ele (portão e aviso na tela); fechado, o MCP grava sozinho com a trava de escrita. O agente vê o
+vídeo por `ver_quadro`, `ver_cenas` e `ver_trecho`, que gravam em `saidas/previas/`. A opção fica em Configurações › IA.
 
 ## Como é feito
 
