@@ -180,10 +180,14 @@ export const Inicio: React.FC = () => {
 
   const abrir = async (r: Recente) => {
     if (!r.existe) return avisar(`A pasta deste projeto não existe mais: ${r.raiz}. Use "Remover da lista".`, 'erro');
+    if (ocupado) return; // duplo clique no cartão: uma abertura só
+    setOcupado(true);
     try {
       await abrirProjeto(await window.estudio.abrirProjeto(r.raiz));
     } catch (e) {
       avisar(mensagemDe(e), 'erro');
+    } finally {
+      setOcupado(false);
     }
   };
   const duplicar = async (r: Recente) => {

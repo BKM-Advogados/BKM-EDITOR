@@ -145,6 +145,15 @@ const guardarMiniatura = async () => {
 };
 
 // ---------- abrir, fechar, criar ----------
+// uma troca de projeto por vez (duplo clique no recente, clique enquanto o projeto inicial abre): sem isso o abrir() que
+// ainda esperava o git criava um observador que ninguém mais fechava. Só nos handlers: as funções chamam umas às outras.
+let filaProjeto: Promise<unknown> = Promise.resolve();
+const emFila = <T>(f: () => Promise<T>): Promise<T> => {
+  const vez = filaProjeto.then(() => f());
+  filaProjeto = vez.catch(() => undefined);
+  return vez;
+};
+
 const fecharSessao = async () => {
   cancelarFala(); // frente Fala: o whisper para junto com o projeto (transversal-N4)
   await guardarMiniatura().catch(() => undefined);
@@ -162,7 +171,7 @@ const abrirProjeto = async (raiz: string) => {
   if (!existsSync(path.join(raiz, 'estudio.json'))) throw new Error(`Esta pasta não é um projeto do Estúdio (falta o estudio.json): ${raiz}`);
   const manifesto = new Projeto(raiz).manifesto(); // confere antes de fechar o que está aberto
   await fecharSessao();
-  sessao = new SessaoProjeto(raiz, (arquivo) => {
+  const nova = new SessaoProjeto(raiz, (arquivo) => {
     if (arquivo === 'estudio.json') {
       try {
         tituloDaJanela(sessao?.projeto.manifesto().nome);
@@ -173,12 +182,18 @@ const abrirProjeto = async (raiz: string) => {
     }
     enviar(CANAL.mudou, {arquivo});
   });
-  midia.servir(raiz);
-  regerarClaudeMd(raiz); // o Claude conhece os campos desta versão também nos projetos criados antes dela
-  sessao.projeto.adicionarAjuste(somAcompanhaCenas); // frente Som: a narração presa às cenas (som-com-cenas.ts)
-  apagarLimposSemUso(sessao.projeto); // frente Som: as versões limpas da voz que nem documento nem diário citam (limpeza-voz.ts)
-  aoAbrirMusica(sessao.projeto); // frente Música: renders que faltam (pasta clonada) e os que sobraram (ipc-musica.ts)
-  await sessao.abrir();
+  sessao = nova;
+  try {
+    midia.servir(raiz);
+    regerarClaudeMd(raiz); // o Claude conhece os campos desta versão também nos projetos criados antes dela
+    nova.projeto.adicionarAjuste(somAcompanhaCenas); // frente Som: a narração presa às cenas (som-com-cenas.ts)
+    apagarLimposSemUso(nova.projeto); // frente Som: as versões limpas da voz que nem documento nem diário citam (limpeza-voz.ts)
+    aoAbrirMusica(nova.projeto); // frente Música: renders que faltam (pasta clonada) e os que sobraram (ipc-musica.ts)
+    await nova.abrir();
+  } catch (e) {
+    await fecharSessao(); // nada de projeto meio aberto (mídia e MCP servindo, sem observador)
+    throw e;
+  }
   memoria.lembrar(raiz, manifesto.nome);
   tituloDaJanela(manifesto.nome);
   avisoAbertura = dentroDoOneDrive(raiz)
@@ -284,21 +299,21 @@ const lidar = <A extends unknown[], R>(canal: string, f: (...a: A) => R | Promis
 
 lidar(CANAL.abrirPasta, async () => {
   const r = await dialog.showOpenDialog(janela!, {properties: ['openDirectory'], title: 'Abrir projeto do Estúdio'});
-  return r.canceled || !r.filePaths[0] ? null : abrirProjeto(r.filePaths[0]);
+  return r.canceled || !r.filePaths[0] ? null : emFila(() => abrirProjeto(r.filePaths[0]));
 });
 // o exemplo sempre em cópia nova: editar não estraga o "ver um pronto" da próxima vez
 lidar(CANAL.temExemplo, () => temExemplo());
-lidar(CANAL.abrirExemplo, () => {
+lidar(CANAL.abrirExemplo, () => emFila(() => {
   if (!temExemplo()) throw new Error('Esta instalação não traz um projeto de exemplo.');
   const destino = pastaLivre(memoria.prefs().pasta_projetos, EXEMPLO.nome);
   gravarPlano(destino, planoDoExemplo(EXEMPLO.nome), pastaDoExemplo());
   return abrirProjeto(destino);
-});
-lidar(CANAL.abrirProjeto, (raiz: string) => abrirProjeto(raiz));
+}));
+lidar(CANAL.abrirProjeto, (raiz: string) => emFila(() => abrirProjeto(raiz)));
 lidar(CANAL.projetoAtual, () => info());
-lidar(CANAL.criarProjeto, (o: NovoProjeto) => criarProjeto(o));
-lidar(CANAL.fecharProjeto, () => fecharSessao());
-lidar(CANAL.duplicarProjeto, async (o: {raiz?: string; nome: string}) => {
+lidar(CANAL.criarProjeto, (o: NovoProjeto) => emFila(() => criarProjeto(o)));
+lidar(CANAL.fecharProjeto, () => emFila(() => fecharSessao()));
+lidar(CANAL.duplicarProjeto, (o: {raiz?: string; nome: string}) => emFila(async () => {
   const origem = o.raiz ?? exigirProjeto().raiz;
   if (!existsSync(path.join(origem, 'estudio.json'))) throw new Error(`a pasta do projeto não existe mais: ${origem}`);
   if (sessao && path.resolve(sessao.projeto.raiz) === path.resolve(origem)) await sessao.marcarVersao('estúdio: antes de duplicar');
@@ -309,7 +324,7 @@ lidar(CANAL.duplicarProjeto, async (o: {raiz?: string; nome: string}) => {
   const arq = path.join(destino, 'estudio.json');
   writeFileSync(arq, serializar({...(JSON.parse(readFileSync(arq, 'utf-8')) as Manifesto), nome}), 'utf-8');
   return abrirProjeto(destino);
-});
+}));
 lidar(CANAL.renomearProjeto, (nome: string) => {
   const m = exigirProjeto().renomear(nome);
   memoria.lembrar(sessao!.projeto.raiz, m.nome);
@@ -334,7 +349,9 @@ lidar(CANAL.escolherPasta, async (titulo?: string) => {
 lidar(CANAL.marcarVersao, async () => {
   exigirProjeto();
   const ok = await sessao!.marcarVersao();
-  return ok ? {ok, mensagem: 'Ponto de restauração criado'} : {ok, mensagem: 'Sem o Git instalado não há pontos de restauração; o histórico continua no diário'};
+  if (ok) return {ok, mensagem: 'Ponto de restauração criado'};
+  return {ok, mensagem: sessao?.temGit ? 'O Git não conseguiu criar o ponto de restauração agora; o histórico continua no diário'
+    : 'Sem o Git instalado não há pontos de restauração; o histórico continua no diário'};
 });
 lidar(CANAL.escolherMidia, async (tipo: 'imagem' | 'audio' | 'video') => {
   const p = exigirProjeto();
@@ -565,7 +582,7 @@ app.on('ready', async () => {
   claude = await terminais.preparar();
   criarJanela();
   const inicial = process.env.ESTUDIO_PROJETO ? path.resolve(process.env.ESTUDIO_PROJETO) : memoria.prefs().ao_iniciar === 'ultimo' ? memoria.ultimo() : null;
-  if (inicial) await abrirProjeto(inicial).catch(() => undefined);
+  if (inicial) await emFila(() => abrirProjeto(inicial)).catch(() => undefined);
 });
 
 app.on('window-all-closed', async () => {
