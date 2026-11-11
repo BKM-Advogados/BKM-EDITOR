@@ -168,7 +168,7 @@ describe('extensão .mcpb de ponta a ponta (como o Claude Desktop roda)', () => 
     execSync('npm run mcpb', {cwd: RAIZ, stdio: 'ignore'});
     const versao = JSON.parse(readFileSync(path.join(RAIZ, 'package.json'), 'utf-8')).version as string;
     // o Claude Desktop desempacota a extensão numa pasta dele
-    const ext = path.join(casa, 'Claude Extensions', 'local.mcpb.bkm.estudio');
+    const ext = path.join(casa, 'Claude Extensions', 'local.mcpb.estudio.estudio');
     for (const e of deszipar(readFileSync(path.join(RAIZ, 'out', 'mcpb', `Estudio-${versao}.mcpb`)))) {
       mkdirSync(path.dirname(path.join(ext, e.nome)), {recursive: true});
       writeFileSync(path.join(ext, e.nome), e.dados);

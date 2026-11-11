@@ -53,7 +53,7 @@ máquina real confirma · ❌ não funciona ou falta · ➖ não se aplica.
 1. Ninguém abriu este pacote num Windows. O código Windows da V2 continua, mas a V3 inteira (terminais, transcrição,
    música, cofre, MCP, animação) só rodou no Linux.
 2. O instalador NSIS não sai do Linux sem Wine: sai no CI (`windows-latest`) ou num Windows com `npm run instalador:win`.
-3. Sem assinatura de código: SmartScreen na primeira vez (já era assim na V2) e o antivírus da BKM (GravityZone) já
+3. Sem assinatura de código: SmartScreen na primeira vez (já era assim na V2) e o antivírus do escritório (GravityZone) já
    travou executáveis do app; pode pedir exceção de novo.
 
 **Mac** (porte novo):
@@ -76,7 +76,7 @@ máquina real confirma · ❌ não funciona ou falta · ➖ não se aplica.
 | `npm run mcp:build` | Linux | ✅ |
 | Lógica por sistema (janela, PATH, shell, git, atalhos, nomes, whisper, menu, assinatura) | vitest no Linux, com a plataforma injetada | ✅ — é a decisão, não o comportamento do sistema |
 | `electron-forge package --platform win32 --arch x64` | **a partir do Linux** | ✅ gerado e conferido por dentro (seção 3); **não executado** |
-| `Estudio.exe`: ícone e versão | lido com o `resedit` no Linux | ✅ 7 tamanhos; BKM Advogados, Estúdio, 1.0.0 (sem Wine: o packager 18 usa `resedit`) |
+| `Estudio.exe`: ícone e versão | lido com o `resedit` no Linux | ✅ 7 tamanhos; empresa, produto e versão 1.0.0 preenchidos (sem Wine: o packager 18 usa `resedit`) |
 | NSIS (`electron-builder --prepackaged … --win nsis`) | Linux | ❌ `spawn wine ENOENT`: o electron-builder roda o gerador do desinstalador; precisa de Windows ou Wine |
 | `electron-forge package --platform darwin --arch arm64` e `x64` | **a partir do Linux** | ✅ gerados e conferidos por dentro; `.zip` com o `.app` (symlinks dos frameworks e bits de execução preservados); **não executados**, **sem assinatura** (nem ad hoc: não há `codesign` no Linux) |
 | `Info.plist` do `.app` | lido com `plistlib` | ✅ `br.com.bkmadvogados.estudio`, `NSMicrophoneUsageDescription`, `CFBundleDocumentTypes` (pasta), categoria vídeo, macOS mínimo 12.0 |
@@ -189,7 +189,7 @@ Se o macOS disser que o app "está danificado", é a quarentena (passo 2) ou a a
 
 | Variável | Para quê |
 |---|---|
-| `ESTUDIO_MAC_IDENTIDADE` | o certificado do keychain, ex.: `Developer ID Application: BKM Advogados (ABCDE12345)`. Liga a assinatura com hardened runtime |
+| `ESTUDIO_MAC_IDENTIDADE` | o certificado do keychain, ex.: `Developer ID Application: Nome da Conta (ABCDE12345)`. Liga a assinatura com hardened runtime |
 | `APPLE_API_KEY`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER` | notarização pela chave da API do App Store Connect (preferida; `APPLE_API_KEY` é o caminho do `.p8`) |
 | `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` | notarização pelo Apple ID com senha de app |
 | `ESTUDIO_MAC_ADHOC=0` | sem identidade, desliga a assinatura ad hoc (o padrão num Mac é assinar ad hoc) |
@@ -308,7 +308,7 @@ Para rodar num Windows 10/11 x64 e num Mac (um Apple Silicon e, se houver, um In
       no Finder. Com o pacote feito no Linux, anotar se precisou do `codesign --force --deep --sign -`.
 - [ ] A janela abre com a barra própria: no Windows os três botões à direita sem cobrir nada; no Mac os semáforos à
       esquerda, alinhados no meio da barra, sem cobrir o logo nem o nome do projeto (tela inicial e editor).
-- [ ] Mac: menu Estúdio › Sobre mostra 2.0.0 e BKM Advogados; Cmd+Q sai; Cmd+H oculta; Cmd+M minimiza.
+- [ ] Mac: menu Estúdio › Sobre mostra o nome e a versão; Cmd+Q sai; Cmd+H oculta; Cmd+M minimiza.
 - [ ] Abrir de novo com o app aberto traz a janela para a frente (não abre outra).
 
 **Projeto**
@@ -373,7 +373,7 @@ Para rodar num Windows 10/11 x64 e num Mac (um Apple Silicon e, se houver, um In
 
 1. **Rodar o CI uma vez** (Run workflow) e baixar os quatro artifacts: confirma o NSIS, o DMG, o whisper do Mac e a
    suíte de testes no Windows e no Mac.
-2. **Passar a lista da seção 9 num Windows** (o PC da BKM onde a V2 rodava) e **num Mac**. Abrir cada falha como item
+2. **Passar a lista da seção 9 num Windows** (o PC do escritório onde a V2 rodava) e **num Mac**. Abrir cada falha como item
    desta frente.
 3. **Conta Apple Developer**: com ela, os secrets do CI e uma execução assinada para provar o render com hardened runtime.
 4. Trocar os textos "Ctrl+Z desfaz" e as dicas de campo por `rotuloDoAtalho` (hoje só menus e botões mudam no Mac).

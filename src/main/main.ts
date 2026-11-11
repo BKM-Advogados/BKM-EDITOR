@@ -654,7 +654,7 @@ app.on('ready', async () => {
   if (!primeiraInstancia) return; // a segunda instância já pediu para sair (garantirInstanciaUnica)
   // Mac: barra de menu do sistema com Editar (copiar e colar nos campos) e sem Recarregar (menu-do-app.ts)
   if (process.platform === 'darwin') {
-    app.setAboutPanelOptions({applicationName: 'Estúdio', applicationVersion: app.getVersion(), copyright: 'BKM Advogados'});
+    app.setAboutPanelOptions({applicationName: 'Estúdio', applicationVersion: app.getVersion()});
     Menu.setApplicationMenu(Menu.buildFromTemplate(modeloDoMenuDoMac({desenvolvimento: !app.isPackaged})));
   }
   await midia.iniciar();

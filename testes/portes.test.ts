@@ -304,7 +304,7 @@ describe('empacotamento por sistema', () => {
 });
 
 describe('assinatura e notarização do Mac (de verdade só com as variáveis da Apple)', () => {
-  const ID = 'Developer ID Application: BKM Advogados (ABCDE12345)';
+  const ID = 'Developer ID Application: Nome da Conta (ABCDE12345)';
 
   it('fora do Mac nada; no Mac sem identidade, só ad hoc (sem hardened runtime) e nada de notarizar', () => {
     expect(assinaturaDoMac({ESTUDIO_MAC_IDENTIDADE: ID}, 'linux')).toEqual({});

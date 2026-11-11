@@ -16,13 +16,13 @@ export const INFO_PLIST = {
   // a pasta de um projeto arrastada para o ícone do Dock abre no Estúdio (main.ts, evento open-file)
   CFBundleDocumentTypes: [{CFBundleTypeName: 'Pasta de projeto do Estúdio', CFBundleTypeRole: 'Viewer', LSHandlerRank: 'Alternate',
     LSItemContentTypes: ['public.folder']}],
-  NSHumanReadableCopyright: 'BKM Advogados',
+  NSHumanReadableCopyright: 'Estúdio',
 };
 
 export const opcoesDoMac = () => ({
   appBundleId: ID_DO_APP,
   appCategoryType: 'public.app-category.video',
-  appCopyright: 'BKM Advogados',
+  appCopyright: 'Estúdio',
   darwinDarkModeSupport: true,
   extendInfo: INFO_PLIST,
 });
@@ -43,7 +43,7 @@ export const entitlementsDoArquivo = (arquivo: string) => (ehBinarioFilho(arquiv
 type Ambiente = Record<string, string | undefined>;
 
 /** Assinatura, só quando o empacotamento roda num Mac (o codesign é da Apple):
- *  - com ESTUDIO_MAC_IDENTIDADE (ex.: "Developer ID Application: BKM Advogados (ABCDE12345)"): o certificado do keychain,
+ *  - com ESTUDIO_MAC_IDENTIDADE (ex.: "Developer ID Application: Nome da Conta (ABCDE12345)"): o certificado do keychain,
  *    com hardened runtime e os entitlements de cada arquivo;
  *  - sem ela: assinatura ad hoc ("-"), sem hardened runtime. O packager troca o Info.plist e renomeia os auxiliares do
  *    Electron depois da assinatura ad hoc que vem do Electron; assinar de novo deixa o bundle inteiro coerente (o Apple

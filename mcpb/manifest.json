@@ -6,9 +6,9 @@
   "version": "2.0.1",
   "description": "Opere o Estúdio (vídeo, imagem, 3D, efeitos, música e animação) pelo Claude Desktop. Precisa do Estúdio instalado.",
   "long_description": "Liga o Claude Desktop ao Estúdio instalado neste computador. Com o app aberto num projeto, o Claude trabalha nele: cada mudança entra no Histórico com a origem Claude Desktop, tem Reverter, e as ações sensíveis pedem permissão na tela do app. Com o app fechado, o Claude lista os projetos (os recentes e a pasta Estudio) e trabalha no que for escolhido. A extensão não traz as ferramentas: ela acha o Estúdio e roda o MCP do próprio app, que se atualiza junto com ele.",
-  "author": {"name": "BKM Advogados", "url": "https://bkmadvogados.com.br"},
+  "author": {"name": "Estúdio"},
   "icon": "icon.png",
-  "keywords": ["estudio", "video", "imagem", "remotion", "bkm"],
+  "keywords": ["estudio", "video", "imagem", "remotion"],
   "server": {
     "type": "node",
     "entry_point": "server/index.js",

@@ -204,7 +204,7 @@ const config = {
     name: "Estudio",
     executableName: "Estudio",
     icon: "build/icone",
-    win32metadata: {CompanyName: "BKM Advogados", FileDescription: "Estúdio", ProductName: "Estúdio"},
+    win32metadata: {CompanyName: "Estúdio", FileDescription: "Estúdio", ProductName: "Estúdio"},
     // Mac: id, categoria, Info.plist (microfone, pastas arrastadas no ícone) e, só com as variáveis da Apple no
     // ambiente, assinatura e notarização (build/mac.ts, docs/portes.md)
     ...opcoesDoMac(),

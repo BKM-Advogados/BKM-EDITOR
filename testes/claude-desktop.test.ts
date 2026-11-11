@@ -204,10 +204,15 @@ describe('claude_desktop_config.json com arquivos de verdade (o botão do app)',
     expect(tr.conectar()).toMatchObject({translocado: true, situacao: 'desconectado', aviso: expect.stringMatching(/Aplicativos/)});
   });
 
-  it('acha a extensão .mcpb instalada pelo nome da pasta', () => {
+  it('acha a extensão .mcpb instalada pelo nome da pasta, também a de uma versão antiga com outro autor no manifesto', () => {
     const pasta = pastaDoClaude(sistema);
     expect(temExtensao(pasta)).toBe(false);
-    mkdirSync(path.join(pasta, 'Claude Extensions', 'local.mcpb.bkm-advogados.estudio'), {recursive: true});
+    const antiga = path.join(pasta, 'Claude Extensions', 'local.mcpb.autor-antigo.estudio');
+    mkdirSync(antiga, {recursive: true});
+    expect(temExtensao(pasta)).toBe(true);
+    rmSync(antiga, {recursive: true});
+    expect(temExtensao(pasta)).toBe(false);
+    mkdirSync(path.join(pasta, 'Claude Extensions', 'local.mcpb.estudio.estudio'), {recursive: true});
     expect(temExtensao(pasta)).toBe(true);
     expect(cd().estado().extensao).toBe(true);
   });

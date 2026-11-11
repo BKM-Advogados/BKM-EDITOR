@@ -45,7 +45,7 @@ Exec=env -u ELECTRON_RUN_AS_NODE $destino/Estudio %U
 Icon=estudio
 Terminal=false
 Categories=AudioVideo;Video;
-Keywords=estudio;studio;video;imagem;3d;remotion;carrossel;bkm;
+Keywords=estudio;studio;video;imagem;3d;remotion;carrossel;
 StartupWMClass=estudio
 StartupNotify=true
 EOF
