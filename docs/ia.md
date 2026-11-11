@@ -94,6 +94,9 @@ Envolve o `registerTool`: toda ferramenta registrada depois dele passa por ele, 
   - **stdio**, para o Claude Desktop e quem só aceita stdio. Usa a ponte `mcp/ponte.mjs` (gerada em
     `dist-mcp/ponte.cjs` pelo `mcp:build`), rodada pelo próprio Estúdio com `ELECTRON_RUN_AS_NODE=1`. A escrita passa
     pelo app, com diário e portão, e não pelo MCP de arquivo.
+    A ponte repassa cada mensagem na hora (pedidos em paralelo): uma chamada lenta não segura o `ping`. O
+    `notifications/cancelled` (o Parar do cliente) aborta o pedido HTTP dele; o app vê a conexão fechar e cancela a
+    ferramenta e o cartão do portão que esperava a pessoa.
 - Se um dia a fuse `RunAsNode` do Electron for desligada, a ponte stdio para de funcionar. A configuração HTTP
   continua.
 
