@@ -84,8 +84,20 @@ export class McpHttp {
       res.writeHead(405, {Allow: 'POST'}).end();
       return true;
     }
-    let corpo = '';
-    for await (const pedaco of req) corpo += pedaco;
+    const corpo = await lerCorpo(req);
+    if (corpo === null) {
+      res.writeHead(413, {'Content-Type': 'application/json', Connection: 'close'})
+        .end(JSON.stringify({jsonrpc: '2.0', id: null, error: {code: -32600, message: `pedido maior que ${TETO_CORPO / 1024 / 1024} MB`}}));
+      return true;
+    }
+    let mensagem: unknown;
+    try {
+      mensagem = corpo ? JSON.parse(corpo) : undefined;
+    } catch {
+      res.writeHead(400, {'Content-Type': 'application/json'})
+        .end(JSON.stringify({jsonrpc: '2.0', id: null, error: {code: -32700, message: 'o corpo não é JSON válido'}}));
+      return true;
+    }
     const servidor = new McpServer({name: 'estudio', version: '0.1.0'}, {instructions: INSTRUCOES_MCP});
     // frente IA: o portão pergunta à pessoa pelo app; "Sempre nesta conversa" vale para o token desta aba
     const perguntar = this.perguntador;
@@ -105,7 +117,32 @@ export class McpHttp {
       void servidor.close();
     });
     await servidor.connect(transporte);
-    await transporte.handleRequest(req, res, corpo ? JSON.parse(corpo) : undefined);
+    await transporte.handleRequest(req, res, mensagem);
     return true;
   }
 }
+
+/** Teto do corpo de um pedido: bem acima de qualquer patch real, abaixo do que pesaria no processo principal. */
+export const TETO_CORPO = 32 * 1024 * 1024;
+
+/** O corpo inteiro como texto, ou null se passa do teto. Os pedaços se juntam antes de virar texto: um acento partido
+ *  entre dois pedaços (corpo acima de ~64 KB) viraria U+FFFD gravado no documento e no diário. */
+const lerCorpo = (req: http.IncomingMessage) => new Promise<string | null>((ok, falha) => {
+  if (Number(req.headers['content-length'] ?? 0) > TETO_CORPO) {
+    req.resume();
+    return ok(null);
+  }
+  const pedacos: Buffer[] = [];
+  let total = 0;
+  let estourou = false;
+  req.on('data', (pedaco: Buffer) => {
+    if (estourou) return; // o resto é descartado; a resposta 413 sai com Connection: close
+    total += pedaco.length;
+    if (total <= TETO_CORPO) return void pedacos.push(pedaco);
+    estourou = true;
+    pedacos.length = 0;
+    ok(null);
+  });
+  req.on('end', () => estourou || ok(Buffer.concat(pedacos).toString('utf-8')));
+  req.on('error', falha);
+});

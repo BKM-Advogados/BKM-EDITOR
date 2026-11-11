@@ -265,10 +265,11 @@ export const patchDaMarca = (doc: unknown, m: Marca, tema: TemaDeMarca = temaDaM
   if (ehDocCenas(doc)) {
     return doc.tema === undefined ? [{op: 'add', path: '/tema', value: tema}] : [{op: 'test', path: '/tema', value: doc.tema}, {op: 'replace', path: '/tema', value: tema}];
   }
-  if (ehDocImagem(doc)) return patchDaImagem(doc, m);
+  // a animação antes da imagem: ela também tem camadas e largura, mas lê o kit só do `tema`
   if (ehDocAnimacao(doc)) {
     return doc.tema === undefined ? [{op: 'add', path: '/tema', value: tema}] : [{op: 'test', path: '/tema', value: doc.tema}, {op: 'replace', path: '/tema', value: tema}];
   }
+  if (ehDocImagem(doc)) return patchDaImagem(doc, m);
   return [];
 };
 

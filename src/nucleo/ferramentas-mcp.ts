@@ -17,6 +17,7 @@ import {MARCAS_INICIAIS} from './marca';
 import {registrarMarca} from './mcp-marca';
 import {PastaMarcas} from './pasta-marcas';
 import {ehDocCenas, resolverCenas, type DocCenas} from './cenas';
+import {problemasDosEfeitos} from './efeitos';
 import {arquivoDaFala, arquivoDasPalavras, clipesDeVoz, comTexto, CPS_MAX, cpsDe, deslocamentoDaLegenda, legendasDeArquivo, legendasDeOutraTomada, limitesDoArrasto, nomeLivreDaLegenda, palavrasDuvidosas, termosDoDicionario, textoDeLegenda, type PalavraLegenda, recusaDoDestinoNoProjeto, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt, type EstadoDaFala, type IdEstiloLegenda} from './legendas';
 import {CATALOGO_FONTES} from './catalogo-fontes';
 import {
@@ -31,6 +32,7 @@ import {registrarExportar} from './mcp-exportar';
 import {instalarPortao, type Portao} from './portao'; // frente IA: portão de permissão e seq em todo resultado
 import {registrarIa} from './mcp-ia'; // frente IA: desfazer, reverter, guia, comentários
 import {registrarImagem} from './mcp-imagem';
+import {instalarMostrarCriado, registrarTela} from './mcp-tela';
 import {medidasDoVideo, registrarSom} from './mcp-som'; // frente Som (rodada 3)
 import {registrarMusica} from './mcp-musica'; // frente Música
 import {musicaDoModelo, type ModeloMusica} from './musica-modelos'; // frente Música (item 27)
@@ -122,9 +124,36 @@ export const criarRede = (buscar: Buscar = (url, init) => fetch(url, init), opco
 
 // ---------- ferramentas ----------
 
+/** Acima disto, ler_documento sem caminho resume as grades de pixel: a resposta passaria do limite de saída do cliente. */
+export const TETO_LEITURA = 200_000;
+
+/** Cópia do documento com cada `grade.celulas` trocado por um resumo (quantas células e o caminho para ler). */
+const resumirGrades = (doc: unknown) => {
+  let grades = 0;
+  let exemplo = '';
+  const andar = (x: unknown, onde: string): unknown => {
+    if (Array.isArray(x)) return x.map((v, i) => andar(v, `${onde}/${i}`));
+    if (!x || typeof x !== 'object') return x;
+    const o = x as Record<string, unknown>;
+    const fora: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(o)) {
+      const g = v as {celulas?: unknown} | null;
+      if (k === 'grade' && g && typeof g === 'object' && (typeof g.celulas === 'string' || Array.isArray(g.celulas))) {
+        grades++;
+        exemplo ||= `${onde}/grade/celulas`;
+        fora[k] = {...g, celulas: `<${(g.celulas as string | unknown[]).length} células: leia com caminho ${onde}/grade/celulas>`};
+      } else fora[k] = andar(v, `${onde}/${k.replace(/~/g, '~0').replace(/\//g, '~1')}`);
+    }
+    return fora;
+  };
+  return {doc: andar(doc, ''), grades, exemplo};
+};
+
 export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, autor: string, origem: string, rede?: Rede, transcritor?: TranscritorMcp, portao?: Portao) => {
   // frente IA: tudo o que for registrado daqui em diante passa pelo portão (permissão e mudanças do diário no resultado)
   instalarPortao(servidor, {projeto, origem, portao});
+  // documento criado pelo Claude: a tela da pessoa vai até ele por padrão ("mostrar: false" não leva), em mcp-tela.ts
+  instalarMostrarCriado(servidor, projeto, autor);
   // frente Animação: depois do portão, como as outras
   registrarFerramentasAnimacao(servidor, projeto, autor, origem);
   servidor.registerTool('projeto_info', {
@@ -148,7 +177,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   }));
 
   servidor.registerTool('estado_do_editor', {
-    description: 'O que a pessoa está vendo agora no app: área (video, imagem, 3d, efeitos, musica), documento, objeto selecionado (caminho JSON Pointer), tempo do vídeo e a transição em curso (levar_para).',
+    description: 'O que a pessoa está vendo agora no app: área (video, imagem, 3d, efeitos, musica, animacao), documento, objeto selecionado (caminho JSON Pointer), tempo do vídeo e a transição em curso (levar_para).',
     inputSchema: {},
   }, seguro(() => {
     const e = projeto.estado();
@@ -162,19 +191,23 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   }));
 
   servidor.registerTool('ler_documento', {
-    description: 'Lê um documento (pelo id do manifesto ou caminho). Devolve o JSON e a versão, que vai em versao_base no aplicar_patch. No vídeo de cenas traz também os avisos do resolvedor e o som medido (nível e ducking de cada clipe). Com "caminho", devolve só aquele trecho.',
+    description: `Lê um documento (pelo id do manifesto ou caminho). Devolve o JSON e a versão, que vai em versao_base no aplicar_patch. No vídeo de cenas traz também os avisos do resolvedor e o som medido (nível e ducking de cada clipe). Com "caminho", devolve só aquele trecho (e a versão do documento inteiro). Documento acima de ${Math.round(TETO_LEITURA / 1000)} KB vem com as células das grades de pixel resumidas e um "aviso": leia a grade pelo caminho.`,
     inputSchema: {documento: z.string(), caminho: z.string().optional().describe('JSON Pointer, ex.: /cenas/2/blocos/1')},
   }, seguro(({documento, caminho}: {documento: string; caminho?: string}) => {
     const rel = projeto.arquivoDoDocumento(documento);
     const {doc, versao} = projeto.lerJson(rel);
-    return {documento: rel, versao, conteudo: caminho ? valorEm(doc, caminho) : doc, ...(caminho ? {} : medidasDoVideo(projeto, doc))}; // frente Som: avisos e som medido (som-D11)
+    if (caminho) return {documento: rel, versao, conteudo: valorEm(doc, caminho)};
+    const resumo = JSON.stringify(doc).length > TETO_LEITURA ? resumirGrades(doc) : undefined;
+    const grande = resumo?.grades ? resumo : undefined;
+    return {documento: rel, versao, conteudo: grande?.doc ?? doc, ...medidasDoVideo(projeto, doc), // frente Som: avisos e som medido (som-D11)
+      ...(grande ? {aviso: `documento grande: as células de ${grande.grades} grade(s) de pixel vieram resumidas; leia uma pelo caminho (ex.: ${grande.exemplo}) e não grave o resumo de volta`} : {})};
   }));
 
   servidor.registerTool('aplicar_patch', {
     description: 'Muda um documento com JSON Patch (RFC 6902), de forma atômica. Passe a versao_base lida em ler_documento e um "test" no valor que vai trocar; se o documento mudou por baixo, nada é gravado e você deve ler de novo. A tela do app atualiza sozinha.',
     inputSchema: {
       documento: z.string(),
-      versao_base: z.string(),
+      versao_base: z.string().min(1, 'passe a versao devolvida por ler_documento'),
       patch: z.array(z.object({op: z.enum(['add', 'remove', 'replace', 'move', 'copy', 'test']), path: z.string(), value: z.any().optional(), from: z.string().optional()})),
       rotulo: z.string().optional().describe('o que a mudança faz, em poucas palavras'),
     },
@@ -185,6 +218,8 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
     try {
       const {doc} = projeto.lerJson<unknown>(projeto.arquivoDoDocumento(documento));
       if (ehDocCenas(doc)) avisos = resolverCenas(doc as DocCenas).avisos;
+      // fora das cenas (imagem, roteiro antigo), o efeito com tipo ou campo errado também volta como aviso
+      else if (doc && typeof doc === 'object' && 'efeitos' in doc) avisos = problemasDosEfeitos((doc as {efeitos: unknown}).efeitos).map((p) => `Efeitos: ${p}`);
     } catch {
       /* sem avisos: o patch já foi gravado */
     }
@@ -192,7 +227,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   }));
 
   servidor.registerTool('criar_documento', {
-    description: `Cria um documento novo no projeto (vídeo de cenas, imagem, cena 3D ou música) e o põe no manifesto; a tela abre sozinha. Formatos de vídeo: ${FORMATOS_VIDEO.map((f) => `${f.id} (${f.proporcao}, ${f.largura}x${f.altura})`).join(', ')}. De imagem: ${FORMATOS_IMAGEM.map((f) => `${f.id} (${f.largura}x${f.altura})`).join(', ')}. Ou largura e altura livres.`,
+    description: `Cria um documento novo no projeto (vídeo de cenas, imagem, cena 3D, música com "modelo" ou animação) e o põe no manifesto. Formatos de vídeo: ${FORMATOS_VIDEO.map((f) => `${f.id} (${f.proporcao}, ${f.largura}x${f.altura})`).join(', ')}. De imagem: ${FORMATOS_IMAGEM.map((f) => `${f.id} (${f.largura}x${f.altura})`).join(', ')}. Ou largura e altura livres.`,
     inputSchema: {
       modulo: z.enum(['video', 'imagem', '3d', 'musica', 'animacao']),
       titulo: z.string().optional(),
@@ -206,6 +241,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
     modelo?: ModeloMusica}) => {
     const preset = (modulo === 'imagem' ? FORMATOS_IMAGEM : FORMATOS_VIDEO).find((f) => f.id === formato);
     if (formato && !preset) throw new ErroProjeto(`formato desconhecido: ${formato}`, 'nao_achado');
+    if ((largura === undefined) !== (altura === undefined)) throw new ErroProjeto('passe largura e altura juntas (ou um formato da lista)', 'patch');
     const tam = largura && altura ? {largura, altura} : preset ? {largura: preset.largura, altura: preset.altura} : undefined;
     const {entrada, conteudo} = documentoNovo(projeto.manifesto(), modulo, {titulo, formato: tam ? {...tam, fps: fps ?? 30} : undefined});
     projeto.adicionarDocumento(entrada, modulo === 'musica' && modelo ? musicaDoModelo(modelo, conteudo as DocMusica) : conteudo); // frente Música: modelo
@@ -270,7 +306,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
     /* pasta ilegível agora: a lista de fábrica serve */
   }
   servidor.registerTool('aplicar_marca', {
-    description: `Aplica um kit de marca a um documento. No vídeo de cenas troca o "tema" inteiro (cores, fonte, logo copiado para midia/, assinatura e fontes próprias copiadas para fontes/); na imagem passa cada cor e fonte para o mesmo papel no kit novo (o que a pessoa escolheu à mão fica) e guarda o kit em "marca" (veja ver_marca). Kits: ${ids.join(', ')} (a pessoa cria outros no app, em menu → Marca…). Sem "documento", vai no que a pessoa está vendo.`,
+    description: `Aplica um kit de marca a um documento. No vídeo de cenas troca o "tema" inteiro (cores, fonte, logo copiado para midia/, assinatura e fontes próprias copiadas para fontes/); na imagem passa cada cor e fonte para o mesmo papel no kit novo (o que a pessoa escolheu à mão fica) e guarda o kit em "marca" (veja ver_marca); na animação troca o "tema", que resolve @fundo, @texto, @destaque e @suave (e pixelizar_imagem {usar_paleta_marca} usa essas cores). 3D e música não recebem kit. Kits: ${ids.join(', ')} (a pessoa cria outros no app, em menu → Marca…). Sem "documento", vai no que a pessoa está vendo.`,
     inputSchema: {id: z.string().describe('id do kit, ex.: bkm'), documento: z.string().optional().describe('id do documento no manifesto')},
   }, seguro(({id, documento}: {id: string; documento?: string}) => {
     const alvo = documento ?? projeto.estado()?.documento ?? projeto.manifesto().documentos[0]?.id;
@@ -288,6 +324,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   registrarImagem(servidor, projeto, autor, origem); // seleção e layout da imagem (rodada 3, B2): src/nucleo/mcp-imagem.ts
   registrarSom(servidor, projeto, autor, origem); // frente Som (rodada 3): dividir, copiar e crossfade de clipe de áudio
   registrarMusica(servidor, projeto, autor, origem); // frente Música: música e ida e volta entre módulos (docs/musica.md)
+  registrarTela(servidor, projeto, autor); // mostrar_documento: leva a tela da pessoa a um documento (mcp-tela.ts)
 };
 
 // ---------- pesquisa: fontes e fatos (src/nucleo/pesquisa.ts, docs/pesquisa.md) ----------

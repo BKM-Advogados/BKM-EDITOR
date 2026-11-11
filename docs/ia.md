@@ -67,10 +67,13 @@ preenchido onde foi conferido na fonte (DeepSeek `deepseek-flash`, Gemini `gemin
 Envolve o `registerTool`: toda ferramenta registrada depois dele passa por ele, de qualquer frente.
 
 - **Classe "cartao"** (pergunta à pessoa antes de rodar):
-  - a tabela `CLASSES`: `ler_fonte`, `transcrever`, `remover_fundo`, `exportar_legendas`;
+  - a tabela `CLASSES`: `ler_fonte`, `transcrever`, `remover_fundo`, `exportar_legendas`, `destravar_camadas`,
+    `exportar_musica`, `importar_midi`, `escolher_trilha`;
   - ou quem declara `annotations: {openWorldHint: true}` (sai do PC ou do projeto) ou `destructiveHint: true` (apaga)
     no `registerTool`.
-- **Classe "livre"**: o resto. Grava no diário e tem Reverter.
+- **Classe "livre"**: o resto. Quando muda um documento que já existe, grava no diário e tem Reverter. Criar documento
+  (`criar_documento`, `criar_animacao`) não entra no diário (o app não tem "excluir documento" para reverter): o
+  documento novo aparece na tela da pessoa (veja "A tela da pessoa" abaixo).
 - **Para declarar a classe de uma ferramenta nova**: uma linha em `CLASSES` ou a anotação. Não precisa devolver o
   `seq`: o portão acrescenta ao resultado `{"estudio_mudancas":[{seq, documento, rotulo}]}`.
 - **Onde aparece o pedido**: na conversa da aba ou, sem conversa (terminal, app de fora), num cartão solto no canto da
@@ -91,6 +94,9 @@ Envolve o `registerTool`: toda ferramenta registrada depois dele passa por ele, 
   - **stdio**, para o Claude Desktop e quem só aceita stdio. Usa a ponte `mcp/ponte.mjs` (gerada em
     `dist-mcp/ponte.cjs` pelo `mcp:build`), rodada pelo próprio Estúdio com `ELECTRON_RUN_AS_NODE=1`. A escrita passa
     pelo app, com diário e portão, e não pelo MCP de arquivo.
+    A ponte repassa cada mensagem na hora (pedidos em paralelo): uma chamada lenta não segura o `ping`. O
+    `notifications/cancelled` (o Parar do cliente) aborta o pedido HTTP dele; o app vê a conexão fechar e cancela a
+    ferramenta e o cartão do portão que esperava a pessoa.
 - Se um dia a fuse `RunAsNode` do Electron for desligada, a ponte stdio para de funcionar. A configuração HTTP
   continua.
 
@@ -101,11 +107,32 @@ Envolve o `registerTool`: toda ferramenta registrada depois dele passa por ele, 
 | `desfazer` | `{n?}` (só as mudanças da própria aba) | livre |
 | `reverter` | `{seq, mesmo_se_mudou?}` | livre; pergunta à pessoa se a mudança é de outra aba |
 | `guia_do_projeto` | — | livre |
-| `criar_comentario` | `{documento, texto, objeto?, tempo_ms?}` | livre |
+| `criar_comentario` | `{documento, texto, objeto?, tempo_ms?}` (`objeto` tem de existir; `tempo_ms` ≥ 0) | livre |
 | `reabrir_comentario` | `{id}` | livre |
 
 O servidor também manda `instructions` na abertura, para todo cliente MCP. O `listar_mudancas` traz no máximo 50
-entradas e filtra por documento. O `aplicar_patch` devolve os avisos do resolvedor no vídeo de cenas.
+entradas e filtra por documento. O `aplicar_patch` exige `versao_base` não vazia, recusa o patch que deixaria o
+documento sem ser objeto ou fora do formato do módulo dele, e devolve os avisos do resolvedor no vídeo de cenas.
+
+## A tela da pessoa (`src/nucleo/mcp-tela.ts`)
+
+O pedido de navegação é o `.estudio/selecao.json` (`{documento, caminhos, tempo_ms?, autor, em}`), que a interface segue
+(`aplicarSelecaoPedida` em `src/renderer/estado/loja.ts`): troca de área e de documento e seleciona os caminhos.
+`tempo_ms` é opcional e retrocompatível: a interface que ainda não o lê ignora.
+
+- **`mostrar_documento`** `{documento, caminho?, tempo_ms?}` (livre): leva a tela a um documento, a um objeto que existe
+  ou a um tempo. Documento ou caminho que não existe dá `nao_achado`.
+- **Documento criado pelo Claude**: `criar_documento` e `criar_animacao` levam a tela até ele por padrão; com
+  `mostrar: false`, não levam. A resposta traz `mostrado`. O parâmetro vem de um envoltório do `registerTool`
+  (`instalarMostrarCriado`, como o portão), que vale para as ferramentas de `CRIAM_DOCUMENTO`.
+- `selecionar_camadas` usa o mesmo pedido. Sem o app (MCP por stdio puro), o arquivo fica gravado e não faz mal.
+
+## Corpo do pedido HTTP (`src/main/mcp-http.ts`)
+
+- O corpo é juntado em bytes e só depois vira texto: um acento partido entre dois pedaços (pedido acima de ~64 KB) não
+  vira U+FFFD.
+- Teto de 32 MB: acima disso, 413. JSON inválido: 400 com o erro `-32700` do JSON-RPC. Na porta fixa dos apps de fora,
+  uma falha no meio vira 500, nunca cliente pendurado.
 
 ## Testes
 

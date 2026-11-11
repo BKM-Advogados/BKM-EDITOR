@@ -13,7 +13,8 @@ import {amostrasDaMarca, avisoDeContraste, ehReferenciaCor, resolverCor} from '.
 import {buscarIcones, etiquetasDoIcone, existeIcone, sugerirIcones, VERSAO_LUCIDE} from './icones';
 import {linhaNova, PONTAS_DE_SETA, type OpcoesLinha} from './linha';
 import {MARCADOR_PADRAO} from './lista';
-import type {CamadaImagem, DocImagem, MarcaDoDocumento, OperacaoPatch, PontaDeSeta} from './documentos';
+import {ehDocImagem, type CamadaImagem, type DocImagem, type MarcaDoDocumento, type OperacaoPatch, type PontaDeSeta} from './documentos';
+import {ehDocAnimacao} from './animacao';
 import {MARCA_NEUTRO, marcaDoKit} from './marca';
 import {ErroProjeto, type Projeto} from './projeto';
 
@@ -28,11 +29,6 @@ const seguro = <A,>(f: (a: A) => unknown) => async (a: A) => {
   } catch (e) {
     return erro(e);
   }
-};
-
-const ehImagem = (doc: unknown): doc is DocImagem => {
-  const d = doc as DocImagem | null;
-  return Boolean(d) && typeof d === 'object' && (Array.isArray(d!.camadas) || Array.isArray(d!.paginas)) && typeof d!.largura === 'number';
 };
 
 export const CAMPOS_DE_COR = ['cor', 'preenchimento', 'contorno', 'sombra', 'fundo'] as const;
@@ -110,7 +106,7 @@ export const patchFonteDaMarca = (doc: DocImagem, camada: string, papel: PapelDe
 
 /** O que o kit do documento oferece, para a IA saber os nomes antes de pedir uma cor. */
 export const descreverMarca = (doc: unknown) => {
-  if (ehImagem(doc)) {
+  if (ehDocImagem(doc)) {
     const {marca, semKit} = kitDa(doc);
     return {kit: semKit ? null : marca.id, nome: marca.nome ?? marca.id, ...(semKit ? {aviso: 'sem kit: a imagem lê o neutro; aplicar_marca põe um'} : {}),
       cores: amostrasDaMarca(marca).map((a) => ({nome: a.nome, referencia: a.referencia, valor: a.valor})), fontes: marca.fontes,
@@ -119,6 +115,11 @@ export const descreverMarca = (doc: unknown) => {
   if (ehDocCenas(doc)) {
     const t = doc.tema;
     return {kit: (t as {marca?: string} | undefined)?.marca ?? null, tema: t ?? null, como_usar: 'no vídeo de cenas o kit é o "tema" do documento (aplicar_marca troca; aplicar_patch em /tema ajusta)'};
+  }
+  if (ehDocAnimacao(doc)) {
+    const t = doc.tema;
+    return {kit: (t as {marca?: string} | undefined)?.marca ?? null, tema: t ?? null, ...(t ? {} : {aviso: 'sem kit: @fundo, @texto, @destaque e @suave leem o neutro; aplicar_marca põe um'}),
+      como_usar: 'na animação o kit é o "tema" do documento: aplicar_marca troca, e as cores "@fundo", "@texto", "@destaque" e "@suave" das camadas leem dele'};
   }
   return {kit: null, aviso: 'este documento não recebe kit de marca'};
 };
@@ -132,7 +133,7 @@ export const registrarMarca = (servidor: McpServer, projeto: Projeto, autor: str
   const imagem = (documento?: string) => {
     const alvo = alvoDe(documento);
     const lido = projeto.lerJson<unknown>(projeto.arquivoDoDocumento(alvo));
-    if (!ehImagem(lido.doc)) throw new ErroProjeto(`${alvo} não é uma imagem`, 'patch');
+    if (!ehDocImagem(lido.doc)) throw new ErroProjeto(`${alvo} não é uma imagem`, 'patch');
     return {alvo, doc: lido.doc, versao: lido.versao};
   };
 

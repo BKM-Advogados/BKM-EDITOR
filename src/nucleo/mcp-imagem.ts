@@ -4,10 +4,10 @@
 // com autor e origem, no diário e com Reverter. Classe de permissão: livre, menos destravar_camadas (cartão: desfaz uma
 // trava que a pessoa pôs). Esquemas sem união solta, para qualquer provedor. Ver docs/imagem.md.
 import type {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
-import path from 'node:path';
 import {z} from 'zod';
-import {ErroProjeto, PASTA_INTERNA, serializar, type Projeto} from './projeto';
-import type {DocImagem, OperacaoPatch} from './documentos';
+import {ErroProjeto, type Projeto} from './projeto';
+import {pedirTela} from './mcp-tela';
+import {ehDocImagem, type DocImagem, type OperacaoPatch} from './documentos';
 import {baseCamadas, caminhosDoId, indiceNaBase, paginasDe, temPaginas} from './carrossel';
 import {ALINHAMENTOS, DISTRIBUICOES, patchAgrupar, patchDesagrupar, patchMover, patchTravar, planoAlinhar, planoDistribuir, unidadesDe, type Alinhamento, type Distribuicao} from './layout-imagem';
 import {destravando} from './travas-imagem';
@@ -53,15 +53,22 @@ export const registrarImagem = (servidor: McpServer, projeto: Projeto, autor: st
     const rel = projeto.arquivoDoDocumento(documento);
     return {rel, ...projeto.lerJson<DocImagem>(rel)};
   };
+  // alinhar, distribuir e agrupar gravam campos da imagem (x base, grupo) que a animação não conhece; selecionar, travar
+  // e destravar valem também nas camadas da animação (o cadeado da pessoa lá é o mesmo campo)
+  const lerImagem = (documento: string) => {
+    const lido = ler(documento);
+    if (!ehDocImagem(lido.doc)) throw new ErroProjeto(`${documento} não é uma imagem (na animação, só selecionar, travar e destravar camadas)`, 'patch');
+    return lido;
+  };
 
   servidor.registerTool('selecionar_camadas', {
-    description: 'Seleciona camadas da imagem na tela da pessoa (a página delas vem para a frente). Lista vazia limpa a seleção.',
+    description: 'Seleciona camadas da imagem ou da animação na tela da pessoa (a página delas vem para a frente). Lista vazia limpa a seleção.',
     inputSchema: {documento: z.string(), camadas: camadasSchema},
   }, seguro(({documento, camadas}: {documento: string; camadas: string[]}) => {
     const {doc} = ler(documento);
     const r = camadas.length ? resolverCamadas(doc, camadas) : {caminhos: [] as string[], pagina: 0};
     const id = projeto.manifesto().documentos.find((d) => d.id === documento || d.caminho === documento)?.id ?? documento;
-    projeto.gravarTexto(path.join(PASTA_INTERNA, 'selecao.json'), serializar({documento: id, caminhos: r.caminhos, autor, em: new Date().toISOString()}));
+    pedirTela(projeto, {documento: id, caminhos: r.caminhos, autor});
     return {ok: true, documento: id, caminhos: r.caminhos, ...(temPaginas(doc) && r.caminhos.length ? {pagina: `/paginas/${r.pagina}`} : {})};
   }));
 
@@ -74,7 +81,7 @@ export const registrarImagem = (servidor: McpServer, projeto: Projeto, autor: st
       alvo: z.enum(['selecao', 'prancheta']).optional(),
     },
   }, seguro(({documento, camadas, como, alvo}: {documento: string; camadas: string[]; como: Alinhamento; alvo?: 'selecao' | 'prancheta'}) => {
-    const {doc, versao} = ler(documento);
+    const {doc, versao} = lerImagem(documento);
     if (!camadas.length) throw new ErroProjeto('passe ao menos uma camada', 'patch');
     const r = resolverCamadas(doc, camadas);
     const lista = paginasDe(doc)[r.pagina].camadas;
@@ -89,7 +96,7 @@ export const registrarImagem = (servidor: McpServer, projeto: Projeto, autor: st
     description: 'Distribui três camadas ou mais da imagem com o mesmo espaço entre elas; a primeira e a última ficam.',
     inputSchema: {documento: z.string(), camadas: camadasSchema, eixo: z.enum(DISTRIBUICOES as [Distribuicao, ...Distribuicao[]])},
   }, seguro(({documento, camadas, eixo}: {documento: string; camadas: string[]; eixo: Distribuicao}) => {
-    const {doc, versao} = ler(documento);
+    const {doc, versao} = lerImagem(documento);
     const r = resolverCamadas(doc, camadas);
     const lista = paginasDe(doc)[r.pagina].camadas;
     if (unidadesDe(lista, r.indices).length < 3) throw new ErroProjeto('distribuir pede três camadas ou mais (cada grupo conta como uma)', 'patch');
@@ -100,10 +107,10 @@ export const registrarImagem = (servidor: McpServer, projeto: Projeto, autor: st
     return {ok: true, movidas: patch.filter((o) => o.op === 'test').length, versao: feito.versao};
   }));
 
-  const mudarCamadas = (nome: string, descricao: string, minimo: number, fazer: (doc: DocImagem, r: ReturnType<typeof resolverCamadas>) => {patch: OperacaoPatch[]; rotulo: string; extra?: object}, embrulho = <T,>(f: () => T) => f()) =>
+  const mudarCamadas = (nome: string, descricao: string, minimo: number, fazer: (doc: DocImagem, r: ReturnType<typeof resolverCamadas>) => {patch: OperacaoPatch[]; rotulo: string; extra?: object}, embrulho = <T,>(f: () => T) => f(), naAnimacao = false) =>
     servidor.registerTool(nome, {description: descricao, inputSchema: {documento: z.string(), camadas: camadasSchema}},
       seguro(({documento, camadas}: {documento: string; camadas: string[]}) => {
-        const {doc, versao} = ler(documento);
+        const {doc, versao} = naAnimacao ? ler(documento) : lerImagem(documento);
         if (camadas.length < minimo) throw new ErroProjeto(`passe ${minimo === 1 ? 'ao menos uma camada' : `${minimo} camadas ou mais`}`, 'patch');
         const r = resolverCamadas(doc, camadas);
         const {patch, rotulo, extra} = fazer(doc, r);
@@ -119,8 +126,8 @@ export const registrarImagem = (servidor: McpServer, projeto: Projeto, autor: st
   });
   mudarCamadas('desagrupar_camadas', 'Desfaz os grupos das camadas pedidas (o grupo inteiro).', 1, (doc, r) =>
     ({patch: patchDesagrupar(paginasDe(doc)[r.pagina].camadas, r.base, r.indices), rotulo: 'desagrupar'}));
-  mudarCamadas('travar_camadas', 'Trava camadas da imagem: não andam na tela e patch da IA nelas é recusado.', 1, (doc, r) =>
-    ({patch: patchTravar(paginasDe(doc)[r.pagina].camadas, r.base, r.indices, true), rotulo: `travar ${r.indices.length} camada(s)`}));
-  mudarCamadas('destravar_camadas', 'Destrava camadas que a pessoa travou. Peça o ok dela antes.', 1, (doc, r) =>
-    ({patch: patchTravar(paginasDe(doc)[r.pagina].camadas, r.base, r.indices, false), rotulo: `destravar ${r.indices.length} camada(s)`}), destravando);
+  mudarCamadas('travar_camadas', 'Trava camadas da imagem ou da animação: não andam na tela e patch da IA nelas é recusado.', 1, (doc, r) =>
+    ({patch: patchTravar(paginasDe(doc)[r.pagina].camadas, r.base, r.indices, true), rotulo: `travar ${r.indices.length} camada(s)`}), undefined, true);
+  mudarCamadas('destravar_camadas', 'Destrava camadas (da imagem ou da animação) que a pessoa travou. Peça o ok dela antes.', 1, (doc, r) =>
+    ({patch: patchTravar(paginasDe(doc)[r.pagina].camadas, r.base, r.indices, false), rotulo: `destravar ${r.indices.length} camada(s)`}), destravando, true);
 };

@@ -154,11 +154,15 @@ export class PastaMarcas {
     const {copiar, logo, fontes_arquivos} = arquivosDaMarca(m);
     const copiados: string[] = [];
     const atualizados: string[] = [];
-    const presentes = new Set<string>();
+    // o kit aponta para um arquivo que não está mais lá: o tema não o cita
+    const presentes = new Set(copiar.filter((c) => existsSync(path.join(m.pasta, c.de))).map((c) => c.para));
+    const tema = temaDaMarca(m, {logo: logo && presentes.has(logo) ? logo : undefined, fontes_arquivos: fontes_arquivos.filter((f) => presentes.has(f.arquivo))});
+    const patch = patchDaMarca(doc, m, tema);
+    // recusa antes de copiar: documento que não recebe kit não ganha logo nem fonte no projeto
+    if (!patch.length) throw new ErroProjeto(`o documento ${documento} não recebe kit de marca (só vídeo de cenas, imagem e animação)`, 'patch');
     for (const c of copiar) {
+      if (!presentes.has(c.para)) continue;
       const de = path.join(m.pasta, c.de);
-      if (!existsSync(de)) continue; // o kit aponta para um arquivo que não está mais lá: o tema não o cita
-      presentes.add(c.para);
       const para = projeto.caminho(c.para);
       const jaTem = existsSync(para);
       if (jaTem && readFileSync(de).equals(readFileSync(para))) continue;
@@ -166,9 +170,6 @@ export class PastaMarcas {
       copyFileSync(de, para); // o kit manda: logo e fonte novos com o mesmo nome trocam os que o projeto já tinha
       (jaTem ? atualizados : copiados).push(c.para);
     }
-    const tema = temaDaMarca(m, {logo: logo && presentes.has(logo) ? logo : undefined, fontes_arquivos: fontes_arquivos.filter((f) => presentes.has(f.arquivo))});
-    const patch = patchDaMarca(doc, m, tema);
-    if (!patch.length) throw new ErroProjeto(`o documento ${documento} não recebe kit de marca (só vídeo de cenas e imagem)`, 'patch');
     const r = projeto.aplicarPatch({documento, patch, autor: o.autor, origem: o.origem, rotulo: `kit de marca: ${m.nome}`});
     return {versao: r.versao, seq: r.entrada.seq, marca: m.id, nome: m.nome, copiados, atualizados, tema};
   }
