@@ -13,6 +13,7 @@ import {
 import {iconeTipoAnimacao, NOME_TIPO_ANIMACAO} from "./CamadasAnimacao";
 import {EditorPixel} from "./EditorPixel";
 import {aoQuadro, msAtual} from "./tocador";
+import {MudancasNoInspetor} from "../../componentes/Agente";
 
 export const InspectorAnimacao: React.FC = () => {
   const ativo = useLoja((e) => e.ativo.animacao);
@@ -149,6 +150,7 @@ export const InspectorAnimacao: React.FC = () => {
   return (
     <div className="painel">
       <CabecalhoInspector icone={iconeTipoAnimacao(camada.tipo)} nome={camada.nome} sub={`${NOME_TIPO_ANIMACAO[camada.tipo]} · ${camada.id}`} />
+      <MudancasNoInspetor documento={ativo} objeto={origem} />
       <div className="insp-corpo">
         <Secao titulo="Transformação" acao={<span className="rotulo" title="O losango põe ou tira um quadro-chave no tempo da agulha">◆ = quadro-chave</span>}>
           <CampoNumero rotulo="Posição X" valor={x} unidade="px" marcador={BotaoLosango("x")} aoMudar={(v) => mudarValorPropriedade("x", v)} />

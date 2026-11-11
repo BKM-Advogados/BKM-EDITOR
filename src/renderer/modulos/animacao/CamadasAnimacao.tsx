@@ -10,6 +10,7 @@ import {idLivreAnimacao, novaCamadaAnimacao} from "../../../nucleo/animacao";
 import {aplicar, selecionar, useLoja} from "../../estado/loja";
 import {BotaoMenu} from "../../componentes/Menu";
 import {SeletorDocumento} from "../../componentes/SeletorDocumento";
+import {mudouEm} from "../../estado/agente";
 
 export const iconeTipoAnimacao = (tipo: TipoCamadaAnimacao) => {
   switch (tipo) {
@@ -26,6 +27,7 @@ export const CamadasAnimacao: React.FC = () => {
   const ativo = useLoja((e) => e.ativo.animacao);
   const doc = useLoja((e) => (ativo ? (e.docs[ativo]?.doc as DocAnimacao | undefined) : undefined));
   const selecao = useLoja((e) => (e.selecao && e.selecao.documento === ativo ? e.selecao.caminho : null));
+  const mudancas = useLoja((e) => e.mudancasAgente);
   const [editandoNome, setEditandoNome] = useState<string | null>(null);
   const [nomeTemp, setNomeTemp] = useState("");
 
@@ -113,7 +115,7 @@ export const CamadasAnimacao: React.FC = () => {
             const visivel = c.visivel !== false;
             const travada = c.travada === true;
             return (
-              <li key={c.id ?? i} className={`${sel ? "sel" : ""}${visivel ? "" : " oculto"}`} tabIndex={0}
+              <li key={c.id ?? i} className={`${sel ? "sel" : ""}${visivel ? "" : " oculto"}${mudouEm(mudancas, ativo, caminho) ? " agente" : ""}`} tabIndex={0}
                 onClick={() => selecionar({documento: ativo, caminho})} onKeyDown={(e) => e.key === "Enter" && selecionar({documento: ativo, caminho})}>
                 <span className="tipo">{iconeTipoAnimacao(c.tipo)}</span>
                 {editandoNome === c.id ? (
@@ -127,6 +129,7 @@ export const CamadasAnimacao: React.FC = () => {
                 ) : (
                   <span className="nome" title="Clique duplo para renomear" onDoubleClick={parar(() => (setEditandoNome(c.id), setNomeTemp(c.nome)))}>{c.nome}</span>
                 )}
+                {mudouEm(mudancas, ativo, caminho) && <span className="ponto-agente" title="O Claude mudou esta camada" />}
                 {sel && (
                   <>
                     <button className="bti" disabled={i === camadas.length - 1} title="Trazer para a frente" aria-label="Trazer para a frente" onClick={parar(() => moverCamada(i, i + 1))}><ArrowUp className="i14" /></button>

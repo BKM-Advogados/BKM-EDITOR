@@ -23,6 +23,7 @@ import {andamentoLimpeza, assinarLimpeza, cancelarLimpeza, crossfadeComSeguinte,
   voltarAoOriginal} from './acoes-audio';
 import {CamposMovimento} from './CamposMovimento';
 import {lufsTexto, MedidorLoudness, useMedidasLoudness} from './MedidorLoudness';
+import {MudancasNoInspetor} from '../../componentes/Agente';
 
 const CURVAS_OPCOES: [CurvaFade, string][] = [['linear', 'Linear'], ['suave', 'Suave'], ['potencia', 'Potência igual']]; // frente Som: forma do fade
 const pct = (v: number | undefined, padrao: number) => Math.round((v ?? padrao) * 1000) / 10;
@@ -178,6 +179,8 @@ const PropsBloco: React.FC<{documento: string; caminho: string; b: BlocoCenas; f
     return (
       <div className="painel">
         <CabecalhoInspector icone={<Icone />} familia={t.familia} nome={[t.nome, resumoBloco(b, 28)].filter(Boolean).join(' · ')} sub={sub} dica={b.id} menu={menu} />
+        <MudancasNoInspetor documento={documento} objeto={caminho}
+          formatar={(campo, v) => (typeof v === 'number' && ['x', 'y', 'largura'].includes(campo) ? `${numeroBr(v * 100, 1)} %` : undefined)} />
         <div className="insp-corpo">
           <Secao titulo="Conteúdo" chave="cenas:conteudo">
             {(b.tipo === 'titulo' || b.tipo === 'texto') && <CampoTexto rotulo="Texto" multilinha valor={b.texto ?? ''} aoMudar={campo('texto', 'texto')} />}

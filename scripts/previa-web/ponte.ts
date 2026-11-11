@@ -141,6 +141,30 @@ const pesquisaDeExemplo: Pesquisa = {formato: 1, fontes: fontesDeExemplo, fatos:
 const ouvintesMudou = new Set<(m: Mudanca) => void>();
 const mudou = (arquivo: string) => setTimeout(() => ouvintesMudou.forEach((f) => f({arquivo})), 30);
 
+// diário em memória (Histórico, Reverter e as marcas do que o Claude mudou): cada patch entra com o inverso
+const diarioPrevia: EntradaDiario[] = [];
+const caminhoDoDoc = (id: string) => aberto?.manifesto.documentos.find((d) => d.id === id)?.caminho ?? id;
+const registrar = (documento: string, patch: OperacaoPatch[], rotulo: string, autor: string, origem: string, desfaz?: number) => {
+  const antes = aberto!.docs[documento];
+  const inverso = jsonpatch.compare(jsonpatch.applyPatch(structuredClone(antes), patch as Operation[], true, false).newDocument as object, antes as object) as OperacaoPatch[];
+  const r = jsonpatch.applyPatch(structuredClone(antes), patch as Operation[], true, false);
+  aberto!.docs[documento] = r.newDocument;
+  const versaoAntes = String(aberto!.versao);
+  aberto!.versao++;
+  const seq = (diarioPrevia.at(-1)?.seq ?? 0) + 1;
+  diarioPrevia.push({seq, em: new Date().toISOString(), documento: caminhoDoDoc(documento), autor, origem, rotulo, versao_antes: versaoAntes,
+    versao_depois: String(aberto!.versao), patch, inverso, ...(desfaz !== undefined ? {desfaz} : {})});
+  return seq;
+};
+// na prévia, uma mudança do agente sai pelo console: window.__mudancaDoAgente('video', [{op: 'replace', path: '/cenas/0/blocos/0/x', value: 30}], 'mover o título')
+(window as unknown as {__mudancaDoAgente: (documento: string, patch: OperacaoPatch[], rotulo?: string, origem?: string) => number}).__mudancaDoAgente =
+  (documento, patch, rotulo = 'mudança do Claude', origem = 'Claude 1') => {
+    const seq = registrar(documento, patch, rotulo, 'agente', origem);
+    mudou(caminhoDoDoc(documento));
+    mudou('.estudio/diario.jsonl');
+    return seq;
+  };
+
 // exportação de mentira: andamento em pouco mais de 1 s por destino, cancelável, nada gravado
 const ouvintesProgresso = new Set<(p: Progresso) => void>();
 let exportacaoCancelada = false;
@@ -185,6 +209,7 @@ const criar = (o: NovoProjeto): InfoProjeto => {
   if (o.marca) aplicarMarca(p, o.marca, doc.id);
   projetos.set(p.raiz, p);
   aberto = p;
+  diarioPrevia.length = 0;
   recentes.unshift({raiz: p.raiz, nome, aberto_em: new Date().toISOString(), existe: true, modulos: [modelo.modulo]});
   return info()!;
 };
@@ -245,12 +270,10 @@ const api: ApiEstudio = {
   aplicarPatch: async ({documento, patch: patchDaTela, rotulo}) => {
     const patch = musicaPrevia.doDisco(patchDaTela);
     const antesDaTela = aberto!.docs[documento];
-    const r = jsonpatch.applyPatch(structuredClone(aberto!.docs[documento]), patch as Operation[], true, false);
-    musicaPrevia.anotar(documento, antesDaTela, r.newDocument, rotulo);
-    nomearClipes(r.newDocument);
-    aberto!.docs[documento] = r.newDocument;
-    aberto!.versao++;
-    return {versao: String(aberto!.versao), seq: aberto!.versao};
+    const seq = registrar(documento, patch as OperacaoPatch[], rotulo ?? 'edição', 'pessoa', 'interface');
+    musicaPrevia.anotar(documento, antesDaTela, aberto!.docs[documento], rotulo);
+    nomearClipes(aberto!.docs[documento]);
+    return {versao: String(aberto!.versao), seq};
   },
   desfazer: async () => ({ok: false, mensagem: 'desfazer não funciona na prévia web'}),
   propsVideo: async (id) => {
@@ -271,7 +294,7 @@ const api: ApiEstudio = {
   reabrir: async () => {
     throw new Error('não');
   },
-  diario: async () => [],
+  diario: async () => structuredClone(diarioPrevia),
   gravarEstado: nada,
   aoMudar: (cb) => {
     ouvintesMudou.add(cb);
@@ -462,7 +485,15 @@ const api: ApiEstudio = {
     },
     aoPortaoCancelado: () => nada,
     responderPortao: (id, permitir) => console.log(`[prévia] portão ${id}: ${permitir ? 'permitido' : 'negado'}`),
-    reverter: async (seq) => ({ok: true as const, seq: seq + 1000, rotulo: `reverter: #${seq}`}),
+    reverter: async (seq) => {
+      const e = diarioPrevia.find((x) => x.seq === seq);
+      const doc = e && aberto?.manifesto.documentos.find((d) => d.caminho === e.documento);
+      if (!e || !doc) return {ok: false as const, mensagem: `#${seq} não está no diário`};
+      const novo = registrar(doc.id, e.inverso, `reverter: ${e.rotulo}`, 'pessoa', 'interface', seq);
+      mudou(doc.caminho);
+      mudou('.estudio/diario.jsonl');
+      return {ok: true as const, seq: novo, rotulo: `reverter: ${e.rotulo}`};
+    },
     apps: async () => iaNaPrevia.estadoApps(),
     appsLigar: async (ligado, porta) => ((iaNaPrevia.appsLigado = ligado), porta && (iaNaPrevia.porta = porta), iaNaPrevia.estadoApps()),
     appsNovo: async (nome) => {

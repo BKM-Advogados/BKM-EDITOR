@@ -22,6 +22,7 @@ import {FaixasAudio} from './FaixasAudio';
 import {FaixaLegendas} from './FaixaLegendas'; // frente Fala
 import {aoQuadro, irPara, msAtual, tocando} from './tocador';
 import {tipoDe} from './tipos';
+import {mudouEm} from '../../estado/agente';
 
 type BlocoP = {tipo: string; em: number; sai?: number; origem?: string; texto?: string; id?: string};
 type CenaP = {tipo: string; t_in: number; t_out: number; n?: number; titulo?: string; nome?: string; tag?: string; origem?: string; blocos?: BlocoP[]};
@@ -121,6 +122,7 @@ const rotuloSeg = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 
 
 export const LinhaDoTempo: React.FC = () => {
   const documento = useLoja((e) => (e.area === 'efeitos' ? e.alvoEfeitos ?? e.ativo.video : e.ativo.video));
+  const mudancas = useLoja((e) => e.mudancasAgente);
   const montado = useLoja((e) => (documento ? e.props[documento] : undefined));
   const selecao = useLoja((e) => e.selecao);
   const comentarios = useLoja((e) => e.comentarios);
@@ -444,7 +446,7 @@ export const LinhaDoTempo: React.FC = () => {
                 const sel = selecao?.caminho === b.origem;
                 const texto = b.texto ? b.texto.replace(/\*\*/g, '') : t.nome;
                 return (
-                  <div key={b.origem} className={`bloco ${t.familia}${sel ? ' sel' : ''}`} style={{left: l, width: w}}
+                  <div key={b.origem} className={`bloco ${t.familia}${sel ? ' sel' : ''}${b.origem && mudouEm(mudancas, documento, b.origem) ? ' agente' : ''}`} style={{left: l, width: w}}
                     title={`${t.nome}${b.texto ? ` · ${texto}` : ''}`}
                     onClick={(e) => e.stopPropagation()}
                     onPointerDown={(e) => pegar(e, b, fim, 'mover')}

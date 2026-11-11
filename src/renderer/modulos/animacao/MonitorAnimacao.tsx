@@ -13,11 +13,14 @@ import {
   alternar, alternarRepetir, aoQuadro, assinarControle, definirFps, formatarTempo,
   irPara, msAtual, registrarPlayer,
 } from "./tocador";
+import {mudouEm} from "../../estado/agente";
+import {AvisoAgente, MarcasAgente} from "../../componentes/Agente";
 
 export const MonitorAnimacao: React.FC = () => {
   const ativo = useLoja((e) => e.ativo.animacao);
   const doc = useLoja((e) => (ativo ? (e.docs[ativo]?.doc as DocAnimacao | undefined) : undefined));
   const selecao = useLoja((e) => (e.selecao && e.selecao.documento === ativo ? e.selecao.caminho : null));
+  const mudancas = useLoja((e) => e.mudancasAgente);
   const [tempoMs, setTempoMs] = useState(msAtual());
   const [tocando, setTocando] = useState(false);
   const [repetir, setRepetir] = useState(true);
@@ -195,6 +198,7 @@ export const MonitorAnimacao: React.FC = () => {
     <div className="painel">
       <div className="monitor-grade sem-trilho">
         <div className="monitor monitor-animacao" ref={containerRef}>
+          <AvisoAgente />
           <div className="palco" style={{width: doc.largura * escala, height: doc.altura * escala}}>
             <div className="pma-palco" style={{width: doc.largura, height: doc.altura, transform: `scale(${escala})`, transformOrigin: "top left"}}>
               <Player
@@ -223,6 +227,11 @@ export const MonitorAnimacao: React.FC = () => {
                     }} />
                 );
               })}
+              <MarcasAgente caixas={doc.camadas.flatMap((c, i) => {
+                if (c.visivel === false || !mudouEm(mudancas, ativo, `/camadas/${i}`)) return [];
+                const k = caixaDe(c);
+                return [{chave: `/camadas/${i}`, x: k.x * escala, y: k.y * escala, w: k.w * escala, h: k.h * escala}];
+              })} />
               {caixaSelecao && (
                 <div className="caixa-sel" style={{left: caixaSelecao.x * escala, top: caixaSelecao.y * escala, width: caixaSelecao.w * escala, height: caixaSelecao.h * escala, pointerEvents: "none"}}>
                   {camadaSelecionada && caixaSelecao.y * escala > 20 && <span className="etiqueta-sel">{camadaSelecionada.nome}</span>}

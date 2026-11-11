@@ -13,7 +13,7 @@ import {Blend, BookMarked, BookOpen, Box, Check, Copy, Download, Film, FilePlus2
 import type {Preferencias, Recente} from '../../compartilhado/api';
 import type {Modulo} from '../../nucleo/documentos';
 import {FORMATOS_IMAGEM, FORMATOS_VIDEO} from '../../nucleo/formatos';
-import {abrirProjeto, avisar, criarDocumento, desfazer, fecharProjeto, loja, mensagemDe, quandoVerFato, useLoja, type Area} from '../estado/loja';
+import {abrirProjeto, avisar, criarDocumento, desfazer, dispensarMudancasAgente, fecharProjeto, loja, mensagemDe, quandoVerFato, useLoja, type Area} from '../estado/loja';
 import {pedirTexto} from '../componentes/Dialogo';
 import {Segmentado} from '../componentes/Controles';
 import {acaoDeArquivo} from './atalhos';
@@ -366,6 +366,19 @@ export const Casca: React.FC = () => {
     p.api.setActive();
   }), []);
 
+  // "N mudanças do Claude" no rodapé: o Histórico vem para a frente (volta ao grupo do inspetor se tinha sido fechado)
+  useEffect(() => {
+    const ver = () => {
+      const d = api.current;
+      if (!d) return;
+      const p = d.getPanel('historico') ?? d.addPanel({id: 'historico', component: 'historico', title: 'Histórico',
+        ...(d.getPanel('inspector') ? {position: {referencePanel: 'inspector', direction: 'within' as const}} : {})});
+      p.api.setActive();
+    };
+    window.addEventListener('estudio:ver-historico', ver);
+    return () => window.removeEventListener('estudio:ver-historico', ver);
+  }, []);
+
   // o painel de mídia fechado volta pelo menu do projeto, ao lado da Lista (ou do inspetor, se a Lista não estiver)
   const abrirMidia = () => {
     const d = api.current;
@@ -437,6 +450,7 @@ export const Casca: React.FC = () => {
         loja.definir({modoComentario: false});
       } else if (ev.key === 'Escape') {
         loja.definir({modoComentario: false, comentarioAberto: undefined});
+        dispensarMudancasAgente();
       }
     };
     window.addEventListener('keydown', tecla, true);

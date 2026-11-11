@@ -518,3 +518,26 @@ button.escolha:disabled { opacity: 0.5; cursor: default; }
 .lista-escolha .opcao-marca svg.lucide { width: 14px; height: 14px; }
 .lista-escolha .opcao-rotulo { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .escolha-curta { display: inline-flex; width: 150px; min-width: 0; flex: none; }
+
+/* ── o que o Claude mudou, no lugar (componentes/Agente.tsx) ── */
+.aviso-agente { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 8px; max-width: min(640px, 90%);
+  padding: 4px 4px 4px 12px; background: var(--fundo-elevado); border: 1px solid var(--agente-borda); border-radius: var(--raio-2); box-shadow: var(--sombra-2);
+  color: var(--texto); font-size: var(--tam-2); }
+.aviso-agente > svg.lucide { color: var(--agente); }
+.aviso-agente .texto { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aviso-agente .quando { color: var(--texto-3); }
+.sobreposicao .caixa-agente { position: absolute; border: 1px dashed var(--agente); pointer-events: none; animation: brilho-agente 1.2s ease-out 1; }
+.sobreposicao .etiqueta-agente { position: absolute; left: -1px; top: calc(100% + 3px); display: inline-flex; align-items: center; gap: 4px; padding: 1px 6px; border-radius: var(--raio-1);
+  background: var(--agente); color: var(--sobre-agente); font: var(--peso-forte) var(--tam-1)/16px var(--fonte); white-space: nowrap; }
+@keyframes brilho-agente { from { box-shadow: 0 0 0 6px var(--agente-borda); } to { box-shadow: 0 0 0 0 transparent; } }
+.lista li.agente::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--agente); }
+.ponto-agente { width: 7px; height: 7px; border-radius: 50%; background: var(--agente); flex: none; }
+.lt .bloco.agente:not(.sel), .lt .clipe.agente:not(.sel) { outline: 1px dashed var(--agente); outline-offset: -1px; }
+.mudou-agente { flex: none; margin: 8px 8px 4px; padding: 6px 8px 8px; border: 1px solid var(--agente-borda); border-radius: var(--raio-2); background: var(--agente-fundo);
+  font-size: var(--tam-2); display: flex; flex-direction: column; gap: 2px; }
+.mudou-agente .topo { display: flex; align-items: center; gap: 6px; color: var(--agente); font-weight: var(--peso-forte); }
+.mudou-agente .topo .esp { flex: 1; }
+.mudou-agente .linha-mudou { display: flex; gap: 8px; padding-left: 20px; color: var(--texto); }
+.mudou-agente .era { color: var(--texto-2); }
+.contador-agente { display: inline-flex; align-items: center; gap: 5px; border: 0; padding: 0; background: none; color: var(--agente); font: inherit; cursor: pointer; }
+.contador-agente:hover { text-decoration: underline; }

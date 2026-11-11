@@ -25,6 +25,8 @@ import {
 import {resumoBloco, tipoDe} from './tipos';
 import {adicionarCena, dividirNaCabeca, duplicarSelecao, excluirSelecao} from './acoes';
 import './zonas-seguras.css';
+import {objetosMudados} from '../../estado/agente';
+import {AvisoAgente, MarcasAgente} from '../../componentes/Agente';
 
 const arred = (n: number) => Math.round(n * 10000) / 10000;
 
@@ -88,6 +90,7 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
   const montado = useLoja((e) => (documento ? e.props[documento] : undefined));
   const selecao = useLoja((e) => e.selecao);
   const modoComentario = useLoja((e) => e.modoComentario);
+  const mudancas = useLoja((e) => e.mudancasAgente);
   const comentarios = useLoja((e) => e.comentarios);
   const tempoParado = useLoja((e) => e.tempo_ms);
   const blocoSel = useLoja((e) => (selecao && documento && selecao.documento === documento ? valorEm(e.docs[documento]?.doc, selecao.caminho) : undefined)) as
@@ -331,6 +334,7 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
           ],
         ]} />
         <div className="monitor" ref={area}>
+          <AvisoAgente />
           {montado && 'erro' in montado && <div className="erro-monitor">{montado.erro}</div>}
           {props && (
             <div className="palco" ref={palco} style={{width: W * escala, height: H * escala, cursor: modoComentario ? 'crosshair' : 'default'}}
@@ -355,6 +359,11 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
                     ))}
                   </div>
                 )}
+                <MarcasAgente caixas={objetosMudados(mudancas, documento).filter((o) => /\/blocos\/\d+$/.test(o)).flatMap((o) => {
+                  const el = elementoDe(o);
+                  const c = el ? caixaDe(el) : null;
+                  return c ? [{chave: o, ...c}] : [];
+                })} />
                 {hover && !tocandoAgora && <div className="caixa-hover" style={{left: hover.x, top: hover.y, width: hover.w, height: hover.h}} />}
                 {caixaSel && (
                   <div className="caixa-sel" onPointerDown={(e) => iniciarArrasto(e, 'mover')} onPointerMove={durante} onPointerUp={() => void soltar()}

@@ -4,6 +4,7 @@ import React, {useEffect, useState} from 'react';
 import {CircleAlert, CircleCheck, Info} from 'lucide-react';
 import {useLoja, type Area} from '../estado/loja';
 import {avisoVivo as vivoEm, restaDoAviso} from '../estado/gravacao';
+import {ContadorAgente} from '../componentes/Agente';
 
 const DICAS: Record<Area, [string[], string][]> = {
   video: [[['V'], 'seleção'], [['M'], 'comentar'], [['Espaço'], 'tocar'], [['←', '→'], 'quadro'], [['J', 'K', 'L'], 'velocidade']],
@@ -47,6 +48,7 @@ export const Rodape: React.FC = () => {
         </span>
       )}
       <span className="dir">
+        <ContadorAgente />
         {abertos > 0 && <span className="cmt"><span className="ponto-c" />{abertos === 1 ? '1 comentário aberto' : `${abertos} comentários abertos`}</span>}
         {info && !info.claude && <span className="falta" title="Instale o Claude Code (claude.ai/install) para conversar com o Claude">Claude não encontrado</span>}
         <span title="memória de todos os processos do app (conjunto de trabalho); o Claude de cada aba soma à parte">{memoria !== null ? `${memoria} MB` : '…'}</span>

@@ -18,6 +18,7 @@ import {docMusica, musica, selecionarMusica, transicaoAberta, useMusica} from '.
 import {motor, vozGuiaDe} from './motor';
 import {campo, campoFaixa, estilo, exportarMusica, forcaDaNota, novaBateria, novoPadrao, passo, novaMusicaDoModelo} from './acoes';
 import {Escolha} from '../../componentes/Controles';
+import {AvisoAgente} from '../../componentes/Agente';
 
 export const useDocMusica = () => {
   const id = useLoja((e) => e.ativo.musica);
@@ -360,6 +361,7 @@ export const MonitorMusica: React.FC = () => {
   const temAberta = Boolean(transicaoAberta());
   return (
     <div className="musica-monitor">
+      <AvisoAgente />
       <Transporte doc={doc} />
       <div className="musica-abas">
         <button className={aba === 'passos' ? 'ativa' : ''} onClick={() => musica.definir({aba: 'passos'})}>Passos</button>

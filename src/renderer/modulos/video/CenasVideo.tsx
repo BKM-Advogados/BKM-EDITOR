@@ -14,6 +14,7 @@ import {resumoBloco, tipoDe} from './tipos';
 import {adicionarBloco, adicionarCena, dividirNaCabeca, duplicarSelecao, excluirSelecao, movimentoEmTodas, TIPOS_ROTEIRO} from './acoes';
 import {Escolha} from '../../componentes/Controles';
 import {trocarDocumento} from '../../componentes/SeletorDocumento';
+import {mudouEm} from '../../estado/agente';
 
 type Cena = {tipo?: string; nome?: string; tag?: string; titulo?: string; linhas?: {t: string}[]; blocos?: {tipo: string; texto?: string; id?: string}[]};
 type CenaP = {origem?: string; tipo: string; n?: number; t_in: number; t_out: number; blocos?: {origem?: string; em: number}[]};
@@ -22,6 +23,7 @@ const recolhidas = new Set<string>(); // vale enquanto o app está aberto
 
 export const CenasVideo: React.FC = () => {
   const documento = useLoja((e) => e.ativo.video);
+  const mudancas = useLoja((e) => e.mudancasAgente);
   const doc = useLoja((e) => (documento ? e.docs[documento]?.doc : undefined)) as {cenas?: Cena[]} | undefined;
   const montado = useLoja((e) => (documento ? e.props[documento] : undefined));
   const selecao = useLoja((e) => e.selecao);
@@ -113,11 +115,12 @@ export const CenasVideo: React.FC = () => {
                   const t = tipoDe(b.tipo);
                   const Icone = t.icone;
                   return (
-                    <li key={j} className={`sub${selecao?.caminho === cb ? ' sel' : ''}`} onClick={() => ir(cb)} title={b.id} tabIndex={0} onKeyDown={tecla(cb)}>
+                    <li key={j} className={`sub${selecao?.caminho === cb ? ' sel' : ''}${mudouEm(mudancas, documento, cb) ? ' agente' : ''}`} onClick={() => ir(cb)} title={b.id} tabIndex={0} onKeyDown={tecla(cb)}>
                       <span style={{position: 'absolute', left: 14, top: 5, bottom: 5, width: 3, borderRadius: 2, background: `var(--trilha-${t.familia})`}} />
                       <span className="tipo" style={{color: `var(--trilha-${t.familia})`}}><Icone /></span>
                       <span className="nome">{resumoBloco(b) || t.nome}</span>
                       {temComentario(cb) && <span className="ponto-c" title="comentário aberto" />}
+                      {mudouEm(mudancas, documento, cb) && <span className="ponto-agente" title="O Claude mudou este bloco" />}
                       <span className="meta">{t.nome}</span>
                     </li>
                   );

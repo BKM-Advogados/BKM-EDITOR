@@ -36,6 +36,8 @@ import {CamadasDaPagina, FundoPintado} from './Prancheta';
 import {BarraSelecao, type VistaAlvo} from './BarraSelecao';
 import {agruparSelecao, alternarTravaSelecao, desagruparSelecao} from './acoesSelecao';
 import {AjudaDoArrasto, Grade, Margem, Reguas, ROTULOS_GUIAS, usarOpcoesGuias} from './Guias';
+import {mudouEm} from '../../estado/agente';
+import {AvisoAgente, MarcasAgente} from '../../componentes/Agente';
 
 type Geometria = {x: number; y: number; largura: number; altura: number};
 // uma camada no gesto: índice, id (para o test do patch) e a geometria
@@ -101,6 +103,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
   const editavel = useLoja((e) => e.area !== 'efeitos');
   const selecao = useLoja((e) => e.selecao);
   const modoComentario = useLoja((e) => e.modoComentario);
+  const mudancas = useLoja((e) => e.mudancasAgente);
   const comentarios = useLoja((e) => e.comentarios);
   const comentarioAberto = useLoja((e) => e.comentarioAberto);
   const previaEfeitos = useLoja((e) => (e.previaEfeitos && e.previaEfeitos.documento === documento ? e.previaEfeitos.efeitos : undefined));
@@ -554,6 +557,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
         <div className="monitor" ref={refMonitor} style={{overflow: 'auto', justifyContent: 'flex-start', alignItems: 'flex-start', padding: `${MARGEM + 8}px ${MARGEM}px ${MARGEM - 8}px`}}
           onPointerDown={(e) => comecarPanoramica(e)} onPointerMove={(e) => durantePanoramica(e)}
           onPointerUp={() => setTimeout(() => (panoramica.current = null), 0)}>
+          <AvisoAgente />
           {w > 0 && h > 0 && <div className="palco xadrez" ref={palco} style={{width: W * escala, height: H * escala, margin: 'auto', cursor}}
             onClick={clicar} onDoubleClick={duploClique} onMouseMove={mover} onMouseLeave={() => {
               setHover(null);
@@ -577,6 +581,8 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
               </CamadaEfeitos>
             </div>
             <div className="sobreposicao">
+              <MarcasAgente caixas={camadas.flatMap((c, i) => (mudouEm(mudancas, documento, `${base}/${i}`) ? [{chave: `${base}/${i}`, x: c.x * escala, y: c.y * escala,
+                w: c.largura * escala, h: c.altura * escala}] : []))} />
               {sobre && <div className="caixa-hover" style={caixaCss(sobre, escala)} />}
               {nova && <div className="caixa-nova" style={{left: nova.x * escala, top: nova.y * escala, width: nova.largura * escala, height: nova.altura * escala}} />}
               {sel && (
