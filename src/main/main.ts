@@ -1,7 +1,7 @@
 // Processo principal do Estúdio: uma janela, o projeto aberto, os terminais, o servidor de mídia e a exportação.
 import {app, BrowserWindow, dialog, ipcMain, net, safeStorage, shell, type IpcMainInvokeEvent} from 'electron';
 import {execFile} from 'node:child_process';
-import {copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
+import {copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {CANAL, type InfoProjeto, type Metricas, type NovoProjeto, type Perfil, type Preferencias, type Progresso, type ResultadoExportacao, type Retangulo} from '../compartilhado/api';
@@ -35,7 +35,7 @@ import {registrarContrasteMarca} from './contraste-marca';
 import {apagarLimposSemUso, registrarIpcLimpeza} from './limpeza-voz';
 import {registrarIpcLoudness} from './loudness';
 import {registrarRemoverFundo} from './remover-fundo';
-import {avisoDeQuedaEmLaco, decidirRecarga, garantirInstanciaUnica, trazerParaFrente} from './janela-segura'; // frente Casca
+import {avisoDeQuedaEmLaco, decidirRecarga, ehPaginaDoApp, garantirInstanciaUnica, permissaoLiberada, trazerParaFrente} from './janela-segura'; // frente Casca
 import {registrarIpcMidia} from './ipc-midia'; // frente Casca: painel de mídia
 import {lojaDeSenhasLinux} from './loja-de-senhas'; // frente IA
 import {criarSessoesIA, fecharAppsDeFora, iniciarAppsDeFora, perguntarAPessoa, registrarIpcIa, retomadaDe} from './ipc-ia'; // frente IA
@@ -90,8 +90,11 @@ const recursos = (rel: string) => (app.isPackaged ? path.join(process.resourcesP
 const pastaDoExemplo = () => recursos(path.join('exemplos', EXEMPLO.pasta));
 const temExemplo = () => existsSync(path.join(pastaDoExemplo(), 'estudio.json'));
 
+const paginaDoApp = (url?: string) => ehPaginaDoApp(url, {dev: MAIN_WINDOW_VITE_DEV_SERVER_URL || undefined,
+  indexHtml: path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`), windows: process.platform === 'win32'});
+// a mesma janela não basta: uma página que entrasse no lugar do app (P5) herdaria o preload; o quadro tem de ser o do app
 const confiavel = (e: IpcMainInvokeEvent | Electron.IpcMainEvent) => {
-  if (!janela || e.sender.id !== janela.webContents.id) throw new Error('chamada de IPC de origem desconhecida');
+  if (!janela || e.sender.id !== janela.webContents.id || !paginaDoApp(e.senderFrame?.url)) throw new Error('chamada de IPC de origem desconhecida');
 };
 const exigirProjeto = () => {
   if (!sessao) throw new ErroProjeto('nenhum projeto aberto', 'nao_achado');
@@ -225,6 +228,17 @@ const criarJanela = () => {
     if (url.startsWith('https://')) void shell.openExternal(url);
     return {action: 'deny'};
   });
+  // a janela só mostra o app: um arquivo solto nela (o Chromium navega para file://…) ou um link sem target não trocam a
+  // página, que levaria junto o preload com window.estudio. A própria página passa (location.reload, recarga do Vite).
+  janela.webContents.on('will-navigate', (e, url) => {
+    if (paginaDoApp(url)) return;
+    e.preventDefault();
+    if (url.startsWith('https://')) void shell.openExternal(url);
+  });
+  // câmera, localização, notificações etc.: a tela só usa o microfone (gravação da narração), a área de transferência e a
+  // tela cheia da prévia
+  janela.webContents.session.setPermissionRequestHandler((wc, permissao, ok, d) =>
+    ok(wc === janela?.webContents && paginaDoApp(d.requestingUrl) && permissaoLiberada(permissao, 'mediaTypes' in d ? d : {})));
   // recarregar a página (Ctrl+R) ou perder o renderer faz a interface esquecer as abas: fecha os terminais para não
   // sobrar claude órfão gastando memória por trás
   const largarTerminais = () => {
@@ -232,9 +246,9 @@ const criarJanela = () => {
     conversas.fecharTodas();
     mcpHttp?.esquecerTudo();
   };
-  janela.webContents.on('did-start-navigation', (d) => {
-    if (d.isMainFrame && !d.isSameDocument) largarTerminais();
-  });
+  // did-navigate (a página nova entrou) e não did-start-navigation: este vem ANTES do will-navigate, e um arquivo solto na
+  // janela, mesmo barrado lá, derrubaria todas as conversas
+  janela.webContents.on('did-navigate', () => largarTerminais());
   // frente Casca (transversal-D6): o renderer que cai (falta de memória no perfil leve) recarrega a janela em vez de ficar
   // branca; o projeto segue aberto aqui e a tela o relê. Depois de quedas em laço, avisa em vez de recarregar de novo.
   let recargas: number[] = [];
@@ -497,7 +511,10 @@ ipcMain.on(CANAL.gravarEstado, (e, estado: Omit<EstadoEditor, 'atualizado_em'>) 
 ipcMain.on(CANAL.mostrarNaPasta, (e, caminho?: string) => {
   confiavel(e);
   const alvo = caminho ?? sessao?.projeto.raiz;
-  if (alvo && existsSync(alvo)) void shell.openPath(alvo);
+  if (!alvo || !existsSync(alvo)) return;
+  // openPath abre com o programa padrão, e no Windows isso executa .exe/.bat/.lnk: arquivo só é mostrado na pasta
+  if (statSync(alvo).isDirectory()) void shell.openPath(alvo);
+  else shell.showItemInFolder(alvo);
 });
 ipcMain.on(CANAL.terminalEscrever, (e, id: number, d: string) => (confiavel(e), terminais.escrever(id, d)));
 ipcMain.on(CANAL.terminalTamanho, (e, id: number, c: number, l: number) => (confiavel(e), terminais.tamanho(id, c, l)));
