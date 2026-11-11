@@ -2,11 +2,11 @@
 // ver src/nucleo/efeitos.ts). O monitor mostra o alvo com os efeitos; no vídeo, o controle deslizante já aparece na
 // prévia enquanto se arrasta, e o patch sai ao soltar.
 import React from 'react';
-import {ArrowDown, ArrowUp, Blend, Copy, GripVertical, Plus, Trash2, TriangleAlert, Wrench} from 'lucide-react';
+import {ArrowDown, ArrowUp, Blend, Copy, GripVertical, Trash2, TriangleAlert, Wrench} from 'lucide-react';
 import type {PaineisDoModulo} from '../../casca/contrato';
 import {aplicar, documentosDe, loja, selecionar, trocar, useLoja} from '../../estado/loja';
 import {SemDocumento} from '../../componentes/SemDocumento';
-import {definicao, EFEITOS, lerEfeitos, novoEfeito, TOM_PADRAO, type Efeito, type EfeitoLido} from '../../../nucleo/efeitos';
+import {definicao, EFEITOS, filtroCss, lerEfeitos, novoEfeito, TOM_PADRAO, type Efeito, type EfeitoLido} from '../../../nucleo/efeitos';
 import {comLimiteDeErro} from '../../componentes/LimiteDeErro';
 import {CabecalhoInspector, CampoCor, CampoDeslizante, CampoLeitura, Secao} from '../../componentes/Campos';
 import {MonitorVideo} from '../video/MonitorVideo';
@@ -42,6 +42,28 @@ const PRESETS: {nome: string; efeitos: Omit<Efeito, 'id'>[]}[] = [
   {nome: 'Quente', efeitos: [{tipo: 'tom', valor: 0.2, cor: TOM_PADRAO}, {tipo: 'brilho', valor: 1.05}]},
   {nome: 'Preto e branco', efeitos: [{tipo: 'saturacao', valor: 0}, {tipo: 'contraste', valor: 1.2}]},
 ];
+
+/** Amostra de 48 px com o efeito aplicado (o filtro CSS de verdade e as camadas de vinheta e tom), numa cena neutra de
+ *  céu, pele e mato: dá para ver o que o efeito faz antes de pôr. */
+export const AmostraEfeito: React.FC<{efeitos: Omit<Efeito, 'id'>[]}> = ({efeitos}) => {
+  const lista = efeitos.map((e, i) => ({...e, id: `amostra-${i}`}));
+  const vinheta = lista.find((e) => e.tipo === 'vinheta');
+  const tom = lista.find((e) => e.tipo === 'tom');
+  const grao = lista.find((e) => e.tipo === 'granulado');
+  return (
+    <span className="amostra-efeito" aria-hidden="true">
+      <span className="cena" style={{filter: filtroCss(lista) || undefined}} />
+      {tom && <span className="camada" style={{background: tom.cor ?? TOM_PADRAO, mixBlendMode: 'soft-light', opacity: tom.valor}} />}
+      {vinheta && <span className="camada vinheta" style={{opacity: vinheta.valor}} />}
+      {grao && <span className="camada grao" style={{opacity: grao.valor}} />}
+    </span>
+  );
+};
+/** Um valor que mostra bem o efeito na amostra (o padrão quase não aparece em 48 px). */
+const valorDeMostra = (tipo: Efeito['tipo']) => {
+  const d = definicao(tipo);
+  return tipo === 'matiz' ? 90 : d.padrao + (d.max - d.padrao) * 0.5;
+};
 
 const adicionar = (alvo: string, total: number, novos: Efeito[]) => {
   const doc = loja.get().docs[alvo]?.doc;
@@ -94,11 +116,11 @@ const Pilha: React.FC = () => {
           <>
             <div className="pre-ajustes">
               {PRESETS.map((p) => (
-                <button key={p.nome} className="anexo-preset" title={p.efeitos.map((e) => definicao(e.tipo).nome).join(' · ')} onClick={() => {
+                <button key={p.nome} className="cartao-efeito" title={`Pôr ${p.nome}: ${p.efeitos.map((e) => definicao(e.tipo).nome).join(' · ')}`} onClick={() => {
                   const novos: Efeito[] = [];
                   for (const e of p.efeitos) novos.push({...novoEfeito(e.tipo, [...idsEmUso(lidos), ...novos]), ...e});
                   adicionar(alvo, lidos.length, novos);
-                }}><Plus size={12} />{p.nome}</button>
+                }}><AmostraEfeito efeitos={p.efeitos} /><span className="nome-efeito">{p.nome}</span></button>
               ))}
             </div>
             {lidos.length === 0 && <div className="vazio">Nenhum efeito. Use um pré-ajuste acima ou adicione abaixo.</div>}
@@ -180,7 +202,10 @@ const Pilha: React.FC = () => {
             <Secao titulo="Adicionar efeito" chave="efeitos-adicionar" fechadaDePadrao={lidos.length > 0}>
               <div className="grade-adicionar">
                 {EFEITOS.map((d) => (
-                  <button key={d.tipo} className="bt fantasma mini" onClick={() => adicionar(alvo, lidos.length, [novoEfeito(d.tipo, idsEmUso(lidos))])}><Plus size={12} />{d.nome}</button>
+                  <button key={d.tipo} className="cartao-efeito" title={`Pôr ${d.nome}`} onClick={() => adicionar(alvo, lidos.length, [novoEfeito(d.tipo, idsEmUso(lidos))])}>
+                    <AmostraEfeito efeitos={[{tipo: d.tipo, valor: valorDeMostra(d.tipo), ...(d.tipo === 'tom' ? {cor: TOM_PADRAO} : {})}]} />
+                    <span className="nome-efeito">{d.nome}</span>
+                  </button>
                 ))}
               </div>
             </Secao>
@@ -189,6 +214,38 @@ const Pilha: React.FC = () => {
       </div>
     </div>
   );
+};
+
+/** Antes e depois pelo teclado: segurar Shift+D mostra sem os efeitos; soltar volta (o tela.md previa a tecla). */
+const usarAntesDepois = (sem: () => void, com: () => void, ligado: boolean) => {
+  const ref = React.useRef({sem, com});
+  ref.current = {sem, com};
+  React.useEffect(() => {
+    if (!ligado) return;
+    let segurando = false;
+    const baixa = (e: KeyboardEvent) => {
+      const alvo = e.target as HTMLElement;
+      if (/INPUT|TEXTAREA/.test(alvo.tagName) || alvo.isContentEditable || alvo.closest?.('.xterm')) return;
+      if (e.shiftKey && !e.ctrlKey && !e.altKey && e.code === 'KeyD' && !segurando) {
+        e.preventDefault();
+        segurando = true;
+        ref.current.sem();
+      }
+    };
+    const solta = (e: KeyboardEvent) => {
+      if (segurando && (e.code === 'KeyD' || e.key === 'Shift')) {
+        segurando = false;
+        ref.current.com();
+      }
+    };
+    window.addEventListener('keydown', baixa);
+    window.addEventListener('keyup', solta);
+    return () => {
+      window.removeEventListener('keydown', baixa);
+      window.removeEventListener('keyup', solta);
+      if (segurando) ref.current.com();
+    };
+  }, [ligado]);
 };
 
 // inspector da área: o alvo (o que recebe os efeitos), quantos estão ligados e o "antes" segurando o botão
@@ -209,6 +266,7 @@ const InspectorEfeito: React.FC = () => {
   const sub = modulo === 'video' ? `Vídeo ${medidaVideo}${duracao ? ` · ${Math.round(duracao / 1000)} s` : ''}` : `Imagem ${doc?.largura ?? '?'} × ${doc?.altura ?? '?'}`;
   const semEfeitos = () => loja.definir({previaEfeitos: {documento: alvo, efeitos: efeitos.map((x) => ({...x, ativo: false}))}});
   const comEfeitos = () => loja.definir({previaEfeitos: undefined});
+  usarAntesDepois(semEfeitos, comEfeitos, Boolean(efeitos.length));
   return (
     <div className="painel"><div className="painel-corpo">
       <CabecalhoInspector icone={<Blend size={14} />} familia="efeito" nome={titulo ?? alvo} sub={sub} />
@@ -219,7 +277,7 @@ const InspectorEfeito: React.FC = () => {
         </div>}
         <div style={{padding: '4px 10px 6px 18px'}}>
           <button className="bt mini" disabled={!efeitos.length} onPointerDown={semEfeitos} onPointerUp={comEfeitos} onPointerLeave={comEfeitos}
-            title="Segure para ver como fica sem os efeitos">Segure para ver o antes</button>
+            title="Segure (ou segure Shift+D) para ver como fica sem os efeitos">Segure para ver o antes <kbd>Shift</kbd><kbd>D</kbd></button>
         </div>
       </Secao>
       <div className="vazio" style={{textAlign: 'left'}}>Os ajustes de cada efeito abrem na própria pilha: clique no nome.</div>

@@ -354,10 +354,7 @@ input[type="range"]:focus-visible { outline: none; }
 /* o tema do dockview fica num lugar só: casca/casca.css */
 
 /* ── pilha de efeitos em acordeão (1.11) ── */
-.pre-ajustes { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 10px 6px; }
-.anexo-preset { height: 22px; display: inline-flex; align-items: center; gap: 4px; padding: 0 9px; border-radius: 11px; border: 1px solid var(--borda-forte);
-  background: var(--fundo-1); color: var(--texto-2); font: 11px var(--fonte); cursor: pointer; }
-.anexo-preset:hover { color: var(--texto); border-color: var(--trilha-efeito); }
+.pre-ajustes { display: grid; grid-template-columns: repeat(auto-fill, minmax(66px, 1fr)); gap: 6px; padding: 8px 10px 6px; }
 .pilha-efeitos { list-style: none; margin: 0; padding: 2px 0 6px; }
 .pilha-efeitos .efeito { border-bottom: 1px solid var(--borda); }
 .pilha-efeitos .efeito.arrastando { opacity: 0.5; }
@@ -376,8 +373,18 @@ input[type="range"]:focus-visible { outline: none; }
 .efeito-linha:hover .acoes-efeito, .efeito.aberto .acoes-efeito { display: inline-flex; }
 .efeito-linha .acoes-efeito .bti { width: 24px; height: 24px; }
 .efeito-ajustes { padding: 4px 0 6px; background: var(--fundo-2); }
-.grade-adicionar { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 0 8px 6px; }
-.grade-adicionar .bt { justify-content: flex-start; }
+.grade-adicionar { display: grid; grid-template-columns: repeat(auto-fill, minmax(66px, 1fr)); gap: 6px; padding: 2px 10px 8px; }
+/* pré-ajuste e efeito com a amostra do resultado (cena neutra de céu, pele e mato com o filtro de verdade por cima) */
+.cartao-efeito { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 4px; border: 1px solid var(--borda); border-radius: var(--raio-2);
+  background: var(--fundo-1); color: var(--texto); font: var(--tam-2) var(--fonte); cursor: pointer; }
+.cartao-efeito:hover { border-color: var(--trilha-efeito); background: var(--fundo-3); }
+.cartao-efeito .nome-efeito { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.amostra-efeito { position: relative; width: 48px; height: 48px; border-radius: var(--raio); overflow: hidden; flex: none; box-shadow: inset 0 0 0 1px var(--borda); }
+.amostra-efeito .cena { position: absolute; inset: 0;
+  background: radial-gradient(circle at 34% 58%, burlywood 0 22%, transparent 23%), linear-gradient(180deg, skyblue 0 52%, darkolivegreen 52% 100%); }
+.amostra-efeito .camada { position: absolute; inset: 0; pointer-events: none; }
+.amostra-efeito .vinheta { background: radial-gradient(circle, transparent 35%, black 100%); }
+.amostra-efeito .grao { background: repeating-conic-gradient(color-mix(in srgb, black 35%, transparent) 0 25%, transparent 0 50%) 0 0 / 3px 3px; mix-blend-mode: overlay; }
 
 /* ── estado vazio com ação (componentes/SemDocumento.tsx) ── */
 .sem-documento { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px; text-align: center;
