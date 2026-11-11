@@ -1,7 +1,7 @@
 // Gravação atômica que aguenta arquivo preso (transversal-D8): projeto no OneDrive ou com o antivírus lendo o JSON faz o
 // rename do Windows dar EPERM/EBUSY/EACCES por alguns milissegundos. Em vez de perder a edição, tenta de novo com espera
 // curta (20, 40, 80, 160 e 320 ms: menos de 1 s no pior caso). Acabou o prazo, apaga o temporário e diz o que houve.
-import {renameSync, rmSync, writeFileSync} from 'node:fs';
+import {chmodSync, realpathSync, renameSync, rmSync, statSync, writeFileSync} from 'node:fs';
 
 /** Erros do Windows e do OneDrive que passam sozinhos quando o outro processo solta o arquivo. */
 export const CODIGOS_DE_ARQUIVO_PRESO = ['EPERM', 'EBUSY', 'EACCES'];
@@ -67,4 +67,22 @@ export const gravarAtomico = (abs: string, texto: string, sistema: Sistema = SIS
     }
     throw e;
   }
+};
+
+/** Como `gravarAtomico`, para arquivo de configuração que a pessoa pode ter arrumado: grava no arquivo de verdade (um
+ *  symlink para os dotfiles continua symlink) e com o modo que ele tinha (um 600 com token de outro servidor continua
+ *  600; o umask não entra). Arquivo novo: o modo padrão do sistema, ou `modoNovo`. */
+export const gravarAtomicoNoLugar = (abs: string, texto: string, modoNovo?: number): void => {
+  let destino = abs;
+  let modo = modoNovo;
+  try {
+    destino = realpathSync(abs);
+    modo = statSync(destino).mode & 0o7777;
+  } catch {
+    /* ainda não existe: grava no caminho pedido */
+  }
+  gravarAtomico(destino, texto, undefined, ((p: string, t: string) => {
+    writeFileSync(p, t, {encoding: 'utf-8', ...(modo === undefined ? {} : {mode: modo})});
+    if (modo !== undefined) chmodSync(p, modo);
+  }) as typeof writeFileSync);
 };

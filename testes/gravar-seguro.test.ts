@@ -1,9 +1,9 @@
 // Gravação que aguenta arquivo preso (transversal-D8): rename com EPERM/EBUSY tenta de novo e não deixa .tmp para trás.
-import {existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, type writeFileSync} from 'node:fs';
+import {existsSync, lstatSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {afterAll, describe, expect, it} from 'vitest';
-import {ESPERAS_MS, gravarAtomico, renomearComRetry} from '../src/nucleo/gravar-seguro';
+import {ESPERAS_MS, gravarAtomico, gravarAtomicoNoLugar, renomearComRetry} from '../src/nucleo/gravar-seguro';
 import {Projeto} from '../src/nucleo/projeto';
 
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'estudio-gravar-'));
@@ -86,5 +86,31 @@ describe('gravarAtomico', () => {
     const p = new Projeto(tmp);
     p.gravarTexto('pasta/dentro.txt', 'oi');
     expect(readFileSync(path.join(tmp, 'pasta', 'dentro.txt'), 'utf-8')).toBe('oi');
+  });
+});
+
+// modo e symlink só valem onde o sistema os tem (no Windows o modo é só "somente leitura" e symlink pede privilégio)
+describe.skipIf(process.platform === 'win32')('gravarAtomicoNoLugar', () => {
+  it('o modo do original fica (600 continua 600, mesmo com umask); arquivo novo pode nascer com o modo pedido', () => {
+    const abs = path.join(tmp, 'config-600.json');
+    writeFileSync(abs, '{}', {mode: 0o600});
+    gravarAtomicoNoLugar(abs, '{"a":1}\n');
+    expect(readFileSync(abs, 'utf-8')).toBe('{"a":1}\n');
+    expect(statSync(abs).mode & 0o777).toBe(0o600);
+    const novo = path.join(tmp, 'novo-600.json');
+    gravarAtomicoNoLugar(novo, 'x', 0o600);
+    expect(statSync(novo).mode & 0o777).toBe(0o600);
+    expect(readdirSync(tmp).filter((n) => n.endsWith('.tmp'))).toEqual([]);
+  });
+
+  it('symlink continua symlink: grava no arquivo para onde ele aponta', () => {
+    const real = path.join(tmp, 'dotfiles-config.json');
+    writeFileSync(real, '{}', {mode: 0o640});
+    const link = path.join(tmp, 'link-config.json');
+    symlinkSync(real, link);
+    gravarAtomicoNoLugar(link, '{"b":2}\n');
+    expect(lstatSync(link).isSymbolicLink()).toBe(true);
+    expect(readFileSync(real, 'utf-8')).toBe('{"b":2}\n');
+    expect(statSync(real).mode & 0o777).toBe(0o640);
   });
 });
