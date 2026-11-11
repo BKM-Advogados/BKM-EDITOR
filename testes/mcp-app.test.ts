@@ -13,7 +13,7 @@ import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import {McpHttp} from '../src/main/mcp-http';
 import {registrarFerramentas} from '../src/nucleo/ferramentas-mcp';
-import {ARQUIVO_MCP_APP, appAberto, origemDaIde, publicarMcpApp, repassarAoAppQuandoAberto, retirarMcpApp} from '../src/nucleo/mcp-app';
+import {ARQUIVO_MCP_APP, appAberto, type ConexaoApp, origemDaIde, publicarMcpApp, repassarAoAppQuandoAberto, retirarMcpApp} from '../src/nucleo/mcp-app';
 import {Projeto} from '../src/nucleo/projeto';
 
 let pasta = '';
@@ -38,12 +38,12 @@ afterAll(() => {
 });
 
 /** O MCP por stdio da IDE (um processo à parte): servidor local sobre outro Projeto da mesma pasta, com o repasse. */
-const ide = async (conversa?: string) => {
+const ide = async (conversa?: string, encontrar?: (raiz: string) => ConexaoApp | null) => {
   const local = new McpServer({name: 'estudio', version: '0'});
   registrarFerramentas(local, new Projeto(pasta), 'agente', conversa ? origemDaIde(conversa) : 'mcp');
   const [a, b] = InMemoryTransport.createLinkedPair();
   await local.connect(a);
-  repassarAoAppQuandoAberto(a, pasta, conversa ? {quem: {conversa, autor: 'agente'}} : {});
+  repassarAoAppQuandoAberto(a, pasta, {...(conversa ? {quem: {conversa, autor: 'agente'}} : {}), ...(encontrar ? {encontrar} : {})});
   const c = new Client({name: 'ide', version: '0'});
   await c.connect(b);
   return c;
@@ -124,11 +124,32 @@ describe('repasse do MCP da IDE', () => {
     await cliente.close();
   });
 
-  it('com o token revogado (401), roda na IDE', async () => {
+  it('com o app vivo recusando o token (401), responde erro e não grava sem o portão', async () => {
     publicarMcpApp(pasta, {url: `${origem}/mcp`, token: 'revogado'});
+    const antes = ultima().seq;
     const cliente = await ide();
-    expect((await trocarCor(cliente, '#333333')).isError).toBeFalsy();
-    expect(ultima()).toMatchObject({origem: 'mcp'});
+    await expect(trocarCor(cliente, '#333333')).rejects.toThrow(/recusou a conexão; reabra o projeto no app/);
+    expect(ultima().seq).toBe(antes);
+    await cliente.close();
+  });
+
+  it('token recusado e republicado: relê o arquivo e passa pelo app', async () => {
+    const c = mcp.novaConexao(origem, 'IDE republicada', {ide: true});
+    publicarMcpApp(pasta, {url: c.url, token: c.headers.Authorization.slice('Bearer '.length)});
+    const atual = appAberto(pasta)!;
+    let leituras = 0; // a primeira leitura vê o token velho (a tela recarregou entre a leitura e o pedido)
+    const cliente = await ide(undefined, () => (++leituras === 1 ? {...atual, token: 'velho'} : appAberto(pasta)));
+    expect((await trocarCor(cliente, '#353535')).isError).toBeFalsy();
+    expect(ultima()).toMatchObject({origem: 'IDE republicada', rotulo: 'cor #353535'});
+    await cliente.close();
+  });
+
+  it('token recusado e o app fechou o projeto (arquivo apagado): roda na IDE', async () => {
+    let leituras = 0;
+    const velho = {formato: 1 as const, url: `${origem}/mcp`, token: 'velho', pid: process.pid, host: os.hostname(), raiz: pasta, em: ''};
+    const cliente = await ide(undefined, () => (++leituras === 1 ? velho : null));
+    expect((await trocarCor(cliente, '#363636')).isError).toBeFalsy();
+    expect(ultima()).toMatchObject({origem: 'mcp', rotulo: 'cor #363636'});
     await cliente.close();
   });
 

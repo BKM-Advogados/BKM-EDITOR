@@ -2,8 +2,9 @@
 // O app, ao abrir um projeto, publica em .estudio/mcp-app.json o endereço do MCP por HTTP dele (src/main/mcp-http.ts),
 // um token só para isso, o pid e a máquina; ao fechar, apaga. O MCP por stdio (mcp/nucleo.ts, um processo por conversa
 // da IDE) confere o arquivo a cada chamada de ferramenta: com o app vivo, repassa a chamada a ele, e a gravação passa
-// pelo portão, pelo aviso na tela e por um escritor só; com o app fechado (ou sem projeto, ou o token revogado), roda
-// ali mesmo, com a trava de arquivo (trava-escrita.ts). O arquivo está no .gitignore do projeto (.estudio/mcp*).
+// pelo portão, pelo aviso na tela e por um escritor só; com o app fechado (ou sem projeto), roda ali mesmo, com a trava
+// de arquivo (trava-escrita.ts). Com o app vivo recusando o token, relê o arquivo (a tela recarregada republica o token)
+// e tenta uma vez mais; recusado de novo, responde erro: gravar ali sem o portão passaria por cima da pessoa. O arquivo está no .gitignore do projeto (.estudio/mcp*).
 // Cada processo da IDE é uma conversa: nasce com um id curto, e a origem dele no diário é ide-<id> nos dois caminhos
 // (pelo app, pelo cabeçalho X-Estudio-Conversa; sem o app, ali mesmo). Assim o desfazer de uma conversa só desfaz as
 // mudanças dela, o "Sempre nesta conversa" do portão vale só para ela e reverter a mudança de outra pede permissão.
@@ -106,9 +107,9 @@ const postar = (c: ConexaoApp, corpo: string, quem?: ConversaIde) =>
 
 const erroJsonRpc = (id: unknown, message: string): JSONRPCMessage => ({jsonrpc: '2.0', id: id as string | number, error: {code: -32000, message}});
 
-/** Repassa uma mensagem JSON-RPC ao app. Devolve a resposta, ou null quando o app não a atende (fechou, sem projeto,
- *  token revogado) e a chamada deve rodar aqui; o pedido recusado na conexão não chegou a rodar no app. */
-export const encaminharAoApp = async (c: ConexaoApp, msg: JSONRPCMessage, quem?: ConversaIde): Promise<JSONRPCMessage | null> => {
+/** Repassa uma mensagem JSON-RPC ao app. Devolve a resposta; null quando o app não a atende (fechou, sem projeto) e a
+ *  chamada deve rodar aqui; 'recusado' quando o app vivo recusou o token (401). Nos dois, o pedido não rodou no app. */
+export const encaminharAoApp = async (c: ConexaoApp, msg: JSONRPCMessage, quem?: ConversaIde): Promise<JSONRPCMessage | null | 'recusado'> => {
   const id = (msg as {id?: unknown}).id;
   let r: Resposta;
   try {
@@ -117,7 +118,8 @@ export const encaminharAoApp = async (c: ConexaoApp, msg: JSONRPCMessage, quem?:
     if ((e as NodeJS.ErrnoException).code === 'ECONNREFUSED') return null;
     return erroJsonRpc(id, `o Estúdio aberto neste projeto não respondeu (${(e as Error).message}); tente de novo`);
   }
-  if (r.status === 401 || r.status === 409) return null;
+  if (r.status === 401) return 'recusado';
+  if (r.status === 409) return null; // o app está aberto sem projeto
   if (r.status < 200 || r.status >= 300) return erroJsonRpc(id, `o Estúdio respondeu ${r.status}: ${r.texto.slice(0, 200)}`);
   const mensagens = r.tipo.includes('text/event-stream')
     ? r.texto.split('\n').filter((l) => l.startsWith('data:')).map((l) => l.slice(5).trim()).filter(Boolean)
@@ -138,6 +140,8 @@ const ehChamadaDeFerramenta = (msg: JSONRPCMessage) => (msg as {method?: string;
 /** Liga o repasse no transporte de um servidor já conectado: cada tools/call vai ao app quando ele está aberto neste
  *  projeto; o resto (initialize, a lista de ferramentas) e as chamadas com o app fechado ficam no servidor local. As
  *  chamadas repassadas seguem uma de cada vez, na ordem em que chegaram. */
+export const RECUSADO_PELO_APP = 'o Estúdio aberto neste projeto recusou a conexão; reabra o projeto no app e tente de novo (nada foi gravado)';
+
 export const repassarAoAppQuandoAberto = (t: Transport, raiz: string, o: {encontrar?: typeof appAberto; quem?: ConversaIde} = {}) => {
   const local = t.onmessage;
   if (!local) throw new Error('conecte o servidor ao transporte antes de ligar o repasse');
@@ -147,7 +151,12 @@ export const repassarAoAppQuandoAberto = (t: Transport, raiz: string, o: {encont
     if (!ehChamadaDeFerramenta(msg)) return local(msg, extra);
     fila = fila.then(async () => {
       const app = encontrar(raiz);
-      const r = app ? await encaminharAoApp(app, msg, o.quem) : null;
+      let r = app ? await encaminharAoApp(app, msg, o.quem) : null;
+      if (r === 'recusado') {
+        const deNovo = encontrar(raiz); // o token pode ter sido republicado; sem o arquivo ou sem o app, roda aqui
+        r = deNovo ? await encaminharAoApp(deNovo, msg, o.quem) : null;
+        if (r === 'recusado') r = erroJsonRpc((msg as {id?: unknown}).id, RECUSADO_PELO_APP);
+      }
       if (r) await t.send(r); // o app já rodou: se a resposta não sair, não roda de novo aqui
       else local(msg, extra);
     }).catch(() => undefined);
