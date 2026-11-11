@@ -17,6 +17,7 @@ import path from 'node:path';
 import type {Transport} from '@modelcontextprotocol/sdk/shared/transport.js';
 import type {JSONRPCMessage} from '@modelcontextprotocol/sdk/types.js';
 import {gravarAtomico} from './gravar-seguro';
+import {ESPERA_DO_CARTAO_MS} from './portao';
 import {PASTA_INTERNA} from './projeto';
 
 export const ARQUIVO_MCP_APP = `${PASTA_INTERNA}/mcp-app.json`;
@@ -89,9 +90,14 @@ export const appAberto = (raiz: string): ConexaoApp | null => {
 
 type Resposta = {status: number; tipo: string; texto: string};
 
-const postar = (c: ConexaoApp, corpo: string, quem?: ConversaIde) =>
+/** Quanto o MCP da IDE espera a resposta do app: o cartão do portão (a pessoa tem até 10 min) e uma folga para a
+ *  ferramenta rodar depois de permitida. Um app travado sem fechar a conexão não prende a IDE para sempre. */
+export const PRAZO_DO_APP_MS = ESPERA_DO_CARTAO_MS + 5 * 60 * 1000;
+
+class PrazoEstourado extends Error {}
+
+const postar = (c: ConexaoApp, corpo: string, quem: ConversaIde | undefined, prazo: number) =>
   new Promise<Resposta>((ok, falhou) => {
-    // sem prazo: o portão espera a pessoa responder no app (até 10 min)
     const req = http.request(c.url, {method: 'POST', headers: {'Content-Type': 'application/json', Accept: 'application/json, text/event-stream',
       Authorization: `Bearer ${c.token}`, 'Content-Length': Buffer.byteLength(corpo),
       ...(quem ? {[CABECALHO_CONVERSA]: quem.conversa, [CABECALHO_AUTOR]: encodeURIComponent(quem.autor)} : {})}}, (res) => {
@@ -101,6 +107,8 @@ const postar = (c: ConexaoApp, corpo: string, quem?: ConversaIde) =>
       res.on('end', () => ok({status: res.statusCode ?? 0, tipo: String(res.headers['content-type'] ?? ''), texto}));
       res.on('error', falhou);
     });
+    const relogio = setTimeout(() => req.destroy(new PrazoEstourado()), prazo);
+    req.on('close', () => clearTimeout(relogio));
     req.on('error', falhou);
     req.end(corpo);
   });
@@ -109,12 +117,17 @@ const erroJsonRpc = (id: unknown, message: string): JSONRPCMessage => ({jsonrpc:
 
 /** Repassa uma mensagem JSON-RPC ao app. Devolve a resposta; null quando o app não a atende (fechou, sem projeto) e a
  *  chamada deve rodar aqui; 'recusado' quando o app vivo recusou o token (401). Nos dois, o pedido não rodou no app. */
-export const encaminharAoApp = async (c: ConexaoApp, msg: JSONRPCMessage, quem?: ConversaIde): Promise<JSONRPCMessage | null | 'recusado'> => {
+export const encaminharAoApp = async (c: ConexaoApp, msg: JSONRPCMessage, quem?: ConversaIde,
+  prazo = PRAZO_DO_APP_MS): Promise<JSONRPCMessage | null | 'recusado'> => {
   const id = (msg as {id?: unknown}).id;
   let r: Resposta;
   try {
-    r = await postar(c, JSON.stringify(msg), quem);
+    r = await postar(c, JSON.stringify(msg), quem, prazo);
   } catch (e) {
+    if (e instanceof PrazoEstourado) {
+      return erroJsonRpc(id, `o Estúdio aberto neste projeto não respondeu em ${Math.round(prazo / 60000)} min; nada foi gravado por aqui. `
+        + 'Se a pessoa permitiu no app depois disso, confira com listar_mudancas antes de repetir');
+    }
     if ((e as NodeJS.ErrnoException).code === 'ECONNREFUSED') return null;
     return erroJsonRpc(id, `o Estúdio aberto neste projeto não respondeu (${(e as Error).message}); tente de novo`);
   }
@@ -142,7 +155,7 @@ const ehChamadaDeFerramenta = (msg: JSONRPCMessage) => (msg as {method?: string;
  *  chamadas repassadas seguem uma de cada vez, na ordem em que chegaram. */
 export const RECUSADO_PELO_APP = 'o Estúdio aberto neste projeto recusou a conexão; reabra o projeto no app e tente de novo (nada foi gravado)';
 
-export const repassarAoAppQuandoAberto = (t: Transport, raiz: string, o: {encontrar?: typeof appAberto; quem?: ConversaIde} = {}) => {
+export const repassarAoAppQuandoAberto = (t: Transport, raiz: string, o: {encontrar?: typeof appAberto; quem?: ConversaIde; prazo?: number} = {}) => {
   const local = t.onmessage;
   if (!local) throw new Error('conecte o servidor ao transporte antes de ligar o repasse');
   const encontrar = o.encontrar ?? appAberto;
@@ -151,10 +164,10 @@ export const repassarAoAppQuandoAberto = (t: Transport, raiz: string, o: {encont
     if (!ehChamadaDeFerramenta(msg)) return local(msg, extra);
     fila = fila.then(async () => {
       const app = encontrar(raiz);
-      let r = app ? await encaminharAoApp(app, msg, o.quem) : null;
+      let r = app ? await encaminharAoApp(app, msg, o.quem, o.prazo) : null;
       if (r === 'recusado') {
         const deNovo = encontrar(raiz); // o token pode ter sido republicado; sem o arquivo ou sem o app, roda aqui
-        r = deNovo ? await encaminharAoApp(deNovo, msg, o.quem) : null;
+        r = deNovo ? await encaminharAoApp(deNovo, msg, o.quem, o.prazo) : null;
         if (r === 'recusado') r = erroJsonRpc((msg as {id?: unknown}).id, RECUSADO_PELO_APP);
       }
       if (r) await t.send(r); // o app já rodou: se a resposta não sair, não roda de novo aqui

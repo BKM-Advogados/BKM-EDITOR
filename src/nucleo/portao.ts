@@ -14,6 +14,9 @@ export type Classe = 'livre' | 'cartao';
 export type PedidoPortao = {ferramenta: string; entrada: Record<string, unknown>; motivo: string; sinal?: AbortSignal};
 /** Quem pergunta à pessoa (o app); sem ele (MCP por stdio, fora do app), nada pergunta. Devolve se pode rodar. */
 export type Portao = {perguntar: (p: PedidoPortao) => Promise<boolean>};
+/** Quanto o cartão espera a pessoa responder no app; sem resposta, nega. O MCP da IDE espera o app por isso e mais uma
+ *  folga (mcp-app.ts). */
+export const ESPERA_DO_CARTAO_MS = 10 * 60 * 1000;
 
 export const CLASSES: Record<string, {classe: Classe; motivo: string}> = {
   ler_fonte: {classe: 'cartao', motivo: 'abrir uma página da internet'},

@@ -38,12 +38,12 @@ afterAll(() => {
 });
 
 /** O MCP por stdio da IDE (um processo à parte): servidor local sobre outro Projeto da mesma pasta, com o repasse. */
-const ide = async (conversa?: string, encontrar?: (raiz: string) => ConexaoApp | null) => {
+const ide = async (conversa?: string, encontrar?: (raiz: string) => ConexaoApp | null, prazo?: number) => {
   const local = new McpServer({name: 'estudio', version: '0'});
   registrarFerramentas(local, new Projeto(pasta), 'agente', conversa ? origemDaIde(conversa) : 'mcp');
   const [a, b] = InMemoryTransport.createLinkedPair();
   await local.connect(a);
-  repassarAoAppQuandoAberto(a, pasta, {...(conversa ? {quem: {conversa, autor: 'agente'}} : {}), ...(encontrar ? {encontrar} : {})});
+  repassarAoAppQuandoAberto(a, pasta, {...(conversa ? {quem: {conversa, autor: 'agente'}} : {}), ...(encontrar ? {encontrar} : {}), ...(prazo ? {prazo} : {})});
   const c = new Client({name: 'ide', version: '0'});
   await c.connect(b);
   return c;
@@ -151,6 +151,23 @@ describe('repasse do MCP da IDE', () => {
     expect((await trocarCor(cliente, '#363636')).isError).toBeFalsy();
     expect(ultima()).toMatchObject({origem: 'mcp', rotulo: 'cor #363636'});
     await cliente.close();
+  });
+
+  it('app travado sem fechar a conexão: estoura o prazo e responde erro, sem gravar', async () => {
+    const pendentes: http.ServerResponse[] = [];
+    const mudo = http.createServer((_req, res) => void pendentes.push(res)); // aceita e nunca responde
+    await new Promise<void>((ok) => mudo.listen(0, '127.0.0.1', ok));
+    const travado = {formato: 1 as const, url: `http://127.0.0.1:${(mudo.address() as AddressInfo).port}/mcp`, token: 't', pid: process.pid,
+      host: os.hostname(), raiz: pasta, em: ''};
+    const antes = ultima().seq;
+    const cliente = await ide(undefined, () => travado, 300);
+    const inicio = Date.now();
+    await expect(trocarCor(cliente, '#373737')).rejects.toThrow(/não respondeu em .* min; nada foi gravado/);
+    expect(Date.now() - inicio).toBeLessThan(5000);
+    expect(ultima().seq).toBe(antes);
+    await cliente.close();
+    for (const res of pendentes) res.destroy();
+    await new Promise<void>((ok) => mudo.close(() => ok()));
   });
 
   it('com o app fechado sem apagar o arquivo (conexão recusada), roda na IDE', async () => {

@@ -4,6 +4,7 @@
 import {randomUUID} from 'node:crypto';
 import path from 'node:path';
 import type {EstadoProvedor, PedidoPortaoTela, ResultadoChave} from '../compartilhado/api';
+import {ESPERA_DO_CARTAO_MS} from '../nucleo/portao';
 import type {Projeto} from '../nucleo/projeto';
 import type {McpHttp, Perguntador} from './mcp-http';
 import {acharChave, CofreMemoria, finalDaChave, type Cofre} from './ia/chaves';
@@ -97,7 +98,6 @@ export const modelosDe = async (id: string, f?: typeof fetch) => {
 };
 
 // ---------- portão de permissão (src/nucleo/portao.ts): a pergunta vai à tela e a resposta volta por IPC ----------
-const ESPERA_MAXIMA_MS = 10 * 60 * 1000;
 type Espera = {origem: string; ok: (r: {permitir: boolean; sempre?: boolean}) => void; relogio: NodeJS.Timeout};
 const esperas = new Map<string, Espera>();
 let enviarATela: ((canal: string, ...a: unknown[]) => void) | null = null;
@@ -117,7 +117,7 @@ const encerrarEspera = (id: string, r: {permitir: boolean; sempre?: boolean}, av
 export const perguntarAPessoa: Perguntador = (p) => new Promise((ok) => {
   if (!enviarATela) return ok({permitir: false});
   const id = randomUUID();
-  const relogio = setTimeout(() => encerrarEspera(id, {permitir: false}, true), ESPERA_MAXIMA_MS);
+  const relogio = setTimeout(() => encerrarEspera(id, {permitir: false}, true), ESPERA_DO_CARTAO_MS);
   esperas.set(id, {origem: p.origem, ok, relogio});
   p.sinal?.addEventListener('abort', () => encerrarEspera(id, {permitir: false}, true), {once: true});
   // a entrada vai curta: o cartão mostra o essencial (endereço, arquivo), nunca megabytes
