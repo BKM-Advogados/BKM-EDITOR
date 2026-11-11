@@ -5,7 +5,7 @@ import {copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, 
 import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
-import {ARQUIVO_MARCA, arquivosDaMarca, EXTENSOES_FONTE, EXTENSOES_LOGO, idDeMarca, inferirFonte, MARCA_NEUTRO, MARCAS_INICIAIS, normalizarMarca, PASTA_FONTES,
+import {ARQUIVO_MARCA, arquivosDaMarca, EXTENSOES_FONTE, EXTENSOES_LOGO, idDeMarca, inferirFonte, MARCA_NEUTRO, MARCA_NEUTRO_ANTIGO, MARCAS_INICIAIS, normalizarMarca, PASTA_FONTES,
   patchDaMarca, temaDaMarca, type FonteArquivo, type Marca} from './marca';
 import {lerEixoDePeso} from './fonte-variavel';
 import {gravarAtomico} from './gravar-seguro';
@@ -41,6 +41,16 @@ export const fonteDoArquivo = (arquivo: string): Omit<FonteArquivo, 'arquivo'> =
 
 const ORDEM = new Map(MARCAS_INICIAIS.map((m, i) => [m.id, i]));
 
+/** O JSON com as chaves em ordem e o hex em maiúscula, para comparar dois kits sem ligar para a forma de gravar. */
+const canonico = (v: unknown): unknown => {
+  if (Array.isArray(v)) return v.map(canonico);
+  if (v && typeof v === 'object') return Object.fromEntries(Object.keys(v).sort().map((k) => [k, canonico((v as Record<string, unknown>)[k])]));
+  return typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v.trim()) ? v.trim().toUpperCase() : v;
+};
+const ANTIGO = JSON.stringify(canonico(MARCA_NEUTRO_ANTIGO));
+/** Pastas em que o Neutro antigo já foi conferido nesta execução: a conferência lê um arquivo só, uma vez. */
+const conferidas = new Set<string>();
+
 export class PastaMarcas {
   constructor(private readonly opcoes: {pasta?: () => string} = {}) {}
 
@@ -55,17 +65,36 @@ export class PastaMarcas {
     return path.join(this.pasta, id);
   }
 
-  /** Os kits de fábrica que faltarem (hoje só o neutro). Kit que já está na pasta, de fábrica ou não, fica como está. */
+  /** Os kits de fábrica que faltarem (hoje só o neutro). Kit que já está na pasta, de fábrica ou não, fica como está; a
+   *  exceção é o Neutro gravado antes da reformulação e nunca mexido, que vira o de hoje (destaque branco). */
   garantir() {
     for (const m of MARCAS_INICIAIS) {
       if (existsSync(path.join(this.pastaDe(m.id), ARQUIVO_MARCA))) continue;
       this.gravar(m);
+    }
+    this.atualizarNeutroAntigo();
+  }
+
+  /** Troca o marca.json do Neutro pelo de hoje só se ele é idêntico ao de fábrica antigo (fora a ordem das chaves e a
+   *  caixa do hex). Qualquer mudança da pessoa (cor, fonte, nome, nota, logo) deixa o kit como está. Uma vez por pasta. */
+  private atualizarNeutroAntigo() {
+    const pasta = this.pasta;
+    if (conferidas.has(pasta)) return;
+    conferidas.add(pasta);
+    const arq = path.join(pasta, MARCA_NEUTRO.id, ARQUIVO_MARCA);
+    try {
+      if (!existsSync(arq)) return;
+      if (JSON.stringify(canonico(JSON.parse(semBom(readFileSync(arq, 'utf-8'))))) !== ANTIGO) return;
+      this.gravar(MARCA_NEUTRO);
+    } catch {
+      /* ilegível ou disco indisponível: fica como está */
     }
   }
 
   /** Os kits, com os de fábrica primeiro e os outros por nome. */
   listar(): MarcaLida[] {
     if (!existsSync(this.pasta)) return [];
+    this.atualizarNeutroAntigo();
     return readdirSync(this.pasta, {withFileTypes: true})
       .filter((d) => d.isDirectory() && existsSync(path.join(this.pasta, d.name, ARQUIVO_MARCA)))
       .map((d) => this.ler(d.name))

@@ -55,6 +55,17 @@ export const MARCA_NEUTRO: Marca = {
   notas: 'O tema padrão do Estúdio, igual ao de um vídeo novo sem kit.',
 };
 
+/** O Neutro de fábrica de antes da reformulação (destaque no azul da interface). Um marca.json igual a ele foi gravado
+ *  pelo app e ninguém mexeu: a pasta dos kits troca pelo Neutro de hoje (PastaMarcas.garantir). */
+export const MARCA_NEUTRO_ANTIGO: Marca = {
+  formato: 1,
+  id: 'neutro',
+  nome: 'Neutro',
+  cores: {fundo: '#111418', texto: '#F2F2F2', destaque: '#70B8FF', suave: '#A3ABB5'},
+  fontes: {titulo: 'Inter', texto: 'Inter', arquivos: []},
+  notas: 'O tema padrão do Estúdio, igual ao de um vídeo novo sem kit.',
+};
+
 /** Os kits de fábrica, criados na primeira abertura se não existirem: só o Neutro. Kits de escritório (o da BKM
  *  inclusive) ficam na pasta da pessoa e continuam funcionando, mas não vêm mais de fábrica. */
 export const MARCAS_INICIAIS: Marca[] = [MARCA_NEUTRO];
