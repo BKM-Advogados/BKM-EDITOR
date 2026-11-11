@@ -18,7 +18,9 @@ export const destravando = <T,>(f: () => T): T => {
   }
 };
 
-const ehImagem = (d: unknown): d is DocImagem => {
+/** Documento com camadas: a imagem (com ou sem páginas) e também a animação, de propósito. O cadeado da Animação
+ *  (CamadasAnimacao) grava o mesmo `travada`, e travar_camadas e destravar_camadas valem lá (M4 da auditoria do MCP). */
+const temCamadas = (d: unknown): d is DocImagem => {
   const x = d as DocImagem | null;
   return Boolean(x) && typeof x === 'object' && (Array.isArray(x!.camadas) || Array.isArray(x!.paginas));
 };
@@ -46,7 +48,7 @@ const porChave = (d: DocImagem) => {
 
 /** Por que o patch (que não é da pessoa) não pode passar: mexe numa camada travada; null se pode. Travar passa. */
 export const motivoDaTrava = (doc: unknown, patch: OperacaoPatch[], autor: string): string | null => {
-  if (autor === 'pessoa' || !ehImagem(doc)) return null;
+  if (autor === 'pessoa' || !temCamadas(doc)) return null;
   const antes = porChave(doc);
   if (![...antes.values()].some((l) => l.some((x) => x.travada))) return null;
   let depois: unknown;
@@ -55,14 +57,27 @@ export const motivoDaTrava = (doc: unknown, patch: OperacaoPatch[], autor: strin
   } catch {
     return null; // patch que não se aplica cai no erro de sempre, adiante
   }
-  const agora = ehImagem(depois) ? porChave(depois) : new Map<string, {travada: boolean; json: string; semTrava: string}[]>();
+  const agora = temCamadas(depois) ? porChave(depois) : new Map<string, {travada: boolean; json: string; semTrava: string}[]>();
   for (const [k, lista] of antes) {
+    if (!lista.some((x) => x.travada)) continue;
     const id = k.split('\u0000')[1];
     const depoisDela = agora.get(k) ?? [];
-    for (const x of lista) {
-      if (!x.travada || depoisDela.some((y) => y.json === x.json)) continue;
+    // a chave de uma camada travada não ganha cópias: uma cópia igual (mesmo id) bastaria para "provar" que a travada
+    // ficou como estava, e a original poderia ser mexida ou destravada
+    if (depoisDela.length > lista.length) {
+      return `a camada ${id} está travada pela pessoa: não crie outra camada com o mesmo id (use um id novo)`;
+    }
+    // cada travada de antes casa com uma camada diferente de depois (o par é consumido)
+    const livres = [...depoisDela];
+    const consumir = (achar: (y: (typeof livres)[number]) => boolean) => {
+      const i = livres.findIndex(achar);
+      if (i >= 0) livres.splice(i, 1);
+      return i >= 0;
+    };
+    for (const x of lista.filter((y) => y.travada)) {
+      if (consumir((y) => y.json === x.json)) continue;
       // mesma camada, só sem a trava: é destravar, que a IA só faz pela ferramenta destravar_camadas
-      const destravada = depoisDela.some((y) => !y.travada && y.semTrava === x.semTrava);
+      const destravada = consumir((y) => !y.travada && y.semTrava === x.semTrava);
       if (destravada && destravarPermitido) continue;
       return destravada
         ? `a camada ${id} está travada pela pessoa: destravar é pela ferramenta destravar_camadas, com o ok da pessoa`
