@@ -15,7 +15,7 @@ Este documento conversa com `docs/desempenho.md` (orçamentos de RAM e GPU) e co
    - **Propriedades à direita do monitor**, com as abas Comentários, Histórico e Pesquisa no mesmo grupo.
    - **Terminal do agente na coluna da extrema direita.**
    - **Linha do tempo embaixo**, onde houver tempo.
-3. **O terminal fica sempre no mesmo lugar, na extrema direita, e não embaixo.** Embaixo é da linha do tempo, e a altura é o recurso escasso: são 636 px úteis no pior caso comum. A largura sobra, ainda mais com o C2 em 9:16 [B §1][B40]. O agente nunca muda de lugar entre áreas.
+3. **O terminal fica sempre no mesmo lugar, na extrema direita, e não embaixo.** Embaixo é da linha do tempo, e a altura é o recurso escasso: são 636 px úteis no pior caso comum. A largura sobra, ainda mais com o carrossel de referência em 9:16 [B §1][B40]. O agente nunca muda de lugar entre áreas.
 4. **Duas faixas de layout no MVP, escolhidas pela janela:**
    - **C (compacta):** largura útil < 1600 ou altura útil < 800.
    - **P (padrão):** o resto.
@@ -63,7 +63,7 @@ Este documento conversa com `docs/desempenho.md` (orçamentos de RAM e GPU) e co
 
 ### 1.2 Fora das áreas
 
-- **Tela inicial**, quando não há projeto aberto: "Abrir pasta…" (Ctrl+O), a lista de projetos recentes e "Abrir exemplo C2". Ela ocupa a janela inteira, sem dockview.
+- **Tela inicial**, quando não há projeto aberto: "Abrir pasta…" (Ctrl+O), a lista de projetos recentes e "Ver um pronto" (quando a instalação traz o exemplo). Ela ocupa a janela inteira, sem dockview.
 - **Diálogo Exportar** (Ctrl+Shift+E): escolhe o formato (MP4 do vídeo ou PNG da imagem), o destino e a qualidade. O andamento aparece na barra de status. A exportação é a única operação que "sai" do projeto. O projeto está sempre salvo (JSON + histórico + git), e por isso não existe a confusão entre Salvar e Exportar do GIMP [A26].
 - **Paleta de comandos** (F3 / Ctrl+Shift+P): sobreposta, no topo e no centro.
 - **Preferências** (Ctrl+,): escala da interface, entorno do monitor e caminho do `claude`.
@@ -82,7 +82,7 @@ Este documento conversa com `docs/desempenho.md` (orçamentos de RAM e GPU) e co
 ### 2.1 Barra de título (36 px)
 
 ```
-┌ ≡ │ Estúdio · exemplo │ [Vídeo] Imagem 3D Efeitos │      ⌕ Comandos  F3      │ ● 2 agentes · agente editou há 12 s │ ─ □ × ┐
+┌ ≡ │ Estúdio · teste │ [Vídeo] Imagem 3D Efeitos │      ⌕ Comandos  F3      │ ● 2 agentes · agente editou há 12 s │ ─ □ × ┐
 ```
 
 - **Itens, da esquerda para a direita:**
@@ -160,7 +160,7 @@ Abas de painel: 28 px (C) / 30 px (P).
 ### 3.1 Vídeo, 1920×1080 (faixa P)
 
 ```
-┌ ≡ │ Estúdio · exemplo │ [Vídeo] Imagem 3D Efeitos │   ⌕ Comandos F3   │ ● tempo ◐ logo3d · agente editou há 12 s │ ─ □ × ┐ 36
+┌ ≡ │ Estúdio · teste │ [Vídeo] Imagem 3D Efeitos │   ⌕ Comandos F3   │ ● tempo ◐ logo3d · agente editou há 12 s │ ─ □ × ┐ 36
 ├ Cenas e blocos | Projeto ┬ Monitor · 50% ▾ · área segura · ◎ ────┬ Propriedades | Coment. 2 | Hist. ┬ Terminal ──────────────────┤ 30
 │ ▾ 1 gancho   0:00–0:07   │ ┌─┐                                  │ frase#3              ⧉ /cenas/0/b/3 │ [● tempo][◐ logo3d][○][+] │
 │     linha ×3             │ │V│          ┌──────────┐            │ ▾ Tempo                             │                           │
@@ -173,7 +173,7 @@ Abas de painel: 28 px (C) / 30 px (P).
 ├──────────────────────────┴──────────────────────────────────────┴─────────────────────────────────────┤                           │
 │ Linha do tempo  ⊢ 0:00 ······ 0:10 ······ 0:20 ······ ◆ ······ 0:40 ··▼··· 0:50 ······ 1:00 ······ 1:20 │                           │
 │ Cenas    │gancho────────│parte 1───────────────────│parte 2──────────────│parte 3──────│fecho──│      │                           │
-│ Blocos   │lin│lin│frase─│foto──│ │frase│nota│itens─│cartão─│ fx·2                                    │ ctx: exemplo · q1413 ·      │
+│ Blocos   │lin│lin│frase─│foto──│ │frase│nota│itens─│cartão─│ fx·2                                    │ ctx: teste · q1413 ·      │
 │ Palavras │Recebeu│mudar│cidade│Antes│de│responder│…                                                  │      frase#3              │
 │ Narração │▁▃▅▃▁▂▅▇▅▃▁▁▂▃▅▇▅▃▂▁▃▅▇▅▃▂▁▂▃▅▇▅▃▂▁│                                                       │ [inserir seleção]         │
 ├───────────────────────────────────────────────────────────────────────────────────────────────────────┴───────────────────────────┤
@@ -183,14 +183,14 @@ Abas de painel: 28 px (C) / 30 px (P).
 ```
 
 - **Conta:** 260 + 740 + 320 + 600 = 1920. A altura do monitor é 974 − 260 (linha do tempo) − 30 (aba) − 32 (transporte) = 652, o que dá **367×652 em 9:16**.
-- **O terminal desce até a barra de status.** A linha do tempo vai da borda esquerda até o fim de Propriedades (1320 px, cerca de 16 px/s para os 80,7 s do C2).
+- **O terminal desce até a barra de status.** A linha do tempo vai da borda esquerda até o fim de Propriedades (1320 px, cerca de 16 px/s para os 80,7 s do carrossel de referência).
 - **Trilho de ferramentas (36 px) dentro do monitor:** V seleção · C lâmina · H mão · M comentário. O trilho e o transporte fazem parte do componente Monitor e não são painéis, como no Blender e no Photoshop [B §12].
 - **Os blocos encaixam nas palavras** (a âncora `palavra@ms`). A tecla S liga e desliga o encaixe, como no Premiere [conhecimento prévio].
 
-### 3.2 Vídeo, 1366×768 (faixa C, variante retrato, que é a do C2)
+### 3.2 Vídeo, 1366×768 (faixa C, variante retrato, que é a do carrossel de referência)
 
 ```
-┌ ≡ │ exemplo │ [Vídeo] Imagem 3D Efeitos │ ⌕ │ ●◐ │ ─ □ × ┐ 36
+┌ ≡ │ teste │ [Vídeo] Imagem 3D Efeitos │ ⌕ │ ●◐ │ ─ □ × ┐ 36
 ├▤┬ Monitor ───────────┬ Propriedades | Coment. ┬ Terminal [● tempo][◐ logo3d][+] ┤ 28
 │▦│┌─┐  ┌──────────┐   │ frase#3        ⧉       │ claude · tempo                     │
 │ ││V│  │          │   │ ▾ Tempo                │ > o título entra cedo…             │
@@ -254,15 +254,15 @@ Abas de painel: 28 px (C) / 30 px (P).
 
 ```
 ├ Objetos | Projeto ──────┬ Monitor · Perspectiva ▾ · câmera: cam1 ▾ · sólido ▾ · 🎥 ver pela câmera ─┬ Propriedades | Coment. | Hist. ┬ Terminal ──────┤
-│ ▾ cena                  │ ┌─┐                                                    ┌─────┐          │ logo-exemplo         ⧉ /objetos/3   │ [◐ logo3d] [+] │
+│ ▾ cena                  │ ┌─┐                                                    ┌─────┐          │ logo-3d         ⧉ /objetos/3   │ [◐ logo3d] [+] │
 │    🎥 cam1              │ │Q│                                                    │  Y  │ eixos    │ ▾ Transformação                │                │
 │    💡 luz-chave         │ │W│                 [ objeto com gizmo ]               │ Z┘X │          │   posição  0.00  1.20  0.00    │ claude · logo  │
 │    💡 luz-recorte       │ │E│                                                    └─────┘          │   rotação  0     35    0       │ > gira menos e │
-│    ◇ logo-exemplo      ●     │ │R│                                                                     │   escala   1     1     1       │   baixa a luz  │
+│    ◇ logo-3d      ●     │ │R│                                                                     │   escala   1     1     1       │   baixa a luz  │
 │    ▢ chão               │ │M│                                                                     │ ▾ Material  cobre ■ · rug. 0.4 │   do cobre     │
 │ + adicionar  Shift+A    │ └─┘   grade · ⌖ F enquadrar · vistas F1–F4                              │ ▸ Efeitos (0)                  │                │
 ├─────────────────────────┴─────────────────────────────────────────────────────────────────────────┴────────────────────────────────┴────────────────┤
-│ Q seleção · W mover · E girar · R escalar · F enquadrar · Alt+arrastar orbitar │ 4 objetos · 1 selecionado │ logo-exemplo │ 520 MB                    │
+│ Q seleção · W mover · E girar · R escalar · F enquadrar · Alt+arrastar orbitar │ 4 objetos · 1 selecionado │ logo-3d │ 520 MB                    │
 ```
 
 - O viewport fica com cerca de 740×944 (sem barra de opções: os controles de vista ficam no cabeçalho do painel).
@@ -279,7 +279,7 @@ Abas de painel: 28 px (C) / 30 px (P).
 │ ││W│        [ objeto com gizmo ]        │ Y │  │ > gira menos                           │
 │ ││E│                                    └───┘  ├ Objetos ─────────┬ Propriedades|Coment. ┤
 │ ││R│                                           │ 🎥 cam1          │ posição 0 1.2 0      │
-│ ││M│                                           │ ◇ logo-exemplo   ●    │ rotação 0 35 0       │
+│ ││M│                                           │ ◇ logo-3d   ●    │ rotação 0 35 0       │
 │ │   F enquadrar                                 │ ▢ chão           │ ▸ Material           │
 └─┴──────────────────────────────────────────────┴──────────────────┴──────────────────────┘
  35              ~771                                   220                 340
@@ -445,7 +445,7 @@ Abas de painel: 28 px (C) / 30 px (P).
 | SFX | 28 |
 
 - Bloco com efeito ganha o selo `fx·2`.
-- **Desenho:** DOM para os blocos (são 12 no C2); canvas para a forma de onda e as palavras no zoom baixo; renderiza só o trecho visível [B §7].
+- **Desenho:** DOM para os blocos (são 12 no carrossel de referência); canvas para a forma de onda e as palavras no zoom baixo; renderiza só o trecho visível [B §7].
 
 **Histórico (diário):**
 - Lista de patches: autor (você / agente + aba), hora, rótulo legível e objeto. Clicar seleciona o objeto.

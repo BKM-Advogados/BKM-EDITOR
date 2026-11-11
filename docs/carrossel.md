@@ -28,7 +28,7 @@ um carrossel tem um tamanho só (1080×1350 para o feed 4:5, 1080×1080 para o q
 }
 ```
 
-**Uma prancheta só continua como estava.** Documento sem `paginas` (a `capa.json` da Cliente, os projetos de antes) vale
+**Uma prancheta só continua como estava.** Documento sem `paginas` (as capas e os projetos de antes) vale
 como uma página só: `paginasDe(doc)` devolve, em memória, `[{id: "pagina-1", nome: "Página 1", camadas: doc.camadas}]`
 e nada é reescrito no arquivo da pessoa. O arquivo só ganha `paginas` quando ela cria a segunda página (ou renomeia a
 primeira): a primeira página recebe as camadas da raiz e `camadas` fica `[]`. Num carrossel, a lista `camadas` da raiz

@@ -1,7 +1,7 @@
 # Casca, projeto, mídia e regras (frente Casca, rodada 3)
 
 O que a frente Casca cuida: a janela e o processo principal (instância, queda do renderer), a gravação do projeto, a barra, o
-rodapé e a tela inicial, as regras de texto da Cliente, o `.gitignore` e o `CLAUDE.md` do projeto criado e o painel de mídia. Este
+rodapé e a tela inicial, as regras de conteúdo, o `.gitignore` e o `CLAUDE.md` do projeto criado e o painel de mídia. Este
 doc diz o que mudou na rodada 3, onde está e como se vê.
 
 ## Painel de mídia
@@ -74,7 +74,7 @@ tomada marcada como boa e não use a descartada sem perguntar. Para usar um arqu
   e pelo app.
 - **transversal-D21.** `scripts/e2e-boas-vindas.mjs` procura "Ver um pronto".
 
-## Regras da Cliente no texto do vídeo
+## Regras de conteúdo no texto do vídeo
 
 - **transversal-D18.** A frase de fecho que as regras pedem ("Ficou com alguma dúvida? Procure um advogado trabalhista.", também sem o
   ponto final) não recebe o aviso de "advogado". O resto do texto continua sendo checado.
@@ -84,9 +84,9 @@ tomada marcada como boa e não use a descartada sem perguntar. Para usar um arqu
 
 ## CLAUDE.md do projeto
 
-- **imagem-N3.** O `CLAUDE.md` à mão do modelo "Carrossel narrado Cliente" leva, entre `<!-- estudio:imagem:inicio -->` e
+- **imagem-N3.** O `CLAUDE.md` escrito à mão (o do projeto de exemplo) leva, entre `<!-- estudio:imagem:inicio -->` e
   `<!-- estudio:imagem:fim -->`, a lista de imagem do app (camadas, páginas, sombra, contorno, degradê, máscara, `remover_fundo`).
-  O bloco é refeito ao abrir; o texto à mão fora dele não é tocado; projeto da Cliente antigo ganha o bloco no fim; projeto sem módulo
+  O bloco é refeito ao abrir; o texto à mão fora dele não é tocado; projeto antigo criado do exemplo ganha o bloco no fim; projeto sem módulo
   de imagem não o recebe.
 - **imagem-N5.** Ao trocar o texto sem marcas da 0.2.0 ou 0.3.0 pelo novo, as linhas que o app nunca escreveu vão para a seção
   "Anotações do texto anterior" em vez de sumir. A lista do que o app escreveu está em `src/nucleo/claude-md-antigo.ts` (gerada
@@ -110,5 +110,5 @@ selo e os campos de tamanho foram testados na lógica pura (vitest) e pelo typec
 duas vezes (a segunda só traz a primeira para a frente); digitar 9000 no tamanho livre; Ctrl+W dentro do terminal; segurar
 Alt+seta na pilha de efeitos (sem aviso de "outra mão"); um erro de gravação deixa o selo em "Não salvo". Do painel de mídia: abrir
 a aba Mídia, buscar "transcrito", marcar uma tomada com B e conferir no Histórico, usar uma foto em "Usar em…". O painel foi visto
-na prévia web (arquivos de exemplo da Cliente), não no Electron; as miniaturas são o próprio arquivo (sem cache de miniatura) e o áudio
+na prévia web (arquivos de exemplo), não no Electron; as miniaturas são o próprio arquivo (sem cache de miniatura) e o áudio
 não tem forma de onda nelas.

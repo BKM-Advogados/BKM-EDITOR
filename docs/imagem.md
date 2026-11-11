@@ -11,7 +11,7 @@ gravação). Testes em `testes/acabamento.test.ts` e `testes/remover-fundo.test.
 ## Formato
 
 Campos opcionais no fim da camada (`CamadaImagem`) e um no documento. Sem eles, a camada e o documento são os de
-sempre: a capa da Cliente abre igual, inteira em DOM na prévia.
+sempre: uma capa de antes abre igual, inteira em DOM na prévia.
 
 ```json
 {

@@ -31,7 +31,7 @@ valor sai de `marca`, na hora de pintar: a prévia, a miniatura, o PNG e o PDF p
 | Referência | Vale |
 |---|---|
 | `@fundo`, `@texto`, `@destaque`, `@suave` | As quatro cores de todo kit. |
-| `@cobreProfundo`, `@nevoa`… | Cor de apoio do kit, pelo nome (a Cliente tem `cobre`, `grafite`, `osso`, `aco`…). Maiúsculas não importam. |
+| `@terracotaEscura`, `@nevoa`… | Cor de apoio do kit, pelo nome (um kit pode ter `terracota`, `grafite`, `areia`…). Maiúsculas não importam. |
 | `@destaque+35` | A cor 35% em direção ao branco. `@texto-20`: 20% em direção ao preto. |
 | `@fundo:destaque:25` | A cor 25% do caminho até outra cor do kit (o degradê "Da marca" do fundo usa). |
 | `@titulo`, `@texto`, `@mono` | Só em `fonte`: a de título, a de texto e a mono do kit (sem mono, a de texto). |
@@ -44,13 +44,13 @@ não tem vira cinza `#808080`, que aparece em vez de esconder a camada.
 
 `patchDaMarca` (imagem) passa cada cor e fonte para o **mesmo papel** no kit novo: o que era o destaque do kit
 anterior vira o destaque do novo; título, texto e mono também. O kit anterior é o que a imagem guarda em `marca`; sem
-ele valem os kits de fábrica (Cliente, BKM, neutro e o carrossel de antes do campo). Cor ou fonte que não é de nenhum kit
+ele valem os kits de fábrica (BKM, neutro, a paleta escura de um kit de fábrica que saiu e o carrossel de antes do campo). Cor ou fonte que não é de nenhum kit
 (`#123456`, "Impact") é escolha da pessoa e fica. Referência (`@destaque`) não é tocada: ela já lê o kit novo. O texto
 sem cor, ou no branco padrão, recebe `@texto`. Fecha imagem-D1 (fundo, formas e degradês ficavam do kit anterior) e
 imagem-D9 (o subtítulo virava cor de título e o numeral perdia a mono).
 
 Camada nova (`textoNovo` e `formaNova`, em `camadas-novas.ts`) e o modelo de carrossel nascem com `@titulo`, `@texto`,
-`@mono`, `@destaque` e `@suave`: a marca da peça, não o cobre da Cliente (imagem-D8).
+`@mono`, `@destaque` e `@suave`: a marca da peça, não as cores de um kit fixo (imagem-D8).
 
 ## Fontes
 

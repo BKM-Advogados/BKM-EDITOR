@@ -116,15 +116,15 @@ metades e duplicar copia. Um id em `refs` que não existe na pesquisa é só um 
 | `registrar_fato` | `afirmacao`, `fonte_id`, `trecho`, `localizador?`, `nota?` | confere trecho, dígitos e vigência e grava o fato; nunca recusa (fonte fora da pesquisa ou sem o texto na pasta: grava como não encontrado, com `aviso`) |
 | `listar_pesquisa` | `fonte_id?` | fontes (sem o texto) e fatos; com `fonte_id`, só aquela fonte e os fatos dela |
 | `texto_da_fonte` | `fonte_id`, `pagina?` ou `inicio?`/`fim?` | o texto paginado (6.000 caracteres) ou o recorte |
-| `checar_texto` | `documento?` ou `texto?` | avisos das regras da Cliente (OAB, empresa, pessoa, número sem fato) sobre todos os textos do documento (no roteiro da Cliente, também as linhas do gancho, as etiquetas e a narração de `video/palavras.json`); no vídeo de cenas, os blocos com número e sem `refs`; e se o documento termina com a frase de fecho (`ultima_frase`). Só informa |
+| `checar_texto` | `documento?` ou `texto?` | avisos das regras de conteúdo (OAB, empresa, pessoa, número sem fato) sobre todos os textos do documento (no roteiro do carrossel narrado, também as linhas do gancho, as etiquetas e a narração de `video/palavras.json`); no vídeo de cenas, os blocos com número e sem `refs`; e se o documento termina com a frase de fecho (`ultima_frase`). Só informa |
 
 `projeto_info` passa a contar fontes e fatos. Sem rede (`registrarFerramentas` chamado sem o 5º parâmetro), `ler_fonte`
 responde "este MCP não tem acesso à rede". A rede sai de `criarRede` (em `ferramentas-mcp.ts`, junto do tipo `Rede`):
-User-Agent "Mozilla/5.0 (compatible; Estudio-BKM/0.2; +ti@escritorioexemplo.com.br)", 40 s, até 20 MB lidos em pedaços (vale
+User-Agent "Mozilla/5.0 (compatible; Estudio-BKM/0.2; +https://bkmadvogados.com.br)", 40 s, até 20 MB lidos em pedaços (vale
 também sem Content-Length), segue redirecionamentos, só http/https. No app ela usa o `net.fetch` do Electron e entra pelo
 construtor do `McpHttp` (`src/main/mcp-http.ts`); no MCP por stdio (`mcp/nucleo.ts`) e nos testes, o `fetch` do Node.
 
-## Regras da Cliente (`src/nucleo/regras.ts`)
+## Regras de conteúdo (`src/nucleo/regras.ts`)
 
 `checarTexto` compara sem acento, em minúsculas e por palavra inteira, como o `conferir_capa.py` do `outro-projeto`.
 Devolve só avisos (`oab`, `empresa`, `pessoa`, `numero_sem_fato`). O filtro de nome de empresa e de pessoa vale **só para
@@ -134,7 +134,7 @@ o texto do vídeo**: a fonte e o fato guardam os nomes como estão no original. 
 
 Nada da fonte. O texto gravado em `pesquisa/fontes/` é o da página, limpo de HTML e mais nada: nomes de pessoas e de
 partes, número de OAB, CNPJ, número de processo, valores e trechos revogados ficam como no original. O riscado aparece
-marcado, não apagado. A observação da fonte só cresce. As regras da Cliente olham o texto do vídeo (blocos, falas, legenda),
+marcado, não apagado. A observação da fonte só cresce. As regras de conteúdo olham o texto do vídeo (blocos, falas, legenda),
 nunca a pesquisa.
 
 ## Medição contra o gabarito
@@ -180,9 +180,9 @@ O script da medição só lê (gabarito e textos da fase 0) e chama `acharTrecho
 ## Limites conhecidos (06/11/2026)
 
 - **Planalto bloqueia a rede do escritório por IP de origem.** O `del5452compilado.htm` responde "Acesso Negado!" (814 B)
-  a curl, .NET, WebFetch e até ao Chromium deste PC e do Mac mini; o servidor do escritório baixa a CLT inteira (1,5 MB). Até a
+  a curl, .NET, WebFetch e até ao Chromium deste PC e do Mac mini; um servidor de fora da rede do escritório baixa a CLT inteira (1,5 MB). Até a
   liberação pelo canal oficial ou a leitura por um servidor nosso, a CLT atualizada vem da Câmara (LEGIN) ou de um texto
-  baixado pelo servidor do escritório. Detalhe em `tasks/estudio-pesquisa-e-grosso-2026-11-06/fase-0/achados-acesso.md`.
+  baixado por esse servidor. Detalhe em `tasks/estudio-pesquisa-e-grosso-2026-11-06/fase-0/achados-acesso.md`.
 - **O Planalto injeta um script f5 depois do `</html>`** (`<script id="f5_cspm">` com token aleatório). A limpeza tira o
   script e o hash é do texto limpo normalizado, então o mesmo texto dá o mesmo sha256 em cada visita.
 - **LexML SRU fora do ar:** a busca pede desafio em JavaScript e `/busca/SRU` dá 404 do Tomcat. Senado Normas e Dados
@@ -216,7 +216,7 @@ Decisões que vão além do texto do contrato da fase 1, para quem revisa:
 - **Leitor de números:** `tokens` lê o texto sem acento e em minúsculas: número com o sufixo de ordinal colado ("13º",
   "1o", "1.º"), data como um token só (dd/mm/aaaa; "24 de julho de 1991" também), "/" separado ("13.467/2017" vira
   13467, "/", 2017). `lerNumeros` marca cada número como `valor`, `identificador` ou `nome` (ordinal com símbolo fora de
-  unidade de tempo). `numerosDe` devolve valores e identificadores (a regra `numero_sem_fato` das regras da Cliente continua
+  unidade de tempo). `numerosDe` devolve valores e identificadores (a regra `numero_sem_fato` das regras de conteúdo continua
   vendo "Lei 13.467" no texto do vídeo), sem os nomes. `conferirDigitos` pede só os valores da afirmação e aceita tudo
   o que está escrito no trecho, inclusive identificadores, ordinais com símbolo e o ano de cada data. Desvio do pedido
   de 06/11: o ordinal por extenso também só vira número antes de unidade de tempo, porque "segundo" é "conforme",
@@ -231,7 +231,7 @@ Decisões que vão além do texto do contrato da fase 1, para quem revisa:
   `testes/fixtures/pesquisa/pares-c1.json` completa os 8 com P17-01 e P17-02 (art. 477, § 2º e caput), com o campo
   `pauta` para deixar claro. Conferido fora do teste: os 79 trechos do gabarito tirados da CLT inteira saem `exato` no
   texto limpo, e o único verdadeiro com dígito faltando é o C1-02 ("um salário"; os testes tratam a exceção pelo
-  nome). No arquivo real baixado pelo servidor do escritório, o `<script id="f5_cspm">`
+  nome). No arquivo real baixado pelo servidor de fora, o `<script id="f5_cspm">`
   está antes de `</body>`, não depois de `</html>`; o fixture guarda a posição real e o teste do hash cobre as duas.
 - **`ler_fonte`:** HTTP 400 ou mais não grava fonte: devolve erro com o status e os 200 primeiros caracteres da resposta
   ("Acesso Negado!"), para o Claude procurar outro caminho; o status é conferido antes de tudo, então um 403 que devolve
@@ -258,9 +258,10 @@ Decisões que vão além do texto do contrato da fase 1, para quem revisa:
   onde também procura a frase de fecho.
 - **`.gitignore`:** projetos novos já saem com `pesquisa/fontes/`; em projetos antigos, `Projeto.gravarTextoFonte`
   acrescenta a linha quando falta (cria o arquivo se não houver), sem mexer no resto.
-- **CLAUDE.md:** projetos com vídeo ou imagem ganham a seção "## Pesquisa". O modelo `modelo-carrossel` copia o exemplo
-  empacotado (`exemplos/exemplo`) inteiro e não gera CLAUDE.md por cima; o CLAUDE.md do exemplo já traz a seção, igual à
-  de `secaoPesquisa()` (um teste confere), e o `.gitignore` dele já tem `pesquisa/fontes/`. Se uma cópia antiga do
+- **CLAUDE.md:** projetos com vídeo ou imagem ganham a seção "## Pesquisa". O "Ver um pronto" copia o projeto
+  de exemplo (`exemplos/<pasta>`, `src/nucleo/exemplo.ts`) inteiro e não gera CLAUDE.md por cima; o CLAUDE.md do exemplo
+  deve trazer a seção igual à de `secaoPesquisa()` (o teste confere no projeto de teste), e o `.gitignore` dele,
+  `pesquisa/fontes/`. Se uma cópia antiga do
   exemplo vier sem a seção, `gravarPlano` a acrescenta, uma vez só. O `.gitignore` do projeto novo é o `GITIGNORE` do
   app, gravado por cima do copiado.
 - **Interface:** a loja guarda `pesquisa` e relê quando o arquivo mudado começa com `pesquisa/`; se a leitura falha, o

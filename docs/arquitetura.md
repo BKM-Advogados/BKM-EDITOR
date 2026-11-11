@@ -18,14 +18,14 @@ Fixo e fora de discussão: app desktop sem servidor (Windows primeiro, macOS dep
 | Endereçamento | `editar_objeto` por id | segmento `@id` no ponteiro | — | **As duas.** `@id` em `aplicar_patch` e as ferramentas de alto nível `editar_objeto`, `inserir_objeto`, `remover_objeto` e `mover_objeto`. O diário guarda RFC 6902 puro | O agente nunca conta índice |
 | Biblioteca de patch | própria | Mutative | — | **Própria**, em `src/doc` (aplicar, inversa com `test`, `@id`, cópia só do caminho alterado) | É preciso inversa com testes, `@id` e compartilhamento estrutural para o `React.memo`. O `fast-json-patch` do protótipo sai |
 | Envelope | `tipo`, `v`, `id`, `$schema` = caminho | `$tipo`, `$schema` = número, `$id` | — | **`$schema` (caminho do JSON Schema), `$tipo`, `$v`, `$id`** | O `$` separa envelope de conteúdo (blocos já têm `tipo`). O `$schema` como caminho dá validação grátis no VS Code |
-| Pastas do projeto | `videos/c2/`, `imagens/`… | `docs/` + `midia/` + `diario/` | — | **`docs/` plano com sufixo por tipo, `midia/`, `diario/` versionado, `.estudio/` todo fora do git** | O `.gitignore` fica de uma linha, e o agente acha tudo por glob |
+| Pastas do projeto | `videos/carrossel/`, `imagens/`… | `docs/` + `midia/` + `diario/` | — | **`docs/` plano com sufixo por tipo, `midia/`, `diario/` versionado, `.estudio/` todo fora do git** | O `.gitignore` fica de uma linha, e o agente acha tudo por glob |
 | Constantes do motor (1600/3500/1200/500, marca, final, dúvida) | viram campos do documento | ficam fora | — | **Campos do roteiro, com padrão no schema** | O agente não muda o que não vê |
-| Narração na prévia | segmentos da fonte com `trimBefore` | `narracao.wav` pronto | — | **Segmentos da fonte**, já que o `video-exemplo.mp4` está em `exemplos/exemplo/midia` [lido]. Projeto sem fonte usa o wav com o aviso "pausas travadas" | Mudar uma pausa vira só recálculo, sem ffmpeg |
+| Narração na prévia | segmentos da fonte com `trimBefore` | `narracao.wav` pronto | — | **Segmentos da fonte**, já que o vídeo-fonte da narração está na `midia/` do exemplo [lido]. Projeto sem fonte usa o wav com o aviso "pausas travadas" | Mudar uma pausa vira só recálculo, sem ffmpeg |
 | Motor de efeitos no MVP | `@remotion/effects` na mídia + CSS no DOM | idem, com catálogo | CSS no vídeo, WebGL2 compartilhado na imagem | **Um compilador só: CSS `filter` + filtro SVG + camada sobreposta, para todo alvo.** `@remotion/effects` fica para a fase 2, na mídia | Nenhum contexto WebGL a mais e o mesmo resultado em qualquer alvo (bloco, foto, camada, vídeo inteiro). O mesmo Chromium desenha a prévia e o render [inferência]. Isso também tira do caminho crítico a licença `UNLICENSED` do pacote |
 | Schema dos efeitos | união discriminada tipada | `{efeito, params}` genérico | — | **União discriminada gerada de um catálogo** | O agente recebe um JSON Schema preciso, e um efeito novo é uma entrada no catálogo |
 | PNG da Imagem | `renderStill` | `renderStill` | Worker com OffscreenCanvas | **`renderStill` no render-host** | Um motor de pixel só, com paridade. O Worker fica como otimização da fase 2, se o tempo medido incomodar |
 | Desfazer | pilhas em memória | derivado do diário | — | **Derivado do diário** (`desfaz`/`desfeito_por`) | Sobrevive a reinício e é o mesmo para a pessoa e para o agente |
-| Resolvedor no renderer | Web Worker | thread da UI | — | **Thread da UI, com memo por versão**; vai para Worker se passar de 8 ms medidos | Menos de 2 ms no C2 [inferência]. O Worker teria custo de cópia sem ganho |
+| Resolvedor no renderer | Web Worker | thread da UI | — | **Thread da UI, com memo por versão**; vai para Worker se passar de 8 ms medidos | Menos de 2 ms no carrossel de referência [inferência]. O Worker teria custo de cópia sem ganho |
 | Arraste | valor provisório no resolvido | DOM imperativo | — | **DOM imperativo** para mover e redimensionar (vídeo e imagem). Sliders do painel usam valor provisório nas props, a no máximo um por quadro | 60 fps sem render do React durante o gesto |
 | Git | checkpoint no `Stop`, ocioso 30 s, export, marcar versão | um autor por commit, 8 s | — | **Gatilhos da A + um autor por commit da B** (checkpoint forçado quando muda o autor) | Um `git revert` limpo desfaz um lote do agente |
 | Versões | Electron 45 | Electron 45 | — | **Electron 45.x** (o protótipo está no 42, sem suporte desde 20/10/2026), Remotion 4.0.540 em todos os `@remotion/*`, Zod 4, MCP SDK v2, chokidar 4.0.3 (JS puro, já instalado), `@lydell/node-pty` 1.2.0-beta.18 (prebuild, já instalado) | — |
@@ -136,7 +136,7 @@ estudio/
                       #   paineis/ (Propriedades gerado do schema, Timeline, Camadas, Comentarios, Diario),
                       #   overlay/ (seleção, alças, alfinetes), terminal/, estado/ (docs, editor, provisorio), comandos.ts
   testes/             # vitest: doc, schemas, motor (dourado), nucleo, mcp; e2e/ (Playwright em modo Electron)
-  exemplos/exemplo/     # projeto de exemplo (seção 4)
+  exemplos/teste/     # projeto de exemplo (seção 4)
   referencia/         # motor-mac e template-electron (somente leitura)
   docs/               # arquitetura.md (este), desempenho.md, estilo.md (frente de estilo)
 ```
@@ -158,7 +158,7 @@ estudio/
 
 - `src/nucleo/roteiro/resolver.ts` e `testes/resolver.test.ts`: porta com teste dourado e arredondamento par. Vai para `src/motor`.
 - `src/nucleo/roteiro/ids.ts`: migração de ids. Vai para `src/schemas/migracoes`.
-- `src/composicoes/cliente/*`, `anim.ts`, `midia.ts`.
+- `src/composicoes/carrossel/*`, `anim.ts`, `midia.ts`.
 - `src/main/servidor-midia.ts`, `compositor-package.ts`, `packaged-browser.ts`, `exportar.ts` e `terminais.ts`.
 - O `terminais.ts` passa a lançar o `claude` direto no PTY, sem PowerShell, e muda para o pty-host.
 - **Sai:** `fast-json-patch`, `@remotion/google-fonts` (troca por woff2 local com `@remotion/fonts`), MCP SDK v1, Zod 3 e o `mcp/nucleo.ts` stdio, que vira `src/mcp/ferramentas.ts`.
@@ -169,19 +169,19 @@ estudio/
 ## 4. Projeto em disco
 
 ```
-exemplo/                                    # pasta aberta em "Abrir projeto"
+teste/                                    # pasta aberta em "Abrir projeto"
   estudio.json                            # $tipo "projeto"
   CLAUDE.md                               # guia do projeto para o agente (gerado, editável)
   docs/
-    c2.roteiro.json                       # $tipo "roteiro"
+    carrossel.roteiro.json                # $tipo "roteiro"
     capa.imagem.json                      # $tipo "imagem"
     anel.cena3d.json                      # $tipo "cena3d"
     quente.efeitos.json                   # $tipo "efeitos" (predefinição reutilizável)
   comentarios.json                        # $tipo "comentarios"
   diario/2026-11.jsonl                    # diário (versionado, um arquivo por mês)
   midia/
-    c2/fonte.mp4  c2/palavras.json  c2/narracao.wav (opcional)
-    fotos/Cidade Exemplo.jpg  marca/logo-exemplo.png  sfx/*.wav  3d/*.glb  fontes/*.woff2 (só as do projeto)
+    carrossel/fonte.mp4  carrossel/palavras.json  carrossel/narracao.wav (opcional)
+    fotos/cidade.jpg  marca/logo.png  sfx/*.wav  3d/*.glb  fontes/*.woff2 (só as do projeto)
   saidas/                                 # renders (fora do git)
   .estudio/                               # fora do git: estado-ui.json, quadros/ (PNG dos comentários),
                                           #   cache/ (quadros do MCP, resolvidos), escritor.lock
@@ -192,13 +192,13 @@ exemplo/                                    # pasta aberta em "Abrir projeto"
 - **Descoberta:** `docs/**/*.{roteiro,imagem,cena3d,efeitos}.json`, sem lista de documentos no manifesto. O endereço de um documento é o caminho relativo.
 - **`palavras.json`** é mídia derivada (transcrição `[{w, s, e, p}]`), só leitura, sem envelope.
 - **Configs de sessão das abas** (com token) ficam em `<userData>/sessoes/<projeto-hash>/aba-N.*.json`, fora da pasta do projeto, longe do git e do OneDrive.
-- **Importar do motor antigo** (`ferramentas/importar-antigo.ts`):
+- **Importar do motor antigo** (`ferramentas/importar-motor.ts`):
   1. copia roteiro, palavras, fonte, sfx, foto e logo;
   2. reescreve os caminhos para `midia/...`;
   3. gera ids;
   4. explicita constantes e marca;
   5. grava com o formatador estável.
-- **`exemplos/exemplo`** já existe no formato do protótipo (`video/`, `imagem/`, `3d/`) [lido]. A importação o converte para o formato acima no passo 2 do MVP.
+- **O projeto de exemplo** já existe no formato do protótipo (`video/`, `imagem/`, `3d/`) [lido]. A importação o converte para o formato acima no passo 2 do MVP.
 
 ---
 
@@ -207,11 +207,11 @@ exemplo/                                    # pasta aberta em "Abrir projeto"
 ```ts
 export type TipoDoc = 'projeto' | 'roteiro' | 'imagem' | 'cena3d' | 'efeitos' | 'comentarios';
 export type Id = string;                        // /^[a-z][a-z0-9-]{0,63}$/, único no documento inteiro (todos os níveis)
-export type CaminhoDoc = string;                // relativo à raiz, com '/': "docs/c2.roteiro.json"
+export type CaminhoDoc = string;                // relativo à raiz, com '/': "docs/carrossel.roteiro.json"
 export type CaminhoMidia = `midia/${string}`;
 export type Versao = `sha256:${string}`;        // 12 hex do texto formatado com LF; nunca gravada no arquivo
 export type Ponteiro = string;                  // RFC 6901; na entrada aceita segmentos "@id"
-export type Ref = `${CaminhoDoc}#${Id}`;        // "docs/c2.roteiro.json#parte2-numero"
+export type Ref = `${CaminhoDoc}#${Id}`;        // "docs/carrossel.roteiro.json#parte2-numero"
 export type Ancora = string;                    // palavra@ms | palavra$@ms (fim da palavra) | palavra@ms+120 | palavra@ms-150
 export type Cor = `#${string}`;
 export type Vec3 = [number, number, number];
@@ -252,16 +252,16 @@ Os tipos abaixo são `z.infer` dos schemas Zod 4. O JSON Schema sai de `z.toJSON
 
 ### 6.1 Roteiro (`$tipo: 'roteiro'`)
 
-Evolução direta do `roteiro.json` do C2 [lido]. Muda o envelope, entram ids em cena, linha, bloco, item, barra, marca e faixa, entram as constantes e a marca como campos, e chegam os blocos que trazem outros módulos.
+Evolução direta do `roteiro.json` do carrossel de referência [lido]. Muda o envelope, entram ids em cena, linha, bloco, item, barra, marca e faixa, entram as constantes e a marca como campos, e chegam os blocos que trazem outros módulos.
 
 ```ts
 export interface DocRoteiro extends Envelope<'roteiro'> {
-  tema: 'modelo-carrossel';                              // componente que desenha (registro em composicoes/roteiro)
-  variante?: string;                                 // "c2" (era o campo "tema")
+  tema: 'carrossel-narrado';                              // componente que desenha (registro em composicoes/roteiro)
+  variante?: string;                                 // "neutro" (era o campo "tema")
   formato: {largura: number; altura: number; fps: number};          // 1080 × 1920 × 30
-  fonte?: CaminhoMidia;                              // "midia/c2/fonte.mp4" → narração por segmentos
+  fonte?: CaminhoMidia;                              // "midia/carrossel/fonte.mp4" → narração por segmentos
   narracao?: CaminhoMidia;                           // wav já cortado; só sem `fonte` ("pausas travadas")
-  palavras: CaminhoMidia;                            // "midia/c2/palavras.json"
+  palavras: CaminhoMidia;                            // "midia/carrossel/palavras.json"
   rotulo_partes: string;
   tempos?: {abertura_ms?: number; final_ms?: number; pausa_gancho_ms?: number; pausa_parte_ms?: number}; // 1600/3500/1200/500
   pausas?: (Objeto & {depois_de: Ancora; ms: number})[];
@@ -555,7 +555,7 @@ O escritor único é o núcleo no main, sempre que o app está aberto.
 **Alto nível para o agente** (`src/mcp`, traduzido para o mesmo pedido):
 
 ```ts
-// editar_objeto({doc:'docs/c2.roteiro.json', id:'parte2-numero', campos:{em:'adicional$@43800'}})
+// editar_objeto({doc:'docs/carrossel.roteiro.json', id:'parte2-numero', campos:{em:'adicional$@43800'}})
 [{op:'test',    path:'/cenas/2/blocos/1/id', value:'parte2-numero'},
  {op:'test',    path:'/cenas/2/blocos/1/em', value:'adicional@43800'},   // valor lido na versão base
  {op:'replace', path:'/cenas/2/blocos/1/em', value:'adicional$@43800'}]
@@ -772,7 +772,7 @@ export type MsgRender =
 export interface PedidoRender {
   doc: CaminhoDoc; composicao: 'Roteiro' | 'Imagem' | 'Cena3D';
   formato: 'mp4-h264' | 'png' | 'jpeg';
-  saida: string;                                    // "saidas/c2-2026-11-05-1012.mp4"
+  saida: string;                                    // "saidas/carrossel-2026-11-05-1012.mp4"
   escala?: number; quadro?: number; faixa_quadros?: [number, number];
 }
 ```
@@ -837,7 +837,7 @@ chokidar.watch(raiz, {
 - **Mensagem:**
 
 ```
-estudio: c2 · Mover parte2-numero (y 860→920) (+2)
+estudio: carrossel · Mover parte2-numero (y 860→920) (+2)
 
 Estudio-Autor: agente:aba-3
 Estudio-Seq: 128-130
@@ -870,7 +870,7 @@ await renderMedia({composition, serveUrl, inputProps, codec: 'h264', outputLocat
 6. **Fila:** um job por vez, cancelável (`makeCancelSignal`). Matar o processo é o último recurso. A prévia pausa durante o export.
 7. **Áudio no MVP:** narração por segmentos `<Audio trimBefore>` da fonte, com `ganho_narracao_db`, mais os sons. O Remotion mixa no render.
 8. **Áudio na fase 2:** loudness BS.1770 em TS, metas do `mix.py` (−14 LUFS, efeitos com mediana 23 LU abaixo da voz) e duas passadas (voz e efeitos) se precisar.
-9. **Paridade:** `testes/e2e/paridade.ts` compara `capturePage` do Player com `renderStill` nos quadros `em_saida` de cada bloco do C2, com limiar de diferença por pixel.
+9. **Paridade:** `testes/e2e/paridade.ts` compara `capturePage` do Player com `renderStill` nos quadros `em_saida` de cada bloco do carrossel de referência, com limiar de diferença por pixel.
 
 ---
 
@@ -879,7 +879,7 @@ await renderMedia({composition, serveUrl, inputProps, codec: 'h264', outputLocat
 ```ts
 export interface PerfilAba {
   id: string;                         // "aba-3"
-  titulo: string;                     // "c2 · tempo"
+  titulo: string;                     // "carrossel · tempo"
   projeto: string;                    // raiz absoluta
   cwd: string;                        // = projeto (worktree para frente de código: fase 3)
   comando: 'claude' | 'shell';
@@ -915,7 +915,7 @@ pty.criar({aba: aba.id, exe: claudeExe, cwd: aba.cwd, cols, rows,
   - Um `.cmd` do npm roda por `cmd.exe /d /s /c`.
   - Sem `claude` instalado, a aba mostra o instalador oficial. O app não embute o binário.
 - **Hooks** (rotas `/h/*` do main, Bearer = token da aba):
-  - `/contexto` devolve `{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"[estudio] área Vídeo · docs/c2.roteiro.json (sha256:a17b…) · 47,1 s (q1413) · seleção parte2-numero · 2 comentários abertos (cmt_0007, cmt_0009) · mudanças da pessoa desde o seu último turno: #131 y 860→920 em parte2-numero"}}`. O mesmo texto aparece no chip acima do terminal;
+  - `/contexto` devolve `{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"[estudio] área Vídeo · docs/carrossel.roteiro.json (sha256:a17b…) · 47,1 s (q1413) · seleção parte2-numero · 2 comentários abertos (cmt_0007, cmt_0009) · mudanças da pessoa desde o seu último turno: #131 y 860→920 em parte2-numero"}}`. O mesmo texto aparece no chip acima do terminal;
   - `/arquivo` atribui autoria (8.6);
   - `/fim-turno` marca a aba como "pronto" e dispara o checkpoint;
   - `/aviso` põe o selo "precisa de você".
@@ -973,10 +973,10 @@ Os orçamentos, perfis e testes que reprovam estão em `docs/desempenho.md`, que
 
 **Entra**
 
-- Abrir pasta, com importação do formato do protótipo e do motor antigo para `exemplos/exemplo`.
+- Abrir pasta, com importação do formato do protótipo e do motor antigo para o projeto de exemplo.
 - As quatro áreas.
 - **Vídeo:**
-  - o C2 real no Player a partir do roteiro resolvido em TS;
+  - o carrossel de referência real no Player a partir do roteiro resolvido em TS;
   - seleção por clique;
   - alças para `y`, `x`, `largura` e `tam`;
   - painel de propriedades gerado do schema;
@@ -1014,16 +1014,16 @@ Cada passo termina rodando, com `npm run typecheck` e `npm test` verdes, e com u
 | # | Passo | Pronto quando |
 |---|---|---|
 | 1 | **Fundação.** Reorganizar o protótipo nas camadas da seção 3; Electron 45, Zod 4, regras de fronteira no ESLint; casca com as 4 áreas em chunks; perfil da máquina; selo de RAM; pty-host e render-host vazios via utilityProcess (decide o plano B) | `npm run dev` abre a casca em menos de 2 s; trocar de área carrega o chunk; o selo mostra main, renderer e pty; primeiro commit no repositório |
-| 2 | **`doc` + `schemas`.** Ponteiro com `@id`, `aplicar`, inversa, `diff` por id, `alvos`, `formatar`, hash; Zod dos 6 tipos; geração do JSON Schema; importação do `exemplos/exemplo` para o formato da seção 4 | Suíte de testes do RFC 6902 (json-patch-tests) verde; inversa de cada op volta ao original; C2 importado sem id duplicado (`parte3-cartao-1/2`); `formatar` idempotente |
-| 3 | **`motor`.** Mover a porta do protótipo; somar `MapaTempo`, segmentos de narração, `origem` por id, `encaixarNaPalavra`, `frases` | Teste dourado contra `referencia/.../exemplo/props.json` (cenas, `em`/`sai`, legendas, sons e `duracao_ms` exatos); segmentos cobrem a fonte sem buraco |
+| 2 | **`doc` + `schemas`.** Ponteiro com `@id`, `aplicar`, inversa, `diff` por id, `alvos`, `formatar`, hash; Zod dos 6 tipos; geração do JSON Schema; importação do projeto de exemplo para o formato da seção 4 | Suíte de testes do RFC 6902 (json-patch-tests) verde; inversa de cada op volta ao original; carrossel de referência importado sem id duplicado (`parte3-cartao-1/2`); `formatar` idempotente |
+| 3 | **`motor`.** Mover a porta do protótipo; somar `MapaTempo`, segmentos de narração, `origem` por id, `encaixarNaPalavra`, `frases` | Teste dourado contra `referencia/.../props.json` do exemplo (cenas, `em`/`sai`, legendas, sons e `duracao_ms` exatos); segmentos cobrem a fonte sem buraco |
 | 4 | **Núcleo + IPC.** DocStore, `aplicar()` com a regra de concorrência, diário, desfazer, watcher (eco, inválido, diff), comentários como documento, `CanaisInvoke`/`CanaisEvento`, servidor HTTP `/m` | Testes de conflito, rebase por alvo, desfazer cruzado (pessoa × agente), reinício com desfazer e arquivo inválido verdes; uma edição feita no VS Code aparece no app em menos de 300 ms |
 | 5 | **Vídeo.** Composição `Roteiro` (tema com `Bloco.id` e `data-estudio-id` na `Caixa`, `midiaUrl`, fontes locais, narração por segmentos); Player 0,5×; overlay de seleção e alças; Propriedades geradas do schema; Timeline com encaixe | Arrastar o 25% grava `y` no disco, o diário ganha uma linha e o Ctrl+Z volta; mudar o `em` pela timeline encaixa na palavra; patch → quadro redesenhado em menos de 100 ms |
 | 6 | **Terminal + MCP + hooks.** xterm com abas pelo pty-host e porta direta; perfil de aba; `/mcp` com as ferramentas de leitura e escrita; hooks `/h/*`; chip de contexto | Duas abas `claude` em paralelo; "faça o 25% entrar no fim de 'adicional'" vira `editar_objeto`, o Player atualiza em menos de 1 s, o diário mostra `agente:aba-N` e o Ctrl+Z da pessoa não desfaz a mudança do agente |
 | 7 | **Comentários.** Ferramenta `C` no Vídeo (as outras áreas ganham `resolverAlvo` nos passos 8 a 10), PNG por `capturePage`, painel, "mandar para a aba", ferramentas `comentarios`/`comentario`/`responder`/`resolver` | **Marco 1:** clicar no bloco cria `cmt_0001` com PNG; o agente o lê, aplica a mudança e o resolve com as `seqs`; o comentário aparece resolvido na tela |
-| 8 | **Efeitos.** Catálogo + compilador; `<ComEfeitos>` no tema, na foto e na raiz; área Efeitos com pilha do alvo selecionado; predefinição | Vinheta + granulado no C2 inteiro e `cor` na foto, na prévia; a mesma predefinição em dois alvos muda junto quando editada; o agente adiciona um desfoque por `inserir_objeto` |
-| 9 | **Imagem.** Composição `Imagem`/`ImagemView`; `<Thumbnail>` + alças imperativas; Camadas; render-host com `renderStill` | Capa 1080×1350 com 3 camadas montada à mão e pelo terminal; PNG com alfa em `saidas/`; bloco `imagem` com a capa aparece no C2 |
-| 10 | **3D.** Área com R3F `demand`, primitivas, luzes, `TransformControls`, `OrbitControls`, câmera → documento; composição `Cena3D`; bloco `cena3d` | Cubo e esfera; o gizmo gera um patch por arraste; o agente muda `transform.rotacao` e a viewport segue; o bloco `cena3d` aparece no Player do C2 |
-| 11 | **Exportação + git.** `renderMedia` com fila, progresso, cancelamento e perfil; checkpoints (Stop, ocioso, marcar versão, export) com um autor por commit; `quadro`/`exportar`/`marcar_versao` no MCP; teste de paridade | MP4 do C2 em `saidas/`, com áudio; `git log` com commits de `ana` e de `agente:aba-N` separados e com trailers; paridade abaixo do limiar nos quadros de entrada |
+| 8 | **Efeitos.** Catálogo + compilador; `<ComEfeitos>` no tema, na foto e na raiz; área Efeitos com pilha do alvo selecionado; predefinição | Vinheta + granulado no carrossel de referência inteiro e `cor` na foto, na prévia; a mesma predefinição em dois alvos muda junto quando editada; o agente adiciona um desfoque por `inserir_objeto` |
+| 9 | **Imagem.** Composição `Imagem`/`ImagemView`; `<Thumbnail>` + alças imperativas; Camadas; render-host com `renderStill` | Capa 1080×1350 com 3 camadas montada à mão e pelo terminal; PNG com alfa em `saidas/`; bloco `imagem` com a capa aparece no carrossel de referência |
+| 10 | **3D.** Área com R3F `demand`, primitivas, luzes, `TransformControls`, `OrbitControls`, câmera → documento; composição `Cena3D`; bloco `cena3d` | Cubo e esfera; o gizmo gera um patch por arraste; o agente muda `transform.rotacao` e a viewport segue; o bloco `cena3d` aparece no Player do carrossel de referência |
+| 11 | **Exportação + git.** `renderMedia` com fila, progresso, cancelamento e perfil; checkpoints (Stop, ocioso, marcar versão, export) com um autor por commit; `quadro`/`exportar`/`marcar_versao` no MCP; teste de paridade | MP4 do carrossel de referência em `saidas/`, com áudio; `git log` com commits de `ana` e de `agente:aba-N` separados e com trailers; paridade abaixo do limiar nos quadros de entrada |
 | 12 | **Orçamento.** Teste Playwright em modo Electron do `desempenho.md` (partida, E1, E2, export curto, rajada no terminal) | E1 e E2 dentro do teto no PC de desenvolvimento, com o perfil leve forçado |
 
 **Se o tempo apertar, sai nesta ordem:**
@@ -1078,10 +1078,10 @@ Cada passo termina rodando, com `npm run typecheck` e `npm test` verdes, e com u
 Internas, lidas em 05/11/2026:
 
 - `C:\Users\usuario\projetos\estudio\referencia\motor-mac\scripts\preparar_carrossel.py` (constantes, `round`, cortes)
-- `...\referencia\motor-mac\dados\trabalho\exemplo\roteiro.json`, `props.json` (chaves de topo) e `pub/narracao.wav`
+- `...\referencia\motor-mac\dados\trabalho\<exemplo>\roteiro.json`, `props.json` (chaves de topo) e `pub/narracao.wav`
 - `...\referencia\template-electron\package.json` (Electron 42.11.16, Forge 7.11.1)
 - `C:\Users\usuario\projetos\estudio\package.json`, `src/**` e `testes/resolver.test.ts` (protótipo)
-- `exemplos/exemplo` (estrutura e presença do `video-exemplo.mp4`)
+- o projeto de exemplo (estrutura e presença do vídeo-fonte da narração)
 - `C:\Users\usuario\projetos\estudio\docs\desempenho.md` (processos, MCP por HTTP, perfis, orçamentos)
 - Proposta A e proposta B (05/11/2026), com as fontes externas que elas citam.
 

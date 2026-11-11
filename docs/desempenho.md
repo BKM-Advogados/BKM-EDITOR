@@ -87,7 +87,7 @@ Três mudanças em relação ao que já estava decidido, com motivo:
 | `main:pronto` (`app.whenReady`) | 200 ms | 600 ms |
 | `janela:visivel` (`ready-to-show`, casca pintada) | 700 ms | 1,5 s |
 | `ui:interativa` (casca e área padrão aceitam entrada) | 1,2 s | 2,5 s |
-| `projeto:aberto` (C2: ler os JSON e resolver âncoras em TS) | 300 ms | 800 ms |
+| `projeto:aberto` (carrossel de referência: ler os JSON e resolver âncoras em TS) | 300 ms | 800 ms |
 | `video:primeiro-quadro` (depois do projeto aberto) | 800 ms | 1,5 s |
 | `area:3d:pronta` (primeira vez: chunk + contexto + cena) | 800 ms | 1,5 s |
 | `area:imagem:pronta` | 500 ms | 1 s |
@@ -102,11 +102,11 @@ Métrica: soma de `privateBytes` (só Windows) de todos os processos de `app.get
 
 | Estado | Alvo | Teto (reprova) |
 |---|---|---|
-| E1. Parado: projeto C2 aberto, Vídeo pausado, 1 aba de terminal | 300 MB | 400 MB |
+| E1. Parado: projeto de referência aberto, Vídeo pausado, 1 aba de terminal | 300 MB | 400 MB |
 | E2. Vídeo tocando (prévia em escala 0,5), timeline e propriedades | 500 MB | 700 MB |
 | E3. Imagem 4096² com 10 camadas e 3 efeitos | 650 MB | 850 MB |
 | E4. 3D: 50 primitivas + 1 glTF de 20 MB, girando | 600 MB | 800 MB |
-| E5. Exportando o C2 (1080×1920, 80,7 s), concurrency 2, render-host incluído | 1,4 GB | 1,9 GB |
+| E5. Exportando o carrossel de referência (1080×1920, 80,7 s), concurrency 2, render-host incluído | 1,4 GB | 1,9 GB |
 | Volta a E1 depois de E3, E4 e E5 (vazamento) | E1 + 30 MB | E1 + 60 MB |
 
 **Pior caso no leve:** 1,9 GB do export mais 2 sessões `claude` (cerca de 1 GB) dão cerca de 3 GB. Sobram cerca de 5 GB para o Windows e os outros apps [inferência].
@@ -118,7 +118,7 @@ A conta da Imagem que sustenta E3: uma camada RGBA de 4096² tem 64 MB. Dez cama
 - **E1:** CPU média abaixo de 1% em 60 s; nenhum `requestAnimationFrame` em laço (o build de teste conta: menos de 1 por segundo em repouso).
 - **E2:** 30 fps com no máximo 2% de quadros pulados. A conta usa o salto de quadro entre eventos `frameupdate` do Player. Zero *long tasks* acima de 50 ms em 10 s de reprodução.
 - **E4 parado:** `renderer.info.render.frame` não avança (nenhum quadro renderizado).
-- **E5:** latência de entrada na UI com p95 abaixo de 100 ms. Tempo de export de até 3× a duração do vídeo, ou seja, C2 em até 4 min [medir na fase 0, com `npx remotion benchmark` [21]].
+- **E5:** latência de entrada na UI com p95 abaixo de 100 ms. Tempo de export de até 3× a duração do vídeo, ou seja, o carrossel de referência em até 4 min [medir na fase 0, com `npx remotion benchmark` [21]].
 - **Bundle [inferência]:** JS inicial do renderer de até 1,5 MB minificado. Three.js, os addons do xterm, Mediabunny e `@remotion/renderer` ficam fora dele.
 
 ### 3.4 Política das sessões `claude`
@@ -165,11 +165,11 @@ A conta da Imagem que sustenta E3: uma camada RGBA de 4096² tem 64 MB. Dez cama
 - **Cálculo fora do quadro.** O resolvedor de âncoras e a mixagem (portados para TS) rodam no núcleo a cada patch e entregam props prontas. Por quadro, a composição só lê e interpola os blocos visíveis.
 - **Player leve:** escala do perfil, controles irmãos, `inputProps` memoizado [25]. `bufferStateDelayInMilliseconds` evita o spinner piscando [26].
 - **Mídia:** usar o `<Video>` de `@remotion/media`, que a página de desempenho recomenda; `Html5Video` e `OffthreadVideo` "are not optimized" [21]. `maxCanvasSinkFrameSize` limita o tamanho dos quadros na prévia, mas a decodificação continua em tamanho cheio [27]. `premountFor` monta o vídeo antes do quadro de entrada [27].
-- **Proxies (depois do MVP: o C2 não tem vídeo, só foto e áudio):** um Worker com Mediabunny `Conversion` gera a versão de prévia, com `width`/`height`/`fit`, `codec: 'avc'` e `hardwareAcceleration: 'prefer-hardware'` [28]. Isso usa o WebCodecs do Chromium, em geral acelerado por hardware, e roda em Worker [29]. GOP curto para busca rápida [inferência; confirmar a opção na lib]. O proxy fica no cache em disco por hash do arquivo; a exportação usa sempre o original.
+- **Proxies (depois do MVP: o carrossel de referência não tem vídeo, só foto e áudio):** um Worker com Mediabunny `Conversion` gera a versão de prévia, com `width`/`height`/`fit`, `codec: 'avc'` e `hardwareAcceleration: 'prefer-hardware'` [28]. Isso usa o WebCodecs do Chromium, em geral acelerado por hardware, e roda em Worker [29]. GOP curto para busca rápida [inferência; confirmar a opção na lib]. O proxy fica no cache em disco por hash do arquivo; a exportação usa sempre o original.
 - **WebCodecs:** todo `VideoFrame` recebe `close()` assim que deixa de ser usado [29].
 - **Miniaturas e quadros (depois do MVP):** LRU de `ImageBitmap` a 160 px de largura, até 64 MB, com `close()` ao sair do cache.
 - **Quadro para comentário e para o agente:** se o quadro está na tela, `capturePage` do retângulo do Player. Se não, `renderStillOnWeb` em escala pequena, sem subir o Chrome Headless Shell (a rodada 1 registra o web-renderer como estável desde a 4.0.491).
-- **Forma de onda:** picos calculados uma vez (num Worker, não no pty-host) e guardados em JSON, sem `decodeAudioData` do arquivo inteiro. Para referência, 10 min de áudio estéreo a 48 kHz em float32 dão cerca de 230 MB [inferência]. No C2 (80 s), decodificar é aceitável no MVP.
+- **Forma de onda:** picos calculados uma vez (num Worker, não no pty-host) e guardados em JSON, sem `decodeAudioData` do arquivo inteiro. Para referência, 10 min de áudio estéreo a 48 kHz em float32 dão cerca de 230 MB [inferência]. No carrossel de referência (80 s), decodificar é aceitável no MVP.
 
 ### 4.5 Imagem
 
@@ -233,14 +233,14 @@ A conta da Imagem que sustenta E3: uma camada RGBA de 4096² tem 64 MB. Dez cama
 ## 6. Teste automático que reprova
 
 - **Ferramenta:** Playwright em modo Electron. `_electron.launch()`, depois `electronApp.evaluate(({ app }) => app.getAppMetrics())` para rodar no main e `firstWindow()` para a janela [36]. A API está na seção "Experimental" da doc [36].
-- **Modo de teste:** `--perfil=leve --teste-desempenho` liga `--js-flags=--expose-gc` para chamar `gc()` antes de cada medida, usa uma cópia fixa do projeto C2 e desliga atualização automática.
+- **Modo de teste:** `--perfil=leve --teste-desempenho` liga `--js-flags=--expose-gc` para chamar `gc()` antes de cada medida, usa uma cópia fixa do projeto de referência e desliga atualização automática.
 - **Arquivos:** `tests/desempenho/orcamento.json` (perfil → estado → `memoria_mb`, `tempo_ms`, `cpu_ocioso_pct`, `contextos_webgl`, `quadros_pulados_pct`) e `tests/desempenho/estados.spec.ts`.
 - **Roteiro:**
   1. Partida: tempo até `ui:interativa`.
   2. E1: assentar 5 s, chamar `gc()`, fazer 10 amostras a cada 500 ms e pegar o p95 da soma de `privateBytes`, mais CPU média em 30 s.
   3. E2: tocar 10 s; conferir quadros pulados e *long tasks*.
   4. E3 e E4: abrir os fixtures (imagem 4096² com 10 camadas; cena com 50 primitivas e glTF).
-  5. E5: exportar os primeiros 10 s do C2 (o export inteiro roda à noite, no notebook de referência).
+  5. E5: exportar os primeiros 10 s do carrossel de referência (o export inteiro roda à noite, no notebook de referência).
   6. Vazamento: abrir e descarregar 3D e Imagem 20 vezes. Depois de `gc()`, o crescimento tem de ficar abaixo de 30 MB. Contextos WebGL e `ImageBitmap` voltam ao valor de antes.
   7. Terminal: um agente falso (script Node) despeja 50 MB de ANSI numa aba. O teste confere que a memória do renderer fica limitada e que a tecla ecoa em menos de 100 ms durante a rajada. Não usa o `claude` real, porque o teste não tem login.
 - **Regra de aprovação:** passar do teto reprova; passar do alvo gera aviso. Cada estado roda 3 vezes, vale a mediana, com tolerância de 10% por ruído. Os resultados vão para JSONL, para ver a tendência.
@@ -316,7 +316,7 @@ expect(kb / 1024).toBeLessThan(orcamento.leve.E1.teto_mb);
 
 1. Electron vazio e app com só a casca no notebook mais fraco: soma de `privateBytes` e tempo até `ready-to-show`. Isso calibra a seção 3.
 2. RAM de uma sessão `claude` parada e depois de 1 h de uso, com e sem `--strict-mcp-config`.
-3. Chrome Headless Shell por aba no C2 1080×1920, com concurrency 1, 2 e 4 (`npx remotion benchmark` [21]), e o tempo de export.
+3. Chrome Headless Shell por aba no carrossel de referência 1080×1920, com concurrency 1, 2 e 4 (`npx remotion benchmark` [21]), e o tempo de export.
 4. `@remotion/renderer` dentro de `utilityProcess`, com os binários fora do asar.
 5. WebGL do xterm.js com o TUI do Claude (texto embaralhado?) e custo da troca de addon entre abas.
 6. Contagem real de contextos com Player, Imagem, Efeitos e terminal abertos juntos, abaixo de 3 no leve; e o limite real de contextos do Chromium embutido no Electron escolhido (a fonte pública do 16 é de 2013).

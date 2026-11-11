@@ -3,7 +3,7 @@
 Versão 1, de 07/11/2026 (rodada 2, frente C: zoom dinâmico nas imagens e marca d'água por rede). Junta o que a
 exportação faz desde a rodada 1 (diálogo com destinos, formato, qualidade, escala, trecho, estimativa, andamento e
 Cancelar; zona segura no monitor; lâmina) com o que entrou agora. Vale para o vídeo de cenas (`"tipo": "cenas"`); a
-marca d'água vale também para o carrossel narrado da Cliente.
+marca d'água vale também para o carrossel narrado.
 
 ## Zoom dinâmico (Ken Burns)
 
@@ -47,9 +47,9 @@ lado menor; padrão 6%) e opacidade (20% a 100%; padrão 85%). Ao lado, uma mini
 no tamanho do destino, a marca e as zonas da rede apagadas por cima. O destino com marca ligada ganha um carimbo na
 lista.
 
-- **De onde vem:** no vídeo de cenas, `tema.logo` e `tema.assinatura` (o kit de marca põe os dois); no carrossel da
-  Cliente, `logo` e `marca.insta`. Sem nenhum dos dois, a linha avisa para aplicar um kit. Se o conteúdo pedido faltar, vai o
-  outro. O logo vai como está, sem sombra nem filtro (o manual da Cliente não deixa o logo levar efeito); a assinatura sai em
+- **De onde vem:** no vídeo de cenas, `tema.logo` e `tema.assinatura` (o kit de marca põe os dois); no carrossel
+  narrado, `logo` e `marca.insta`. Sem nenhum dos dois, a linha avisa para aplicar um kit. Se o conteúdo pedido faltar, vai o
+  outro. O logo vai como está, sem sombra nem filtro (os manuais de marca não deixam o logo levar efeito); a assinatura sai em
   branco, na fonte do tema (no carrossel, IBM Plex Sans), com uma sombra curta para ler em fundo claro.
 - **Onde fica:** o canto padrão é o livre de cada rede: em cima à direita no 9:16 (logo abaixo do nome do perfil; a
   coluna de ícones só começa no meio do quadro), embaixo à direita no 4:5 (dentro dos cortes 1:1 e 3:4 da grade) e em
@@ -96,7 +96,7 @@ lista.
   `testes/marca-dagua-legenda.test.ts`; entre eles, a marca fora das zonas em todo formato, canto e tamanho, as
   preferências juntando por destino, o botão passando Inteira para Preencher com um Ctrl+Z só e a marca fora da legenda
   em todo formato, estilo e posição de legenda, canto e tamanho até 10%).
-- Prévia web (`?vista`, porta 5204): "Escolher imagem" devolve fotos sintéticas e o kit da Cliente ganha um logo de exemplo
+- Prévia web (`?vista`, porta 5204): "Escolher imagem" devolve fotos sintéticas e o kit bkm ganha um logo de exemplo
   (`scripts/previa-web/ponte.ts`); o movimento aparece no monitor e no inspetor, e o diálogo mostra a miniatura e
   lembra a escolha.
 - `npx tsx scripts/exportar-teste-kenburns.mjs` renderiza três fotos com movimento nos quatro formatos com o logo e uma
@@ -106,11 +106,11 @@ lista.
 
 ## Rodada 3: correções do vídeo que vai ao ar
 
-Para o guia da IA (texto para o `claudeMd`), no vídeo de cenas e no carrossel da Cliente:
+Para o guia da IA (texto para o `claudeMd`), no vídeo de cenas e no carrossel narrado:
 
 - **Número com decimais** (video-D8): o bloco `numero` mostra as casas decimais que `de` e `ate` têm (7,5 → "7,5"; 2824,68 →
   "2.824,68"); em dinheiro (`prefixo` ou `sufixo` com "R$" ou "reais") com centavos, sempre duas ("R$ 1.412,50"). Para forçar,
-  o campo opcional `casas` (0 a 4) no bloco. Vale também nos blocos `numero` do carrossel da Cliente.
+  o campo opcional `casas` (0 a 4) no bloco. Vale também nos blocos `numero` do carrossel narrado.
 - **Lâmina sem corte visível** (video-D1): quando a lâmina (Ctrl+K) corta no meio de um bloco, ela põe `segue_ms` na primeira
   metade e `desde_ms` na segunda. **Não edite esses dois campos**: dizem à composição que o bloco continua dos dois lados do
   corte (não some, não entra de novo, a contagem e o Ken Burns seguem). O vídeo dividido sai igual ao inteiro. Se a cena
@@ -141,7 +141,7 @@ Conferido: `testes/numero.test.ts`, `testes/corte-limpo.test.ts`, `testes/carros
 - **Contraste de 3:1 da marca d'água**: o botão **Conferir** (linha "Contraste") renderiza três quadros do destino (25%, 50% e 75% do
   trecho), sem a marca e com ela, e mede na caixa dela o fundo (média do quadro sem a marca) e a cor da marca na tela (os pixels que
   mudaram, já com a opacidade). O pior quadro manda; o mínimo é 3:1 (WCAG para gráficos e texto grande). Abaixo disso, o diálogo
-  avisa e oferece **Usar placa escura/clara**, a que mais contrasta com a marca: a placa é a caixa da marca (grafite `#171A19` ou osso
+  avisa e oferece **Usar placa escura/clara**, a que mais contrasta com a marca: a placa é a caixa da marca (escura `#171A19` ou clara
   `#F4F0EA`), com respiro de um quarto da altura, e continua fora das zonas da rede e da legenda; com ela aplicada, o diálogo mede de
   novo (a medida passa a ser da marca contra a placa). A escolha vai em `.estudio/exportacao.json` (`"placa": "escura"`).
   Código: `src/nucleo/contraste.ts` (a conta), `src/main/contraste-marca.ts` (o render e a leitura dos pixels, canal

@@ -39,7 +39,8 @@ arquivo baixado; os dos modelos são o oid do LFS no Hugging Face. Nada disso en
 
 ### Medido (07/11/2026, i5-1135G7, 32 GB, 7 threads)
 
-Narração do exemplo Cliente C2 (72 s, pt-BR), contra o `video/palavras.json` do exemplo (`scripts/transcrever-teste.mjs`):
+Uma narração real de 72 s (pt-BR), contra o `palavras.json` de referência dela (`scripts/transcrever-teste.mjs`, com a
+voz em `ESTUDIO_VOZ_TESTE` e a referência em `ESTUDIO_PALAVRAS_TESTE`; o repositório não traz gravação de voz):
 
 | Configuração | Tempo | Pico de memória do whisper-cli | Palavras erradas | Começo da palavra (mediana / p90) |
 |---|---|---|---|---|
@@ -95,11 +96,11 @@ neste PC; os tempos variam com a carga). Os áudios:
 
 - **silêncio**: 20 s de silêncio de sala, perto de −47 dB;
 - **música**: 20 s de música sintética (acordes, baixo, batida e chimbal, sem voz cantada);
-- **efeitos**: os seis efeitos do C2 em sequência;
-- **antes da fala**: o começo da mistura, 6 s de silêncio e 8 s de música, antes da narração do C2 (72 s).
+- **efeitos**: seis efeitos sonoros em sequência (hoje o script os sintetiza);
+- **antes da fala**: o começo da mistura, 6 s de silêncio e 8 s de música, antes da narração (72 s).
 
 A coluna "antes da fala" conta as palavras escritas nesses 14 s. As últimas colunas medem a narração da mistura
-contra o `palavras.json` do exemplo, que também é de máquina.
+contra o `palavras.json` de referência, que também é de máquina.
 
 | Configuração | Silêncio | Música | Efeitos | Antes da fala | Palavras erradas | Começo até 100 ms | Mediana / p90 do começo |
 |---|---|---|---|---|---|---|---|
@@ -125,18 +126,11 @@ Não medido:
 
 Para medir a régua da transcrição com fala da casa, conferida à mão: WER abaixo de 10%, glossário certo em 95% das
 ocorrências e começo da palavra a até 100 ms em 90% das palavras. O conjunto está em `scripts/conjunto-casa.json`:
-oito itens, 636 s (10,6 min).
+cerca de 10 min, com vozes humanas (celular, com música; vídeo de mensageiro) e narrações sintéticas. O JSON do
+repositório é um modelo: os itens, a pasta das mídias (`base`, fora do repositório) e a da conferência são de quem mede.
 
-| Item | O que é | Duração |
-|---|---|---|
-| `igor-reel` | voz humana: o Reel do Igor, gravado no celular, com música | 76 s |
-| `whatsapp` | voz humana: o advogado no vídeo do WhatsApp (480p) | 106 s |
-| `c3` a `c8` | narrações dos Curtas da Cliente (Notebook): saúde e PPP, o que a Justiça reconheceu, adicional noturno, feriado, banco de horas, portaria até o ponto | 454 s |
-
-O C2 fica de fora, porque o vocabulário do whisper (`PROMPT_PADRAO`) foi afinado nele. As mídias ficam na pasta dos
-shorts da Cliente (`tasks/shorts-2026-11-04`, fora do repositório). A conferência fica em
-`tasks/estudio-acompanhamento/rodada-3/conjunto-casa/`. O glossário (siglas, nomes da casa e termos do direito do
-trabalho) está no mesmo JSON.
+A fala usada para afinar o vocabulário do whisper (`PROMPT_PADRAO`) fica de fora. O glossário (siglas e termos do
+direito do trabalho; acrescente os nomes que os vídeos citam) está no mesmo JSON.
 
 **Roteiro de conferência** (a conferência à mão é do responsável):
 
@@ -151,7 +145,7 @@ trabalho) está no mesmo JSON.
 2. **Texto.** Abra `<id>.texto.txt` e ouça `<id>.wav`. Corrija o texto para o que foi dito, palavra por palavra:
    - siglas em caixa alta;
    - números como a legenda escreveria (13º, 40%);
-   - nomes como se escrevem (Empresa, Escritório Exemplo);
+   - nomes como se escrevem (empresas, pessoas, cidades);
    - o que não dá para entender vira `[?]`, que sai da conta.
 
    Pontuação e quebra de linha não contam. No fim, troque `conferido: não` por `conferido: sim`. Conta uns 3 a 5 min
@@ -166,7 +160,7 @@ trabalho) está no mesmo JSON.
    São 96 palavras no conjunto, cerca de meia hora.
 4. `npx tsx scripts/conjunto-casa.mjs medir` mede o que já foi conferido e diz o que falta. Grava `resultado.json` na
    pasta, com o total, a régua e as ocorrências erradas do glossário. As medidas:
-   - **WER**: sem acento, caixa e pontuação, como a medida do C2, e também com acento.
+   - **WER**: sem acento, caixa e pontuação, como a medida da narração acima, e também com acento.
    - **Glossário**: o que o whisper escreveu e o que fica depois do dicionário da casa, como na legenda.
    - **Começo**: o rótulo movido contra a palavra igual mais perto (até 1 s).
 
@@ -180,8 +174,8 @@ Ao lado do áudio, na **versão 2**: `{"versao": 2, "fonte": {"tamanho", "modifi
 probabilidade média dos tokens (o app sempre leu ms; o brief dizia segundos). `fonte` é o carimbo do áudio transcrito,
 o mesmo do envelope do som: tamanho e data iguais, a transcrição vale; mesmo tamanho e outra data (cópia, git clone), o
 sha256 decide; outro tamanho, ou a lista sem carimbo da versão 1, conta como **velha** e é transcrita de novo. Assim a
-tomada regravada com o mesmo nome não fica com o texto da antiga. Com `destino` (o `video/palavras.json` do roteiro da
-Cliente) grava só a lista, o formato do roteiro; quem lê o roteiro aceita os dois. O arquivo entra no git.
+tomada regravada com o mesmo nome não fica com o texto da antiga. Com `destino` (o `video/palavras.json` do roteiro do
+carrossel narrado) grava só a lista, o formato do roteiro; quem lê o roteiro aceita os dois. O arquivo entra no git.
 
 **Voz limpa:** a fala do clipe é a do arquivo da pessoa (`original`) quando o clipe toca a versão limpa, que tem os
 mesmos tempos (`arquivoDaFala`). Limpar a voz, ou voltar ao original, não pede outra transcrição nem tira o ✓.
@@ -203,7 +197,7 @@ arquivo de fora do projeto, exporta, apaga ou reverte mudança de outro autor.
 
 | Ferramenta | Classe | Entrada | Faz |
 |---|---|---|---|
-| `transcrever` | `cartao` (na primeira vez baixa o whisper.cpp e o modelo, 200 MB) | `arquivo?`, `destino?`, `documento?`, `clipe?`, `faixa?`, `legendas?`, `estilo?`, `refazer?`, `refazer_legendas?`, `modelo?`, `vocabulario?` | Uma ferramenta para os dois usos do plano. Com `arquivo` (qualquer áudio ou vídeo do projeto: a narração de um roteiro da Cliente, uma gravação para a pesquisa), grava as palavras ao lado ou em `destino` (ex.: `video/palavras.json`; nunca o manifesto, um documento, `comentarios.json`, a pesquisa, `.estudio/` ou um .json que não seja lista de palavras, porque grava por cima e fora do diário) e devolve o texto (até 4.000 caracteres). No vídeo de cenas, transcreve a fala que ainda não tem transcrição ou cuja tomada mudou (ou toda, com `refazer`) e gera as legendas **dos clipes que ainda não têm** (padrão), pelo `aplicar_patch` de sempre (diário e versão). Clipe com legendas fica como está e volta em `ja_tinham_legendas` (e em `legendas_de_audio_antigo`, se a tomada mudou); `refazer_legendas` refaz, levando as palavras corrigidas à mão |
+| `transcrever` | `cartao` (na primeira vez baixa o whisper.cpp e o modelo, 200 MB) | `arquivo?`, `destino?`, `documento?`, `clipe?`, `faixa?`, `legendas?`, `estilo?`, `refazer?`, `refazer_legendas?`, `modelo?`, `vocabulario?` | Uma ferramenta para os dois usos do plano. Com `arquivo` (qualquer áudio ou vídeo do projeto: a narração de um roteiro do carrossel narrado, uma gravação para a pesquisa), grava as palavras ao lado ou em `destino` (ex.: `video/palavras.json`; nunca o manifesto, um documento, `comentarios.json`, a pesquisa, `.estudio/` ou um .json que não seja lista de palavras, porque grava por cima e fora do diário) e devolve o texto (até 4.000 caracteres). No vídeo de cenas, transcreve a fala que ainda não tem transcrição ou cuja tomada mudou (ou toda, com `refazer`) e gera as legendas **dos clipes que ainda não têm** (padrão), pelo `aplicar_patch` de sempre (diário e versão). Clipe com legendas fica como está e volta em `ja_tinham_legendas` (e em `legendas_de_audio_antigo`, se a tomada mudou); `refazer_legendas` refaz, levando as palavras corrigidas à mão |
 | `ler_legendas` | `livre` (só lê) | `documento?`, `de?`, `ate?` | as legendas nos tempos da tela (id, em, sai, texto, falante), já com o clipe de voz no lugar em que está |
 | `editar_legenda` | `livre` | `documento?`, `id`, `texto?`, `em?`, `sai?` | corrige o texto (cada palavra guarda o tempo da que estava no lugar, como na lista do app) e o tempo, dado como na tela: o app desconta o quanto o clipe andou desde que a legenda nasceu. Entrar e sair o mesmo tanto leva as palavras junto (sem sair do trecho do clipe: recusa e diz quanto dá); mudar uma ponta apara |
 | `exportar_legendas` | `cartao` (exporta) | `documento?`, `formatos?` (`srt`, `vtt`, `srt_pt_br`), `nome?`, `falantes_no_srt?`, `sobrescrever?`, `trecho?` | `saidas/<título>.srt` e `.vtt` (padrão), ou `.pt_BR.srt` (o nome que o Facebook pede), nos tempos de saída; com `trecho` {de_ms, ate_ms}, só as legendas dele, cortadas nas pontas e contadas do zero (para o vídeo exportado com o mesmo trecho); trecho sem legenda é erro claro; com o nome tomado, `<título> (2).srt` (só grava por cima com `sobrescrever`) |
@@ -281,7 +275,7 @@ tira as palavras que o clipe não toca mais. Clipe apagado: as legendas ficam on
 |---|---|---|---|---|---|
 | Clássica | embaixo | 4,2% | caixa escura translúcida por linha | cor de destaque e um fundo leve (pista além da cor) | 2 linhas |
 | Palavra em caixa | no meio | 6,8%, maiúsculas, 800 | nenhuma, com contorno | dentro de uma caixa na cor de destaque | 3 palavras |
-| Karaokê | embaixo | 5,6%, 700 | nenhuma, com sombra | cor de destaque; as que vêm depois apagadas (como o carrossel da Cliente) | 4 palavras |
+| Karaokê | embaixo | 5,6%, 700 | nenhuma, com sombra | cor de destaque; as que vêm depois apagadas (como o carrossel narrado) | 4 palavras |
 | Faixa da marca | embaixo | 4% | faixa de lado a lado na cor de destaque, texto na cor do fundo | sublinhada | 2 linhas |
 | Discreta | embaixo | 3,4%, 500 | nenhuma, com sombra | sem destaque | 2 linhas |
 
@@ -452,12 +446,12 @@ começa em `em_ms` com `corte_ms + (em_ms − em)`.
 Da frente: `src/main/transcricao.ts` (sem Electron), `src/main/ipc-fala.ts`, `src/nucleo/legendas.ts`,
 `src/composicoes/cenas/Legendas.tsx`, `src/renderer/modulos/video/{PainelLegendas,FaixaLegendas}.tsx`,
 `acoes-legendas.ts`, `legendas.css`, `scripts/transcrever-teste.mjs`, `scripts/exportar-teste-legendas.mjs`,
-`testes/legendas.test.ts`, `testes/fala-mcp.test.ts`, `testes/fixtures/fala/whisper-c2-small.json` (o JSON real do
-whisper na narração do C2, sem o caminho da máquina).
+`testes/legendas.test.ts`, `testes/fala-mcp.test.ts`, `testes/fixtures/fala/whisper-small.json` (uma saída sintética no
+formato do whisper-cli, da narração de teste de `testes/fixtures/carrossel`).
 
 Compartilhados, só no fim e com comentário "frente Fala": `cenas.ts` (campo `legendas` no documento, `legendas_cenas`
-nas props e uma linha no resolvedor; o nome nas props não é `legendas` porque a linha do tempo lê esse do carrossel da
-Cliente), `VideoCenas.tsx` (uma linha), `LinhaDoTempo.tsx` (uma linha), `InspectorVideo.tsx` (uma linha: a seleção
+nas props e uma linha no resolvedor; o nome nas props não é `legendas` porque a linha do tempo lê esse do carrossel
+narrado), `VideoCenas.tsx` (uma linha), `LinhaDoTempo.tsx` (uma linha), `InspectorVideo.tsx` (uma linha: a seleção
 `/legendas…` mostra o painel), `ferramentas-mcp.ts` (sexto parâmetro `transcritor` e as três ferramentas no fim),
 `mcp-http.ts` (`definirTranscritorMcp`), `mcp/nucleo.ts`, `api.ts`, `preload.ts`, `main.ts` (uma linha),
 `scripts/previa-web/ponte.ts` (transcrição simulada) e `testes/mcp.test.ts` (a lista).
@@ -465,11 +459,11 @@ Cliente), `VideoCenas.tsx` (uma linha), `LinhaDoTempo.tsx` (uma linha), `Inspect
 ## Testes e verificação
 
 - `npm test`: 172 testes (36 em `legendas.test.ts`, 5 em `fala-mcp.test.ts` e os 131 de antes, com a lista do MCP).
-- `npx tsx scripts/transcrever-teste.mjs [base small]`: baixa o que falta, transcreve a narração do C2 e compara com a
+- `npx tsx scripts/transcrever-teste.mjs [base small]`: baixa o que falta, transcreve a narração de teste e compara com a
   referência (palavras erradas, erro do começo, tempo e pico de memória).
 - `npx tsx scripts/exportar-teste-legendas.mjs [estilo]`: 15 s da narração real → whisper → legendas → MP4 com som e
   legenda, uma foto de cada estilo, SRT e VTT, em `testes/saida/exportar-legendas/`.
-- `npx tsx scripts/vad-teste.mjs`: silêncio, música sintética, os efeitos do C2 e a narração depois de 14 s sem fala,
+- `npx tsx scripts/vad-teste.mjs`: silêncio, música sintética, efeitos sintéticos e a narração depois de 14 s sem fala,
   sem VAD, com o VAD como filtro e com o `--vad` numa passada (ver "Detector de voz").
 - `npx tsx scripts/conjunto-casa.mjs preparar|medir`: o conjunto da casa e a medida contra a conferência à mão (ver
   "Conjunto da casa").
@@ -487,7 +481,7 @@ Cliente), `VideoCenas.tsx` (uma linha), `LinhaDoTempo.tsx` (uma linha), `Inspect
   "Mostrar na pasta". A transcrição, o download e o ffmpeg foram exercitados pelo mesmo código fora do Electron.
 - O app instalado: o caminho do ffmpeg em `app.asar.unpacked` (o mesmo que a exportação já usa) e o antivírus de
   outro PC com o `whisper-cli.exe`.
-- Tempo e memória numa máquina de 8 GB; vídeos longos (uma hora de fala) e o modelo base em pt-BR fora do C2.
+- Tempo e memória numa máquina de 8 GB; vídeos longos (uma hora de fala) e o modelo base em pt-BR fora da narração medida.
 
 ## Para depois
 

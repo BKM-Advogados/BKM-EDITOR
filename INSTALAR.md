@@ -26,7 +26,7 @@
 
 1. O app abre na **tela inicial**. Para começar do zero: em **Novo**, escolha o formato pelo destino (Reels 9:16,
    YouTube 16:9…) e clique em **Em branco**. Os projetos ficam em `%USERPROFILE%\Estudio` (dá para trocar em
-   Preferências). Para ver um vídeo pronto, clique em **Ver um pronto**: o app copia o carrossel C2 da Cliente.
+   Preferências). Quando a instalação traz o projeto de exemplo, **Ver um pronto** abre uma cópia dele.
 2. **Login do Claude, uma vez só:**
    - no painel **Claude**, à direita, clique em **Abrir terminal**;
    - digite `/login` e entre com a sua conta;
@@ -38,7 +38,7 @@
 ## Bom saber
 
 - **Exportar vídeo** funciona sem internet: o navegador de render vem dentro do app.
-- **Fontes do exemplo:** as composições do exemplo Cliente buscam as fontes no Google Fonts. Na primeira prévia e na
+- **Fontes do carrossel narrado:** as composições buscam as fontes no Google Fonts. Na primeira prévia e na
   primeira exportação, o PC precisa estar na internet.
 - **Cobrança:** se houver uma `ANTHROPIC_API_KEY` configurada no Windows, o Claude cobra pela API, não pela assinatura.
   O app avisa quando isso acontece.

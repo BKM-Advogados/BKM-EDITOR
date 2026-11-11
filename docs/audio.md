@@ -3,7 +3,7 @@
 Versão 1, de 06/11/2026 (grupo 1 da Ordem sugerida: sessão multipista, trilha com volume e fades por clipe, ducking
 automático da música sob a voz e a pasta de trilhas). Versão 2, de 07/11/2026 (rodada 2): limpeza de voz, medidor de
 loudness (LUFS e pico verdadeiro) e o arquivo exportado no alvo de −14 LUFS. Vale para o documento `"tipo": "cenas"`; o
-carrossel narrado da Cliente continua com a narração em trechos e os efeitos sonoros do resolvedor de roteiro (e sai da
+carrossel narrado continua com a narração em trechos e os efeitos sonoros do resolvedor de roteiro (e sai da
 exportação como o render o faz, sem correção de loudness).
 
 ## O formato
@@ -144,7 +144,7 @@ a limpeza é TypeScript puro, sem modelo nem download:
 gente falando ao fundo) pede um modelo (RNNoise, BSD-3; DeepFilterNet, MIT/Apache-2.0), que fica para uma fatia
 seguinte: baixaria no primeiro uso para `%USERPROFILE%\Estudio\modelos\` com SHA-256 conferido, como as regras pedem.
 
-**Medido** (`npx tsx scripts/limpeza-teste.mjs`, 07/11/2026): a narração do exemplo da Cliente (40 s, mono, 44,1 kHz) com
+**Medido** (`npx tsx scripts/limpeza-teste.mjs`, 07/11/2026): uma narração real (40 s, mono, 44,1 kHz) com
 zumbido de 60 Hz e harmônicos (−45 dBFS), ruído largo (−42) e chiado (−50) somados. Ruído nas pausas (média de potência das
 10 % janelas de 50 ms mais quietas, ponderação K), antes → depois; voz (mediana com as portas do BS.1770):
 
@@ -184,10 +184,10 @@ nesse build), 07/11/2026:
 
 | Sinal | Integrado: medidor × ffmpeg | Pico: medidor × ffmpeg |
 |---|---|---|
-| Voz da Cliente com ruído (40 s) | −20,3 × −20,34 LUFS | −1,8 × −1,75 dBTP |
+| voz real com ruído (40 s) | −20,3 × −20,34 LUFS | −1,8 × −1,75 dBTP |
 | A mesma, limpa (média) | −20,8 × −20,83 LUFS | −1,7 × −1,74 dBTP |
 | Mistura do MP4 de teste, sintético | −20,4 × −20,45 LUFS | −8,3 × −9,13 dBTP |
-| Mistura do MP4 de teste, voz da Cliente | −20,5 × −20,57 LUFS | −5,1 × −5,11 dBTP |
+| Mistura do MP4 de teste, voz real | −20,5 × −20,57 LUFS | −5,1 × −5,11 dBTP |
 
 O pico da mistura sintética fica 0,8 dB abaixo do real: é no começo de cada frase, onde a música ainda não caiu e o
 alinhamento exato dos pacotes manda; o arquivo exportado é medido de novo, então o pico final não depende dessa previsão.
@@ -205,7 +205,7 @@ O ganho é o mesmo para todas as faixas: o ducking e os LU entre voz e música n
 exportação ("Igualando o loudness a −14 LUFS…" e a medida final).
 
 **Medido** (`npx tsx scripts/exportar-teste-som.mjs [--voz-real]`, 07/11/2026): sintético −20,45 → −14,0 LUFS, pico
-−9,13 → −2,69 dBTP (modo linear); com a voz da Cliente −20,57 → −14,21 LUFS, pico −5,11 → −1,49 dBTP (modo dinâmico, o
+−9,13 → −2,69 dBTP (modo linear); com a voz real −20,57 → −14,21 LUFS, pico −5,11 → −1,49 dBTP (modo dinâmico, o
 limitador segurou o pico); vídeo intacto e áudio sem atraso (a forma de onda casa com a mistura sem deslocamento).
 
 ## Licenças
@@ -322,7 +322,7 @@ mensagem manda para Configurações › Privacidade › Microfone.
 
 ## Correções de som da rodada 3 (D5, D6, D8, D10, D11, D12, N8)
 
-- **som-D5, carrossel narrado da Cliente:** `igualarLoudness` agora também acerta o MP4 do `CarrosselTema` (narração em `props.audio`) para
+- **som-D5, carrossel narrado:** `igualarLoudness` agora também acerta o MP4 do `CarrosselTema` (narração em `props.audio`) para
   −14 LUFS e −1 dBTP, o alvo padrão da casa. Medido num MP4 só de áudio com um tom baixo: **−29,9 → −14,1 LUFS, pico −10,2 dBTP**.
   **Não feito:** os efeitos do carrossel continuam com os volumes fixos de `roteiro/resolver.ts` (pensados para uma narração perto de
   −20 LUFS); como o ganho é um só para o arquivo, a diferença entre narração e efeitos fica a de antes, e numa narração gravada
