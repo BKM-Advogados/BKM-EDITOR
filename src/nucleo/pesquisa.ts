@@ -185,9 +185,22 @@ export const normalizar = (s: string): string => indexarExato(s, false).s;
 
 const semAcento = (s: string): string => s.normalize('NFD').replace(/\p{M}/gu, '');
 
-// Na comparação, quebra de linha vale espaço: um trecho de dois parágrafos copiado com espaço no lugar do \n (como
-// fazem a pessoa e o modelo) continua exato. Troca um caractere por um, então os índices não mudam.
-const quebraComoEspaco = (s: string) => s.replace(/\n/g, ' ');
+// Na comparação, quebra de linha vale espaço, e quebras seguidas (a linha em branco entre parágrafos, comum em texto puro
+// e PDF) valem um espaço só: um trecho de dois parágrafos copiado com espaço no lugar das quebras (como fazem a pessoa e o
+// modelo) continua exato. Vale dos dois lados, texto e trecho; o mapa de índices acompanha.
+const quebraComoEspaco = (x: Indexado): Indexado => {
+  const s: string[] = [];
+  const ini: number[] = [];
+  const fim: number[] = [];
+  for (let k = 0; k < x.s.length; k++) {
+    const c = x.s[k] === '\n' ? ' ' : x.s[k];
+    if (c === ' ' && s[s.length - 1] === ' ') continue;
+    s.push(c);
+    ini.push(x.ini[k]);
+    fim.push(x.fim[k]);
+  }
+  return {s: s.join(''), ini, fim};
+};
 
 /** Onde o trecho está no texto: 'exato' depois de normalizar os dois (quebra de linha vale espaço); 'parecido'
  * ignorando caixa, acentos e pontuação; senão 'nao'. inicio e fim são índices no texto como gravado no arquivo. */
@@ -195,8 +208,10 @@ export const acharTrecho = (texto: string, trecho: string): {achado: Achado; ini
   const tx = indexarExato(trecho);
   if (!tx.s) return {achado: 'nao'};
   const ix = indexarExato(texto);
-  const p = quebraComoEspaco(ix.s).indexOf(quebraComoEspaco(tx.s));
-  if (p >= 0) return {achado: 'exato', inicio: ix.ini[p], fim: ix.fim[p + tx.s.length - 1]};
+  const ex = quebraComoEspaco(ix);
+  const et = quebraComoEspaco(tx).s;
+  const p = ex.s.indexOf(et);
+  if (p >= 0) return {achado: 'exato', inicio: ex.ini[p], fim: ex.fim[p + et.length - 1]};
   const ts = indexarSolto(tx).s;
   if (!ts) return {achado: 'nao'};
   const sx = indexarSolto(ix);
