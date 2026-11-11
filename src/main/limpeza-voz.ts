@@ -28,7 +28,7 @@ export const REGRAS_GIT = SUFIXOS.flatMap((s) => [`*${s}`, `*${s}.envelope.json`
 const TITULO_GIT = '# Estúdio · Limpeza de voz: as versões limpas se refazem a partir do original e ficam fora do histórico';
 
 /** Acrescenta ao .gitignore do projeto as regras que faltarem (cria o arquivo se não houver); devolve se mudou. */
-export const garantirForaDoGit = (p: Projeto) => {
+export const garantirForaDoGit = (p: Projeto) => p.comTrava(() => {
   const atual = p.existe('.gitignore') ? p.lerTexto('.gitignore') : '';
   const linhas = new Set(atual.split(/\r?\n/).map((l) => l.trim()));
   const faltam = REGRAS_GIT.filter((r) => !linhas.has(r));
@@ -36,7 +36,7 @@ export const garantirForaDoGit = (p: Projeto) => {
   const bloco = [...(linhas.has(TITULO_GIT) ? [] : [TITULO_GIT]), ...faltam].join('\n');
   p.gravarTexto('.gitignore', `${atual}${atual && !atual.endsWith('\n') ? '\n' : ''}${bloco}\n`);
   return true;
-};
+}); // na trava de escrita: o MCP da IDE (outro processo) também acrescenta linhas ao .gitignore
 
 // só o nome que a limpeza dá: <arquivo com extensão>.limpo[-intensidade].wav (um "voz.limpo.wav" da pessoa não entra)
 const DERIVADO = new RegExp(`\\.[a-z0-9]{1,5}(${SUFIXOS.map((s) => s.replace(/\./g, '\\.')).join('|')})$`, 'i');

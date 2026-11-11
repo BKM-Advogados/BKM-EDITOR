@@ -20,7 +20,7 @@ import {ARQUIVO_TRANSICOES, lerRegistro, type BaseProjeto} from './transicoes';
 const TITULO_GIT = '# Estúdio · Música: o registro das transições e os renders se refazem e ficam fora do histórico';
 export const REGRAS_GIT_MUSICA = [ARQUIVO_TRANSICOES, 'midia/musica/'];
 
-export const garantirMusicaForaDoGit = (p: Projeto) => {
+export const garantirMusicaForaDoGit = (p: Projeto) => p.comTrava(() => {
   const atual = p.existe('.gitignore') ? p.lerTexto('.gitignore') : '';
   const linhas = new Set(atual.split(/\r?\n/).map((l) => l.trim()));
   const faltam = REGRAS_GIT_MUSICA.filter((r) => !linhas.has(r));
@@ -28,7 +28,7 @@ export const garantirMusicaForaDoGit = (p: Projeto) => {
   const bloco = [...(linhas.has(TITULO_GIT) ? [] : [TITULO_GIT]), ...faltam].join('\n');
   p.gravarTexto('.gitignore', `${atual}${atual && !atual.endsWith('\n') ? '\n' : ''}${bloco}\n`);
   return true;
-};
+}); // na trava de escrita: o app e o MCP da IDE acrescentam linhas ao mesmo .gitignore
 
 /** O tamanho do arquivo: regravar a tomada com o mesmo nome muda o código do render. */
 export const assinaturaDe = (p: Projeto) => (arquivo: string) => {

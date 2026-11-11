@@ -27,11 +27,12 @@ const LINHA_GITIGNORE = '.estudio/conversas/';
 
 const nomeSeguro = (sessao: string) => String(sessao).replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120);
 
-const garantirGitignore = (p: Projeto) => {
+// na trava de escrita do projeto: o MCP da IDE (outro processo) também acrescenta linhas ao .gitignore
+const garantirGitignore = (p: Projeto) => p.comTrava(() => {
   const atual = p.existe('.gitignore') ? p.lerTexto('.gitignore') : '';
   if (atual.split(/\r?\n/).some((l) => l.trim() === LINHA_GITIGNORE)) return;
   p.gravarTexto('.gitignore', `${atual}${atual && !atual.endsWith('\n') ? '\n' : ''}# conversas com a IA (Estúdio): ficam só neste PC\n${LINHA_GITIGNORE}\n`);
-};
+});
 
 export const guardarConversa = (p: Projeto, c: Omit<ConversaGuardada, 'formato' | 'criada_em' | 'atualizada_em'>) => {
   garantirGitignore(p);
@@ -72,4 +73,4 @@ export const lerGuardada = (p: Projeto, sessao: string): ConversaGuardada | unde
   }
 };
 
-export const apagarGuardada = (p: Projeto, sessao: string) => rmSync(p.caminho(`${PASTA}/${nomeSeguro(sessao)}.json`), {force: true});
+export const apagarGuardada = (p: Projeto, sessao: string) => rmSync(p.caminhoParaGravar(`${PASTA}/${nomeSeguro(sessao)}.json`), {force: true});
