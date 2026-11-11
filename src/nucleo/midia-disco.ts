@@ -138,7 +138,7 @@ export const marcarMidia = (
   const depois = comMarca(antes, rel, mudanca);
   const texto = serializar(depois);
   p.gravarTexto(ARQUIVO_MARCAS_MIDIA, texto);
-  const seq = (p.diario().at(-1)?.seq ?? 0) + 1;
+  const seq = p.ultimaSeq() + 1;
   const marca = depois.marcas[rel] ?? null;
   const rotulo = mudanca.estado === 'boa' ? `tomada boa: ${rel}` : mudanca.estado === 'descartada' ? `tomada descartada: ${rel}` : mudanca.estado === null ? `sem marca: ${rel}` : `nota em ${rel}`;
   p.registrar({

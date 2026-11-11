@@ -187,6 +187,16 @@ export type ResultadoConcluir = {
   avisos: string[];
 };
 
+/** O clipe do vídeo que toca a música (a volta já aplicada numa tentativa anterior). */
+const clipeDaMusica = (video: DocCenas, idMusica: string) => {
+  const faixas = video.audio?.faixas ?? [];
+  for (let fi = faixas.length - 1; fi >= 0; fi--) {
+    const ci = (faixas[fi].clipes ?? []).findLastIndex((c) => c.musica === idMusica);
+    if (ci >= 0) return {fi, ci, faixa: faixas[fi].id, clipe: faixas[fi].clipes[ci].id};
+  }
+  return undefined;
+};
+
 const seqsDa = (b: BaseProjeto, id: string) => b.diario().filter((e) => e.transicao === id).map((e) => e.seq);
 
 /** Volta ao vídeo com a música no lugar: o clipe de origem passa a tocar o render (ligado ao documento), ou, na
@@ -207,11 +217,20 @@ export const concluirTransicao = (b: BaseProjeto, p: {transicao: string; aplicar
   if (!ehDocCenas(video.doc)) throw new Error(`${t.origem.documento} não é mais um vídeo de cenas`);
   const avisos: string[] = [];
   const titulo = b.manifesto().documentos.find((d) => d.id === idMusica)?.titulo ?? idMusica;
+  // lido antes de aplicar; uma tentativa anterior que pôs a música no vídeo e parou antes de fechar a transição (o
+  // registro preso pelo OneDrive, por exemplo) não põe outro clipe: só fecha
+  const feitas = b.diario().filter((e) => e.transicao === t.id);
+  const jaAplicada = feitas.find((e) => e.documento === video.arquivo);
   let patch: OperacaoPatch[];
   let caminho: string;
   let selecao: string | undefined;
   const alvo = t.intencao === 'criar' ? null : acharAlvoAudio(video.doc, t.origem.caminho) ?? acharClipePorId(video.doc, t.origem.caminho.split('@').pop() ?? '');
-  if (alvo?.clipe && alvo.ci !== undefined) {
+  const ligado = jaAplicada ? clipeDaMusica(video.doc, idMusica) : undefined;
+  if (ligado) {
+    patch = [];
+    caminho = caminhoPorId(ligado.faixa, ligado.clipe);
+    selecao = `/audio/faixas/${ligado.fi}/clipes/${ligado.ci}`;
+  } else if (alvo?.clipe && alvo.ci !== undefined) {
     patch = patchLigarClipe({...alvo, clipe: alvo.clipe, ci: alvo.ci}, idMusica, render, titulo);
     caminho = caminhoPorId(alvo.faixa.id, alvo.clipe.id);
     selecao = `/audio/faixas/${alvo.fi}/clipes/${alvo.ci}`;
@@ -226,12 +245,12 @@ export const concluirTransicao = (b: BaseProjeto, p: {transicao: string; aplicar
     const ci = fi >= 0 ? video.doc.audio!.faixas[fi].clipes.length : 0;
     selecao = `/audio/faixas/${fi >= 0 ? fi : video.doc.audio?.faixas.length ?? 0}/clipes/${ci}`;
   }
-  const feito = patch.some((o) => o.op !== 'test')
+  const feito = jaAplicada ? {seq: jaAplicada.seq} : patch.some((o) => o.op !== 'test')
     ? b.aplicar({documento: t.origem.documento, versao_base: video.versao, patch, rotulo: `música "${titulo}" no vídeo`, transicao: t.id})
     : undefined;
   t.estado = 'concluida';
   t.fechada_em = agora();
-  t.seqs = seqsDa(b, t.id);
+  t.seqs = [...feitas.map((e) => e.seq), ...(feito && !jaAplicada ? [feito.seq] : [])];
   if (feito) t.resultado = {seq: feito.seq, documento: t.origem.documento, caminho};
   guardar(b, r);
   const volta: ResultadoVolta = {area: t.origem.area, documento: t.origem.documento, selecao: selecao ?? t.origem.selecao, tempo_ms: t.origem.tempo_ms};

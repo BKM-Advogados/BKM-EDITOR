@@ -34,9 +34,8 @@ export const gravarPrefsExportacaoNoDiario = (p: Projeto, mudanca: PrefsExportac
   const textoAntes = p.existe(ARQUIVO_PREFS_EXPORTACAO) ? p.lerTexto(ARQUIVO_PREFS_EXPORTACAO) : serializar(antes);
   const depois = gravarPrefsExportacao(p, mudanca);
   const texto = serializar(depois);
-  const todas = p.diario();
   p.registrar({
-    seq: todas.length ? todas[todas.length - 1].seq + 1 : 1,
+    seq: p.ultimaSeq() + 1,
     em: new Date().toISOString(),
     documento: CAMINHO_PREFS_NO_DIARIO,
     autor: quem.autor,

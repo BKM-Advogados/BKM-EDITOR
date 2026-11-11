@@ -58,7 +58,7 @@ export const baseDoProjeto = (p: Projeto, autor: string, origem: string): BasePr
     p.gravarTexto(ARQUIVO_TRANSICOES, serializar(r));
   },
   estado: () => p.estado(),
-  diario: () => p.diario(),
+  diario: () => p.diario(0, {tolerante: true}),
   assinatura: assinaturaDe(p),
 });
 

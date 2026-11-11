@@ -255,7 +255,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   }, seguro(({desde = 0, autor, documento, limite = 50}: {desde?: number; autor?: string; documento?: string; limite?: number}) => {
     // transversal-D14: sem limite, um projeto com milhares de mudanças mandava megabytes de diário à IA
     const doc = documento ? projeto.arquivoDoDocumento(documento) : undefined;
-    const lista = projeto.diario(desde).filter((e) => (!autor || e.autor === autor) && (!doc || e.documento === doc));
+    const lista = projeto.diario(desde, {tolerante: true}).filter((e) => (!autor || e.autor === autor) && (!doc || e.documento === doc));
     return lista.slice(-limite).map(({inverso: _i, ...e}) => e);
   }));
 
