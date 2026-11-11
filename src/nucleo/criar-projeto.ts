@@ -322,8 +322,11 @@ export const claudeMd = (modulos: Modulo[]) => {
       '  ou `chuva`) e `semente`. Use `criar_animacao`, `adicionar_camada_animacao`, `animar`, `pixelizar_imagem` e',
       '  `efeito_pixel` (docs/animacao.md) em vez de montar à mão. `opacidade` e `progresso` vão de 0 a 1 e `tamanho_pixel`',
       '  é 1 ou mais; `x` e `y` podem ser negativos (entrada de fora do quadro). `pixelizar_imagem` lê uma imagem do projeto',
-      '  (PNG ou JPG, até 4096 px de lado). Das ferramentas da imagem, só `selecionar_camadas`, `travar_camadas` e',
-      '  `destravar_camadas` valem na animação.',
+      '  (PNG ou JPG, até 4096 px de lado); a célula só é pintada com `cobertura_min` de tinta na área dela (padrão',
+      '  0,25; use menos, como 0,1, para logo de linha fina). A grade volta inteira na resposta só até 32x32; acima disso',
+      '  vem a paleta, e as células se leem com `ler_documento` pelo `caminho` da grade (documento grande vem com as',
+      '  grades resumidas e um `aviso`: nunca grave o resumo de volta). Das ferramentas da imagem, só',
+      '  `selecionar_camadas`, `travar_camadas` e `destravar_camadas` valem na animação.',
     );
   }
   if (tem('video') || tem('imagem')) linhas.push(...secaoEfeitos());
