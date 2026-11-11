@@ -1,11 +1,12 @@
-// Projetos prontos para IDE de agentes (frente IDE, docs/ide.md) no app: a opção de Configurações › IA, os arquivos do
-// núcleo (src/nucleo/ide.ts) escritos ao criar ou abrir um projeto, e o "Abrir no T3 Code", que roda `t3 project add`
-// quando o CLI do T3 está no PATH. Sem Electron aqui: main.ts passa o executável do app e o caminho do nucleo.cjs.
+// Projetos prontos para IDE de agentes (frente IDE, docs/ide.md; harnesses, docs/harnesses.md) no app: a opção de
+// Configurações › IA, os arquivos do núcleo (src/nucleo/ide.ts) e os guias (AGENTS.md e GEMINI.md, criar-projeto.ts)
+// escritos ao criar ou abrir um projeto, o "Abrir no T3 Code", que roda `t3 project add` quando o CLI do T3 está no PATH,
+// e o `codex mcp add` para copiar. Sem Electron aqui: main.ts passa o executável do app e o caminho do nucleo.cjs.
 import {execFile} from 'node:child_process';
 import {existsSync} from 'node:fs';
 import path from 'node:path';
 import type {EstadoIde} from '../compartilhado/api';
-import {prepararParaIde, servidorDoMcp, type ResultadoIde} from '../nucleo/ide';
+import {comOrigem, HARNESSES, prepararParaIde, SERVIDOR_IDE, servidorDoMcp, type ResultadoIde, type ServidorMcpStdio} from '../nucleo/ide';
 
 /** Um executável no PATH (no Windows, com as extensões do PATHEXT); null se não houver. */
 export const acharNoPath = (nome: string, env: NodeJS.ProcessEnv = process.env, plataforma: string = process.platform, existe: (p: string) => boolean = existsSync) => {
@@ -44,10 +45,26 @@ export const adicionarNoT3 = (t3: string | null, raiz: string, titulo: string): 
   });
 };
 
+/** Um argumento para colar no terminal: entre aspas simples no Linux e no Mac; entre aspas duplas no Windows. */
+const argumentoDoShell = (a: string, plataforma: string) => {
+  if (/^[\w./:=@%+,-]+$/.test(a)) return a;
+  return plataforma === 'win32' ? `"${a.replace(/"/g, '\\"')}"` : `'${a.replace(/'/g, `'\\''`)}'`;
+};
+
+/** O `codex mcp add` do servidor deste projeto, para colar no terminal: liga o MCP na configuração da pessoa
+ *  (~/.codex/config.toml, que o CLI, o app e a extensão do Codex dividem), para quem não quer marcar a pasta como
+ *  confiável. Com o `--ide`, a pasta em que o Codex abrir vale no lugar do `--projeto`, se for um projeto do Estúdio. */
+export const comandoCodexMcpAdd = (s: ServidorMcpStdio, plataforma: string = process.platform) => {
+  const codex = comOrigem(s, HARNESSES.find((h) => h.id === 'codex')?.origem);
+  const env = Object.entries(codex.env ?? {}).flatMap(([k, v]) => ['--env', `${k}=${v}`]);
+  return ['codex', 'mcp', 'add', SERVIDOR_IDE, ...env, '--', codex.command, ...codex.args].map((a) => argumentoDoShell(a, plataforma)).join(' ');
+};
+
 /** O app roda de uma cópia temporária do macOS (App Translocation), e o caminho do executável não vale depois de fechar. */
 export const emTranslocacao = (executavel: string) => executavel.includes('/AppTranslocation/');
 
-export const criarIde = (o: {executavel: string; script: string; ligado: () => boolean}) => {
+/** `guias` refaz o AGENTS.md e o GEMINI.md do projeto (regerarGuias, criar-projeto.ts) e devolve os que gravou. */
+export const criarIde = (o: {executavel: string; script: string; ligado: () => boolean; guias?: (raiz: string) => string[]}) => {
   let ultimo: (ResultadoIde & {raiz: string}) | undefined;
   return {
     /** Ao criar ou abrir um projeto (e ao ligar a opção): escreve ou atualiza os arquivos. Desligado, não toca em nada.
@@ -60,7 +77,7 @@ export const criarIde = (o: {executavel: string; script: string; ligado: () => b
         ultimo = {raiz, gravados: [], avisos: ['o Estúdio está rodando de uma cópia temporária do macOS (aberto de Downloads): mova o Estudio.app para Aplicativos e abra de novo para os projetos ficarem prontos para a IDE']};
         return ultimo;
       }
-      const gravar = () => prepararParaIde(raiz, servidorDoMcp({executavel: o.executavel, script: o.script, projeto: raiz}));
+      const gravar = () => prepararParaIde(raiz, servidorDoMcp({executavel: o.executavel, script: o.script, projeto: raiz}), o.guias);
       let r: ResultadoIde;
       try {
         r = projeto ? projeto.comTrava(gravar) : gravar();
@@ -72,7 +89,10 @@ export const criarIde = (o: {executavel: string; script: string; ligado: () => b
     },
     estado(raiz?: string): EstadoIde {
       const doProjeto = raiz && ultimo && path.resolve(ultimo.raiz) === path.resolve(raiz) ? ultimo : undefined;
-      return {ligado: o.ligado(), t3: acharNoPath('t3'), ...(doProjeto ? {raiz: doProjeto.raiz, gravados: doProjeto.gravados, avisos: doProjeto.avisos} : raiz ? {raiz} : {})};
+      const harnesses = HARNESSES.map((h) => ({nome: h.nome, guia: h.guia, mcp: h.mcp}));
+      const comandoCodex = raiz && !emTranslocacao(o.executavel) ? comandoCodexMcpAdd(servidorDoMcp({executavel: o.executavel, script: o.script, projeto: raiz})) : undefined;
+      return {ligado: o.ligado(), t3: acharNoPath('t3'), harnesses, ...(comandoCodex ? {comandoCodex} : {}),
+        ...(doProjeto ? {raiz: doProjeto.raiz, gravados: doProjeto.gravados, avisos: doProjeto.avisos} : raiz ? {raiz} : {})};
     },
     abrirNoT3: (raiz: string, titulo: string) => adicionarNoT3(acharNoPath('t3'), raiz, titulo),
   };

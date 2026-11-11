@@ -44,10 +44,11 @@ export const registrarIa = (servidor: McpServer, projeto: Projeto, autor: string
   });
 
   servidor.registerTool('guia_do_projeto', {
-    description: 'O guia deste projeto (o CLAUDE.md que o app escreve): tipos de documento, campos e regras. Leia antes de editar se você não o recebeu.',
+    description: 'O guia deste projeto (o CLAUDE.md, o AGENTS.md ou o GEMINI.md que o app escreve): tipos de documento, campos e regras. Leia antes de editar se você não o recebeu.',
   }, async () => {
-    const arq = path.join(projeto.raiz, 'CLAUDE.md');
-    return existsSync(arq) ? texto(readFileSync(arq, 'utf-8')) : erro('este projeto não tem guia (CLAUDE.md)');
+    // o mesmo guia nos três (docs/harnesses.md); o CLAUDE.md vem primeiro, como antes
+    const arq = ['CLAUDE.md', 'AGENTS.md', 'GEMINI.md'].map((n) => path.join(projeto.raiz, n)).find((a) => existsSync(a));
+    return arq ? texto(readFileSync(arq, 'utf-8')) : erro('este projeto não tem guia (CLAUDE.md, AGENTS.md ou GEMINI.md)');
   });
 
   servidor.registerTool('criar_comentario', {

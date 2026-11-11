@@ -23,7 +23,7 @@ import type {MarcaLida} from './pasta-marcas';
 import {dentroDe, semBom, serializar} from './projeto';
 import {gravarAtomico} from './gravar-seguro';
 import {ehNomeReservado} from './nome-de-arquivo';
-import {LINHAS_GITIGNORE_IDE, secaoIde} from './ide'; // frente IDE: a seção "Trabalhando por uma IDE" e os arquivos desta máquina
+import {ARQUIVOS_DE_GUIA, LINHAS_GITIGNORE_IDE, secaoDoHarness, type ArquivoDeGuia} from './ide'; // frente IDE e harnesses: a seção de cada harness e os arquivos desta máquina
 
 // o texto baixado de cada fonte (pesquisa/fontes/<id>.txt) fica fora do git: é grande e se baixa de novo pela url
 // vídeo e áudio sem perda em midia/ também ficam de fora (transversal-D7, midia-git.ts); o que passa de 25 MB entra na regra
@@ -258,7 +258,9 @@ const secaoMusica = () => [
   '  `levar_para {..., intencao: "criar", modelo: "trilha_video"}`.',
 ];
 
-export const claudeMd = (modulos: Modulo[]) => {
+/** O guia do projeto: o mesmo texto no CLAUDE.md (Claude Code, T3), no AGENTS.md (Codex, Cursor, VS Code, opencode,
+ *  Antigravity) e no GEMINI.md (Gemini CLI); só a seção do fim, de cada harness, muda (ide.ts, docs/harnesses.md). */
+export const guiaDoProjeto = (modulos: Modulo[], arquivo: ArquivoDeGuia = 'CLAUDE.md') => {
   const tem = (m: Modulo) => modulos.includes(m);
   const linhas = [
     '# Projeto do Estúdio',
@@ -391,10 +393,12 @@ export const claudeMd = (modulos: Modulo[]) => {
   linhas.push('', '## Como trabalhar', '', ...passos.map((t, i) => `${i + 1}. ${t}`));
   if (tem('musica')) linhas.push(...secaoMusica());
   if (tem('video') || tem('imagem')) linhas.push(...secaoPesquisa());
-  linhas.push(...secaoIde(tem('video') || tem('animacao'))); // frente IDE (docs/ide.md)
+  linhas.push(...secaoDoHarness(arquivo, tem('video') || tem('animacao'))); // frente IDE e harnesses (docs/ide.md)
   linhas.push('', FIM_DO_TEXTO);
   return [MARCA_CLAUDE_INICIO, ...linhas, MARCA_CLAUDE_FIM, ''].join('\n');
 };
+
+export const claudeMd = (modulos: Modulo[]) => guiaDoProjeto(modulos, 'CLAUDE.md');
 
 // ---------- CLAUDE.md refeito ao abrir ----------
 /** O texto que o app escreve no CLAUDE.md fica entre estas marcas e é refeito a cada abertura do projeto, para o Claude
@@ -452,24 +456,52 @@ export const claudeMdAtualizado = (atual: string | null, modulos: Modulo[]): str
   return novo === null || novo === texto ? null : novo;
 };
 
-/** Refaz a parte do app no CLAUDE.md de um projeto, pelos módulos que o manifesto tem. Devolve se gravou. Nunca lança:
- *  um CLAUDE.md que não dá para atualizar não impede abrir o projeto. */
-export const regerarClaudeMd = (raiz: string): boolean => {
+/** O AGENTS.md ou o GEMINI.md novo a partir do atual, ou null se nada muda. Sem arquivo: o guia gerado. Com as marcas:
+ *  troca só o que está entre elas. Um arquivo da pessoa, sem as marcas: o guia vai no fim, uma vez, e o texto dela fica
+ *  antes (sem o guia, o harness não saberia do app; a parte do app fica marcada, como no CLAUDE.md). */
+export const guiaAtualizado = (atual: string | null, modulos: Modulo[], arquivo: ArquivoDeGuia): string | null => {
+  if (arquivo === 'CLAUDE.md') return claudeMdAtualizado(atual, modulos);
+  const gerado = guiaDoProjeto(modulos, arquivo);
+  if (atual === null) return gerado;
+  const texto = atual.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
+  const i = texto.indexOf(MARCA_CLAUDE_INICIO);
+  const f = i >= 0 ? texto.indexOf(MARCA_CLAUDE_FIM, i) : -1;
+  const novo = i >= 0 && f > i
+    ? texto.slice(0, i) + gerado.trimEnd() + texto.slice(f + MARCA_CLAUDE_FIM.length)
+    : `${texto.trimEnd()}${texto.trim() ? '\n\n' : ''}${gerado}`;
+  return novo === atual.replace(/\r\n/g, '\n') ? null : novo;
+};
+
+/** Refaz a parte do app nos guias pedidos (CLAUDE.md, AGENTS.md, GEMINI.md), pelos módulos que o manifesto tem. Devolve
+ *  os que gravou. Nunca lança: um guia que não dá para atualizar não impede abrir o projeto. O arquivo em CRLF
+ *  (core.autocrlf do Git para Windows) continua CRLF; o que não muda não é regravado (o app commita o git sozinho). */
+export const regerarGuias = (raiz: string, arquivos: readonly ArquivoDeGuia[] = ARQUIVOS_DE_GUIA): ArquivoDeGuia[] => {
+  let modulos: Modulo[];
   try {
     const manifesto = JSON.parse(semBom(readFileSync(path.join(raiz, 'estudio.json'), 'utf-8'))) as Manifesto;
-    const modulos = [...new Set((manifesto.documentos ?? []).map((d) => d.modulo))];
-    const arq = path.join(raiz, 'CLAUDE.md');
-    const atual = existsSync(arq) ? readFileSync(arq, 'utf-8') : null;
-    // o CLAUDE.md em CRLF (core.autocrlf do Git para Windows) continua CRLF: compara e grava no fim de linha dele
-    const crlf = Boolean(atual?.includes('\r\n'));
-    const novo = claudeMdAtualizado(crlf ? atual!.replace(/\r\n/g, '\n') : atual, modulos);
-    if (novo === null) return false;
-    gravarAtomico(arq, crlf ? novo.replace(/\n/g, '\r\n') : novo); // o arquivo tem texto da pessoa: nunca meio gravado
-    return true;
+    modulos = [...new Set((manifesto.documentos ?? []).map((d) => d.modulo))];
   } catch {
-    return false;
+    return [];
   }
+  const gravados: ArquivoDeGuia[] = [];
+  for (const nome of arquivos) {
+    try {
+      const arq = path.join(raiz, nome);
+      const atual = existsSync(arq) ? readFileSync(arq, 'utf-8') : null;
+      const crlf = Boolean(atual?.includes('\r\n'));
+      const novo = guiaAtualizado(crlf ? atual!.replace(/\r\n/g, '\n') : atual, modulos, nome);
+      if (novo === null) continue;
+      gravarAtomico(arq, crlf ? novo.replace(/\n/g, '\r\n') : novo); // o arquivo tem texto da pessoa: nunca meio gravado
+      gravados.push(nome);
+    } catch {
+      /* este guia fica para a próxima abertura */
+    }
+  }
+  return gravados;
 };
+
+/** Refaz a parte do app no CLAUDE.md de um projeto. Devolve se gravou. */
+export const regerarClaudeMd = (raiz: string): boolean => regerarGuias(raiz, ['CLAUDE.md']).length > 0;
 
 // ---------- plano do projeto ----------
 export type OpcoesProjeto = {nome: string; modelo: IdModelo; formato?: Formato | {largura: number; altura: number}};
