@@ -1,11 +1,12 @@
 // Testes de integração das ferramentas MCP de Animação
 import {execSync} from "node:child_process";
-import {cpSync, mkdtempSync, rmSync} from "node:fs";
+import {cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from "node:fs";
 import {tmpdir} from "node:os";
 import path from "node:path";
 import {afterAll, beforeAll, describe, expect, it} from "vitest";
 import {Client} from "@modelcontextprotocol/sdk/client/index.js";
 import {StdioClientTransport} from "@modelcontextprotocol/sdk/client/stdio.js";
+import {png8} from "./apoio/png-teste";
 
 const RAIZ = path.join(__dirname, "..");
 let pasta = "";
@@ -160,5 +161,108 @@ describe("Ferramentas MCP de Animação", () => {
     const forma = dado.camadas.find((c: any) => c.nome === "Quadrado");
     expect(forma.x).toBeGreaterThan(100);
     expect(forma.x).toBeLessThan(500);
+  });
+});
+
+describe("Validação das ferramentas de Animação (M3, M5, M6, M7, M17)", () => {
+  let docId = "";
+  let pixelId = "";
+  const lerDoc = (rel: string) => readFileSync(path.join(pasta, rel), "utf-8");
+  const caminhoDoc = () => `animacao/${docId}.json`;
+
+  beforeAll(async () => {
+    const r = await chamar("criar_animacao", {titulo: "Validação"});
+    docId = r.dado.documento;
+    pixelId = (await chamar("adicionar_camada_animacao", {documento: docId, tipo: "pixel"})).dado.camada_id;
+    mkdirSync(path.join(pasta, "midia"), {recursive: true});
+    writeFileSync(path.join(pasta, "midia", "alta.png"), png8(10, 100, 2, (_x, y) => (y < 50 ? [255, 0, 0] : [0, 0, 255])));
+    writeFileSync(path.join(pasta, "midia", "grande.png"), png8(64, 64, 2, (x) => (x < 32 ? [0, 0, 0] : [255, 255, 255])));
+  });
+
+  it("M3: as cinco ferramentas recusam documento que não é animação, sem mexer no arquivo", async () => {
+    const antes = lerDoc("imagem/capa.json");
+    for (const documento of ["capa", "carrossel"]) {
+      const chamadas: [string, Record<string, unknown>][] = [
+        ["adicionar_camada_animacao", {documento, tipo: "pixel"}],
+        ["animar", {documento, camada_id: "x", propriedade: "x", quadros: [{t_ms: 0, valor: 1}]}],
+        ["pixelizar_imagem", {documento, camada_id: "x", imagem_src: "midia/logo.png"}],
+        ["efeito_pixel", {documento, camada_id: "x", efeito: "chuva"}],
+        ["ver_animacao", {documento}],
+      ];
+      for (const [nome, args] of chamadas) {
+        const r = await chamar(nome, args);
+        expect(r.erro, `${nome} em ${documento}`).toBe(true);
+        expect(String(r.dado)).toMatch(/patch: .*não é uma animação/);
+      }
+    }
+    expect(lerDoc("imagem/capa.json")).toBe(antes);
+  });
+
+  it("M5: tipo e faixa por propriedade no animar; cor e tamanhos no esquema", async () => {
+    const antes = lerDoc(caminhoDoc());
+    const casos: [string, unknown[]][] = [
+      ["x", ["abc", 500]],
+      ["cor", [7, "#FF0000"]],
+      ["opacidade", [-3, 40]],
+      ["progresso", [0, 2]],
+      ["tamanho_pixel", [0, 8]],
+      ["cor", ["banana", "#FF0000"]],
+    ];
+    for (const [propriedade, valores] of casos) {
+      const r = await chamar("animar", {documento: docId, camada_id: "forma-1", propriedade,
+        quadros: valores.map((valor, i) => ({t_ms: i * 1000, valor}))});
+      expect(r.erro, `${propriedade} ${JSON.stringify(valores)}`).toBe(true);
+    }
+    expect((await chamar("adicionar_camada_animacao", {documento: docId, tipo: "pixel", tamanho_pixel: 0})).erro).toBe(true);
+    expect((await chamar("adicionar_camada_animacao", {documento: docId, tipo: "forma", largura: -50})).erro).toBe(true);
+    expect((await chamar("adicionar_camada_animacao", {documento: docId, tipo: "forma", cor: "banana"})).erro).toBe(true);
+    expect((await chamar("criar_animacao", {fundo: "banana"})).erro).toBe(true);
+    expect(lerDoc(caminhoDoc())).toBe(antes);
+    // entrada de fora do quadro e cor do tema seguem valendo
+    expect((await chamar("animar", {documento: docId, camada_id: "forma-1", propriedade: "x", quadros: [{t_ms: 0, valor: -200}, {t_ms: 500, valor: 100}]})).erro).toBe(false);
+    expect((await chamar("animar", {documento: docId, camada_id: "forma-1", propriedade: "cor", quadros: [{t_ms: 0, valor: "@destaque"}, {t_ms: 500, valor: "#f00"}]})).erro).toBe(false);
+  });
+
+  it("M6: efeito_pixel só em camada pixel, tempos válidos e a semente devolvida é a gravada", async () => {
+    const forma = await chamar("efeito_pixel", {documento: docId, camada_id: "forma-1", efeito: "chuva"});
+    expect(forma.erro).toBe(true);
+    expect(String(forma.dado)).toMatch(/é forma/);
+    expect((await chamar("efeito_pixel", {documento: docId, camada_id: pixelId, efeito: "chuva", animar_progresso: true, duracao_ms: -2000})).erro).toBe(true);
+    expect((await chamar("efeito_pixel", {documento: docId, camada_id: pixelId, efeito: "chuva", animar_progresso: true, inicio_ms: -500})).erro).toBe(true);
+    await chamar("efeito_pixel", {documento: docId, camada_id: pixelId, efeito: "meio", semente: 77});
+    const r = await chamar("efeito_pixel", {documento: docId, camada_id: pixelId, efeito: "chuva"});
+    expect(r.dado.semente).toBe(77);
+  });
+
+  it("M7: pixelizar só em camada pixel, linhas até o teto, paleta sem cor repetida e resposta enxuta", async () => {
+    const forma = await chamar("pixelizar_imagem", {documento: docId, camada_id: "forma-1", imagem_src: "midia/logo.png"});
+    expect(forma.erro).toBe(true);
+    expect(String(forma.dado)).toMatch(/é forma/);
+
+    const alta = await chamar("pixelizar_imagem", {documento: docId, camada_id: pixelId, imagem_src: "midia/alta.png", colunas: 128, cores: 8});
+    expect(alta.erro).toBe(false);
+    expect(alta.dado.linhas).toBeLessThanOrEqual(128);
+    expect(alta.dado.cores).toBe(2);
+    expect(new Set(alta.dado.paleta).size).toBe(alta.dado.paleta.length);
+    expect(alta.dado.grade).toBeUndefined();
+    expect(JSON.stringify(alta.dado).length).toBeLessThan(20_000);
+    expect(alta.dado.avisos.join(" ")).toMatch(/limitei a 128/);
+
+    const semKit = await chamar("pixelizar_imagem", {documento: docId, camada_id: pixelId, imagem_src: "midia/grande.png", colunas: 8, linhas: 8, usar_paleta_marca: true});
+    expect(semKit.erro).toBe(false);
+    expect(semKit.dado.grade.celulas).toHaveLength(64);
+    expect(semKit.dado.avisos.join(" ")).toMatch(/não tem kit/);
+  });
+
+  it("M17: id de camada repetido é recusado", async () => {
+    const doc = JSON.parse(lerDoc(caminhoDoc()));
+    const r0 = await chamar("ler_documento", {documento: docId});
+    const versao = r0.dado.versao;
+    const copia = {...doc.camadas[0]};
+    const p = await chamar("aplicar_patch", {documento: docId, versao_base: versao, patch: [{op: "add", path: "/camadas/-", value: copia}]});
+    expect(p.erro).toBe(false);
+    const r = await chamar("animar", {documento: docId, camada_id: copia.id, propriedade: "x", quadros: [{t_ms: 0, valor: 1}]});
+    expect(r.erro).toBe(true);
+    expect(String(r.dado)).toMatch(/está em 2 camadas/);
   });
 });

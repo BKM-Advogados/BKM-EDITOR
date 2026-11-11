@@ -3,7 +3,8 @@
 // animar, pixelizar_imagem…), e os dois passam pelo mesmo JSON Patch com diário. Este arquivo é TypeScript puro (sem
 // Remotion, sem DOM): tipos, validação com calma, curvas, interpolação de valores (inclusive de cor em OKLab) e a
 // resolução do documento para as props da composição. A arte em pixel fica em animacao-pixel.ts.
-import type {EfeitoPixel, GradePixel} from './animacao-pixel';
+import {lerGrade, type EfeitoPixel, type GradePixel} from './animacao-pixel';
+import {limitarTamanho} from './formatos';
 
 // ---------- tipos ----------
 export type ModuloAnimacao = 'animacao';
@@ -248,30 +249,56 @@ export const valorEm = (camada: CamadaAnimacao, prop: PropriedadeAnimavel, t_ms:
 };
 
 // ---------- normalização e resolução ----------
-const LIMITE = {largura: 7680, altura: 7680, fps: 120, duracao: 60 * 60 * 1000};
+const LIMITE = {fps: 120, duracao: 60 * 60 * 1000};
+
+/** Faixas seguras das propriedades numéricas, as mesmas do inspetor e das ferramentas do MCP. `x`, `y` e `rotacao` são
+ *  livres (entrar de fora do quadro é legítimo). A curva `mola` passa da faixa de propósito entre os quadros-chave; quem
+ *  desenha limita de novo (a opacidade, o progresso e o tamanho do pixel). */
+export const FAIXAS_ANIMACAO: Partial<Record<PropriedadeAnimavel, {min: number; max?: number}>> = {
+  opacidade: {min: 0, max: 1},
+  progresso: {min: 0, max: 1},
+  escala: {min: 0},
+  tamanho: {min: 1},
+  tamanho_pixel: {min: 1},
+};
+
+export const limitarAFaixa = (prop: string, v: number): number => {
+  const f = FAIXAS_ANIMACAO[prop as PropriedadeAnimavel];
+  return f ? Math.min(f.max ?? Infinity, Math.max(f.min, v)) : v;
+};
+
+export const textoFaixa = (prop: string): string => {
+  const f = FAIXAS_ANIMACAO[prop as PropriedadeAnimavel];
+  return !f ? 'livre' : f.max === undefined ? `a partir de ${f.min}` : `de ${f.min} a ${f.max}`;
+};
+
+const positivo = (v: unknown, padrao: number) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : padrao);
 
 /** Quadros-chave de uma trilha, com o valor no tipo da propriedade: a cor é texto; o resto é número (o texto "100" vira
  *  100). O que não serve é descartado com aviso, em vez de virar preto ou NaN na hora de desenhar. */
 const normalizarTrilha = (prop: string, lista: unknown[], camadaId: string, avisos: string[]): QuadroChave[] => {
   const out: QuadroChave[] = [];
   let descartados = 0;
+  let limitados = 0;
   for (const q of lista) {
     const k = (q && typeof q === 'object' ? q : {}) as Record<string, unknown>;
-    const valor = prop === 'cor' ? (typeof k.valor === 'string' ? k.valor : undefined) : numeroDe(k.valor);
-    if (valor === undefined) {
+    const lido = prop === 'cor' ? (typeof k.valor === 'string' ? k.valor : undefined) : numeroDe(k.valor);
+    if (lido === undefined) {
       descartados++;
       continue;
     }
+    const valor = typeof lido === 'number' ? limitarAFaixa(prop, lido) : lido;
+    if (valor !== lido) limitados++;
     out.push({t_ms: num(k.t_ms, 0), valor,
       ...(typeof k.curva === 'string' && CURVAS.some((c) => c.id === k.curva) ? {curva: k.curva as Curva} : {})});
   }
   if (descartados) avisos.push(`camada ${camadaId}: ${descartados} quadro(s)-chave de "${prop}" com valor fora do tipo (${prop === 'cor' ? 'cor' : 'número'}) foram ignorados`);
+  if (limitados) avisos.push(`camada ${camadaId}: ${limitados} quadro(s)-chave de "${prop}" fora da faixa ${textoFaixa(prop)} foram limitados`);
   return out;
 };
 
 const normalizar = (x: unknown, avisos: string[]): DocAnimacao => {
   const o = (x && typeof x === 'object' ? x : {}) as Record<string, unknown>;
-  const menor = Math.min(num(o.largura, 1920), LIMITE.largura);
   const camadas = (Array.isArray(o.camadas) ? o.camadas : []).map((c): CamadaAnimacao => {
     const l = (c && typeof c === 'object' ? c : {}) as Record<string, unknown>;
     const tipo: TipoCamadaAnimacao = ['forma', 'texto', 'imagem', 'pixel'].includes(l.tipo as string) ? (l.tipo as TipoCamadaAnimacao) : 'forma';
@@ -282,32 +309,39 @@ const normalizar = (x: unknown, avisos: string[]): DocAnimacao => {
         trilhas[p as PropriedadeAnimavel] = normalizarTrilha(p, lista, typeof l.id === 'string' ? l.id : '?', avisos);
       }
     }
+    const id = typeof l.id === 'string' ? l.id : 'camada';
+    let grade: GradePixel | undefined;
+    if (l.grade !== undefined) {
+      const lida = lerGrade(l.grade);
+      grade = lida.grade;
+      if (lida.problema) avisos.push(`grade da camada ${id} ${lida.grade ? 'consertada' : 'inválida: descartada'} (${lida.problema})`);
+    }
     return {
-      id: typeof l.id === 'string' ? l.id : 'camada',
+      id,
       nome: typeof l.nome === 'string' ? l.nome : 'Camada',
       tipo,
       ...(l.visivel === false ? {visivel: false} : {}),
       ...(l.travada === true ? {travada: true} : {}),
       x: num(l.x, 0),
       y: num(l.y, 0),
-      largura: num(l.largura, 100),
-      altura: num(l.altura, 100),
-      ...(l.escala !== undefined ? {escala: num(l.escala, 1)} : {}),
+      largura: positivo(l.largura, 100),
+      altura: positivo(l.altura, 100),
+      ...(l.escala !== undefined ? {escala: limitarAFaixa('escala', num(l.escala, 1))} : {}),
       ...(l.rotacao !== undefined ? {rotacao: num(l.rotacao, 0)} : {}),
-      ...(l.opacidade !== undefined ? {opacidade: num(l.opacidade, 1)} : {}),
+      ...(l.opacidade !== undefined ? {opacidade: limitarAFaixa('opacidade', num(l.opacidade, 1))} : {}),
       ...(typeof l.cor === 'string' ? {cor: l.cor} : {}),
       ...(l.forma === 'elipse' ? {forma: 'elipse' as const} : {}),
       ...(l.raio !== undefined ? {raio: num(l.raio, 0)} : {}),
       ...(typeof l.texto === 'string' ? {texto: l.texto} : {}),
       ...(typeof l.fonte === 'string' ? {fonte: l.fonte} : {}),
-      ...(l.tamanho !== undefined ? {tamanho: num(l.tamanho, 40)} : {}),
+      ...(l.tamanho !== undefined ? {tamanho: limitarAFaixa('tamanho', num(l.tamanho, 40))} : {}),
       ...(l.peso !== undefined ? {peso: num(l.peso, 400)} : {}),
       ...(l.alinhar === 'esquerda' || l.alinhar === 'direita' ? {alinhar: l.alinhar} : {}),
       ...(typeof l.src === 'string' ? {src: l.src} : {}),
       ...(l.ajuste === 'cobrir' ? {ajuste: 'cobrir' as const} : {}),
-      ...(l.grade && typeof l.grade === 'object' ? {grade: l.grade as GradePixel} : {}),
-      ...(l.tamanho_pixel !== undefined ? {tamanho_pixel: num(l.tamanho_pixel, 8)} : {}),
-      ...(l.progresso !== undefined ? {progresso: num(l.progresso, 1)} : {}),
+      ...(grade ? {grade} : {}),
+      ...(l.tamanho_pixel !== undefined ? {tamanho_pixel: limitarAFaixa('tamanho_pixel', num(l.tamanho_pixel, 8))} : {}),
+      ...(l.progresso !== undefined ? {progresso: limitarAFaixa('progresso', num(l.progresso, 1))} : {}),
       ...(typeof l.efeito === 'string' ? {efeito: l.efeito as EfeitoPixel} : {}),
       ...(l.semente !== undefined ? {semente: num(l.semente, 1)} : {}),
       ...(Object.keys(trilhas).length ? {trilhas} : {}),
@@ -315,14 +349,13 @@ const normalizar = (x: unknown, avisos: string[]): DocAnimacao => {
   });
   return {
     formato: 1,
-    largura: Math.max(16, Math.round(num(o.largura, 1920))),
-    altura: Math.max(16, Math.round(num(o.altura, 1080))),
+    largura: limitarTamanho(o.largura, 1920),
+    altura: limitarTamanho(o.altura, 1080),
     fps: Math.max(1, Math.min(LIMITE.fps, Math.round(num(o.fps, 30)))),
     duracao_ms: Math.max(100, Math.min(LIMITE.duracao, num(o.duracao_ms, 3000))),
     fundo: typeof o.fundo === 'string' ? o.fundo : TEMA_ANIMACAO_NEUTRO.fundo,
     ...(o.tema && typeof o.tema === 'object' ? {tema: o.tema as TemaAnimacao} : {}),
     camadas,
-    ...(menor < 16 ? {} : {}),
   };
 };
 

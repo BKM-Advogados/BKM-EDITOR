@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {
-  codificarCelulas, decodificarCelulas, gradeDeImagem, gradeVazia, misturarCor, ordemAleatoria, revelar,
+  codificarCelulas, decodificarCelulas, gradeDeImagem, gradeVazia, misturarCor, ordemAleatoria, quantizar, revelar,
   type DadosImagem, type GradePixel,
 } from '../src/nucleo/animacao-pixel';
 
@@ -126,5 +126,21 @@ describe('efeitos de revelação', () => {
     expect(misturarCor('#000000', '#FFFFFF', 0)).toBe('#000000');
     expect(misturarCor('#000000', '#FFFFFF', 1)).toBe('#FFFFFF');
     expect(misturarCor('#000000', '#FFFFFF', 0.5)).toBe('#808080');
+  });
+});
+
+describe('C10: median-cut sem cores repetidas', () => {
+  it('imagem de 2 cores pedida com 8 sai com paleta de 2', () => {
+    const px = Array.from({length: 64}, (_, i) => (i % 2 ? {r: 255, g: 255, b: 255, a: 1} : {r: 0, g: 0, b: 0, a: 1}));
+    expect(quantizar(px, 8).paleta).toHaveLength(2);
+  });
+  it('com proporção desigual (a mediana cai entre pixels iguais) também não repete', () => {
+    const px = Array.from({length: 64}, (_, i) => (i === 0 ? {r: 0, g: 0, b: 0, a: 1} : {r: 255, g: 255, b: 255, a: 1}));
+    const {paleta, indices} = quantizar(px, 8);
+    expect(paleta).toEqual(['#000000', '#FFFFFF']);
+    expect(indices.slice(0, 3)).toEqual([0, 1, 1]);
+  });
+  it('uma cor só dá paleta de 1', () => {
+    expect(quantizar(Array.from({length: 9}, () => ({r: 10, g: 20, b: 30, a: 1})), 4).paleta).toEqual(['#0A141E']);
   });
 });

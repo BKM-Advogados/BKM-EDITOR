@@ -6,10 +6,10 @@ import {ErroProjeto, type Projeto} from "./projeto";
 import type {OperacaoPatch} from "./documentos";
 import {documentoNovo} from "./criar-projeto";
 import {
-  idLivreAnimacao, novaCamadaAnimacao, TEMA_ANIMACAO_NEUTRO, valorEm, type CamadaAnimacao, type Curva,
-  type DocAnimacao, type PropriedadeAnimavel, type TipoCamadaAnimacao,
+  ehDocAnimacao, FAIXAS_ANIMACAO, idLivreAnimacao, limitarAFaixa, novaCamadaAnimacao, TEMA_ANIMACAO_NEUTRO, textoFaixa, valorEm,
+  type CamadaAnimacao, type Curva, type DocAnimacao, type PropriedadeAnimavel, type TipoCamadaAnimacao,
 } from "./animacao";
-import {gradeDeImagem, type EfeitoPixel} from "./animacao-pixel";
+import {gradeDeImagem, MAX_LADO_GRADE, type EfeitoPixel} from "./animacao-pixel";
 import {decodificarPng} from "./png";
 
 const seguro = <A,>(f: (a: A) => unknown) => async (a: A) => {
@@ -17,9 +17,31 @@ const seguro = <A,>(f: (a: A) => unknown) => async (a: A) => {
     const r = await f(a);
     return {content: [{type: "text" as const, text: typeof r === "string" ? r : JSON.stringify(r, null, 2)}]};
   } catch (e) {
-    return {isError: true, content: [{type: "text" as const, text: e instanceof ErroProjeto ? e.message : (e as Error).message}]};
+    return {isError: true, content: [{type: "text" as const, text: e instanceof ErroProjeto ? `${e.codigo}: ${e.message}` : (e as Error).message}]};
   }
 };
+
+/** Cor aceita na animação: "#rrggbb", "#rgb" ou uma referência do tema. */
+const COR = z.string().regex(/^(#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3}|@(fundo|texto|destaque|suave))$/, 'cor "#rrggbb" ou @fundo, @texto, @destaque, @suave');
+
+/** Lê o documento e confere que é uma animação (as ferramentas daqui gravariam campos estranhos em outro módulo). */
+const docAnimacao = (projeto: Projeto, documento: string) => {
+  const rel = projeto.arquivoDoDocumento(documento);
+  const lido = projeto.lerJson<unknown>(rel);
+  if (!ehDocAnimacao(lido.doc)) throw new ErroProjeto(`${documento} não é uma animação (use as ferramentas do módulo dele)`, "patch");
+  return {rel, doc: lido.doc, versao: lido.versao};
+};
+
+/** Índice da camada pelo id; recusa id ausente e id repetido (editar só a primeira seria um erro silencioso). */
+const indiceUnico = (doc: DocAnimacao, documento: string, id: string) => {
+  const achados = doc.camadas.flatMap((c, i) => (c?.id === id ? [i] : []));
+  if (!achados.length) throw new ErroProjeto(`camada ${id} não encontrada no documento ${documento}`, "nao_achado");
+  if (achados.length > 1) throw new ErroProjeto(`o id ${id} está em ${achados.length} camadas (${achados.map((i) => `/camadas/${i}`).join(", ")}): dê um id único a cada uma com aplicar_patch`, "patch");
+  return achados[0];
+};
+
+/** A grade volta inteira na resposta só até este tamanho; acima, a resposta passaria de dezenas de KB. */
+const GRADE_NA_RESPOSTA = 32 * 32;
 
 export const registrarFerramentasAnimacao = (
   servidor: McpServer,
@@ -35,7 +57,7 @@ export const registrarFerramentasAnimacao = (
       altura: z.number().int().min(16).max(7680).optional(),
       fps: z.number().min(1).max(120).optional(),
       duracao_ms: z.number().min(100).max(3600000).optional(),
-      fundo: z.string().optional(),
+      fundo: COR.optional(),
     },
   }, seguro(({titulo, largura, altura, fps, duracao_ms, fundo}: {
     titulo?: string; largura?: number; altura?: number; fps?: number; duracao_ms?: number; fundo?: string;
@@ -64,19 +86,19 @@ export const registrarFerramentasAnimacao = (
       nome: z.string().optional(),
       x: z.number().optional(),
       y: z.number().optional(),
-      largura: z.number().optional(),
-      altura: z.number().optional(),
+      largura: z.number().positive().optional(),
+      altura: z.number().positive().optional(),
       forma: z.enum(["retangulo", "elipse"]).optional(),
-      cor: z.string().optional(),
-      raio: z.number().optional(),
+      cor: COR.optional(),
+      raio: z.number().min(0).optional(),
       texto: z.string().optional(),
       fonte: z.string().optional(),
-      tamanho: z.number().optional(),
-      peso: z.number().optional(),
+      tamanho: z.number().positive().optional(),
+      peso: z.number().min(1).max(1000).optional(),
       alinhar: z.enum(["esquerda", "centro", "direita"]).optional(),
       src: z.string().optional(),
       ajuste: z.enum(["cobrir", "conter"]).optional(),
-      tamanho_pixel: z.number().optional(),
+      tamanho_pixel: z.number().min(1).optional(),
       efeito: z.enum(["aleatorio", "decodificar", "varredura", "varredura-baixo", "meio", "chuva"]).optional(),
       semente: z.number().optional(),
     },
@@ -86,8 +108,7 @@ export const registrarFerramentasAnimacao = (
     tamanho?: number; peso?: number; alinhar?: "esquerda" | "centro" | "direita"; src?: string;
     ajuste?: "cobrir" | "conter"; tamanho_pixel?: number; efeito?: EfeitoPixel; semente?: number;
   }) => {
-    const rel = projeto.arquivoDoDocumento(o.documento);
-    const {doc, versao} = projeto.lerJson<DocAnimacao>(rel);
+    const {doc, versao} = docAnimacao(projeto, o.documento);
     const id = idLivreAnimacao(doc, o.tipo);
     const base = novaCamadaAnimacao(o.tipo, id);
 
@@ -119,7 +140,7 @@ export const registrarFerramentasAnimacao = (
   }));
 
   servidor.registerTool("animar", {
-    description: "Cria ou substitui a trilha de animação de uma propriedade em uma camada (com quadros-chave {t_ms, valor, curva}).",
+    description: `Cria ou substitui a trilha de animação de uma propriedade em uma camada (com quadros-chave {t_ms, valor, curva}). "cor" pede cor ("#rrggbb" ou @fundo, @texto, @destaque, @suave); as outras, número (${Object.keys(FAIXAS_ANIMACAO).map((p) => `${p} ${textoFaixa(p)}`).join("; ")}; x, y e rotacao livres).`,
     inputSchema: {
       documento: z.string(),
       camada_id: z.string(),
@@ -134,10 +155,16 @@ export const registrarFerramentasAnimacao = (
     documento: string; camada_id: string; propriedade: PropriedadeAnimavel;
     quadros: {t_ms: number; valor: number | string; curva?: Curva}[];
   }) => {
-    const rel = projeto.arquivoDoDocumento(documento);
-    const {doc, versao} = projeto.lerJson<DocAnimacao>(rel);
-    const idx = doc.camadas.findIndex((c) => c.id === camada_id);
-    if (idx < 0) throw new ErroProjeto(`camada ${camada_id} não encontrada no documento ${documento}`, "nao_achado");
+    const {doc, versao} = docAnimacao(projeto, documento);
+    const idx = indiceUnico(doc, documento, camada_id);
+    for (const q of quadros) {
+      if (propriedade === "cor" ? !COR.safeParse(q.valor).success : typeof q.valor !== "number" || !Number.isFinite(q.valor)) {
+        throw new ErroProjeto(`${propriedade} pede ${propriedade === "cor" ? 'cor ("#rrggbb" ou @fundo, @texto, @destaque, @suave)' : "número"} (veio ${JSON.stringify(q.valor)})`, "patch");
+      }
+      if (typeof q.valor === "number" && limitarAFaixa(propriedade, q.valor) !== q.valor) {
+        throw new ErroProjeto(`${propriedade} vai ${textoFaixa(propriedade)} (veio ${q.valor})`, "patch");
+      }
+    }
 
     const ks = [...quadros].sort((a, b) => a.t_ms - b.t_ms);
     const c = doc.camadas[idx];
@@ -153,13 +180,13 @@ export const registrarFerramentasAnimacao = (
   }));
 
   servidor.registerTool("pixelizar_imagem", {
-    description: "Converte uma imagem do projeto (em midia/) numa grade de pixel art para a camada pixel indicada.",
+    description: `Converte uma imagem PNG do projeto (em midia/, até 4096 px de lado) numa grade de pixel art para a camada pixel indicada. Sem "linhas", segue a proporção da imagem (até ${MAX_LADO_GRADE}). A grade volta inteira só até 32x32; acima disso, a resposta traz a paleta (veja a grade com ler_documento).`,
     inputSchema: {
       documento: z.string(),
       camada_id: z.string(),
       imagem_src: z.string().describe("caminho da imagem no projeto, ex: midia/foto.png"),
-      colunas: z.number().int().min(1).max(128).optional(),
-      linhas: z.number().int().min(1).max(128).optional(),
+      colunas: z.number().int().min(1).max(MAX_LADO_GRADE).optional(),
+      linhas: z.number().int().min(1).max(MAX_LADO_GRADE).optional(),
       cores: z.number().int().min(2).max(62).optional(),
       usar_paleta_marca: z.boolean().optional(),
     },
@@ -167,10 +194,10 @@ export const registrarFerramentasAnimacao = (
     documento: string; camada_id: string; imagem_src: string; colunas?: number; linhas?: number;
     cores?: number; usar_paleta_marca?: boolean;
   }) => {
-    const rel = projeto.arquivoDoDocumento(documento);
-    const {doc, versao} = projeto.lerJson<DocAnimacao>(rel);
-    const idx = doc.camadas.findIndex((c) => c.id === camada_id);
-    if (idx < 0) throw new ErroProjeto(`camada ${camada_id} não encontrada no documento ${documento}`, "nao_achado");
+    const {doc, versao} = docAnimacao(projeto, documento);
+    const idx = indiceUnico(doc, documento, camada_id);
+    if (doc.camadas[idx].tipo !== "pixel") throw new ErroProjeto(`${camada_id} é ${doc.camadas[idx].tipo}: pixelizar_imagem é da camada pixel`, "patch");
+    const avisos: string[] = [];
 
     const abs = projeto.caminho(imagem_src);
     const buffer = readFileSync(abs);
@@ -179,10 +206,14 @@ export const registrarFerramentasAnimacao = (
     let paletaAlvo: string[] | undefined;
     if (usar_paleta_marca && doc.tema) {
       paletaAlvo = [doc.tema.fundo, doc.tema.texto, doc.tema.destaque, doc.tema.suave];
+    } else if (usar_paleta_marca) {
+      avisos.push("a animação não tem kit (tema): rode aplicar_marca antes; usei as cores da imagem");
     }
 
     const cols = colunas ?? 16;
-    const lins = linhas ?? Math.max(1, Math.round(cols * (dadosImg.altura / dadosImg.largura)));
+    const proporcional = Math.max(1, Math.round(cols * (dadosImg.altura / dadosImg.largura)));
+    const lins = linhas ?? Math.min(MAX_LADO_GRADE, proporcional);
+    if (!linhas && proporcional > MAX_LADO_GRADE) avisos.push(`a proporção da imagem pedia ${proporcional} linhas: limitei a ${MAX_LADO_GRADE} (a imagem fica achatada; peça menos colunas)`);
     const grade = gradeDeImagem(dadosImg, {
       colunas: cols,
       linhas: lins,
@@ -192,7 +223,10 @@ export const registrarFerramentasAnimacao = (
 
     const patch: OperacaoPatch[] = [{op: "add", path: `/camadas/${idx}/grade`, value: grade}];
     const r = projeto.aplicarPatch({documento, versao_base: versao, patch, autor, origem, rotulo: `pixelizar imagem em ${camada_id}`});
-    return {ok: true, versao: r.versao, colunas: grade.colunas, linhas: grade.linhas, cores: grade.paleta.length, grade};
+    const inteira = grade.colunas * grade.linhas <= GRADE_NA_RESPOSTA;
+    if (!inteira) avisos.push(`grade de ${grade.colunas}x${grade.linhas} gravada; a resposta traz só a paleta (veja as células com ler_documento)`);
+    return {ok: true, versao: r.versao, colunas: grade.colunas, linhas: grade.linhas, cores: grade.paleta.length, paleta: grade.paleta,
+      ...(inteira ? {grade} : {}), ...(avisos.length ? {avisos} : {})};
   }));
 
   servidor.registerTool("efeito_pixel", {
@@ -203,17 +237,16 @@ export const registrarFerramentasAnimacao = (
       efeito: z.enum(["aleatorio", "decodificar", "varredura", "varredura-baixo", "meio", "chuva"]),
       semente: z.number().optional(),
       animar_progresso: z.boolean().optional(),
-      inicio_ms: z.number().optional(),
-      duracao_ms: z.number().optional(),
+      inicio_ms: z.number().min(0).optional(),
+      duracao_ms: z.number().min(1).optional(),
     },
   }, seguro(({documento, camada_id, efeito, semente, animar_progresso, inicio_ms, duracao_ms}: {
     documento: string; camada_id: string; efeito: EfeitoPixel; semente?: number;
     animar_progresso?: boolean; inicio_ms?: number; duracao_ms?: number;
   }) => {
-    const rel = projeto.arquivoDoDocumento(documento);
-    const {doc, versao} = projeto.lerJson<DocAnimacao>(rel);
-    const idx = doc.camadas.findIndex((c) => c.id === camada_id);
-    if (idx < 0) throw new ErroProjeto(`camada ${camada_id} não encontrada no documento ${documento}`, "nao_achado");
+    const {doc, versao} = docAnimacao(projeto, documento);
+    const idx = indiceUnico(doc, documento, camada_id);
+    if (doc.camadas[idx].tipo !== "pixel") throw new ErroProjeto(`${camada_id} é ${doc.camadas[idx].tipo}: efeito_pixel é da camada pixel`, "patch");
 
     const patch: OperacaoPatch[] = [
       {op: "add", path: `/camadas/${idx}/efeito`, value: efeito},
@@ -235,7 +268,7 @@ export const registrarFerramentasAnimacao = (
     }
 
     const r = projeto.aplicarPatch({documento, versao_base: versao, patch, autor, origem, rotulo: `efeito pixel ${efeito} em ${camada_id}`});
-    return {ok: true, versao: r.versao, efeito, semente: semente ?? 1};
+    return {ok: true, versao: r.versao, efeito, semente: semente ?? doc.camadas[idx].semente ?? 1};
   }));
 
   servidor.registerTool("ver_animacao", {
@@ -245,8 +278,7 @@ export const registrarFerramentasAnimacao = (
       tempo_ms: z.number().min(0).optional(),
     },
   }, seguro(({documento, tempo_ms = 0}: {documento: string; tempo_ms?: number}) => {
-    const rel = projeto.arquivoDoDocumento(documento);
-    const {doc, versao} = projeto.lerJson<DocAnimacao>(rel);
+    const {doc, versao} = docAnimacao(projeto, documento);
     const tema = {...TEMA_ANIMACAO_NEUTRO, ...(doc.tema ?? {})};
 
     const camadasCalculadas = doc.camadas.map((c) => ({

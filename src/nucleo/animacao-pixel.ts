@@ -48,6 +48,45 @@ export const decodificarCelulas = (celulas: string): number[] => {
 export const corDaCelula = (grade: GradePixel, indice: number): string | null =>
   indice < 0 ? null : (grade.paleta[indice] ?? grade.paleta[0] ?? '#000000');
 
+// ---------- validação ----------
+/** Maior lado de uma grade (colunas ou linhas). O esquema do MCP (pixelizar_imagem) e o normalizador do documento usam o
+ *  mesmo teto: acima disso a prévia trava (o laço da revelação e o canvas crescem com colunas × linhas). */
+export const MAX_LADO_GRADE = 128;
+
+/** Cor da paleta em "#RRGGBB": "#rgb" é expandida; o que não é cor vira preto, **na mesma posição** (filtrar deslocaria
+ *  os índices das células). */
+const corDaPaleta = (c: unknown): string => {
+  if (typeof c !== 'string') return '#000000';
+  if (/^#[0-9a-f]{6}$/i.test(c)) return c;
+  if (/^#[0-9a-f]{3}$/i.test(c)) return `#${[...c.slice(1)].map((x) => x + x).join('')}`.toUpperCase();
+  return '#000000';
+};
+
+/**
+ * Lê uma grade vinda do documento (que pode ter sido editado à mão ou por aplicar_patch). Colunas e linhas precisam ser
+ * inteiros de 1 a MAX_LADO_GRADE e `celulas` um texto; senão a grade é recusada com o motivo (reformatar embaralharia a
+ * imagem, porque as células são lidas linha a linha). Células a menos viram vazio e a mais são cortadas; a paleta é
+ * consertada posição a posição. Uma grade válida volta igual.
+ */
+export const lerGrade = (g: unknown): {grade?: GradePixel; problema?: string} => {
+  if (!g || typeof g !== 'object') return {problema: 'não é um objeto'};
+  const o = g as Record<string, unknown>;
+  const lado = (v: unknown) => typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= MAX_LADO_GRADE;
+  if (!lado(o.colunas) || !lado(o.linhas)) return {problema: `colunas e linhas precisam ser inteiros de 1 a ${MAX_LADO_GRADE}`};
+  if (typeof o.celulas !== 'string') return {problema: 'sem "celulas"'};
+  const colunas = o.colunas as number;
+  const linhas = o.linhas as number;
+  const n = colunas * linhas;
+  const paleta = (Array.isArray(o.paleta) ? o.paleta : []).slice(0, MAX_CORES).map(corDaPaleta);
+  const celulas = o.celulas.length === n ? o.celulas : o.celulas.slice(0, n).padEnd(n, VAZIO);
+  const grade = {colunas, linhas, paleta, celulas};
+  if (celulas !== o.celulas) return {grade, problema: `"celulas" com ${o.celulas.length} caracteres em vez de ${n}: completada com vazio ou cortada`};
+  if (!Array.isArray(o.paleta)) return {grade, problema: 'sem paleta: as células saem pretas'};
+  const crua = o.paleta;
+  if (crua.length !== paleta.length || paleta.some((c, i) => c !== crua[i])) return {grade, problema: 'paleta com cores fora de "#rrggbb" (ou mais de 62): consertada na mesma posição'};
+  return {grade};
+};
+
 // ---------- determinismo (mesma semente, mesma saída) ----------
 /** Gerador pseudo-aleatório determinístico (mulberry32). */
 export const mulberry32 = (semente: number) => {
@@ -85,11 +124,15 @@ const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
  * - chuva: colunas caem como a chuva do Matrix, com a ponta clara.
  */
 export const revelar = (grade: GradePixel, efeito: EfeitoPixel | undefined, semente: number, progresso: number): (string | null)[] => {
-  const colunas = Math.max(1, grade.colunas);
-  const linhas = Math.max(1, grade.linhas);
-  const indices = decodificarCelulas(grade.celulas);
-  const n = indices.length;
-  const finais = indices.map((i) => corDaCelula(grade, i));
+  // defensiva: a grade normalmente já passou por lerGrade, mas quem chama direto não derruba a composição
+  const colunas = Math.max(1, Math.floor(grade.colunas) || 1);
+  const linhas = Math.max(1, Math.floor(grade.linhas) || 1);
+  const n = colunas * linhas;
+  const celulas = typeof grade.celulas === 'string' ? grade.celulas : '';
+  const paleta = Array.isArray(grade.paleta) ? grade.paleta : [];
+  const indices = decodificarCelulas(celulas.slice(0, n).padEnd(n, VAZIO));
+  const segura = {...grade, paleta};
+  const finais = indices.map((i) => corDaCelula(segura, i));
   const p = clamp01(progresso);
   if (p <= 0) return finais.map(() => null);
   if (p >= 1) return finais;
@@ -109,7 +152,7 @@ export const revelar = (grade: GradePixel, efeito: EfeitoPixel | undefined, seme
         if (finais[i] === null) continue;
         const limiar = ordem[i] / n;
         if (p <= limiar) continue;
-        const corTrocada = grade.paleta[Math.floor(rnd() * grade.paleta.length)] ?? finais[i];
+        const corTrocada = paleta[Math.floor(rnd() * paleta.length)] ?? finais[i];
         // assim que entra, a célula ainda está com a cor trocada; assenta rápido na final
         const local = clamp01((p - limiar) / Math.max(0.05, 0.25));
         out[i] = local >= 1 ? finais[i] : misturarCor(corTrocada, finais[i]!, local);
@@ -233,18 +276,23 @@ export const quantizar = (pixels: {r: number; g: number; b: number; a: number}[]
 
   const opacos = pixels.map((p, i) => ({...p, i})).filter((p) => p.a >= 0.5);
   const k = Math.max(1, Math.min(MAX_CORES, Math.floor(nCores)));
-  const caixas: {px: typeof opacos; min: number[]; max: number[]}[] = opacos.length ? [{
-    px: opacos,
-    min: [0, 0, 0],
-    max: [255, 255, 255],
-  }] : [];
-  // median-cut: divide a caixa com mais alcance pelo canal de maior variação, na mediana
+  const minMax = (px: typeof opacos) => [0, 1, 2].map((cc) => [
+    Math.min(...px.map((p) => (cc === 0 ? p.r : cc === 1 ? p.g : p.b))),
+    Math.max(...px.map((p) => (cc === 0 ? p.r : cc === 1 ? p.g : p.b))),
+  ]);
+  const caixaDe = (px: typeof opacos) => {
+    const mm = minMax(px);
+    return {px, min: mm.map((m) => m[0]), max: mm.map((m) => m[1])};
+  };
+  const caixas: {px: typeof opacos; min: number[]; max: number[]}[] = opacos.length ? [caixaDe(opacos)] : [];
+  // median-cut: divide a caixa com mais alcance pelo canal de maior variação, na mediana. Caixa de uma cor só (alcance 0)
+  // não se divide: daria cores repetidas na paleta.
   while (caixas.length < k) {
     let alvoI = -1;
     let alcance = -1;
     caixas.forEach((c, i) => {
       const spread = (c.max[0] - c.min[0]) + (c.max[1] - c.min[1]) + (c.max[2] - c.min[2]);
-      if (spread > alcance && c.px.length > 1) {
+      if (spread > 0 && spread > alcance && c.px.length > 1) {
         alcance = spread;
         alvoI = i;
       }
@@ -264,17 +312,15 @@ export const quantizar = (pixels: {r: number; g: number; b: number; a: number}[]
     const meio = Math.floor(ordenado.length / 2);
     const a = ordenado.slice(0, meio);
     const b = ordenado.slice(meio);
-    const minMax = (px: typeof opacos) => [0, 1, 2].map((cc) => [
-      Math.min(...px.map((p) => (cc === 0 ? p.r : cc === 1 ? p.g : p.b))),
-      Math.max(...px.map((p) => (cc === 0 ? p.r : cc === 1 ? p.g : p.b))),
-    ]);
-    caixas[alvoI] = {px: a, min: minMax(a).map((m) => m[0]), max: minMax(a).map((m) => m[1])};
-    caixas.push({px: b, min: minMax(b).map((m) => m[0]), max: minMax(b).map((m) => m[1])});
+    caixas[alvoI] = caixaDe(a);
+    caixas.push(caixaDe(b));
   }
-  const paleta = caixas.map((c) => {
+  // a mediana pode cair no meio de pixels iguais e deixar a mesma cor em duas caixas: a paleta fica sem repetição (os
+  // índices vêm da cor mais próxima logo abaixo)
+  const paleta = [...new Set(caixas.map((c) => {
     const n = c.px.length || 1;
     return hexDe(c.px.reduce((s, p) => s + p.r, 0) / n, c.px.reduce((s, p) => s + p.g, 0) / n, c.px.reduce((s, p) => s + p.b, 0) / n);
-  });
+  }))];
   const rgb = paleta.map((c) => {
     const v = parseInt(c.slice(1), 16);
     return [(v >> 16) & 255, (v >> 8) & 255, v & 255] as [number, number, number];
