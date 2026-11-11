@@ -441,29 +441,7 @@ input[type="range"]:focus-visible { outline: none; }
 .terminal-corpo { flex: 1; position: relative; min-height: 0; background: #101113; }
 .terminal-corpo .xterm-host { position: absolute; inset: 4px 0 0 8px; }
 
-/* ---------- dockview no tema da casa ---------- */
-.dockview-theme-estudio {
-  --dv-background-color: var(--fundo-0);
-  --dv-paneview-header-border-color: var(--borda);
-  --dv-tabs-and-actions-container-background-color: var(--fundo-2);
-  --dv-activegroup-visiblepanel-tab-background-color: var(--fundo-1);
-  --dv-activegroup-hiddenpanel-tab-background-color: var(--fundo-2);
-  --dv-inactivegroup-visiblepanel-tab-background-color: var(--fundo-1);
-  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--fundo-2);
-  --dv-activegroup-visiblepanel-tab-color: var(--texto);
-  --dv-activegroup-hiddenpanel-tab-color: var(--texto-3);
-  --dv-inactivegroup-visiblepanel-tab-color: var(--texto-2);
-  --dv-inactivegroup-hiddenpanel-tab-color: var(--texto-3);
-  --dv-tab-divider-color: var(--borda);
-  --dv-separator-border: var(--fundo-0);
-  --dv-group-view-background-color: var(--fundo-1);
-  --dv-tabs-and-actions-container-height: 28px;
-  --dv-tabs-and-actions-container-font-size: 12px;
-  --dv-sash-color: transparent;
-  --dv-active-sash-color: var(--acento);
-  --dv-drag-over-background-color: var(--acento-fraco);
-  --dv-drag-over-border-color: var(--acento);
-}
+/* o tema do dockview fica num lugar só: casca/casca.css */
 
 /* ── pilha de efeitos em acordeão (1.11) ── */
 .pre-ajustes { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 10px 6px; }

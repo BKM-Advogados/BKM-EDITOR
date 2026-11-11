@@ -70,3 +70,12 @@ describe('tokens usados no CSS do renderer', () => {
     expect(anim).not.toMatch(/--bg-painel|var\(--fg|--azul|var\(--mono|#0d1117|#161b22|#f0f6fc|#ff5252/i);
   });
 });
+
+describe('tema do dockview', () => {
+  it('é declarado num lugar só (casca.css), com a aba da frente sublinhada', () => {
+    const comTema = arquivosCss().filter((a) => /\.dockview-theme-estudio\s*\{/.test(fs.readFileSync(a, 'utf8')));
+    expect(comTema.map((a) => path.relative(RAIZ, a))).toEqual([path.join('casca', 'casca.css')]);
+    const casca = fs.readFileSync(path.join(RAIZ, 'casca', 'casca.css'), 'utf8');
+    expect(casca).toMatch(/\.dv-active-group \.dv-tab\.dv-active-tab::before \{ background: var\(--acento\)/);
+  });
+});
