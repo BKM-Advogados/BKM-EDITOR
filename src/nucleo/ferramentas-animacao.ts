@@ -6,7 +6,7 @@ import {ErroProjeto, type Projeto} from "./projeto";
 import type {OperacaoPatch} from "./documentos";
 import {documentoNovo} from "./criar-projeto";
 import {
-  idLivreAnimacao, novaCamadaAnimacao, valorEm, type CamadaAnimacao, type Curva,
+  idLivreAnimacao, novaCamadaAnimacao, TEMA_ANIMACAO_NEUTRO, valorEm, type CamadaAnimacao, type Curva,
   type DocAnimacao, type PropriedadeAnimavel, type TipoCamadaAnimacao,
 } from "./animacao";
 import {gradeDeImagem, type EfeitoPixel} from "./animacao-pixel";
@@ -247,6 +247,7 @@ export const registrarFerramentasAnimacao = (
   }, seguro(({documento, tempo_ms = 0}: {documento: string; tempo_ms?: number}) => {
     const rel = projeto.arquivoDoDocumento(documento);
     const {doc, versao} = projeto.lerJson<DocAnimacao>(rel);
+    const tema = {...TEMA_ANIMACAO_NEUTRO, ...(doc.tema ?? {})};
 
     const camadasCalculadas = doc.camadas.map((c) => ({
       id: c.id,
@@ -259,7 +260,7 @@ export const registrarFerramentasAnimacao = (
       escala: valorEm(c, "escala", tempo_ms),
       rotacao: valorEm(c, "rotacao", tempo_ms),
       opacidade: valorEm(c, "opacidade", tempo_ms),
-      cor: valorEm(c, "cor", tempo_ms),
+      cor: valorEm(c, "cor", tempo_ms, tema),
       ...(c.tipo === "texto" ? {texto: c.texto, tamanho: valorEm(c, "tamanho", tempo_ms)} : {}),
       ...(c.tipo === "forma" ? {forma: c.forma ?? "retangulo", raio: c.raio} : {}),
       ...(c.tipo === "pixel" ? {

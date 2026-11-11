@@ -2,7 +2,7 @@
 import React, {useEffect, useState} from "react";
 import {Diamond} from "lucide-react";
 import {
-  CURVAS, valorEm, type CamadaAnimacao, type Curva, type DocAnimacao,
+  CURVAS, TEMA_ANIMACAO_NEUTRO, valorEm, type CamadaAnimacao, type Curva, type DocAnimacao,
   type PropriedadeAnimavel, type QuadroChave,
 } from "../../../nucleo/animacao";
 import {aplicar, useLoja} from "../../estado/loja";
@@ -67,6 +67,7 @@ export const InspectorAnimacao: React.FC = () => {
   }
 
   const origem = `/camadas/${indiceCamada}`;
+  const tema = {...TEMA_ANIMACAO_NEUTRO, ...(doc.tema ?? {})};
 
   // Auxiliar para verificar se há quadro-chave exatamente no tempo atual (margem de 25ms)
   const quadroChaveNoTempo = (prop: PropriedadeAnimavel): QuadroChave | undefined => {
@@ -86,7 +87,7 @@ export const InspectorAnimacao: React.FC = () => {
       else delete trilhas[prop];
     } else {
       // Adiciona quadro-chave com o valor atual
-      const val = valorEm(camada, prop, tempoMs);
+      const val = valorEm(camada, prop, tempoMs, tema);
       const novoK: QuadroChave = {
         t_ms: Math.round(tempoMs),
         valor: val,
@@ -139,7 +140,7 @@ export const InspectorAnimacao: React.FC = () => {
   const escala = Number(valorEm(camada, "escala", tempoMs));
   const rotacao = Number(valorEm(camada, "rotacao", tempoMs));
   const opacidade = Number(valorEm(camada, "opacidade", tempoMs));
-  const cor = String(valorEm(camada, "cor", tempoMs));
+  const cor = String(valorEm(camada, "cor", tempoMs, tema));
 
   const BotaoLosango: React.FC<{prop: PropriedadeAnimavel}> = ({prop}) => {
     const ativoK = Boolean(quadroChaveNoTempo(prop));

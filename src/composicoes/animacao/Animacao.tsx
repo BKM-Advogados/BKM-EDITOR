@@ -44,7 +44,7 @@ const Camada: React.FC<{c: CamadaAnimacao; tema: TemaAnimacao; origem: string; t
   const escala = num(valorEm(c, 'escala', t_ms));
   const rotacao = num(valorEm(c, 'rotacao', t_ms));
   const opacidade = num(valorEm(c, 'opacidade', t_ms));
-  const cor = resolverCor(String(valorEm(c, 'cor', t_ms)), tema);
+  const cor = resolverCor(String(valorEm(c, 'cor', t_ms, tema)), tema);
   // o pixel define o tamanho pela grade × tamanho_pixel; os demais usam largura/altura da camada
   const tamanho = c.tipo === 'pixel' && c.grade ? {largura: c.grade.colunas * Math.max(1, num(valorEm(c, 'tamanho_pixel', t_ms))), altura: c.grade.linhas * Math.max(1, num(valorEm(c, 'tamanho_pixel', t_ms)))} : {largura: c.largura, altura: c.altura};
   const base: React.CSSProperties = {

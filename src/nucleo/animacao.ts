@@ -104,9 +104,10 @@ export const resolverCor = (cor: string, tema: TemaAnimacao): string => {
 
 const canalHex = (h: string, de: number) => parseInt(h.slice(de, de + 2), 16);
 
-/** "#rrggbb" → [r, g, b] 0..255 (hex inválido vira 0, para nunca derrubar o render). */
+/** "#rrggbb" ou "#rgb" → [r, g, b] 0..255 (hex inválido vira 0, para nunca derrubar o render). */
 export const hexParaRgb = (cor: string): [number, number, number] => {
-  const h = cor.replace(/^#/, '');
+  const curto = String(cor).trim().replace(/^#/, '');
+  const h = /^[0-9a-f]{3}$/i.test(curto) ? [...curto].map((x) => x + x).join('') : curto;
   if (!/^[0-9a-f]{6}$/i.test(h)) return [0, 0, 0];
   return [canalHex(h, 0), canalHex(h, 2), canalHex(h, 4)];
 };
@@ -173,6 +174,7 @@ export const aliviar = (curva: Curva, u: number): number => {
       return 1 + c3 * Math.pow(u - 1, 3) + c1 * Math.pow(u - 1, 2);
     }
     case 'degrau': return 0; // segura o valor do quadro-chave anterior até o seguinte
+    default: return u; // curva desconhecida (JSON editado à mão) anda em linha
   }
 };
 
@@ -209,33 +211,65 @@ export const interpolar = (a: number | string, b: number | string, e: number): n
   return interpolarCor(String(a), String(b), e);
 };
 
+/** Número de um quadro-chave: número finito, ou texto que é número ("100"); o resto é `undefined`. */
+const numeroDe = (v: unknown): number | undefined => {
+  const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN;
+  return Number.isFinite(n) ? n : undefined;
+};
+
 /**
  * Valor de uma propriedade no instante `t_ms`. Sem trilha (ou trilha vazia), vale a prop base. Antes do primeiro
  * quadro-chave vale o dele; depois do último, o dele. Entre dois, interpola pela curva do quadro-chave de saída.
+ * Na cor, as referências ("@destaque"…) são resolvidas pelo `tema` antes de interpolar; no quadro-chave e no `degrau`
+ * volta o valor cru, para quem grava o valor (o losango do inspetor) não congelar a cor do tema no documento.
  */
-export const valorEm = (camada: CamadaAnimacao, prop: PropriedadeAnimavel, t_ms: number): number | string => {
+export const valorEm = (camada: CamadaAnimacao, prop: PropriedadeAnimavel, t_ms: number, tema: TemaAnimacao = TEMA_ANIMACAO_NEUTRO): number | string => {
   const base = valorBase(camada, prop);
   const trilha = camada.trilhas?.[prop];
   if (!trilha || !trilha.length) return base;
+  const cru = (v: number | string): number | string => (prop === 'cor' ? (typeof v === 'string' ? v : base) : numeroDe(v) ?? base);
   const ks = [...trilha].sort((a, b) => a.t_ms - b.t_ms);
   const primeiro = ks[0];
   const ultimo = ks[ks.length - 1];
-  if (t_ms <= primeiro.t_ms) return primeiro.valor;
-  if (t_ms >= ultimo.t_ms) return ultimo.valor;
+  if (t_ms <= primeiro.t_ms) return cru(primeiro.valor);
+  if (t_ms >= ultimo.t_ms) return cru(ultimo.valor);
   let i = 0;
   while (i < ks.length - 1 && ks[i + 1].t_ms <= t_ms) i++;
   const a = ks[i];
   const b = ks[i + 1];
-  if (b.t_ms <= a.t_ms) return b.valor;
-  const u = (t_ms - a.t_ms) / (b.t_ms - a.t_ms);
-  return interpolar(a.valor, b.valor, aliviar(a.curva ?? 'linear', u));
+  if (b.t_ms <= a.t_ms) return cru(b.valor);
+  const curva = a.curva ?? 'linear';
+  if (curva === 'degrau') return cru(a.valor);
+  const e = aliviar(curva, (t_ms - a.t_ms) / (b.t_ms - a.t_ms));
+  const va = cru(a.valor);
+  const vb = cru(b.valor);
+  if (prop === 'cor') return interpolarCor(resolverCor(String(va), tema), resolverCor(String(vb), tema), e);
+  return interpolar(va, vb, e);
 };
 
 // ---------- normalização e resolução ----------
 const LIMITE = {largura: 7680, altura: 7680, fps: 120, duracao: 60 * 60 * 1000};
 
-/** Lê um documento com calma: campo fora do lugar volta ao padrão, nunca derruba o app. */
-export const normalizarAnimacao = (x: unknown): DocAnimacao => {
+/** Quadros-chave de uma trilha, com o valor no tipo da propriedade: a cor é texto; o resto é número (o texto "100" vira
+ *  100). O que não serve é descartado com aviso, em vez de virar preto ou NaN na hora de desenhar. */
+const normalizarTrilha = (prop: string, lista: unknown[], camadaId: string, avisos: string[]): QuadroChave[] => {
+  const out: QuadroChave[] = [];
+  let descartados = 0;
+  for (const q of lista) {
+    const k = (q && typeof q === 'object' ? q : {}) as Record<string, unknown>;
+    const valor = prop === 'cor' ? (typeof k.valor === 'string' ? k.valor : undefined) : numeroDe(k.valor);
+    if (valor === undefined) {
+      descartados++;
+      continue;
+    }
+    out.push({t_ms: num(k.t_ms, 0), valor,
+      ...(typeof k.curva === 'string' && CURVAS.some((c) => c.id === k.curva) ? {curva: k.curva as Curva} : {})});
+  }
+  if (descartados) avisos.push(`camada ${camadaId}: ${descartados} quadro(s)-chave de "${prop}" com valor fora do tipo (${prop === 'cor' ? 'cor' : 'número'}) foram ignorados`);
+  return out;
+};
+
+const normalizar = (x: unknown, avisos: string[]): DocAnimacao => {
   const o = (x && typeof x === 'object' ? x : {}) as Record<string, unknown>;
   const menor = Math.min(num(o.largura, 1920), LIMITE.largura);
   const camadas = (Array.isArray(o.camadas) ? o.camadas : []).map((c): CamadaAnimacao => {
@@ -245,11 +279,7 @@ export const normalizarAnimacao = (x: unknown): DocAnimacao => {
     if (l.trilhas && typeof l.trilhas === 'object') {
       for (const [p, lista] of Object.entries(l.trilhas as Record<string, unknown>)) {
         if (!(Array.isArray(lista))) continue;
-        trilhas[p as PropriedadeAnimavel] = lista.map((q): QuadroChave => {
-          const k = (q && typeof q === 'object' ? q : {}) as Record<string, unknown>;
-          return {t_ms: num(k.t_ms, 0), valor: (typeof k.valor === 'number' || typeof k.valor === 'string') ? k.valor : 0,
-            ...(typeof k.curva === 'string' && CURVAS.some((c) => c.id === k.curva) ? {curva: k.curva as Curva} : {})};
-        });
+        trilhas[p as PropriedadeAnimavel] = normalizarTrilha(p, lista, typeof l.id === 'string' ? l.id : '?', avisos);
       }
     }
     return {
@@ -296,10 +326,13 @@ export const normalizarAnimacao = (x: unknown): DocAnimacao => {
   };
 };
 
+/** Lê um documento com calma: campo fora do lugar volta ao padrão, nunca derruba o app. */
+export const normalizarAnimacao = (x: unknown): DocAnimacao => normalizar(x, []);
+
 /** Props da composição Animacao, com o tema resolvido e avisos. Valores fora do lugar viram aviso, nunca erro. */
 export const resolverAnimacao = (doc: DocAnimacao, base_midia?: string): {props: PropsAnimacao; avisos: string[]} => {
   const avisos: string[] = [];
-  const d = normalizarAnimacao(doc);
+  const d = normalizar(doc, avisos);
   const tema = {...TEMA_ANIMACAO_NEUTRO, ...(d.tema ?? {})};
   if (d.camadas.some((c) => !c.id || c.id === 'camada')) avisos.push('há camadas sem id: dê um id único a cada uma');
   return {
