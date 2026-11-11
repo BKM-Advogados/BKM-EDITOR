@@ -515,7 +515,13 @@ const api: ApiEstudio = {
     apagarGuardada: async () => undefined,
   },
   ide: {
-    estado: async () => ({ligado: prefs.projetos_ide !== false, t3: null, ...(aberto ? {raiz: 'C:\\Users\\pessoa\\Estudio\\Projeto', gravados: [], avisos: []} : {})}),
+    // a lista é a de HARNESSES (src/nucleo/ide.ts, que lê o disco e não entra no navegador)
+    estado: async () => ({ligado: prefs.projetos_ide !== false, t3: null, harnesses: [
+      {nome: 'Claude Code e T3 Code', guia: 'CLAUDE.md', mcp: '.mcp.json'}, {nome: 'Codex (CLI, app e extensão)', guia: 'AGENTS.md', mcp: '.codex/config.toml'},
+      {nome: 'Gemini CLI', guia: 'GEMINI.md', mcp: '.gemini/settings.json'}, {nome: 'Antigravity', guia: 'AGENTS.md', mcp: '.agents/mcp_config.json'},
+      {nome: 'Cursor', guia: 'AGENTS.md', mcp: '.cursor/mcp.json'}, {nome: 'VS Code (Copilot)', guia: 'AGENTS.md', mcp: '.vscode/mcp.json'},
+      {nome: 'opencode', guia: 'AGENTS.md', mcp: 'opencode.json'}],
+    ...(aberto ? {raiz: 'C:\\Users\\pessoa\\Estudio\\Projeto', gravados: [], avisos: []} : {})}),
     abrirNoT3: async () => ({ok: false, mensagem: 'Na prévia web não há T3 Code: no app, o botão roda t3 project add com a pasta do projeto.'}),
   },
   // carrossel em partes (rodada 3, B2): conta as páginas desenhadas, uma por vez; gravar não funciona aqui
