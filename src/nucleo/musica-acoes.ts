@@ -2,7 +2,7 @@
 // do MCP (mcp-musica.ts). Cada função lê o documento como está e devolve o patch (com "test" no que ela confere), o
 // rótulo do diário e o caminho do que mudou; nada aqui grava. Erro é Error com a frase para a pessoa ou para a IA.
 import type {OperacaoPatch} from './documentos';
-import {arredondarBatida, batidasPorCompasso, idLivre, NOME_PRESET, novaFaixaMixer, posicaoEmCompasso, PRESETS, segPorBatida,
+import {arredondarBatida, batidasPorCompasso, DUR_MIN, idLivre, NOME_PRESET, novaFaixaMixer, posicaoEmCompasso, PRESETS, segPorBatida,
   type AcordeNoTempo, type CanalMusica, type ClipeMusica, type DocMusica, type NotaMusica, type PadraoMusica, type PecaBateria, type PresetFaixa, type PresetSintetizador,
   PRESETS_FAIXA} from './musica';
 import {acordeDe, baixoDoAcorde, encaixarNaEscala, escalaDe, NOMES, nomeDaNota, vozesDoAcorde} from './musica-teoria';
@@ -99,6 +99,10 @@ export const editarArranjo = (doc: DocMusica, a: PedidoArranjo, o: {existe?: (ar
     case 'dividir': {
       if (a.em === undefined || a.em <= c.em || a.em >= c.em + c.dur) throw new Error(`diga o "em" do corte, entre ${c.em} e ${c.em + c.dur}`);
       const corte = arredondarBatida(a.em);
+      // conferido depois de arredondar: os dois pedaços precisam de pelo menos DUR_MIN (como o aparar)
+      if (corte - c.em < DUR_MIN - 1e-9 || c.em + c.dur - corte < DUR_MIN - 1e-9) {
+        throw new Error(`o corte deixa um pedaço menor que 1/16 de batida: diga um "em" entre ${arredondarBatida(c.em + DUR_MIN)} e ${arredondarBatida(c.em + c.dur - DUR_MIN)}`);
+      }
       const id = idLivre('c', doc.arranjo.clipes.map((x) => x.id));
       const desloc = corte - c.em;
       const {fade_in: _fi, origem: _o, ...resto} = c;

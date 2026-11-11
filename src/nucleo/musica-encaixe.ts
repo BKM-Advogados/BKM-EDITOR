@@ -112,9 +112,12 @@ export const encaixarNoVideo = (doc: DocMusica, video: DocCenas, o: PedidoEncaix
     }
     divisas.sort((a, b) => a - b);
     if (longe.length) avisos.push(`cortes longe do compasso: ${longe.join('; ')}`);
-    const fimSecoes = total || divisas[divisas.length - 1] + bpc * 4;
-    const bordas = [0, ...divisas, fimSecoes];
-    secoes = bordas.slice(0, -1).map((b, i) => ({id: `s${i + 1}`, nome: `Cena ${i + 1}`, em: arredondarBatida(b), dur: arredondarBatida(bordas[i + 1] - b)}));
+    // música vazia (sem clipes) num vídeo sem cortes: não há onde pôr seção, e as que existem ficam (o aviso já foi dado)
+    if (total || divisas.length) {
+      const fimSecoes = total || divisas[divisas.length - 1] + bpc * 4;
+      const bordas = [0, ...divisas, fimSecoes];
+      secoes = bordas.slice(0, -1).map((b, i) => ({id: `s${i + 1}`, nome: `Cena ${i + 1}`, em: arredondarBatida(b), dur: arredondarBatida(bordas[i + 1] - b)}));
+    }
     extra.secoes = secoes.length;
     if (o.viradas) {
       const bateria = doc.canais.find((c) => c.tipo === 'bateria' && clipes.some((x) => x.canal === c.id && !x.mudo));

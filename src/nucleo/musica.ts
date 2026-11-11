@@ -357,6 +357,8 @@ export const resolverMusica = (doc: DocMusica): {musica: MusicaP; avisos: string
     const dur = Math.max(DUR_MIN, numero(p.dur, bpc));
     padroes[p.id] = {...p, dur, passos: limitar(Math.round(numero(p.passos, Math.round(dur * 4))), 1, 256), notas: Array.isArray(p.notas) ? p.notas : []};
     if (!idsCanais.has(p.canal)) avisos.push(`o padrão "${p.nome || p.id}" é do canal "${p.canal}", que não existe`);
+    const fora = padroes[p.id].notas.filter((n) => n && n.nota !== undefined && !(Number.isInteger(n.nota) && n.nota >= 0 && n.nota <= 127));
+    if (fora.length) avisos.push(`o padrão "${p.nome || p.id}" tem ${fora.length} nota(s) fora de 0 a 127 (ex.: ${fora[0].nota}): não tocam no MIDI`);
   }
 
   const clipes: ClipeMusicaP[] = [];

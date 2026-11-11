@@ -148,6 +148,11 @@ export type OpcoesResolver = {envelopes?: Record<string, Envelope | undefined>};
 
 const numero = (v: unknown, padrao: number) => (typeof v === 'number' && Number.isFinite(v) ? v : padrao);
 
+/** Duração de uma cena como o vídeo toca: o padrão quando falta e a faixa de DURACAO_MIN a DURACAO_MAX. O resolvedor e
+ *  os cortes que a Música lê (cortesDoVideo) usam a mesma conta. */
+export const duracaoDaCena = (c: {duracao_ms?: unknown} | null | undefined): number =>
+  Math.min(DURACAO_MAX, Math.max(DURACAO_MIN, numero(c?.duracao_ms, DURACAO_CENA_PADRAO)));
+
 /** Props da composição VideoCenas, em ms de saída. Valores fora do lugar viram aviso, não erro: o vídeo sempre toca. */
 export const resolverCenas = (doc: DocCenas, opcoes: OpcoesResolver = {}): {props: PropsCenas; avisos: string[]} => {
   const avisos: string[] = [];
@@ -155,11 +160,9 @@ export const resolverCenas = (doc: DocCenas, opcoes: OpcoesResolver = {}): {prop
   const tema = {...TEMA_NEUTRO, ...(doc.tema ?? {})};
   let t = 0;
   const cenas: CenaCenasP[] = (Array.isArray(doc.cenas) ? doc.cenas : []).map((c, i) => {
-    let dur = numero(c.duracao_ms, DURACAO_CENA_PADRAO);
-    if (dur < DURACAO_MIN || dur > DURACAO_MAX) {
-      avisos.push(`a cena ${i + 1} tem duração ${dur} ms; vai com ${Math.min(DURACAO_MAX, Math.max(DURACAO_MIN, dur))} ms`);
-      dur = Math.min(DURACAO_MAX, Math.max(DURACAO_MIN, dur));
-    }
+    const pedida = numero(c.duracao_ms, DURACAO_CENA_PADRAO);
+    const dur = duracaoDaCena(c);
+    if (dur !== pedida) avisos.push(`a cena ${i + 1} tem duração ${pedida} ms; vai com ${dur} ms`);
     const t_in = t;
     const t_out = t + dur;
     t = t_out;

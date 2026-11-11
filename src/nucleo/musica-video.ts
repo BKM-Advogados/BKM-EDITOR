@@ -5,7 +5,7 @@
 import type {ClipeAudio, FaixaAudio} from './audio';
 import {PAPEIS, papelDe} from './audio';
 import type {OperacaoPatch} from './documentos';
-import type {DocCenas} from './cenas';
+import {duracaoDaCena, type DocCenas} from './cenas';
 import {caminhoDoRender, partesDoSom, resolverMusica, type DocMusica} from './musica';
 
 // ---------- código do render ----------
@@ -158,9 +158,9 @@ export const patchAtualizarLigados = (doc: DocCenas, idMusica: string, render: {
 export const cortesDoVideo = (doc: DocCenas): number[] => {
   const out: number[] = [];
   let t = 0;
-  for (const c of doc.cenas ?? []) {
+  for (const c of Array.isArray(doc.cenas) ? doc.cenas : []) {
     if (t > 0) out.push(t);
-    t += Math.max(0, typeof c.duracao_ms === 'number' ? c.duracao_ms : 0);
+    t += duracaoDaCena(c); // a mesma duração do resolvedor (padrão e faixa)
   }
   return out;
 };
