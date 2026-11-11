@@ -134,15 +134,20 @@ export const marcarMidia = (
   caminho: string,
   mudanca: {estado?: EstadoDaTomada | null; nota?: string},
   quem: {autor: string; origem: string},
-): {seq: number; documento: string; caminho: string; marca: MarcaDeMidia | null} => p.comTrava(() => {
+): {seq: number; documento: string; caminho: string; marca: MarcaDeMidia | null} => {
   const rel = path.posix.normalize(caminho.replace(/\\/g, '/'));
   if (!rel.startsWith(`${PASTA}/`) || rel === ARQUIVO_MARCAS_MIDIA) throw new ErroProjeto(`só se marca arquivo de ${PASTA}/: ${caminho}`, 'caminho');
+  // fora da trava: andar por midia/ (às vezes um disco de fora, por link) demora, e a trava segura os outros processos
   const entradas = indiceDaMidia(p).entradas;
   if (!entradas.some((e) => e.caminho === rel)) {
     if (!p.existe(rel)) throw new ErroProjeto(`arquivo não achado em ${PASTA}/: ${caminho}`, 'nao_achado');
     const dono = classificarDerivado(rel);
     throw new ErroProjeto(`${rel} é um arquivo gerado${dono ? ` a partir de ${dono.origem}` : ''}: marque o original`, 'caminho');
   }
+  return p.comTrava(() => marcarNaTrava(p, rel, mudanca, quem));
+};
+
+const marcarNaTrava = (p: Projeto, rel: string, mudanca: {estado?: EstadoDaTomada | null; nota?: string}, quem: {autor: string; origem: string}) => {
   const existia = p.existe(ARQUIVO_MARCAS_MIDIA) ? p.lerTexto(ARQUIVO_MARCAS_MIDIA) : null;
   const textoAntes = existia ?? serializar(marcasVazias());
   const antes = lerMarcasDoProjeto(p);
@@ -164,7 +169,7 @@ export const marcarMidia = (
     inverso: jsonpatch.compare(depois, antes) as OperacaoPatch[],
   });
   return {seq, documento: ARQUIVO_MARCAS_MIDIA, caminho: rel, marca};
-});
+};
 
 // ---------- onde cada arquivo é usado ----------
 /** Ids dos documentos do manifesto cujo JSON cita o caminho como valor (entre aspas), por arquivo pedido. */

@@ -129,9 +129,10 @@ export class SessaoProjeto {
    *  também ficam fora (REGRAS_GIT_INTERNAS), inclusive nos projetos criados antes dessa regra. */
   private ignorarMidiaPesada() {
     try {
+      const midia = arquivosDaMidia(this.projeto.raiz); // fora da trava: andar por midia/ (às vezes um disco de fora) demora
       this.projeto.comTrava(() => {
         const atual = this.projeto.existe('.gitignore') ? this.projeto.lerTexto('.gitignore') : '';
-        const novo = gitignoreComRegrasInternas(gitignoreComMidiaPesada(atual, arquivosDaMidia(this.projeto.raiz)));
+        const novo = gitignoreComRegrasInternas(gitignoreComMidiaPesada(atual, midia));
         if (novo !== atual) this.projeto.gravarTexto('.gitignore', novo);
       });
     } catch {
