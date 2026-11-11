@@ -155,8 +155,9 @@ export class SessaoProjeto {
       const rel = this.projeto.arquivoDoDocumento(documento);
       const {doc} = this.projeto.lerJson<DocVideo>(rel);
       if (ehDocAnimacao(doc)) {
+        // as camadas são relativas a midia/; o tema do kit (fontes/…, midia/logo-…) e a marca d'água, à raiz do projeto
         const {props, avisos} = resolverAnimacao(doc, `${base}/midia`);
-        return {props, avisos};
+        return {props: {...props, base_projeto: base}, avisos};
       }
       if (ehDocCenas(doc)) {
         // os envelopes medidos (midia/*.envelope.json) entram nas props: prévia e exportação veem o mesmo ducking

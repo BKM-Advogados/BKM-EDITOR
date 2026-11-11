@@ -367,8 +367,9 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
     if (!fontesMarca.logo) return;
     const img = new Image();
     img.onload = () => img.naturalWidth > 0 && img.naturalHeight > 0 && setProporcaoLogo(img.naturalWidth / img.naturalHeight);
-    img.src = urlDaMidia(props?.base_midia, fontesMarca.logo);
-  }, [fontesMarca.logo, props?.base_midia]);
+    const raiz = (props?.base_projeto ?? props?.base_midia) as string | undefined; // a animação tem a mídia em <raiz>/midia, mas o logo do kit é da raiz
+    img.src = urlDaMidia(raiz, fontesMarca.logo);
+  }, [fontesMarca.logo, props?.base_projeto, props?.base_midia]);
 
   useEffect(() => {
     if (fase.tipo !== 'exportando') return;
