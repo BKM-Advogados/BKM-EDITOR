@@ -6,7 +6,8 @@ import {existsSync, mkdirSync, readFileSync, renameSync, appendFileSync, closeSy
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import jsonpatch, {type Operation} from 'fast-json-patch';
-import type {ArquivoComentarios, Comentario, EntradaDiario, EntradaDocumento, EstadoEditor, Manifesto, OperacaoPatch} from './documentos';
+import {ehDocImagem, type ArquivoComentarios, type Comentario, type EntradaDiario, type EntradaDocumento, type EstadoEditor, type Manifesto, type Modulo, type OperacaoPatch} from './documentos';
+import {ehDocAnimacao} from './animacao';
 import {gravarAtomico} from './gravar-seguro';
 import {ARQUIVO_PESQUISA, caminhoTextoFonte, lerPesquisa, pesquisaVazia, type Pesquisa} from './pesquisa';
 import {motivoDaTrava} from './travas-imagem';
@@ -22,6 +23,16 @@ export class ErroProjeto extends Error {
 export const versaoDe = (texto: string) => createHash('sha256').update(texto).digest('hex').slice(0, 12);
 
 export const serializar = (doc: unknown) => `${JSON.stringify(doc, null, 2)}\n`;
+
+/** O formato de cada módulo, para um patch não tirar o documento do tipo dele (o app passaria a ler outra coisa). */
+const FORMA_DO_MODULO: Record<Modulo, (d: unknown) => boolean> = {
+  video: (d) => (d as {tipo?: unknown})?.tipo === 'cenas',
+  imagem: ehDocImagem,
+  '3d': (d) => Array.isArray((d as {objetos?: unknown})?.objetos),
+  musica: (d) => (d as {tipo?: unknown})?.tipo === 'musica',
+  animacao: ehDocAnimacao,
+};
+const NOME_DO_MODULO: Record<Modulo, string> = {video: 'um vídeo de cenas', imagem: 'uma imagem', '3d': 'uma cena 3D', musica: 'uma música', animacao: 'uma animação'};
 
 export class Projeto {
   constructor(readonly raiz: string) {}
@@ -125,7 +136,8 @@ export class Projeto {
   }): {versao: string; entrada: EntradaDiario} {
     const rel = this.arquivoDoDocumento(entrada.documento);
     const {doc, versao} = this.lerJson<unknown>(rel);
-    if (entrada.versao_base && entrada.versao_base !== versao) {
+    // "" não desliga a trava: só a ausência (a tela sem documento lido, desfazer, reverter) passa sem conferir
+    if (entrada.versao_base !== undefined && entrada.versao_base !== versao) {
       throw new ErroProjeto(`o documento mudou (versão ${versao}, esperada ${entrada.versao_base}); leia de novo e refaça o patch`, 'conflito');
     }
     const erro = jsonpatch.validate(entrada.patch as Operation[], doc);
@@ -148,6 +160,11 @@ export class Projeto {
     } catch (e) {
       throw new ErroProjeto(`patch recusado: ${(e as Error).message.split('\n')[0]}`);
     }
+    if (!depois || typeof depois !== 'object' || Array.isArray(depois)) throw new ErroProjeto('patch recusado: o documento deixaria de ser um objeto JSON', 'patch');
+    const modulo = this.manifesto().documentos.find((d) => d.caminho === rel)?.modulo;
+    const forma = modulo ? FORMA_DO_MODULO[modulo] : undefined;
+    // só o que era do módulo e deixaria de ser: documento antigo fora do formato (o carrossel do vídeo) segue editável
+    if (forma && forma(doc) && !forma(depois)) throw new ErroProjeto(`patch recusado: o documento deixaria de ser ${NOME_DO_MODULO[modulo!]}`, 'patch');
     const texto = serializar(depois);
     const versaoDepois = versaoDe(texto);
     this.gravarTexto(rel, texto);
