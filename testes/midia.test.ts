@@ -191,7 +191,7 @@ describe('índice da mídia', () => {
     bruto('midia/solta.palavras.json'),
     bruto(ARQUIVO_MARCAS_MIDIA),
   ];
-  const marcas = comMarca(comMarca(marcasVazias(), 'midia/tomadas/c2.mp4', {estado: 'boa', nota: 'Tomada com o gancho do responsável'}), 'midia/narracao.wav', {estado: 'descartada'});
+  const marcas = comMarca(comMarca(marcasVazias(), 'midia/tomadas/c2.mp4', {estado: 'boa', nota: 'Tomada com o gancho da Ana'}), 'midia/narracao.wav', {estado: 'descartada'});
   const indice = montarIndice(arquivos, marcas);
   const por = (c: string) => indice.find((e) => e.caminho === c)!;
 
@@ -222,7 +222,7 @@ describe('índice da mídia', () => {
   });
 
   it('a marca da tomada acompanha a entrada', () => {
-    expect(por('midia/tomadas/c2.mp4').marca).toEqual({estado: 'boa', nota: 'Tomada com o gancho do responsável'});
+    expect(por('midia/tomadas/c2.mp4').marca).toEqual({estado: 'boa', nota: 'Tomada com o gancho da Ana'});
     expect(por('midia/narracao.wav').marca).toEqual({estado: 'descartada'});
     expect(por('midia/foto.jpg').marca).toBeUndefined();
   });
