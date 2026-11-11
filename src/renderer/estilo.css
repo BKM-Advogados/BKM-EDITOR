@@ -178,11 +178,11 @@ div.campo .tm { font: var(--tam-1) var(--fonte-mono); color: var(--texto-3); fle
 div.campo .pre { color: var(--texto-3); font-weight: var(--peso-forte); font-size: var(--tam-1); flex: none; }
 .campo.invalido { border-color: var(--erro); }
 .erro-campo { color: var(--erro); font-size: var(--tam-1); margin-top: 2px; }
-.amostra { width: 16px; height: 16px; border-radius: 3px; flex: none; position: relative; cursor: pointer; overflow: hidden;
+.amostra { width: 18px; height: 18px; border-radius: var(--raio-1); flex: none; position: relative; cursor: pointer; overflow: hidden;
   background: var(--xadrez); background-size: 8px 8px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15); }
 .amostra > span { position: absolute; inset: 0; }
 .amostra > input[type="color"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; padding: 0; border: 0; }
-.campo-cor > input.hex { font-family: var(--fonte-mono); font-size: var(--tam-1); text-transform: uppercase; }
+.campo-cor > input.hex { font-family: var(--fonte-mono); font-size: var(--tam-2); text-transform: lowercase; }
 .campo-cor .gotas { color: var(--texto-3); background: none; border: 0; padding: 0; display: grid; place-items: center; cursor: pointer; }
 .campo-cor .gotas:hover { color: var(--texto); }
 .amostras-marca { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 0 10px 4px 102px; }
