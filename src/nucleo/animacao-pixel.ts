@@ -49,9 +49,13 @@ export const corDaCelula = (grade: GradePixel, indice: number): string | null =>
   indice < 0 ? null : (grade.paleta[indice] ?? grade.paleta[0] ?? '#000000');
 
 // ---------- validação ----------
-/** Maior lado de uma grade (colunas ou linhas). O esquema do MCP (pixelizar_imagem) e o normalizador do documento usam o
- *  mesmo teto: acima disso a prévia trava (o laço da revelação e o canvas crescem com colunas × linhas). */
+/** Maior lado da grade que o pixelizar_imagem gera (colunas ou linhas): a arte em pixel de uma imagem não pede mais. */
 export const MAX_LADO_GRADE = 128;
+
+/** Maior lado de uma grade que o documento aceita. Bem acima do pixelizar: cenário inteiro em pixel (ex.: 637 × 301
+ *  células a 4 px, que cobre 1920 × 1080 com folga) é feito à mão ou pelo agente, e desde o ImageData com cache
+ *  (revelarRGBA) a prévia toca uma grade dessas sem travar. Acima disso a grade é recusada com aviso. */
+export const MAX_LADO_GRADE_DOCUMENTO = 1024;
 
 /** Cor da paleta em "#RRGGBB": "#rgb" é expandida; o que não é cor vira preto, **na mesma posição** (filtrar deslocaria
  *  os índices das células). */
@@ -64,15 +68,15 @@ const corDaPaleta = (c: unknown): string => {
 
 /**
  * Lê uma grade vinda do documento (que pode ter sido editado à mão ou por aplicar_patch). Colunas e linhas precisam ser
- * inteiros de 1 a MAX_LADO_GRADE e `celulas` um texto; senão a grade é recusada com o motivo (reformatar embaralharia a
+ * inteiros de 1 a MAX_LADO_GRADE_DOCUMENTO e `celulas` um texto; senão a grade é recusada com o motivo (reformatar embaralharia a
  * imagem, porque as células são lidas linha a linha). Células a menos viram vazio e a mais são cortadas; a paleta é
  * consertada posição a posição. Uma grade válida volta igual.
  */
 export const lerGrade = (g: unknown): {grade?: GradePixel; problema?: string} => {
   if (!g || typeof g !== 'object') return {problema: 'não é um objeto'};
   const o = g as Record<string, unknown>;
-  const lado = (v: unknown) => typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= MAX_LADO_GRADE;
-  if (!lado(o.colunas) || !lado(o.linhas)) return {problema: `colunas e linhas precisam ser inteiros de 1 a ${MAX_LADO_GRADE}`};
+  const lado = (v: unknown) => typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= MAX_LADO_GRADE_DOCUMENTO;
+  if (!lado(o.colunas) || !lado(o.linhas)) return {problema: `colunas e linhas precisam ser inteiros de 1 a ${MAX_LADO_GRADE_DOCUMENTO}`};
   if (typeof o.celulas !== 'string') return {problema: 'sem "celulas"'};
   const colunas = o.colunas as number;
   const linhas = o.linhas as number;

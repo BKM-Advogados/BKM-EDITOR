@@ -81,7 +81,8 @@ de `@destaque` para `#FF0000` o meio parte do destaque do kit, não do preto.
 ## 2. Arte em Pixel
 
 A camada `pixel` contém uma grade `{colunas, linhas, paleta, celulas}` codificada em formato compacto (Base 62, onde `.` indica transparência).
-Colunas e linhas são inteiros de 1 a 128; uma grade fora disso (ou sem `celulas`) é descartada pelo resolvedor com aviso.
+Colunas e linhas são inteiros de 1 a 1024 (o `pixelizar_imagem` gera até 128); uma grade fora disso (ou sem `celulas`) é
+descartada pelo resolvedor com aviso.
 
 ### Revelações Determinísticas
 

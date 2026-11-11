@@ -1,7 +1,7 @@
 // Validação do documento de animação no núcleo (C1, C11 e o lado do núcleo do M5): a grade do pixel, o tamanho da
 // composição e as faixas das propriedades. É a defesa que pega também o aplicar_patch e a edição do JSON à mão.
 import {describe, expect, it} from 'vitest';
-import {lerGrade, MAX_LADO_GRADE, revelar, type GradePixel} from '../src/nucleo/animacao-pixel';
+import {lerGrade, MAX_LADO_GRADE_DOCUMENTO, revelar, type GradePixel} from '../src/nucleo/animacao-pixel';
 import {modeloAnimacaoLogoPixel, normalizarAnimacao, resolverAnimacao, valorEm, type DocAnimacao} from '../src/nucleo/animacao';
 
 const comGrade = (grade: unknown) => ({camadas: [{id: 'p', tipo: 'pixel', grade, progresso: 0.5}]}) as unknown as DocAnimacao;
@@ -46,12 +46,19 @@ describe('C1: a grade do pixel é validada no normalizador', () => {
     expect(lerGrade({colunas: 1, linhas: 1, paleta: ['#abc'], celulas: '0'}).grade!.paleta).toEqual(['#AABBCC']);
   });
 
-  it(`lado acima de ${MAX_LADO_GRADE} (ou não inteiro) descarta a grade em vez de reformatar`, () => {
+  it(`lado acima de ${MAX_LADO_GRADE_DOCUMENTO} (ou não inteiro) descarta a grade em vez de reformatar`, () => {
     const d = resolverAnimacao(comGrade({colunas: 100000, linhas: 100000, paleta: [], celulas: ''}));
     expect(d.props.camadas[0].grade).toBeUndefined();
-    expect(d.avisos.join(' ')).toMatch(new RegExp(`1 a ${MAX_LADO_GRADE}`));
+    expect(d.avisos.join(' ')).toMatch(new RegExp(`1 a ${MAX_LADO_GRADE_DOCUMENTO}`));
     expect(lerGrade({colunas: 2.5, linhas: 2, paleta: [], celulas: '.....'}).grade).toBeUndefined();
-    expect(lerGrade({colunas: MAX_LADO_GRADE, linhas: 1, paleta: [], celulas: '.'.repeat(MAX_LADO_GRADE)}).grade).toBeDefined();
+    expect(lerGrade({colunas: MAX_LADO_GRADE_DOCUMENTO, linhas: 1, paleta: [], celulas: '.'.repeat(MAX_LADO_GRADE_DOCUMENTO)}).grade).toBeDefined();
+  });
+
+  it('cenário grande feito à mão (637 × 301, como o do Nascer do Sol) continua no documento', () => {
+    const celulas = '0'.repeat(637 * 301);
+    const d = resolverAnimacao(comGrade({colunas: 637, linhas: 301, paleta: ['#112233'], celulas}));
+    expect(d.props.camadas[0].grade?.colunas).toBe(637);
+    expect(d.avisos).toEqual([]);
   });
 
   it('documento válido não muda: a grade do modelo passa igual e sem aviso', () => {
