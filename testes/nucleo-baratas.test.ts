@@ -1,6 +1,6 @@
 // Correções baratas do núcleo (auditoria, fase F4): N4 (kit de marca fora da pasta do kit), N5 (BOM), N9 (.gitignore com
-// caracteres especiais), N10 (link simbólico em midia/ só para leitura), N13 (validação), N15 (WAV de 0 canais) e N16
-// (CLAUDE.md gravado de forma atômica, no fim de linha dele).
+// caracteres especiais), N10 (link simbólico em midia/ só para leitura), N13 (validação) e N16
+// (CLAUDE.md gravado de forma atômica, no fim de linha dele). N15 ficou de fora: contestado pela verificação.
 import {execFileSync} from 'node:child_process';
 import {existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
@@ -8,7 +8,6 @@ import path from 'node:path';
 import {afterAll, describe, expect, it} from 'vitest';
 import {novoDocCenas} from '../src/nucleo/cenas';
 import {gravarPlano, planoDoProjeto, regerarClaudeMd} from '../src/nucleo/criar-projeto';
-import {lerCabecalhoWav} from '../src/nucleo/gravacao';
 import {gravarAtomico} from '../src/nucleo/gravar-seguro';
 import {indiceDaMidia} from '../src/nucleo/midia-disco';
 import {gitignoreComMidiaPesada} from '../src/nucleo/midia-git';
@@ -186,18 +185,6 @@ describe('N13 validação', () => {
     expect(() => p.aplicarPatch({documento: 'd', versao_base: '', patch: [{op: 'replace', path: '/cor', value: 'agente'}], autor: 'agente', origem: 'A'}))
       .toThrow(expect.objectContaining({codigo: 'conflito'}));
     expect(p.lerJson<{cor: string}>('d.json').doc.cor).toBe('a');
-  });
-});
-
-describe('N15 WAV de 0 canais', () => {
-  it('lerCabecalhoWav dá erro em vez de amostras infinitas', () => {
-    const b = new Uint8Array(48);
-    const v = new DataView(b.buffer);
-    const tag = (o: number, s: string) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
-    tag(0, 'RIFF'); v.setUint32(4, 40, true); tag(8, 'WAVE'); tag(12, 'fmt '); v.setUint32(16, 16, true);
-    v.setUint16(20, 1, true); v.setUint16(22, 0, true); v.setUint32(24, 48000, true); v.setUint16(34, 24, true);
-    tag(36, 'data'); v.setUint32(40, 4, true);
-    expect(lerCabecalhoWav(b)).toMatchObject({erro: expect.stringMatching(/0 canais/)});
   });
 });
 
