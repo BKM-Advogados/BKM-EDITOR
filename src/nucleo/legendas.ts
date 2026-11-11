@@ -720,19 +720,28 @@ export type OpcoesBusca = {caixa?: boolean; palavra_inteira?: boolean};
 const escapar = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const semAcento = (s: string) => s.normalize('NFD').replace(/\p{Mn}/gu, '');
 
-/** Expressão da busca: sem diferença de caixa (padrão) e, com `palavra_inteira`, só a palavra inteira. */
+// cada vogal (e o c e o n) casa com as formas acentuadas: "acao" acha "Ação" e "prévio" acha "previo"
+const VARIANTES: Record<string, string> = {a: 'aáàâãä', e: 'eéèêë', i: 'iíìîï', o: 'oóòôõö', u: 'uúùûü', c: 'cç', n: 'nñ'};
+
+/** Expressão da busca: sem diferença de caixa nem de acento (padrão) e, com `palavra_inteira`, só a palavra inteira. Com
+ *  `caixa`, a busca é literal (caixa e acento contam). O texto procurado deve estar em NFC (`texto.normalize('NFC')`). */
 export const expressaoDeBusca = (procurar: string, o: OpcoesBusca = {}) => {
-  const corpo = escapar(procurar);
+  const corpo = o.caixa ? escapar(procurar.normalize('NFC'))
+    : [...semAcento(procurar)].map((ch) => {
+      const v = VARIANTES[ch.toLowerCase()];
+      return v ? `[${v}]` : escapar(ch);
+    }).join('');
   return new RegExp(o.palavra_inteira ? `(?<![\\p{L}\\p{N}])${corpo}(?![\\p{L}\\p{N}])` : corpo, `gu${o.caixa ? '' : 'i'}`);
 };
 
-/** Ids dos segmentos que têm o texto procurado (sem diferença de acento quando a busca é sem caixa). */
+/** Ids dos segmentos que têm o texto procurado (sem diferença de acento quando a busca é sem caixa). Usa a mesma
+ *  expressão do substituirEmLote: o que acende na lista é o que "substituir em todas" troca. */
 export const localizar = (segmentos: SegmentoLegenda[], procurar: string, o: OpcoesBusca = {}): string[] => {
   if (!procurar) return [];
-  const re = expressaoDeBusca(o.caixa ? procurar : semAcento(procurar), o);
+  const re = expressaoDeBusca(procurar, o);
   return segmentos.filter((s) => {
     re.lastIndex = 0;
-    return re.test(o.caixa ? s.texto : semAcento(s.texto));
+    return re.test(s.texto.normalize('NFC'));
   }).map((s) => s.id);
 };
 
@@ -761,7 +770,7 @@ export const substituirEmLote = (segmentos: SegmentoLegenda[], procurar: string,
   let trocas = 0;
   const novos = segmentos.map((s) => {
     let n = 0;
-    const texto = s.texto.replace(re, () => (n++, trocar));
+    const texto = s.texto.normalize('NFC').replace(re, () => (n++, trocar));
     if (!n) return s;
     trocas += n;
     return comTexto(s, texto.replace(/[ \t]{2,}/g, ' ').trim());
