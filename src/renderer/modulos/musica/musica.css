@@ -1,5 +1,6 @@
 /* Área Música: transporte, arranjo em compassos, sequenciador de passos, mixer e a faixa da transição. Cores da casca
-   (estilo.css): a música usa o verde do áudio; o agente, o lilás de sempre. */
+   (estilo/tokens.ts): cada canal tem a sua cor de faixa (--cor-canal, pela ordem); seções e acordes ficam em cinza (o âmbar
+   é do comentário e o rosa, do efeito); o agente, o violeta de sempre. */
 .musica-monitor { position: relative; display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--fundo-1); }
 .musica-transporte { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--borda); flex-wrap: wrap; }
 .musica-transporte .pos { font-family: var(--fonte-mono); font-size: 12px; width: 156px; flex: none; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--texto); }
@@ -20,59 +21,77 @@
 .passos .peca { font-size: 11px; color: var(--texto-2); padding: 0 6px; height: 24px; display: flex; align-items: center; cursor: pointer; border-radius: var(--raio); white-space: nowrap; }
 .passos .peca:hover { background: var(--fundo-3); color: var(--texto); }
 .passos .passo { height: 24px; border-radius: 3px; background: var(--fundo-3); border: 0; padding: 0; cursor: pointer; position: relative; }
-.passos .passo.tempo { background: #333; }
-.passos .passo.on { background: var(--trilha-audio); }
-.passos .passo.on .forca { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.35); }
+.passos .passo.tempo { background: var(--fundo-4); }
+.passos .passo.on { background: var(--cor-canal, var(--trilha-audio)); }
+.passos .passo.on .forca { position: absolute; left: 0; right: 0; bottom: 0; background: color-mix(in srgb, var(--fundo-0) 35%, transparent); }
 .passos .passo.agora { outline: 1px solid var(--cabeca); }
 
-/* mixer */
-.mixer { display: flex; gap: 6px; align-items: stretch; overflow-x: auto; padding-bottom: 4px; }
-.tira { width: 112px; flex: none; background: var(--fundo-2); border: 1px solid var(--borda); border-radius: var(--raio); padding: 6px; display: flex; flex-direction: column; gap: 4px; font-size: 11px; }
-.tira.sel { border-color: var(--acento); }
-.tira.master { background: var(--fundo-3); }
-.tira .nome { font-weight: var(--peso-forte); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
-.tira label { display: flex; flex-direction: column; gap: 1px; color: var(--texto-2); }
+/* mixer: uma tira em pé por faixa, com a cor do canal no alto, pan, fader e medidor lado a lado, M e S com estado, e os
+   envios de sala e eco; a saída fica à parte */
+.mixer { display: flex; gap: 8px; align-items: stretch; overflow-x: auto; padding-bottom: 4px; }
+.tira { width: 112px; flex: none; background: var(--fundo-2); border: 1px solid var(--borda); border-top: 3px solid var(--cor-canal, var(--borda-forte)); border-radius: var(--raio-2);
+  padding: 8px 8px 10px; display: flex; flex-direction: column; align-items: stretch; gap: 6px; font-size: var(--tam-1); }
+.tira.sel { border-color: var(--acento); border-top-color: var(--cor-canal, var(--acento)); }
+.tira.calada .fader-medidor, .tira.calada .nome { opacity: 0.55; }
+.tira.master { background: var(--fundo-3); border-top-color: var(--texto-3); margin-left: 8px; }
+.tira .nome { display: flex; align-items: center; gap: 6px; font: var(--peso-forte) var(--tam-2) var(--fonte); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  cursor: pointer; border: 0; padding: 0; background: none; color: var(--texto); text-align: left; }
+.ponto-canal { width: 8px; height: 8px; border-radius: 2px; background: var(--cor-canal, var(--texto-3)); flex: none; }
+.tira label { display: flex; flex-direction: column; gap: 2px; color: var(--texto-2); }
+.tira label.pan { align-items: center; }
 .tira input[type=range] { width: 100%; }
-.tira .botoes { display: flex; gap: 4px; }
-.tira .botoes .bti { width: 24px; height: 22px; font-size: 11px; font-weight: 700; }
-.nivel-vivo { height: 6px; background: var(--fundo-1); border-radius: 3px; overflow: hidden; }
-.nivel-vivo > span { display: block; height: 100%; background: var(--ok); transition: width 60ms linear; }
+.fader-medidor { display: flex; justify-content: center; align-items: stretch; gap: 8px; height: 150px; position: relative; padding-bottom: 18px; }
+.fader-medidor .fader { writing-mode: vertical-lr; direction: rtl; width: 24px; height: 100%; }
+.fader-medidor .fader::-webkit-slider-runnable-track { width: 4px; height: 100%; }
+.fader-medidor .fader::-webkit-slider-thumb { width: 22px; height: 10px; margin-top: 0; margin-left: -9px; border-radius: 3px; background: var(--texto-2); }
+.fader-medidor .db { position: absolute; left: 0; right: 0; bottom: 0; text-align: center; font: var(--tam-1) var(--fonte-mono); color: var(--texto-2); }
+.tira .botoes { display: flex; justify-content: center; gap: 4px; }
+.tira .botoes .bti { width: 28px; height: 24px; font-size: var(--tam-2); font-weight: var(--peso-forte); border: 1px solid var(--borda-forte); }
+.tira .botoes .bti.ligado { border-color: var(--acento); }
+.tira .estado-tira { text-align: center; color: var(--aviso); }
+.nivel-vivo { width: 6px; height: 100%; background: var(--fundo-1); border-radius: 3px; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
+.nivel-vivo > span { display: block; width: 100%; background: var(--ok); transition: height 60ms linear; }
+.nivel-vivo > span.medio { background: var(--faixa-lima); }
 .nivel-vivo > span.alto { background: var(--aviso); }
 
 /* arranjo */
 .arranjo { display: grid; grid-template-columns: 150px 1fr; height: 100%; min-height: 0; background: var(--fundo-1); font-size: 11px; }
 .arranjo .cabecas { border-right: 1px solid var(--borda); overflow: hidden; }
 .arranjo .cabecas .cab-regua { height: 24px; border-bottom: 1px solid var(--borda); display: flex; align-items: center; padding: 0 6px; color: var(--texto-2); gap: 4px; }
-.arranjo .cab-canal { height: 40px; display: flex; align-items: center; gap: 4px; padding: 0 6px; border-bottom: 1px solid var(--borda); cursor: pointer; }
+.arranjo .cab-canal { height: 40px; display: flex; align-items: center; gap: 4px; padding: 0 6px 0 9px; border-bottom: 1px solid var(--borda); cursor: pointer;
+  box-shadow: inset 3px 0 0 var(--cor-canal, var(--borda-forte)); }
+.arranjo .cab-canal > svg.lucide { color: var(--cor-canal, var(--texto-2)); }
+.arranjo .cab-canal.mudo .nome { color: var(--texto-3); text-decoration: line-through; }
 .arranjo .cab-canal.sel { background: var(--acento-fraco); }
 .arranjo .cab-canal .nome { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.arranjo .cab-canal .bti { width: 20px; height: 20px; font-size: var(--tam-1); font-weight: 700; }
+.arranjo .cab-canal .bti { width: 24px; height: 24px; font-size: var(--tam-1); font-weight: var(--peso-forte); }
 .arranjo .rolo { overflow: auto; position: relative; }
 .arranjo .tela { position: relative; }
 .arranjo .regua { position: sticky; top: 0; height: 24px; background: var(--fundo-1); border-bottom: 1px solid var(--borda); z-index: 3; cursor: pointer; }
 .arranjo .regua .compasso { position: absolute; top: 0; height: 24px; border-left: 1px solid var(--borda-forte); padding-left: 3px; color: var(--texto-2); line-height: 24px; }
 .arranjo .regua .loop { position: absolute; top: 18px; height: 6px; background: var(--acento); opacity: 0.6; }
 .arranjo .linha-canal { height: 40px; border-bottom: 1px solid var(--borda); position: relative; }
-.arranjo .grade { position: absolute; top: 24px; bottom: 0; width: 1px; background: #262626; pointer-events: none; }
-.arranjo .grade.compasso { background: #3a3a3a; }
+.arranjo .grade { position: absolute; top: 24px; bottom: 0; width: 1px; background: var(--borda); pointer-events: none; }
+.arranjo .grade.compasso { background: var(--borda-campo); }
 .arranjo .corte { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px dashed var(--trilha-midia); pointer-events: none; z-index: 2; }
 .arranjo .corte span { position: absolute; top: 2px; left: 3px; color: var(--trilha-midia); font-size: var(--tam-1); white-space: nowrap; }
 .arranjo .cabeca { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--cabeca); z-index: 4; pointer-events: none; }
-.mclipe { position: absolute; top: 3px; height: 34px; border-radius: 3px; background: #1d3a2c; border: 1px solid #2d6b4c; color: var(--texto); overflow: hidden; cursor: grab; }
-.mclipe.audio { background: #1a3340; border-color: #2b6378; }
-.mclipe.sel { border-color: var(--acento); box-shadow: 0 0 0 1px var(--acento); }
-.mclipe.mudo { opacity: 0.4; }
+.mclipe { --cor-canal-v: var(--cor-canal, var(--trilha-audio)); position: absolute; top: 3px; height: 34px; border-radius: var(--raio-1); color: var(--texto); overflow: hidden; cursor: grab;
+  background: color-mix(in srgb, var(--cor-canal-v) 30%, var(--fundo-2)); border: 1px solid color-mix(in srgb, var(--cor-canal-v) 70%, transparent); box-shadow: inset 0 2px 0 var(--cor-canal-v); }
+
+.mclipe.sel { border-color: var(--acento); box-shadow: 0 0 0 1px var(--acento), inset 0 2px 0 var(--cor-canal-v); }
+.mclipe.mudo { opacity: 0.4; background-image: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--texto) 10%, transparent) 6px 8px); }
 .mclipe .txt { position: absolute; left: 4px; top: 2px; right: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
-.mclipe .nota { position: absolute; width: 2px; background: var(--trilha-audio); opacity: 0.8; pointer-events: none; }
+.mclipe .nota { position: absolute; width: 2px; background: var(--cor-canal-v); opacity: 0.9; pointer-events: none; }
 .mclipe .onda { position: absolute; inset: 14px 0 2px 0; width: 100%; height: 18px; pointer-events: none; }
-.mclipe .onda path { fill: #4ccce680; }
+.mclipe .onda path { fill: color-mix(in srgb, var(--cor-canal-v) 60%, transparent); }
 .mclipe .alc { position: absolute; top: 0; bottom: 0; width: 6px; cursor: ew-resize; }
 .mclipe .alc.ini { left: 0; }
 .mclipe .alc.fim { right: 0; }
 .mclipe .veio { position: absolute; right: 3px; bottom: 2px; font-size: var(--tam-1); color: var(--trilha-midia); pointer-events: none; }
 
 /* faixa da transição (casca) */
-.faixa-transicao { display: flex; align-items: center; gap: 8px; padding: 4px 10px; background: #12301f; border-bottom: 1px solid #2d6b4c; font-size: 12px; }
+.faixa-transicao { display: flex; align-items: center; gap: 8px; padding: 4px 10px; background: var(--acento-fundo); border-bottom: 1px solid var(--acento); font-size: var(--tam-2); }
 .faixa-transicao.fora { background: var(--fundo-2); border-bottom-color: var(--borda); }
 .faixa-transicao .txt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .faixa-transicao .agente { color: var(--agente); }
@@ -80,7 +99,8 @@
 /* lista */
 .lista-musica { display: flex; flex-direction: column; height: 100%; }
 .lista-musica .itens { flex: 1; overflow: auto; }
-.lista-musica .item { display: flex; align-items: center; gap: 6px; padding: 4px 8px; cursor: pointer; border-radius: var(--raio); }
+.lista-musica .item { display: flex; align-items: center; gap: 6px; min-height: var(--linha-lista); padding: 0 8px; cursor: pointer; border-radius: var(--raio); }
+.lista-musica .icone-canal { display: inline-flex; color: var(--cor-canal, var(--texto-2)); }
 .lista-musica .item:hover { background: var(--fundo-3); }
 .lista-musica .item.sel { background: var(--acento-fundo); }
 .lista-musica .item.sub { padding-left: 26px; color: var(--texto-2); }
@@ -91,52 +111,52 @@
 
 /* grade de notas (sintetizador): linhas fora da escala apagadas, o Dó marcado, notas longas seguindo */
 .passos.notas .peca { height: 16px; font-size: var(--tam-1); }
-.passos.notas .peca.fora { color: var(--texto-3, #6e6e6e); }
+.passos.notas .peca.fora { color: var(--texto-3); }
 .passos.notas .peca.do { color: var(--texto); font-weight: var(--peso-forte); }
 .passos.notas .passo { height: 16px; }
-.passos.notas .passo.fora { background: #1c1c1c; }
-.passos.notas .passo.fora.tempo { background: #242424; }
-.passos .passo.segue { background: #2d6b4c; }
+.passos.notas .passo.fora { background: var(--fundo-1); }
+.passos.notas .passo.fora.tempo { background: var(--fundo-2); }
+.passos .passo.segue { background: color-mix(in srgb, var(--cor-canal, var(--trilha-audio)) 55%, var(--fundo-2)); }
 .faixa-acordes { position: absolute; left: 0; height: 18px; top: 24px; z-index: 2; }
-.faixa-acordes .acorde { position: absolute; top: 1px; height: 16px; border-left: 2px solid var(--trilha-efeito); padding: 0 4px; font-size: var(--tam-1); color: var(--trilha-efeito);
-  white-space: nowrap; overflow: hidden; background: rgba(231, 150, 243, 0.08); }
-.arranjo .cab-acordes { height: 18px; display: flex; align-items: center; padding: 0 6px; color: var(--trilha-efeito); font-size: var(--tam-1); border-bottom: 1px solid var(--borda); }
+.faixa-acordes .acorde { position: absolute; top: 1px; height: 16px; border-left: 2px solid var(--borda-forte); padding: 0 4px; font-size: var(--tam-1); color: var(--texto-2);
+  white-space: nowrap; overflow: hidden; background: var(--fundo-3); }
+.arranjo .cab-acordes { height: 18px; display: flex; align-items: center; padding: 0 6px; color: var(--texto-2); font-size: var(--tam-1); border-bottom: 1px solid var(--borda); }
 
 /* piano roll (item 17) */
 .piano-roll { display: flex; flex-direction: column; min-height: 0; }
 .passos-topo .sep { width: 1px; height: 18px; background: var(--borda); }
 .pr-corpo { display: grid; grid-template-columns: 64px 1fr; max-height: 380px; overflow: auto; border: 1px solid var(--borda); border-radius: var(--raio); }
 .pr-teclas { display: flex; flex-direction: column; position: sticky; left: 0; z-index: 3; background: var(--fundo-1); }
-.pr-tecla { font-size: var(--tam-1); display: flex; align-items: center; padding: 0 6px; color: var(--texto-2); border-bottom: 1px solid #222; cursor: pointer; user-select: none; }
-.pr-tecla.fora { background: #161616; color: var(--icone-inativo); }
+.pr-tecla { font-size: var(--tam-1); display: flex; align-items: center; padding: 0 6px; color: var(--texto-2); border-bottom: 1px solid var(--borda); cursor: pointer; user-select: none; }
+.pr-tecla.fora { background: var(--fundo-0); color: var(--icone-inativo); }
 .pr-tecla.do { color: var(--texto); font-weight: var(--peso-forte); }
 .pr-area { overflow: visible; }
-.pr-tela { position: relative; background-color: #1f1f1f; cursor: crosshair; user-select: none; }
-.pr-linha-fora { position: absolute; left: 0; right: 0; background: rgba(0, 0, 0, 0.28); pointer-events: none; }
-.pr-nota { position: absolute; background: var(--trilha-audio); border-radius: 2px; cursor: grab; box-sizing: border-box; }
+.pr-tela { position: relative; background-color: var(--fundo-2); cursor: crosshair; user-select: none; }
+.pr-linha-fora { position: absolute; left: 0; right: 0; background: color-mix(in srgb, var(--fundo-0) 45%, transparent); pointer-events: none; }
+.pr-nota { position: absolute; background: var(--cor-canal, var(--trilha-audio)); border-radius: 2px; cursor: grab; box-sizing: border-box; }
 .pr-nota.sel { outline: 2px solid var(--acento); z-index: 2; }
 .pr-nota.nova { opacity: 0.6; pointer-events: none; }
 .pr-borda { position: absolute; right: -3px; top: 0; bottom: 0; width: 9px; cursor: ew-resize; z-index: 1; }
 .pr-cursor { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--comentario); pointer-events: none; }
 .pr-agora { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--cabeca); pointer-events: none; }
-.faixa-secoes .acorde.secao { border-left-color: var(--comentario); color: var(--comentario); background: rgba(255, 202, 22, 0.08); cursor: grab; }
+.faixa-secoes .acorde.secao { border-left-color: var(--texto-3); color: var(--texto); background: var(--fundo-3); cursor: grab; }
 
 /* monitor do vídeo dentro da Música (item 25) */
 .musica-corpo-linha { display: flex; gap: 10px; align-items: flex-start; }
 .musica-corpo-principal { flex: 1; min-width: 0; }
-.video-na-musica { flex: none; position: relative; border: 1px solid var(--borda); border-radius: var(--raio); overflow: hidden; background: #000; }
+.video-na-musica { flex: none; position: relative; border: 1px solid var(--borda); border-radius: var(--raio); overflow: hidden; background: var(--entorno-monitor); }
 .video-na-musica.vazio { width: 120px; height: 168px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--texto-2); padding: 6px; text-align: center; }
-.video-na-musica .tempo { position: absolute; left: 4px; bottom: 4px; font-size: var(--tam-1); color: #fff; background: rgba(0, 0, 0, 0.55); padding: 1px 4px; border-radius: 3px; }
-.tira.master .ler { font-size: var(--tam-1); color: var(--texto-2); }
+.video-na-musica .tempo { position: absolute; left: 4px; bottom: 4px; font-size: var(--tam-1); color: var(--texto); background: var(--vidro); padding: 1px 4px; border-radius: var(--raio-1); }
+.tira.master .ler { font-size: var(--tam-1); color: var(--texto-2); text-align: center; }
 
 /* marco 5: automação, licenças e modelos */
-.auto-curva { display: block; width: calc(100% - 16px); height: 40px; margin: 2px 8px 4px; background: #1b1b1b; border-radius: var(--raio); }
-.auto-curva polyline { stroke: var(--comentario); stroke-width: 1.5; }
+.auto-curva { display: block; width: calc(100% - 16px); height: 40px; margin: 2px 8px 4px; background: var(--fundo-1); border-radius: var(--raio); }
+.auto-curva polyline { stroke: var(--texto-2); stroke-width: 1.5; }
 .auto-curva .cab { stroke: var(--cabeca); stroke-width: 1; }
 .selo-licenca { font-size: var(--tam-1); padding: 0 5px; border-radius: 8px; border: 1px solid var(--borda); }
 .selo-licenca.livre { color: var(--trilha-audio); }
 .selo-licenca.credito { color: var(--comentario); }
-.selo-licenca.sem_licenca { color: #ff8a65; border-color: #ff8a65; }
+.selo-licenca.sem_licenca { color: var(--erro); border-color: var(--erro); }
 .modelos-musica { display: flex; gap: 8px; flex-wrap: wrap; }
 .musica-vazio .titulo-vazio { font-size: 15px; font-weight: var(--peso-forte); color: var(--texto); }
 .musica-vazio .dica-vazia { font-size: 11px; color: var(--texto-3); max-width: 560px; }
@@ -152,15 +172,15 @@
 .arranjo .cab-auto select { height: 20px; font-size: 11px; padding: 0 4px; }
 .arranjo .cab-auto .dica { font-size: var(--tam-1); color: var(--texto-3); }
 .arranjo .auto-lane { display: block; background: var(--fundo-2); border-bottom: 1px solid var(--borda); cursor: crosshair; }
-.arranjo .auto-lane .regua-db { stroke: #ffffff10; }
-.arranjo .auto-lane .zero { stroke: #ffffff26; stroke-dasharray: 3 3; }
+.arranjo .auto-lane .regua-db { stroke: var(--borda); }
+.arranjo .auto-lane .zero { stroke: var(--borda-forte); stroke-dasharray: 3 3; }
 .arranjo .auto-lane .rotulo-db { fill: var(--texto-3); font-size: var(--tam-1); pointer-events: none; }
-.arranjo .auto-lane .curva { fill: none; stroke: var(--comentario); stroke-width: 1.5; pointer-events: none; }
+.arranjo .auto-lane .curva { fill: none; stroke: var(--texto-2); stroke-width: 1.5; pointer-events: none; }
 .arranjo .auto-lane .curva.fader { stroke: var(--texto-3); stroke-dasharray: 4 3; }
 .arranjo .auto-lane .cab { stroke: var(--cabeca); stroke-width: 1; pointer-events: none; }
-.arranjo .auto-lane .ponto { fill: var(--comentario); stroke: #000; stroke-width: 1; cursor: grab; }
-.arranjo .auto-lane .ponto.ativo, .arranjo .auto-lane .ponto:hover { fill: #fff; cursor: grabbing; }
-.arranjo .auto-lane .rotulo-ponto { fill: #fff; font-size: var(--tam-1); pointer-events: none; }
+.arranjo .auto-lane .ponto { fill: var(--texto-2); stroke: var(--fundo-0); stroke-width: 1; cursor: grab; }
+.arranjo .auto-lane .ponto.ativo, .arranjo .auto-lane .ponto:hover { fill: var(--acento); cursor: grabbing; }
+.arranjo .auto-lane .rotulo-ponto { fill: var(--texto); font-size: var(--tam-1); pointer-events: none; }
 .arranjo .linha-canal.pintavel { cursor: crosshair; }
 .mclipe.fantasma { opacity: 0.55; border-style: dashed; pointer-events: none; }
 .arranjo .cab-regua .zoom-botoes { margin-left: auto; display: flex; gap: 2px; }

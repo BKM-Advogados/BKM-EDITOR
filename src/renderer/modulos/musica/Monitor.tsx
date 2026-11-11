@@ -14,7 +14,7 @@ import type {AudioP} from '../../../nucleo/audio';
 import {criarDocumento, useLoja} from '../../estado/loja';
 import {MODELOS_MUSICA} from '../../../nucleo/musica-modelos';
 import {numeroBr} from '../../componentes/Campos';
-import {docMusica, musica, selecionarMusica, transicaoAberta, useMusica} from './estado';
+import {corDaFaixa, corDoCanal, docMusica, musica, selecionarMusica, transicaoAberta, useMusica} from './estado';
 import {motor, vozGuiaDe} from './motor';
 import {campo, campoFaixa, estilo, exportarMusica, forcaDaNota, novaBateria, novoPadrao, passo, novaMusicaDoModelo} from './acoes';
 import {Escolha} from '../../componentes/Controles';
@@ -248,7 +248,7 @@ const Passos: React.FC<{doc: DocMusica}> = ({doc}) => {
           <input type="range" min={0} max={100} step={5} defaultValue={Math.round((doc.swing ?? 0) * 100)} key={doc.swing}
             onPointerUp={(e) => void campo('/swing', Number((e.target as HTMLInputElement).value) / 100, 'swing')} /> {Math.round((doc.swing ?? 0) * 100)}%</label>
       </div>
-      <div className="passos" style={{gridTemplateColumns: `110px repeat(${passos}, minmax(14px, 1fr))`}}>
+      <div className="passos" style={{gridTemplateColumns: `110px repeat(${passos}, minmax(14px, 1fr))`, '--cor-canal': corDoCanal(doc.canais.findIndex((c) => c.id === p.canal))} as React.CSSProperties}>
         {pecas.map((peca) => (
           <React.Fragment key={peca}>
             <span className="peca" title="Tocar a peça" onClick={() => motor.tocarBatida(peca, canal?.pecas?.[peca], 100, doc.semente)}>{NOME_PECA[peca]}</span>
@@ -275,18 +275,35 @@ const Passos: React.FC<{doc: DocMusica}> = ({doc}) => {
 };
 
 // ---------- mixer ----------
-/** Medidor ao vivo: o pico da faixa (ou do master) na posição da cabeça, de −48 a 0 dBFS; vermelho perto do 0. */
+/** Medidor ao vivo: o pico da faixa (ou do master) na posição da cabeça, de −48 a 0 dBFS; vermelho perto do 0. Em pé, ao
+ *  lado do fader. */
 const Medidor: React.FC<{faixa?: string}> = ({faixa}) => {
   const cabeca = useMusica((e) => e.cabeca_s);
   const tocando = useMusica((e) => e.tocando);
   const db = tocando ? motor.nivelEm(cabeca, faixa) : null;
   const pct = db === null ? 0 : Math.max(0, Math.min(100, ((db + 48) / 48) * 100));
   return (
-    <div className="nivel-vivo" title={db === null ? 'toque para ver o nível' : `pico ${numeroBr(db, 1)} dBFS`}>
-      <span className={db !== null && db > -3 ? 'alto' : ''} style={{width: `${pct}%`}} />
+    <div className="nivel-vivo" role="meter" aria-label="Nível" aria-valuemin={-48} aria-valuemax={0} aria-valuenow={db ?? -48}
+      title={db === null ? 'toque para ver o nível' : `pico ${numeroBr(db, 1)} dBFS`}>
+      <span className={db !== null && db > -3 ? 'alto' : db !== null && db > -12 ? 'medio' : ''} style={{height: `${pct}%`}} />
     </div>
   );
 };
+
+/** Fader de volume em pé (−40 a +12 dB), que grava ao soltar. */
+const Fader: React.FC<{valor: number; rotulo: string; aoMudar: (v: number) => void}> = ({valor, rotulo, aoMudar}) => {
+  const [v, setV] = useState(valor);
+  useEffect(() => setV(valor), [valor]);
+  return (
+    <>
+      <input className="fader" type="range" min={-40} max={12} step={0.5} value={v} aria-label={rotulo} aria-valuetext={`${numeroBr(v, 1)} dB`}
+        onChange={(e) => setV(Number(e.target.value))} onPointerUp={() => v !== valor && aoMudar(v)} onKeyUp={() => v !== valor && aoMudar(v)} />
+      <span className="db">{v > 0 ? '+' : ''}{numeroBr(v, 1)} dB</span>
+    </>
+  );
+};
+
+const panTexto = (p: number) => (p === 0 ? 'centro' : p < 0 ? `${Math.round(-p * 100)} E` : `${Math.round(p * 100)} D`);
 
 const Mixer: React.FC<{doc: DocMusica}> = ({doc}) => {
   const selecao = useMusica((e) => e.selecao);
@@ -294,40 +311,49 @@ const Mixer: React.FC<{doc: DocMusica}> = ({doc}) => {
   const algumSolo = m.faixas.some((f) => f.solo);
   return (
     <div className="mixer">
-      {m.faixas.map((f) => (
-        <div key={f.id} className={`tira${selecao?.tipo === 'faixa' && selecao.id === f.id ? ' sel' : ''}`} style={{opacity: f.mudo || (algumSolo && !f.solo) ? 0.55 : 1}}>
-          <span className="nome" title={f.id} onClick={() => selecionarMusica({tipo: 'faixa', id: f.id})}>{f.nome}</span>
-          <Medidor faixa={f.id} />
-          <label>Volume {numeroBr(f.volume_db, 1)} dB
-            <input type="range" min={-40} max={12} step={0.5} defaultValue={f.volume_db} key={`v${f.volume_db}`}
-              onPointerUp={(e) => void campoFaixa(f.id, 'volume_db', Number((e.target as HTMLInputElement).value), `volume de ${f.nome}`)} /></label>
-          <label>Pan {f.pan === 0 ? 'centro' : f.pan < 0 ? `${Math.round(-f.pan * 100)} E` : `${Math.round(f.pan * 100)} D`}
-            <input type="range" min={-1} max={1} step={0.05} defaultValue={f.pan} key={`p${f.pan}`}
-              onPointerUp={(e) => void campoFaixa(f.id, 'pan', Number((e.target as HTMLInputElement).value), `pan de ${f.nome}`)} /></label>
-          <label>Reverb {Math.round(f.reverb * 100)}%
-            <input type="range" min={0} max={1} step={0.05} defaultValue={f.reverb} key={`r${f.reverb}`}
-              onPointerUp={(e) => void campoFaixa(f.id, 'reverb', Number((e.target as HTMLInputElement).value) || undefined, `reverb de ${f.nome}`)} /></label>
-          <label>Delay {Math.round(f.delay * 100)}%
-            <input type="range" min={0} max={1} step={0.05} defaultValue={f.delay} key={`d${f.delay}`}
-              onPointerUp={(e) => void campoFaixa(f.id, 'delay', Number((e.target as HTMLInputElement).value) || undefined, `delay de ${f.nome}`)} /></label>
-          <span className="botoes">
-            <button className={`bti${f.mudo ? ' ligado' : ''}`} title="Mudo" onClick={() => void campoFaixa(f.id, 'mudo', f.mudo ? undefined : true, `mudo em ${f.nome}`)}>M</button>
-            <button className={`bti${f.solo ? ' ligado' : ''}`} title="Solo" onClick={() => void campoFaixa(f.id, 'solo', f.solo ? undefined : true, `solo em ${f.nome}`)}>S</button>
-          </span>
-        </div>
-      ))}
+      {m.faixas.map((f) => {
+        const calado = f.mudo || (algumSolo && !f.solo);
+        return (
+          <div key={f.id} className={`tira${selecao?.tipo === 'faixa' && selecao.id === f.id ? ' sel' : ''}${calado ? ' calada' : ''}`}
+            style={{'--cor-canal': corDaFaixa(m.canais, f.id)} as React.CSSProperties}>
+            <button className="nome" title={f.id} onClick={() => selecionarMusica({tipo: 'faixa', id: f.id})}><span className="ponto-canal" />{f.nome}</button>
+            <label className="pan" title={`Pan: ${panTexto(f.pan)}`}>
+              <input type="range" min={-1} max={1} step={0.05} defaultValue={f.pan} key={`p${f.pan}`} aria-label={`Pan de ${f.nome}`}
+                onPointerUp={(e) => void campoFaixa(f.id, 'pan', Number((e.target as HTMLInputElement).value), `pan de ${f.nome}`)} />
+              <span>{panTexto(f.pan)}</span>
+            </label>
+            <div className="fader-medidor">
+              <Fader valor={f.volume_db} rotulo={`Volume de ${f.nome}`} aoMudar={(v) => void campoFaixa(f.id, 'volume_db', v, `volume de ${f.nome}`)} />
+              <Medidor faixa={f.id} />
+            </div>
+            <span className="botoes">
+              <button className={`bti${f.mudo ? ' ligado' : ''}`} aria-pressed={f.mudo} title={f.mudo ? 'Mudo: clique para ouvir' : 'Mudo'}
+                onClick={() => void campoFaixa(f.id, 'mudo', f.mudo ? undefined : true, `mudo em ${f.nome}`)}>M</button>
+              <button className={`bti${f.solo ? ' ligado' : ''}`} aria-pressed={f.solo} title="Solo"
+                onClick={() => void campoFaixa(f.id, 'solo', f.solo ? undefined : true, `solo em ${f.nome}`)}>S</button>
+            </span>
+            {calado && <span className="estado-tira">{f.mudo ? 'mudo' : 'calado pelo solo'}</span>}
+            <label className="envio" title="Quanto vai para a sala (reverb)">Sala {Math.round(f.reverb * 100)}%
+              <input type="range" min={0} max={1} step={0.05} defaultValue={f.reverb} key={`r${f.reverb}`} aria-label={`Reverb de ${f.nome}`}
+                onPointerUp={(e) => void campoFaixa(f.id, 'reverb', Number((e.target as HTMLInputElement).value) || undefined, `reverb de ${f.nome}`)} /></label>
+            <label className="envio" title="Quanto vai para o eco (delay)">Eco {Math.round(f.delay * 100)}%
+              <input type="range" min={0} max={1} step={0.05} defaultValue={f.delay} key={`d${f.delay}`} aria-label={`Delay de ${f.nome}`}
+                onPointerUp={(e) => void campoFaixa(f.id, 'delay', Number((e.target as HTMLInputElement).value) || undefined, `delay de ${f.nome}`)} /></label>
+          </div>
+        );
+      })}
       <div className="tira master">
-        <span className="nome">Master</span>
-        <Medidor />
+        <span className="nome">Saída</span>
         {m.master.limitador.ativo && (
           <span className="ler" title={`Limitador em ${numeroBr(m.master.limitador.teto_db, 1)} dB: quanto ele tirou dos picos no último render`}>
             Limitador {motor.limitador_db ? `−${numeroBr(motor.limitador_db, 1)} dB` : 'sem redução'}</span>
         )}
-        <label>Volume {numeroBr(m.master.volume_db, 1)} dB
-          <input type="range" min={-40} max={12} step={0.5} defaultValue={m.master.volume_db} key={`mv${m.master.volume_db}`}
-            onPointerUp={(e) => void campo('/mixer/master/volume_db', Number((e.target as HTMLInputElement).value), 'volume do master')} /></label>
-        <label>Sala do reverb {Math.round(m.master.reverb.tamanho * 100)}%
-          <input type="range" min={0} max={1} step={0.05} defaultValue={m.master.reverb.tamanho} key={`rt${m.master.reverb.tamanho}`}
+        <div className="fader-medidor">
+          <Fader valor={m.master.volume_db} rotulo="Volume da saída" aoMudar={(v) => void campo('/mixer/master/volume_db', v, 'volume do master')} />
+          <Medidor />
+        </div>
+        <label className="envio">Sala do reverb {Math.round(m.master.reverb.tamanho * 100)}%
+          <input type="range" min={0} max={1} step={0.05} defaultValue={m.master.reverb.tamanho} key={`rt${m.master.reverb.tamanho}`} aria-label="Tamanho da sala do reverb"
             onPointerUp={(e) => void campo(doc.mixer.master?.reverb ? '/mixer/master/reverb/tamanho' : '/mixer/master/reverb', doc.mixer.master?.reverb
               ? Number((e.target as HTMLInputElement).value) : {tamanho: Number((e.target as HTMLInputElement).value)}, 'sala do reverb')} /></label>
       </div>

@@ -19,6 +19,7 @@ import {arranjar, campo, campoEmObjeto, campoFaixa, dividirNaCabeca, encaixar, e
   pontosDeAutomacao, presetFaixa, progressao, sidechainDaFaixa} from './acoes';
 import {useDocMusica} from './Monitor';
 import {SeletorDocumento} from '../../componentes/SeletorDocumento';
+import {corDoCanal} from './estado';
 
 const InspectorClipe: React.FC<{doc: DocMusica; id: string}> = ({doc, id}) => {
   const m = useMemo(() => resolverMusica(doc).musica, [doc]);
@@ -403,10 +404,11 @@ export const ListaMusica: React.FC = () => {
       {seletor}
       <div className="itens">
         <div className={`item${!s ? ' sel' : ''}`} onClick={() => selecionarMusica(null)}><Music size={14} /><span className="nome">Música inteira</span></div>
-        {doc.canais.map((c) => (
+        {doc.canais.map((c, i) => (
           <React.Fragment key={c.id}>
-            <div className={`item${s?.tipo === 'canal' && s.id === c.id ? ' sel' : ''}`} onClick={() => selecionarMusica({tipo: 'canal', id: c.id})}>
-              {iconeDoCanal(c, 14)}<span className="nome">{c.nome}</span>
+            <div className={`item${s?.tipo === 'canal' && s.id === c.id ? ' sel' : ''}`} onClick={() => selecionarMusica({tipo: 'canal', id: c.id})}
+              style={{'--cor-canal': corDoCanal(i)} as React.CSSProperties}>
+              <span className="icone-canal">{iconeDoCanal(c, 14)}</span><span className="nome">{c.nome}</span>{c.mudo && <span className="ler">mudo</span>}
               <span className="ler" style={{fontSize: "var(--tam-1)"}}>{doc.arranjo.clipes.filter((x) => x.canal === c.id).length}</span>
             </div>
             {doc.padroes.filter((p) => p.canal === c.id).map((p) => (

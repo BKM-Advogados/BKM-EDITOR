@@ -14,6 +14,7 @@ import {aplicarMusica, musica, selecionarMusica} from './estado';
 import {motor} from './motor';
 import {novoPadrao} from './acoes';
 import {Escolha} from '../../componentes/Controles';
+import {corDoCanal} from './estado';
 
 const ALT = 14; // altura de uma linha (uma nota)
 const TECLAS = 'awsedftgyhujk'; // do Dó ao Dó, como um piano no teclado do computador
@@ -190,7 +191,7 @@ export const PianoRoll: React.FC<{doc: DocMusica; padrao: string; agora_bat: num
   const fundo = `repeating-linear-gradient(90deg, #3a3a3a 0 1px, transparent 1px ${px}px), repeating-linear-gradient(90deg, #262626 0 1px, transparent 1px ${passo * px}px)`;
 
   return (
-    <div className="piano-roll">
+    <div className="piano-roll" style={{'--cor-canal': corDoCanal(doc.canais.findIndex((c) => c.id === p.canal))} as React.CSSProperties}>
       <div className="passos-topo">
         <span className="escolha-curta"><Escolha valor={p.id} rotulo="Padrão do canal" aoMudar={(id) => selecionarMusica({tipo: 'padrao', id})}
           opcoes={doCanal.map((x): [string, string] => [x.id, x.nome ?? x.id])} /></span>
