@@ -175,6 +175,7 @@ const abrirProjeto = async (raiz: string) => {
   apagarLimposSemUso(sessao.projeto); // frente Som: as versões limpas da voz que nem documento nem diário citam (limpeza-voz.ts)
   aoAbrirMusica(sessao.projeto); // frente Música: renders que faltam (pasta clonada) e os que sobraram (ipc-musica.ts)
   await sessao.abrir();
+  sessao.publicarMcp(mcpHttp?.novaConexao(midia.origem, 'mcp')); // o MCP da IDE passa pelo app enquanto o projeto está aberto (mcp-app.ts)
   memoria.lembrar(raiz, manifesto.nome);
   tituloDaJanela(manifesto.nome);
   avisoAbertura = dentroDoOneDrive(raiz)

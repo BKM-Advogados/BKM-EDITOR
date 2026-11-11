@@ -16,6 +16,7 @@ import type {PropsVideo} from '../compartilhado/api';
 import {lerEnvelopes} from './ipc-audio';
 import {arquivosDaMidia, gitignoreComMidiaPesada} from '../nucleo/midia-git'; // frente Casca (transversal-D7)
 import {gitignoreComRegrasInternas} from '../nucleo/criar-projeto';
+import {publicarMcpApp, retirarMcpApp} from '../nucleo/mcp-app';
 
 const exec = promisify(execFile);
 // a trava de escrita (.estudio/escrita.lock) entra e sai a cada gravação: avisar a tela por ela seria um aviso por edição
@@ -27,6 +28,7 @@ export class SessaoProjeto {
   private pendentes = new Map<string, NodeJS.Timeout>();
   private relogioGit: NodeJS.Timeout | null = null;
   private _temGit = false;
+  private tokenMcp: string | null = null;
 
   constructor(raiz: string, private readonly aoMudar: (arquivo: string) => void) {
     this.projeto = new Projeto(raiz);
@@ -43,7 +45,22 @@ export class SessaoProjeto {
     this.observador.on('all', (_ev, abs) => this.avisar(path.relative(this.projeto.raiz, abs).split(path.sep).join('/')));
   }
 
+  /** O MCP da IDE (mcp/nucleo.ts, outro processo) passa a mandar as chamadas de ferramenta ao app enquanto o projeto
+   *  está aberto aqui (src/nucleo/mcp-app.ts). `headers` traz o token que o McpHttp deu para isso. */
+  publicarMcp(c: {url: string; headers: {Authorization: string}} | undefined) {
+    const token = /^Bearer\s+(\S+)$/.exec(c?.headers.Authorization ?? '')?.[1];
+    if (!c || !token) return;
+    try {
+      publicarMcpApp(this.projeto.raiz, {url: c.url, token});
+      this.tokenMcp = token;
+    } catch {
+      /* pasta sem escrita: o MCP da IDE segue gravando direto, com a trava */
+    }
+  }
+
   async fechar() {
+    if (this.tokenMcp) retirarMcpApp(this.projeto.raiz, this.tokenMcp);
+    this.tokenMcp = null;
     await this.observador?.close();
     if (this.relogioGit) {
       clearTimeout(this.relogioGit);
