@@ -211,3 +211,16 @@ describe('efeito inválido volta como aviso (M14)', () => {
     expect(r.dado.avisos.join('\n')).toMatch(/explosao/);
   });
 });
+
+describe('comentário ancorado no que existe (M18)', () => {
+  it('objeto inexistente e tempo negativo dão erro e não criam comentário', async () => {
+    const antes = projeto.comentarios().length;
+    const r = await chamar('criar_comentario', {documento: 'capa', texto: 'olhe aqui', objeto: '/camadas/999'});
+    expect(r.erro).toBe(true);
+    expect(r.texto).toMatch(/não existe em capa/);
+    expect((await chamar('criar_comentario', {documento: 'capa', texto: 'olhe aqui', tempo_ms: -5000})).erro).toBe(true);
+    expect(projeto.comentarios().length).toBe(antes);
+    const ok = await chamar('criar_comentario', {documento: 'capa', texto: 'olhe aqui', objeto: '/camadas/0', tempo_ms: 0});
+    expect(ok.erro, ok.texto).toBe(false);
+  });
+});
