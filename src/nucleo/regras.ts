@@ -1,5 +1,5 @@
 // Regras de conteúdo para o TEXTO DO VÍDEO (capa, blocos, falas), copiadas à mão de um perfil de regras do
-// conferir_capa.py (outro-projeto) e das regras comuns das campanhas. Tudo aqui é AVISO para a pessoa decidir (D2,
+// conferidor de capas de outro projeto (conferir_capa.py) e das regras comuns das campanhas. Tudo aqui é AVISO para a pessoa decidir (D2,
 // 06/11/2026): nada bloqueia, e a
 // saída não tem campo de reprovar. As fontes da pesquisa não passam por aqui: nome, parte, OAB e CNPJ ficam nelas como
 // no original. A comparação é a mesma do conferir_capa.py: sem acento, minúsculas, palavra inteira.
