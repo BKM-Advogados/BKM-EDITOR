@@ -144,3 +144,40 @@ describe('C10: median-cut sem cores repetidas', () => {
     expect(quantizar(Array.from({length: 9}, () => ({r: 10, g: 20, b: 30, a: 1})), 4).paleta).toEqual(['#0A141E']);
   });
 });
+
+describe('C3: cobertura da célula pela área (25% de tinta, parâmetro)', () => {
+  const umPixel = () => {
+    const dados = new Uint8ClampedArray(10 * 10 * 4); // tudo transparente
+    dados.set([255, 0, 0, 255], 0); // 1% da área opaca
+    return {largura: 10, altura: 10, dados};
+  };
+  // logo 64×64 transparente com contorno de 1 px; na grade 8×8 o traço cobre 8/64 (lado) ou 15/64 (canto) da célula
+  const contorno = (espessura: number) => {
+    const d = new Uint8ClampedArray(64 * 64 * 4);
+    for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) {
+      if (x < espessura || y < espessura || x >= 64 - espessura || y >= 64 - espessura) d.set([255, 255, 255, 255], (y * 64 + x) * 4);
+    }
+    return {largura: 64, altura: 64, dados: d};
+  };
+  const pintadas = (g: GradePixel) => [...g.celulas].filter((c) => c !== '.').length;
+
+  it('célula com 1% de tinta fica vazia', () => {
+    expect(gradeDeImagem(umPixel(), {colunas: 1, linhas: 1, cores: 2}).celulas).toBe('.');
+  });
+
+  it('traço de 2 px numa célula de 8 (25%) aparece com o padrão; o de 1 px some, e volta com cobertura_min menor', () => {
+    expect(pintadas(gradeDeImagem(contorno(2), {colunas: 8, linhas: 8, cores: 2}))).toBe(28);
+    expect(pintadas(gradeDeImagem(contorno(1), {colunas: 8, linhas: 8, cores: 2}))).toBe(0);
+    expect(pintadas(gradeDeImagem(contorno(1), {colunas: 8, linhas: 8, cores: 2, cobertura_min: 0.1}))).toBe(28);
+  });
+
+  it('a cor não puxa para o preto do transparente (média pelo alfa)', () => {
+    const g = gradeDeImagem(contorno(4), {colunas: 8, linhas: 8, cores: 2});
+    expect(g.paleta).toEqual(['#FFFFFF']);
+  });
+
+  it('cobertura_min 0 não pinta célula toda transparente', () => {
+    const vazia = {largura: 4, altura: 4, dados: new Uint8ClampedArray(64)};
+    expect(gradeDeImagem(vazia, {colunas: 2, linhas: 2, cobertura_min: 0}).celulas).toBe('....');
+  });
+});

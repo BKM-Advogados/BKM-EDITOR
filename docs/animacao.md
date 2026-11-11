@@ -61,6 +61,12 @@ Cada camada possui propriedades base e trilhas de quadros-chave (`{propriedade: 
 - Texto: também `tamanho` (em px).
 - Pixel: também `tamanho_pixel` e `progresso` (0 a 1).
 
+Faixas: `opacidade` e `progresso` de 0 a 1, `escala` a partir de 0, `tamanho` e `tamanho_pixel` a partir de 1; `x`, `y` e
+`rotacao` são livres (entrar de fora do quadro vale). O `animar` recusa valor fora da faixa ou do tipo (`cor` é
+`#rrggbb`, `#rgb` ou `@fundo`, `@texto`, `@destaque`, `@suave`; o resto é número). O resolvedor limita de novo o que
+chega por `aplicar_patch` ou JSON editado à mão, com aviso. Na cor, a referência do tema é resolvida antes de interpolar:
+de `@destaque` para `#FF0000` o meio parte do destaque do kit, não do preto.
+
 ### Curvas de Interpolação
 
 - `linear`: interpolação linear constante.
@@ -75,6 +81,7 @@ Cada camada possui propriedades base e trilhas de quadros-chave (`{propriedade: 
 ## 2. Arte em Pixel
 
 A camada `pixel` contém uma grade `{colunas, linhas, paleta, celulas}` codificada em formato compacto (Base 62, onde `.` indica transparência).
+Colunas e linhas são inteiros de 1 a 128; uma grade fora disso (ou sem `celulas`) é descartada pelo resolvedor com aviso.
 
 ### Revelações Determinísticas
 
@@ -86,7 +93,14 @@ Com `progresso` de 0 a 1 e semente determinística, a grade pode ser revelada us
 5. `meio`: revelação que expande do centro para as bordas.
 6. `chuva`: colunas caem no estilo Matrix com ponta mais clara.
 
-A ferramenta MCP `pixelizar_imagem` converte qualquer imagem PNG em grade de pixel com quantização de cores (median-cut) ou aplicando a paleta do kit de marca.
+Nos quatro primeiros, a célula entra quando a frente passa pelo centro dela: nada aparece em 0, a grade fica cheia antes
+do último quadro e a frente anda em ritmo constante. No `decodificar`, as células entram até 3/4 do progresso e todas já
+assentaram na cor final no fim.
+
+A ferramenta MCP `pixelizar_imagem` converte uma imagem em grade de pixel com quantização de cores (median-cut) ou
+aplicando a paleta do kit de marca. Lê PNG (8 bits, indexado de 1 a 8 bits, com transparência, até 4096 px de lado); JPG
+e o PNG que ela não lê direto (entrelaçado, 16 bits, grande demais) passam pelo ffmpeg do app, já reduzidos. Uma célula
+só é pintada com pelo menos 25% de tinta (`cobertura_min`, de 0 a 1): logo de linha fina pede um valor menor.
 
 ---
 
@@ -110,8 +124,8 @@ Na casca do app, a área Animação é acessada pelo atalho **6** ou pelo botão
 | `criar_animacao` | `titulo?, largura?, altura?, fps?, duracao_ms?, fundo?` | Cria o documento `animacao/<id>.json` e registra no manifesto |
 | `adicionar_camada_animacao` | `documento, tipo, nome?, x?, y?, ...` | Adiciona camada de forma, texto, imagem ou pixel |
 | `animar` | `documento, camada_id, propriedade, quadros` | Cria ou substitui trilha de quadros-chave com curvas |
-| `pixelizar_imagem` | `documento, camada_id, imagem_src, colunas?, linhas?, cores?, usar_paleta_marca?` | Converte foto/logo em pixel art |
-| `efeito_pixel` | `documento, camada_id, efeito, semente?, animar_progresso?, inicio_ms?, duracao_ms?` | Configura revelação determinística do pixel |
+| `pixelizar_imagem` | `documento, camada_id, imagem_src, colunas?, linhas?, cores?, usar_paleta_marca?, cobertura_min?` | Converte foto/logo (PNG ou JPG) em pixel art; só em camada pixel |
+| `efeito_pixel` | `documento, camada_id, efeito, semente?, animar_progresso?, inicio_ms?, duracao_ms?` | Configura revelação determinística do pixel; só em camada pixel |
 | `ver_animacao` | `documento, tempo_ms?` | Resumo e valores calculados de cada camada no tempo |
 
 ---

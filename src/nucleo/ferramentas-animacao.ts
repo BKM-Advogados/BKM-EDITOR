@@ -9,7 +9,7 @@ import {
   ehDocAnimacao, FAIXAS_ANIMACAO, idLivreAnimacao, limitarAFaixa, novaCamadaAnimacao, TEMA_ANIMACAO_NEUTRO, textoFaixa, valorEm,
   type CamadaAnimacao, type Curva, type DocAnimacao, type PropriedadeAnimavel, type TipoCamadaAnimacao,
 } from "./animacao";
-import {gradeDeImagem, MAX_LADO_GRADE, type EfeitoPixel} from "./animacao-pixel";
+import {COBERTURA_MIN_PADRAO, gradeDeImagem, MAX_LADO_GRADE, type EfeitoPixel} from "./animacao-pixel";
 import {decodificarPng, ErroPng} from "./png";
 // o ffmpeg mora com o processo principal (o mesmo do render); o MCP só existe no processo principal e no stdio
 import {converterParaPng} from "../main/imagem-ffmpeg";
@@ -209,10 +209,12 @@ export const registrarFerramentasAnimacao = (
       linhas: z.number().int().min(1).max(MAX_LADO_GRADE).optional(),
       cores: z.number().int().min(2).max(62).optional(),
       usar_paleta_marca: z.boolean().optional(),
+      cobertura_min: z.number().min(0).max(1).optional()
+        .describe(`tinta mínima (fração da área) para a célula ser pintada; padrão ${COBERTURA_MIN_PADRAO}. Use menos (ex.: 0,1) para logo de linha fina`),
     },
-  }, seguro(async ({documento, camada_id, imagem_src, colunas, linhas, cores, usar_paleta_marca}: {
+  }, seguro(async ({documento, camada_id, imagem_src, colunas, linhas, cores, usar_paleta_marca, cobertura_min}: {
     documento: string; camada_id: string; imagem_src: string; colunas?: number; linhas?: number;
-    cores?: number; usar_paleta_marca?: boolean;
+    cores?: number; usar_paleta_marca?: boolean; cobertura_min?: number;
   }) => {
     const {doc, versao} = docAnimacao(projeto, documento);
     const idx = indiceUnico(doc, documento, camada_id);
@@ -237,6 +239,7 @@ export const registrarFerramentasAnimacao = (
       linhas: lins,
       cores: cores ?? 8,
       paleta: paletaAlvo,
+      cobertura_min: cobertura_min ?? COBERTURA_MIN_PADRAO,
     });
 
     const patch: OperacaoPatch[] = [{op: "add", path: `/camadas/${idx}/grade`, value: grade}];

@@ -364,13 +364,18 @@ export const misturarCor = (a: string, b: string, u: number): string => {
 // ---------- conversão de imagem → grade ----------
 export type DadosImagem = {largura: number; altura: number; dados: Uint8ClampedArray}; // RGBA
 
-/** Pixel médio de uma área (com o peso do alfa): ignora o que é transparente. */
+/** Tinta mínima de uma célula para ela ser pintada no pixelizar (a fração da área coberta, pelo alfa). Abaixo disso a
+ *  célula fica vazia. 0,25 guarda os traços mais grossos que um quarto da célula e apaga a sujeira das bordas; para
+ *  logo de linha fina, um valor menor (a ferramenta aceita `cobertura_min`). */
+export const COBERTURA_MIN_PADRAO = 0.25;
+
+/** Pixel médio de uma área: a cor é a média com o peso do alfa (o transparente não puxa para o preto) e `a` é a
+ *  cobertura, a soma do alfa dividida pela área inteira da célula. */
 const mediaArea = (img: DadosImagem, x0: number, y0: number, x1: number, y1: number): {r: number; g: number; b: number; a: number} => {
   let r = 0;
   let g = 0;
   let b = 0;
   let a = 0;
-  let n = 0;
   for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
     const i = (y * img.largura + x) * 4;
     const alfa = img.dados[i + 3] / 255;
@@ -379,10 +384,9 @@ const mediaArea = (img: DadosImagem, x0: number, y0: number, x1: number, y1: num
     g += img.dados[i + 1] * alfa;
     b += img.dados[i + 2] * alfa;
     a += alfa;
-    n++;
   }
-  if (n === 0) return {r: 0, g: 0, b: 0, a: 0};
-  return {r: r / a, g: g / a, b: b / a, a: a / n};
+  if (a <= 0) return {r: 0, g: 0, b: 0, a: 0};
+  return {r: r / a, g: g / a, b: b / a, a: a / Math.max(1, (x1 - x0) * (y1 - y0))};
 };
 
 const hexDe = (r: number, g: number, b: number) =>
@@ -396,8 +400,11 @@ const distanciaRgb = (a: [number, number, number], b: [number, number, number]) 
   return dr * dr + dg * dg + db * db;
 };
 
-/** Quantização por median-cut determinística: a imagem em nCores (≤ 62). Devolve paleta e índice por pixel. */
-export const quantizar = (pixels: {r: number; g: number; b: number; a: number}[], nCores: number, paletaAlvo?: string[]): {paleta: string[]; indices: number[]} => {
+/** Quantização por median-cut determinística: a imagem em nCores (≤ 62). Devolve paleta e índice por pixel. O pixel com
+ *  cobertura (`a`) abaixo de `coberturaMin` fica vazio (-1). */
+export const quantizar = (pixels: {r: number; g: number; b: number; a: number}[], nCores: number, paletaAlvo?: string[],
+  coberturaMin = COBERTURA_MIN_PADRAO): {paleta: string[]; indices: number[]} => {
+  const vazio = (p: {a: number}) => !(p.a > 0) || p.a < coberturaMin;
   const alvo = paletaAlvo?.filter((c) => /^#[0-9a-f]{6}$/i.test(c)).slice(0, MAX_CORES).map((c) => c.toUpperCase());
   if (alvo && alvo.length) {
     const rgb = alvo.map((c) => {
@@ -405,7 +412,7 @@ export const quantizar = (pixels: {r: number; g: number; b: number; a: number}[]
       return [(v >> 16) & 255, (v >> 8) & 255, v & 255] as [number, number, number];
     });
     const indices = pixels.map((p) => {
-      if (p.a < 0.5) return -1;
+      if (vazio(p)) return -1;
       let melhor = 0;
       let d = Infinity;
       rgb.forEach((c, i) => {
@@ -420,7 +427,7 @@ export const quantizar = (pixels: {r: number; g: number; b: number; a: number}[]
     return {paleta: alvo, indices};
   }
 
-  const opacos = pixels.map((p, i) => ({...p, i})).filter((p) => p.a >= 0.5);
+  const opacos = pixels.map((p, i) => ({...p, i})).filter((p) => !vazio(p));
   const k = Math.max(1, Math.min(MAX_CORES, Math.floor(nCores)));
   const minMax = (px: typeof opacos) => [0, 1, 2].map((cc) => [
     Math.min(...px.map((p) => (cc === 0 ? p.r : cc === 1 ? p.g : p.b))),
@@ -472,7 +479,7 @@ export const quantizar = (pixels: {r: number; g: number; b: number; a: number}[]
     return [(v >> 16) & 255, (v >> 8) & 255, v & 255] as [number, number, number];
   });
   const indices = pixels.map((p) => {
-    if (p.a < 0.5) return -1;
+    if (vazio(p)) return -1;
     let melhor = 0;
     let d = Infinity;
     rgb.forEach((c, i) => {
@@ -489,9 +496,9 @@ export const quantizar = (pixels: {r: number; g: number; b: number; a: number}[]
 
 /**
  * Imagem (RGBA) → grade de células. Reduz para `colunas × linhas` por média de área e quantiza para `cores` (ou para a
- * `paleta` dada, ex. o kit de marca). Célula quase toda transparente vira vazio (".").
+ * `paleta` dada, ex. o kit de marca). Célula com menos tinta que `cobertura_min` (padrão 0,25 da área) vira vazio (".").
  */
-export const gradeDeImagem = (img: DadosImagem, o: {colunas: number; linhas: number; cores?: number; paleta?: string[]}): GradePixel => {
+export const gradeDeImagem = (img: DadosImagem, o: {colunas: number; linhas: number; cores?: number; paleta?: string[]; cobertura_min?: number}): GradePixel => {
   const colunas = Math.max(1, Math.round(o.colunas));
   const linhas = Math.max(1, Math.round(o.linhas));
   const pixels: {r: number; g: number; b: number; a: number}[] = new Array(colunas * linhas);
@@ -504,7 +511,7 @@ export const gradeDeImagem = (img: DadosImagem, o: {colunas: number; linhas: num
       pixels[l * colunas + c] = mediaArea(img, x0, y0, x1, y1);
     }
   }
-  const {paleta, indices} = quantizar(pixels, o.cores ?? 8, o.paleta);
+  const {paleta, indices} = quantizar(pixels, o.cores ?? 8, o.paleta, o.cobertura_min ?? COBERTURA_MIN_PADRAO);
   return {colunas, linhas, paleta, celulas: codificarCelulas(indices)};
 };
 
