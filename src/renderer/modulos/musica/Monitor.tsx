@@ -349,11 +349,11 @@ export const MonitorMusica: React.FC = () => {
         <div>Comece por um modelo pronto (dá para mudar tudo depois) ou por uma música vazia:</div>
         <div className="modelos-musica">
           {MODELOS_MUSICA.filter((x) => x.id !== 'vazio').map((x) => (
-            <button key={x.id} className={`cartao-modelo${x.id === 'batida' ? ' destaque' : ''}`} onClick={() => void novaMusicaDoModelo(x.id)}>
+            <button key={x.id} className={`musica-modelo${x.id === 'batida' ? ' destaque' : ''}`} onClick={() => void novaMusicaDoModelo(x.id)}>
               <b>{x.nome}</b><span>{x.descricao}</span>
             </button>
           ))}
-          <button className="cartao-modelo" onClick={() => void criarDocumento('musica')}><b>Música vazia</b><span>sem canais: ponha bateria, instrumento ou áudio você mesmo</span></button>
+          <button className="musica-modelo" onClick={() => void criarDocumento('musica')}><b>Música vazia</b><span>sem canais: ponha bateria, instrumento ou áudio você mesmo</span></button>
         </div>
         <div className="dica-vazia">Dentro de um vídeo: selecione um clipe de música e clique em "Editar em Música", ou uma faixa e "Criar em Música".</div>
       </div>
