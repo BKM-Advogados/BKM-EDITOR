@@ -96,3 +96,52 @@ export const textoDoValor = (v: {tinha: boolean; valor?: unknown} | undefined) =
   if (typeof x === 'boolean') return x ? 'sim' : 'não';
   return Array.isArray(x) ? `${x.length} itens` : 'outro valor';
 };
+
+// ---------- Histórico agrupado (item 11) ----------
+/** Uma diferença de campo de uma entrada do diário, em português de quem edita. */
+export type DiferencaCampo = {campo: string; caminho: string; antes?: {tinha: boolean; valor?: unknown}; depois?: {tinha: boolean; valor?: unknown}};
+
+/** O que cada entrada mudou, campo a campo: o depois sai do patch, o antes do inverso. */
+export const diferencasDa = (e: Pick<EntradaDiario, 'patch' | 'inverso'>): DiferencaCampo[] =>
+  (e.patch ?? []).filter((o) => o.op !== 'test' && o.op !== 'move' && o.op !== 'copy').map((o) => {
+    const objeto = objetoDoCaminho(o.path);
+    const campo = o.path === objeto ? o.path.split('/').filter(Boolean).slice(-2).join(' ') : o.path.slice(objeto.length + 1).replace(/\//g, ' › ');
+    return {campo: campo || o.path, caminho: o.path, antes: valorDoInverso(e.inverso ?? [], o.path),
+      depois: o.op === 'remove' ? {tinha: false} : {tinha: true, valor: (o as {value?: unknown}).value}};
+  });
+
+export type GrupoHistorico = {
+  chave: string;
+  autor: string;
+  origem: string;
+  entradas: EntradaDiario[]; // da mais nova para a mais velha
+  documentos: string[]; // títulos
+  inicio: string;
+  fim: string;
+};
+
+/** Junta o diário em rodadas: entradas seguidas do mesmo autor e da mesma origem (a mesma conversa do Claude ou a mesma
+ *  sessão de edição da pessoa) com menos de `vaoMs` entre uma e outra. Mais nova primeiro. */
+export const agruparDiario = (diario: EntradaDiario[], docs: EntradaDocumento[], vaoMs = 120_000): GrupoHistorico[] => {
+  const grupos: GrupoHistorico[] = [];
+  const titulo = (caminho: string) => docs.find((d) => d.caminho === caminho || d.id === caminho)?.titulo ?? caminho;
+  for (const e of [...diario].sort((a, b) => a.seq - b.seq)) {
+    const ult = grupos[grupos.length - 1];
+    const mesmo = ult && ult.autor === e.autor && ult.origem === e.origem && Date.parse(e.em) - Date.parse(ult.fim) < vaoMs;
+    if (mesmo) {
+      ult.entradas.unshift(e);
+      ult.fim = e.em;
+      if (!ult.documentos.includes(titulo(e.documento))) ult.documentos.push(titulo(e.documento));
+    } else {
+      grupos.push({chave: `g${e.seq}`, autor: e.autor, origem: e.origem, entradas: [e], documentos: [titulo(e.documento)], inicio: e.em, fim: e.em});
+    }
+  }
+  return grupos.reverse();
+};
+
+/** "3 mudanças em Vídeo 9:16" */
+export const resumoDoGrupo = (g: GrupoHistorico) => {
+  const n = g.entradas.length;
+  const onde = g.documentos.length === 1 ? g.documentos[0] : `${g.documentos.length} documentos`;
+  return `${n === 1 ? '1 mudança' : `${n} mudanças`} em ${onde}`;
+};

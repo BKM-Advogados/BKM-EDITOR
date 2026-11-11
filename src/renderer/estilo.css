@@ -541,3 +541,27 @@ button.escolha:disabled { opacity: 0.5; cursor: default; }
 .mudou-agente .era { color: var(--texto-2); }
 .contador-agente { display: inline-flex; align-items: center; gap: 5px; border: 0; padding: 0; background: none; color: var(--agente); font: inherit; cursor: pointer; }
 .contador-agente:hover { text-decoration: underline; }
+
+/* ── Histórico agrupado (paineis/Historico.tsx) ── */
+.historico .painel-topo .rotulo { white-space: normal; line-height: 1.3; }
+.lista-hist { list-style: none; margin: 0; padding: 4px 0; }
+.grupo-hist { border-bottom: 1px solid var(--borda); padding: 2px 0 6px; position: relative; }
+.grupo-hist.agente::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--agente); }
+.grupo-topo { display: flex; align-items: center; gap: 6px; min-height: var(--linha-lista); padding: 0 10px 0 6px; cursor: pointer; }
+.grupo-topo:hover { background: var(--fundo-3); }
+.grupo-topo > svg.lucide { color: var(--texto-3); }
+.grupo-topo .resumo-grupo { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--texto); }
+.grupo-topo .hora { color: var(--texto-3); font-size: var(--tam-1); flex: none; }
+.entradas-hist { list-style: none; margin: 0; padding: 0 10px 0 26px; display: flex; flex-direction: column; gap: 4px; }
+.entradas-hist > li { display: flex; flex-direction: column; gap: 3px; }
+.entradas-hist > li.revertida { opacity: 0.6; }
+.entrada-topo { display: flex; align-items: center; gap: 6px; min-height: 24px; }
+.entrada-topo .rotulo-entrada { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 4px; color: var(--texto-2); overflow: hidden; text-overflow: ellipsis; }
+.entrada-topo .bti { width: 24px; height: 24px; }
+.difs { display: flex; flex-wrap: wrap; gap: 4px; }
+.dif { font: var(--tam-1) var(--fonte-mono); color: var(--texto-2); background: var(--fundo-3); border-radius: var(--raio-1); padding: 1px 6px; white-space: nowrap;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.dif s { color: var(--texto-3); }
+.dif ins { color: var(--texto); text-decoration: none; }
+.grupo-hist.agente .dif ins { background: var(--agente-fundo); border-radius: 2px; padding: 0 2px; }
+.grupo-acoes { display: flex; justify-content: flex-end; gap: 6px; padding: 4px 10px 0 26px; }

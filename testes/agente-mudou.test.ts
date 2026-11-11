@@ -50,3 +50,21 @@ describe('mudanças do agente', () => {
     expect(mudancasNovas([...diario, entrada(4, 'agente', [], [], {desfaz: 2})], 3, docs, 0)).toEqual([]);
   });
 });
+
+describe('Histórico agrupado', async () => {
+  const {agruparDiario, diferencasDa, resumoDoGrupo} = await import('../src/renderer/estado/agente');
+  const em = (s: number) => new Date(Date.UTC(2026, 10, 10, 10, 0, s)).toISOString();
+  const e = (seq: number, autor: string, origem: string, s: number): EntradaDiario => ({...entrada(seq, autor, [{op: 'replace', path: '/cenas/0/blocos/0/x', value: 0.2}],
+    [{op: 'replace', path: '/cenas/0/blocos/0/x', value: 0.1}]), origem, em: em(s)});
+
+  it('junta as entradas seguidas do mesmo autor e da mesma conversa; a mais nova primeiro', () => {
+    const g = agruparDiario([e(1, 'pessoa', 'interface', 0), e(2, 'agente', 'Claude 1', 10), e(3, 'agente', 'Claude 1', 20), e(4, 'agente', 'Claude 2', 25),
+      e(5, 'pessoa', 'interface', 30), e(6, 'pessoa', 'interface', 400)], docs);
+    expect(g.map((x) => x.entradas.map((y) => y.seq))).toEqual([[6], [5], [4], [3, 2], [1]]);
+    expect(resumoDoGrupo(g[3])).toBe('2 mudanças em Vídeo 9:16');
+  });
+
+  it('cada entrada diz o antes → depois por campo', () => {
+    expect(diferencasDa(e(1, 'agente', 'x', 0))).toEqual([{campo: 'x', caminho: '/cenas/0/blocos/0/x', antes: {tinha: true, valor: 0.1}, depois: {tinha: true, valor: 0.2}}]);
+  });
+});
