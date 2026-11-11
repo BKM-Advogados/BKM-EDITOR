@@ -1,7 +1,7 @@
 // A animação exportada leva a marca d'água e as fontes do kit (auditoria de render, R3): o componente registrado passa
 // pelo mesmo embrulho dos outros tipos, e o tema (fontes/…, midia/logo-…) e a marca d'água são lidos da raiz do projeto
 // (base_projeto), enquanto as camadas continuam em <raiz>/midia. Sem a raiz, o logo ia para …/midia/midia/ e o render caía.
-import {mkdirSync, mkdtempSync, rmSync, writeFileSync} from 'node:fs';
+import {mkdtempSync, rmSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import React from 'react';
