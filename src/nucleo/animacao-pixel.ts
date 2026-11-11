@@ -235,7 +235,8 @@ export const revelar = (grade: GradePixel, efeito: EfeitoPixel | undefined, seme
 // canvas recebe tudo de uma vez (putImageData) em vez de um fillRect por célula. A saída é a mesma de revelar, célula a célula.
 type Preparo = {celulas: string; n: number; vazia: Uint8Array; final: Int32Array; paleta: Int32Array; ordem: Int32Array;
   limiares: Map<string, Float64Array>};
-const LIMITE_PREPAROS = 16;
+const LIMITE_PREPAROS = 64; // acima do número de camadas de pixel de um cenário (21 no Nascer do Sol): menos que isso, cada quadro
+// tira do cache a camada que vai usar logo depois e prepara todas de novo
 const LIMITE_CELULAS_GUARDADAS = 4_000_000; // ~100 MB no pior caso (4 + 4 + 1 + 4 bytes por célula, mais 8 por efeito usado)
 const preparos = new Map<string, Preparo>(); // na ordem de uso: o mais antigo sai primeiro
 const rgbDe = (c: unknown) => parseInt(corDaPaleta(c).slice(1), 16);

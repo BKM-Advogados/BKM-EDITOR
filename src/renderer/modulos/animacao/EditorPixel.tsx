@@ -29,7 +29,8 @@ export const EditorPixel: React.FC<{
 
   const colunas = Math.max(1, grade.colunas);
   const linhas = Math.max(1, grade.linhas);
-  const indices = decodificarCelulas(grade.celulas);
+  // memorizado: um array novo a cada render redesenhava o canvas inteiro a cada quadro da prévia tocando
+  const indices = React.useMemo(() => decodificarCelulas(grade.celulas), [grade.celulas]);
 
   // Redesenha o canvas de edição quando a grade muda
   useEffect(() => {

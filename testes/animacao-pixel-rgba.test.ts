@@ -64,9 +64,9 @@ describe('R4: revelarRGBA = revelar, célula a célula', () => {
   });
 
   it('várias camadas e sementes: o cache fica no teto e não vaza', () => {
-    for (let k = 0; k < 60; k++) revelarRGBA(gradeAleatoria(128, 128, 8, k), 'decodificar', k, 0.5);
+    for (let k = 0; k < 100; k++) revelarRGBA(gradeAleatoria(128, 128, 8, k), 'decodificar', k, 0.5);
     const g = preparosGuardados();
-    expect(g.quantos).toBeLessThanOrEqual(16);
+    expect(g.quantos).toBeLessThanOrEqual(64);
     expect(g.celulas).toBeLessThanOrEqual(4_000_000);
     // grades enormes: saem pelo teto de células, mas a que está em uso fica
     const enorme: GradePixel = {colunas: 1500, linhas: 1000, paleta: ['#ff0000'], celulas: '0'.repeat(1_500_000)};
