@@ -14,6 +14,7 @@ import {medirMistura, type FonteAudio, type MedidasLoudness} from '../../src/nuc
 import type {Fato, Fonte, Pesquisa} from '../../src/nucleo/pesquisa';
 import {novoDocCenas, resolverCenas, type DocCenas} from '../../src/nucleo/cenas';
 import {novoDoc3d} from '../../src/nucleo/cena3d';
+import {modeloAnimacaoLogoPixel} from '../../src/nucleo/animacao';
 import {idDeMarca, MARCA_NEUTRO, MARCAS_INICIAIS, patchDaMarca, temaDaMarca, type Marca} from '../../src/nucleo/marca';
 import {MODELOS} from '../../src/nucleo/modelos';
 import {codificarWav, decodificarWav, musicaSintetica, narracaoSintetica, TAXA} from '../audio-sintetico';
@@ -163,7 +164,7 @@ const docVideo = (f?: {largura: number; altura: number; fps?: number}) => {
   return d;
 };
 const conteudo = (m: Modulo, f?: {largura: number; altura: number; fps?: number}) =>
-  m === 'video' ? docVideo(f) : m === 'imagem' ? docImagem(f?.largura ?? 1080, f?.altura ?? 1350) : m === 'musica' ? novaMusica() : doc3d();
+  m === 'video' ? docVideo(f) : m === 'imagem' ? docImagem(f?.largura ?? 1080, f?.altura ?? 1350) : m === 'musica' ? novaMusica() : m === 'animacao' ? modeloAnimacaoLogoPixel() : doc3d(); // a animação nasce no modelo do logo em pixel, para ter o que ver
 
 const novoDocumento = (p: Proj, modulo: Modulo, f?: {largura: number; altura: number; fps?: number}, titulo?: string): EntradaDocumento => {
   const base = modulo === '3d' ? 'cena3d' : modulo;

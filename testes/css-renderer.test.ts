@@ -47,3 +47,26 @@ describe('CSS do renderer', () => {
     expect(classesBase(musica).has('musica-modelo')).toBe(true);
   });
 });
+
+describe('tokens usados no CSS do renderer', () => {
+  it('toda var(--x) usada existe (a Animação usava --bg-painel, --fg, --azul e --mono, que caíam no tema do GitHub)', () => {
+    const todos = arquivosCss();
+    const tsx = (dir = RAIZ): string[] =>
+      fs.readdirSync(dir, {withFileTypes: true}).flatMap((e) => {
+        const p = path.join(dir, e.name);
+        return e.isDirectory() ? tsx(p) : /\.tsx?$/.test(e.name) ? [p] : [];
+      });
+    const css = todos.map((a) => semComentarios(fs.readFileSync(a, 'utf8'))).join('\n');
+    const codigo = tsx().map((a) => fs.readFileSync(a, 'utf8')).join('\n');
+    // definidas no CSS ou por estilo inline / gerador de tokens ('--x': valor)
+    const definidas = new Set([...css.matchAll(/(--[\w-]+)\s*:/g), ...codigo.matchAll(/['"](--[\w-]+)['"]\s*[:,]/g)].map((m) => m[1]));
+    const usadas = new Set([...css.matchAll(/var\((--[\w-]+)/g)].map((m) => m[1]));
+    const faltam = [...usadas].filter((u) => !definidas.has(u) && !u.startsWith('--dv-'));
+    expect(faltam).toEqual([]);
+  });
+
+  it('a Animação não tem mais fallback de outro tema', () => {
+    const anim = fs.readFileSync(path.join(RAIZ, 'modulos', 'animacao', 'animacao.css'), 'utf8');
+    expect(anim).not.toMatch(/--bg-painel|var\(--fg|--azul|var\(--mono|#0d1117|#161b22|#f0f6fc|#ff5252/i);
+  });
+});
