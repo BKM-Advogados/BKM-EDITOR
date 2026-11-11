@@ -1,5 +1,6 @@
 # Pacotes do Estúdio para Linux, Windows e Mac (docs/portes.md). Cada sistema empacota a si mesmo: npm ci, typecheck,
-# testes e o MCP; depois o pacote e o instalador da plataforma sobem como artifact da execução (14 dias).
+# testes e o MCP; depois o pacote e o instalador da plataforma sobem como artifact da execução (14 dias). A linha do
+# Linux também gera a extensão do Claude Desktop (.mcpb, uma para os três sistemas; docs/claude-desktop.md).
 # Roda à mão (Actions › Build › Run workflow), ao subir uma tag v* (git tag v3.1.0 && git push --tags) ou ao subir um branch
 # ci/* (git push origin HEAD:ci/<nome>), que serve para validar um branch antes de ele chegar ao main: o "Run workflow"
 # só existe para o que já está no branch padrão. Não roda a cada push: em repositório privado o minuto do Mac conta 10
@@ -81,6 +82,24 @@ jobs:
 
       - name: MCP
         run: npm run mcp:build
+
+      # ---------- extensão do Claude Desktop (docs/claude-desktop.md) ----------
+      # Um .mcpb só serve aos três sistemas (o lançador é JavaScript puro e acha o Estúdio de cada um): sai do Linux.
+      # O validador oficial confere o manifesto desempacotado, com o ícone ao lado.
+      - name: Extensão do Claude Desktop (.mcpb)
+        if: matrix.alvo == 'linux'
+        run: |
+          npm run mcpb
+          npx --yes @anthropic-ai/mcpb@2.1.2 unpack out/mcpb/Estudio-*.mcpb "$RUNNER_TEMP/mcpb"
+          npx --yes @anthropic-ai/mcpb@2.1.2 validate "$RUNNER_TEMP/mcpb/manifest.json"
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.alvo == 'linux'
+        with:
+          name: estudio-claude-desktop
+          retention-days: 14
+          if-no-files-found: error
+          path: out/mcpb/*.mcpb
 
       # ---------- Mac: whisper-cli e assinatura ----------
       # o whisper.cpp não publica binário do Mac: compila a versão presa do app (transcricao.ts), estático, e vai para
