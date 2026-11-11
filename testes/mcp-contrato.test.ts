@@ -1,7 +1,7 @@
 // O contrato das ferramentas do MCP (auditoria MCP): a trava otimista do aplicar_patch (M9), a tela que vai até o
 // documento criado e a ferramenta mostrar_documento (M10), o cartão do escolher_trilha (M11), os avisos de efeito
 // inválido (M14), o ler_documento grande (M16) e o comentário ancorado no que existe (M18). Tudo em processo, sem build.
-import {cpSync, existsSync, mkdtempSync, readFileSync, rmSync} from 'node:fs';
+import {cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {afterAll, beforeAll, describe, expect, it} from 'vitest';
@@ -12,6 +12,8 @@ import {claudeMd} from '../src/nucleo/criar-projeto';
 import type {Modulo} from '../src/nucleo/documentos';
 import {registrarFerramentas} from '../src/nucleo/ferramentas-mcp';
 import {INSTRUCOES_MCP} from '../src/nucleo/mcp-ia';
+import {definirPastaTrilhas} from '../src/nucleo/pasta-trilhas';
+import {classeDe} from '../src/nucleo/portao';
 import {Projeto} from '../src/nucleo/projeto';
 
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'estudio-contrato-'));
@@ -170,5 +172,30 @@ describe('o guia do projeto cobre as ferramentas (M13)', () => {
     expect(claudeMd(['animacao'])).toMatch(/Na animação grava o `tema`/);
     expect(claudeMd(['musica'])).toContain('## Música');
     expect(claudeMd(['video'])).not.toContain('## Música');
+  });
+});
+
+describe('escolher_trilha pede a permissão da pessoa (M11)', () => {
+  const trilhas = path.join(tmp, 'trilhas');
+  afterAll(() => definirPastaTrilhas(null));
+
+  it('é da classe cartão; negado, nada vai para midia/', async () => {
+    expect(classeDe('escolher_trilha')).toBe('cartao');
+    mkdirSync(trilhas, {recursive: true});
+    writeFileSync(path.join(trilhas, 'minha.wav'), 'bytes minha');
+    definirPastaTrilhas(() => trilhas);
+    const video = (await chamar('criar_documento', {modulo: 'video', titulo: 'Com trilha', mostrar: false})).dado.id as string;
+    const perguntas: string[] = [];
+    const servidor = new McpServer({name: 'estudio', version: '0'});
+    registrarFerramentas(servidor, projeto, 'agente', 'teste', undefined, undefined, {perguntar: async (p) => (perguntas.push(p.ferramenta), false)});
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    await servidor.connect(a);
+    const c = new Client({name: 'negado', version: '0'});
+    await c.connect(b);
+    const r = (await c.callTool({name: 'escolher_trilha', arguments: {documento: video, trilha: 'minha'}})) as Res;
+    expect(r.isError).toBe(true);
+    expect(perguntas).toEqual(['escolher_trilha']);
+    expect(readdirSync(path.join(pasta, 'midia')).filter((f) => f.startsWith('minha'))).toEqual([]);
+    await c.close();
   });
 });

@@ -24,6 +24,7 @@ export const CLASSES: Record<string, {classe: Classe; motivo: string}> = {
   destravar_camadas: {classe: 'cartao', motivo: 'destravar camadas que você travou na imagem'},
   exportar_musica: {classe: 'cartao', motivo: 'gravar a música em arquivo em saidas/'},
   importar_midi: {classe: 'cartao', motivo: 'trazer um arquivo MIDI para o projeto'},
+  escolher_trilha: {classe: 'cartao', motivo: 'trazer uma trilha da sua pasta de trilhas para o projeto'},
 };
 
 type Anotacoes = {openWorldHint?: boolean; destructiveHint?: boolean};
