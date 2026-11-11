@@ -407,15 +407,15 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
         <div className="transporte">
           <span className="tc"><Tempo />{controle.taxa !== 1 && <span className="taxa">{controle.taxa}×</span>}</span>
           <div className="centro">
-            <button className="bti largo" onClick={() => irPara(0)} title="Início  Home"><SkipBack /></button>
-            <button className="bti" onClick={() => andar(-1)} title="Quadro anterior  ←"><StepBack /></button>
-            <button className="bti tocar" onClick={() => alternar()} title="Tocar ou pausar  Espaço · J K L velocidade">{tocandoAgora ? <Pause /> : <Play />}</button>
-            <button className="bti" onClick={() => andar(1)} title="Próximo quadro  →"><StepForward /></button>
-            <button className="bti largo" onClick={() => irPara(duracaoMs)} title="Fim  End"><SkipForward /></button>
-            <button className={`bti largo${controle.repetir ? ' ligado' : ''}`} onClick={alternarRepetir} title="Repetir"><Repeat2 /></button>
+            <button aria-label="Início  Home" className="bti largo" onClick={() => irPara(0)} title="Início  Home"><SkipBack /></button>
+            <button aria-label="Quadro anterior  ←" className="bti" onClick={() => andar(-1)} title="Quadro anterior  ←"><StepBack /></button>
+            <button aria-label="Tocar ou pausar  Espaço · J K L velocidade" className="bti tocar" onClick={() => alternar()} title="Tocar ou pausar  Espaço · J K L velocidade">{tocandoAgora ? <Pause /> : <Play />}</button>
+            <button aria-label="Próximo quadro  →" className="bti" onClick={() => andar(1)} title="Próximo quadro  →"><StepForward /></button>
+            <button aria-label="Fim  End" className="bti largo" onClick={() => irPara(duracaoMs)} title="Fim  End"><SkipForward /></button>
+            <button aria-label="Repetir" className={`bti largo${controle.repetir ? ' ligado' : ''}`} onClick={alternarRepetir} title="Repetir"><Repeat2 /></button>
           </div>
           <span className="zona-botoes">
-            <button className={`bti${conjunto ? ' ligado' : ''}`} onClick={() => escolherZona(conjunto ? null : ultimaZona.get(sugerida) ?? lerZona(sugerida) ?? sugerida)}
+            <button aria-label={conjunto ? `Zona segura: ${conjunto.nome}. Clique para desligar` : 'Zona segura das redes: o que a interface do Reels, do TikTok e do YouTube cobre (só na tela, não sai na exportação)'} className={`bti${conjunto ? ' ligado' : ''}`} onClick={() => escolherZona(conjunto ? null : ultimaZona.get(sugerida) ?? lerZona(sugerida) ?? sugerida)}
               title={conjunto ? `Zona segura: ${conjunto.nome}. Clique para desligar` : 'Zona segura das redes: o que a interface do Reels, do TikTok e do YouTube cobre (só na tela, não sai na exportação)'}>
               <Frame />
             </button>

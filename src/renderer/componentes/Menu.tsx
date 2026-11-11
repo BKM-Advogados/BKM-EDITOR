@@ -28,7 +28,7 @@ export const BotaoMenu: React.FC<{titulo: string; icone: React.ReactNode; itens:
   const caixa = usarFora(aberto, () => setAberto(false));
   return (
     <div ref={caixa} style={{position: 'relative', display: 'inline-flex'}}>
-      <button className={`${className}${aberto ? ' ligado' : ''}`} title={titulo} aria-haspopup="menu" aria-expanded={aberto} onClick={() => setAberto((a) => !a)}>
+      <button className={`${className}${aberto ? ' ligado' : ''}`} title={titulo} aria-label={rotulo ? undefined : titulo} aria-haspopup="menu" aria-expanded={aberto} onClick={() => setAberto((a) => !a)}>
         {icone}{rotulo}
       </button>
       {aberto && (

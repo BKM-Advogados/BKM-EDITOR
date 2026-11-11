@@ -200,7 +200,7 @@ const DialogoConfigIA: React.FC = () => {
   return (
     <div className="dialogo-fundo" onPointerDown={(e) => e.target === e.currentTarget && fecharConfigIA()} onKeyDown={(e) => e.key === 'Escape' && fecharConfigIA()}>
       <div className="dialogo config-ia" role="dialog" aria-modal="true" aria-label="Configurações da IA">
-        <div className="dialogo-titulo">IA: provedores e chaves<button className="bti fechar" onClick={fecharConfigIA} title="Fechar"><X size={14} /></button></div>
+        <div className="dialogo-titulo">IA: provedores e chaves<button aria-label="Fechar" className="bti fechar" onClick={fecharConfigIA} title="Fechar"><X size={14} /></button></div>
         <div className="dialogo-texto">
           Escolha com qual IA conversar. Todas editam pelo mesmo MCP do Estúdio, com o mesmo histórico e o mesmo Reverter.
           {cofreTexto ? ` Chave ${cofreTexto}.` : persistente ? ' A chave fica cifrada neste PC.' : ' Neste PC a chave vale só enquanto o app estiver aberto.'}

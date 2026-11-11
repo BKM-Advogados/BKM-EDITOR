@@ -138,8 +138,8 @@ const Transporte: React.FC<{doc: DocMusica}> = ({doc}) => {
   const ligado = Boolean(doc.video);
   return (
     <div className="musica-transporte">
-      <button className="bti" title={tocando ? 'Pausar (Espaço)' : 'Tocar (Espaço)'} onClick={tocarOuPausar}>{tocando ? <Pause size={16} /> : <Play size={16} />}</button>
-      <button className="bti" title="Parar e voltar ao começo" onClick={parar}><Square size={14} /></button>
+      <button aria-label={tocando ? 'Pausar (Espaço)' : 'Tocar (Espaço)'} className="bti" title={tocando ? 'Pausar (Espaço)' : 'Tocar (Espaço)'} onClick={tocarOuPausar}>{tocando ? <Pause size={16} /> : <Play size={16} />}</button>
+      <button aria-label="Parar e voltar ao começo" className="bti" title="Parar e voltar ao começo" onClick={parar}><Square size={14} /></button>
       <span className="pos" title={`Compasso.tempo · minutos:segundos${motor.ultimoRender_ms ? ` (o som foi refeito em ${motor.ultimoRender_ms} ms na última mudança)` : ''}`}>{posicaoEmCompasso(batida, m.compasso).split('+')[0]}<small>{tempoTexto(cabeca)} / {tempoTexto(m.duracao_s)}</small></span>
       <span className="sep" />
       <label title="Batidas por minuto">BPM <input className="campo bpm" value={bpm} onChange={(e) => setBpm(e.target.value)}
@@ -150,18 +150,18 @@ const Transporte: React.FC<{doc: DocMusica}> = ({doc}) => {
         }} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} /></label>
       <span className="ler">{m.compasso[0]}/{m.compasso[1]}</span>
       <span className="sep" />
-      <button className={`bti${loop ? ' ligado' : ''}`} title="Repetir (L): o trecho do clipe selecionado, ou a música inteira" onClick={() => alternarLoop()}><Repeat size={15} /></button>
-      <button className={`bti${metronomo ? ' ligado' : ''}`} title="Metrônomo" onClick={() => {
+      <button aria-label="Repetir (L): o trecho do clipe selecionado, ou a música inteira" className={`bti${loop ? ' ligado' : ''}`} title="Repetir (L): o trecho do clipe selecionado, ou a música inteira" onClick={() => alternarLoop()}><Repeat size={15} /></button>
+      <button aria-label="Metrônomo" className={`bti${metronomo ? ' ligado' : ''}`} title="Metrônomo" onClick={() => {
         musica.definir({metronomo: !metronomo});
         if (motor.estaTocando()) (motor.parar(), tocarOuPausar());
       }}><Timer size={15} /></button>
       {ligado && (
         <>
-          <button className={`bti${doc.video?.voz_guia !== false ? ' ligado' : ''}`} title="Voz do vídeo como guia (não entra na música)"
+          <button aria-label="Voz do vídeo como guia (não entra na música)" className={`bti${doc.video?.voz_guia !== false ? ' ligado' : ''}`} title="Voz do vídeo como guia (não entra na música)"
             onClick={() => void campo('/video/voz_guia', doc.video?.voz_guia === false ? true : false, 'voz guia')}><Mic size={15} /></button>
-          <button className={`bti${comoNoVideo ? ' ligado' : ''}`} title="Ouvir como no vídeo: volume, fades e ducking do clipe ligado"
+          <button aria-label="Ouvir como no vídeo: volume, fades e ducking do clipe ligado" className={`bti${comoNoVideo ? ' ligado' : ''}`} title="Ouvir como no vídeo: volume, fades e ducking do clipe ligado"
             onClick={() => musica.definir({comoNoVideo: !comoNoVideo})}><Tv size={15} /></button>
-          <button className={`bti${verVideo ? ' ligado' : ''}`} title="Ver o vídeo na posição da cabeça (sem som)" onClick={() => musica.definir({verVideo: !verVideo})}>
+          <button aria-label="Ver o vídeo na posição da cabeça (sem som)" className={`bti${verVideo ? ' ligado' : ''}`} title="Ver o vídeo na posição da cabeça (sem som)" onClick={() => musica.definir({verVideo: !verVideo})}>
             <Clapperboard size={15} /></button>
         </>
       )}
@@ -327,9 +327,9 @@ const Mixer: React.FC<{doc: DocMusica}> = ({doc}) => {
               <Medidor faixa={f.id} />
             </div>
             <span className="botoes">
-              <button className={`bti${f.mudo ? ' ligado' : ''}`} aria-pressed={f.mudo} title={f.mudo ? 'Mudo: clique para ouvir' : 'Mudo'}
+              <button aria-label={f.mudo ? 'Mudo: clique para ouvir' : 'Mudo'} className={`bti${f.mudo ? ' ligado' : ''}`} aria-pressed={f.mudo} title={f.mudo ? 'Mudo: clique para ouvir' : 'Mudo'}
                 onClick={() => void campoFaixa(f.id, 'mudo', f.mudo ? undefined : true, `mudo em ${f.nome}`)}>M</button>
-              <button className={`bti${f.solo ? ' ligado' : ''}`} aria-pressed={f.solo} title="Solo"
+              <button aria-label="Solo" className={`bti${f.solo ? ' ligado' : ''}`} aria-pressed={f.solo} title="Solo"
                 onClick={() => void campoFaixa(f.id, 'solo', f.solo ? undefined : true, `solo em ${f.nome}`)}>S</button>
             </span>
             {calado && <span className="estado-tira">{f.mudo ? 'mudo' : 'calado pelo solo'}</span>}

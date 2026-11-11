@@ -96,11 +96,11 @@ export const AcoesLinhaDoTempo: React.FC<{noCabecalho?: boolean}> = ({noCabecalh
           {gravador && <GravadorNarracao documento={documento} aoFechar={() => setGravador(false)} />}
         </span>
       )}
-      <button className={`bti${zoom === null ? ' ligado' : ''}`} onClick={() => m.zoom(null)} title="Ajustar à janela  Shift+Z"><Maximize2 /></button>
-      <button className="bti" onClick={() => passo(1 / 1.5)} title="Afastar  −"><ZoomOut /></button>
+      <button aria-label="Ajustar à janela  Shift+Z" className={`bti${zoom === null ? ' ligado' : ''}`} onClick={() => m.zoom(null)} title="Ajustar à janela  Shift+Z"><Maximize2 /></button>
+      <button aria-label="Afastar  −" className="bti" onClick={() => passo(1 / 1.5)} title="Afastar  −"><ZoomOut /></button>
       <input type="range" aria-label="Zoom da linha do tempo" min={Math.log(minimo)} max={Math.log(ZOOM_MAX)} step={0.01} value={Math.log(pxs)}
         onChange={(e) => m.zoom(Math.exp(Number(e.target.value)))} />
-      <button className="bti" onClick={() => passo(1.5)} title="Aproximar  ="><ZoomIn /></button>
+      <button aria-label="Aproximar  =" className="bti" onClick={() => passo(1.5)} title="Aproximar  ="><ZoomIn /></button>
       <span className="conta">{m.blocos} {m.blocos === 1 ? 'bloco' : 'blocos'}{m.clipes > 0 && ` · ${m.clipes} ${m.clipes === 1 ? 'clipe' : 'clipes'}`}</span>
     </div>
   );

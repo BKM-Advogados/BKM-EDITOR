@@ -151,15 +151,15 @@ export const PaginasImagem: React.FC<{documento: string; doc: DocImagem}> = ({do
       <div className="acoes-pg">
         <div className="linha">
           <button className="bt fantasma mini" onClick={() => void novaPagina(documento)} title="Nova página depois desta"><Plus size={13} /><span className="largo">Página</span></button>
-          <button className="bti" onClick={() => void duplicarPagina(documento)} title="Duplicar esta página"><Copy size={14} /></button>
-          <button className="bti" onClick={() => void excluirPagina(documento)} disabled={n < 2} title={n < 2 ? 'A última página não sai' : 'Excluir esta página (Delete na miniatura)'}><Trash2 size={14} /></button>
+          <button aria-label="Duplicar esta página" className="bti" onClick={() => void duplicarPagina(documento)} title="Duplicar esta página"><Copy size={14} /></button>
+          <button aria-label={n < 2 ? 'A última página não sai' : 'Excluir esta página (Delete na miniatura)'} className="bti" onClick={() => void excluirPagina(documento)} disabled={n < 2} title={n < 2 ? 'A última página não sai' : 'Excluir esta página (Delete na miniatura)'}><Trash2 size={14} /></button>
           <BotaoMenu titulo="Mais ações da página" icone={<MoreHorizontal size={14} />} itens={menu} acima />
         </div>
         <div className="linha">
           <button className="bt fantasma mini" disabled={exportando} onClick={exportar} title={`Exportar ${n} ${n === 1 ? 'página' : 'páginas'}: PNG por página em saidas/<nome>/ e PDF para o LinkedIn`}>
             <Download size={13} /><span className="largo">{exportando ? 'Exportando…' : 'Exportar carrossel'}</span>
           </button>
-          {mostrar && <button className="bti" title={`Mostrar na pasta\n${mostrar}`} onClick={() => window.estudio.mostrarNaPasta(ultimo?.pasta ?? mostrar)}><FolderOpen size={14} /></button>}
+          {mostrar && <button aria-label={`Mostrar na pasta\n${mostrar}`} className="bti" title={`Mostrar na pasta\n${mostrar}`} onClick={() => window.estudio.mostrarNaPasta(ultimo?.pasta ?? mostrar)}><FolderOpen size={14} /></button>}
         </div>
       </div>
     </div>

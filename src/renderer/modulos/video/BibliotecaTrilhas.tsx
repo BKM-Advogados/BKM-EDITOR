@@ -46,7 +46,7 @@ export const BibliotecaTrilhas: React.FC<{documento: string; aoFechar: () => voi
         <Music className="i14" />
         <input className="campo" autoFocus placeholder="Filtrar trilhas…" value={filtro} onChange={(e) => setFiltro(e.target.value)}
           onKeyDown={(e) => e.key === 'Escape' && aoFechar()} />
-        <button className="bti" title="Reler a pasta" onClick={carregar}><RefreshCw /></button>
+        <button aria-label="Reler a pasta" className="bti" title="Reler a pasta" onClick={carregar}><RefreshCw /></button>
       </div>
       <div className="corpo">
         {erro && <div className="vazio" style={{color: 'var(--erro)'}}>{erro}</div>}

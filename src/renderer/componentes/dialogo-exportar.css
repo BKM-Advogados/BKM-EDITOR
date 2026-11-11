@@ -83,7 +83,7 @@
 .md-linha input[type="range"] { width: 120px; accent-color: var(--acento); }
 .md-linha .nota { color: var(--texto-3); font-size: var(--tam-1); }
 .md-linha .cantos { display: inline-flex; gap: 2px; }
-.md-linha .cantos .bti { width: 22px; height: 22px; }
+.md-linha .cantos .bti { width: 24px; height: 24px; }
 .miniatura-exp { position: relative; flex: none; border-radius: 4px; overflow: hidden; background: var(--fundo-1); box-shadow: 0 0 0 1px var(--borda); }
 .miniatura-exp .zonas-seguras .zona.coberta { background: color-mix(in srgb, var(--cabeca) 16%, transparent); border: none; }
 .miniatura-exp .zonas-seguras .zona.contorno { border-width: 1px; border-color: var(--acento-tracejado); }

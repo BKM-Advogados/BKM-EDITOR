@@ -88,8 +88,8 @@ const InserirImagem: React.FC<{documento: string; doc: DocImagem; fechar: () => 
     <div ref={caixa} className="flutuante pop-trilho" style={{top: 160}}>
       <input className="campo" autoFocus value={caminho} placeholder="midia/logo.png" title="Caminho do arquivo dentro da pasta do projeto"
         onChange={(e) => setCaminho(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void confirmar()} />
-      <button className="bti ligado" disabled={!caminho.trim()} onClick={() => void confirmar()} title="Inserir"><Check /></button>
-      <button className="bti" onClick={fechar} title="Cancelar"><X /></button>
+      <button aria-label="Inserir" className="bti ligado" disabled={!caminho.trim()} onClick={() => void confirmar()} title="Inserir"><Check /></button>
+      <button aria-label="Cancelar" className="bti" onClick={fechar} title="Cancelar"><X /></button>
     </div>
   );
 };

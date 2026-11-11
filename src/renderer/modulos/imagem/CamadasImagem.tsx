@@ -112,17 +112,17 @@ export const CamadasImagem: React.FC = () => {
                 {mudouEm(mudancas, documento, caminho) && <span className="ponto-agente" title="O Claude mudou esta camada" />}
                 {ativaL && (
                   <>
-                    <button className="bti" disabled={hi === camadas.length - 1} title="Subir" onClick={(e) => (e.stopPropagation(), void mover(i, 1))}><ArrowUp className="i14" /></button>
-                    <button className="bti" disabled={lo === 0} title="Descer" onClick={(e) => (e.stopPropagation(), void mover(i, -1))}><ArrowDown className="i14" /></button>
-                    <button className="bti" title="Excluir camada" onClick={(e) => (e.stopPropagation(), void excluir(i))}><Trash2 className="i14" /></button>
+                    <button aria-label="Subir" className="bti" disabled={hi === camadas.length - 1} title="Subir" onClick={(e) => (e.stopPropagation(), void mover(i, 1))}><ArrowUp className="i14" /></button>
+                    <button aria-label="Descer" className="bti" disabled={lo === 0} title="Descer" onClick={(e) => (e.stopPropagation(), void mover(i, -1))}><ArrowDown className="i14" /></button>
+                    <button aria-label="Excluir camada" className="bti" title="Excluir camada" onClick={(e) => (e.stopPropagation(), void excluir(i))}><Trash2 className="i14" /></button>
                     {menu.length > 0 && <span onClick={(e) => e.stopPropagation()}><BotaoMenu titulo="Mais ações da camada" icone={<Ellipsis className="i14" />} itens={menu} /></span>}
                   </>
                 )}
-                <button className={`bti olho${visivel(c) ? '' : ' sempre'}`} title={visivel(c) ? 'Ocultar' : 'Mostrar'}
+                <button aria-label={visivel(c) ? 'Ocultar' : 'Mostrar'} className={`bti olho${visivel(c) ? '' : ' sempre'}`} title={visivel(c) ? 'Ocultar' : 'Mostrar'}
                   onClick={(e) => (e.stopPropagation(), void trocar(documento, `${caminho}/visivel`, visivel(c) ? false : undefined, `${visivel(c) ? 'ocultar' : 'mostrar'} ${c.id}`))}>
                   {visivel(c) ? <Eye className="i14" /> : <EyeOff className="i14" />}
                 </button>
-                <button className={`bti olho${travada(c) ? ' sempre' : ''}`} title={travada(c) ? 'Destravar' : 'Travar: não anda nem muda de tamanho, e a IA não mexe'}
+                <button aria-label={travada(c) ? 'Destravar' : 'Travar: não anda nem muda de tamanho, e a IA não mexe'} className={`bti olho${travada(c) ? ' sempre' : ''}`} title={travada(c) ? 'Destravar' : 'Travar: não anda nem muda de tamanho, e a IA não mexe'}
                   onClick={(e) => (e.stopPropagation(), void aplicar(documento, patchTravar(camadas, base, [i], !travada(c)), `${travada(c) ? 'destravar' : 'travar'} ${c.id}`))}>
                   {travada(c) ? <Lock className="i14" /> : <LockOpen className="i14" />}
                 </button>

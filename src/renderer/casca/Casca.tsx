@@ -508,7 +508,7 @@ export const Casca: React.FC = () => {
           <button className={`bt fantasma${modoComentario ? ' ligado' : ''}`} onClick={() => loja.definir((s) => ({modoComentario: !s.modoComentario}))} title="Comentar na tela (M)">
             <MessageSquarePlus size={15} />Comentar<kbd>M</kbd>
           </button>
-          <button className="bt fantasma" onClick={() => void desfazer()} title="Desfazer a sua última edição (Ctrl+Z)"><Undo2 size={15} /></button>
+          <button className="bt fantasma" onClick={() => void desfazer()} title="Desfazer a sua última edição (Ctrl+Z)" aria-label="Desfazer"><Undo2 size={15} /></button>
           <button className="bt exportar" disabled={!podeExportar} onClick={exportarArea}
             title={podeExportar ? (docAtivo!.modulo === 'musica' ? 'Exportar a música em WAV para a pasta saidas (M4A, Opus, MIDI e stems: botão Exportar do transporte) (Ctrl+Shift+E)'
               : `Exportar ${docAtivo!.modulo === 'video' ? 'o vídeo' : docAtivo!.modulo === 'animacao' ? 'a animação' : 'a imagem'} para a pasta saidas… (Ctrl+Shift+E)`)

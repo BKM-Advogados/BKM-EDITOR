@@ -78,7 +78,7 @@ export const FaixaLegendas: React.FC<{documento: string; legendas?: LegendasP; x
           <Captions />
           <span className="nome">Legendas</span>
           {temNoDoc && (
-            <button className={`bti${oculto ? ' ligado' : ''}`} title={oculto ? 'Legendas escondidas: clique para mostrar no vídeo' : 'Esconder do vídeo (a lista e o SRT continuam)'}
+            <button aria-label={oculto ? 'Legendas escondidas: clique para mostrar no vídeo' : 'Esconder do vídeo (a lista e o SRT continuam)'} className={`bti${oculto ? ' ligado' : ''}`} title={oculto ? 'Legendas escondidas: clique para mostrar no vídeo' : 'Esconder do vídeo (a lista e o SRT continuam)'}
               onClick={(e) => {
                 e.stopPropagation();
                 void trocar(documento, '/legendas/oculto', oculto ? undefined : true, oculto ? 'mostrar legendas' : 'esconder legendas');

@@ -243,9 +243,9 @@ const Arranjo: React.FC<{doc: DocMusica}> = ({doc}) => {
       <div className="cabecas" ref={cabecas}>
         <div className="cab-regua" title={`${m.bpm} BPM · compasso ${m.compasso[0]}/${m.compasso[1]}`}><span style={{whiteSpace: 'nowrap'}}>{m.bpm} BPM</span>
           <span className="zoom-botoes">
-            <button className="bti" title="Afastar (Ctrl + roda do mouse)" onClick={() => zoomar(1 / 1.3)}><ZoomOut size={12} /></button>
-            <button className="bti" title="Aproximar (Ctrl + roda do mouse)" onClick={() => zoomar(1.3)}><ZoomIn size={12} /></button>
-            <button className="bti" title="Ajustar: a música inteira cabe na largura" onClick={ajustar}><Maximize2 size={12} /></button>
+            <button aria-label="Afastar (Ctrl + roda do mouse)" className="bti" title="Afastar (Ctrl + roda do mouse)" onClick={() => zoomar(1 / 1.3)}><ZoomOut size={12} /></button>
+            <button aria-label="Aproximar (Ctrl + roda do mouse)" className="bti" title="Aproximar (Ctrl + roda do mouse)" onClick={() => zoomar(1.3)}><ZoomIn size={12} /></button>
+            <button aria-label="Ajustar: a música inteira cabe na largura" className="bti" title="Ajustar: a música inteira cabe na largura" onClick={ajustar}><Maximize2 size={12} /></button>
           </span></div>
         {doc.secoes?.length ? <div className="cab-acordes">Seções</div> : null}
         {doc.acordes?.length ? <div className="cab-acordes">Acordes · {doc.tom ?? 'C'} {doc.escala ?? 'maior'}</div> : null}

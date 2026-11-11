@@ -17,8 +17,11 @@ svg.lucide { width: var(--icone); height: var(--icone); stroke-width: var(--trac
 .i12 svg.lucide, svg.lucide.i12 { width: 12px; height: 12px; }
 kbd { font: 600 var(--tam-1)/14px var(--fonte-mono); color: var(--texto-2); background: var(--fundo-3); border-radius: 3px; padding: 0 4px; }
 
-/* anel de foco só na navegação por teclado */
-:where(button, [role="tab"], [tabindex], a, summary, .dv-tab):focus-visible { outline: 1px solid var(--acento); outline-offset: -1px; }
+/* anel de foco só na navegação por teclado: 2 px de acento afastado do controle (WCAG 2.4.13); no alto contraste, anel
+   duplo (o vão no fundo e o acento por fora) */
+:where(button, [role="tab"], [tabindex], a, summary, .dv-tab, input, textarea):focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
+:root[data-contraste="alto"] :where(button, [role="tab"], [tabindex], a, summary, .dv-tab):focus-visible { outline: 2px solid var(--foco); outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--fundo-0), 0 0 0 4px var(--foco); }
 .lista li:focus-visible { outline: 2px solid var(--acento); outline-offset: -2px; }
 
 /* ---------- casca ---------- */
@@ -61,7 +64,7 @@ kbd { font: 600 var(--tam-1)/14px var(--fonte-mono); color: var(--texto-2); back
 .bt.fantasma { background: transparent; color: var(--texto-2); }
 .bt.fantasma:hover { background: var(--fundo-3); color: var(--texto); }
 .bt.ligado { background: var(--acento-fundo); color: var(--acento); }
-.bt.mini { height: 22px; padding: 0 6px; font-size: var(--tam-2); }
+.bt.mini { height: var(--controle-p); padding: 0 8px; font-size: var(--tam-2); }
 .bti { width: var(--controle); height: var(--controle); display: inline-grid; place-items: center; border: 0; padding: 0; border-radius: var(--raio);
   background: transparent; color: var(--texto-2); cursor: pointer; flex: none; }
 .bti:hover { background: var(--fundo-3); color: var(--texto); }
@@ -104,10 +107,10 @@ input[type="range"]:hover::-webkit-slider-thumb, input[type="range"]:focus-visib
 input[type="range"]:focus-visible { outline: none; }
 
 /* chave (liga/desliga) */
-.chave { width: 28px; height: 16px; border-radius: 8px; border: 0; padding: 0; background: var(--fundo-4); position: relative; cursor: pointer; flex: none; }
-.chave::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--texto-2); transition: left 0.12s; }
+.chave { width: 32px; height: 20px; border-radius: 10px; border: 0; padding: 0; background: var(--fundo-4); position: relative; cursor: pointer; flex: none; }
+.chave::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--texto-2); transition: left 0.12s; }
 .chave.ligada { background: var(--acento); }
-.chave.ligada::after { left: 14px; background: var(--sobre-acento); }
+.chave.ligada::after { left: 15px; background: var(--sobre-acento); }
 
 /* metadado pequeno (não é título de seção; título é .secao-titulo) */
 .rotulo { font-size: var(--tam-1); color: var(--texto-3); }
@@ -371,7 +374,7 @@ input[type="range"]:focus-visible { outline: none; }
 .efeito-linha .valor { font: 11px var(--fonte-mono); color: var(--texto-2); }
 .efeito-linha .acoes-efeito { display: none; }
 .efeito-linha:hover .acoes-efeito, .efeito.aberto .acoes-efeito { display: inline-flex; }
-.efeito-linha .acoes-efeito .bti { width: 22px; height: 22px; }
+.efeito-linha .acoes-efeito .bti { width: 24px; height: 24px; }
 .efeito-ajustes { padding: 4px 0 6px; background: var(--fundo-2); }
 .grade-adicionar { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 0 8px 6px; }
 .grade-adicionar .bt { justify-content: flex-start; }
@@ -401,7 +404,7 @@ input[type="range"]:focus-visible { outline: none; }
   color: var(--texto-2); background: linear-gradient(90deg, var(--fundo-2) 85%, transparent); cursor: pointer; white-space: nowrap; }
 .lt .rotulo-faixa > svg.lucide { color: var(--trilha-audio); flex: none; }
 .lt .rotulo-faixa .nome { max-width: 90px; overflow: hidden; text-overflow: ellipsis; }
-.lt .rotulo-faixa .bti { width: 18px; height: 18px; color: var(--texto-3); }
+.lt .rotulo-faixa .bti { width: 24px; height: 24px; color: var(--texto-3); }
 .lt .trilha.audio.muda .rotulo-faixa .bti { color: var(--aviso); }
 .lt .trilha.audio.sel .rotulo-faixa { color: var(--texto); }
 .lt .clipe { position: absolute; top: 2px; bottom: 2px; border-radius: var(--raio-1); background: var(--trilha-audio-fundo); box-shadow: inset 0 2px 0 var(--trilha-audio); overflow: hidden; cursor: grab; }
@@ -572,3 +575,11 @@ button.escolha:disabled { opacity: 0.5; cursor: default; }
 .casca.modo-comentario .monitor, .casca.modo-comentario .monitor * {
   cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M3 21V12a9 9 0 1 1 9 9z' fill='gold' stroke='black' stroke-width='1.5'/%3E%3C/svg%3E") 3 21, crosshair; }
 .rodape .modo-cmt { display: inline-flex; align-items: center; gap: 6px; flex: none; color: var(--comentario); font-weight: var(--peso-forte); }
+
+/* ── movimento: o sistema pede menos (ou Preferências › Aparência › Reduzir) e nada anima ── */
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-movimento="normal"]) *, :root:not([data-movimento="normal"]) *::before, :root:not([data-movimento="normal"]) *::after {
+    animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
+:root[data-movimento="reduzido"] *, :root[data-movimento="reduzido"] *::before, :root[data-movimento="reduzido"] *::after {
+  animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }

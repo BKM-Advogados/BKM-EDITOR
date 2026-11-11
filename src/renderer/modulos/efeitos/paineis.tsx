@@ -114,7 +114,7 @@ const Pilha: React.FC = () => {
                         <span className="nome" title={l.problema}>{idNoDocumento(l) ?? `Item ${i + 1}`} (inválido)</span>
                         <span className="valor" title={l.problema}>{l.problema?.replace(/^[^:]+: /, '')}</span>
                         <span className="acoes-efeito">
-                          <button className="bti" title="Excluir este item" onClick={() => remover(i)}><Trash2 size={13} /></button>
+                          <button aria-label="Excluir este item" className="bti" title="Excluir este item" onClick={() => remover(i)}><Trash2 size={13} /></button>
                         </span>
                       </div>
                     </li>
@@ -154,10 +154,10 @@ const Pilha: React.FC = () => {
                       {l.problema && <TriangleAlert size={12} style={{color: 'var(--aviso)'}} aria-label="valor corrigido na leitura" />}
                       <span className="valor">{valorCurto(e)}</span>
                       <span className="acoes-efeito" onClick={(ev) => ev.stopPropagation()}>
-                        <button className="bti" title="Subir (Alt+↑)" disabled={i === 0} onClick={() => mover(i, i - 1)}><ArrowUp size={13} /></button>
-                        <button className="bti" title="Descer (Alt+↓)" disabled={i === lidos.length - 1} onClick={() => mover(i, i + 1)}><ArrowDown size={13} /></button>
-                        <button className="bti" title="Duplicar" onClick={() => duplicar(i)}><Copy size={13} /></button>
-                        <button className="bti" title="Excluir (Delete)" onClick={() => remover(i)}><Trash2 size={13} /></button>
+                        <button aria-label="Subir (Alt+↑)" className="bti" title="Subir (Alt+↑)" disabled={i === 0} onClick={() => mover(i, i - 1)}><ArrowUp size={13} /></button>
+                        <button aria-label="Descer (Alt+↓)" className="bti" title="Descer (Alt+↓)" disabled={i === lidos.length - 1} onClick={() => mover(i, i + 1)}><ArrowDown size={13} /></button>
+                        <button aria-label="Duplicar" className="bti" title="Duplicar" onClick={() => duplicar(i)}><Copy size={13} /></button>
+                        <button aria-label="Excluir (Delete)" className="bti" title="Excluir (Delete)" onClick={() => remover(i)}><Trash2 size={13} /></button>
                       </span>
                     </div>
                     {aberto && (

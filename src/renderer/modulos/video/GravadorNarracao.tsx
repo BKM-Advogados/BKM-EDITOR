@@ -105,7 +105,7 @@ export const GravadorNarracao: React.FC<{documento: string; aoFechar: () => void
         <strong>Gravar narração</strong>
         <span className="espaco" />
         {estado === 'gravando' && <span className="ler" style={{color: 'var(--erro)'}}>● {tempo(decorrido)}</span>}
-        {estado === 'parado' && <button className="bti" title="Fechar" onClick={aoFechar}><X /></button>}
+        {estado === 'parado' && <button aria-label="Fechar" className="bti" title="Fechar" onClick={aoFechar}><X /></button>}
       </div>
       <div className={`prompter${espelhar ? ' espelho' : ''}`} style={{fontSize: `${Math.round((salvo?.tamanho ?? 0.045) * 700)}px`}}>
         {estado === 'contagem' && <div className="contagem">{contagem}</div>}

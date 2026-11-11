@@ -78,14 +78,16 @@ export const CenasVideo: React.FC = () => {
             return {rotulo: t.nome, icone: <Icone className="i14" />, acao: () => void adicionarBloco(documento, t.tipo)};
           })} />
         <span className="espaco" />
-        <button className="bti" disabled={!deCenas} onClick={() => void dividirNaCabeca(documento)}
+        <button aria-label={deCenas ? 'Dividir a cena na cabeça (lâmina)  Ctrl+K' : 'No carrossel narrado as cenas seguem a narração'} className="bti" disabled={!deCenas} onClick={() => void dividirNaCabeca(documento)}
           title={deCenas ? 'Dividir a cena na cabeça (lâmina)  Ctrl+K' : 'No carrossel narrado as cenas seguem a narração'}><Scissors size={14} /></button>
-        <button className={`bti${imagens.length && imagens.every((b) => b.movimento) ? ' ligado' : ''}`} disabled={!imagens.length} onClick={() => void movimentoEmTodas(documento)}
+        <button aria-label={!imagens.length ? 'Movimento em todas as imagens: o vídeo ainda não tem bloco de imagem'
+            : imagens.every((b) => b.movimento) ? 'Tirar o movimento de todas as imagens'
+            : 'Movimento em todas as imagens (Ken Burns): aproxima, desliza e afasta, alternando, nas que estão paradas'} className={`bti${imagens.length && imagens.every((b) => b.movimento) ? ' ligado' : ''}`} disabled={!imagens.length} onClick={() => void movimentoEmTodas(documento)}
           title={!imagens.length ? 'Movimento em todas as imagens: o vídeo ainda não tem bloco de imagem'
             : imagens.every((b) => b.movimento) ? 'Tirar o movimento de todas as imagens'
             : 'Movimento em todas as imagens (Ken Burns): aproxima, desliza e afasta, alternando, nas que estão paradas'}><ImagePlay size={14} /></button>
-        <button className="bti" disabled={!temSelecao} onClick={() => void duplicarSelecao(documento)} title="Duplicar  Ctrl+D"><CopyPlus size={14} /></button>
-        <button className="bti" disabled={!temSelecao} onClick={() => void excluirSelecao(documento)} title="Excluir  Delete"><Trash2 size={14} /></button>
+        <button aria-label="Duplicar  Ctrl+D" className="bti" disabled={!temSelecao} onClick={() => void duplicarSelecao(documento)} title="Duplicar  Ctrl+D"><CopyPlus size={14} /></button>
+        <button aria-label="Excluir  Delete" className="bti" disabled={!temSelecao} onClick={() => void excluirSelecao(documento)} title="Excluir  Delete"><Trash2 size={14} /></button>
       </div>
       <div className="painel-corpo sem-margem">
         <ul className="lista">
@@ -100,7 +102,7 @@ export const CenasVideo: React.FC = () => {
                 <li className={selecao?.caminho === caminho ? 'sel' : ''} onClick={() => ir(caminho)} tabIndex={0} onKeyDown={tecla(caminho)} style={{paddingLeft: 4}}>
                   {aqui && <span title="A cabeça está nesta cena" style={{position: 'absolute', left: 0, top: 6, bottom: 6, width: 3, borderRadius: 2, background: 'var(--cabeca)'}} />}
                   {c.blocos?.length ? (
-                    <button className="bti" style={{width: 18, height: 18}} title={fechada ? 'Mostrar os blocos' : 'Recolher os blocos'}
+                    <button aria-label={fechada ? 'Mostrar os blocos' : 'Recolher os blocos'} className="bti" style={{width: 18, height: 18}} title={fechada ? 'Mostrar os blocos' : 'Recolher os blocos'}
                       onClick={(e) => (e.stopPropagation(), alternar(chave))}>
                       {fechada ? <ChevronRight className="i12" /> : <ChevronDown className="i12" />}
                     </button>

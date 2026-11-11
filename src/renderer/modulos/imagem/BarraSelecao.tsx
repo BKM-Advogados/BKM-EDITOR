@@ -56,7 +56,7 @@ export const BarraSelecao: React.FC<{documento: string; base: string; camadas: C
           aoVer({alvo: p.alvo, fantasmas: fantasmasDe(camadas, p.indices, p.desl)});
         };
         return (
-          <button key={b.como} type="button" className="bti" title={`${b.nome}${unidades > 1 ? '' : ' da prancheta'}`} onMouseEnter={ver} onFocus={ver}
+          <button aria-label={`${b.nome}${unidades > 1 ? '' : ' da prancheta'}`} key={b.como} type="button" className="bti" title={`${b.nome}${unidades > 1 ? '' : ' da prancheta'}`} onMouseEnter={ver} onFocus={ver}
             onClick={() => fazer(plano(), `${b.nome.toLowerCase()} (${quem})`)}>
             {b.icone}
           </button>
@@ -70,25 +70,25 @@ export const BarraSelecao: React.FC<{documento: string; base: string; camadas: C
           aoVer({alvo: null, fantasmas: fantasmasDe(camadas, p.indices, p.desl)});
         };
         return (
-          <button key={b.eixo} type="button" className="bti" disabled={unidades < 3} title={unidades < 3 ? `${b.nome}: escolha três ou mais (cada grupo conta como um)` : b.nome}
+          <button aria-label={unidades < 3 ? `${b.nome}: escolha três ou mais (cada grupo conta como um)` : b.nome} key={b.eixo} type="button" className="bti" disabled={unidades < 3} title={unidades < 3 ? `${b.nome}: escolha três ou mais (cada grupo conta como um)` : b.nome}
             onMouseEnter={ver} onFocus={ver} onClick={() => fazer(plano(), `distribuir na ${b.eixo} (${quem})`)}>
             {b.icone}
           </button>
         );
       })}
       <span className="sep" />
-      <button type="button" className="bti" disabled={validos.length < 2} title="Agrupar (Ctrl+G): escolhidas e movidas juntas" onClick={() => void agruparSelecao()}><Group /></button>
-      <button type="button" className="bti" disabled={!algumGrupo} title="Desagrupar (Ctrl+Shift+G)" onClick={() => void desagruparSelecao()}><Ungroup /></button>
+      <button aria-label="Agrupar (Ctrl+G): escolhidas e movidas juntas" type="button" className="bti" disabled={validos.length < 2} title="Agrupar (Ctrl+G): escolhidas e movidas juntas" onClick={() => void agruparSelecao()}><Group /></button>
+      <button aria-label="Desagrupar (Ctrl+Shift+G)" type="button" className="bti" disabled={!algumGrupo} title="Desagrupar (Ctrl+Shift+G)" onClick={() => void desagruparSelecao()}><Ungroup /></button>
       {validos.length === 1 && camadas[validos[0]].tipo === 'texto' && (() => {
         const c = camadas[validos[0]];
         return (
-          <button type="button" className={`bti${c.caber ? ' ligado' : ''}`} title={c.caber ? 'Caber na caixa: ligado (o tamanho é o maior que cabe; clique para voltar ao tamanho fixo)' : 'Caber na caixa: o maior tamanho que cabe, igual na prévia, no PNG e no PDF'}
+          <button aria-label={c.caber ? 'Caber na caixa: ligado (o tamanho é o maior que cabe; clique para voltar ao tamanho fixo)' : 'Caber na caixa: o maior tamanho que cabe, igual na prévia, no PNG e no PDF'} type="button" className={`bti${c.caber ? ' ligado' : ''}`} title={c.caber ? 'Caber na caixa: ligado (o tamanho é o maior que cabe; clique para voltar ao tamanho fixo)' : 'Caber na caixa: o maior tamanho que cabe, igual na prévia, no PNG e no PDF'}
             onClick={() => void trocar(documento, `${base}/${validos[0]}/caber`, c.caber ? undefined : true, `${c.id}: ${c.caber ? 'tamanho fixo' : 'caber na caixa'}`)}>
             <ScanText />
           </button>
         );
       })()}
-      <button type="button" className={`bti${todasTravadas ? ' ligado' : ''}`} title={todasTravadas ? 'Destravar (Ctrl+Shift+L)' : 'Travar (Ctrl+Shift+L): não anda nem muda de tamanho, e a IA não mexe'}
+      <button aria-label={todasTravadas ? 'Destravar (Ctrl+Shift+L)' : 'Travar (Ctrl+Shift+L): não anda nem muda de tamanho, e a IA não mexe'} type="button" className={`bti${todasTravadas ? ' ligado' : ''}`} title={todasTravadas ? 'Destravar (Ctrl+Shift+L)' : 'Travar (Ctrl+Shift+L): não anda nem muda de tamanho, e a IA não mexe'}
         onClick={() => void alternarTravaSelecao()}>
         {todasTravadas ? <Lock /> : <LockOpen />}
       </button>

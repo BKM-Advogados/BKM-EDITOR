@@ -86,11 +86,11 @@ const ItemLegenda: React.FC<{documento: string; s: SegmentoLegenda; em: number; 
           </span>
         )}
         <span className="acoes-item">
-          <button className="bti" title="Juntar com a próxima" disabled={ultima} onClick={() => void juntarComProxima(documento, s.id)}><Combine /></button>
-          <button className="bti" title={cabeca > em && cabeca < sai ? 'Dividir na cabeça' : 'Dividir no meio'} onClick={() => void dividir(documento, s.id, cabeca > em && cabeca < sai ? cabeca - (em - s.em) : undefined)}>
+          <button aria-label="Juntar com a próxima" className="bti" title="Juntar com a próxima" disabled={ultima} onClick={() => void juntarComProxima(documento, s.id)}><Combine /></button>
+          <button aria-label={cabeca > em && cabeca < sai ? 'Dividir na cabeça' : 'Dividir no meio'} className="bti" title={cabeca > em && cabeca < sai ? 'Dividir na cabeça' : 'Dividir no meio'} onClick={() => void dividir(documento, s.id, cabeca > em && cabeca < sai ? cabeca - (em - s.em) : undefined)}>
             <Scissors />
           </button>
-          <button className="bti" title="Excluir esta legenda" onClick={() => void excluirSegmento(documento, s.id)}><Trash2 /></button>
+          <button aria-label="Excluir esta legenda" className="bti" title="Excluir esta legenda" onClick={() => void excluirSegmento(documento, s.id)}><Trash2 /></button>
         </span>
       </div>
     );
@@ -334,7 +334,7 @@ export const PainelLegendas: React.FC<{documento: string}> = ({documento}) => {
                   <span>Dicionário do vídeo (vale ao gerar de novo; as siglas da casa, como CLT e FGTS, já valem sempre):</span>
                   {leg!.dicionario!.map((e) => (
                     <span key={e.de} className="entrada">{e.de} → {e.para}
-                      <button className="bti" title="Tirar do dicionário" onClick={() => void tirarDoDicionario(documento, e.de)}><X /></button></span>
+                      <button aria-label="Tirar do dicionário" className="bti" title="Tirar do dicionário" onClick={() => void tirarDoDicionario(documento, e.de)}><X /></button></span>
                   ))}
                 </div>
               )}
