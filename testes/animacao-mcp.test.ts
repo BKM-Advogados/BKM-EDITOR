@@ -254,6 +254,17 @@ describe("Validação das ferramentas de Animação (M3, M5, M6, M7, M17)", () =
     expect(semKit.dado.avisos.join(" ")).toMatch(/não tem kit/);
   });
 
+  it("M8: pixelizar_imagem aceita JPG pelo ffmpeg do app e recusa o que não é imagem com erro claro", async () => {
+    const r = await chamar("pixelizar_imagem", {documento: docId, camada_id: pixelId, imagem_src: "midia/foto.jpg", colunas: 12, cores: 4});
+    expect(r.erro, String(r.dado)).toBe(false);
+    expect(r.dado.colunas).toBe(12);
+    expect(r.dado.linhas).toBe(Math.round(12 * 760 / 1080));
+    writeFileSync(path.join(pasta, "midia", "nada.png"), "isto não é uma imagem");
+    const ruim = await chamar("pixelizar_imagem", {documento: docId, camada_id: pixelId, imagem_src: "midia/nada.png"});
+    expect(ruim.erro).toBe(true);
+    expect(String(ruim.dado)).toMatch(/midia\/nada\.png: arquivo não é um PNG; o ffmpeg não conseguiu ler a imagem/);
+  });
+
   it("M17: id de camada repetido é recusado", async () => {
     const doc = JSON.parse(lerDoc(caminhoDoc()));
     const r0 = await chamar("ler_documento", {documento: docId});

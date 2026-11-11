@@ -10,7 +10,9 @@ import {
   type CamadaAnimacao, type Curva, type DocAnimacao, type PropriedadeAnimavel, type TipoCamadaAnimacao,
 } from "./animacao";
 import {gradeDeImagem, MAX_LADO_GRADE, type EfeitoPixel} from "./animacao-pixel";
-import {decodificarPng} from "./png";
+import {decodificarPng, ErroPng} from "./png";
+// o ffmpeg mora com o processo principal (o mesmo do render); o MCP só existe no processo principal e no stdio
+import {converterParaPng} from "../main/imagem-ffmpeg";
 
 const seguro = <A,>(f: (a: A) => unknown) => async (a: A) => {
   try {
@@ -38,6 +40,24 @@ const indiceUnico = (doc: DocAnimacao, documento: string, id: string) => {
   if (!achados.length) throw new ErroProjeto(`camada ${id} não encontrada no documento ${documento}`, "nao_achado");
   if (achados.length > 1) throw new ErroProjeto(`o id ${id} está em ${achados.length} camadas (${achados.map((i) => `/camadas/${i}`).join(", ")}): dê um id único a cada uma com aplicar_patch`, "patch");
   return achados[0];
+};
+
+/** Imagem do projeto em RGBA. PNG que o decodificador lê vai direto; o resto (JPG, PNG entrelaçado, de 16 bits ou grande
+ *  demais) passa pelo ffmpeg, que converte e reduz. Sem ffmpeg, o erro diz o que fazer. */
+const lerImagem = async (abs: string, rel: string) => {
+  const buffer = readFileSync(abs);
+  try {
+    return decodificarPng(buffer);
+  } catch (e) {
+    if (!(e instanceof ErroPng) || !e.convertivel) throw new ErroProjeto(`${rel}: ${e instanceof Error ? e.message : String(e)}`, "patch");
+    let png: Buffer;
+    try {
+      png = await converterParaPng(abs);
+    } catch (falha) {
+      throw new ErroProjeto(`${rel}: ${e.message}; ${(falha as Error).message}`, "patch");
+    }
+    return decodificarPng(png);
+  }
 };
 
 /** A grade volta inteira na resposta só até este tamanho; acima, a resposta passaria de dezenas de KB. */
@@ -180,17 +200,17 @@ export const registrarFerramentasAnimacao = (
   }));
 
   servidor.registerTool("pixelizar_imagem", {
-    description: `Converte uma imagem PNG do projeto (em midia/, até 4096 px de lado) numa grade de pixel art para a camada pixel indicada. Sem "linhas", segue a proporção da imagem (até ${MAX_LADO_GRADE}). A grade volta inteira só até 32x32; acima disso, a resposta traz a paleta (veja a grade com ler_documento).`,
+    description: `Converte uma imagem do projeto (em midia/: PNG, ou JPG e outros formatos que o ffmpeg do app converte) numa grade de pixel art para a camada pixel indicada. Sem "linhas", segue a proporção da imagem (até ${MAX_LADO_GRADE}). A grade volta inteira só até 32x32; acima disso, a resposta traz a paleta (veja a grade com ler_documento).`,
     inputSchema: {
       documento: z.string(),
       camada_id: z.string(),
-      imagem_src: z.string().describe("caminho da imagem no projeto, ex: midia/foto.png"),
+      imagem_src: z.string().describe("caminho da imagem no projeto, ex: midia/logo.png ou midia/foto.jpg"),
       colunas: z.number().int().min(1).max(MAX_LADO_GRADE).optional(),
       linhas: z.number().int().min(1).max(MAX_LADO_GRADE).optional(),
       cores: z.number().int().min(2).max(62).optional(),
       usar_paleta_marca: z.boolean().optional(),
     },
-  }, seguro(({documento, camada_id, imagem_src, colunas, linhas, cores, usar_paleta_marca}: {
+  }, seguro(async ({documento, camada_id, imagem_src, colunas, linhas, cores, usar_paleta_marca}: {
     documento: string; camada_id: string; imagem_src: string; colunas?: number; linhas?: number;
     cores?: number; usar_paleta_marca?: boolean;
   }) => {
@@ -199,9 +219,7 @@ export const registrarFerramentasAnimacao = (
     if (doc.camadas[idx].tipo !== "pixel") throw new ErroProjeto(`${camada_id} é ${doc.camadas[idx].tipo}: pixelizar_imagem é da camada pixel`, "patch");
     const avisos: string[] = [];
 
-    const abs = projeto.caminho(imagem_src);
-    const buffer = readFileSync(abs);
-    const dadosImg = decodificarPng(buffer);
+    const dadosImg = await lerImagem(projeto.caminho(imagem_src), imagem_src);
 
     let paletaAlvo: string[] | undefined;
     if (usar_paleta_marca && doc.tema) {
