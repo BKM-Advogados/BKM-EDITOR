@@ -108,9 +108,9 @@
 .barra .salvo.gravando svg { color: var(--texto-3); animation: girar-salvo 1s linear infinite; }
 .barra .salvo.falhou, .barra .salvo.falhou svg { color: var(--erro); }
 @keyframes girar-salvo { to { transform: rotate(360deg); } }
-.barra .acoes .bt.exportar { background: var(--fundo-3); color: var(--texto); margin-left: 6px; padding: 0 10px; }
-.barra .acoes .bt.exportar:hover { background: var(--fundo-4); }
+.barra .acoes .bt.exportar { margin-left: 6px; padding: 0 12px; } /* a única ação azul da barra */
 .barra .acoes .bt.exportar:disabled { opacity: 0.45; }
+.barra .acoes .bti { width: 30px; height: 28px; }
 .menu-app .menu-rotulo { display: flex; align-items: center; gap: 8px; padding: 6px 8px 2px; font: 600 var(--tam-2) var(--fonte);
   color: var(--texto-2); }
 .menu-app .menu-rotulo svg { color: var(--texto-3); }

@@ -8,14 +8,34 @@ Nome provisório. Pasta: `C:\Users\usuario\projetos\estudio` (fora do OneDrive, 
 Repositório: `BKM-Advogados/BKM-EDITOR` (privado). Versões: V1 = tag `v1.0.0` (pacote 0.1.0), V2 = `v2.0.0` (0.2.0),
 V3 = `v3.0.0` (pacote 1.0.0). No Linux a pasta é `~/Projects/estudio`.
 
+## Notas desta versão: visual neutro (10/11/2026)
+
+- **Atalhos das áreas mudaram.** A ordem das áreas segue o uso: **1 Vídeo, 2 Imagem, 3 Animação, 4 Música, 5 Efeitos,
+  6 3D** (as teclas 1 a 6 e Alt+1 a 6 seguem esta ordem; antes eram Vídeo, Imagem, 3D, Efeitos, Música, Animação).
+  Novos: **Ctrl+\\** foca no monitor (esconde os outros painéis; de novo, volta), **Shift+D** segurado mostra o antes dos
+  efeitos.
+- **Visual neutro:** grafite de croma zero, um acento azul (`#70B8FF`) para seleção, foco e a ação principal, e o violeta
+  só para o que o Claude fez. Nenhuma cor de cliente na interface nem nos padrões (efeito Tom e pré-ajuste Quente em
+  âmbar neutro, objeto 3D novo em cinza). O único kit de fábrica é o **Neutro** (destaque branco, marcado pelo peso);
+  kits que já estão na pasta da pessoa continuam funcionando.
+- **Preferências › Aparência:** tema escuro (padrão), claro ou o do sistema, alto contraste, densidade, tamanho da
+  interface (90 a 150%) e reduzir movimento. Os tokens ficam num arquivo só (`src/renderer/estilo/tokens.ts`).
+- **O que o Claude mudou aparece no lugar** por 30 s: contorno violeta no monitor, barra na lista e na linha do tempo,
+  "era X" no inspetor, aviso com Ver e Desfazer; o Histórico agrupa por rodada, com o antes → depois de cada campo.
+- **Tela inicial** com o pedido ao Claude no alto e os tipos de peça (inclui Música) no mesmo peso; **Exportar** com
+  destinos em cartões e o verbo exato no botão; **Música** com cor por canal e mixer com fader; **Animação** no sistema
+  das outras áreas, com seletor de documento, pré-ajustes de entrada e saída, modo animar e editor de pixel grande;
+  **Efeitos** com amostra de cada pré-ajuste; controles próprios no lugar de select e caixa de marcar nativos.
+- Detalhes e decisões em `docs/tela.md` (seções 6 e 7).
+
 ## Novidades da V3 (pacote 1.0.0, 10/11/2026)
 
 - **Linux (Omarchy/Hyprland):** roda e se instala no lançador de aplicativos com `bash scripts/instalar-linux.sh`; em
   gerenciador em mosaico a janela vem sem os botões sobrepostos. Detalhes em `STACKS.md`.
-- **Música (área 5, `docs/musica.md`):** bateria e sintetizadores da casa, passos e piano roll, arranjo com seções e
+- **Música (área 4, `docs/musica.md`):** bateria e sintetizadores da casa, passos e piano roll, arranjo com seções e
   acordes, mixer com delay, reverb, limitador e presets, sidechain, automação de volume desenhada no arranjo, pintar
   clipes, exportar WAV, M4A, Opus, MIDI e stems no alvo de loudness, e ida e volta com o vídeo de cenas.
-- **Animação (área 6, `docs/animacao.md`):** formas, texto, imagem e camada de pixel com quadros-chave e curvas (a cor
+- **Animação (área 3, `docs/animacao.md`):** formas, texto, imagem e camada de pixel com quadros-chave e curvas (a cor
   interpola em OKLab), revelações do pixel (aleatório, decodificar, varredura, do meio, chuva), editor de pixel,
   exportação MP4 e ferramentas para o Claude; modelo "Logo em pixels".
 - **Rodada 3 integrada:** painel Mídia, instância única e gravação segura (Casca); três vias de conversa, cofre de chaves
@@ -67,7 +87,7 @@ O app abre na **tela inicial**:
 - Na primeira vez, a faixa "Antes de começar" mostra o estado do Claude, a pasta dos projetos, o perfil da máquina e
   avisa se falta o Git.
 
-No editor, o menu do ícone tem Novo projeto (Ctrl+N), Novo neste projeto (vídeo, imagem, 3D), Abrir (Ctrl+O), Abrir
+No editor, o menu do ícone tem Novo projeto (Ctrl+N), Novo neste projeto (vídeo, imagem, animação, música, 3D), Abrir (Ctrl+O), Abrir
 recente, Duplicar projeto, Mostrar na pasta, Marcar ponto de restauração (Ctrl+S), Marca, Preferências e Fechar projeto
 (Ctrl+W, volta à tela inicial). O nome do projeto na barra renomeia com um clique; "Salvo" lembra que tudo grava na
 hora. **Exportar** (Ctrl+Shift+E) abre o diálogo de exportação do documento da área (abaixo). O projeto reabre na área, no
@@ -145,7 +165,8 @@ Em todas as áreas:
 - **Ctrl+Z** desfaz só as edições da pessoa; **Ctrl+S** marca um ponto de restauração no git do projeto.
 - **Claude:** conversas e terminais em abas; a conversa pode hibernar e retomar (`--resume`). O limite de sessões
   vivas vem da RAM (2 com 8 GB, 4 com 16 GB, 8 acima).
-- **Atalhos:** Alt+1…4 troca de área, Ctrl+' vai à conversa, Espaço/J/K/L e ←/→ no vídeo, M comenta, V seleciona.
+- **Atalhos:** 1…6 ou Alt+1…6 troca de área (Vídeo, Imagem, Animação, Música, Efeitos, 3D), Ctrl+' vai à conversa,
+  Ctrl+\\ foca no monitor, Espaço/J/K/L e ←/→ no vídeo, M comenta, V seleciona.
 
 O agente recebe: `projeto_info`, `estado_do_editor`, `ler_documento`, `aplicar_patch` (com `versao_base` e `test`),
 `criar_documento`, `renomear_projeto`, `listar_comentarios`, `ler_comentario`, `responder_comentario`,

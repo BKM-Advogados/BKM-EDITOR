@@ -44,13 +44,14 @@ const Terminal = React.lazy(() => import('../paineis/Terminal').then((m) => ({de
 const carregar3d = () => import('../modulos/tres/paineis').then((m) => m.PaineisTres);
 let Paineis3d: PaineisDoModulo | null = null;
 
-const AREAS: {id: Area; nome: string; icone: React.ReactNode; atalho: string}[] = [
+// na ordem de uso (as menos usadas, Efeitos e 3D, no fim); as teclas 1 a 6 (e Alt+1 a 6) seguem esta ordem
+export const AREAS: {id: Area; nome: string; icone: React.ReactNode; atalho: string}[] = [
   {id: 'video', nome: 'Vídeo', icone: <Film size={15} />, atalho: '1'},
   {id: 'imagem', nome: 'Imagem', icone: <ImageIcon size={15} />, atalho: '2'},
-  {id: '3d', nome: '3D', icone: <Box size={15} />, atalho: '3'},
-  {id: 'efeitos', nome: 'Efeitos', icone: <Blend size={15} />, atalho: '4'},
-  {id: 'musica', nome: 'Música', icone: <Music size={15} />, atalho: '5'}, // frente Música
-  {id: 'animacao', nome: 'Animação', icone: <Sparkles size={15} />, atalho: '6'},
+  {id: 'animacao', nome: 'Animação', icone: <Sparkles size={15} />, atalho: '3'},
+  {id: 'musica', nome: 'Música', icone: <Music size={15} />, atalho: '4'}, // frente Música
+  {id: 'efeitos', nome: 'Efeitos', icone: <Blend size={15} />, atalho: '5'},
+  {id: '3d', nome: '3D', icone: <Box size={15} />, atalho: '6'},
 ];
 
 const Carregando: React.FC = () => <div className="vazio">carregando…</div>;
@@ -407,8 +408,9 @@ export const Casca: React.FC = () => {
               <span className="menu-linha">
                 <button onClick={() => novoDocumento('video')}><Film size={13} />Vídeo</button>
                 <button onClick={() => novoDocumento('imagem')}><ImageIcon size={13} />Imagem</button>
-                <button onClick={() => novoDocumento('3d')}><Box size={13} />3D</button>
                 <button onClick={() => novoDocumento('animacao')}><Sparkles size={13} />Animação</button>
+                <button onClick={() => (setMenu(false), loja.definir({area: 'musica'}))} title="Abre a área Música, com os modelos (Batida, Trilha…)"><Music size={13} />Música</button>
+                <button onClick={() => novoDocumento('3d')}><Box size={13} />3D</button>
               </span>
             </div>
             <hr />
@@ -447,13 +449,14 @@ export const Casca: React.FC = () => {
           ))}
         </nav>
         <div className="acoes">
-          <button className={`bt fantasma${modoComentario ? ' ligado' : ''}`} onClick={() => loja.definir((s) => ({modoComentario: !s.modoComentario}))} title="Comentar na tela (M)">
-            <MessageSquarePlus size={15} />Comentar<kbd>M</kbd>
+          <button className={`bti${modoComentario ? ' ligado' : ''}`} onClick={() => loja.definir((s) => ({modoComentario: !s.modoComentario}))} title="Comentar na tela (M)"
+            aria-label="Comentar na tela" aria-pressed={modoComentario}>
+            <MessageSquarePlus size={15} />
           </button>
-          <button className={`bt fantasma${focado ? ' ligado' : ''}`} onClick={alternarFoco} title={focado ? 'Mostrar os painéis de novo (Ctrl+\\)' : 'Focar no monitor: esconde os outros painéis (Ctrl+\\)'}
+          <button className={`bti${focado ? ' ligado' : ''}`} onClick={alternarFoco} title={focado ? 'Mostrar os painéis de novo (Ctrl+\\)' : 'Focar no monitor: esconde os outros painéis (Ctrl+\\)'}
             aria-label={focado ? 'Mostrar os painéis' : 'Focar no monitor'} aria-pressed={focado}>{focado ? <Minimize2 size={15} /> : <Maximize2 size={15} />}</button>
-          <button className="bt fantasma" onClick={() => void desfazer()} title="Desfazer a sua última edição (Ctrl+Z)" aria-label="Desfazer"><Undo2 size={15} /></button>
-          <button className="bt exportar" disabled={!podeExportar} onClick={exportarArea}
+          <button className="bti" onClick={() => void desfazer()} title="Desfazer a sua última edição (Ctrl+Z)" aria-label="Desfazer"><Undo2 size={15} /></button>
+          <button className="bt principal exportar" disabled={!podeExportar} onClick={exportarArea}
             title={podeExportar ? (docAtivo!.modulo === 'musica' ? 'Exportar a música em WAV para a pasta saidas (M4A, Opus, MIDI e stems: botão Exportar do transporte) (Ctrl+Shift+E)'
               : `Exportar ${docAtivo!.modulo === 'video' ? 'o vídeo' : docAtivo!.modulo === 'animacao' ? 'a animação' : 'a imagem'} para a pasta saidas… (Ctrl+Shift+E)`)
             : area === '3d' ? 'A cena 3D ainda não exporta' : 'Nada para exportar nesta área'}>
