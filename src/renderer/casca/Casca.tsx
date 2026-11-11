@@ -451,7 +451,7 @@ export const Casca: React.FC = () => {
   const podeExportar = Boolean(docAtivo && docAtivo.modulo !== '3d');
 
   return (
-    <div className="casca">
+    <div className={`casca${modoComentario ? ' modo-comentario' : ''}`}>
       <header className="barra">
         <button className="marca" onPointerDown={(e) => e.stopPropagation()} onClick={() => setMenu((m) => !m)} title="Menu do Estúdio">
           <IconeEstudio />

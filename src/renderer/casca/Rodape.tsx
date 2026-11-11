@@ -20,6 +20,7 @@ export const Rodape: React.FC = () => {
   const area = useLoja((e) => e.area);
   const info = useLoja((e) => e.info);
   const abertos = useLoja((e) => e.comentarios.filter((c) => c.estado === 'aberto').length);
+  const modoComentario = useLoja((e) => e.modoComentario);
   const [memoria, setMemoria] = useState<number | null>(null);
   const [, tique] = useState(0);
   useEffect(() => {
@@ -40,8 +41,9 @@ export const Rodape: React.FC = () => {
   const icone = avisoVivo?.tipo === 'erro' ? <CircleAlert /> : avisoVivo?.tipo === 'ok' ? <CircleCheck /> : <Info />;
   return (
     <footer className="rodape">
+      {modoComentario && <span className="modo-cmt" role="status"><span className="ponto-c" />Modo comentário · clique na peça para comentar · <kbd>Esc</kbd> sai</span>}
       {avisoVivo ? (
-        <span className={`aviso ${avisoVivo.tipo}`} title={avisoVivo.texto}>{icone}{avisoVivo.texto}</span>
+        <span className={`aviso ${avisoVivo.tipo}`} title={avisoVivo.texto} role="status" aria-live="polite">{icone}{avisoVivo.texto}</span>
       ) : (
         <span className="dicas">
           {DICAS[area].map(([teclas, o]) => <span key={o}>{teclas.map((t) => <kbd key={t}>{t}</kbd>)} {o}</span>)}

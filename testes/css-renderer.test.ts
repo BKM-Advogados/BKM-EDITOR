@@ -114,3 +114,14 @@ describe('abas do grupo do inspetor', () => {
     expect(tsx).not.toMatch(/pesquisa: <Quote/);
   });
 });
+
+describe('modo comentário', () => {
+  it('o monitor ganha a borda âmbar e o cursor de pino, e o rodapé diz como sair', () => {
+    const estilo = fs.readFileSync(path.join(RAIZ, 'estilo.css'), 'utf8');
+    expect(estilo).toMatch(/\.casca\.modo-comentario \.monitor \{ box-shadow: inset 0 0 0 2px var\(--comentario\); \}/);
+    expect(estilo).toMatch(/\.casca\.modo-comentario \.monitor[^{]*\{\s*cursor: url\(/);
+    const rodape = fs.readFileSync(path.join(RAIZ, 'casca', 'Rodape.tsx'), 'utf8');
+    expect(rodape).toContain('Modo comentário');
+    expect(rodape).toContain('<kbd>Esc</kbd> sai');
+  });
+});
