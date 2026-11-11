@@ -270,7 +270,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
     /* pasta ilegível agora: a lista de fábrica serve */
   }
   servidor.registerTool('aplicar_marca', {
-    description: `Aplica um kit de marca a um documento. No vídeo de cenas troca o "tema" inteiro (cores, fonte, logo copiado para midia/, assinatura e fontes próprias copiadas para fontes/); na imagem passa cada cor e fonte para o mesmo papel no kit novo (o que a pessoa escolheu à mão fica) e guarda o kit em "marca" (veja ver_marca). Kits: ${ids.join(', ')} (a pessoa cria outros no app, em menu → Marca…). Sem "documento", vai no que a pessoa está vendo.`,
+    description: `Aplica um kit de marca a um documento. No vídeo de cenas troca o "tema" inteiro (cores, fonte, logo copiado para midia/, assinatura e fontes próprias copiadas para fontes/); na imagem passa cada cor e fonte para o mesmo papel no kit novo (o que a pessoa escolheu à mão fica) e guarda o kit em "marca" (veja ver_marca); na animação troca o "tema", que resolve @fundo, @texto, @destaque e @suave (e pixelizar_imagem {usar_paleta_marca} usa essas cores). 3D e música não recebem kit. Kits: ${ids.join(', ')} (a pessoa cria outros no app, em menu → Marca…). Sem "documento", vai no que a pessoa está vendo.`,
     inputSchema: {id: z.string().describe('id do kit, ex.: bkm'), documento: z.string().optional().describe('id do documento no manifesto')},
   }, seguro(({id, documento}: {id: string; documento?: string}) => {
     const alvo = documento ?? projeto.estado()?.documento ?? projeto.manifesto().documentos[0]?.id;

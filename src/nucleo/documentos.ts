@@ -3,7 +3,7 @@
 import type {DocCenas} from './cenas';
 import type {Efeito} from './efeitos';
 import type {Roteiro} from './roteiro/resolver';
-import type {DocAnimacao} from './animacao';
+import {ehDocAnimacao, type DocAnimacao} from './animacao';
 import type {DocMusica} from './musica'; // frente Música
 
 export type Modulo = 'video' | 'imagem' | '3d' | 'musica' | 'animacao';
@@ -196,4 +196,11 @@ export type EstadoEditor = {
   pagina?: string; // imagem com várias páginas: caminho da página ativa, ex.: /paginas/2
   atualizado_em: string;
   selecao_varias?: string[]; // imagem (B2, rodada 3): todos os caminhos da seleção múltipla, o principal primeiro
+};
+
+/** Documento de imagem (prancheta ou páginas). A animação também tem `camadas` e `largura`, mas não é imagem: as
+ *  ferramentas e o kit da imagem gravariam nela campos que ela não lê. */
+export const ehDocImagem = (doc: unknown): doc is DocImagem => {
+  const d = doc as Partial<DocImagem> | null;
+  return Boolean(d) && typeof d === 'object' && !ehDocAnimacao(d) && (Array.isArray(d!.camadas) || Array.isArray(d!.paginas)) && typeof d!.largura === 'number';
 };
