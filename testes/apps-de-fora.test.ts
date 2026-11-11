@@ -47,13 +47,14 @@ afterAll(async () => {
   rmSync(dados, {recursive: true, force: true, maxRetries: 10, retryDelay: 100});
 });
 
-const pedirCru = (headers: Record<string, string>) => new Promise<number>((ok) => {
-  const r = http.request({host: '127.0.0.1', port: porta, path: '/mcp', method: 'POST', agent: false, headers: {'Content-Type': 'application/json', ...headers}}, (res) => {
+const pedirCru = (headers: Record<string, string>, corpo?: string, p = porta) => new Promise<number>((ok) => {
+  const r = http.request({host: '127.0.0.1', port: p, path: '/mcp', method: 'POST', agent: false, headers: {'Content-Type': 'application/json', ...headers}}, (res) => {
     res.resume();
     ok(res.statusCode ?? 0);
   });
   r.on('error', () => ok(-1));
-  r.end(JSON.stringify({jsonrpc: '2.0', id: 1, method: 'tools/list'}));
+  r.setTimeout(3000, () => (r.destroy(), ok(-2)));
+  r.end(corpo ?? JSON.stringify({jsonrpc: '2.0', id: 1, method: 'tools/list'}));
 });
 
 type Res = {isError?: boolean; content: {type: string; text: string}[]};
@@ -119,6 +120,31 @@ describe('apps de IA de fora', () => {
     expect(await pedirCru({Authorization: auth, Accept: 'application/json, text/event-stream'})).toBe(401);
     expect(() => reaberto.configs(id)).toThrow(/não achado/);
     await reaberto.fechar();
+  });
+
+  it('na porta fixa, JSON inválido recebe 400 na hora e falha do MCP vira 500, sem rejeição solta', async () => {
+    const soltas: unknown[] = [];
+    const pegar = (e: unknown) => soltas.push(e);
+    process.on('unhandledRejection', pegar);
+    try {
+      await apps.ligar(true, porta);
+      const {configs} = apps.novo('Cliente torto');
+      const auth = JSON.parse(configs.http).mcpServers.estudio.headers.Authorization;
+      const inicio = Date.now();
+      expect(await pedirCru({Authorization: auth}, '{"jsonrpc":')).toBe(400);
+      expect(Date.now() - inicio).toBeLessThan(1000);
+      const p = await portaLivre();
+      const quebrado = new AppsDeFora({pasta: mkdtempSync(path.join(tmpdir(), 'estudio-apps-4-')), cofre: new CofreMemoria(),
+        mcp: () => ({atender: () => Promise.reject(new Error('projeto falhou')), registrarFixo: () => {}, esquecerFixo: () => {}}),
+        ponte: () => ({exe: 'x', script: 'y'})});
+      await quebrado.ligar(true, p);
+      expect(await pedirCru({}, undefined, p)).toBe(500);
+      await quebrado.fechar();
+      await new Promise((ok) => setTimeout(ok, 50));
+      expect(soltas).toEqual([]);
+    } finally {
+      process.off('unhandledRejection', pegar);
+    }
   });
 
   it('porta ocupada vira aviso em português, sem derrubar o app', async () => {

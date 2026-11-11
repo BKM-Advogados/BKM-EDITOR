@@ -57,3 +57,66 @@ describe('MCP por HTTP', () => {
     await c.close();
   });
 });
+
+// corpo cru por http.request; cortes: posições em que o corpo é partido em write() separados
+const postar = (headers: Record<string, string>, corpo: Buffer | string, cortes: number[] = []) => new Promise<{status: number; texto: string}>((ok) => {
+  const r = http.request(`${origem}/mcp`, {method: 'POST', agent: false,
+    headers: {'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', ...headers}}, (res) => {
+    const pedacos: Buffer[] = [];
+    res.on('data', (d: Buffer) => pedacos.push(d));
+    res.on('end', () => ok({status: res.statusCode ?? 0, texto: Buffer.concat(pedacos).toString('utf-8')}));
+  });
+  r.on('error', (e) => ok({status: -1, texto: String(e)}));
+  r.setTimeout(3000, () => (r.destroy(), ok({status: -2, texto: 'sem resposta'})));
+  const b = Buffer.isBuffer(corpo) ? corpo : Buffer.from(corpo);
+  let i = 0;
+  const mandar = () => {
+    const n = cortes.shift();
+    if (n === undefined) return void r.end(b.subarray(i));
+    r.write(b.subarray(i, n));
+    i = n;
+    setTimeout(mandar, 30);
+  };
+  mandar();
+});
+
+describe('MCP por HTTP: o corpo do pedido', () => {
+  const chamada = (id: number, name: string, args: Record<string, unknown>) => JSON.stringify({jsonrpc: '2.0', id, method: 'tools/call', params: {name, arguments: args}});
+  const resultado = (texto: string) => JSON.parse(JSON.parse(texto).result.content[0].text);
+  let headers: Record<string, string> = {};
+  const versao = async () => resultado((await postar(headers, chamada(1, 'ler_documento', {documento: 'cena3d', caminho: '/objetos/0'}))).texto).versao as string;
+  const nomeGravado = () => JSON.parse(readFileSync(path.join(pasta, '3d', 'cena.json'), 'utf-8')).objetos[0].nome as string;
+
+  beforeAll(() => {
+    headers = JSON.parse(readFileSync(mcp.novaAba(origem, 'Claude corpo'), 'utf-8')).mcpServers.estudio.headers;
+  });
+
+  it('um "ç" partido entre dois pedaços chega inteiro ao documento', async () => {
+    const valor = 'ação '.repeat(20);
+    const b = Buffer.from(chamada(2, 'aplicar_patch', {documento: 'cena3d', versao_base: await versao(), patch: [{op: 'replace', path: '/objetos/0/nome', value: valor}]}));
+    const r = await postar(headers, b, [b.indexOf(Buffer.from('ç')) + 1]); // entre 0xC3 e 0xA7
+    expect(r.status).toBe(200);
+    expect(nomeGravado()).toBe(valor);
+  });
+
+  it('um pedido único de 512 KB em português grava sem U+FFFD', async () => {
+    const valor = 'ação€ '.repeat(512 * 1024 / 10);
+    const r = await postar(headers, chamada(3, 'aplicar_patch', {documento: 'cena3d', versao_base: await versao(), patch: [{op: 'replace', path: '/objetos/0/nome', value: valor}]}));
+    expect(r.status).toBe(200);
+    const gravado = nomeGravado();
+    expect(gravado.includes('\uFFFD')).toBe(false);
+    expect(gravado).toBe(valor);
+  });
+
+  it('JSON inválido recebe 400 com o erro de parse do JSON-RPC', async () => {
+    const r = await postar(headers, '{"jsonrpc":');
+    expect(r.status).toBe(400);
+    expect(JSON.parse(r.texto)).toMatchObject({jsonrpc: '2.0', id: null, error: {code: -32700}});
+  });
+
+  it('corpo acima do teto recebe 413 sem ser lido', async () => {
+    const {TETO_CORPO} = await import('../src/main/mcp-http');
+    const r = await postar({...headers, 'Content-Length': String(TETO_CORPO + 1)}, '{');
+    expect(r.status).toBe(413);
+  });
+});
