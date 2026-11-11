@@ -25,7 +25,7 @@ export const acharFfmpeg = (): string | null => {
   const candidatos = [
     recursos && path.join(recursos, 'app.asar.unpacked', 'node_modules', pacote, exe),
     aqui && path.resolve(aqui, '..', 'node_modules', pacote, exe), // dist-mcp/ → raiz
-    aqui && path.resolve(aqui, '..', '..', 'node_modules', pacote, exe), // .vite/app/ ou src/main/ → raiz
+    aqui && path.resolve(aqui, '..', '..', 'node_modules', pacote, exe), // .vite/app/ ou src/nucleo/ → raiz
   ].filter((c): c is string => Boolean(c));
   for (const base of [aqui, process.cwd()]) {
     if (!base) continue;

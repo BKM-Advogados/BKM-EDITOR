@@ -4,7 +4,7 @@ import path from "node:path";
 import {ensureBrowser} from "@remotion/renderer";
 import {MakerZIP} from "@electron-forge/maker-zip";
 import {VitePlugin} from "@electron-forge/plugin-vite";
-import {getCompositorPackage} from "./src/main/compositor-package";
+import {getCompositorPackage} from "./src/nucleo/compositor-package";
 import {getPackagedBrowserPaths} from "./src/main/packaged-browser";
 import {empacotarComposicoes, PASTA_PACOTE} from "./src/main/exportar";
 

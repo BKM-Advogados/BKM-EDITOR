@@ -4,7 +4,7 @@
 import path from 'node:path';
 import {describe, expect, it} from 'vitest';
 import {decodificarPng, ErroPng} from '../src/nucleo/png';
-import {acharFfmpeg, converterParaPng, LADO_CONVERTIDO} from '../src/main/imagem-ffmpeg';
+import {acharFfmpeg, converterParaPng, LADO_CONVERTIDO} from '../src/nucleo/imagem-ffmpeg';
 import {chunk, ihdr, png8, pngEntrelacado, pngIndexado, pngSoCabecalho, tRNS16} from './apoio/png-teste';
 import {deflateSync} from 'node:zlib';
 

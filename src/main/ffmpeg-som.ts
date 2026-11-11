@@ -7,7 +7,7 @@ import {spawn} from 'node:child_process';
 import {existsSync} from 'node:fs';
 import path from 'node:path';
 import type {CancelSignal} from '@remotion/renderer';
-import {getCompositorPackage} from './compositor-package';
+import {getCompositorPackage} from '../nucleo/compositor-package';
 
 /** Pasta do ffmpeg: a do render quando vem (app empacotado: app.asar.unpacked), senão a do node_modules. */
 export const pastaDoFfmpeg = (binariesDirectory?: string | null) => {

@@ -11,7 +11,7 @@ import {rm, statfs} from 'node:fs/promises';
 import type {CancelSignal, HeadlessBrowser} from '@remotion/renderer';
 import type {Progresso} from '../compartilhado/api';
 import {espacoNecessario, formatarBytes} from '../nucleo/exportacao';
-import {getCompositorPackage} from './compositor-package';
+import {getCompositorPackage} from '../nucleo/compositor-package';
 import {getPackagedBrowserPaths} from './packaged-browser';
 
 export const PASTA_PACOTE = 'remotion-bundle';

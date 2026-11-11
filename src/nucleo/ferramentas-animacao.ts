@@ -12,7 +12,7 @@ import {
 import {COBERTURA_MIN_PADRAO, gradeDeImagem, MAX_LADO_GRADE, type EfeitoPixel} from "./animacao-pixel";
 import {decodificarPng, ErroPng} from "./png";
 // o ffmpeg mora com o processo principal (o mesmo do render); o MCP só existe no processo principal e no stdio
-import {converterParaPng} from "../main/imagem-ffmpeg";
+import {converterParaPng} from "./imagem-ffmpeg";
 
 const seguro = <A,>(f: (a: A) => unknown) => async (a: A) => {
   try {

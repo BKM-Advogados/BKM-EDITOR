@@ -20,7 +20,7 @@ import {CANAL, type EstadoTranscricao, type PedidoEmenda, type PedidoTranscricao
 import {arquivoDasPalavras, conferirFala, fonteDaFala, palavrasValidas, recusaDoDestinoNoProjeto, VERSAO_PALAVRAS, type EstadoDaFala, type FonteDaFala, type PalavrasGravadas} from '../nucleo/legendas';
 import type {Palavra} from '../nucleo/roteiro/resolver';
 import {ErroProjeto, type Projeto} from '../nucleo/projeto';
-import {getCompositorPackage} from './compositor-package';
+import {getCompositorPackage} from '../nucleo/compositor-package';
 
 // ---------- o que baixa: versões presas, com tamanho e SHA-256 ----------
 // whisper.cpp v1.9.5 (MIT), build b5454 (06/10/2026), a mesma do commit d1be6fd da tag. O SHA-256 é o que o GitHub
