@@ -30,7 +30,8 @@ import {appAberto, encaminharAoApp, novaConversaIde, PRAZO_DO_APP_MS, type Desti
 import {INSTRUCOES_MCP} from './mcp-ia';
 import {ESPERA_DO_CARTAO_MS, type Portao} from './portao';
 import {modelosDaPessoa} from './mcp-modelos';
-import {PastaModelos} from './pasta-modelos';
+import {pastaPadraoModelos, PastaModelos} from './pasta-modelos';
+import {pastaDasPreferencias} from './preferencias-arquivo';
 import {ehTrocaDeProjeto, registrarTrocaDeProjeto, trocadorSemApp} from './mcp-projeto'; // frente 2
 import {Projeto} from './projeto';
 
@@ -69,7 +70,8 @@ export type OpcoesDesktop = {
   encaminhar?: typeof encaminharAoApp;
   appDoProjeto?: typeof appAberto;
   prazo?: number;
-  /** A pasta de modelos da pessoa (listar_modelos sem projeto e criar_projeto com modelo_proprio); padrão: a das preferências. */
+  /** A pasta de modelos (listar_modelos sem projeto e criar_projeto com modelo_proprio); padrão: a pasta_modelos das preferências
+   *  do app (em `dados`), e sem ela ESTUDIO_MODELOS ou ~/Estudio/meus-modelos. */
   modelos?: PastaModelos;
 };
 
@@ -168,7 +170,7 @@ export const criarServidorDesktop = (o: OpcoesDesktop) => {
     return m.result ?? texto('o Estúdio respondeu sem resultado', true);
   };
 
-  const modelos = o.modelos ?? new PastaModelos();
+  const modelos = o.modelos ?? new PastaModelos({pasta: () => pastaDasPreferencias(o.dados, 'pasta_modelos') ?? pastaPadraoModelos()});
   const listar = () => listarProjetos({dados: o.dados, pastas: o.pastas});
 
   // frente 2: trocar de projeto com o app fechado, aqui mesmo (mcp-projeto.ts)

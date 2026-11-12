@@ -7,6 +7,7 @@
 import {existsSync, readdirSync, readFileSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {pastaDasPreferencias} from './preferencias-arquivo';
 
 export type Sistema = {plataforma: NodeJS.Platform | string; env: Record<string, string | undefined>; home: string};
 
@@ -217,16 +218,6 @@ const mesmaPasta = (a: string, b: string, plataforma = process.platform) => {
   return plataforma === 'win32' ? n(a).toLowerCase() === n(b).toLowerCase() : n(a) === n(b);
 };
 
-/** A pasta dos projetos escolhida nas preferências do app (pasta_projetos), se houver. */
-const pastaDasPreferencias = (dados: string) => {
-  try {
-    const p = JSON.parse(readFileSync(path.join(dados, 'preferencias.json'), 'utf-8')) as {pasta_projetos?: unknown};
-    return typeof p.pasta_projetos === 'string' && p.pasta_projetos ? p.pasta_projetos : null;
-  } catch {
-    return null;
-  }
-};
-
 /** Os recentes do app (recentes.json, o mais novo primeiro) e as subpastas com estudio.json da pasta dos projetos (a das
  *  preferências e ~/Estudio), sem repetir e só os que ainda existem. Roda neste sistema: lê o disco de verdade. */
 export const listarProjetos = (o: {dados: string; pastas: string[]}): ProjetoListado[] => {
@@ -242,7 +233,7 @@ export const listarProjetos = (o: {dados: string; pastas: string[]}): ProjetoLis
   } catch {
     /* sem recentes */
   }
-  const pastas = [pastaDasPreferencias(o.dados), ...o.pastas].filter((p): p is string => Boolean(p));
+  const pastas = [pastaDasPreferencias(o.dados, 'pasta_projetos'), ...o.pastas].filter((p): p is string => Boolean(p));
   for (const base of pastas) {
     let nomes: string[] = [];
     try {
