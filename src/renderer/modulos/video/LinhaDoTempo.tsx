@@ -30,7 +30,8 @@ import {mudouEm} from '../../estado/agente';
 type BlocoP = {tipo: string; em: number; sai?: number; origem?: string; texto?: string; id?: string};
 type CenaP = {tipo: string; t_in: number; t_out: number; n?: number; titulo?: string; nome?: string; tag?: string; origem?: string; blocos?: BlocoP[]};
 type Legenda = {s: number; e: number; palavras: {w: string; s?: number; e?: number}[]};
-type PropsLt = {duracao_ms: number; cenas: CenaP[]; legendas?: Legenda[]; narracao?: {trechos: TrechoNarracao[]}; composicao?: string; audio?: AudioP | string};
+type PropsLt = {duracao_ms: number; cenas: CenaP[]; legendas?: Legenda[]; narracao?: {trechos: TrechoNarracao[]}; composicao?: string; audio?: AudioP | string;
+  acabamento?: {cartao?: {t_in: number; t_out: number}}}; // o cartão final do acabamento, depois da última cena (acabamento-video.ts)
 type ArrastoCena = {origem: string; x0: number; dms: number; dur: number};
 type Arrasto = {origem: string; modo: 'mover' | 'ini' | 'fim'; x0: number; dms: number; em: number; fim: number};
 
@@ -442,6 +443,15 @@ export const LinhaDoTempo: React.FC = () => {
                 </div>
               );
             })}
+            {props.acabamento?.cartao && (
+              <div className="cena" style={{left: x(props.acabamento.cartao.t_in), width: Math.max(2, x(props.acabamento.cartao.t_out) - x(props.acabamento.cartao.t_in)),
+                background: 'var(--trilha-cena-a)', opacity: 0.6, fontStyle: 'italic'}}
+                title={`Cartão final · ${((props.acabamento.cartao.t_out - props.acabamento.cartao.t_in) / 1000).toLocaleString('pt-BR')} s (no inspetor do vídeo, em Marca no vídeo)`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  irPara(props.acabamento!.cartao!.t_in);
+                }}>Cartão final</div>
+            )}
           </div>
           {(faixas.length ? faixas : [[]]).map((faixa, fi) => (
             <div key={fi} className="trilha" onClick={buscar}>
