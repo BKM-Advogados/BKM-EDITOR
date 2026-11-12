@@ -12,6 +12,7 @@ import {comNovaTentativa, gravarAtomico, renomearComRetry} from './gravar-seguro
 import {comATrava, comTrava} from './trava-escrita';
 import {ARQUIVO_PESQUISA, caminhoTextoFonte, lerPesquisa, pesquisaVazia, type Pesquisa} from './pesquisa';
 import {motivoDaTrava} from './travas-imagem';
+import {ARQUIVO_PLANO, ErroPlano, lerPlano, type PlanoVideo} from './plano-video'; // Onda B: o Plano do vídeo
 
 export const PASTA_INTERNA = '.estudio';
 
@@ -46,7 +47,7 @@ export const dentroDe = (base: string, alvo: string) => {
 
 /** Arquivos internos que entram no diário sem ser documento do manifesto: o Reverter e o Ctrl+Z voltam as mudanças
  *  deles pelo patch inverso (sem ajustes de módulo nem trava de camada). O aplicar_patch do MCP continua sem acesso. */
-const ARQUIVOS_INTERNOS = new Set(['pesquisa/pesquisa.json', 'midia/marcas.json', '.estudio/exportacao.json']);
+const ARQUIVOS_INTERNOS = new Set(['pesquisa/pesquisa.json', 'midia/marcas.json', '.estudio/exportacao.json', ARQUIVO_PLANO]);
 
 export class Projeto {
   constructor(readonly raiz: string) {}
@@ -635,6 +636,43 @@ export class Projeto {
       inverso: jsonpatch.compare(depois, antes) as OperacaoPatch[],
     });
     return r;
+  }
+
+  // ---------- plano do vídeo (src/nucleo/plano-video.ts, Onda B) ----------
+  // plano.json não é documento do manifesto: como a pesquisa, vai para o diário com o caminho do arquivo (Histórico e
+  // Reverter), e o aplicar_patch do MCP não o toca. Quem escreve é a IA (escrever_plano); quem decide é a pessoa.
+  plano(): PlanoVideo | null {
+    if (!this.existe(ARQUIVO_PLANO)) return null;
+    return lerPlano(this.lerJson<unknown>(ARQUIVO_PLANO).doc);
+  }
+
+  /** Troca o plano pelo que `mudar` devolve (a partir do atual, ou null) e registra no diário o patch e o inverso. */
+  alterarPlano(mudar: (p: PlanoVideo | null) => PlanoVideo, quem: {autor: string; origem: string; rotulo: string}): PlanoVideo {
+    return this.comTrava(() => {
+      const existia = this.existe(ARQUIVO_PLANO) ? this.lerTexto(ARQUIVO_PLANO) : null;
+      const bruto = existia === null ? {} : (this.lerJson<unknown>(ARQUIVO_PLANO).doc ?? {});
+      let depois: PlanoVideo;
+      try {
+        depois = mudar(lerPlano(bruto));
+      } catch (e) {
+        if (e instanceof ErroPlano) throw new ErroProjeto(e.message, e.tipo);
+        throw new ErroProjeto((e as Error).message, 'patch');
+      }
+      const texto = serializar(depois);
+      this.gravarComDiario(ARQUIVO_PLANO, existia, texto, {
+        seq: this.proximaSeq(),
+        em: new Date().toISOString(),
+        documento: ARQUIVO_PLANO,
+        autor: quem.autor,
+        origem: quem.origem,
+        rotulo: quem.rotulo,
+        versao_antes: versaoDe(existia ?? serializar({})),
+        versao_depois: versaoDe(texto),
+        patch: jsonpatch.compare(bruto as object, depois) as OperacaoPatch[],
+        inverso: jsonpatch.compare(depois, bruto as object) as OperacaoPatch[],
+      });
+      return depois;
+    });
   }
 
   /** Texto limpo de uma fonte (pesquisa/fontes/<id>.txt, fora do git). O primeiro texto gravado põe a pasta no

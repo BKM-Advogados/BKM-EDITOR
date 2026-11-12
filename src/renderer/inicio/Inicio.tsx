@@ -333,7 +333,7 @@ export const Inicio: React.FC = () => {
       : aba === 'musica' ? `um vídeo em branco (documento "video", ${tamanho?.largura}×${tamanho?.altura}); o pedido é de música: crie a música com criar_documento (módulo música)`
       : `${aba === 'video' ? 'um vídeo de cenas' : aba === 'animacao' ? 'uma animação' : 'uma imagem'} em branco (documento "${aba}", ${tamanho?.largura}×${tamanho?.altura})`;
     void criar(branco, {texto: t, rotulo: `Projeto novo · ${chip}${kit ? ` · ${kit.nome}` : ''}`,
-      contexto: `projeto novo, criado agora com ${doc}. Monte o pedido nesse documento pelas ferramentas do MCP "estudio" (o CLAUDE.md da pasta explica o formato). Faça direto, sem perguntar, e diga no fim o que montou.`});
+      contexto: `projeto novo, criado agora com ${doc}. É um pedido novo: siga "Planejar antes de montar" do CLAUDE.md da pasta (pergunte só o que faltar, até 3 perguntas com sugestão; escreva o plano com escrever_plano e espere a aprovação). Aprovado, monte nesse documento pelas ferramentas do MCP "estudio" e diga no fim o que montou.`});
   };
 
   // Enter cria em branco com o que está marcado (fora de campo de texto e de botão, que já tratam o Enter)

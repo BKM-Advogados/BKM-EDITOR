@@ -57,6 +57,7 @@ describe('MCP estudio', () => {
       'limpar_voz', 'medir_envelope', 'medir_loudness', 'ver_cena_3d', 'ver_imagem', // frente 3 do MCP
       // frente 4: edição fina (mcp-edicao-fina.ts)
       'adicionar_efeito', 'animar_entrada', 'animar_saida', 'dividir_cena', 'duplicar_cena', 'editar_legendas', 'editar_paginas', 'remover_efeito',
+      'aprovar_plano', 'escrever_plano', 'ler_plano', // Onda B: o Plano do vídeo (mcp-plano.ts)
     ].sort());
   });
 

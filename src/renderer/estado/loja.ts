@@ -6,6 +6,7 @@ import type {InfoProjeto, PropsVideo} from '../../compartilhado/api';
 import type {Comentario, DocImagem, Modulo, OperacaoPatch, ResumoDiario} from '../../nucleo/documentos';
 import type {Efeito} from '../../nucleo/efeitos';
 import type {Pesquisa} from '../../nucleo/pesquisa'; // só o tipo: pesquisa.ts usa node:crypto
+import type {PlanoVideo} from '../../nucleo/plano-video'; // Onda B: o Plano do vídeo
 import {indicePagina, paginasDe} from '../../nucleo/carrossel';
 import {JANELA_AGENTE_MS, juntarMudancas, mudancasNovas, type MudancaAgente} from './agente';
 import {EstadoDeGravacao, FilaPorChave, JANELA_EDICAO_PROPRIA_MS, mensagemDeFalhaNaEdicao, validadeDoAviso, type Gravacao} from './gravacao'; // frente Casca
@@ -34,6 +35,7 @@ export type Estado = {
   comentarioAberto?: string;
   pesquisa: Pesquisa | null; // null = ainda não lida; a interface só mostra, quem grava é o Claude pelo MCP
   erroPesquisa?: string; // pesquisa/pesquisa.json não pôde ser lido: o painel mostra o motivo em vez de "carregando"
+  plano: PlanoVideo | null; // o Plano do vídeo (plano.json); null = não há (ou ainda não lido). A IA escreve; a pessoa decide na conversa
   fatoAberto?: string; // fato pedido de fora do painel Pesquisa (etiqueta do inspetor): o painel vem à frente e mostra
   aviso?: Aviso;
   gravacao: Gravacao; // selo "Salvo" da barra: gravando, salvo ou a última gravação que falhou (gravacao.ts)
@@ -48,7 +50,7 @@ export type Estado = {
 };
 
 const INICIAL: Estado = {info: null, area: 'video', ativo: {}, docs: {}, props: {}, selecao: null, tempo_ms: 0, comentarios: [], diario: [], modoComentario: false, gravacao: {estado: 'salvo'}, zoomLinha: null,
-  paginaAtiva: {}, mudancasAgente: [], seqVisto: undefined, pesquisa: null, erroPesquisa: undefined, fatoAberto: undefined}; // os opcionais da pesquisa ficam aqui para a troca de projeto zerá-los
+  paginaAtiva: {}, mudancasAgente: [], seqVisto: undefined, pesquisa: null, erroPesquisa: undefined, fatoAberto: undefined, plano: null}; // os opcionais da pesquisa ficam aqui para a troca de projeto zerá-los
 let estado: Estado = INICIAL;
 const ouvintes = new Set<() => void>();
 
@@ -122,6 +124,16 @@ export const carregarPesquisa = async () => {
   } catch (e) {
     // a última pesquisa lida fica na tela; sem nenhuma, o painel mostra o motivo
     if (estado.info?.raiz === raiz) loja.definir({erroPesquisa: mensagemDe(e)});
+  }
+};
+// o Plano do vídeo (Onda B): plano.json ilegível deixa o último lido na tela (o cartão mostra o que havia)
+export const carregarPlano = async () => {
+  const raiz = estado.info?.raiz;
+  try {
+    const plano = await window.estudio.plano();
+    if (estado.info?.raiz === raiz) loja.definir({plano});
+  } catch {
+    /* fica o último plano lido */
   }
 };
 // "ver o fato" de fora do painel (etiqueta do inspetor): marca o fato e a casca traz o painel Pesquisa para a frente
@@ -200,7 +212,7 @@ export const abrirProjeto = async (info: InfoProjeto) => {
       zoomLinha: estado.zoomLinha, pedidoClaude: estado.pedidoClaude});
     if (info.aviso) avisar(info.aviso, 'info');
   }
-  await Promise.all([...info.manifesto.documentos.map((d) => carregarDoc(d.id)), carregarComentarios(), carregarDiario(), ...(mesmo ? [] : [carregarPesquisa()])]);
+  await Promise.all([...info.manifesto.documentos.map((d) => carregarDoc(d.id)), carregarComentarios(), carregarDiario(), carregarPlano(), ...(mesmo ? [] : [carregarPesquisa()])]);
   // a página do carrossel em que a pessoa parou só se resolve com o documento lido (o estado guarda o caminho, a loja o id)
   const ult = info.estado;
   if (!mesmo && ult?.documento && ult.pagina && estado.info?.raiz === info.raiz) {
@@ -245,6 +257,7 @@ export const observarProjeto = () =>
     if (arquivo.startsWith('.estudio/diario')) return void carregarDiario();
     // pesquisa.json ou o texto de uma fonte (pesquisa/fontes/<id>.txt): a lista relê; o texto aberto relê pelo sha256
     if (arquivo.startsWith('pesquisa/')) return void carregarPesquisa();
+    if (arquivo === 'plano.json') return void carregarPlano(); // Onda B: o cartão do plano na conversa
     if (arquivo === 'estudio.json') return void window.estudio.projetoAtual().then((i) => i && abrirProjeto(i));
     // envelope de áudio medido (midia/x.wav.envelope.json): as props dos vídeos ganham a forma de onda e o ducking
     if (arquivo.endsWith('.envelope.json')) return void info.manifesto.documentos.filter((d) => d.modulo === 'video').forEach((d) => void carregarDoc(d.id));

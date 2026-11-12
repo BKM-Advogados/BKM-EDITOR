@@ -6,13 +6,14 @@
 // Som: "escolher arquivo de áudio" devolve um WAV sintético (uma narração, depois uma música, alternando), como URL de
 // blob que o <audio> e o Web Audio tocam de verdade; o envelope medido fica em memória e entra nas props como no app.
 import jsonpatch, {type Operation} from 'fast-json-patch';
-import type {ApiEstudio, EstadoProvedor, InfoProjeto, PedidoPortaoTela, MarcaInfo, ModeloInfo, Mudanca, NovoProjeto, Preferencias, Progresso, ProgressoTranscricao, Recente, ResultadoLimpezaVoz, Trilha, RespostaJanela} from '../../src/compartilhado/api';
+import type {ApiEstudio, EventoConversa, EstadoProvedor, InfoProjeto, PedidoPortaoTela, MarcaInfo, ModeloInfo, Mudanca, NovoProjeto, Preferencias, Progresso, ProgressoTranscricao, Recente, ResultadoLimpezaVoz, Trilha, RespostaJanela} from '../../src/compartilhado/api';
 import type {EntradaDocumento, Manifesto, Modulo} from '../../src/nucleo/documentos';
 import type {ApiAtualizacao, EstadoAtualizacao} from '../../src/compartilhado/atualizacao';
 import type {Envelope, IntensidadeLimpeza} from '../../src/nucleo/audio';
 import {LimpezaCancelada, limparVoz} from '../../src/nucleo/limpeza-voz';
 import {medirMistura, type FonteAudio, type MedidasLoudness} from '../../src/nucleo/loudness';
 import type {Fato, Fonte, Pesquisa} from '../../src/nucleo/pesquisa';
+import {decidirPlano, escreverPlano, type ConteudoPlano, type PlanoVideo} from '../../src/nucleo/plano-video'; // Onda B
 import {novoDocCenas, resolverCenas, type DocCenas} from '../../src/nucleo/cenas';
 import {novoDoc3d} from '../../src/nucleo/cena3d';
 import {modeloAnimacaoLogoPixel} from '../../src/nucleo/animacao';
@@ -180,6 +181,51 @@ const ouvintesProgresso = new Set<(p: Progresso) => void>();
 let exportacaoCancelada = false;
 const progresso = (p: Progresso) => ouvintesProgresso.forEach((f) => f(p));
 const esperar = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
+
+// ---------- o Plano do vídeo (Onda B) na conversa simulada ----------
+// A primeira mensagem vira duas perguntas; a segunda, o plano (escrever_plano). "Ajuste no plano…" reescreve com a
+// revisão seguinte; "Aprovei o plano…" responde que vai montar. Só para ver o cartão do plano na prévia web.
+let planoPrevia: PlanoVideo | null = null;
+const ouvintesConversa = new Set<(id: number, e: EventoConversa) => void>();
+const conversasSimuladas = new Map<number, number>(); // id → mensagens recebidas
+const CONTEUDO_PREVIA: ConteudoPlano = {
+  objetivo: 'Explicar em 40 s quem tem direito a férias proporcionais ao sair da empresa',
+  publico: 'trabalhadores da indústria, sem termo jurídico',
+  formato_e_duracao: 'Reels 9:16, cerca de 40 s',
+  roteiro: [
+    {cena: 'Abertura', mostra: 'Título "Saiu antes de um ano?"', fala: 'Saiu da empresa antes de completar um ano?', duracao_s: 5},
+    {cena: 'A regra', mostra: 'Número grande "1/12" e o texto "por mês trabalhado"', fala: 'Você tem férias proporcionais: um doze avos por mês.', duracao_s: 12},
+    {cena: 'O terço', mostra: 'Lista com "férias" e "+ 1/3"', duracao_s: 10},
+    {cena: 'Fecho', mostra: 'Frase de fecho e o logo', fala: 'Ficou com alguma dúvida? Procure um advogado trabalhista.', duracao_s: 8},
+  ],
+  midia: {usar: ['midia/logo.png'], falta: ['uma foto de linha de produção (opcional)']},
+  narracao: 'narração por IA, voz calma, sem pressa',
+  musica: 'trilha leve sob a voz (cama a −20 LU)',
+  notas: 'supus Reels por ser o formato marcado na tela inicial',
+};
+const conversaSimulada = async (id: number, texto: string) => {
+  const ev = (e: EventoConversa) => ouvintesConversa.forEach((f) => f(id, e));
+  const n = (conversasSimuladas.get(id) ?? 0) + 1;
+  conversasSimuladas.set(id, n);
+  await esperar(250);
+  ev({tipo: 'pronto', sessao: 'previa', modelo: 'claude-previa'});
+  const mensagem = (t: string) => ev({tipo: 'mensagem', texto: t});
+  if (/^Aprovei o plano/.test(texto)) {
+    mensagem('Plano aprovado. Montando as 4 cenas agora (na prévia web nada é montado).');
+  } else if (n === 1 && !/^Ajuste no plano/.test(texto)) {
+    mensagem('Antes de montar, duas perguntas:\n\n1. Para quem é? Sugiro: trabalhadores da indústria.\n2. Com narração? Sugiro: narração por IA, voz calma.');
+  } else {
+    const uso = `plano-${Date.now()}`;
+    const ajuste = /^Ajuste no plano[^:]*: (.*)$/s.exec(texto)?.[1];
+    ev({tipo: 'ferramenta', uso, nome: 'mcp__estudio__escrever_plano', entrada: {objetivo: CONTEUDO_PREVIA.objetivo}});
+    await esperar(300);
+    planoPrevia = escreverPlano(planoPrevia, ajuste ? {...CONTEUDO_PREVIA, notas: `ajuste pedido: ${ajuste}`} : CONTEUDO_PREVIA, 'Claude 1', new Date().toISOString());
+    mudou('plano.json');
+    ev({tipo: 'resultado', uso, ok: true, texto: JSON.stringify({existe: true, estado: planoPrevia.estado, revisao: planoPrevia.revisao})});
+    mensagem('Escrevi o plano acima: 4 cenas em cerca de 35 s. Aprove ou peça ajuste antes de eu montar.');
+  }
+  ev({tipo: 'fim', erro: false, duracao_ms: 900});
+};
 const pastaSaidas = () => `${aberto!.raiz}\\saidas`;
 
 const info = (): InfoProjeto | null => aberto && {raiz: aberto.raiz, manifesto: structuredClone(aberto.manifesto), base_midia: aberto.base_midia ?? `${location.origin}/testes/fixtures/projeto`, claude: true, git: true,
@@ -333,12 +379,15 @@ const api: ApiEstudio = {
   conversa: {
     conta: async () => ({instalado: true, logado: true, metodo: 'claude.ai', email: 'pessoa@exemplo.com.br', chave_api: false}),
     abrir: async (o) => ({id: Math.floor(Math.random() * 1000), sessao: 'previa', provedor: o?.provedor ?? 'claude', rotulo: o?.provedor === 'deepseek' ? 'DeepSeek 1' : 'Claude 1'}),
-    enviar: async () => undefined,
+    enviar: async (id, texto) => void conversaSimulada(id, texto),
     permitir: nada,
     parar: nada,
     hibernar: async () => null,
     fechar: nada,
-    aoEvento: () => nada,
+    aoEvento: (cb) => {
+      ouvintesConversa.add(cb);
+      return () => ouvintesConversa.delete(cb);
+    },
   },
   exportarVideo: async (documento, opcoes) => {
     exportacaoCancelada = false;
@@ -483,6 +532,12 @@ const api: ApiEstudio = {
   },
   mostrarArquivo: nada,
   pesquisa: async () => structuredClone(pesquisaDeExemplo),
+  plano: async () => structuredClone(planoPrevia),
+  decidirPlano: async (revisao, d) => {
+    planoPrevia = decidirPlano(planoPrevia, revisao, d, 'pessoa', new Date().toISOString());
+    mudou('plano.json');
+    return structuredClone(planoPrevia);
+  },
   textoFonte: async (fonteId, inicio, fim) => {
     const texto = textosFonte[fonteId];
     if (texto === undefined) throw new Error(`o texto da fonte ${fonteId} não está nesta pasta`);

@@ -34,6 +34,7 @@ export const FERRAMENTAS_ESTUDIO: ReadonlySet<string> = new Set([
   'responder_comentario', 'resolver_comentario', 'listar_mudancas', 'aplicar_marca', 'ler_fonte', 'anotar_fonte', 'registrar_fato', 'listar_pesquisa',
   'texto_da_fonte', 'checar_texto', 'transcrever', 'exportar_legendas', 'importar_legendas', 'remover_fundo', 'ler_legendas', 'editar_legenda',
   'desfazer', 'reverter', 'guia_do_projeto', 'criar_comentario', 'reabrir_comentario', // frente IA, rodada 3
+  'ler_plano', 'escrever_plano', 'aprovar_plano', // Onda B: o Plano do vídeo
 ]);
 
 /** Corta o texto do resultado para a tela sem perder as mudanças do diário que o portão põe no fim (Ver e Reverter). */
