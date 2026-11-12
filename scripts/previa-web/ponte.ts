@@ -47,7 +47,7 @@ let aberto: Proj | null = null;
 const PASTA_MARCAS = 'C:\\Users\\pessoa\\Estudio\\marcas';
 let prefs: Preferencias = {pasta_projetos: 'C:\\Users\\pessoa\\Estudio', ao_iniciar: 'inicio', formato_video: 'reels', formato_imagem: 'feed',
   boas_vindas_vista: new URLSearchParams(location.search).has('vista'), pasta_trilhas: 'C:\\Users\\pessoa\\Estudio\\trilhas', pasta_marcas: PASTA_MARCAS,
-  pasta_modelos: 'C:\\Users\\pessoa\\Estudio\\modelos'};
+  pasta_modelos: 'C:\\Users\\pessoa\\Estudio\\meus-modelos'};
 // modelos da pessoa (Salvar como modelo), em memória: os documentos guardados em cópia, como a pasta modelos/ do app
 const modelosProprios: {info: ModeloInfo; manifesto: Manifesto; docs: Record<string, unknown>}[] = [];
 

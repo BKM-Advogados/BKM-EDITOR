@@ -197,7 +197,7 @@ export type Recente = {raiz: string; nome: string; aberto_em: string; existe: bo
 export type Preferencias = {pasta_projetos: string; ao_iniciar: 'inicio' | 'ultimo'; formato_video: string; formato_imagem: string; boas_vindas_vista: boolean;
   pasta_trilhas: string; // biblioteca de músicas e efeitos da pessoa (padrão: Estudio/trilhas)
   pasta_marcas: string;
-  pasta_modelos: string; // os modelos da pessoa (Salvar como modelo; padrão: Estudio/modelos)
+  pasta_modelos: string; // os modelos da pessoa (Salvar como modelo; padrão: Estudio/meus-modelos; Estudio/modelos é a do whisper e do MODNet)
   projetos_ide?: boolean; // frente IDE e harnesses: guias e MCP de cada harness em cada projeto (padrão: ligado; docs/ide.md)
   procurar_atualizacoes?: boolean; versao_pulada?: string}; // atualização do app (padrão: procura; "Pular esta versão")
 
@@ -350,7 +350,7 @@ export type ApiEstudio = {
     aplicar: (id: string, documento: string) => Promise<{versao: string; marca: string; nome: string; copiados: string[]; atualizados: string[]}>;
     fontesDoProjeto: () => Promise<FonteArquivo[]>;
   };
-  // modelos da pessoa (pasta modelos/ das preferências): aparecem em Novo na tela inicial, ao lado dos de fábrica
+  // modelos da pessoa (pasta meus-modelos/ das preferências): aparecem em Novo na tela inicial, ao lado dos de fábrica
   modelos: {
     listar: () => Promise<ModeloInfo[]>;
     /** Salva o projeto aberto (ou só `documento`) como modelo: os documentos e a mídia que eles citam, sem diário, git nem conversas. */

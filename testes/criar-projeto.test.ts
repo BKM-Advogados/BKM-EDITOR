@@ -134,7 +134,7 @@ describe('criar projeto', () => {
   });
 
   it('o exemplo não é modelo, e o nome da pasta dele fica numa constante', () => {
-    expect(MODELOS.map((m) => m.id)).toEqual(['video-branco', 'imagem-branco', '3d-branco', 'animacao-branco', 'animacao-9x16', 'animacao-logo-pixel']);
+    expect(MODELOS.map((m) => m.id)).toEqual(['video-branco', 'video-carrossel-narrado', 'imagem-branco', '3d-branco', 'animacao-branco', 'animacao-9x16', 'animacao-logo-pixel']);
     expect(EXEMPLO_DO_APP.pasta).toMatch(/^[a-z0-9-]+$/);
   });
 

@@ -1,6 +1,7 @@
-// Os modelos da pessoa ("Salvar como modelo"): a pasta modelos/ ao lado dos projetos (%USERPROFILE%\Estudio\modelos,
-// trocável nas preferências, ESTUDIO_MODELOS fora do app e nos testes), no mesmo jeito da pasta dos kits de marca
-// (pasta-marcas.ts). Cada modelo é uma pasta <id>/ com:
+// Os modelos da pessoa ("Salvar como modelo"): a pasta meus-modelos/ ao lado dos projetos
+// (%USERPROFILE%\Estudio\meus-modelos, trocável nas preferências, ESTUDIO_MODELOS fora do app e nos testes), no mesmo jeito
+// da pasta dos kits de marca (pasta-marcas.ts). Não é Estudio\modelos: essa guarda os modelos de IA (whisper e MODNet).
+// Cada modelo é uma pasta <id>/ com:
 //   modelo.json     o nome, a descrição, o tipo (módulo do primeiro documento), o tamanho e os documentos
 //   miniatura.jpg   a miniatura do projeto na hora de salvar, se havia (a tela inicial mostra no cartão)
 //   projeto/        estudio.json, os documentos e só a mídia que eles citam (midia/ e fontes/)
@@ -39,7 +40,7 @@ export type ModeloProprio = {
 export type ModeloLido = ModeloProprio & {pasta: string; miniatura?: string};
 
 /** Pasta padrão, ao lado dos projetos. ESTUDIO_MODELOS aponta outra (o MCP fora do app e os testes usam). */
-export const pastaPadraoModelos = () => process.env.ESTUDIO_MODELOS || path.join(os.homedir(), 'Estudio', 'modelos');
+export const pastaPadraoModelos = () => process.env.ESTUDIO_MODELOS || path.join(os.homedir(), 'Estudio', 'meus-modelos'); // modelos/ é a do whisper e do MODNet
 
 let configurada: (() => string) | null = null;
 /** O app diz onde fica a pasta (preferências); sem isso, a padrão. */

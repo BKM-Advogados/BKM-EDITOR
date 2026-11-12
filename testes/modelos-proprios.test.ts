@@ -76,14 +76,14 @@ afterAll(() => {
 });
 
 describe('pasta dos modelos', () => {
-  it('fica ao lado das marcas: a das preferências no app, ESTUDIO_MODELOS fora dele, ~/Estudio/modelos sem nada', () => {
+  it('fica ao lado das marcas: a das preferências no app, ESTUDIO_MODELOS fora dele, ~/Estudio/meus-modelos sem nada (modelos/ é a do whisper)', () => {
     expect(pastaModelos()).toBe(pastaDosModelos);
     definirPastaModelos(null);
     const antes = process.env.ESTUDIO_MODELOS;
     process.env.ESTUDIO_MODELOS = path.join(tmp, 'outra');
     expect(pastaModelos()).toBe(path.join(tmp, 'outra'));
     delete process.env.ESTUDIO_MODELOS;
-    expect(pastaModelos()).toBe(path.join(os.homedir(), 'Estudio', 'modelos'));
+    expect(pastaModelos()).toBe(path.join(os.homedir(), 'Estudio', 'meus-modelos'));
     if (antes !== undefined) process.env.ESTUDIO_MODELOS = antes;
     definirPastaModelos(() => pastaDosModelos);
     expect(modelos.listar()).toEqual([]); // pasta que ainda não existe: lista vazia

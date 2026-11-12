@@ -1,5 +1,5 @@
 // Ferramenta MCP salvar_como_modelo (Onda B, tela inicial): o "Salvar como modelo" do menu do ícone do editor, pela mesma
-// pasta de modelos (pasta-modelos.ts: a das preferências no app, ESTUDIO_MODELOS ou ~/Estudio/modelos fora dele). É
+// pasta de modelos (pasta-modelos.ts: a das preferências no app, ESTUDIO_MODELOS ou ~/Estudio/meus-modelos fora dele). É
 // "cartao" (portao.ts): grava fora do projeto, sem diário nem Reverter. O modelo aparece em Novo na tela inicial.
 import type {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {z} from 'zod';
