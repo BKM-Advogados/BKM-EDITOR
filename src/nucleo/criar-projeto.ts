@@ -340,7 +340,8 @@ export const guiaDoProjeto = (modulos: Modulo[], arquivo: ArquivoDeGuia = 'CLAUD
       '  em linguagem natural), `velocidade` (só google-tts, 0,25 a 2), `folga_ms` (a fala entra depois do começo da cena;',
       '  padrão 300), `margem_ms` (padrão 500) e `pronuncias` [{de, para}], o dicionário aplicado antes da voz (ex.: RH →',
       '  erre agá). A fala gerada é um WAV em `midia/narracao/<hash>.wav` num clipe de voz com `narracao_ia` {cena, hash}:',
-      '  não escreva `narracao_ia` nem esses clipes à mão; use `narrar`.',
+      '  não escreva `narracao_ia` nem esses clipes à mão; use `narrar`. O trecho de uma gravação inteira dividida nas cenas',
+      '  é um clipe com `narracao_gravada` {cena} (`dividir_narracao`); a cena com ele não vai à IA sem ser pedida.',
     );
   }
   if (tem('imagem')) linhas.push(...linhasDaImagem());
@@ -418,7 +419,7 @@ export const guiaDoProjeto = (modulos: Modulo[], arquivo: ArquivoDeGuia = 'CLAUD
   if (tem('video') || tem('imagem') || tem('animacao')) passos.push('`aplicar_marca` troca o kit de marca (cores, fonte, logo e fontes próprias) de um documento.');
   if (tem('video')) {
     passos.push('`transcrever` transcreve a fala no próprio PC: grava `<arquivo>.palavras.json` e, no vídeo de cenas, gera as\n   legendas que faltam. `ler_legendas` mostra as legendas nos tempos da tela e `editar_legenda` corrige texto e tempo.\n   `exportar_legendas` grava SRT e VTT em `saidas/`; `importar_legendas` lê um SRT ou VTT do projeto.');
-    passos.push('Narração por IA: escreva `cenas[i].narracao.texto`, ajuste a voz com `configurar_narracao` e as pronúncias com\n   `pronuncias_narracao`; mostre à pessoa `narrar` com `previa: true` (texto final e custo, sem gastar) e depois\n   gere com `narrar` (cache: só a cena que mudou vai ao Google). `ajustar_cenas_a_fala` faz a cena durar a fala;\n   `transcrever`, depois, cria as legendas.');
+    passos.push('Narração por IA: escreva `cenas[i].narracao.texto`, ajuste a voz com `configurar_narracao` e as pronúncias com\n   `pronuncias_narracao`; mostre à pessoa `narrar` com `previa: true` (texto final e custo, sem gastar) e depois\n   gere com `narrar` (cache: só a cena que mudou vai ao Google). `ajustar_cenas_a_fala` faz a cena durar a fala;\n   `transcrever`, depois, cria as legendas. Narração gravada inteira (um áudio só): `transcrever {arquivo}` e depois\n   `dividir_narracao`, primeiro com `previa: true` (mostre os cortes à pessoa); cada cena passa a tocar o trecho dela.');
     passos.push('`propor_cortes_fala` propõe tirar pausas longas e "ãh" de um clipe de voz e `aplicar_cortes_fala` grava a\n   narração emendada (as legendas vão junto). `preparar_teleprompter` grava o texto que a pessoa lê ao gravar.');
     passos.push('Som: `adicionar_clipe_audio` põe um áudio do projeto numa faixa; `dividir_clipe`, `copiar_clipe` e `crossfade`\n   editam os clipes. `listar_trilhas` mostra a pasta de trilhas da pessoa e `escolher_trilha` traz uma para o vídeo\n   (pede a permissão dela); `creditos_das_musicas` dá os créditos que as licenças pedem.');
     passos.push('`medir_loudness` mede o som do vídeo como o render vai soar (LUFS da mistura contra o alvo, a voz e quanto a\n   música fica abaixo dela). `medir_envelope` mede um áudio novo (duração e forma de onda), o que a tela faz ao ver o\n   arquivo: chame com o app fechado. `limpar_voz` limpa a voz de um clipe sem tocar no original (`voltar: true` desfaz).');

@@ -7,7 +7,7 @@
 // e os medidores da narração e da mistura no resumo do vídeo; o da faixa no inspetor dela) e, no clipe de voz, a limpeza.
 // No tempo do bloco, "Entra na palavra" e "Sai na palavra" prendem o bloco a uma palavra da fala da cena (as palavras das
 // legendas que caem nela); mudar o tempo em segundos, aqui ou na linha do tempo, solta o bloco da palavra.
-import React, {useState, useSyncExternalStore} from 'react';
+import React, {useEffect, useState, useSyncExternalStore} from 'react';
 import {rotuloDoAtalho} from '../../teclas';
 import {Clapperboard, CopyPlus, Film, FileAudio, FileJson, ImagePlus, Link, Quote, Scissors, Shuffle, Sparkles, Trash2, Undo2, X} from 'lucide-react';
 import {ALVO_LU_MAX, ALVO_LU_MIN, ALVO_LUFS_MAX, ALVO_LUFS_MIN, ALVO_LUFS_PADRAO, DUCKING_PADRAO, PAPEIS, PICO_DBTP_MAX, PICO_DBTP_MIN, PICO_DBTP_PADRAO, type AudioP,
@@ -28,6 +28,7 @@ import {andamentoLimpeza, assinarLimpeza, cancelarLimpeza, crossfadeComSeguinte,
 import {CamposMovimento} from './CamposMovimento';
 import {abrirNarracaoIA, gerarFalas, narracaoTela, trocarTextoDaCena} from './acoes-narracao'; // narração por IA (docs/narracao.md)
 import {itensDaNarracao, ROTULO_ESTADO} from '../../../nucleo/narracao-cenas';
+import {aplicarNaTela, gravacoesDoProjeto, proporNaTela, textoDoTrecho, type GravacaoEscolhivel, type PropostaNaTela} from './acoes-narracao-inteira'; // Onda B
 import {lufsTexto, MedidorLoudness, useMedidasLoudness} from './MedidorLoudness';
 import {MudancasNoInspetor} from '../../componentes/Agente';
 
@@ -66,6 +67,81 @@ const SecaoLoudness: React.FC<{documento: string; doc: DocCenas}> = ({documento,
   );
 };
 
+/** Narração gravada inteira (Onda B): a pessoa escolhe a gravação já importada, vê a proposta de cortes (o trecho de cada
+ *  cena e o que ela fala) e aplica; cada cena passa a tocar o trecho dela da mesma gravação. */
+const NarracaoInteira: React.FC<{documento: string; doc: DocCenas}> = ({documento, doc}) => {
+  const [lista, setLista] = useState<GravacaoEscolhivel[] | null>(null);
+  const [escolhida, setEscolhida] = useState('');
+  const [ocupado, setOcupado] = useState<string | null>(null);
+  const [proposta, setProposta] = useState<PropostaNaTela | null>(null);
+  const nVoz = (doc.audio?.faixas ?? []).reduce((n, f) => n + (f.clipes?.length ?? 0), 0);
+  useEffect(() => {
+    let vivo = true;
+    void gravacoesDoProjeto(doc).then((l) => vivo && setLista(l));
+    return () => {
+      vivo = false;
+    };
+  }, [documento, nVoz]); // eslint-disable-line react-hooks/exhaustive-deps
+  const g = lista?.find((x) => x.arquivo === escolhida) ?? lista?.[0];
+  const propor = async () => {
+    if (!g) return;
+    setOcupado('Lendo a transcrição…');
+    const p = await proporNaTela(documento, g, () => setOcupado(`Transcrevendo ${g.nome} no PC…`));
+    setOcupado(null);
+    setProposta(p);
+  };
+  const aplicarProposta = async () => {
+    if (!proposta) return;
+    setOcupado('Dividindo…');
+    const ok = await aplicarNaTela(documento, proposta);
+    setOcupado(null);
+    if (ok) setProposta(null);
+  };
+  return (
+    <Secao titulo="Narração gravada inteira" chave="cenas:narracao-inteira">
+      {!lista ? <div className="vazio">Procurando as gravações…</div> : !lista.length ? (
+        <div className="vazio">Importe a gravação da fala inteira (um áudio só) e ela aparece aqui para dividir nas cenas.</div>
+      ) : (
+        <>
+          <CampoSelecao rotulo="Gravação" valor={g?.arquivo ?? ''} aoMudar={(v) => (setEscolhida(v), setProposta(null))}
+            opcoes={lista.map((x): [string, string] => [x.arquivo, `${x.nome}${x.no_video ? ' · no vídeo' : ''}${x.duracao_ms ? ` · ${formatarTempo(x.duracao_ms)}` : ''}`])} />
+          {!proposta && (
+            <div style={{padding: '2px 10px 6px 18px', display: 'flex', gap: 6, alignItems: 'center'}}>
+              <button className="bt mini" disabled={Boolean(ocupado) || !g} onClick={() => void propor()}
+                title="Acha onde cada cena começa e termina na gravação: pelo texto falado das cenas, ou pelas pausas. Nada muda antes de aplicar.">
+                <Scissors size={12} />Dividir nas cenas…</button>
+              {ocupado && <span className="meta">{ocupado}</span>}
+            </div>
+          )}
+          {proposta && (
+            <>
+              <div className="vazio">
+                {proposta.proposta.metodo === 'pausas' ? 'Pelas pausas mais longas (as cenas não têm texto falado).' : proposta.proposta.metodo === 'texto'
+                  ? 'Pelo texto falado de cada cena.' : 'Pelo texto falado e, nas cenas sem texto, pelas pausas.'} Cada cena vai tocar o trecho dela:
+              </div>
+              <div className="proposta-divisao">
+                {proposta.proposta.trechos.map((t) => (
+                  <div key={t.cena} title={t.texto} className={t.palavras ? undefined : 'sem-fala'}>
+                    <b>Cena {t.n}</b> · {textoDoTrecho(t)}{t.texto ? ` · ${t.texto.length > 70 ? `${t.texto.slice(0, 69)}…` : t.texto}` : ''}
+                  </div>
+                ))}
+                {proposta.proposta.avisos.map((a, i) => <div key={`a${i}`} className="aviso">{a[0].toUpperCase()}{a.slice(1)}.</div>)}
+              </div>
+              <div style={{padding: '2px 10px 6px 18px', display: 'flex', gap: 6, alignItems: 'center'}}>
+                <button className="bt principal mini" disabled={Boolean(ocupado)} onClick={() => void aplicarProposta()}
+                  title={`Cada cena ganha um clipe com o trecho dela, a duração da cena se ajusta à fala e as legendas saem da transcrição. ${rotuloDoAtalho('Ctrl+Z')} desfaz.`}>
+                  Aplicar</button>
+                <button className="bt mini fantasma" disabled={Boolean(ocupado)} onClick={() => setProposta(null)}>Cancelar</button>
+                {ocupado && <span className="meta">{ocupado}</span>}
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </Secao>
+  );
+};
+
 const ResumoVideo: React.FC<{documento: string; doc: DocCenas; titulo: string; duracao: number; avisos: string[]; erro?: string}> = ({documento, doc, titulo, duracao, avisos, erro}) => {
   const f = formatoDoVideo(doc);
   const preset = FORMATOS_VIDEO.find((p) => p.largura === f.largura && p.altura === f.altura);
@@ -98,6 +174,7 @@ const ResumoVideo: React.FC<{documento: string; doc: DocCenas; titulo: string; d
           <CampoCor rotulo="Texto suave" valor={tema.suave ?? TEMA_NEUTRO.suave} aoMudar={(v) => void trocar(documento, '/tema/suave', v, 'cor do texto suave')} />
         </Secao>
         {nClipes > 0 && <SecaoLoudness documento={documento} doc={doc} />}
+        <NarracaoInteira documento={documento} doc={doc} />
         {erro && <Secao titulo="Não deu para montar o vídeo"><div className="texto-livre" style={{color: 'var(--erro)'}}>{erro}</div></Secao>}
         {avisos.length > 0 && <Secao titulo={`Avisos (${avisos.length})`}><div className="avisos-roteiro">{avisos.map((a, i) => <div key={i}>{a}</div>)}</div></Secao>}
         <div className="vazio">Clique num bloco no monitor, na lista ou na linha do tempo para editar. "**trecho**" no texto sai na cor de destaque.</div>
@@ -149,12 +226,12 @@ const FalaDaCena: React.FC<{documento: string; n: number}> = ({documento, n}) =>
   const it = doc ? itensDaNarracao(doc)[n - 1] : undefined;
   if (!doc || !it) return null;
   return (
-    <Secao titulo={`Fala (narração por IA) · ${ROTULO_ESTADO[it.estado]}`} chave="cenas:fala">
+    <Secao titulo={it.estado === 'gravada' ? 'Fala · gravada (trecho da narração inteira)' : `Fala (narração por IA) · ${ROTULO_ESTADO[it.estado]}`} chave="cenas:fala">
       <CampoTexto rotulo="Texto falado" multilinha dica="O que a voz fala nesta cena; o texto da tela pode ser outro. [pausa] e [pausa longa] fazem pausa."
         valor={doc.cenas[n - 1]?.narracao?.texto ?? ''} aoMudar={(v) => void trocarTextoDaCena(documento, n - 1, v)} />
       {it.clipe && <CampoLeitura rotulo="Fala gerada">{numeroBr(it.clipe.duracao_ms / 1000, 1)} s{it.clipe.em + it.clipe.duracao_ms > it.t_out + 1 ? ' · passa do fim da cena' : ''}</CampoLeitura>}
       <div style={{padding: '2px 10px 6px 18px', display: 'flex', gap: 6}}>
-        {it.estado !== 'sem_texto' && <button className="bt mini" disabled={Boolean(andamento)} onClick={() => void gerarFalas(documento, {cenas: [it.cena], refazer: it.estado === 'gerada'})}
+        {it.estado !== 'sem_texto' && it.estado !== 'gravada' && <button className="bt mini" disabled={Boolean(andamento)} onClick={() => void gerarFalas(documento, {cenas: [it.cena], refazer: it.estado === 'gerada'})}
           title={it.estado === 'gerada' ? `Pede outra tomada ao Google (tem custo; ${rotuloDoAtalho('Ctrl+Z')} volta à anterior)` : undefined}>{it.estado === 'gerada' ? 'Outra tomada' : 'Gerar esta cena'}</button>}
         <button className="bt mini fantasma" onClick={() => abrirNarracaoIA(documento)}>Narração por IA…</button>
       </div>

@@ -19,7 +19,7 @@ import {transcreverEGerar} from './acoes-legendas';
 import {Escolha, Segmentado} from '../../componentes/Controles';
 
 const s1 = (ms: number) => (ms / 1000).toLocaleString('pt-BR', {maximumFractionDigits: 1});
-const COR_ESTADO: Record<EstadoFala, string> = {sem_texto: 'sem', pendente: 'pendente', gerada: 'gerada', desatualizada: 'velha'};
+const COR_ESTADO: Record<EstadoFala, string> = {sem_texto: 'sem', pendente: 'pendente', gerada: 'gerada', desatualizada: 'velha', gravada: 'gerada'};
 
 /** O texto falado de uma cena: grava ao sair do campo (ou Ctrl+Enter). */
 const TextoDaCena: React.FC<{documento: string; i: number; valor: string}> = ({documento, i, valor}) => {
@@ -95,7 +95,7 @@ export const NarracaoIA: React.FC<{documento: string; aoFechar: () => void}> = (
 
   if (!doc) return null;
   const chave = chaves?.[cfg.provedor];
-  const temFala = itens.some((i) => i.clipe);
+  const temFala = itens.some((i) => i.clipe || i.estado === 'gravada'); // a gravação inteira dividida nas cenas também é fala
   const passam = itens.filter((i) => i.clipe && i.clipe.em + i.clipe.duracao_ms > i.t_out + 1);
   const trocarProvedor = (p: ProvedorNarracao) => void configurar(documento, {provedor: p, voz: vozDoProvedor(p, cfg.voz)}, `narração por ${NOMES_PROVEDOR[p]}`);
   const custoCena = (cena: string) => previa?.itens.find((x) => x.cena === cena);
@@ -167,7 +167,7 @@ export const NarracaoIA: React.FC<{documento: string; aoFechar: () => void}> = (
                 {it.clipe && <span className={`meta${it.clipe.em + it.clipe.duracao_ms > it.t_out + 1 ? ' passa' : ''}`}
                   title="Duração da fala e da cena">fala {s1(it.clipe.duracao_ms)} s · cena {s1(it.t_out - it.t_in)} s</span>}
                 {!it.clipe && it.medida && <span className="meta" title="Estimativa antes de gerar">~{s1(it.medida.segundos * 1000)} s</span>}
-                {it.estado !== 'sem_texto' && (
+                {it.estado !== 'sem_texto' && it.estado !== 'gravada' && (
                   <button className="bt mini" disabled={Boolean(andamento)}
                     title={it.estado === 'gerada' ? 'Pede outra tomada ao Google, com o mesmo texto e a mesma voz (tem custo; ' + rotuloDoAtalho('Ctrl+Z') + ' volta à anterior)'
                       : p ? `${p.caracteres} caracteres · ${textoCusto(p.em_cache ? 0 : p.custo_usd)}` : undefined}
