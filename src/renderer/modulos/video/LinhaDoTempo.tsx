@@ -336,7 +336,7 @@ export const LinhaDoTempo: React.FC = () => {
     const cena = props.cenas.find((c) => a.origem.startsWith(`${c.origem}/`));
     if (!cena) return;
     const doc = loja.get().docs[documento]?.doc;
-    const b = valorEm(doc, a.origem) as {em?: number; sai?: number} | undefined;
+    const b = valorEm(doc, a.origem) as {em?: number; sai?: number; em_palavra?: string; sai_palavra?: string} | undefined;
     if (!b) return;
     const dur = cena.t_out - cena.t_in;
     const r50 = (v: number) => Math.round(v / 50) * 50;
@@ -352,6 +352,9 @@ export const LinhaDoTempo: React.FC = () => {
       const sai = Math.max(emRel + 100, Math.min(dur, r50(fimRel + a.dms)));
       patch = patchTrocar(doc, `${a.origem}/sai`, sai >= dur ? undefined : sai);
     }
+    // arrastar solta o bloco da palavra da fala (em_palavra, sai_palavra) na ponta que mudou; senão a palavra mandaria
+    const soltas = [...(a.modo !== 'fim' && b.em_palavra !== undefined ? ['em_palavra'] : []), ...(a.modo !== 'ini' && b.sai_palavra !== undefined ? ['sai_palavra'] : [])];
+    patch = [...patch, ...soltas.flatMap((k) => patchTrocar(doc, `${a.origem}/${k}`, undefined))];
     await aplicar(documento, patch, a.modo === 'mover' ? 'mover bloco no tempo' : a.modo === 'ini' ? 'onde o bloco entra' : 'onde o bloco sai');
   };
   const soltarCena = async () => {
