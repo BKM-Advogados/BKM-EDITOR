@@ -31,6 +31,8 @@ export const CLASSES: Record<string, {classe: Classe; motivo: string; livreSe?: 
   // narração por IA (docs/narracao.md): vai ao Google com a chave da pessoa; a prévia (previa: true) não sai do PC
   narrar: {classe: 'cartao', motivo: 'gerar a narração com a IA do Google (sai do PC, usa a sua chave e pode ter custo)', livreSe: (e) => e.previa === true},
   vozes_narracao: {classe: 'cartao', motivo: 'listar as vozes de narração do Google (usa a sua chave, sem custo)'},
+  // Onda B (mcp-narracao-inteira.ts): só mexe no documento (diário, Reverter); a prévia nem isso
+  dividir_narracao: {classe: 'livre', motivo: 'dividir a narração gravada inteira nas cenas (vai para o histórico; Reverter desfaz)'},
   // exportação final pelo MCP (src/nucleo/mcp-exportacao-final.ts): grava o arquivo final em saidas/
   exportar_video: {classe: 'cartao', motivo: 'exportar o vídeo para saidas/ (leva de segundos a minutos)'},
   exportar_imagem: {classe: 'cartao', motivo: 'exportar a imagem para saidas/'},

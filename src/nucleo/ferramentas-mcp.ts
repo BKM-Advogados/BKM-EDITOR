@@ -39,6 +39,7 @@ import {musicaDoModelo, type ModeloMusica} from './musica-modelos'; // frente M�
 import type {DocMusica} from './musica'; // frente Música (item 27)
 import {ARQUIVO_TRANSICOES, lerRegistro, transicaoEmCurso} from './transicoes'; // frente Música
 import {registrarNarracao} from './mcp-narracao'; // narração por IA (docs/narracao.md)
+import {registrarNarracaoInteira} from './mcp-narracao-inteira'; // Onda B: a narração gravada inteira dividida nas cenas
 import type {ServicoNarracao} from './narracao-servico';
 import {registrarPrevia} from './mcp-previa'; // frente IDE: ver_quadro, ver_cenas e ver_trecho (docs/ide.md)
 import {registrarExportacaoFinal} from './mcp-exportacao-final'; // exportar_video, exportar_imagem, exportar_carrossel (docs/exportacao.md)
@@ -339,6 +340,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   registrarMusica(servidor, projeto, autor, origem); // frente Música: música e ida e volta entre módulos (docs/musica.md)
   registrarTela(servidor, projeto, autor); // mostrar_documento: leva a tela da pessoa a um documento (mcp-tela.ts)
   registrarNarracao(servidor, projeto, autor, origem, narrador); // narração por IA (docs/narracao.md): vozes, narrar, pronúncias, ajustar cenas à fala
+  registrarNarracaoInteira(servidor, projeto, autor, origem); // Onda B: dividir_narracao, a gravação inteira nas cenas (mcp-narracao-inteira.ts)
   registrarPrevia(servidor, projeto); // frente IDE: prévias do vídeo em saidas/previas/ (src/nucleo/mcp-previa.ts)
   registrarExportacaoFinal(servidor, projeto, autor, origem); // o arquivo final em saidas/ sem clicar em Exportar (mcp-exportacao-final.ts)
   registrarProjeto(servidor, projeto); // frente 2: importar_midia, renomear_documento e marcar_ponto_de_restauracao (mcp-projeto.ts)
