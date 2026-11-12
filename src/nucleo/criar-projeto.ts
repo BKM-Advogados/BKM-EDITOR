@@ -219,6 +219,31 @@ export const linhasDaImagem = (): string[] => [
   '  `src_original`. A pessoa exporta PNG por página e PDF pelo app; o MCP não exporta.',
 ];
 
+/** Seção "Planejar antes de montar" (Onda B): num pedido novo, poucas perguntas, o Plano do vídeo e a aprovação da pessoa
+ *  antes de montar; pedido pequeno vai direto. O plano em src/nucleo/plano-video.ts; as ferramentas em mcp-plano.ts. Vem
+ *  antes de "Como trabalhar" e sem lista numerada (o teste conta os itens de "Como trabalhar"). */
+export const secaoPlanejar = () => [
+  '',
+  '## Planejar antes de montar',
+  '',
+  'Num pedido novo (um vídeo, um carrossel ou outra peça do zero, ou refazer o roteiro de uma), planeje antes de montar:',
+  '',
+  '- **Pergunte só o que falta.** No máximo 3 perguntas, numa mensagem só, cada uma com uma sugestão de resposta',
+  '  ("Para quem é? Sugiro: trabalhadores da indústria"). Não pergunte o que o pedido já diz; o que dá para supor, suponha',
+  '  e escreva nas `notas` do plano. Pedido que já traz tudo vai direto ao plano, sem pergunta.',
+  '- **Escreva o Plano do vídeo** com `escrever_plano`: objetivo, público, formato e duração, roteiro cena a cena (o que',
+  '  aparece e o que se fala), a mídia que vai usar e a que falta, narração e música. Ele fica em `plano.json` e, no app,',
+  '  aparece na conversa com "Aprovar plano" e "Pedir ajuste". Depois, mostre o plano em poucas linhas e pare.',
+  '- **Espere a aprovação.** Antes de montar, `ler_plano`: só monte com o `estado` `aprovado`. Em `ajustar`, refaça o plano',
+  '  com o pedido de `decisao.ajuste` (de novo com `escrever_plano`) e espere outra vez. A pessoa pode também aprovar ou',
+  '  pedir ajuste escrevendo na conversa.',
+  '- **Sem a tela do app** (Claude Desktop ou IDE com o app fechado), a pessoa aprova na conversa: registre com',
+  '  `aprovar_plano` {revisao} e monte. Nunca aprove por ela; com o app aberto, o app pergunta a ela antes.',
+  '- **Pedido pequeno não tem plano**: trocar uma cor, um texto ou um tempo, mexer num bloco, resolver um comentário ou',
+  '  continuar uma peça já planejada vai direto.',
+  '- Ao montar, siga o roteiro aprovado. Se algo mudar no caminho (uma cena a mais, uma mídia que não veio), diga no fim.',
+];
+
 // O texto da música é o de docs/musica.md ("Para o guia da IA"), mais o editar_notas.
 const secaoMusica = () => [
   '',
@@ -360,6 +385,7 @@ export const guiaDoProjeto = (modulos: Modulo[], arquivo: ArquivoDeGuia = 'CLAUD
   linhas.push(
     '- `midia/`: arquivos usados pelos documentos. `saidas/`: o que o app exporta (fora do git).',
     '- `comentarios.json`: comentários da pessoa, ancorados num objeto (`alvo.objeto`, JSON Pointer), num tempo e num ponto.',
+    '- `plano.json`: o Plano do vídeo (seção "Planejar antes de montar"); grave e leia pelas ferramentas, nunca à mão.',
     '- `.estudio/diario.jsonl`: diário de todas as mudanças (quem, quando, patch e patch inverso).',
   );
   if (tem('video') || tem('imagem')) {
@@ -381,6 +407,7 @@ export const guiaDoProjeto = (modulos: Modulo[], arquivo: ArquivoDeGuia = 'CLAUD
     '`listar_marcas` mostra os kits de marca da pessoa; `criar_marca`, `editar_marca`, `importar_logo_marca` e\n   `importar_fonte_marca` mudam esses kits, fora do projeto e sem Reverter (pedem a permissão dela).',
     '`criar_projeto`, `abrir_projeto`, `duplicar_projeto` e `fechar_projeto` existem no Claude Desktop e na IDE. Numa conversa\n   dentro do app elas não aparecem (trocar de projeto fecharia a conversa): peça à pessoa para fazer pela tela.',
     '`guia_do_projeto` devolve este guia, se você não o recebeu.',
+    '`ler_plano`, `escrever_plano` e `aprovar_plano` cuidam do Plano do vídeo de um pedido novo (seção acima).',
   ];
   if (tem('video') || tem('imagem') || tem('animacao')) passos.push('`aplicar_marca` troca o kit de marca (cores, fonte, logo e fontes próprias) de um documento.');
   if (tem('video')) {
@@ -404,6 +431,7 @@ export const guiaDoProjeto = (modulos: Modulo[], arquivo: ArquivoDeGuia = 'CLAUD
   if (tem('animacao')) passos.push('`criar_animacao`, `adicionar_camada_animacao`, `animar`, `pixelizar_imagem`, `efeito_pixel` e `ver_animacao` montam e animam a animação (docs/animacao.md).');
   if (tem('video') || tem('animacao')) passos.push('`exportar_video` exporta o vídeo para `saidas/` como o botão Exportar (destinos, codec, qualidade, trecho,\n   legendas e marca d\'água; pede a permissão da pessoa). Render longo devolve um id: `situacao_exportacao` acompanha.');
   if (tem('imagem')) passos.push('`exportar_imagem` (PNG, JPG ou WebP) e `exportar_carrossel` (PNG por página e PDF) gravam em `saidas/`; só com o\n   projeto aberto no app, que desenha a imagem.');
+  linhas.push(...secaoPlanejar()); // Onda B: perguntas, plano e aprovação antes de montar
   linhas.push('', '## Como trabalhar', '', ...passos.map((t, i) => `${i + 1}. ${t}`));
   if (tem('musica')) linhas.push(...secaoMusica());
   if (tem('video') || tem('imagem')) linhas.push(...secaoPesquisa());

@@ -48,6 +48,7 @@ import {registrarProjeto} from './mcp-projeto'; // frente 2: importar_midia, ren
 import {registrarMarcaEdicao} from './mcp-marca-edicao'; // frente 2: os kits de marca da pessoa
 import {registrarMedidas} from './mcp-medidas'; // frente 3 do MCP: medir_loudness, medir_envelope, limpar_voz
 import {registrarPreviaJanela} from './mcp-previa-janela'; // frente 3 do MCP: ver_imagem, ver_cena_3d
+import {registrarPlano} from './mcp-plano'; // Onda B: o Plano do vídeo (ler_plano, escrever_plano, aprovar_plano)
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x, null, 2)}]});
 const erro = (e: unknown) => ({
@@ -344,6 +345,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   registrarPreviaJanela(servidor, projeto); // frente 3: prévias da imagem e da cena 3D pela janela (mcp-previa-janela.ts)
   registrarMedidas(servidor, projeto, autor, origem); // frente 3: loudness, envelope e limpeza de voz (mcp-medidas.ts)
   registrarEdicaoFina(servidor, projeto, autor, origem); // frente 4: lâmina, legendas, páginas, entradas e efeitos (mcp-edicao-fina.ts)
+  registrarPlano(servidor, projeto, autor, origem); // Onda B: o plano antes de montar (mcp-plano.ts, plano-video.ts)
 };
 
 // ---------- pesquisa: fontes e fatos (src/nucleo/pesquisa.ts, docs/pesquisa.md) ----------
