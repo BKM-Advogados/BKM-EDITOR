@@ -35,6 +35,16 @@ export const CLASSES: Record<string, {classe: Classe; motivo: string; livreSe?: 
   exportar_video: {classe: 'cartao', motivo: 'exportar o vídeo para saidas/ (leva de segundos a minutos)'},
   exportar_imagem: {classe: 'cartao', motivo: 'exportar a imagem para saidas/'},
   exportar_carrossel: {classe: 'cartao', motivo: 'exportar o carrossel (PNG por página e PDF) para saidas/'},
+  // frente 2 (mcp-projeto.ts, mcp-marca-edicao.ts): trazer arquivo de fora, trocar de projeto e gravar na pasta dos kits
+  importar_midia: {classe: 'cartao', motivo: 'trazer um arquivo do seu computador para midia/ do projeto'},
+  criar_projeto: {classe: 'cartao', motivo: 'criar um projeto novo e abri-lo no Estúdio (o projeto aberto fecha, com as conversas dele)'},
+  abrir_projeto: {classe: 'cartao', motivo: 'abrir outro projeto no Estúdio (o projeto aberto fecha, com as conversas dele)'},
+  duplicar_projeto: {classe: 'cartao', motivo: 'copiar o projeto para uma pasta nova e abrir a cópia no Estúdio'},
+  fechar_projeto: {classe: 'cartao', motivo: 'fechar o projeto aberto no Estúdio (as conversas dele fecham)'},
+  criar_marca: {classe: 'cartao', motivo: 'criar um kit de marca na sua pasta de kits (fora do projeto)'},
+  editar_marca: {classe: 'cartao', motivo: 'mudar um kit de marca na sua pasta de kits (fora do projeto, sem Reverter)'},
+  importar_logo_marca: {classe: 'cartao', motivo: 'trazer uma imagem do seu computador como logo de um kit de marca'},
+  importar_fonte_marca: {classe: 'cartao', motivo: 'trazer um arquivo de fonte do seu computador para um kit de marca'},
 };
 
 type Anotacoes = {openWorldHint?: boolean; destructiveHint?: boolean};

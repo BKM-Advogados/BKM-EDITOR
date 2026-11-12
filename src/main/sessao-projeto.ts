@@ -105,6 +105,14 @@ export class SessaoProjeto {
     return this.salvarVersao(mensagem);
   }
 
+  /** O ponto de restauração com o app fechado (o marcar_ponto_de_restauracao pelo MCP da IDE e do Claude Desktop): o
+   *  mesmo commit do Ctrl+S, com o .gitignore da mídia pesada, sem observar a pasta. Sem git (ou sem permissão), false. */
+  static async pontoSemApp(raiz: string, mensagem?: string): Promise<{ok: boolean; temGit: boolean}> {
+    const s = new SessaoProjeto(raiz, () => undefined);
+    s._temGit = await s.prepararGit();
+    return {ok: s._temGit ? await s.marcarVersao(mensagem) : false, temGit: s._temGit};
+  }
+
   private async git(...args: string[]) {
     return exec(this.exeGit, args, {cwd: this.projeto.raiz, windowsHide: true});
   }
