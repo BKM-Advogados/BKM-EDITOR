@@ -287,7 +287,7 @@ export const guiaDoProjeto = (modulos: Modulo[], arquivo: ArquivoDeGuia = 'CLAUD
       '  `clipes[]` com `id`, `arquivo` (em `midia/`), `em` (ms na linha do tempo), `duracao_ms`, `corte_ms`, `volume`,',
       '  `fade_in_ms`, `fade_out_ms` e `mudo`. O que ficar fora do vídeo vira aviso, não erro (detalhe em docs/audio.md do app).',
       '  Loudness: `audio.alvo_lufs` (padrão −14) e `audio.pico_dbtp` (padrão −1) são o alvo do arquivo exportado; a exportação',
-      '  mede o arquivo final e corrige o ganho. A limpeza de voz se faz na tela, por clipe: o app troca o `arquivo` pelo WAV',
+      '  mede o arquivo final e corrige o ganho. A limpeza de voz é por clipe (na tela ou `limpar_voz`): troca o `arquivo` pelo WAV',
       '  limpo, guarda o da pessoa em `original` e as medidas em `limpeza`. Não escreva `original` nem `limpeza` à mão.',
       '  Movimento no bloco `imagem` (zoom dinâmico): `movimento` {`tipo` (`aproximar`, `afastar`, `esquerda`, `direita`,',
       '  `cima`, `baixo`), `intensidade` (0,05 a 0,4; padrão 0,15), `suave` (padrão sim)}. Fica limpo com `ajuste: "cobrir"`.',
@@ -382,6 +382,7 @@ export const guiaDoProjeto = (modulos: Modulo[], arquivo: ArquivoDeGuia = 'CLAUD
     passos.push('Narração por IA: escreva `cenas[i].narracao.texto`, ajuste a voz com `configurar_narracao` e as pronúncias com\n   `pronuncias_narracao`; mostre à pessoa `narrar` com `previa: true` (texto final e custo, sem gastar) e depois\n   gere com `narrar` (cache: só a cena que mudou vai ao Google). `ajustar_cenas_a_fala` faz a cena durar a fala;\n   `transcrever`, depois, cria as legendas.');
     passos.push('`propor_cortes_fala` propõe tirar pausas longas e "ãh" de um clipe de voz e `aplicar_cortes_fala` grava a\n   narração emendada (as legendas vão junto). `preparar_teleprompter` grava o texto que a pessoa lê ao gravar.');
     passos.push('Som: `adicionar_clipe_audio` põe um áudio do projeto numa faixa; `dividir_clipe`, `copiar_clipe` e `crossfade`\n   editam os clipes. `listar_trilhas` mostra a pasta de trilhas da pessoa e `escolher_trilha` traz uma para o vídeo\n   (pede a permissão dela); `creditos_das_musicas` dá os créditos que as licenças pedem.');
+    passos.push('`medir_loudness` mede o som do vídeo como o render vai soar (LUFS da mistura contra o alvo, a voz e quanto a\n   música fica abaixo dela). `medir_envelope` mede um áudio novo (duração e forma de onda), o que a tela faz ao ver o\n   arquivo: chame com o app fechado. `limpar_voz` limpa a voz de um clipe sem tocar no original (`voltar: true` desfaz).');
     passos.push('`marca_dagua` lê ou muda a marca d\'água de cada destino da exportação; `medir_contraste_marca` confere se ela lê\n   sobre o fundo (só com o app aberto).');
   }
   if (tem('imagem')) {

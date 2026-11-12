@@ -46,6 +46,8 @@ import {registrarIpcNarracao} from './ipc-narracao'; // narração por IA (docs/
 import {aoAbrirMusica, registrarIpcMusica} from './ipc-musica'; // frente Música
 import {criarPonteJanela} from './ponte-janela';
 import {definirServicoPrevia} from '../nucleo/mcp-previa'; // frente IDE: prévias do MCP
+import {definirServicoMedidas} from '../nucleo/medidas-som'; // frente 3 do MCP: medidas do som
+import {servicoDeMedidas} from './medidas';
 import {criarServicoPrevia} from './previa'; // frente IDE
 import {criarIde} from './ide'; // frente IDE: projetos prontos para IDE de agentes
 import {scriptDoMcp} from '../nucleo/ide'; // frente IDE
@@ -616,6 +618,8 @@ definirServicoPrevia(criarServicoPrevia({preparar: (aviso) => prepararRender({ra
 // frente Som (rodada 2): limpeza de voz (limpeza-voz.ts) e medidor de loudness da mistura (loudness.ts)
 registrarIpcLimpeza(lidar, exigirProjeto, enviar);
 registrarIpcLoudness(lidar, exigirProjeto, (documento) => (exigirProjeto(), sessao!.propsVideo(documento, midia.base)));
+// frente 3 do MCP: medir_loudness, medir_envelope e limpar_voz com as funções da tela
+definirServicoMedidas(servicoDeMedidas());
 registrarIpcMidia(lidar, exigirProjeto); // frente Casca: painel de mídia (lista de midia/ e marcas das tomadas)
 // frente IA: Configurações › IA (provedores, chaves cifradas pelo safeStorage em userData/ia, modelos, uso do mês)
 registrarIpcIa({lidar, claudeInstalado: () => claude, pasta: path.join(app.getPath('userData'), 'ia'), conversas: () => conversas,

@@ -15,10 +15,14 @@ import {servicoDeRender} from '../src/main/musica-render';
 import {servicoDoAmbiente} from '../src/main/narracao';
 import {definirServicoPrevia} from '../src/nucleo/mcp-previa';
 import {servicoDePreviaStdio} from '../src/main/previa-stdio';
+import {definirServicoMedidas} from '../src/nucleo/medidas-som'; // frente 3: loudness, envelope e limpeza com o app fechado
+import {pastaDoFfmpegDoApp, servicoDeMedidas} from '../src/main/medidas';
 
 const raizApp = path.resolve(__dirname, '..');
 definirServicoMusica(servicoDeRender());
 definirServicoPrevia(servicoDePreviaStdio(raizApp));
+const ffmpeg = pastaDoFfmpegDoApp(raizApp);
+definirServicoMedidas(servicoDeMedidas({binarios: () => ffmpeg}));
 const transcritor = new Transcritor({raizApp});
 const rede = criarRede();
 const narrador = servicoDoAmbiente();

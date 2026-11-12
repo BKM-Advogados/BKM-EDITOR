@@ -24,6 +24,8 @@ import {servicoDeRender} from '../src/main/musica-render';
 import {servicoDoAmbiente} from '../src/main/narracao';
 import {definirServicoPrevia} from '../src/nucleo/mcp-previa'; // frente IDE: ver_quadro, ver_cenas, ver_trecho
 import {servicoDePreviaStdio} from '../src/main/previa-stdio';
+import {definirServicoMedidas} from '../src/nucleo/medidas-som'; // frente 3: loudness, envelope e limpeza com o app fechado
+import {pastaDoFfmpegDoApp, servicoDeMedidas} from '../src/main/medidas';
 
 const arg = (nome: string) => {
   const i = process.argv.indexOf(nome);
@@ -41,6 +43,10 @@ const servidor = new McpServer({name: 'estudio', version: '0.1.0'}, {instruction
 definirServicoMusica(servicoDeRender());
 // frente IDE: as prévias renderizam com o app de onde veio este arquivo (src/main/previa-stdio.ts)
 definirServicoPrevia(servicoDePreviaStdio(path.resolve(__dirname, '..')));
+// frente 3: as medidas do som com o ffmpeg do app de onde veio este arquivo (ver_imagem e ver_cena_3d precisam da janela:
+// sem o app aberto, respondem pedindo para abrir o projeto)
+const ffmpeg = pastaDoFfmpegDoApp(path.resolve(__dirname, '..'));
+definirServicoMedidas(servicoDeMedidas({binarios: () => ffmpeg}));
 // a transcrição local acha o ffmpeg no node_modules do repositório (dist-mcp/ fica na raiz)
 const raiz = pasta;
 // um processo por conversa da IDE: a mesma origem (ide-<id>) no diário com o app aberto ou fechado (mcp-app.ts)
