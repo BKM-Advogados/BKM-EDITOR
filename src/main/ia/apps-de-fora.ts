@@ -6,6 +6,7 @@ import {randomBytes} from 'node:crypto';
 import {existsSync, mkdirSync, readFileSync, renameSync, writeFileSync} from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
+import {pedidoLocal} from '../pedido-local';
 import type {Cofre} from './chaves';
 
 export const PORTA_PADRAO = 47815;
@@ -124,8 +125,7 @@ export class AppsDeFora {
     this.erro = null;
     const s = http.createServer((req, res) => {
       // só o próprio PC, só /mcp, e nada vindo de página web (DNS rebinding, CSRF): Host exato e sem Origin
-      const hostOk = req.headers.host === `127.0.0.1:${porta}` || req.headers.host === `localhost:${porta}`;
-      if (!hostOk || req.headers.origin) return void res.writeHead(403, {'Content-Type': 'text/plain'}).end('recusado');
+      if (!pedidoLocal(req)) return void res.writeHead(403, {'Content-Type': 'text/plain'}).end('recusado');
       const mcp = this.o.mcp();
       if (!mcp) return void res.writeHead(503).end();
       // como o despachar do servidor de mídia: falha no meio vira resposta, nunca rejeição solta e cliente pendurado

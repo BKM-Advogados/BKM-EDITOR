@@ -199,7 +199,8 @@ const secaoEfeitos = () => {
     '  cada item é {`id` (único), `tipo`, `valor`, `ativo` (padrão sim), `cor` (só no `tom`)}. Só estes tipos existem.',
     ...linhas,
     '  Brilho, contraste e saturação valem 1 quando não mudam nada; preto e branco é `saturacao` 0; sépia, vinheta,',
-    '  granulado e tom vão de 0 (nada) a 1. Tipo ou campo fora disto quebra a área Efeitos do app: não invente.',
+    '  granulado e tom vão de 0 (nada) a 1. Valor fora da faixa vira a ponta mais próxima; tipo fora da lista não se',
+    '  desenha e fica na pilha como "(inválido)", com aviso na resposta do patch: não invente.',
   ];
 };
 

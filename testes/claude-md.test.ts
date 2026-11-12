@@ -56,6 +56,9 @@ describe('CLAUDE.md do projeto', () => {
       expect(listados).toEqual(EFEITOS.map((d) => [d.tipo, d.min, d.max]));
       expect(trecho).toContain('preto e branco é `saturacao` 0');
       expect(trecho).toContain('não invente');
+      // o app lê a pilha com tolerância (efeitos.ts, lerEfeitos): o guia não pode dizer que tipo errado quebra a área
+      expect(trecho).toContain('"(inválido)"');
+      expect(trecho).not.toContain('quebra a área');
     }
     expect(claudeMd(['3d'])).not.toContain('- Efeitos');
   });

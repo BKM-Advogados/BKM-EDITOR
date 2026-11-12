@@ -33,7 +33,16 @@ export const CLASSES: Record<string, {classe: Classe; motivo: string; livreSe?: 
   vozes_narracao: {classe: 'cartao', motivo: 'listar as vozes de narração do Google (usa a sua chave, sem custo)'},
 };
 
-type Anotacoes = {openWorldHint?: boolean; destructiveHint?: boolean};
+/** Ferramentas que só leem o projeto (nada grava, nada renderiza, nada sai do PC): ganham readOnlyHint, para o cliente
+ *  do MCP (Claude Code, Claude Desktop) poder liberá-las sem perguntar. Ferramenta nova só de leitura entra aqui. */
+export const SO_LEITURA = new Set([
+  'estado_do_editor', 'projeto_info', 'guia_do_projeto', 'ler_documento', 'listar_mudancas',
+  'listar_comentarios', 'ler_comentario', 'listar_pesquisa', 'texto_da_fonte', 'checar_texto',
+  'ver_marca', 'buscar_icone', 'listar_midia', 'ler_legendas', 'ver_animacao',
+  'listar_trilhas', 'creditos_das_musicas', 'ler_musica', 'licencas_do_projeto',
+]);
+
+type Anotacoes = {openWorldHint?: boolean; destructiveHint?: boolean; readOnlyHint?: boolean};
 
 export const classeDe = (nome: string, anotacoes?: Anotacoes): Classe =>
   CLASSES[nome]?.classe ?? (anotacoes?.openWorldHint || anotacoes?.destructiveHint ? 'cartao' : 'livre');
@@ -49,7 +58,9 @@ const NEGADO = 'A pessoa negou esta ação no Estúdio. Não tente de novo sem e
 export const instalarPortao = (servidor: McpServer, o: {projeto: DiarioDoPortao; origem: string; portao?: Portao}) => {
   const original = servidor.registerTool.bind(servidor) as (...a: unknown[]) => unknown;
   const envolvido = (nome: string, config: {inputSchema?: unknown; annotations?: Anotacoes}, cb: (...a: unknown[]) => unknown) =>
-    original(nome, config, async (...a: unknown[]) => {
+    original(nome, SO_LEITURA.has(nome)
+      ? {...config, annotations: {readOnlyHint: true, destructiveHint: false, openWorldHint: false, ...config.annotations}}
+      : config, async (...a: unknown[]) => {
       // com inputSchema o SDK chama (args, extra); sem ele, só (extra)
       const entrada = (config.inputSchema ? a[0] : {}) as Record<string, unknown>;
       const extra = (config.inputSchema ? a[1] : a[0]) as {signal?: AbortSignal} | undefined;
