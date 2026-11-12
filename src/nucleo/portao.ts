@@ -46,6 +46,7 @@ export const CLASSES: Record<string, {classe: Classe; motivo: string; livreSe?: 
   importar_logo_marca: {classe: 'cartao', motivo: 'trazer uma imagem do seu computador como logo de um kit de marca'},
   importar_fonte_marca: {classe: 'cartao', motivo: 'trazer um arquivo de fonte do seu computador para um kit de marca'},
   // Onda B (mcp-modelos.ts): grava na pasta de modelos da pessoa, fora do projeto e sem Reverter
+  listar_modelos: {classe: 'livre', motivo: 'listar os modelos que você salvou (só leitura)'},
   salvar_como_modelo: {classe: 'cartao', motivo: 'salvar o projeto como modelo na sua pasta de modelos (fora do projeto, aparece em Novo)'},
   // Onda B (mcp-plano.ts): a aprovação é da pessoa; com o app aberto ela confirma aqui (ou aprova pelo botão do cartão)
   aprovar_plano: {classe: 'cartao', motivo: 'registrar que você aprovou o Plano do vídeo (depois disso a IA começa a montar)'},

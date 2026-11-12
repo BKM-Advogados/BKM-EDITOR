@@ -156,7 +156,7 @@ documento sem ser objeto ou fora do formato do módulo dele, e devolve os avisos
 | `importar_midia` | `{caminho, pasta?, nome?}` | cartao: traz arquivo de fora |
 | `renomear_documento` | `{documento, titulo}` | livre (o manifesto, como `renomear_projeto`; fora do diário) |
 | `marcar_ponto_de_restauracao` | `{mensagem?}` | livre: o Ctrl+S, um commit no git do projeto |
-| `criar_projeto` | `{nome?, modelo?, formato?, largura?, altura?, marca?, pasta?}` | cartao; só fora do app (abaixo) |
+| `criar_projeto` | `{nome?, modelo? ou modelo_proprio?, formato?, largura?, altura?, marca?, pasta?}` (`modelo_proprio`: id de `listar_modelos`) | cartao; só fora do app (abaixo) |
 | `abrir_projeto` | `{projeto}` (nome ou pasta) | cartao; só fora do app |
 | `duplicar_projeto` | `{nome?}` | cartao; só fora do app |
 | `fechar_projeto` | — | cartao; só fora do app |
@@ -165,6 +165,7 @@ documento sem ser objeto ou fora do formato do módulo dele, e devolve os avisos
 | `editar_marca` | `{marca, nome?, fundo?, texto?, destaque?, suave?, fonte_titulo?, fonte_texto?, fonte_mono?, assinatura?, notas?}` | cartao: idem |
 | `importar_logo_marca` | `{marca, caminho}` | cartao: traz arquivo de fora para o kit |
 | `importar_fonte_marca` | `{marca, caminho, familia?, peso?, estilo?}` | cartao: idem |
+| `listar_modelos` | `{}` | livre: lista os modelos da pessoa (id, nome, módulo, tamanho); o id vai em `criar_projeto {modelo_proprio}` |
 | `salvar_como_modelo` | `{nome, descricao?, documento?}` | cartao: grava na pasta de modelos da pessoa, fora do projeto e sem diário (Onda B) |
 
 - **Uma regra para a tela e para a IA.** `importar_midia` e o botão de escolher arquivo da tela (`escolherMidia`, no

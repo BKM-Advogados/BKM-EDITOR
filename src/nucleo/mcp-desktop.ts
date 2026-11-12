@@ -29,6 +29,8 @@ import {listarProjetos, ORIGEM_CLAUDE_DESKTOP, resolverProjeto, type Descoberta}
 import {appAberto, encaminharAoApp, novaConversaIde, PRAZO_DO_APP_MS, type DestinoApp} from './mcp-app';
 import {INSTRUCOES_MCP} from './mcp-ia';
 import {ESPERA_DO_CARTAO_MS, type Portao} from './portao';
+import {modelosDaPessoa} from './mcp-modelos';
+import {PastaModelos} from './pasta-modelos';
 import {ehTrocaDeProjeto, registrarTrocaDeProjeto, trocadorSemApp} from './mcp-projeto'; // frente 2
 import {Projeto} from './projeto';
 
@@ -67,6 +69,8 @@ export type OpcoesDesktop = {
   encaminhar?: typeof encaminharAoApp;
   appDoProjeto?: typeof appAberto;
   prazo?: number;
+  /** A pasta de modelos da pessoa (listar_modelos sem projeto e criar_projeto com modelo_proprio); padrão: a das preferências. */
+  modelos?: PastaModelos;
 };
 
 const texto = (t: unknown, erro = false): CallToolResult => ({...(erro ? {isError: true} : {}),
@@ -164,6 +168,7 @@ export const criarServidorDesktop = (o: OpcoesDesktop) => {
     return m.result ?? texto('o Estúdio respondeu sem resultado', true);
   };
 
+  const modelos = o.modelos ?? new PastaModelos();
   const listar = () => listarProjetos({dados: o.dados, pastas: o.pastas});
 
   // frente 2: trocar de projeto com o app fechado, aqui mesmo (mcp-projeto.ts)
@@ -175,6 +180,7 @@ export const criarServidorDesktop = (o: OpcoesDesktop) => {
       ultimo = raiz; // escolha explícita: a troca não precisa de aviso
     },
     resolver: (pedido) => resolverProjeto(pedido, listar()),
+    modelos,
   });
   // criar e duplicar gravam uma pasta nova: pedem a permissão pela confirmação do Claude Desktop; abrir e fechar só escolhem
   const MOTIVO_LOCAL: Record<string, string> = {criar_projeto: 'criar um projeto novo do Estúdio numa pasta nova', duplicar_projeto: 'copiar o projeto do Estúdio para uma pasta nova'};
@@ -256,6 +262,10 @@ export const criarServidorDesktop = (o: OpcoesDesktop) => {
       }
       return (await (await clienteDaTroca()).callTool(req.params, CallToolResultSchema, {signal: extra.signal})) as CallToolResult;
     }
+
+    // listar_modelos não precisa de projeto: sem app aberto num projeto e sem projeto escolhido, responde daqui (a pessoa pede
+    // "cria um projeto do meu modelo X" de cara); com projeto, segue o caminho de sempre
+    if (nome === 'listar_modelos' && !app?.projeto && !escolhido) return texto(modelosDaPessoa(modelos));
 
     // o projeto em que a chamada vai rodar: o do app, se ele está aberto num projeto; senão, o escolhido
     const alvo = app?.projeto ?? escolhido;
