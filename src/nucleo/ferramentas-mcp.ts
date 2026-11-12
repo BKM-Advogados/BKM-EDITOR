@@ -41,6 +41,7 @@ import {ARQUIVO_TRANSICOES, lerRegistro, transicaoEmCurso} from './transicoes'; 
 import {registrarNarracao} from './mcp-narracao'; // narração por IA (docs/narracao.md)
 import type {ServicoNarracao} from './narracao-servico';
 import {registrarPrevia} from './mcp-previa'; // frente IDE: ver_quadro, ver_cenas e ver_trecho (docs/ide.md)
+import {registrarEdicaoFina} from './mcp-edicao-fina'; // frente 4: edição fina (cenas, legendas, páginas, entradas e efeitos)
 import {USER_AGENT_ESTUDIO} from './versao';
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x, null, 2)}]});
@@ -332,6 +333,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   registrarTela(servidor, projeto, autor); // mostrar_documento: leva a tela da pessoa a um documento (mcp-tela.ts)
   registrarNarracao(servidor, projeto, autor, origem, narrador); // narração por IA (docs/narracao.md): vozes, narrar, pronúncias, ajustar cenas à fala
   registrarPrevia(servidor, projeto); // frente IDE: prévias do vídeo em saidas/previas/ (src/nucleo/mcp-previa.ts)
+  registrarEdicaoFina(servidor, projeto, autor, origem); // frente 4: lâmina, legendas, páginas, entradas e efeitos (mcp-edicao-fina.ts)
 };
 
 // ---------- pesquisa: fontes e fatos (src/nucleo/pesquisa.ts, docs/pesquisa.md) ----------
