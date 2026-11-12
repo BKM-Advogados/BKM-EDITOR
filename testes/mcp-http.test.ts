@@ -108,6 +108,13 @@ describe('MCP por HTTP: o corpo do pedido', () => {
     expect(gravado).toBe(valor);
   });
 
+  it('recusa página web (Origin) e Host estranho mesmo com o token da aba: 403', async () => {
+    const lista = JSON.stringify({jsonrpc: '2.0', id: 9, method: 'tools/list'});
+    expect((await postar({...headers, Origin: 'https://site-malicioso.example'}, lista)).status).toBe(403);
+    expect((await postar({...headers, Host: 'site-malicioso.example'}, lista)).status).toBe(403);
+    expect((await postar({...headers, Host: `localhost:${new URL(origem).port}`}, lista)).status).toBe(200);
+  });
+
   it('JSON inválido recebe 400 com o erro de parse do JSON-RPC', async () => {
     const r = await postar(headers, '{"jsonrpc":');
     expect(r.status).toBe(400);

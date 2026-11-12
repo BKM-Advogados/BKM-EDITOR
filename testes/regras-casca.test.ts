@@ -49,6 +49,20 @@ describe('valor em reais (transversal-D19)', () => {
   });
 });
 
+describe('sem travessão no texto do vídeo', () => {
+  it('avisa o travessão, colado ou entre espaços, uma vez por texto com a contagem', () => {
+    expect(termos('O prazo — em regra — é curto')).toEqual(['travessao:—']);
+    expect(termos('O prazo—em regra—é curto')).toEqual(['travessao:—']);
+    expect(checarTexto('a — b — c').avisos[0].nota).toMatch(/^2 /);
+  });
+
+  it('o meia-risca só avisa quando faz papel de travessão; intervalo fica', () => {
+    expect(termos('O prazo – em regra – é curto')).toEqual(['travessao:–']);
+    expect(termos('De 2020–2024 e das 8–12h')).toEqual([]);
+    expect(termos('Um hífen-comum não avisa')).toEqual([]);
+  });
+});
+
 describe('checar_texto lê as legendas do vídeo de cenas (transversal-N5)', () => {
   let pasta = '';
   beforeAll(() => {

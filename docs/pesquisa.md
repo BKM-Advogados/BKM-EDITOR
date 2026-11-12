@@ -127,7 +127,7 @@ construtor do `McpHttp` (`src/main/mcp-http.ts`); no MCP por stdio (`mcp/nucleo.
 ## Regras de conteúdo (`src/nucleo/regras.ts`)
 
 `checarTexto` compara sem acento, em minúsculas e por palavra inteira, como o `conferir_capa.py` de outro projeto.
-Devolve só avisos (`oab`, `empresa`, `pessoa`, `numero_sem_fato`). O filtro de nome de empresa e de pessoa vale **só para
+Devolve só avisos (`oab`, `empresa`, `pessoa`, `numero_sem_fato`, `travessao`). O filtro de nome de empresa e de pessoa vale **só para
 o texto do vídeo**: a fonte e o fato guardam os nomes como estão no original. "vale" avisa, não reprova (é verbo comum).
 
 ## O que não é censurado

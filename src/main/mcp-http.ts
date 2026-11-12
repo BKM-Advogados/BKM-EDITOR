@@ -10,6 +10,7 @@ import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {StreamableHTTPServerTransport} from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import {registrarFerramentas, type Rede, type TranscritorMcp} from '../nucleo/ferramentas-mcp';
 import {INSTRUCOES_MCP} from '../nucleo/mcp-ia';
+import {pedidoLocal} from './pedido-local';
 import {autorAceito, CABECALHO_AUTOR, CABECALHO_CONVERSA, CABECALHO_ORIGEM, conversaValida, origemDaIde, rotuloAceito} from '../nucleo/mcp-app';
 import type {PedidoPortao, Portao} from '../nucleo/portao';
 import type {Projeto} from '../nucleo/projeto';
@@ -115,6 +116,10 @@ export class McpHttp {
   /** Atende /mcp; devolve false se o pedido não é para cá. */
   async atender(req: http.IncomingMessage, res: http.ServerResponse): Promise<boolean> {
     if (!req.url?.startsWith('/mcp')) return false;
+    if (!pedidoLocal(req)) {
+      res.writeHead(403, {'Content-Type': 'text/plain'}).end('recusado');
+      return true;
+    }
     const token = /^Bearer\s+(\S+)$/.exec(req.headers.authorization ?? '')?.[1];
     const aba = token ? this.abas.get(token) : undefined;
     const projeto = this.projeto();

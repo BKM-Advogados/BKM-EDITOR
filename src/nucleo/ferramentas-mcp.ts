@@ -572,7 +572,7 @@ const registrarPesquisa = (servidor: McpServer, projeto: Projeto, autor: string,
   }));
 
   servidor.registerTool('checar_texto', {
-    description: 'Avisos das regras de conteúdo sobre o texto do vídeo: termos que o Provimento 205/2021 da OAB veda ou pede cuidado, nomes de empresa e de pessoa, e números que não estão em nenhum fato da pesquisa. Passe "texto" ou um "documento" (todos os textos dele, inclusive a narração do roteiro do carrossel narrado e as legendas do vídeo de cenas); no vídeo de cenas vem também a lista dos blocos com número e sem refs, e no documento, se o último texto (ou a narração) termina com a frase de fecho das regras. Só informa: nada é bloqueado.',
+    description: 'Avisos das regras de conteúdo sobre o texto do vídeo: termos que o Provimento 205/2021 da OAB veda ou pede cuidado, nomes de empresa e de pessoa, travessão, e números que não estão em nenhum fato da pesquisa. Passe "texto" ou um "documento" (todos os textos dele, inclusive a narração do roteiro do carrossel narrado e as legendas do vídeo de cenas); no vídeo de cenas vem também a lista dos blocos com número e sem refs, e no documento, se o último texto (ou a narração) termina com a frase de fecho das regras. Só informa: nada é bloqueado.',
     inputSchema: {documento: z.string().optional().describe('id do documento no manifesto'), texto: z.string().optional()},
   }, seguro(({documento, texto: t}: {documento?: string; texto?: string}) => {
     if (!documento && t === undefined) throw new ErroProjeto('passe "texto" ou "documento"', 'patch');

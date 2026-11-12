@@ -181,6 +181,14 @@ export const resolverCenas = (doc: DocCenas, opcoes: OpcoesResolver = {}): {prop
     return {origem: `/cenas/${i}`, id: c.id, nome: c.nome, tipo: 'cena', n: i + 1, t_in, t_out, fundo: c.fundo ?? tema.fundo, blocos,
       ...(Array.isArray(c.refs) ? {refs: c.refs} : {})};
   });
+  // ids de cena e de bloco são únicos no documento (o guia do projeto pede; a seleção, os comentários e as legendas acham o
+  // objeto pelo id). Repetido não quebra o vídeo: avisa onde está, para quem escreveu (pessoa ou IA) trocar.
+  const onde = new Map<string, string[]>();
+  for (const c of cenas) {
+    if (typeof c.id === 'string') onde.set(c.id, [...(onde.get(c.id) ?? []), c.origem]);
+    for (const b of c.blocos) if (typeof b.id === 'string') onde.set(b.id, [...(onde.get(b.id) ?? []), b.origem]);
+  }
+  for (const [id, lugares] of onde) if (lugares.length > 1) avisos.push(`o id "${id}" se repete em ${lugares.join(', ')}: troque por um id novo`);
   const duracao_ms = Math.max(1000, t);
   const som = resolverAudio(doc.audio, duracao_ms, opcoes.envelopes);
   avisos.push(...som.avisos);

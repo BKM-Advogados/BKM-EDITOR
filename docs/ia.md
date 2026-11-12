@@ -95,6 +95,9 @@ Envolve o `registerTool`: toda ferramenta registrada depois dele passa por ele, 
   documento novo aparece na tela da pessoa (veja "A tela da pessoa" abaixo).
 - **Para declarar a classe de uma ferramenta nova**: uma linha em `CLASSES` ou a anotação. Não precisa devolver o
   `seq`: o portão acrescenta ao resultado `{"estudio_mudancas":[{seq, documento, rotulo}]}`.
+- **Só leitura** (`SO_LEITURA`): as ferramentas que só leem o projeto (nada gravam, renderizam ou levam para fora) saem
+  com `readOnlyHint: true` no `tools/list`, para o cliente do MCP poder liberá-las sem perguntar. Ferramenta nova que só
+  lê entra nessa lista; o teste do portão confere que cada nome existe e que nenhum pede cartão.
 - **`livreSe`** na linha de `CLASSES`: o pedido que não sai do PC roda sem cartão. Hoje vale para `narrar` com
   `previa: true`, que só devolve o texto final e o custo estimado.
 - **Onde aparece o pedido**: na conversa da aba ou, sem conversa (terminal, app de fora), num cartão solto no canto da

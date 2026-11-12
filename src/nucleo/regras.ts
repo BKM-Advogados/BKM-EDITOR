@@ -31,7 +31,11 @@ export const REGRAS_CONTEUDO: Regras = {
   texto: {ultima_frase: 'Ficou com alguma dúvida? Procure um advogado trabalhista.'},
 };
 
-export type TipoAviso = 'oab' | 'empresa' | 'pessoa' | 'numero_sem_fato';
+export type TipoAviso = 'oab' | 'empresa' | 'pessoa' | 'numero_sem_fato' | 'travessao';
+
+// "sem travessão" é regra do texto do vídeo (guia do projeto, criar-projeto.ts): o travessão (—) sempre; o meia-risca (–) só
+// quando faz o papel dele, entre espaços, porque "2020–2024" é intervalo e fica.
+const TRAVESSOES = /—|(?<=\s)–(?=\s)/g;
 export type Aviso = {tipo: TipoAviso; termo: string; onde: string; nota?: string};
 
 // conferir_capa.py:_norm: NFKD e fora tudo o que não é ASCII, em minúsculas
@@ -102,6 +106,9 @@ export const checarTexto = (texto: string, regras: Regras = REGRAS_CONTEUDO, opc
       avisos.push({tipo: 'pessoa', termo, onde, nota: 'parece nome de pessoa: no vídeo, use a função ("operador de máquinas")'});
     }
   }
+  const travessoes = texto.match(TRAVESSOES) ?? [];
+  const [primeiro] = travessoes;
+  if (primeiro) avisos.push({tipo: 'travessao', termo: primeiro, onde, nota: `${travessoes.length} travessão(ões): troque por vírgula, ponto ou dois-pontos`});
   if (opcoes.fatos) {
     const comFato = new Set(opcoes.fatos.flatMap((f) => numerosDe(f.afirmacao)));
     for (const n of numerosDe(texto)) {

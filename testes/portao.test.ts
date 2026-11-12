@@ -14,7 +14,7 @@ import {StreamableHTTPClientTransport} from '@modelcontextprotocol/sdk/client/st
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {McpHttp, type Perguntador} from '../src/main/mcp-http';
-import {instalarPortao, mudancasDoResultado} from '../src/nucleo/portao';
+import {CLASSES, instalarPortao, mudancasDoResultado, SO_LEITURA} from '../src/nucleo/portao';
 import {Projeto} from '../src/nucleo/projeto';
 
 let pasta = '';
@@ -53,6 +53,20 @@ const chamar = async (c: Client, name: string, args: Record<string, unknown> = {
 const texto = (r: Res) => r.content.map((x) => x.text).join('\n');
 
 describe('portão de permissão (invólucro do registerTool)', () => {
+  it('as ferramentas só de leitura saem com readOnlyHint; as que gravam, não', async () => {
+    const c = await conectar('Claude leitura');
+    const {tools} = await c.listTools();
+    const porNome = new Map(tools.map((t) => [t.name, t.annotations]));
+    for (const nome of SO_LEITURA) {
+      expect(porNome.has(nome), `${nome} não existe no servidor`).toBe(true);
+      expect(porNome.get(nome)).toMatchObject({readOnlyHint: true, destructiveHint: false, openWorldHint: false});
+      expect(CLASSES[nome]?.classe, `${nome} pede cartão: não é só leitura`).not.toBe('cartao');
+    }
+    for (const nome of ['aplicar_patch', 'desfazer', 'criar_documento']) expect(porNome.get(nome)?.readOnlyHint).not.toBe(true);
+    await c.close();
+  });
+
+
   it('cartão: pergunta antes, não roda se negar; sempre nesta conversa não pergunta de novo; livre não pergunta', async () => {
     const s = new McpServer({name: 't', version: '0'});
     const projeto = new Projeto(pasta);
