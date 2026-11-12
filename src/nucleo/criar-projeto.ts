@@ -200,6 +200,8 @@ const secaoEfeitos = () => {
     ...linhas,
     '  Brilho, contraste e saturação valem 1 quando não mudam nada; preto e branco é `saturacao` 0; sépia, vinheta,',
     '  granulado e tom vão de 0 (nada) a 1. Tipo ou campo fora disto quebra a área Efeitos do app: não invente.',
+    '  `adicionar_efeito` {tipo, valor?, cor?} ou {preajuste: `cinema`, `quente`, `preto_e_branco`} põe na pilha com id livre;',
+    '  `remover_efeito` {id} tira (frente 4: edição fina).',
   ];
 };
 
@@ -382,6 +384,7 @@ export const guiaDoProjeto = (modulos: Modulo[], arquivo: ArquivoDeGuia = 'CLAUD
     passos.push('Narração por IA: escreva `cenas[i].narracao.texto`, ajuste a voz com `configurar_narracao` e as pronúncias com\n   `pronuncias_narracao`; mostre à pessoa `narrar` com `previa: true` (texto final e custo, sem gastar) e depois\n   gere com `narrar` (cache: só a cena que mudou vai ao Google). `ajustar_cenas_a_fala` faz a cena durar a fala;\n   `transcrever`, depois, cria as legendas.');
     passos.push('`propor_cortes_fala` propõe tirar pausas longas e "ãh" de um clipe de voz e `aplicar_cortes_fala` grava a\n   narração emendada (as legendas vão junto). `preparar_teleprompter` grava o texto que a pessoa lê ao gravar.');
     passos.push('Som: `adicionar_clipe_audio` põe um áudio do projeto numa faixa; `dividir_clipe`, `copiar_clipe` e `crossfade`\n   editam os clipes. `listar_trilhas` mostra a pasta de trilhas da pessoa e `escolher_trilha` traz uma para o vídeo\n   (pede a permissão dela); `creditos_das_musicas` dá os créditos que as licenças pedem.');
+    passos.push('Edição fina: `dividir_cena` {em_ms} é a lâmina (Ctrl+K) e `duplicar_cena` copia uma cena com ids novos;\n   `editar_legendas` {op} divide, junta, exclui, cria, substitui em lote e troca a predefinição das legendas.');
     passos.push('`marca_dagua` lê ou muda a marca d\'água de cada destino da exportação; `medir_contraste_marca` confere se ela lê\n   sobre o fundo (só com o app aberto).');
   }
   if (tem('imagem')) {
@@ -389,6 +392,8 @@ export const guiaDoProjeto = (modulos: Modulo[], arquivo: ArquivoDeGuia = 'CLAUD
     passos.push('`selecionar_camadas` mostra camadas na tela da pessoa; `alinhar_camadas`, `distribuir_camadas`, `agrupar_camadas`\n   e `desagrupar_camadas` arrumam o layout; `travar_camadas` trava e `destravar_camadas` destrava (pede a permissão\n   da pessoa: a trava é dela).');
     passos.push('`ver_marca` mostra o kit da imagem; `cor_da_marca` e `fonte_da_marca` põem a cor (`@destaque`) ou a fonte\n   (`@titulo`) do kit numa camada. `buscar_icone` e `inserir_icone` (Lucide), `inserir_linha` (linha e seta) e\n   `fazer_lista` (marcadores ou números num texto) criam as peças já no kit.');
   }
+  if (tem('imagem')) passos.push('`editar_paginas` {op} cria, duplica, move, exclui e renomeia as páginas do carrossel.');
+  if (tem('animacao')) passos.push('`animar_entrada` e `animar_saida` {camada, preajuste} põem uma entrada ou saída pronta (surgir, subir, descer,\n   crescer, girar), como os botões do inspetor.');
   if (tem('animacao')) passos.push('`criar_animacao`, `adicionar_camada_animacao`, `animar`, `pixelizar_imagem`, `efeito_pixel` e `ver_animacao` montam e animam a animação (docs/animacao.md).');
   linhas.push('', '## Como trabalhar', '', ...passos.map((t, i) => `${i + 1}. ${t}`));
   if (tem('musica')) linhas.push(...secaoMusica());

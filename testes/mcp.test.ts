@@ -53,7 +53,9 @@ describe('MCP estudio', () => {
       'medir_musica', 'mostrar_documento', 'narrar', 'pixelizar_imagem', 'por_no_video', 'preparar_teleprompter', 'projeto_info', 'pronuncias_narracao', 'propor_cortes_fala', 'reabrir_comentario', 'registrar_fato', 'remover_fundo', 'renomear_projeto', 'resolver_comentario', 'responder_comentario',
       'reverter', 'selecionar_camadas', 'texto_da_fonte', 'transcrever', 'travar_camadas', 'trocar_kit', 'ver_animacao', 'ver_cenas', 'ver_marca', 'ver_quadro',
       'ver_trecho', 'vozes_narracao',
-    ]);
+      // frente 4: edição fina (mcp-edicao-fina.ts)
+      'adicionar_efeito', 'animar_entrada', 'animar_saida', 'dividir_cena', 'duplicar_cena', 'editar_legendas', 'editar_paginas', 'remover_efeito',
+    ].sort());
   });
 
   it('resolve um comentário da pessoa com patch, e a mudança vai para o diário', async () => {

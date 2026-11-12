@@ -143,6 +143,24 @@ O servidor também manda `instructions` na abertura, para todo cliente MCP. O `l
 entradas e filtra por documento. O `aplicar_patch` exige `versao_base` não vazia, recusa o patch que deixaria o
 documento sem ser objeto ou fora do formato do módulo dele, e devolve os avisos do resolvedor no vídeo de cenas.
 
+## Edição fina (`src/nucleo/mcp-edicao-fina.ts`, frente 4)
+
+O que antes só saía de um `aplicar_patch` grande montado à mão. Cada ferramenta usa a mesma conta do núcleo que o botão
+da tela e grava **uma** entrada no diário (desfazer e Reverter voltam a chamada inteira). Todas `livre`: só mexem no
+documento. Sem `documento`, valem no que a pessoa está vendo (se for do módulo) ou no primeiro do módulo.
+
+| Ferramenta | Parâmetros | O que faz | Conta (núcleo) |
+|---|---|---|---|
+| `dividir_cena` | `{em_ms?, cena?, documento?}` | a lâmina (Ctrl+K), no tempo do vídeo; sem `em_ms`, na cabeça | `cenas-dividir.ts` |
+| `duplicar_cena` | `{cena, documento?}` | cópia logo depois, com ids novos | `comIdsNovos` (`cenas.ts`) |
+| `editar_legendas` | `{op: dividir, juntar, excluir, criar, substituir, estilo, …}` | os botões do painel Legendas; tempos como na tela | `legendas-edicao.ts` |
+| `editar_paginas` | `{op: nova, duplicar, mover, excluir, renomear, pagina?, para?, nome?}` | a barra de páginas do carrossel | `carrossel.ts` |
+| `animar_entrada`, `animar_saida` | `{camada, preajuste, duracao_ms?, em_ms?}` | as entradas e saídas prontas do inspetor | `animacao-preajustes.ts` |
+| `adicionar_efeito` | `{tipo, valor?, cor?}` ou `{preajuste}` | põe na pilha de efeitos do vídeo ou da imagem | `efeitos.ts` |
+| `remover_efeito` | `{id}` | tira da pilha | `efeitos.ts` |
+
+Testes: `testes/edicao-fina-mcp.test.ts` (uma entrada no diário por chamada e o desfazer de cada uma).
+
 ## A tela da pessoa (`src/nucleo/mcp-tela.ts`)
 
 O pedido de navegação é o `.estudio/selecao.json` (`{documento, caminhos, tempo_ms?, autor, em}`), que a interface segue

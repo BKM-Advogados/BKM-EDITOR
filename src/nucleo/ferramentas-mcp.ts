@@ -753,7 +753,7 @@ const registrarFala = (servidor: McpServer, projeto: Projeto, autor: string, ori
     if (texto === undefined && em === undefined && sai === undefined) throw new ErroProjeto('diga o texto, o em ou o sai novos', 'patch');
     let s = segs[i];
     if (texto !== undefined) {
-      if (!texto.trim()) throw new ErroProjeto('texto vazio: para tirar a legenda, use aplicar_patch com remove em /legendas/segmentos/N', 'patch');
+      if (!texto.trim()) throw new ErroProjeto('texto vazio: para tirar a legenda, use editar_legendas com op excluir', 'patch');
       s = comTexto(s, texto);
     }
     if (em !== undefined || sai !== undefined) {

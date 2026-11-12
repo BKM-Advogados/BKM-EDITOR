@@ -382,6 +382,7 @@ igual para a pessoa (inspetor, linha do tempo, Ctrl+K…) e para a IA (`aplicar_
 - **Cena mais curta ou excluída**: tira esse trecho do som. Os clipes inteiros dentro dele saem (com as legendas e os efeitos), os que o
   atravessam são cortados, e o que vem depois anda para trás.
 - **Dividir a cena** (Ctrl+K): a metade de baixo é uma cena nova logo depois da antiga, o total é o mesmo e o som não muda.
+  Desfazer a divisão (a cena de antes cresce o que a seguinte tinha, e a seguinte sai) também não muda o som.
 - **Não age:** quando o patch já mexe em `/audio` ou `/legendas` (quem o fez cuida do som, e é o que faz o Ctrl+Z não somar duas
   vezes); quando a ordem das cenas muda; quando nenhuma cena de antes sobra (todas trocadas por ids novos: não há como saber para onde
   o som vai); e com `audio.acompanha_cenas: false` (campo opcional, padrão: acompanha).
