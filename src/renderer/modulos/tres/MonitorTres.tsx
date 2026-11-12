@@ -9,6 +9,7 @@ import type {TransformControlsMode} from 'three/examples/jsm/controls/TransformC
 import type {DocCena3D, OperacaoPatch, Vetor3} from '../../../nucleo/documentos';
 import {aplicar, comentar, loja, patchTrocar, selecionar, useLoja} from '../../estado/loja';
 import {SemDocumento} from '../../componentes/SemDocumento';
+import {ChipFormato} from '../../componentes/ChipFormato';
 import {arredV, iguaisV, indiceEm, objetosDe, type Transformacao} from './comum';
 import {useCena3d} from './lida';
 import {Motor} from './motor';
@@ -231,6 +232,7 @@ const Palco: React.FC<{documento: string}> = ({documento}) => {
           [{id: 'm', nome: 'Comentário', tecla: 'M', icone: <MessageSquarePlus />, ativa: modoComentario, aoClicar: () => loja.definir({modoComentario: true})}],
         ]} />
         <div className="vista-3d">
+          <ChipFormato modulo="3d" doc={doc} className="em-linha" />
           <span className="nome-vista">{naCamera ? 'Câmera da cena' : 'Perspectiva · vista livre'}</span>
           <span className="esp" />
           {!naCamera && (

@@ -18,6 +18,7 @@ import {
 import {mudouEm} from "../../estado/agente";
 import {AvisoAgente, MarcasAgente} from "../../componentes/Agente";
 import {modoAnimar} from "./preajustes";
+import {ChipFormato, TOPO_CHIP} from "../../componentes/ChipFormato";
 
 export const MonitorAnimacao: React.FC = () => {
   const ativo = useLoja((e) => e.ativo.animacao);
@@ -70,7 +71,7 @@ export const MonitorAnimacao: React.FC = () => {
     if (!el || !doc) return;
     const atualizar = () => {
       const wDisponivel = el.clientWidth - 48;
-      const hDisponivel = el.clientHeight - 48;
+      const hDisponivel = el.clientHeight - TOPO_CHIP * 2; // o chip de formato fica acima do palco
       if (wDisponivel > 0 && hDisponivel > 0) {
         const sx = wDisponivel / doc.largura;
         const sy = hDisponivel / doc.altura;
@@ -202,6 +203,7 @@ export const MonitorAnimacao: React.FC = () => {
     <div className="painel" data-monitor-tela-cheia>
       <div className="monitor-grade sem-trilho">
         <div className={`monitor monitor-animacao${animando ? " animando" : ""}`} ref={containerRef}>
+          <ChipFormato documento={ativo} modulo="animacao" />
           <AvisoAgente />
           <AvisoCamadasDescartadas documento={ativo} doc={doc} />
           <div className="palco" style={{width: doc.largura * escala, height: doc.altura * escala}}>

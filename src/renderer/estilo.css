@@ -223,6 +223,17 @@ input[type="range"]:focus-visible { outline: none; }
 .rotulo-peca { position: absolute; left: 0; top: -19px; font-size: var(--tam-1); color: var(--texto-3); white-space: nowrap; cursor: pointer; user-select: none; }
 .rotulo-peca b { color: var(--texto-2); }
 .rotulo-peca:hover b { color: var(--texto); }
+/* chip de formato (Onda B): no canto de cima do monitor, fora do palco (o palco deixa TOPO_CHIP livre); na imagem e no 3D, na linha do rótulo */
+.chip-formato { position: absolute; top: 8px; left: 8px; z-index: 25; display: inline-flex; }
+.chip-formato.em-linha { position: static; vertical-align: middle; }
+.chip-formato-bt, .chip-formato.so-informa { height: 22px; padding: 0 9px; border-radius: 999px; border: 1px solid var(--borda); background: var(--vidro); color: var(--texto-2);
+  font: var(--peso-forte) var(--tam-1) var(--fonte); white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.chip-formato-bt:hover, .chip-formato-bt.ligado { color: var(--texto); background: var(--fundo-3); border-color: var(--borda-forte); }
+.chip-formato-bt::after { content: ''; width: 0; height: 0; border-left: 3px solid transparent; border-right: 3px solid transparent; border-top: 4px solid currentColor; opacity: .7; }
+.chip-formato.so-informa { cursor: default; color: var(--texto-3); }
+.chip-formato.em-linha .chip-formato-bt, .chip-formato.em-linha.so-informa { height: 18px; padding: 0 7px; }
+.chip-formato .menu { min-width: 220px; }
+.monitor > .chip-formato ~ .aviso-agente { top: 38px; } /* o aviso do Claude desce uma linha e não cobre o chip */
 .sobreposicao { position: absolute; inset: 0; pointer-events: none; }
 /* seleção tem uma forma só (no monitor, na lista e na linha do tempo): contorno de 2 px no acento; branco só nas alças */
 .sobreposicao .caixa-sel { position: absolute; border: 2px solid var(--acento); margin: -1px 0 0 -1px; box-shadow: 0 0 0 1px var(--veu); pointer-events: auto; cursor: move; }
