@@ -12,15 +12,21 @@ const erro = (e: unknown) => ({
   content: [{type: 'text' as const, text: e instanceof ErroProjeto ? `${e.codigo}: ${e.message}` : String((e as Error)?.message ?? e)}],
 });
 
+/** O que listar_modelos devolve: os modelos da pessoa (e um aviso se não há nenhum). Também serve ao servidor do Claude Desktop,
+ *  que responde sem projeto escolhido (mcp-desktop.ts). */
+export const modelosDaPessoa = (modelos: PastaModelos) => {
+  const lista = modelos.listar().map((m) => ({id: m.id, nome: m.nome, ...(m.descricao ? {descricao: m.descricao} : {}), modulo: m.modulo,
+    ...(m.largura ? {largura: m.largura, altura: m.altura} : {}), documentos: m.documentos}));
+  return {modelos: lista, ...(lista.length ? {} : {aviso: 'a pessoa ainda não salvou modelo: salvar_como_modelo guarda o projeto como um'})};
+};
+
 export const registrarModelos = (servidor: McpServer, projeto: Projeto, modelos = new PastaModelos()) => {
   servidor.registerTool('listar_modelos', {
     description: 'Lista os modelos da pessoa (os que ela salvou com salvar_como_modelo, na pasta de modelos dela): id, nome, descrição, módulo, tamanho e documentos. O id vai em criar_projeto {modelo_proprio} para criar um projeto novo a partir de um deles. Os modelos de fábrica não entram aqui (são o "modelo" do criar_projeto). Só lê.',
     inputSchema: {},
   }, async () => {
     try {
-      const lista = modelos.listar().map((m) => ({id: m.id, nome: m.nome, ...(m.descricao ? {descricao: m.descricao} : {}), modulo: m.modulo,
-        ...(m.largura ? {largura: m.largura, altura: m.altura} : {}), documentos: m.documentos}));
-      return texto({modelos: lista, ...(lista.length ? {} : {aviso: 'a pessoa ainda não salvou modelo: salvar_como_modelo guarda o projeto como um'})});
+      return texto(modelosDaPessoa(modelos));
     } catch (e) {
       return erro(e);
     }

@@ -187,7 +187,8 @@ não tem forma de onda nelas.
   mesma `criarPastaDoModelo` da tela inicial (`criarProjetoDoModelo` no `main.ts` com o app aberto; `trocadorSemApp` com ele
   fechado). `modelo_proprio` não vale com `modelo`, `formato`, `largura` nem `altura` (o tamanho vem do modelo); `nome`,
   `marca` e `pasta` valem; id que não existe dá `nao_achado: modelo não achado: <id>`. Com o app fechado no Claude Desktop,
-  `listar_modelos` só responde depois de escolher um projeto (como as outras ferramentas do projeto). `src/nucleo/mcp-modelos.ts`.
+  `listar_modelos` responde antes de escolher projeto (como `listar_projetos`; `modelosDaPessoa` em `mcp-modelos.ts`, atendida
+  em `mcp-desktop.ts`), então dá para pedir "cria um projeto do meu modelo X" sem projeto aberto. `src/nucleo/mcp-modelos.ts`.
 - **Prévia web.** `scripts/previa-web/ponte.ts` abre o exemplo de verdade (mídia servida de `exemplos/exemplo`), cria o
   carrossel narrado e guarda os modelos da pessoa em memória.
 
