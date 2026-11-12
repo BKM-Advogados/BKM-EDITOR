@@ -39,7 +39,14 @@ cor funciona, mas sem a opacidade da parada).
 **Por que `fundo_degrade` está no documento.** O brief pedia campos só na camada e na página. O `fundo` é do documento
 (vale para todas as páginas) e uma prancheta só não tem página no arquivo (`docs/carrossel.md`): pôr o degradê na
 página obrigaria a virar carrossel para ter um fundo em degradê. Ficou um campo opcional no fim do `DocImagem`, ao lado
-do `fundo`. Fundo diferente por página fica para depois (hoje: uma forma do tamanho da página, no fundo da pilha).
+do `fundo`. Fundo diferente por página: cada
+página do carrossel pode ter `fundo` (cor) e/ou `fundo_degrade` próprios, no mesmo formato dos do documento
+(`paginas[i].fundo`, `paginas[i].fundo_degrade`). Com um dos dois, a página usa o fundo próprio (sem cor própria, a cor do
+documento; o degradê do documento não entra por cima); sem nenhum, herda o do documento, então os arquivos antigos ficam
+idênticos. A regra é `fundoDaPagina` e `vistaDaPagina` (`src/nucleo/carrossel.ts`), que a tela, as miniaturas, o PNG e o
+PDF já usam. No inspetor, com a página ativa: "Fundo desta página: Igual ao documento / Próprio" (cor e degradê com os
+mesmos editores). Pelo MCP vai por `aplicar_patch` (`/paginas/1/fundo`); duplicar a página leva o fundo junto, e trocar de
+kit leva as cores de referência (`@destaque`) da página. Testes em `testes/fundo-pagina.test.ts`.
 
 ## Máscara de recorte
 

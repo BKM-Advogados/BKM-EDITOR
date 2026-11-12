@@ -189,7 +189,7 @@ export const registrarEdicaoFina = (servidor: McpServer, projeto: Projeto, autor
   // ---------- páginas do carrossel ----------
 
   servidor.registerTool('editar_paginas', {
-    description: 'Páginas do carrossel de imagem, como a barra de páginas da tela: "nova" (vazia, depois de "pagina" ou no fim, com "nome"), "duplicar" a página, "mover" a página para a posição "para", "excluir" a página (a última não sai) e "renomear" a página para "nome". "pagina" é o id (paginas[i].id) ou o número, 1 = a primeira. Os números de página das camadas acompanham. Numa imagem de prancheta só, a primeira mudança a passa a ter páginas.',
+    description: 'Páginas do carrossel de imagem, como a barra de páginas da tela: "nova" (vazia, depois de "pagina" ou no fim, com "nome"), "duplicar" a página, "mover" a página para a posição "para", "excluir" a página (a última não sai) e "renomear" a página para "nome". "pagina" é o id (paginas[i].id) ou o número, 1 = a primeira. Os números de página das camadas acompanham. O fundo próprio de uma página (`fundo` e/ou `fundo_degrade` em paginas[i]) se grava com aplicar_patch. Numa imagem de prancheta só, a primeira mudança a passa a ter páginas.',
     inputSchema: {
       op: z.enum(['nova', 'duplicar', 'mover', 'excluir', 'renomear']),
       pagina: z.string().optional().describe('id ou número da página (1 = a primeira); nova: depois de qual'),
