@@ -215,8 +215,8 @@ export const linhasDaImagem = (): string[] => [
   '  Acabamento por camada: `sombra` {cor, opacidade, desfoque, x, y}; `contorno` {cor, espessura, posicao: `fora`,',
   '  `centro` ou `dentro`}; `degrade` {`tipo` (`linear` ou `radial`), `angulo` (180 = de cima para baixo), `centro` {x, y},',
   '  `paradas` [{cor, posicao de 0 a 1, opacidade}]}, no lugar da cor em texto e forma. `fundo_degrade`, na raiz do',
-  '  documento, vai por cima do `fundo` em todas as páginas. Foto dentro de forma ou texto: na camada de imagem, `mascara`',
-  '  é o id da forma ou do texto logo acima dela. `remover_fundo` troca o `src` pelo recorte e guarda o original em',
+  '  documento, vai por cima do `fundo` em todas as páginas; uma página pode ter `fundo` e/ou `fundo_degrade` próprios.',
+  '  Foto dentro de forma ou texto: na camada de imagem, `mascara` é o id da forma ou do texto logo acima dela. `remover_fundo` troca o `src` pelo recorte e guarda o original em',
   '  `src_original`. A pessoa exporta PNG por página e PDF pelo app; o MCP não exporta.',
 ];
 

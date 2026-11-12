@@ -7,7 +7,7 @@ import {teclaDeApagar} from '../../teclas';
 import React, {useEffect, useRef, useState} from 'react';
 import {ArrowLeft, ArrowRight, Copy, LayoutGrid, MoreHorizontal, Pencil, Plus, Trash2} from 'lucide-react';
 import type {DocImagem} from '../../../nucleo/documentos';
-import {paginaDoAlvo} from '../../../nucleo/carrossel';
+import {fundoDaPagina, paginaDoAlvo} from '../../../nucleo/carrossel';
 import {FORMATOS_IMAGEM} from '../../../nucleo/formatos';
 import {useLoja} from '../../estado/loja';
 import {BotaoMenu, type ItemMenu} from '../../componentes/Menu';
@@ -122,7 +122,7 @@ export const PaginasImagem: React.FC<{documento: string; doc: DocImagem}> = ({do
                 if (alvo?.i !== i || alvo.lado !== lado) setAlvo({i, lado});
               }}
               onDrop={(e) => (e.preventDefault(), soltar(i, ladoDe(e)))}>
-              <Miniatura pagina={pg} largura={doc.largura} altura={doc.altura} fundo={doc.fundo} fundoDegrade={doc.fundo_degrade} alturaCaixa={ALTURA_MINI} marca={doc.marca} />
+              <Miniatura pagina={pg} largura={doc.largura} altura={doc.altura} fundo={fundoDaPagina(doc, pg).fundo} fundoDegrade={fundoDaPagina(doc, pg).fundo_degrade} alturaCaixa={ALTURA_MINI} marca={doc.marca} />
               <span className="legenda">
                 <b>{i + 1}</b>
                 {renomeando === i ? (
