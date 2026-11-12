@@ -6,7 +6,9 @@
 // texto da versão instalada.
 import {TEMA_NEUTRO, type BlocoCenas, type CenaCenas, type DocCenas} from './cenas';
 import type {Manifesto} from './documentos';
-import {serializar} from './projeto';
+
+// o mesmo texto do serializar de projeto.ts, aqui sem node:fs: a prévia web (scripts/previa-web) importa este arquivo
+const serializar = (doc: unknown) => `${JSON.stringify(doc, null, 2)}\n`;
 
 const CAMINHO_DOC = 'video/video.json';
 export const IMAGENS_DO_EXEMPLO = {paisagem: 'midia/exemplo-paisagem.svg', blocos: 'midia/exemplo-blocos.svg'};

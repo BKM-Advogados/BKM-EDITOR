@@ -11,6 +11,7 @@ import jsonpatch, {type Operation} from 'fast-json-patch';
 import type {DocImagem, EntradaDocumento, Manifesto, Modulo} from './documentos';
 import {novoDoc3d} from './cena3d';
 import {novoDocCenas} from './cenas';
+import {modeloCarrosselNarrado} from './modelo-carrossel-narrado';
 import {novaAnimacao, modeloAnimacaoLogoPixel} from './animacao';
 import {novaMusica} from './musica'; // frente Música
 import {EFEITOS} from './efeitos';
@@ -546,6 +547,15 @@ export const planoDoProjeto = (o: OpcoesProjeto): Plano => {
     return {
       manifesto,
       arquivos: {'estudio.json': serializar(manifesto), [entrada.caminho]: serializar(conteudo), '.gitignore': GITIGNORE, 'CLAUDE.md': claudeMd(['animacao'])},
+      pastas,
+    };
+  }
+  if (o.modelo === 'video-carrossel-narrado') {
+    const entrada: EntradaDocumento = {id: 'video', modulo: 'video', caminho: 'video/video.json', titulo: 'Carrossel narrado'};
+    const manifesto: Manifesto = {formato: 1, nome, documentos: [entrada]};
+    return {
+      manifesto,
+      arquivos: {'estudio.json': serializar(manifesto), [entrada.caminho]: serializar(modeloCarrosselNarrado()), '.gitignore': GITIGNORE, 'CLAUDE.md': claudeMd(['video'])},
       pastas,
     };
   }

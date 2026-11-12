@@ -18,6 +18,8 @@ import {novoDoc3d} from '../../src/nucleo/cena3d';
 import {modeloAnimacaoLogoPixel} from '../../src/nucleo/animacao';
 import {idDeMarca, MARCA_NEUTRO, MARCAS_INICIAIS, patchDaMarca, temaDaMarca, type Marca} from '../../src/nucleo/marca';
 import {MODELOS} from '../../src/nucleo/modelos';
+import {modeloCarrosselNarrado} from '../../src/nucleo/modelo-carrossel-narrado';
+import {DOC_DO_EXEMPLO, MANIFESTO_DO_EXEMPLO} from '../../src/nucleo/exemplo-conteudo'; // "Ver um exemplo" com o exemplo de verdade
 import {codificarWav, decodificarWav, musicaSintetica, narracaoSintetica, TAXA} from '../audio-sintetico';
 import {argumentosDoRender, destinoDoFormato, nomesDosArquivos, normalizarPrefsExportacao, type OpcoesExportarVideo, type PrefsExportacao} from '../../src/nucleo/exportacao';
 import {caminhoSemFundo, MODELO_FUNDO} from '../../src/nucleo/remover-fundo';
@@ -39,7 +41,7 @@ import {escolherCenas, itensDaNarracao, patchDasFalas} from '../../src/nucleo/na
 import type {AndamentoNarracao, Previa, ResultadoNarracao} from '../../src/nucleo/narracao-servico';
 import {custoNarracao} from '../../src/main/ia/precos';
 
-type Proj = {raiz: string; manifesto: Manifesto; docs: Record<string, unknown>; versao: number};
+type Proj = {raiz: string; manifesto: Manifesto; docs: Record<string, unknown>; versao: number; base_midia?: string}; // base_midia: o exemplo serve a mídia de exemplos/
 const projetos = new Map<string, Proj>();
 let aberto: Proj | null = null;
 const PASTA_MARCAS = 'C:\\Users\\pessoa\\Estudio\\marcas';
@@ -180,7 +182,7 @@ const progresso = (p: Progresso) => ouvintesProgresso.forEach((f) => f(p));
 const esperar = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
 const pastaSaidas = () => `${aberto!.raiz}\\saidas`;
 
-const info = (): InfoProjeto | null => aberto && {raiz: aberto.raiz, manifesto: structuredClone(aberto.manifesto), base_midia: `${location.origin}/testes/fixtures/projeto`, claude: true, git: true,
+const info = (): InfoProjeto | null => aberto && {raiz: aberto.raiz, manifesto: structuredClone(aberto.manifesto), base_midia: aberto.base_midia ?? `${location.origin}/testes/fixtures/projeto`, claude: true, git: true,
   perfil: {nome: 'padrao', sessoes_claude: 4, escala_previa: 0.75, pixel_ratio: 1.5}, estado: null};
 
 const docImagem = (l: number, a: number) => ({formato: 1, largura: l, altura: a, fundo: '#111418', camadas: [{id: 'titulo', nome: 'Título', tipo: 'texto',
@@ -214,6 +216,7 @@ const criar = (o: NovoProjeto): InfoProjeto => {
   const nome = o.nome || 'Sem título · 05/11 14:32';
   const p: Proj = {raiz: `${prefs.pasta_projetos}\\${nome}`, manifesto: {formato: 1, nome, documentos: []}, docs: {}, versao: 1};
   const doc = novoDocumento(p, modelo.modulo, o.formato as never);
+  if (modelo.id === 'video-carrossel-narrado') p.docs[doc.id] = modeloCarrosselNarrado(); // o mesmo documento que o app grava
   if (o.marca) aplicarMarca(p, o.marca, doc.id);
   projetos.set(p.raiz, p);
   aberto = p;
@@ -231,10 +234,19 @@ const idDoModelo = (nome: string) => {
 };
 const api: ApiEstudio = {
   abrirPasta: async () => null,
+  // o exemplo de exemplos/exemplo (exemplo-conteudo.ts), em cópia nova a cada clique, com a mídia servida de lá
   abrirExemplo: async () => {
-    throw new Error('Na prévia web o exemplo não abre (precisa do exemplo empacotado).');
+    let raiz = `${prefs.pasta_projetos}\\Exemplo`;
+    for (let n = 2; projetos.has(raiz); n++) raiz = `${prefs.pasta_projetos}\\Exemplo (${n})`;
+    const p: Proj = {raiz, manifesto: structuredClone(MANIFESTO_DO_EXEMPLO), docs: {video: structuredClone(DOC_DO_EXEMPLO)}, versao: 1,
+      base_midia: `${location.origin}/exemplos/exemplo`};
+    projetos.set(raiz, p);
+    aberto = p;
+    diarioPrevia.length = 0;
+    recentes.unshift({raiz, nome: p.manifesto.nome, aberto_em: new Date().toISOString(), existe: true, modulos: ['video']});
+    return info()!;
   },
-  temExemplo: async () => false,
+  temExemplo: async () => true,
   abrirProjeto: async (raiz) => {
     const p = projetos.get(raiz);
     if (!p) throw new Error(`Na prévia web só abrem os projetos criados nesta sessão: ${raiz}`);
@@ -294,7 +306,8 @@ const api: ApiEstudio = {
   propsVideo: async (id) => {
     const d = aberto!.docs[id] as DocCenas;
     const {props, avisos} = resolverCenas(d, {envelopes});
-    return {props: musicaPrevia.paraTela(props) as never, avisos};
+    // o exemplo serve as imagens dele de exemplos/exemplo (como o servidor de mídia do app faz com a pasta do projeto)
+    return {props: musicaPrevia.paraTela(aberto!.base_midia ? {...props, base_midia: aberto!.base_midia} : props) as never, avisos};
   },
   comentarios: async () => [],
   novoComentario: async () => {

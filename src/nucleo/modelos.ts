@@ -2,7 +2,7 @@
 // O projeto de exemplo ("Ver um pronto") não é um modelo: ver exemplo.ts.
 import type {Modulo} from './documentos';
 
-export type IdModelo = 'video-branco' | 'imagem-branco' | '3d-branco' | 'animacao-branco' | 'animacao-9x16' | 'animacao-logo-pixel';
+export type IdModelo = 'video-branco' | 'video-carrossel-narrado' | 'imagem-branco' | '3d-branco' | 'animacao-branco' | 'animacao-9x16' | 'animacao-logo-pixel';
 
 export type Modelo = {
   id: IdModelo;
@@ -14,6 +14,9 @@ export type Modelo = {
 
 export const MODELOS: Modelo[] = [
   {id: 'video-branco', nome: 'Em branco', descricao: 'Cenas com título, texto, lista, número e imagem. Duração por cena.', modulo: 'video'},
+  // carrossel narrado em cima do vídeo de cenas (modelo-carrossel-narrado.ts; a decisão está em docs/carrossel-narrado.md)
+  {id: 'video-carrossel-narrado', nome: 'Carrossel narrado', descricao: 'Gancho, partes, dúvida e fecho, com a fala de cada cena para narrar. As cenas acompanham a narração.',
+    modulo: 'video', formato_fixo: 'reels'},
   {id: 'imagem-branco', nome: 'Em branco', descricao: 'Camadas de texto, forma e imagem.', modulo: 'imagem'},
   {id: '3d-branco', nome: 'Em branco', descricao: 'Cena 3D com câmera, luz e um objeto.', modulo: '3d'},
   {id: 'animacao-branco', nome: 'Em branco (16:9)', descricao: 'Animação 2D com quadros-chave: formas, texto, imagem e pixel.', modulo: 'animacao', formato_fixo: 'youtube'},
