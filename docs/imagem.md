@@ -92,6 +92,10 @@ Abaixo das propriedades do tipo:
   posição e opacidade, mais e menos uma cor.
 - **Recorte**: recortar pela camada de cima ou soltar; na máscara, qual foto ela recorta.
 - **Imagem**: "Remover fundo", e "Voltar ao original" quando a camada guardou o original.
+- **Fonte** (texto): lista em grupos: "Do kit" (título, texto e mono do kit), "Da marca" (as fontes de arquivo do kit
+  e do projeto), "Do app" (Inter, Archivo, IBM Plex Sans e Mono) e "Sistema". Uma fonte da marca desenha na tela e no
+  PNG/PDF (a exportação espera o arquivo carregar). Se a fonte gravada não existe mais, o texto cai na Inter e a lista
+  mostra o nome guardado com "não encontrada" (detalhes em `docs/marca.md`).
 - Sem seleção, na Prancheta: **Fundo em degradê**, com "Da marca" (o fundo do kit esquentando para baixo).
 
 O kit das predefinições é o que tem a cor de fundo da imagem (aplicar um kit troca o fundo) ou, sem nenhum, o

@@ -69,9 +69,14 @@ Camada nova (`textoNovo` e `formaNova`, em `camadas-novas.ts`) e o modelo de car
 - **A exportação da imagem espera** (imagem-D7): `aguardarFontes(nomes)` espera cada variante da família terminar de
   carregar, ou de falhar, antes do PNG e do PDF; antes só as três famílias do Google que a imagem conhecia (sem a
   Inter) eram esperadas e as de arquivo nunca.
-- **Seletor da imagem** (`opcoesDeFonte`, `comum.ts`): primeiro "Título do kit", "Texto do kit" e "Mono do kit"
-  (referências), depois as famílias do kit e do projeto (`fontes/`), as do app e a do sistema. Inclui a Inter, e a
-  fonte que a camada já usa entra sempre (imagem-D10).
+- **Seletor da imagem** (`opcoesDeFonte`, `comum.ts`; a lógica pura está em `nucleo/fontes-imagem.ts`, com testes em
+  `testes/fontes-imagem.test.ts`): em grupos, "Do kit" ("Título do kit", "Texto do kit" e "Mono do kit", as
+  referências), "Da marca" (as famílias de arquivo do kit e do projeto, em `fontes/`), "Do app" (as quatro fixas, com a
+  Inter) e "Sistema". Sem kit e sem fonte de arquivo, só "Do app" e "Sistema" (imagem-D10, imagem-D20).
+- **Fonte que sumiu** (imagem-D20): se a fonte gravada na camada não existe mais (kit trocado, arquivo apagado de
+  `fontes/`), o texto sai na Inter, na tela e no PNG/PDF (`familiaCss` põe a Inter atrás da família pedida e a
+  exportação espera a Inter carregar), e o seletor mostra o nome guardado no grupo "Guardada no documento", com
+  "não encontrada". Escolher outra fonte tira o aviso; o documento não é mudado sozinho.
 - **Fonte variável importada no kit** (imagem-D14): `peso_max` em `FonteArquivo` e `pesoMax` em `FonteDeArquivo`. O
   arquivo é lido (`fonte-variavel.ts`: tabela `fvar`, eixo `wght`, TTF/OTF/WOFF; o WOFF2 só pelo nome, "VariableFont"
   ou "[wght]") e a fonte entra no navegador com `font-weight: 100 900`, não presa no 400. Peso dito à mão vale um só.
