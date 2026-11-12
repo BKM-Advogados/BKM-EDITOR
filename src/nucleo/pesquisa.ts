@@ -9,6 +9,9 @@ import {CATALOGO_FONTES, type FonteCatalogo} from './catalogo-fontes';
 
 export type NivelFonte = 1 | 2 | 0; // 0 = fora do catálogo
 
+/** O que a url devolveu: página HTML, texto puro ou PDF (o texto vem da camada de texto, src/nucleo/pdf-texto.ts). */
+export type TipoFonte = 'html' | 'texto' | 'pdf';
+
 export type Fonte = {
   id: string; // f1, f2… (os mesmos do dossiê do skill pesquisa-juridica)
   url: string;
@@ -20,6 +23,8 @@ export type Fonte = {
   acessado_em: string; // ISO
   http?: number;
   bytes?: number;
+  tipo?: TipoFonte; // o que veio da url (sem o campo: fonte lida antes de 12/11/2026, HTML ou texto)
+  paginas_pdf?: number; // só no PDF: quantas páginas o arquivo tem
   sha256: string; // do texto limpo normalizado (hashTexto)
   arquivo: string; // pesquisa/fontes/<id>.txt
   sinais_vigencia: string[];
