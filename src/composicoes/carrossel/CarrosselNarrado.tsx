@@ -2,26 +2,27 @@
 // partes, título de seção, carimbo, selo, número que conta, vinheta do logo, cena de dúvida, cartão final, legenda
 // palavra a palavra e a transição entre cenas. O CarrosselTema monta as cenas com elas a partir do roteiro.json. Paleta e
 // fontes do tema do carrossel (src/nucleo/roteiro/tema.ts): as cenas de conteúdo são claras e abertura, gancho, dúvida
-// e final são escuras. O logo nunca gira nem leva efeito. Todo tempo das props em ms de SAÍDA.
+// e final são escuras. O logo nunca gira nem leva efeito. Todo tempo das props em ms de SAÍDA. A vinheta, o cartão final,
+// o logo e o rodapé são as peças comuns de ../marca-video.tsx (o vídeo de cenas usa as mesmas, nas cores do kit), aqui
+// com a paleta e as fontes fixas do carrossel.
 import React, {createContext, useContext} from 'react';
-import {AbsoluteFill, Easing, Img, interpolate, random, spring, useCurrentFrame, useVideoConfig} from 'remotion';
-import {midia} from '../midia';
-import {FPS, quadros} from '../anim';
+import {AbsoluteFill, Easing, interpolate, random, useCurrentFrame} from 'remotion';
+import {FPS} from '../anim';
 import {fonte} from '../fontes';
 import {TEMA_CARROSSEL_NEUTRO} from '../../nucleo/roteiro/tema';
 import {baseDaLegendaCarrossel} from '../../nucleo/zonas-seguras';
 import {casasDoNumero, formatarNumero} from '../formatar-numero';
+import {CartaoFinal, comAlfa, FaixaRodape, MarcaVideo, useT, Vinheta, type CoresMarcaVideo} from '../marca-video';
+
+export {comAlfa, useT};
 
 export const K = {...TEMA_CARROSSEL_NEUTRO.cores};
 export const TIT = fonte(TEMA_CARROSSEL_NEUTRO.fontes.titulo);
 export const TXT = fonte(TEMA_CARROSSEL_NEUTRO.fontes.texto);
 export const MONO = fonte(TEMA_CARROSSEL_NEUTRO.fontes.mono);
 
-/** "#RRGGBB" com transparência, para sombras, linhas e véus na cor da paleta. */
-export const comAlfa = (cor: string, alfa: number) => {
-  const n = parseInt(cor.slice(1, 7), 16);
-  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alfa})`;
-};
+// a paleta do carrossel nos papéis das peças comuns da marca (marca-video.tsx)
+const CORES_MARCA: CoresMarcaVideo = {destaque: K.destaque, destaqueClaro: K.destaqueClaro, destaqueProfundo: K.destaqueProfundo, claro: K.claro};
 
 export type Tema = {modo: 'claro' | 'escuro'; fundo: string; texto: string; suave: string; destaque: string; destaqueTexto: string;
   cartao: string; cartaoTexto: string; linha: string; vazio: string};
@@ -41,18 +42,7 @@ export type Cena = {tipo: string; n?: number; t_in: number; t_out: number; ev: R
 /** Quem assina o vídeo: o nome (sem logo, a vinheta e o cartão final escrevem o nome), o @ e o site. Vazio não aparece. */
 export type MarcaCarrossel = {nome: string; site: string; insta: string};
 
-// ---------- utilidades de tempo (frame local da cena × evento em ms de saída) ----------
 const clamp = {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'} as const;
-export const useT = (t0: number) => {
-  const frame = useCurrentFrame();
-  const {fps} = useVideoConfig();
-  const ms = (frame / fps) * 1000 + t0;
-  const mola = (evMs: number, rig = 180, am = 16) =>
-    spring({frame: frame - quadros(evMs - t0), fps, config: {stiffness: rig, damping: am, mass: 0.8}});
-  const lin = (evMs: number, durMs: number, ease = Easing.out(Easing.cubic)) =>
-    interpolate(ms, [evMs, evMs + Math.max(1, durMs)], [0, 1], {...clamp, easing: ease});
-  return {frame, ms, mola, lin};
-};
 
 // ---------- fundo e moldura fixa ----------
 const Particulas: React.FC = () => {
@@ -88,18 +78,9 @@ export const FaixaTopo: React.FC = () => (
     background: `linear-gradient(90deg, ${K.destaqueProfundo}, ${K.destaque} 50%, ${K.destaqueClaro})`}} />
 );
 
-export const Rodape: React.FC<{m: MarcaCarrossel}> = ({m}) => {
-  const contato = [m.insta, m.site].filter(Boolean);
-  if (!m.nome && !contato.length) return null;
-  return (
-    <div style={{position: 'absolute', left: 0, right: 0, bottom: 0, height: 120, background: K.escuroProfundo, display: 'flex', alignItems: 'center',
-      justifyContent: 'space-between', padding: '0 48px', borderTop: `4px solid ${K.destaque}`}}>
-      <div style={{fontFamily: TIT, fontWeight: 700, fontSize: 28, color: K.claro, letterSpacing: 1}}>{m.nome.toUpperCase()}</div>
-      <div style={{fontFamily: MONO, fontSize: 21, color: comAlfa(K.claro, 0.7), textAlign: 'right', lineHeight: 1.4}}>
-        {contato.map((c, i) => <React.Fragment key={i}>{i > 0 && <br />}{c}</React.Fragment>)}</div>
-    </div>
-  );
-};
+export const Rodape: React.FC<{m: MarcaCarrossel}> = ({m}) => (
+  <FaixaRodape nome={m.nome} contato={[m.insta, m.site].filter(Boolean)} fontes={{titulo: TIT, texto: TXT, mono: MONO}} cores={{...CORES_MARCA, fundo: K.escuroProfundo}} />
+);
 
 export const Tag: React.FC<{texto: string; y?: number}> = ({texto, y = 70}) => {
   const t = useTema();
@@ -179,25 +160,10 @@ export const Numero: React.FC<{de: number; ate: number; p: number; tam: number; 
 
 // O logo (arquivo na mídia do projeto) ou, sem ele, o nome de quem assina em texto, com degradê no destaque.
 export const Marca: React.FC<{logo?: string; nome?: string; tam?: number}> = ({logo, nome, tam = 1}) =>
-  logo ? (
-    <Img src={midia(logo)} style={{width: 640 * tam, objectFit: 'contain'}} />
-  ) : nome ? (
-    <div style={{maxWidth: 940, textAlign: 'center', fontFamily: TIT, fontWeight: 700, fontSize: 96 * tam, lineHeight: 0.95, letterSpacing: -2 * tam,
-      background: `linear-gradient(135deg, ${K.destaqueClaro}, ${K.destaque} 45%, ${K.destaqueProfundo})`, WebkitBackgroundClip: 'text', color: 'transparent'}}>
-      {nome.toUpperCase()}</div>
-  ) : null;
+  <MarcaVideo logo={logo} nome={nome} tam={tam} fonte={TIT} cores={CORES_MARCA} />;
 
-export const Abertura: React.FC<{c: Cena; logo?: string; nome?: string}> = ({c, logo, nome}) => {
-  const {mola, lin} = useT(c.t_in);
-  const m = mola(c.t_in + 80, 200, 15);
-  const sai = 1 - lin(c.t_out - 260, 260);
-  return (
-    <AbsoluteFill style={{alignItems: 'center', justifyContent: 'center', opacity: sai}}>
-      <div style={{transform: `scale(${0.9 + 0.1 * m})`, opacity: Math.min(1, m * 1.3)}}><Marca logo={logo} nome={nome} /></div>
-      <div style={{position: 'absolute', top: 1280, height: 6, width: 300 * lin(c.t_in + 250, 500), background: K.destaque}} />
-    </AbsoluteFill>
-  );
-};
+export const Abertura: React.FC<{c: Cena; logo?: string; nome?: string}> = ({c, logo, nome}) =>
+  <Vinheta t_in={c.t_in} t_out={c.t_out} logo={logo} nome={nome} fonte={TIT} cores={CORES_MARCA} />;
 
 // CTA de orientação, narrado: "Ficou com alguma dúvida? Procure um advogado trabalhista." Sem chamar para um escritório.
 export const Duvida: React.FC<{c: Cena; p: {duvida: {pergunta: string; resposta: string}}}> = ({c, p}) => {
@@ -218,23 +184,10 @@ export const Duvida: React.FC<{c: Cena; p: {duvida: {pergunta: string; resposta:
 };
 
 // Cartão final: segura ~3,5 s com a marca, o convite para salvar e compartilhar, o @ e o site.
-export const Final: React.FC<{c: Cena; p: {logo?: string; final: {titulo: string; aviso: string}; marca: MarcaCarrossel}}> = ({c, p}) => {
-  const {mola} = useT(c.t_in);
-  const m = mola(c.t_in);
-  const mm = mola(c.t_in + 350);
-  return (
-    <AbsoluteFill>
-      <div style={{position: 'absolute', top: 210, left: 0, right: 0, display: 'flex', justifyContent: 'center', opacity: mm,
-        transform: `scale(${0.8 + 0.2 * mm})`}}><Marca logo={p.logo} nome={p.marca.nome} tam={0.62} /></div>
-      <div style={{position: 'absolute', top: 820, left: 70, right: 70, textAlign: 'center', opacity: m, transform: `translateY(${(1 - m) * 60}px)`}}>
-        <div style={{fontFamily: TIT, fontWeight: 700, fontSize: 82, color: K.claro, lineHeight: 0.95}}>{p.final.titulo}</div>
-        <div style={{height: 8, width: 220, background: K.destaque, margin: '40px auto'}} />
-        <div style={{fontFamily: TXT, fontSize: 40, color: K.destaqueClaro, fontWeight: 600}}>{[p.marca.insta, p.marca.site].filter(Boolean).join(' · ')}</div>
-        <div style={{fontFamily: TXT, fontSize: 26, color: comAlfa(K.claro, 0.55), marginTop: 50}}>{p.final.aviso}</div>
-      </div>
-    </AbsoluteFill>
-  );
-};
+export const Final: React.FC<{c: Cena; p: {logo?: string; final: {titulo: string; aviso: string}; marca: MarcaCarrossel}}> = ({c, p}) => (
+  <CartaoFinal t_in={c.t_in} logo={p.logo} nome={p.marca.nome} titulo={p.final.titulo} contato={[p.marca.insta, p.marca.site].filter(Boolean).join(' · ')}
+    aviso={p.final.aviso} fontes={{titulo: TIT, texto: TXT}} cores={CORES_MARCA} />
+);
 
 // ---------- legenda palavra a palavra ----------
 export const LegendaAtual: React.FC<{legendas: Legenda[]; tema: Tema}> = ({legendas, tema}) => {
