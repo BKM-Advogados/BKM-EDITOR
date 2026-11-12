@@ -18,7 +18,7 @@ import {CabecalhoInspector, CampoCor, CampoDeslizante, CampoLeitura, CampoNumero
 import {IconeEfeitos} from '../../componentes/Icones';
 import {PADRAO, caminhoNoProjeto, definirPrevia, docValido, indiceDe, opcoesDeFonte, rotuloCamada, usarDocumentoImagem, usarPaginaAtiva, type PaginaAtiva} from './comum';
 import {renomearPagina} from './acoes';
-import {SecaoFundoDegrade, SecoesAcabamento, usarKitDaImagem} from './Acabamento';
+import {SecaoFundoDaPagina, SecaoFundoDegrade, SecoesAcabamento, usarKitDaImagem} from './Acabamento';
 import {removerFundoDaCamada, voltarAoOriginal} from './removerFundo';
 import {iconeCamada} from './CamadasImagem';
 import {MudancasNoInspetor} from '../../componentes/Agente';
@@ -204,6 +204,7 @@ const InspectorDocumento: React.FC<{documento: string; doc: DocImagem; ativa: Pa
             <CampoLeitura rotulo="Caminho" dica="Para o Claude: ler_documento com este caminho traz só esta página">{`/paginas/${ativa.p}`}</CampoLeitura>
           </Secao>
         )}
+        {varias && <SecaoFundoDaPagina documento={documento} doc={doc} p={ativa.p} pagina={ativa.pagina} kit={kit} />}
         <Secao titulo={varias ? 'Prancheta (todas as páginas)' : 'Prancheta'} chave="imagem:prancheta">
           <CampoSelecao rotulo="Tamanho" valor={pronto ? `${pronto.l}x${pronto.a}` : 'outro'}
             opcoes={[...TAMANHOS.map((t) => [`${t.l}x${t.a}`, `${t.nome} · ${t.l} × ${t.a}`] as [string, string]), ['outro', 'Personalizado']]}
