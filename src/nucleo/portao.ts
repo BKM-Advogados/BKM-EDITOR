@@ -31,6 +31,11 @@ export const CLASSES: Record<string, {classe: Classe; motivo: string; livreSe?: 
   // narração por IA (docs/narracao.md): vai ao Google com a chave da pessoa; a prévia (previa: true) não sai do PC
   narrar: {classe: 'cartao', motivo: 'gerar a narração com a IA do Google (sai do PC, usa a sua chave e pode ter custo)', livreSe: (e) => e.previa === true},
   vozes_narracao: {classe: 'cartao', motivo: 'listar as vozes de narração do Google (usa a sua chave, sem custo)'},
+  // frente 2 (mcp-projeto.ts, mcp-marca-edicao.ts): trazer arquivo de fora, trocar de projeto e gravar na pasta dos kits
+  criar_marca: {classe: 'cartao', motivo: 'criar um kit de marca na sua pasta de kits (fora do projeto)'},
+  editar_marca: {classe: 'cartao', motivo: 'mudar um kit de marca na sua pasta de kits (fora do projeto, sem Reverter)'},
+  importar_logo_marca: {classe: 'cartao', motivo: 'trazer uma imagem do seu computador como logo de um kit de marca'},
+  importar_fonte_marca: {classe: 'cartao', motivo: 'trazer um arquivo de fonte do seu computador para um kit de marca'},
 };
 
 type Anotacoes = {openWorldHint?: boolean; destructiveHint?: boolean};

@@ -81,7 +81,7 @@ describe('CLAUDE.md do projeto', () => {
     const md = claudeMd(['video', 'imagem']);
     const numeros = [...md.split('## Como trabalhar')[1].split('## Pesquisa')[0].matchAll(/^(\d+)\. /gm)].map((m) => Number(m[1]));
     expect(numeros).toEqual(numeros.map((_, i) => i + 1));
-    expect(numeros.length).toBe(17); // + a narração por IA
+    expect(numeros.length).toBe(18); // + a narração por IA; + os kits de marca (frente 2)
   });
 
   it('sem arquivo, grava o texto gerado; igual, não grava', () => {

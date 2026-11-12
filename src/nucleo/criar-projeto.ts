@@ -374,6 +374,8 @@ export const guiaDoProjeto = (modulos: Modulo[], arquivo: ArquivoDeGuia = 'CLAUD
     '`listar_comentarios`, `ler_comentario`, `responder_comentario`, `resolver_comentario` e `reabrir_comentario` cuidam dos\n   pedidos da pessoa; `criar_comentario` deixa uma nota ancorada num objeto que existe.',
     '`listar_mudancas` mostra o que a pessoa mudou à mão desde a sua última olhada. `desfazer` desfaz as suas últimas\n   mudanças; `reverter {seq}` volta uma mudança do histórico (a de outro autor pede a permissão da pessoa).',
     '`listar_midia` mostra os arquivos de `midia/` e onde são usados; `marcar_midia` marca uma tomada como boa ou descartada.',
+    // frente 2 (mcp-projeto.ts e mcp-marca-edicao.ts)
+    '`listar_marcas` mostra os kits de marca da pessoa; `criar_marca`, `editar_marca`, `importar_logo_marca` e\n   `importar_fonte_marca` mudam esses kits, fora do projeto e sem Reverter (pedem a permissão dela).',
     '`guia_do_projeto` devolve este guia, se você não o recebeu.',
   ];
   if (tem('video') || tem('imagem') || tem('animacao')) passos.push('`aplicar_marca` troca o kit de marca (cores, fonte, logo e fontes próprias) de um documento.');
