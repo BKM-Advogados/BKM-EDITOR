@@ -110,6 +110,8 @@ const api: ApiEstudio = {
   cancelarExportacao: () => ipcRenderer.send(CANAL.exportarCancelar),
   mostrarArquivo: (caminho) => ipcRenderer.send(CANAL.mostrarArquivo, caminho),
   pesquisa: () => ipcRenderer.invoke(CANAL.pesquisa),
+  plano: () => ipcRenderer.invoke(CANAL.plano),
+  decidirPlano: (revisao, d) => ipcRenderer.invoke(CANAL.decidirPlano, revisao, d),
   textoFonte: (fonteId, inicio, fim) => ipcRenderer.invoke(CANAL.textoFonte, fonteId, inicio, fim),
   abrirFonte: (url) => ipcRenderer.invoke(CANAL.abrirFonte, url),
   // frente Fala: transcrição local e legendas (src/main/transcricao.ts)

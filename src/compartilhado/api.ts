@@ -10,6 +10,7 @@ import type {FonteArquivo, Marca} from '../nucleo/marca';
 import type {OpcoesExportarImagem, OpcoesExportarVideo, PrefsExportacao} from '../nucleo/exportacao';
 import type {PedidoContrasteDestino, ResultadoContraste} from '../nucleo/contraste'; // só os tipos (frente C)
 import type {Pesquisa} from '../nucleo/pesquisa';
+import type {Decisao, PlanoVideo} from '../nucleo/plano-video'; // Onda B: o Plano do vídeo
 import type {EstadoDaTomada, IndiceDaMidia, MarcaDeMidia} from '../nucleo/midia'; // frente Casca
 import type {EstadoModeloFundo} from '../nucleo/remover-fundo';
 import type {EstadoDaFala} from '../nucleo/legendas'; // frente Fala
@@ -98,6 +99,9 @@ export const CANAL = {
   mostrarArquivo: 'estudio:mostrar-arquivo',
   // pesquisa do projeto (pesquisa/pesquisa.json e pesquisa/fontes/), só leitura na interface
   pesquisa: 'estudio:pesquisa',
+  // o Plano do vídeo (plano.json, Onda B): a IA escreve pelo MCP; a pessoa aprova ou pede ajuste pela conversa
+  plano: 'estudio:plano',
+  decidirPlano: 'estudio:decidir-plano',
   textoFonte: 'estudio:texto-fonte',
   abrirFonte: 'estudio:abrir-fonte',
   // frente Fala: transcrição local e legendas (src/main/transcricao.ts, docs/legendas.md)
@@ -346,6 +350,10 @@ export type ApiEstudio = {
   // pesquisa (docs/pesquisa.md): a interface só lê; quem lê fontes e registra fatos é o Claude, pelo MCP
   /** pesquisa/pesquisa.json (vazia se a pasta pesquisa/ ainda não existe). */
   pesquisa: () => Promise<Pesquisa>;
+  /** O Plano do vídeo (plano.json), ou null se não há (src/nucleo/plano-video.ts). */
+  plano: () => Promise<PlanoVideo | null>;
+  /** A pessoa aprova ou pede ajuste da revisão que viu; revisão que não é a atual falha (o plano mudou). Vai ao diário. */
+  decidirPlano: (revisao: number, d: Decisao) => Promise<PlanoVideo>;
   /** Texto limpo da fonte (pesquisa/fontes/<id>.txt), inteiro ou o recorte inicio..fim; falha se o texto não está na pasta. */
   textoFonte: (fonteId: string, inicio?: number, fim?: number) => Promise<string>;
   /** Abre a url da fonte no navegador da pessoa; só http e https (devolve false para o resto). */

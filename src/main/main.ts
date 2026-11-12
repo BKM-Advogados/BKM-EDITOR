@@ -12,6 +12,7 @@ import {MODELOS} from '../nucleo/modelos';
 import type {Formato} from '../nucleo/formatos';
 import {FORMATOS_IMAGEM_SAIDA, type OpcoesExportarImagem, type OpcoesExportarVideo} from '../nucleo/exportacao';
 import {ErroProjeto, Projeto} from '../nucleo/projeto';
+import {decidirPlano, type Decisao} from '../nucleo/plano-video'; // Onda B: o Plano do vídeo
 import {criarRede} from '../nucleo/ferramentas-mcp';
 import {prepararRender} from './exportar';
 import {criarExportadorVideo, tituloDoDocumento} from './exportacao-video'; // a exportação do vídeo, a mesma do MCP (exportar_video)
@@ -448,6 +449,10 @@ lidar(CANAL.reabrir, (id: string) => exigirProjeto().reabrir(id));
 lidar(CANAL.diario, (desde?: number) => exigirProjeto().resumoDoDiario(desde ?? 0));
 // pesquisa (docs/pesquisa.md): a interface só lê; o Claude grava pelo MCP e o observador da pasta avisa a tela
 lidar(CANAL.pesquisa, () => exigirProjeto().pesquisa());
+// o Plano do vídeo (Onda B, src/nucleo/plano-video.ts): a pessoa decide a revisão que viu; vai ao diário, com Reverter
+lidar(CANAL.plano, () => exigirProjeto().plano());
+lidar(CANAL.decidirPlano, (revisao: number, d: Decisao) => exigirProjeto().alterarPlano((p) => decidirPlano(p, Number(revisao), d, 'pessoa', new Date().toISOString()),
+  {autor: 'pessoa', origem: 'interface', rotulo: d?.decisao === 'ajustar' ? 'ajuste pedido no plano do vídeo' : `plano do vídeo aprovado (revisão ${revisao})`}));
 // o texto de uma fonte passa de 600 KB (a CLT inteira): lido sem travar o processo principal
 lidar(CANAL.textoFonte, async (fonteId: string, inicio?: number, fim?: number) => {
   const texto = await exigirProjeto().lerTextoFonteSemTravar(fonteId);
