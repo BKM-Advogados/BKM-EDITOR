@@ -388,8 +388,10 @@ export const guiaDoProjeto = (modulos: Modulo[], arquivo: ArquivoDeGuia = 'CLAUD
   if (tem('imagem')) {
     passos.push('`remover_fundo` tira o fundo de uma foto de pessoa com o modelo local; com `voltar: true`, volta ao original.');
     passos.push('`selecionar_camadas` mostra camadas na tela da pessoa; `alinhar_camadas`, `distribuir_camadas`, `agrupar_camadas`\n   e `desagrupar_camadas` arrumam o layout; `travar_camadas` trava e `destravar_camadas` destrava (pede a permissão\n   da pessoa: a trava é dela).');
+    passos.push('`ver_imagem` desenha a imagem (ou uma página do carrossel) como sai na exportação e devolve a imagem para\n   você ver; só com o projeto aberto no app.');
     passos.push('`ver_marca` mostra o kit da imagem; `cor_da_marca` e `fonte_da_marca` põem a cor (`@destaque`) ou a fonte\n   (`@titulo`) do kit numa camada. `buscar_icone` e `inserir_icone` (Lucide), `inserir_linha` (linha e seta) e\n   `fazer_lista` (marcadores ou números num texto) criam as peças já no kit.');
   }
+  if (tem('3d')) passos.push('`ver_cena_3d` tira um instantâneo da cena 3D pela câmera do documento ou por outra, sem mudá-la; só com o\n   projeto aberto no app.');
   if (tem('animacao')) passos.push('`criar_animacao`, `adicionar_camada_animacao`, `animar`, `pixelizar_imagem`, `efeito_pixel` e `ver_animacao` montam e animam a animação (docs/animacao.md).');
   linhas.push('', '## Como trabalhar', '', ...passos.map((t, i) => `${i + 1}. ${t}`));
   if (tem('musica')) linhas.push(...secaoMusica());

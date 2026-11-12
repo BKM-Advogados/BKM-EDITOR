@@ -43,6 +43,7 @@ import type {ServicoNarracao} from './narracao-servico';
 import {registrarPrevia} from './mcp-previa'; // frente IDE: ver_quadro, ver_cenas e ver_trecho (docs/ide.md)
 import {USER_AGENT_ESTUDIO} from './versao';
 import {registrarMedidas} from './mcp-medidas'; // frente 3 do MCP: medir_loudness, medir_envelope, limpar_voz
+import {registrarPreviaJanela} from './mcp-previa-janela'; // frente 3 do MCP: ver_imagem, ver_cena_3d
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x, null, 2)}]});
 const erro = (e: unknown) => ({
@@ -333,6 +334,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   registrarTela(servidor, projeto, autor); // mostrar_documento: leva a tela da pessoa a um documento (mcp-tela.ts)
   registrarNarracao(servidor, projeto, autor, origem, narrador); // narração por IA (docs/narracao.md): vozes, narrar, pronúncias, ajustar cenas à fala
   registrarPrevia(servidor, projeto); // frente IDE: prévias do vídeo em saidas/previas/ (src/nucleo/mcp-previa.ts)
+  registrarPreviaJanela(servidor, projeto); // frente 3: prévias da imagem e da cena 3D pela janela (mcp-previa-janela.ts)
   registrarMedidas(servidor, projeto, autor, origem); // frente 3: loudness, envelope e limpeza de voz (mcp-medidas.ts)
 };
 

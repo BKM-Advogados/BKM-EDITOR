@@ -150,7 +150,7 @@ describe('o guia do projeto cobre as ferramentas (M13)', () => {
       'destravar_camadas', 'buscar_icone', 'inserir_icone', 'inserir_linha', 'fazer_lista', 'ver_marca', 'cor_da_marca', 'fonte_da_marca'].map((n) => [n, ['imagem']])),
     ...Object.fromEntries(['ler_fonte', 'anotar_fonte', 'registrar_fato', 'listar_pesquisa', 'texto_da_fonte', 'checar_texto'].map((n) => [n, ['video', 'imagem']])),
     aplicar_marca: ['video', 'imagem', 'animacao'],
-    ...Object.fromEntries(['medir_loudness', 'medir_envelope', 'limpar_voz'].map((n) => [n, ['video']])), // frente 3 do MCP
+    ...Object.fromEntries(['medir_loudness', 'medir_envelope', 'limpar_voz'].map((n) => [n, ['video']])), ver_imagem: ['imagem'], ver_cena_3d: ['3d'], // frente 3 do MCP
   };
   const TODOS: Modulo[] = ['video', 'imagem', '3d', 'musica', 'animacao'];
 
