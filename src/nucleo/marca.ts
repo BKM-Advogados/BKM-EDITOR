@@ -260,6 +260,10 @@ const patchDaImagem = (doc: DocImagem, m: Marca): OperacaoPatch[] => {
   cor(doc.fundo, '/fundo');
   degrade(doc.fundo_degrade, '/fundo_degrade');
   doc.camadas.forEach((c, i) => camada(c, `/camadas/${i}`));
+  doc.paginas?.forEach((p, i) => {
+    cor(p.fundo, `/paginas/${i}/fundo`);
+    degrade(p.fundo_degrade, `/paginas/${i}/fundo_degrade`);
+  });
   doc.paginas?.forEach((p, i) => p.camadas?.forEach((c, j) => camada(c, `/paginas/${i}/camadas/${j}`)));
   ops.push(por(doc.marca, '/marca', marcaDoKit(m)));
   return ops;

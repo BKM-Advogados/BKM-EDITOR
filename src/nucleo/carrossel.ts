@@ -3,7 +3,7 @@
 // só, em memória; o arquivo da pessoa só ganha `paginas` quando ela cria a segunda página (ou renomeia a primeira).
 // Cada operação devolve o patch e a lista de páginas que resulta dele, para a interface escolher a página ativa sem
 // reler o disco. Ver docs/carrossel.md.
-import type {AlvoComentario, CamadaImagem, DocImagem, MarcaDoDocumento, OperacaoPatch, PaginaImagem} from './documentos';
+import type {AlvoComentario, CamadaImagem, Degrade, DocImagem, MarcaDoDocumento, OperacaoPatch, PaginaImagem} from './documentos';
 import {MARCA_NEUTRO, marcaDoKit} from './marca';
 import {FORMATOS_IMAGEM} from './formatos';
 
@@ -67,8 +67,23 @@ export const indicePagina = (caminho?: string | null) => {
 /** A página `p` como documento de uma prancheta só: é o que a prévia e a exportação (exportarPng.ts) desenham. */
 export const vistaDaPagina = (doc: DocImagem, p: number): DocImagem => {
   const {paginas: _paginas, ...resto} = doc;
-  return {...resto, camadas: paginasDe(doc)[p]?.camadas ?? []};
+  const pagina = paginasDe(doc)[p];
+  if (!temFundoProprio(pagina)) return {...resto, camadas: pagina?.camadas ?? []};
+  const {fundo_degrade: _herdado, ...semDegrade} = resto;
+  const fundo = fundoDaPagina(doc, pagina);
+  return {...semDegrade, fundo: fundo.fundo, ...(fundo.fundo_degrade ? {fundo_degrade: fundo.fundo_degrade} : {}), camadas: pagina?.camadas ?? []};
 };
+
+/** A página tem fundo próprio (cor e/ou degradê)? Sem nenhum dos dois, ela usa o do documento. */
+export const temFundoProprio = (pagina: Pick<PaginaImagem, 'fundo' | 'fundo_degrade'> | undefined): boolean =>
+  Boolean(pagina) && (typeof pagina!.fundo === 'string' || (typeof pagina!.fundo_degrade === 'object' && pagina!.fundo_degrade !== null));
+
+/** O fundo que a página mostra: o próprio (cor e degradê da página; sem cor própria, a cor do documento; o degradê do
+ *  documento não entra por cima de um fundo próprio) ou, sem fundo próprio, o do documento. */
+export const fundoDaPagina = (doc: Pick<DocImagem, 'fundo' | 'fundo_degrade'>, pagina: Pick<PaginaImagem, 'fundo' | 'fundo_degrade'> | undefined): {fundo: string; fundo_degrade?: Degrade} =>
+  temFundoProprio(pagina)
+    ? {fundo: typeof pagina!.fundo === 'string' ? pagina!.fundo : doc.fundo, ...(pagina!.fundo_degrade ? {fundo_degrade: pagina!.fundo_degrade} : {})}
+    : {fundo: doc.fundo, ...(doc.fundo_degrade ? {fundo_degrade: doc.fundo_degrade} : {})};
 
 export const novaPagina = (paginas: PaginaImagem[], nome?: string, camadas: CamadaImagem[] = []): PaginaImagem =>
   ({id: idLivre(paginas, 'pagina'), nome: nome ?? NOME_PAGINA(paginas.length + 1), camadas});
