@@ -192,8 +192,9 @@ export const propsDoVideo = (projeto: Projeto, documento: string, base: string):
       return {props: {...props, base_projeto: base}, avisos};
     }
     if (ehDocCenas(doc)) {
-      // os envelopes medidos (midia/*.envelope.json) entram nas props: prévia e exportação veem o mesmo ducking
-      const {props, avisos} = resolverCenas(doc, {envelopes: lerEnvelopes(projeto, doc)});
+      // os envelopes medidos (midia/*.envelope.json) entram nas props: prévia e exportação veem o mesmo ducking; os efeitos
+      // de midia/sfx/ que o projeto tem servem aos efeitos sonoros do acabamento (acabamento-video.ts)
+      const {props, avisos} = resolverCenas(doc, {envelopes: lerEnvelopes(projeto, doc), sfx: arquivosDaPasta(projeto.raiz, 'midia/sfx')});
       return {props: {...props, base_midia: base}, avisos};
     }
     // o carrossel narrado: 1080×1920 a 30 qps até a animação dele aceitar outro formato
@@ -212,11 +213,14 @@ export const propsDoVideo = (projeto: Projeto, documento: string, base: string):
   }
 };
 
-/** Os arquivos da raiz de midia/ (o logo e a foto padrão do carrossel narrado saem daí). */
-const arquivosDaRaizDaMidia = (raiz: string): string[] => {
+/** Os arquivos (só o nome) de uma pasta do projeto, sem descer nas subpastas; pasta que não há, lista vazia. */
+const arquivosDaPasta = (raiz: string, rel: string): string[] => {
   try {
-    return readdirSync(path.join(raiz, 'midia'), {withFileTypes: true}).filter((d) => d.isFile()).map((d) => d.name);
+    return readdirSync(path.join(raiz, rel), {withFileTypes: true}).filter((d) => d.isFile()).map((d) => d.name);
   } catch {
     return [];
   }
 };
+
+/** Os arquivos da raiz de midia/ (o logo e a foto padrão do carrossel narrado saem daí). */
+const arquivosDaRaizDaMidia = (raiz: string): string[] => arquivosDaPasta(raiz, 'midia');
