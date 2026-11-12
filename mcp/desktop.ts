@@ -15,10 +15,13 @@ import {servicoDeRender} from '../src/main/musica-render';
 import {servicoDoAmbiente} from '../src/main/narracao';
 import {definirServicoPrevia} from '../src/nucleo/mcp-previa';
 import {servicoDePreviaStdio} from '../src/main/previa-stdio';
+import {definirServicoExportacao} from '../src/nucleo/mcp-exportacao-final';
+import {servicoDeExportacaoStdio} from '../src/main/exportacao-servico';
 
 const raizApp = path.resolve(__dirname, '..');
 definirServicoMusica(servicoDeRender());
 definirServicoPrevia(servicoDePreviaStdio(raizApp));
+definirServicoExportacao(servicoDeExportacaoStdio(raizApp));
 const transcritor = new Transcritor({raizApp});
 const rede = criarRede();
 const narrador = servicoDoAmbiente();

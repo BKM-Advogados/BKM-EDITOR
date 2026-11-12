@@ -290,7 +290,7 @@ grade antiga), ou na área de título de 90% com `estilo.no_quadrado: false` ("N
 (fala-D8). Com `legendas_youtube`, a área do 16:9 fica acima da faixa das legendas automáticas do YouTube, para quando o
 SRT sobe junto (a exportação liga isso por destino).
 
-**Em cada destino da exportação** (`legendasNoDestino`, no laço do `main.ts`): o vídeo 16:9 exportado também em 9:16
+**Em cada destino da exportação** (`legendasNoDestino`, no laço de `src/main/exportacao-video.ts`): o vídeo 16:9 exportado também em 9:16
 leva a legenda para a área do 9:16, e a legenda que não cabe nas linhas do estilo nesse tamanho é dividida em pedaços
 que cabem, pela mesma regra da quebra e dentro dela (nada se junta com a vizinha; o que a pessoa dividiu, juntou ou
 corrigiu fica). No caminho contrário, só a área muda. Na mesma proporção do documento o arquivo sai igual à prévia. A

@@ -452,7 +452,7 @@ export type ApiEstudio = {
   };
   // carrossel em partes (rodada 3, B2, imagem-D19): uma página por vez, cada PNG vai ao disco ao chegar e o PDF sai no fechar
   exportarPaginasEmPartes: {
-    abrir: (o: {documento: string; pdf: boolean}) => Promise<{sessao: string}>;
+    abrir: (o: {documento: string; pdf: boolean; nome?: string}) => Promise<{sessao: string}>; // nome: o da pasta e do PDF (sem ele, o título)
     parte: (sessao: string, pagina: {png: string; numero: number}) => Promise<boolean>;
     fechar: (sessao: string) => Promise<ResultadoExportarPaginas>;
   };

@@ -6,6 +6,7 @@ import {caminhoPagina, paginasDe} from '../nucleo/carrossel';
 import {abrirProjeto, caminhosDaSelecao, loja, observarProjeto, useLoja} from './estado/loja';
 import {estadoDaMusica, musica} from './modulos/musica/estado'; // frente Música
 import {ligarPonteDaJanela} from './ponte-janela';
+import {atenderExportacaoPeloMcp} from './modulos/imagem/exportarPeloMcp'; // exportar_imagem e exportar_carrossel do MCP
 import {Inicio} from './inicio/Inicio';
 import {RaizDialogo} from './componentes/Dialogo';
 import {ConfigIA} from './paineis/ConfigIA'; // frente IA: Configurações › IA
@@ -40,6 +41,7 @@ export const App: React.FC = () => {
   }, []);
 
   useEffect(() => ligarPonteDaJanela(), []); // ponte com a janela (05 §0.1): pedidos do processo principal
+  useEffect(() => atenderExportacaoPeloMcp(), []); // a janela desenha a imagem e o carrossel que o MCP exporta
 
   // o que a pessoa está vendo vai para .estudio/estado.json: o agente lê com estado_do_editor e o projeto reabre ali
   useEffect(() => {

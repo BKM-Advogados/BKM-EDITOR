@@ -390,6 +390,8 @@ export const guiaDoProjeto = (modulos: Modulo[], arquivo: ArquivoDeGuia = 'CLAUD
     passos.push('`ver_marca` mostra o kit da imagem; `cor_da_marca` e `fonte_da_marca` põem a cor (`@destaque`) ou a fonte\n   (`@titulo`) do kit numa camada. `buscar_icone` e `inserir_icone` (Lucide), `inserir_linha` (linha e seta) e\n   `fazer_lista` (marcadores ou números num texto) criam as peças já no kit.');
   }
   if (tem('animacao')) passos.push('`criar_animacao`, `adicionar_camada_animacao`, `animar`, `pixelizar_imagem`, `efeito_pixel` e `ver_animacao` montam e animam a animação (docs/animacao.md).');
+  if (tem('video') || tem('animacao')) passos.push('`exportar_video` exporta o vídeo para `saidas/` como o botão Exportar (destinos, codec, qualidade, trecho,\n   legendas e marca d\'água; pede a permissão da pessoa). Render longo devolve um id: `situacao_exportacao` acompanha.');
+  if (tem('imagem')) passos.push('`exportar_imagem` (PNG, JPG ou WebP) e `exportar_carrossel` (PNG por página e PDF) gravam em `saidas/`; só com o\n   projeto aberto no app, que desenha a imagem.');
   linhas.push('', '## Como trabalhar', '', ...passos.map((t, i) => `${i + 1}. ${t}`));
   if (tem('musica')) linhas.push(...secaoMusica());
   if (tem('video') || tem('imagem')) linhas.push(...secaoPesquisa());

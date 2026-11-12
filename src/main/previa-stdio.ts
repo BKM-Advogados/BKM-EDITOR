@@ -8,7 +8,7 @@ import {existsSync} from 'node:fs';
 import path from 'node:path';
 import {getCompositorPackage} from '../nucleo/compositor-package';
 import {prepararRender} from './exportar';
-import {criarServicoPrevia} from './previa';
+import {criarServicoPrevia, type OpcoesPrevia} from './previa';
 import {ServidorMidia} from './servidor-midia';
 
 /** De onde renderizar, pela pasta acima de dist-mcp/: `resources` do app instalado (tem o app.asar) ou a raiz do repositório. */
@@ -23,13 +23,15 @@ const compositorDoRepositorio = (raiz: string) => {
   return existsSync(p) ? p : null;
 };
 
-export const servicoDePreviaStdio = (acima: string) => {
+/** O render fora do app (o mesmo da prévia e da exportação final): navegador e composições do app de onde veio o
+ *  nucleo.cjs e um servidor de mídia aberto só durante cada render. */
+export const renderStdio = (acima: string): OpcoesPrevia => {
   const {raizApp, empacotado} = appDoNucleo(acima);
   let naRaiz = false;
-  return criarServicoPrevia({
+  return {
     preparar: async (aviso) => {
       if (empacotado && !process.versions.electron) {
-        throw new Error('as prévias do Estúdio instalado rodam pelo executável dele com ELECTRON_RUN_AS_NODE=1, como no .mcp.json que o app escreve');
+        throw new Error('o render do Estúdio instalado roda pelo executável dele com ELECTRON_RUN_AS_NODE=1, como no .mcp.json que o app escreve');
       }
       // em desenvolvimento o Remotion acha o navegador e a raiz pelo package.json mais perto da pasta de trabalho: a do
       // repositório, como no app (na do projeto, ele baixaria um navegador para dentro dela)
@@ -50,5 +52,7 @@ export const servicoDePreviaStdio = (acima: string) => {
         midia.parar();
       }
     },
-  });
+  };
 };
+
+export const servicoDePreviaStdio = (acima: string) => criarServicoPrevia(renderStdio(acima));

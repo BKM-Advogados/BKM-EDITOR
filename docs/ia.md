@@ -88,6 +88,7 @@ Envolve o `registerTool`: toda ferramenta registrada depois dele passa por ele, 
 - **Classe "cartao"** (pergunta à pessoa antes de rodar):
   - a tabela `CLASSES`: `ler_fonte`, `transcrever`, `remover_fundo`, `exportar_legendas`, `destravar_camadas`,
     `exportar_musica`, `importar_midi`, `escolher_trilha`, `narrar` e `vozes_narracao` (narração por IA);
+    `exportar_video`, `exportar_imagem` e `exportar_carrossel` (exportação final, `docs/exportacao.md`);
   - ou quem declara `annotations: {openWorldHint: true}` (sai do PC ou do projeto) ou `destructiveHint: true` (apaga)
     no `registerTool`.
 - **Classe "livre"**: o resto. Quando muda um documento que já existe, grava no diário e tem Reverter. Criar documento
