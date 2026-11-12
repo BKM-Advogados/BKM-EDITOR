@@ -39,10 +39,28 @@ O modelo (`src/nucleo/modelo-carrossel-narrado.ts`, id `video-carrossel-narrado`
 (lista e número), dúvida e fecho, com a duração de partida estimada pela fala. O caminho é escrever os textos, gerar a
 narração (`narrar`), ajustar as cenas à fala (`ajustar_cenas_a_fala`) e transcrever (`transcrever`, que cria as legendas).
 
+### Bloco preso a uma palavra (feito)
+
+O bloco do vídeo de cenas pode entrar e sair numa palavra da fala, como no roteiro: `em_palavra` e `sai_palavra` usam
+a mesma âncora (`src/nucleo/ancora-palavra.ts`, que o resolvedor do roteiro também usa), com o `ms` contado do começo
+da cena:
+
+- `"multa@0"`: entra na primeira palavra da cena que começa com "multa"; `"multa@2000"`, na primeira depois de 2 s.
+- `"multa$@0"`: no fim da palavra (o natural para `sai_palavra`); `"multa@0+120"` atrasa 120 ms e `"-80"` adianta.
+
+As palavras são as das legendas (geradas por `transcrever`) que começam dentro da cena, já no lugar em que o clipe de
+voz está: arrastar a fala leva o bloco junto. Sem legendas na cena, com a âncora mal escrita ou sem achar a palavra, o
+bloco fica no `em`/`sai` em ms e o resolvedor devolve um aviso, que o `aplicar_patch` repassa ao agente; a prévia e a
+exportação nunca param por isso. O tempo resolvido não sai da cena.
+
+Na tela, o inspetor do bloco tem "Entra na palavra" e "Sai na palavra", com as palavras transcritas da cena e o segundo
+de cada uma; escolher grava a âncora e põe o `em`/`sai` no mesmo ponto (o que vale se a palavra sumir). Mudar o tempo em
+segundos, no inspetor ou arrastando o bloco na linha do tempo, solta o bloco da palavra naquela ponta. A lâmina
+(`dividir_cena`) conta a âncora do novo começo da segunda cena e larga a ponta que o corte define. Pelo MCP, a âncora
+muda por `aplicar_patch` (`/cenas/i/blocos/j/em_palavra`).
+
 O que falta para chegar ao carrossel do roteiro:
 
-- **Bloco preso a uma palavra.** No vídeo de cenas o bloco entra em ms contados do começo da cena; no roteiro, em
-  `"palavra@ms"`. Falta uma âncora de palavra no `BlocoCenas` (resolvida pelas palavras transcritas da fala da cena).
 - **Narração gravada inteira.** Hoje a fala gravada é uma por cena; dividir uma gravação longa em cenas pela transcrição
   ainda não existe.
 - **Vinheta do logo, rodapé com a marca, cartão final e os efeitos sonoros de `midia/sfx/`**, que o `CarrosselTema` desenha

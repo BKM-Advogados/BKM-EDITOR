@@ -5,15 +5,18 @@
 // Bloco e cena mostram em "Fatos citados" os `refs` (ids dos fatos da pesquisa) como etiquetas, com a afirmação ao lado;
 // clicar leva ao fato no painel Pesquisa e o × tira um da lista. O som tem ainda o loudness (o alvo do arquivo exportado
 // e os medidores da narração e da mistura no resumo do vídeo; o da faixa no inspetor dela) e, no clipe de voz, a limpeza.
+// No tempo do bloco, "Entra na palavra" e "Sai na palavra" prendem o bloco a uma palavra da fala da cena (as palavras das
+// legendas que caem nela); mudar o tempo em segundos, aqui ou na linha do tempo, solta o bloco da palavra.
 import React, {useState, useSyncExternalStore} from 'react';
 import {rotuloDoAtalho} from '../../teclas';
 import {Clapperboard, CopyPlus, Film, FileAudio, FileJson, ImagePlus, Link, Quote, Scissors, Shuffle, Sparkles, Trash2, Undo2, X} from 'lucide-react';
 import {ALVO_LU_MAX, ALVO_LU_MIN, ALVO_LUFS_MAX, ALVO_LUFS_MIN, ALVO_LUFS_PADRAO, DUCKING_PADRAO, PAPEIS, PICO_DBTP_MAX, PICO_DBTP_MIN, PICO_DBTP_PADRAO, type AudioP,
   type ClipeAudio, type ClipeAudioP, type CurvaFade, type FaixaAudio, type FaixaAudioP, type IntensidadeLimpeza, type PapelFaixa} from '../../../nucleo/audio';
 import {INTENSIDADE_PADRAO, INTENSIDADES} from '../../../nucleo/limpeza-voz';
-import {TEMA_NEUTRO, TIPOS_BLOCO_CENAS, type BlocoCenas, type CenaCenas, type DocCenas, type PropsCenas} from '../../../nucleo/cenas';
+import {palavrasDaCena, TEMA_NEUTRO, TIPOS_BLOCO_CENAS, type BlocoCenas, type CenaCenas, type CenaCenasP, type DocCenas, type PropsCenas} from '../../../nucleo/cenas';
+import {ancoraDaPalavra, tempoDaAncora, type Palavra} from '../../../nucleo/ancora-palavra';
 import {FORMATOS_VIDEO, formatoDoVideo, rotuloFormato} from '../../../nucleo/formatos';
-import {avisar, mensagemDe, trocar, useLoja, valorEm, verFato} from '../../estado/loja';
+import {aplicar, avisar, loja, mensagemDe, patchTrocar, trocar, useLoja, valorEm, verFato} from '../../estado/loja';
 import {CriarEmMusica, MusicaDoClipe} from '../musica/NoVideo'; // frente Música
 import {CabecalhoInspector, CampoCor, CampoDeslizante, CampoInterruptor, CampoLeitura, CampoNumero, CampoSelecao, CampoTexto, Secao, copiar, numeroBr} from '../../componentes/Campos';
 import type {ItemMenu} from '../../componentes/Menu';
@@ -182,13 +185,59 @@ const PropsCena: React.FC<{documento: string; caminho: string; c: CenaCenas; n: 
   </div>
 );
 
-const PropsBloco: React.FC<{documento: string; caminho: string; b: BlocoCenas; formato: {largura: number; altura: number}; durCena: number; menu: ItemMenu[]; sub: string}> =
-  ({documento, caminho, b, formato, durCena, menu, sub}) => {
+/** Prende a entrada ou a saída do bloco a uma palavra da fala da cena: a lista traz as palavras transcritas que caem na
+ *  cena, com o segundo em que cada uma começa (ou acaba, na saída). Escolher grava a âncora (`em_palavra`/`sai_palavra`)
+ *  e põe o tempo em ms no mesmo ponto, que vale quando a palavra some (fala trocada, legendas apagadas). "Nenhuma" solta. */
+const CampoPalavra: React.FC<{documento: string; caminho: string; b: BlocoCenas; qual: 'em' | 'sai'; palavras: Palavra[]; durCena: number}> =
+  ({documento, caminho, b, qual, palavras, durCena}) => {
+    const chave = qual === 'em' ? 'em_palavra' : 'sai_palavra';
+    const atual = b[chave];
+    const fim = qual === 'sai';
+    const verbo = qual === 'em' ? 'entra' : 'sai';
+    const opcoes: [string, string][] = [['', 'Nenhuma (tempo em s)'],
+      ...palavras.flatMap((p): [string, string][] => {
+        const a = ancoraDaPalavra(p, fim);
+        return a ? [[a, `${p.w.trim()} · ${numeroBr((fim ? p.e : p.s) / 1000, 1)} s`]] : [];
+      })];
+    const r = typeof atual === 'string' && atual ? tempoDaAncora(atual, palavras) : null;
+    const escolher = (v: string) => {
+      if (!v) return void trocar(documento, `${caminho}/${chave}`, undefined, `bloco solto da palavra (${qual === 'em' ? 'entrada' : 'saída'})`);
+      const doc = loja.get().docs[documento]?.doc;
+      const achado = tempoDaAncora(v, palavras);
+      const ms = 'ms' in achado ? Math.round(Math.max(0, Math.min(durCena, achado.ms))) : undefined;
+      const w = 'ms' in achado ? achado.palavra.w.trim() : v;
+      const tempo = ms === undefined ? []
+        : qual === 'em' ? patchTrocar(doc, `${caminho}/em`, Math.min(ms, durCena - 100))
+          : patchTrocar(doc, `${caminho}/sai`, ms >= durCena ? undefined : Math.max((b.em ?? 0) + 100, ms));
+      void aplicar(documento, [...patchTrocar(doc, `${caminho}/${chave}`, v), ...tempo], `bloco ${verbo} em "${w}"`);
+    };
+    return (
+      <>
+        <CampoSelecao rotulo={qual === 'em' ? 'Entra na palavra' : 'Sai na palavra'} valor={typeof atual === 'string' ? atual : ''} opcoes={opcoes} padrao=""
+          aoMudar={escolher} />
+        {r && 'erro' in r && (
+          <div className="vazio">{palavras.length ? `Não achei a palavra (${r.erro}); o bloco ${verbo} no tempo em segundos.`
+            : `A cena não tem fala transcrita; o bloco ${verbo} no tempo em segundos até a fala ser transcrita.`}</div>
+        )}
+      </>
+    );
+  };
+
+const PropsBloco: React.FC<{documento: string; caminho: string; b: BlocoCenas; formato: {largura: number; altura: number}; durCena: number; menu: ItemMenu[]; sub: string;
+  palavras: Palavra[]}> =
+  ({documento, caminho, b, formato, durCena, menu, sub, palavras}) => {
     const t = tipoDe(b.tipo);
     const Icone = t.icone;
     const padrao = TIPOS_BLOCO_CENAS[b.tipo] ?? TIPOS_BLOCO_CENAS.texto;
     const menor = Math.min(formato.largura, formato.altura);
     const campo = (k: keyof BlocoCenas, rotulo: string) => (v: unknown) => void trocar(documento, `${caminho}/${k}`, v, `${rotulo} do bloco`);
+    // o tempo em segundos escolhido à mão solta o bloco da palavra naquela ponta (senão a palavra continuaria mandando)
+    const tempoEmMs = (k: 'em' | 'sai', v: number | undefined, rotulo: string) => {
+      const ancora = k === 'em' ? 'em_palavra' : 'sai_palavra';
+      if (b[ancora] === undefined) return campo(k, rotulo)(v);
+      const doc = loja.get().docs[documento]?.doc;
+      void aplicar(documento, [...patchTrocar(doc, `${caminho}/${k}`, v), ...patchTrocar(doc, `${caminho}/${ancora}`, undefined)], `${rotulo} do bloco (solto da palavra)`);
+    };
     const fracao = (k: 'x' | 'y' | 'largura' | 'altura', rotulo: string, p: number) => (
       <CampoNumero rotulo={rotulo} unidade="%" passo={1} valor={pct(b[k], p)} aoMudar={(v) => campo(k, rotulo.toLowerCase())(Math.round(v * 10) / 1000)} />
     );
@@ -233,10 +282,16 @@ const PropsBloco: React.FC<{documento: string; caminho: string; b: BlocoCenas; f
           </Secao>
           <Secao titulo="Tempo" chave="cenas:tempo">
             <CampoNumero rotulo="Entra" unidade="s" passo={0.1} valor={(b.em ?? 0) / 1000}
-              aoMudar={(v) => campo('em', 'entrada')(Math.max(0, Math.min(durCena - 100, Math.round(v * 1000))))} />
+              aoMudar={(v) => tempoEmMs('em', Math.max(0, Math.min(durCena - 100, Math.round(v * 1000))), 'entrada')} />
             <CampoNumero rotulo="Sai" unidade="s" passo={0.1} valor={(b.sai ?? durCena) / 1000} padrao={durCena / 1000}
-              aoRedefinir={b.sai !== undefined ? () => campo('sai', 'saída')(undefined) : undefined}
-              aoMudar={(v) => campo('sai', 'saída')(v * 1000 >= durCena ? undefined : Math.max((b.em ?? 0) + 100, Math.round(v * 1000)))} />
+              aoRedefinir={b.sai !== undefined ? () => tempoEmMs('sai', undefined, 'saída') : undefined}
+              aoMudar={(v) => tempoEmMs('sai', v * 1000 >= durCena ? undefined : Math.max((b.em ?? 0) + 100, Math.round(v * 1000)), 'saída')} />
+            {palavras.length || b.em_palavra !== undefined || b.sai_palavra !== undefined ? (
+              <>
+                <CampoPalavra documento={documento} caminho={caminho} b={b} qual="em" palavras={palavras} durCena={durCena} />
+                <CampoPalavra documento={documento} caminho={caminho} b={b} qual="sai" palavras={palavras} durCena={durCena} />
+              </>
+            ) : <div className="vazio">Com a fala da cena transcrita (legendas), dá para prender o bloco a uma palavra.</div>}
           </Secao>
           <Secao titulo="Posição e tamanho" chave="cenas:posicao">
             {fracao('x', 'X', 0.1)}
@@ -473,7 +528,9 @@ export const InspectorCenas: React.FC<{documento: string}> = ({documento}) => {
     {rotulo: 'Copiar JSON', icone: <FileJson className="i14" />, acao: () => copiar(JSON.stringify(obj, null, 2), 'JSON copiado')},
   ];
   if (m[2] === undefined) return <PropsCena documento={documento} caminho={caminho} c={obj as CenaCenas} n={n} menu={menu} />;
+  const cenaP: CenaCenasP | undefined = (props as PropsCenas | null)?.cenas?.[Number(m[1])];
+  const palavras = cenaP ? palavrasDaCena((props as PropsCenas).legendas_cenas, cenaP.t_in, cenaP.t_out) : [];
   return <PropsBloco documento={documento} caminho={caminho} b={obj as BlocoCenas} formato={formatoDoVideo(doc)} durCena={cena?.duracao_ms ?? 4000} menu={menu}
-    sub={`Cena ${n}${cena?.nome ? ` · ${cena.nome}` : ''} · bloco ${Number(m[2]) + 1}`} />;
+    sub={`Cena ${n}${cena?.nome ? ` · ${cena.nome}` : ''} · bloco ${Number(m[2]) + 1}`} palavras={palavras} />;
 };
 
