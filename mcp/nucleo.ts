@@ -24,6 +24,8 @@ import {servicoDeRender} from '../src/main/musica-render';
 import {servicoDoAmbiente} from '../src/main/narracao';
 import {definirServicoPrevia} from '../src/nucleo/mcp-previa'; // frente IDE: ver_quadro, ver_cenas, ver_trecho
 import {servicoDePreviaStdio} from '../src/main/previa-stdio';
+import {definirServicoExportacao} from '../src/nucleo/mcp-exportacao-final'; // exportar_video com o app fechado
+import {servicoDeExportacaoStdio} from '../src/main/exportacao-servico';
 
 const arg = (nome: string) => {
   const i = process.argv.indexOf(nome);
@@ -41,6 +43,8 @@ const servidor = new McpServer({name: 'estudio', version: '0.1.0'}, {instruction
 definirServicoMusica(servicoDeRender());
 // frente IDE: as prévias renderizam com o app de onde veio este arquivo (src/main/previa-stdio.ts)
 definirServicoPrevia(servicoDePreviaStdio(path.resolve(__dirname, '..')));
+// exportação final: o vídeo renderiza aqui com o app fechado; imagem e carrossel pedem o app (src/main/exportacao-servico.ts)
+definirServicoExportacao(servicoDeExportacaoStdio(path.resolve(__dirname, '..')));
 // a transcrição local acha o ffmpeg no node_modules do repositório (dist-mcp/ fica na raiz)
 const raiz = pasta;
 // um processo por conversa da IDE: a mesma origem (ide-<id>) no diário com o app aberto ou fechado (mcp-app.ts)

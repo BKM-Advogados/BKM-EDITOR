@@ -15,6 +15,8 @@ import {ErroProjeto, Projeto, serializar} from '../nucleo/projeto';
 import {criarRede} from '../nucleo/ferramentas-mcp';
 import {prepararRender} from './exportar';
 import {criarExportadorVideo, tituloDoDocumento} from './exportacao-video'; // a exportação do vídeo, a mesma do MCP (exportar_video)
+import {servicoDeExportacao} from './exportacao-servico'; // exportação final pelo MCP
+import {definirServicoExportacao} from '../nucleo/mcp-exportacao-final';
 import {registrarIpcMarcas} from './ipc-marcas';
 import {arquivoLivre, registrarExportarPaginas} from './exportar-paginas';
 import {lerJsonDaTela} from './ler-json';
@@ -565,8 +567,11 @@ registrarIpcNarracao({lidar, enviar, projeto: exigirProjeto, pasta: path.join(ap
   canais: {estado: CANAL.narracaoEstado, gravarChave: CANAL.narracaoGravarChave, apagarChave: CANAL.narracaoApagarChave, vozes: CANAL.narracaoVozes,
     previa: CANAL.narracaoPrevia, gerar: CANAL.narracaoGerar, cancelar: CANAL.narracaoCancelar, andamento: CANAL.narracaoAndamento, amostra: CANAL.narracaoAmostra}});
 // frente Música: ida e volta com o vídeo e o render ligado, feito no Web Worker da janela pela ponte com a janela
-registrarIpcMusica(lidar, exigirProjeto, criarPonteJanela({enviar, temJanela: () => Boolean(janela && !janela.isDestroyed()),
-  ouvir: (canal, f) => ipcMain.on(canal, (e, ...a) => (confiavel(e), f(...(a as never[]))))}));
+const pedirAJanela = criarPonteJanela({enviar, temJanela: () => Boolean(janela && !janela.isDestroyed()),
+  ouvir: (canal, f) => ipcMain.on(canal, (e, ...a) => (confiavel(e), f(...(a as never[]))))});
+registrarIpcMusica(lidar, exigirProjeto, pedirAJanela);
+// exportação final pelo MCP: o vídeo pelo exportador da tela; a imagem e o carrossel desenhados pela janela (mesma ponte)
+definirServicoExportacao(servicoDeExportacao(exportador, pedirAJanela));
 
 // ---------- atualização do app (docs/atualizacao.md) ----------
 // Windows: electron-updater (baixa sozinho, instala ao fechar ou no "Reiniciar e atualizar"). Mac e Linux: aviso com as
