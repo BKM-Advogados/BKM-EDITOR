@@ -101,6 +101,7 @@
 | **zod** | ^3.25.0 | Validação de dados/esquemas |
 | **fast-json-patch** | 3.1.1 | Patch JSON (ferramentas MCP) |
 | **pdf-lib** | 1.17.1 | Geração de PDF (carrossel de páginas) |
+| **unpdf** | 1.9.1 | Texto de PDF para a pesquisa (`ler_fonte`): o pdf.js num arquivo só, sem worker nem nativo |
 | **chokidar** | 4.0.3 | Observação de arquivos (watch) |
 | **@lydell/node-pty** | 1.2.0-beta.18 | Terminal nativo (PTY) |
 
