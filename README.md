@@ -306,7 +306,8 @@ renderiza um vídeo de cenas de teste em 9:16, 4:5 e 16:9 fora do Electron, em `
   ouvida, e o IPC da limpeza, do medidor, da transcrição e da marca d'água nunca rodou no Electron.
 - **Pesquisa de qualidade** (`tasks/estudio-qualidade-2026-11-07`): defeitos conferidos no código e a barra do que falta.
 - **Onda B** (briefing): importar mídia e painel Mídia (feitos), o carrossel narrado como modelo do tipo cenas (feito,
-  com o bloco preso a uma palavra da fala da cena, `docs/carrossel-narrado.md`), um projeto de exemplo neutro para o
+  com o bloco preso a uma palavra da fala da cena e com a vinheta do logo, o rodapé, o cartão final e os efeitos sonoros
+  no vídeo de cenas, `docs/carrossel-narrado.md`; falta a narração gravada inteira dividida nas cenas), um projeto de exemplo neutro para o
   "Ver um exemplo" (feito), o Claude que planeja (perguntas e Plano do vídeo antes de montar; feito: `plano.json`,
   `escrever_plano`/`ler_plano`/`aprovar_plano` e o cartão na conversa, `docs/ia.md`), chip de formato no
   monitor e primeiros passos (feitos, `docs/casca.md`) e "Salvar como modelo" (feito, inclusive criar projeto de um modelo seu

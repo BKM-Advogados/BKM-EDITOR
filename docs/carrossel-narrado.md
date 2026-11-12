@@ -59,9 +59,45 @@ segundos, no inspetor ou arrastando o bloco na linha do tempo, solta o bloco da 
 (`dividir_cena`) conta a âncora do novo começo da segunda cena e larga a ponta que o corte define. Pelo MCP, a âncora
 muda por `aplicar_patch` (`/cenas/i/blocos/j/em_palavra`).
 
+### Vinheta, rodapé, cartão final e efeitos sonoros (feito)
+
+O vídeo de cenas ganhou o bloco opcional `acabamento` (`src/nucleo/acabamento-video.ts`), com as mesmas peças do
+`CarrosselTema`: o logo, a vinheta e o cartão final saíram de `CarrosselNarrado.tsx` para `src/composicoes/marca-video.tsx`
+e servem às duas composições (o carrossel desenha igual, conferido quadro a quadro pela marcação).
+
+```json
+"acabamento": {"nome": "Escritório Exemplo", "vinheta": {"ligada": true, "duracao_ms": 1600}, "rodape": {"ligado": true},
+  "cartao_final": {"ligado": true, "titulo": "Salve e compartilhe com quem precisa", "aviso": "Conteúdo informativo", "duracao_ms": 3500},
+  "sons": {"ligados": true, "volume": 0.5}}
+```
+
+- **O que aparece** vem do kit de marca do `tema` (`logo`, `assinatura`, as cores e a fonte de título) e do bloco: `nome`
+  é quem assina por extenso. Peça presente vale ligada; `false` no interruptor desliga só ela. Sem logo, a vinheta escreve
+  o nome (ou a assinatura); sem logo, nome nem assinatura, a vinheta e o rodapé não aparecem e o resolvedor avisa. O cartão
+  aparece mesmo sem kit, só com o título (padrão "Salve e compartilhe com quem precisa"; o aviso é vazio de fábrica).
+- **Tempo (a escolha):** a vinheta **ocupa o começo da primeira cena** (cobre os primeiros 1,6 s, nunca mais que a cena, e
+  some revelando a cena); o cartão final **soma ao fim** (vem depois da última cena, 3,5 s de fábrica, e o `duracao_ms` das
+  props cresce esse tanto). Assim nada anda: clipes de áudio, legendas e âncoras de palavra ficam nos tempos de sempre, e a
+  música que vai "até o fim do vídeo" cobre o cartão. A linha do tempo mostra o cartão depois da última cena.
+- **Rodapé:** uma linha com um filete no destaque, o nome em caixa alta e a assinatura (ou só o logo), na letra de 2,4% do
+  lado menor, durante as cenas (some na vinheta e no cartão). Fica o mais embaixo e à esquerda possível fora das zonas da
+  rede do formato (`zonas-seguras.ts`, a mesma conta da marca d'água) e da faixa da legenda: no 9:16, acima da faixa de
+  484 px que a rede cobre embaixo, e acima da legenda quando há.
+- **Efeitos sonoros:** os arquivos que o projeto tem em `midia/sfx/` com os nomes do carrossel (`whoosh.wav` na vinheta e em
+  cada troca de cena, `impacto_grave.wav` na vinheta, `pop.wav` no número e em cada item de lista, `swell.wav` antes do
+  cartão); o que falta é pulado. O app não traz esses arquivos. Volume de fábrica 0,5 sobre o de cada efeito (metade do
+  carrossel) e, quando o efeito cai sobre a narração, o ducking da música o põe 20 LU abaixo da voz (a medida da casa
+  para efeito, `docs/audio.md`); efeito sem envelope medido conta como −6 dB, para baixar demais e não de menos. Tocam como mais uma
+  faixa de efeitos das props (`acabamento.sons`), fora da linha do tempo; o medidor de loudness do inspetor não os conta,
+  mas a exportação mede o arquivo final.
+- **Na tela:** no resumo do vídeo (nada selecionado), a seção "Marca no vídeo" liga e desliga cada peça, com quem assina,
+  título, aviso, durações e volume. **Pelo MCP:** `aplicar_patch` em `/acabamento` (o bloco inteiro), ou
+  `aplicar_marca {acabamento: true}`, que troca o kit e liga vinheta, rodapé e cartão num patch só.
+- **Modelo:** com um kit que tenha logo ou assinatura, o "Carrossel narrado" começa por uma cena "Abertura" sem fala, do
+  tamanho da vinheta, e vem com vinheta, rodapé e cartão final ligados (os efeitos, desligados). Sem kit, ou com o Neutro,
+  o modelo é o de antes.
+
 O que falta para chegar ao carrossel do roteiro:
 
 - **Narração gravada inteira.** Hoje a fala gravada é uma por cena; dividir uma gravação longa em cenas pela transcrição
   ainda não existe.
-- **Vinheta do logo, rodapé com a marca, cartão final e os efeitos sonoros de `midia/sfx/`**, que o `CarrosselTema` desenha
-  e o vídeo de cenas não.
