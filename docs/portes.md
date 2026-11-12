@@ -316,7 +316,11 @@ Para rodar num Windows 10/11 x64 e num Mac (um Apple Silicon e, se houver, um In
 - [ ] Nome de projeto `CON` e `nul.x` cria `Projeto CON` / `Projeto nul.x` (Windows).
 - [ ] Atalhos: Ctrl (Windows) / Cmd (Mac) + N, O, S, W, Z, D, K, Shift+E; Alt/Option+1…6 troca de área.
 - [ ] Mac: Cmd+C, Cmd+V, Cmd+A e Cmd+Z dentro de um campo de texto; a tecla delete apaga a cena ou o bloco selecionado.
-- [ ] Ver um exemplo abre e a prévia toca (só quando a instalação traz `exemplos/`; sem ela o botão não aparece).
+- [ ] Ver um exemplo abre e a prévia toca, com as duas imagens SVG; clicar de novo cria outra pasta ("Exemplo (2)").
+      O pacote leva `exemplos/exemplo` (gerado por `npm run exemplo`); sem ela o botão não aparece.
+- [ ] Salvar como modelo (menu do ícone): a pasta nasce em `~/Estudio/meus-modelos` (`%USERPROFILE%\Estudio\meus-modelos`)
+      com `modelo.json` e `projeto/`; o cartão aparece em Novo e cria o projeto; Renomear, Mostrar na pasta e Remover.
+- [ ] Modelo Carrossel narrado (Vídeo): nasce 9:16 com cinco cenas e a fala de cada uma.
 - [ ] Pasta de projeto: arrastar no `Estudio.exe` / no ícone do Dock abre o projeto (com o app fechado e aberto).
 - [ ] Git: ponto de restauração com Ctrl/Cmd+S. Mac sem as ferramentas do Xcode: o app **não** abre o instalador da
       Apple e avisa que não há git.

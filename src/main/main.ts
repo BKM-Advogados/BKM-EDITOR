@@ -18,6 +18,7 @@ import {criarExportadorVideo, tituloDoDocumento} from './exportacao-video'; // a
 import {servicoDeExportacao} from './exportacao-servico'; // exportação final pelo MCP
 import {definirServicoExportacao} from '../nucleo/mcp-exportacao-final';
 import {registrarIpcMarcas} from './ipc-marcas';
+import {registrarIpcModelos} from './ipc-modelos';
 import {arquivoLivre, registrarExportarPaginas} from './exportar-paginas';
 import {lerJsonDaTela} from './ler-json';
 import {McpHttp} from './mcp-http';
@@ -57,7 +58,7 @@ import {criarClaudeDesktop} from './claude-desktop'; // Claude Desktop (docs/cla
 import {listarProjetos, resolverProjeto, SCRIPT_DESKTOP} from '../nucleo/claude-desktop';
 // frente 2: importar mídia, criar, abrir, duplicar e fechar projeto e o ponto de restauração, os mesmos pela tela e pelo MCP
 import {EXTENSOES_IMPORTAVEIS, importarMidia, NOME_DO_TIPO, type TipoImportavel} from '../nucleo/importar-midia';
-import {criarPastaDoProjeto, duplicarPastaDoProjeto, formatoDoPedido, resumoDoProjeto} from '../nucleo/novo-projeto';
+import {criarPastaDoModelo, criarPastaDoProjeto, duplicarPastaDoProjeto, formatoDoPedido, resumoDoProjeto} from '../nucleo/novo-projeto';
 import {definirMedidorDeEnvelope, definirPontoDeRestauracao, mensagemDoPonto, respostaDoPonto, type TrocadorDeProjeto} from '../nucleo/mcp-projeto';
 import {medirEnvelopeDoArquivo} from './ipc-audio';
 import {criarAtualizador} from './atualizacao'; // atualização do app (docs/atualizacao.md)
@@ -541,6 +542,12 @@ ipcMain.on(CANAL.mostrarArquivo, (e, caminho: string) => {
 
 // kits de marca e fontes próprias (ipc-marcas.ts): a pasta das preferências, servida também pelo servidor de mídia
 const marcas = registrarIpcMarcas({lidar, janela: () => janela, memoria, midia, exigirProjeto});
+// modelos da pessoa (ipc-modelos.ts): salvar o projeto como modelo; criar a partir dele abre o projeto novo aqui
+const modelos = registrarIpcModelos({lidar, memoria, exigirProjeto});
+lidar(CANAL.modelosCriarProjeto, (o: {id: string; nome?: string; pasta?: string; marca?: string}) => emFila(() => {
+  const {raiz} = criarPastaDoModelo({modelos, id: o.id, nome: o.nome, marca: o.marca ? marcas.ler(o.marca) : null, pasta: o.pasta || memoria.prefs().pasta_projetos});
+  return abrirProjeto(raiz);
+}));
 
 registrarPrefsExportacao(lidar, exigirProjeto); // marca d'água por destino, lembrada no projeto (frente C)
 registrarContrasteMarca(lidar, exigirProjeto, (documento) => (exigirProjeto(), sessao!.propsVideo(documento, midia.base)), (aviso) => prepararRender({raizApp: app.getAppPath(), empacotado: app.isPackaged, aviso})); // contraste 3:1 da marca (frente C)

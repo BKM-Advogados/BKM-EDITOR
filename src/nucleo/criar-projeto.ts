@@ -11,6 +11,7 @@ import jsonpatch, {type Operation} from 'fast-json-patch';
 import type {DocImagem, EntradaDocumento, Manifesto, Modulo} from './documentos';
 import {novoDoc3d} from './cena3d';
 import {novoDocCenas} from './cenas';
+import {modeloCarrosselNarrado} from './modelo-carrossel-narrado';
 import {novaAnimacao, modeloAnimacaoLogoPixel} from './animacao';
 import {novaMusica} from './musica'; // frente Música
 import {EFEITOS} from './efeitos';
@@ -378,7 +379,7 @@ export const guiaDoProjeto = (modulos: Modulo[], arquivo: ArquivoDeGuia = 'CLAUD
     '`listar_midia` mostra os arquivos de `midia/` e onde são usados; `marcar_midia` marca uma tomada como boa ou descartada.',
     // frente 2 (mcp-projeto.ts e mcp-marca-edicao.ts)
     '`importar_midia` traz um arquivo do computador para `midia/` (pede a permissão da pessoa); `renomear_documento` muda o\n   título de um documento; `marcar_ponto_de_restauracao` cria um ponto de restauração (o Ctrl+S) antes de mudança grande.',
-    '`listar_marcas` mostra os kits de marca da pessoa; `criar_marca`, `editar_marca`, `importar_logo_marca` e\n   `importar_fonte_marca` mudam esses kits, fora do projeto e sem Reverter (pedem a permissão dela).',
+    '`listar_marcas` mostra os kits de marca da pessoa; `criar_marca`, `editar_marca`, `importar_logo_marca` e\n   `importar_fonte_marca` mudam esses kits, fora do projeto e sem Reverter (pedem a permissão dela).\n   `salvar_como_modelo` guarda o projeto (ou um documento) como modelo da pessoa, em Novo na tela inicial (também pede).',
     '`criar_projeto`, `abrir_projeto`, `duplicar_projeto` e `fechar_projeto` existem no Claude Desktop e na IDE. Numa conversa\n   dentro do app elas não aparecem (trocar de projeto fecharia a conversa): peça à pessoa para fazer pela tela.',
     '`guia_do_projeto` devolve este guia, se você não o recebeu.',
   ];
@@ -546,6 +547,15 @@ export const planoDoProjeto = (o: OpcoesProjeto): Plano => {
     return {
       manifesto,
       arquivos: {'estudio.json': serializar(manifesto), [entrada.caminho]: serializar(conteudo), '.gitignore': GITIGNORE, 'CLAUDE.md': claudeMd(['animacao'])},
+      pastas,
+    };
+  }
+  if (o.modelo === 'video-carrossel-narrado') {
+    const entrada: EntradaDocumento = {id: 'video', modulo: 'video', caminho: 'video/video.json', titulo: 'Carrossel narrado'};
+    const manifesto: Manifesto = {formato: 1, nome, documentos: [entrada]};
+    return {
+      manifesto,
+      arquivos: {'estudio.json': serializar(manifesto), [entrada.caminho]: serializar(modeloCarrosselNarrado()), '.gitignore': GITIGNORE, 'CLAUDE.md': claudeMd(['video'])},
       pastas,
     };
   }

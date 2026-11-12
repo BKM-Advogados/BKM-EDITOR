@@ -1,4 +1,4 @@
-// Preferências (menu → Preferências…, e o botão da tela inicial): a pasta dos projetos, o que abre ao iniciar e a
+// Preferências (menu → Preferências…, e o botão da tela inicial): a pasta dos projetos e a dos modelos da pessoa, o que abre ao iniciar e a
 // aparência (tema, contraste, densidade, tamanho e movimento; estado/aparencia.ts) e as atualizações (docs/atualizacao.md).
 import React, {useEffect, useState} from 'react';
 import type {Preferencias} from '../../compartilhado/api';
@@ -36,6 +36,15 @@ export const PainelPreferencias: React.FC<{aoFechar: () => void}> = ({aoFechar})
               </span>
             </label>
             {/onedrive/i.test(p.pasta_projetos) && <div className="dialogo-texto" style={{color: 'var(--aviso)'}}>Pasta dentro do OneDrive: a sincronização pode travar a gravação.</div>}
+            <label className="dialogo-campo"><span>Pasta dos seus modelos</span>
+              <span style={{display: 'flex', gap: 6}}>
+                <input className="campo" readOnly value={p.pasta_modelos} title={p.pasta_modelos} />
+                <button className="bt" onClick={async () => {
+                  const pasta = await window.estudio.escolherPasta('Pasta dos seus modelos (Salvar como modelo)');
+                  if (pasta) void gravar({pasta_modelos: pasta});
+                }}>Trocar…</button>
+              </span>
+            </label>
             <Opcoes rotulo="Ao iniciar o Estúdio" valor={p.ao_iniciar} opcoes={[['inicio', 'Tela inicial'], ['ultimo', 'Último projeto']]}
               aoMudar={(v) => void gravar({ao_iniciar: v})} />
           </>

@@ -112,3 +112,36 @@ Alt+seta na pilha de efeitos (sem aviso de "outra mão"); um erro de gravação 
 a aba Mídia, buscar "transcrito", marcar uma tomada com B e conferir no Histórico, usar uma foto em "Usar em…". O painel foi visto
 na prévia web (arquivos de exemplo), não no Electron; as miniaturas são o próprio arquivo (sem cache de miniatura) e o áudio
 não tem forma de onda nelas.
+
+## Tela inicial (Onda B, frente 1: `onda-b/inicio`)
+
+- **Ver um exemplo.** O exemplo é neutro e sintético: um vídeo de cenas vertical de 23 s (abertura, blocos, número,
+  imagem com aproximação e fecho), tema neutro, duas imagens SVG desenhadas no código, sem logo, foto, áudio ou nome de
+  ninguém. O conteúdo mora em `src/nucleo/exemplo-conteudo.ts`; `npm run exemplo` (`scripts/gerar-exemplo.ts`) grava
+  `exemplos/exemplo`, que o `forge.config.ts` empacota. O `CLAUDE.md` não vai junto: o app o escreve ao abrir a cópia,
+  com o texto da versão instalada. `testes/exemplo.test.ts` falha se a pasta versionada não for a do gerador, se o vídeo
+  tiver aviso, se uma imagem citada faltar, se aparecer marca, ou se dois cliques não derem duas pastas.
+- **Salvar como modelo.** Menu do ícone do editor: "Salvar como modelo…" (o projeto) e, com mais de um documento,
+  "Salvar este documento como modelo…". O modelo vai para `%USERPROFILE%\Estudio\meus-modelos\<id>\` (Preferências ›
+  "Pasta dos seus modelos"; `ESTUDIO_MODELOS` fora do app). Não é `Estudio\modelos`, que guarda o whisper e o MODNet. A
+  pasta tem `modelo.json` (nome, tipo, tamanho, documentos), `miniatura.jpg` (a do projeto, se houver) e `projeto/` com o
+  `estudio.json`, os documentos e só a mídia que eles citam (`midia/` e `fontes/`). Diário, `.git`, conversas,
+  `saidas/`, pesquisa e comentários ficam no projeto. `src/nucleo/pasta-modelos.ts`, IPC em `src/main/ipc-modelos.ts`.
+- **Seus modelos em Novo.** A tela inicial lista os modelos da pessoa nos Modelos do tipo deles, depois dos de fábrica,
+  com "Seu modelo · tamanho". Clicar cria o projeto (`criarPastaDoModelo`, `src/nucleo/novo-projeto.ts`): documentos e
+  mídia do modelo, `CLAUDE.md` e `.gitignore` novos, pasta livre ("Nome", "Nome (2)"). O kit escolhido na ficha troca o
+  tema; Neutro mantém o do modelo. O menu do cartão tem Renomear (o id e a pasta ficam), Mostrar na pasta e Remover
+  (apaga a pasta do modelo depois de confirmar; os projetos criados dele não mudam). Os de fábrica (`modelos.ts`) não
+  moram na pasta, então não se renomeiam nem se removem.
+- **Carrossel narrado.** Modelo de fábrica do vídeo, 9:16 fixo (`src/nucleo/modelo-carrossel-narrado.ts`; a decisão
+  está em `docs/carrossel-narrado.md`).
+- **MCP.** `salvar_como_modelo {nome, descricao?, documento?}`, classe cartão (grava fora do projeto, sem Reverter),
+  citada no passo das marcas do guia do projeto. `src/nucleo/mcp-modelos.ts`.
+- **Prévia web.** `scripts/previa-web/ponte.ts` abre o exemplo de verdade (mídia servida de `exemplos/exemplo`), cria o
+  carrossel narrado e guarda os modelos da pessoa em memória.
+
+O que só se confere com o app aberto: "Ver um exemplo" duas vezes no Electron (duas pastas em `~/Estudio`, a prévia toca e
+as imagens SVG aparecem; `scripts/e2e-boas-vindas.mjs` faz isso); "Salvar como modelo" num projeto com mídia, o cartão com a
+miniatura na tela inicial, criar a partir dele, Renomear, Mostrar na pasta e Remover; a pasta trocada nas Preferências; o
+carrossel narrado com a narração gerada de verdade e "Ajustar as cenas à fala". Na prévia web foram vistos o diálogo de
+salvar, o cartão com o menu, o exemplo (as cinco cenas, a lista, o SVG de blocos e a paisagem) e o carrossel narrado.

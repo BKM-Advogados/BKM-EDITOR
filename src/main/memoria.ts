@@ -44,6 +44,7 @@ export class Memoria {
       boas_vindas_vista: Boolean(p.boas_vindas_vista),
       pasta_trilhas: typeof p.pasta_trilhas === 'string' && p.pasta_trilhas ? p.pasta_trilhas : path.join(this.pastaPadrao, 'trilhas'),
       pasta_marcas: typeof p.pasta_marcas === 'string' && p.pasta_marcas ? p.pasta_marcas : path.join(this.pastaPadrao, 'marcas'),
+      pasta_modelos: typeof p.pasta_modelos === 'string' && p.pasta_modelos ? p.pasta_modelos : path.join(this.pastaPadrao, 'meus-modelos'), // modelos/ é a do whisper e do MODNet
       projetos_ide: p.projetos_ide !== false, // frente IDE: ligado até a pessoa desligar
       procurar_atualizacoes: p.procurar_atualizacoes !== false, // atualização do app: procura até a pessoa desligar
       ...(typeof p.versao_pulada === 'string' && p.versao_pulada ? {versao_pulada: p.versao_pulada} : {}),

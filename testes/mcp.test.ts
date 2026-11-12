@@ -51,7 +51,7 @@ describe('MCP estudio', () => {
       'exportar_musica', 'fazer_lista', 'fechar_projeto', 'fonte_da_marca', 'gerar_notas', 'guia_do_projeto', 'importar_fonte_marca', 'importar_legendas', 'importar_logo_marca', 'importar_midi', 'importar_midia', 'inserir_icone', 'inserir_linha', 'ler_comentario', 'ler_documento', 'ler_fonte',
       'ler_legendas', 'ler_musica', 'levar_para', 'licencas_do_projeto', 'listar_comentarios', 'listar_marcas', 'listar_midia', 'listar_mudancas', 'listar_pesquisa', 'listar_trilhas', 'marca_dagua', 'marcar_midia', 'marcar_ponto_de_restauracao', 'medir_contraste_marca',
       'medir_musica', 'mostrar_documento', 'narrar', 'pixelizar_imagem', 'por_no_video', 'preparar_teleprompter', 'projeto_info', 'pronuncias_narracao', 'propor_cortes_fala', 'reabrir_comentario', 'registrar_fato', 'remover_fundo', 'renomear_documento', 'renomear_projeto', 'resolver_comentario', 'responder_comentario',
-      'reverter', 'selecionar_camadas', 'texto_da_fonte', 'transcrever', 'travar_camadas', 'trocar_kit', 'ver_animacao', 'ver_cenas', 'ver_marca', 'ver_quadro',
+      'reverter', 'salvar_como_modelo', 'selecionar_camadas', 'texto_da_fonte', 'transcrever', 'travar_camadas', 'trocar_kit', 'ver_animacao', 'ver_cenas', 'ver_marca', 'ver_quadro',
       'ver_trecho', 'vozes_narracao',
       'exportar_carrossel', 'exportar_imagem', 'exportar_video', 'situacao_exportacao', // exportação final (docs/exportacao.md)
       'limpar_voz', 'medir_envelope', 'medir_loudness', 'ver_cena_3d', 'ver_imagem', // frente 3 do MCP

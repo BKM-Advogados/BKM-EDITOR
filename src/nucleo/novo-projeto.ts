@@ -9,6 +9,7 @@ import type {Manifesto} from './documentos';
 import {FORMATOS_IMAGEM, FORMATOS_VIDEO, FPS_PADRAO, limitarTamanho, type Formato} from './formatos';
 import {MODELOS, type IdModelo} from './modelos';
 import type {MarcaLida} from './pasta-marcas';
+import type {PastaModelos} from './pasta-modelos';
 import {ErroProjeto, Projeto, semBom, serializar} from './projeto';
 
 /** Um formato da tela (id de formatos.ts) ou um tamanho em pixels. */
@@ -37,6 +38,17 @@ export const criarPastaDoProjeto = (o: {nome?: string; modelo: IdModelo; formato
   const nome = o.nome?.trim() || nomePadrao(o.agora ?? new Date());
   const raiz = pastaLivre(o.pasta, nome);
   const plano = planoDoProjeto({nome, modelo: o.modelo, formato: o.formato});
+  if (o.marca) aplicarMarcaAoPlano(plano, o.marca);
+  gravarPlano(raiz, plano);
+  return {raiz, nome};
+};
+
+/** Grava o projeto novo a partir de um modelo da pessoa (pasta-modelos.ts): os documentos e a mídia do modelo, com o
+ *  kit de marca por cima se vier um. Sem nome, o do modelo. */
+export const criarPastaDoModelo = (o: {modelos: PastaModelos; id: string; nome?: string; marca?: MarcaLida | null; pasta: string}) => {
+  const nome = o.nome?.trim() || o.modelos.ler(o.id).nome;
+  const raiz = pastaLivre(o.pasta, nome);
+  const plano = o.modelos.plano(o.id, nome);
   if (o.marca) aplicarMarcaAoPlano(plano, o.marca);
   gravarPlano(raiz, plano);
   return {raiz, nome};
