@@ -2,7 +2,8 @@
 // a partir da agulha, sem apagar os de fora do trecho; o modo animar liga e desliga.
 import {describe, expect, it} from 'vitest';
 import {novaCamadaAnimacao} from '../src/nucleo/animacao';
-import {DURACAO_PREAJUSTE_MS, modoAnimar, PREAJUSTES, trilhasComPreajuste} from '../src/renderer/modulos/animacao/preajustes';
+import {modoAnimar} from '../src/renderer/modulos/animacao/preajustes';
+import {DURACAO_PREAJUSTE_MS, PREAJUSTES, trilhasComPreajuste} from '../src/nucleo/animacao-preajustes';
 
 const camada = () => ({...novaCamadaAnimacao('forma', 'f1'), x: 100, y: 200, opacidade: 1});
 const pre = (id: string) => PREAJUSTES.find((p) => p.id === id)!;

@@ -7,7 +7,10 @@ import {ArrowDown, ArrowUp, Blend, Copy, GripVertical, Trash2, TriangleAlert, Wr
 import type {PaineisDoModulo} from '../../casca/contrato';
 import {aplicar, documentosDe, loja, selecionar, trocar, useLoja} from '../../estado/loja';
 import {SemDocumento} from '../../componentes/SemDocumento';
-import {definicao, EFEITOS, filtroCss, lerEfeitos, novoEfeito, TOM_PADRAO, type Efeito, type EfeitoLido} from '../../../nucleo/efeitos';
+import {
+  definicao, EFEITOS, efeitosDoPreajuste, filtroCss, idNoDocumento as idDoOriginal, idsEmUso as idsDaPilha, lerEfeitos, novoEfeito, patchAdicionarEfeitos, patchRemoverEfeito,
+  PREAJUSTES_EFEITOS, TOM_PADRAO, type Efeito, type EfeitoLido,
+} from '../../../nucleo/efeitos';
 import {comLimiteDeErro} from '../../componentes/LimiteDeErro';
 import {CabecalhoInspector, CampoCor, CampoDeslizante, CampoLeitura, Secao} from '../../componentes/Campos';
 import {MonitorVideo} from '../video/MonitorVideo';
@@ -29,20 +32,11 @@ const usarAlvo = () => {
 };
 
 /** O id que o documento tem no item (a prova do "test" do patch), ou undefined se não há id de texto. */
-const idNoDocumento = (l: EfeitoLido) => {
-  const id = (l.original as {id?: unknown} | null)?.id;
-  return typeof id === 'string' && id ? id : undefined;
-};
+const idNoDocumento = (l: EfeitoLido) => idDoOriginal(l.original);
 const testeDoId = (i: number, l: EfeitoLido): OperacaoPatch[] => {
   const id = idNoDocumento(l);
   return id ? [{op: 'test', path: `/efeitos/${i}/id`, value: id}] : [];
 };
-
-const PRESETS: {nome: string; efeitos: Omit<Efeito, 'id'>[]}[] = [
-  {nome: 'Cinema', efeitos: [{tipo: 'contraste', valor: 1.15}, {tipo: 'saturacao', valor: 0.9}, {tipo: 'vinheta', valor: 0.45}, {tipo: 'granulado', valor: 0.15}]},
-  {nome: 'Quente', efeitos: [{tipo: 'tom', valor: 0.2, cor: TOM_PADRAO}, {tipo: 'brilho', valor: 1.05}]},
-  {nome: 'Preto e branco', efeitos: [{tipo: 'saturacao', valor: 0}, {tipo: 'contraste', valor: 1.2}]},
-];
 
 /** Amostra de 48 px com o efeito aplicado (o filtro CSS de verdade e as camadas de vinheta e tom), numa cena neutra de
  *  céu, pele e mato: dá para ver o que o efeito faz antes de pôr. */
@@ -66,19 +60,15 @@ const valorDeMostra = (tipo: Efeito['tipo']) => {
   return tipo === 'matiz' ? 90 : d.padrao + (d.max - d.padrao) * 0.5;
 };
 
-const adicionar = (alvo: string, total: number, novos: Efeito[]) => {
-  const doc = loja.get().docs[alvo]?.doc;
+const adicionar = (alvo: string, novos: Efeito[]) => {
   // se o documento tem `efeitos` mas não é uma lista (JSON à mão), o efeito novo troca o valor por uma lista
-  const lista = Array.isArray(doc?.efeitos);
-  const patch: OperacaoPatch[] = !lista
-    ? [{op: doc?.efeitos === undefined ? 'add' : 'replace', path: '/efeitos', value: novos}]
-    : novos.map((e) => ({op: 'add' as const, path: '/efeitos/-', value: e}));
-  void aplicar(alvo, patch, `efeito ${novos.map((e) => e.tipo).join(', ')}`).then(() => selecionar({documento: alvo, caminho: `/efeitos/${(lista ? total : 0) + novos.length - 1}`}));
+  const {patch, primeiro} = patchAdicionarEfeitos(loja.get().docs[alvo]?.doc, novos);
+  void aplicar(alvo, patch, `efeito ${novos.map((e) => e.tipo).join(', ')}`).then(() => selecionar({documento: alvo, caminho: `/efeitos/${primeiro + novos.length - 1}`}));
 };
 
 const valorCurto = (e: Efeito) => `${String(Number(e.valor.toFixed(2))).replace('.', ',')}${definicao(e.tipo).unidade}`;
 // ids que o documento já usa, também os dos itens inválidos, para um efeito novo não repetir
-const idsEmUso = (lidos: EfeitoLido[]) => lidos.map((l, i) => ({id: idNoDocumento(l) ?? `efeito-${i + 1}`}));
+const idsEmUso = (lidos: EfeitoLido[]) => idsDaPilha(lidos.map((l) => l.original));
 
 // a pilha como acordeão (como os Controles de efeito do After Effects): a chave fx liga e desliga, o clique na linha
 // abre os ajustes ali mesmo, arrastar ou Alt+↑/↓ reordena; nada de formulário separado
@@ -93,10 +83,10 @@ const Pilha: React.FC = () => {
     void aplicar(alvo, [...testeDoId(i, lidos[i]), {op: 'move', from: `/efeitos/${i}`, path: `/efeitos/${j}`}], `ordem do efeito ${nomeDe(i)}`)
       .then(() => selecionar({documento: alvo, caminho: `/efeitos/${j}`}));
   };
-  const remover = (i: number) => alvo && void aplicar(alvo, [...testeDoId(i, lidos[i]), {op: 'remove', path: `/efeitos/${i}`}], `remover efeito ${nomeDe(i)}`).then(() => selecionar(null));
+  const remover = (i: number) => alvo && void aplicar(alvo, patchRemoverEfeito(lidos.map((l) => l.original), i), `remover efeito ${nomeDe(i)}`).then(() => selecionar(null));
   const duplicar = (i: number) => {
     const e = lidos[i].efeito;
-    if (alvo && e) adicionar(alvo, lidos.length, [{...e, id: novoEfeito(e.tipo, idsEmUso(lidos)).id}]);
+    if (alvo && e) adicionar(alvo, [{...e, id: novoEfeito(e.tipo, idsEmUso(lidos)).id}]);
   };
   const alternar = (i: number, e: Efeito) => alvo && void trocar(alvo, `/efeitos/${i}/ativo`, e.ativo !== false ? false : undefined, `${e.ativo !== false ? 'desligar' : 'ligar'} ${e.id}`);
   // o item corrigido no lugar do que está no documento (valor em texto, fora da faixa ou sem valor)
@@ -116,12 +106,9 @@ const Pilha: React.FC = () => {
         {!alvo ? <SemDocumento modulo="video" compacto /> : (
           <>
             <div className="pre-ajustes">
-              {PRESETS.map((p) => (
-                <button key={p.nome} className="cartao-efeito" title={`Pôr ${p.nome}: ${p.efeitos.map((e) => definicao(e.tipo).nome).join(' · ')}`} onClick={() => {
-                  const novos: Efeito[] = [];
-                  for (const e of p.efeitos) novos.push({...novoEfeito(e.tipo, [...idsEmUso(lidos), ...novos]), ...e});
-                  adicionar(alvo, lidos.length, novos);
-                }}><AmostraEfeito efeitos={p.efeitos} /><span className="nome-efeito">{p.nome}</span></button>
+              {PREAJUSTES_EFEITOS.map((p) => (
+                <button key={p.nome} className="cartao-efeito" title={`Pôr ${p.nome}: ${p.efeitos.map((e) => definicao(e.tipo).nome).join(' · ')}`}
+                  onClick={() => adicionar(alvo, efeitosDoPreajuste(p.efeitos, lidos.map((l) => l.original)))}><AmostraEfeito efeitos={p.efeitos} /><span className="nome-efeito">{p.nome}</span></button>
               ))}
             </div>
             {lidos.length === 0 && <div className="vazio">Nenhum efeito. Use um pré-ajuste acima ou adicione abaixo.</div>}
@@ -203,7 +190,7 @@ const Pilha: React.FC = () => {
             <Secao titulo="Adicionar efeito" chave="efeitos-adicionar" fechadaDePadrao={lidos.length > 0}>
               <div className="grade-adicionar">
                 {EFEITOS.map((d) => (
-                  <button key={d.tipo} className="cartao-efeito" title={`Pôr ${d.nome}`} onClick={() => adicionar(alvo, lidos.length, [novoEfeito(d.tipo, idsEmUso(lidos))])}>
+                  <button key={d.tipo} className="cartao-efeito" title={`Pôr ${d.nome}`} onClick={() => adicionar(alvo, [novoEfeito(d.tipo, idsEmUso(lidos))])}>
                     <AmostraEfeito efeitos={[{tipo: d.tipo, valor: valorDeMostra(d.tipo), ...(d.tipo === 'tom' ? {cor: TOM_PADRAO} : {})}]} />
                     <span className="nome-efeito">{d.nome}</span>
                   </button>

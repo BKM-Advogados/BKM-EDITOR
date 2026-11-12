@@ -14,7 +14,8 @@ import {iconeTipoAnimacao, NOME_TIPO_ANIMACAO} from "./CamadasAnimacao";
 import {EditorPixel} from "./EditorPixel";
 import {aoQuadro, msAtual} from "./tocador";
 import {MudancasNoInspetor} from "../../componentes/Agente";
-import {DURACAO_PREAJUSTE_MS, modoAnimar, PREAJUSTES, trilhasComPreajuste} from "./preajustes";
+import {modoAnimar} from "./preajustes";
+import {DURACAO_PREAJUSTE_MS, PREAJUSTES, trilhasComPreajuste} from "../../../nucleo/animacao-preajustes";
 
 export const InspectorAnimacao: React.FC = () => {
   const ativo = useLoja((e) => e.ativo.animacao);

@@ -72,9 +72,10 @@ aquela página. Preencher os campos é um `aplicar_patch` comum, com `test` no v
 ]
 ```
 
-Páginas novas pelo Claude: `add` em `/paginas/-` (ou `/paginas/3`) com `{id, nome, camadas}`; ids de página únicos;
-acertar o `pagina` ("3/8") das outras páginas. Numa prancheta só, para virar carrossel: `add /paginas` com a lista
-inteira (a primeira página com as camadas da raiz) e `replace /camadas` por `[]` no mesmo patch.
+Páginas pelo Claude: `editar_paginas` {op: `nova`, `duplicar`, `mover`, `excluir` ou `renomear`; `pagina` (id ou número,
+1 = a primeira); `para` (mover); `nome`} faz o mesmo que a barra de páginas, com a mesma conta (`patchNovaPagina` e
+vizinhas em `src/nucleo/carrossel.ts`): ids únicos, o número "3/8" das páginas acertado e, numa prancheta só, a
+passagem para `paginas` no mesmo passo do diário. A última página não sai.
 
 O `CLAUDE.md` que os projetos novos recebem (`src/nucleo/criar-projeto.ts`, da sessão do kit de marca) ainda descreve
 a imagem como "largura, altura, fundo e camadas"; ao integrar, acrescentar: "ou `paginas` (carrossel: id, nome e

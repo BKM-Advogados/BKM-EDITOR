@@ -200,6 +200,8 @@ const secaoEfeitos = () => {
     ...linhas,
     '  Brilho, contraste e saturação valem 1 quando não mudam nada; preto e branco é `saturacao` 0; sépia, vinheta,',
     '  granulado e tom vão de 0 (nada) a 1. Tipo ou campo fora disto quebra a área Efeitos do app: não invente.',
+    '  `adicionar_efeito` {tipo, valor?, cor?} ou {preajuste: `cinema`, `quente`, `preto_e_branco`} põe na pilha com id livre;',
+    '  `remover_efeito` {id} tira (frente 4: edição fina).',
   ];
 };
 
@@ -387,6 +389,7 @@ export const guiaDoProjeto = (modulos: Modulo[], arquivo: ArquivoDeGuia = 'CLAUD
     passos.push('`propor_cortes_fala` propõe tirar pausas longas e "ãh" de um clipe de voz e `aplicar_cortes_fala` grava a\n   narração emendada (as legendas vão junto). `preparar_teleprompter` grava o texto que a pessoa lê ao gravar.');
     passos.push('Som: `adicionar_clipe_audio` põe um áudio do projeto numa faixa; `dividir_clipe`, `copiar_clipe` e `crossfade`\n   editam os clipes. `listar_trilhas` mostra a pasta de trilhas da pessoa e `escolher_trilha` traz uma para o vídeo\n   (pede a permissão dela); `creditos_das_musicas` dá os créditos que as licenças pedem.');
     passos.push('`medir_loudness` mede o som do vídeo como o render vai soar (LUFS da mistura contra o alvo, a voz e quanto a\n   música fica abaixo dela). `medir_envelope` mede um áudio novo (duração e forma de onda), o que a tela faz ao ver o\n   arquivo: chame com o app fechado. `limpar_voz` limpa a voz de um clipe sem tocar no original (`voltar: true` desfaz).');
+    passos.push('Edição fina: `dividir_cena` {em_ms} é a lâmina (Ctrl+K) e `duplicar_cena` copia uma cena com ids novos;\n   `editar_legendas` {op} divide, junta, exclui, cria, substitui em lote e troca a predefinição das legendas.');
     passos.push('`marca_dagua` lê ou muda a marca d\'água de cada destino da exportação; `medir_contraste_marca` confere se ela lê\n   sobre o fundo (só com o app aberto).');
   }
   if (tem('imagem')) {
@@ -396,6 +399,8 @@ export const guiaDoProjeto = (modulos: Modulo[], arquivo: ArquivoDeGuia = 'CLAUD
     passos.push('`ver_marca` mostra o kit da imagem; `cor_da_marca` e `fonte_da_marca` põem a cor (`@destaque`) ou a fonte\n   (`@titulo`) do kit numa camada. `buscar_icone` e `inserir_icone` (Lucide), `inserir_linha` (linha e seta) e\n   `fazer_lista` (marcadores ou números num texto) criam as peças já no kit.');
   }
   if (tem('3d')) passos.push('`ver_cena_3d` tira um instantâneo da cena 3D pela câmera do documento ou por outra, sem mudá-la; só com o\n   projeto aberto no app.');
+  if (tem('imagem')) passos.push('`editar_paginas` {op} cria, duplica, move, exclui e renomeia as páginas do carrossel.');
+  if (tem('animacao')) passos.push('`animar_entrada` e `animar_saida` {camada, preajuste} põem uma entrada ou saída pronta (surgir, subir, descer,\n   crescer, girar), como os botões do inspetor.');
   if (tem('animacao')) passos.push('`criar_animacao`, `adicionar_camada_animacao`, `animar`, `pixelizar_imagem`, `efeito_pixel` e `ver_animacao` montam e animam a animação (docs/animacao.md).');
   if (tem('video') || tem('animacao')) passos.push('`exportar_video` exporta o vídeo para `saidas/` como o botão Exportar (destinos, codec, qualidade, trecho,\n   legendas e marca d\'água; pede a permissão da pessoa). Render longo devolve um id: `situacao_exportacao` acompanha.');
   if (tem('imagem')) passos.push('`exportar_imagem` (PNG, JPG ou WebP) e `exportar_carrossel` (PNG por página e PDF) gravam em `saidas/`; só com o\n   projeto aberto no app, que desenha a imagem.');

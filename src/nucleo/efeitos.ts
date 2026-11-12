@@ -1,6 +1,7 @@
 // Pilha de efeitos visuais, a mesma para vídeo e imagem. Filtros de cor e desfoque viram uma string de filtro CSS, que
 // vale no DOM (prévia e render do Remotion) e no canvas 2D (ctx.filter, exportação da imagem). Vinheta, granulado e tom
 // são camadas por cima. Tudo determinístico: o granulado usa o quadro como semente.
+import type {OperacaoPatch} from './documentos';
 
 export type TipoEfeito = 'desfoque' | 'brilho' | 'contraste' | 'saturacao' | 'matiz' | 'sepia' | 'vinheta' | 'granulado' | 'tom';
 
@@ -116,6 +117,45 @@ export const novoEfeito = (tipo: TipoEfeito, existentes: {id: string}[] = []): E
   let n = 1;
   while (existentes.some((e) => e.id === `${tipo}-${n}`)) n++;
   return {id: `${tipo}-${n}`, tipo, valor: definicao(tipo).padrao, ...(tipo === 'tom' ? {cor: TOM_PADRAO} : {})};
+};
+
+// ---------- pôr e tirar da pilha (a área Efeitos e o MCP adicionar_efeito/remover_efeito) ----------
+
+/** Pré-ajustes da área Efeitos: vários efeitos de uma vez, com os valores que dão o visual. */
+export const PREAJUSTES_EFEITOS: {id: string; nome: string; efeitos: Omit<Efeito, 'id'>[]}[] = [
+  {id: 'cinema', nome: 'Cinema', efeitos: [{tipo: 'contraste', valor: 1.15}, {tipo: 'saturacao', valor: 0.9}, {tipo: 'vinheta', valor: 0.45}, {tipo: 'granulado', valor: 0.15}]},
+  {id: 'quente', nome: 'Quente', efeitos: [{tipo: 'tom', valor: 0.2, cor: TOM_PADRAO}, {tipo: 'brilho', valor: 1.05}]},
+  {id: 'preto_e_branco', nome: 'Preto e branco', efeitos: [{tipo: 'saturacao', valor: 0}, {tipo: 'contraste', valor: 1.2}]},
+];
+
+/** O id que o item tem no documento (a prova do "test" do patch), ou undefined se não há id de texto. */
+export const idNoDocumento = (original: unknown) => {
+  const id = (original as {id?: unknown} | null)?.id;
+  return typeof id === 'string' && id ? id : undefined;
+};
+
+/** Os ids que a pilha já usa, também os dos itens inválidos, para um efeito novo não repetir nenhum. */
+export const idsEmUso = (pilha: unknown): {id: string}[] => lerEfeitos(pilha).map((l, i) => ({id: idNoDocumento(l.original) ?? `efeito-${i + 1}`}));
+
+/** Os efeitos de um pré-ajuste com ids livres na pilha. */
+export const efeitosDoPreajuste = (preajuste: Omit<Efeito, 'id'>[], pilha: unknown): Efeito[] => {
+  const novos: Efeito[] = [];
+  for (const e of preajuste) novos.push({...novoEfeito(e.tipo, [...idsEmUso(pilha), ...novos]), ...e});
+  return novos;
+};
+
+/** Põe `novos` no fim da pilha. Se o documento tem `efeitos` que não é lista (JSON à mão), a lista nova toma o lugar.
+ *  `primeiro`: o índice do primeiro efeito novo depois do patch. */
+export const patchAdicionarEfeitos = (doc: {efeitos?: unknown} | undefined, novos: Efeito[]): {patch: OperacaoPatch[]; primeiro: number} => {
+  const lista = Array.isArray(doc?.efeitos);
+  if (!lista) return {primeiro: 0, patch: [{op: doc?.efeitos === undefined ? 'add' : 'replace', path: '/efeitos', value: novos}]};
+  return {primeiro: (doc!.efeitos as unknown[]).length, patch: novos.map((e) => ({op: 'add' as const, path: '/efeitos/-', value: e}))};
+};
+
+/** Tira o item `i` da pilha, conferindo o id dele (se tem) para não tirar outro que o agente pôs no lugar. */
+export const patchRemoverEfeito = (pilha: unknown, i: number): OperacaoPatch[] => {
+  const id = Array.isArray(pilha) ? idNoDocumento(pilha[i]) : undefined;
+  return [...(id ? [{op: 'test' as const, path: `/efeitos/${i}/id`, value: id}] : []), {op: 'remove', path: `/efeitos/${i}`}];
 };
 
 // ---------- granulado (tres-efeitos-D6) ----------

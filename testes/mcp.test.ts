@@ -55,6 +55,8 @@ describe('MCP estudio', () => {
       'ver_trecho', 'vozes_narracao',
       'exportar_carrossel', 'exportar_imagem', 'exportar_video', 'situacao_exportacao', // exportação final (docs/exportacao.md)
       'limpar_voz', 'medir_envelope', 'medir_loudness', 'ver_cena_3d', 'ver_imagem', // frente 3 do MCP
+      // frente 4: edição fina (mcp-edicao-fina.ts)
+      'adicionar_efeito', 'animar_entrada', 'animar_saida', 'dividir_cena', 'duplicar_cena', 'editar_legendas', 'editar_paginas', 'remover_efeito',
     ].sort());
   });
 
