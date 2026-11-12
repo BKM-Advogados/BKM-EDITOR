@@ -309,8 +309,8 @@ renderiza um vídeo de cenas de teste em 9:16, 4:5 e 16:9 fora do Electron, em `
   falta o bloco preso a uma palavra dentro da cena, `docs/carrossel-narrado.md`), um projeto de exemplo neutro para o
   "Ver um exemplo" (feito), o Claude que planeja (perguntas e Plano do vídeo antes de montar; feito: `plano.json`,
   `escrever_plano`/`ler_plano`/`aprovar_plano` e o cartão na conversa, `docs/ia.md`), chip de formato no
-  monitor e primeiros passos (feitos, `docs/casca.md`) e "Salvar como modelo" (feito; criar projeto de um modelo seu
-  pelo MCP ainda não). A interface nova foi vista só na prévia web; falta conferir no app aberto.
+  monitor e primeiros passos (feitos, `docs/casca.md`) e "Salvar como modelo" (feito, inclusive criar projeto de um modelo seu
+  pelo MCP: `listar_modelos` e `criar_projeto {modelo_proprio}`). A interface nova foi vista só na prévia web; falta conferir no app aberto.
 - **Memória (app empacotado, 05/11/2026):** 307 MB parado no vídeo; 547 MB com as quatro áreas e o 3D. A tela inicial
   agora abre sem o editor (falta medir a linha "Início parado").
 - **Fontes** do Google (Inter, Archivo, IBM Plex) baixam na primeira vez (precisa de internet); as de arquivo do kit não.
