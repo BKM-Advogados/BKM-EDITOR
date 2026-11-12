@@ -5,6 +5,7 @@ import {existsSync, mkdirSync, readFileSync, renameSync, writeFileSync} from 'no
 import path from 'node:path';
 import type {Preferencias, Recente} from '../compartilhado/api';
 import type {Manifesto} from '../nucleo/documentos';
+import {normalizarPassos} from '../nucleo/primeiros-passos';
 
 const MAX_RECENTES = 24;
 
@@ -47,6 +48,7 @@ export class Memoria {
       projetos_ide: p.projetos_ide !== false, // frente IDE: ligado até a pessoa desligar
       procurar_atualizacoes: p.procurar_atualizacoes !== false, // atualização do app: procura até a pessoa desligar
       ...(typeof p.versao_pulada === 'string' && p.versao_pulada ? {versao_pulada: p.versao_pulada} : {}),
+      primeiros_passos: normalizarPassos(p.primeiros_passos), // Onda B: o que já se marcou e o "Não mostrar mais"
     };
   }
 

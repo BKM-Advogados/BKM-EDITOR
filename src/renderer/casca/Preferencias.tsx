@@ -5,6 +5,8 @@ import type {Preferencias} from '../../compartilhado/api';
 import {aparencia, ESCALAS, usarAparencia} from '../estado/aparencia';
 import {Segmentado} from '../componentes/Controles';
 import {SecaoAtualizacoes} from '../componentes/AvisoAtualizacao';
+import {mostrarPassos, PASSOS_VAZIO} from '../../nucleo/primeiros-passos';
+import {carregarPassos, definirPassos, usePassos} from '../estado/primeiros-passos';
 
 /** Escolha de poucas opções num segmentado (Preferências). */
 const Opcoes = <T extends string | number>({rotulo, valor, opcoes, aoMudar}: {rotulo: string; valor: T; opcoes: [T, string][]; aoMudar: (v: T) => void}) => (
@@ -18,6 +20,8 @@ export const PainelPreferencias: React.FC<{aoFechar: () => void}> = ({aoFechar})
   const [p, setP] = useState<Preferencias | null>(null);
   const {escolha: ap} = usarAparencia();
   useEffect(() => void window.estudio.preferencias().then(setP), []);
+  const passos = usePassos();
+  useEffect(() => void carregarPassos(), []);
   const gravar = async (m: Partial<Preferencias>) => setP(await window.estudio.gravarPreferencias(m));
   return (
     <div className="dialogo-fundo" onPointerDown={(e) => e.target === e.currentTarget && aoFechar()} onKeyDown={(e) => e.key === 'Escape' && aoFechar()}>
@@ -38,6 +42,11 @@ export const PainelPreferencias: React.FC<{aoFechar: () => void}> = ({aoFechar})
             {/onedrive/i.test(p.pasta_projetos) && <div className="dialogo-texto" style={{color: 'var(--aviso)'}}>Pasta dentro do OneDrive: a sincronização pode travar a gravação.</div>}
             <Opcoes rotulo="Ao iniciar o Estúdio" valor={p.ao_iniciar} opcoes={[['inicio', 'Tela inicial'], ['ultimo', 'Último projeto']]}
               aoMudar={(v) => void gravar({ao_iniciar: v})} />
+            {passos && (
+              // Onda B: "Mostrar" recomeça a lista do zero (os passos voltam a se marcar conforme você faz)
+              <Opcoes rotulo="Primeiros passos no editor" valor={mostrarPassos(passos) ? 'sim' : 'nao'} opcoes={[['sim', 'Mostrar'], ['nao', 'Não mostrar']]}
+                aoMudar={(v) => definirPassos(v === 'sim' ? PASSOS_VAZIO : {...passos, dispensado: true})} />
+            )}
           </>
         )}
         <div className="dialogo-secao">Aparência</div>

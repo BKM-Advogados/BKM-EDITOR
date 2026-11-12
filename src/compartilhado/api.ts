@@ -1,6 +1,7 @@
 // Contrato entre a interface (renderer) e o processo principal. O preload expõe só isto em window.estudio; a interface
 // não tem acesso a Node nem ao disco.
 import type {Comentario, EntradaDocumento, EstadoEditor, Manifesto, Modulo, OperacaoPatch, ResumoDiario} from '../nucleo/documentos';
+import type {EstadoPassos} from '../nucleo/primeiros-passos';
 import type {IdModelo} from '../nucleo/modelos';
 import type {Formato} from '../nucleo/formatos';
 import type {Envelope, IntensidadeLimpeza, LimpezaClipe} from '../nucleo/audio';
@@ -191,7 +192,8 @@ export type Preferencias = {pasta_projetos: string; ao_iniciar: 'inicio' | 'ulti
   pasta_trilhas: string; // biblioteca de músicas e efeitos da pessoa (padrão: Estudio/trilhas)
   pasta_marcas: string;
   projetos_ide?: boolean; // frente IDE e harnesses: guias e MCP de cada harness em cada projeto (padrão: ligado; docs/ide.md)
-  procurar_atualizacoes?: boolean; versao_pulada?: string}; // atualização do app (padrão: procura; "Pular esta versão")
+  procurar_atualizacoes?: boolean; versao_pulada?: string; // atualização do app (padrão: procura; "Pular esta versão")
+  primeiros_passos?: EstadoPassos}; // Onda B: os primeiros passos do editor já feitos e o "Não mostrar mais" (nucleo/primeiros-passos.ts)
 
 /** `marca` é o id do kit de marca que entra no tema do documento novo (sem ele, o tema neutro). */
 export type NovoProjeto = {nome?: string; modelo: IdModelo; formato?: Formato | {largura: number; altura: number}; pasta?: string; formato_id?: string; marca?: string};
