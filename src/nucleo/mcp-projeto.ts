@@ -20,7 +20,8 @@ import type {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {z} from 'zod';
 import {importarMidia} from './importar-midia';
 import {MODELOS, type IdModelo} from './modelos';
-import {criarPastaDoProjeto, duplicarPastaDoProjeto, formatoDoPedido, resumoDoProjeto, type PedidoFormato} from './novo-projeto';
+import {PastaModelos} from './pasta-modelos';
+import {criarPastaDoModelo, criarPastaDoProjeto, duplicarPastaDoProjeto, formatoDoPedido, resumoDoProjeto, type PedidoFormato} from './novo-projeto';
 import {PastaMarcas} from './pasta-marcas';
 import {ErroProjeto, type Projeto} from './projeto';
 
@@ -130,7 +131,8 @@ export const registrarProjeto = (servidor: McpServer, projeto: Projeto) => {
 export const FERRAMENTAS_DE_TROCA = ['criar_projeto', 'abrir_projeto', 'duplicar_projeto', 'fechar_projeto'] as const;
 export const ehTrocaDeProjeto = (nome: unknown): boolean => (FERRAMENTAS_DE_TROCA as readonly unknown[]).includes(nome);
 
-export type PedidoNovoProjeto = {nome?: string; modelo?: IdModelo; formato?: PedidoFormato; marca?: string; pasta?: string};
+/** `modeloProprio`: id de um modelo da pessoa (listar_modelos), no lugar do modelo de fábrica; o tamanho vem do modelo. */
+export type PedidoNovoProjeto = {nome?: string; modelo?: IdModelo; modeloProprio?: string; formato?: PedidoFormato; marca?: string; pasta?: string};
 
 /** Quem troca de projeto: o app (main.ts), o servidor do Claude Desktop com o app fechado (mcp-desktop.ts) ou o MCP da IDE
  *  com o app fechado (mcp/nucleo.ts). Cada um devolve o que a IA lê. */
@@ -143,28 +145,39 @@ export type TrocadorDeProjeto = {
 
 const IDS_MODELO = MODELOS.map((m) => m.id) as [IdModelo, ...IdModelo[]];
 
-/** O pedido do criar_projeto, do jeito que as ferramentas recebem (formato por id, ou largura e altura soltas). */
-export const pedidoDoCriar = (a: {nome?: string; modelo?: IdModelo; formato?: string; largura?: number; altura?: number; marca?: string; pasta?: string}): PedidoNovoProjeto => ({
-  ...(a.nome ? {nome: a.nome} : {}),
-  modelo: a.modelo ?? 'video-branco',
-  ...(a.formato ? {formato: a.formato} : a.largura && a.altura ? {formato: {largura: a.largura, altura: a.altura}} : {}),
-  ...(a.marca ? {marca: a.marca} : {}),
-  ...(a.pasta ? {pasta: a.pasta} : {}),
-});
+type ArgsCriar = {nome?: string; modelo?: IdModelo; modelo_proprio?: string; formato?: string; largura?: number; altura?: number; marca?: string; pasta?: string};
+
+/** O pedido do criar_projeto, do jeito que as ferramentas recebem (formato por id, ou largura e altura soltas). Com
+ *  `modelo_proprio` (um modelo da pessoa), o modelo de fábrica e o formato não valem: o modelo da pessoa traz os dele. */
+export const pedidoDoCriar = (a: ArgsCriar): PedidoNovoProjeto => {
+  if (a.modelo_proprio) {
+    if (a.modelo) throw new ErroProjeto('passe "modelo" (de fábrica) ou "modelo_proprio" (da pessoa, de listar_modelos), não os dois', 'patch');
+    if (a.formato || a.largura || a.altura) throw new ErroProjeto('com "modelo_proprio" o tamanho vem do modelo: tire formato, largura e altura', 'patch');
+    return {modeloProprio: a.modelo_proprio, ...(a.nome ? {nome: a.nome} : {}), ...(a.marca ? {marca: a.marca} : {}), ...(a.pasta ? {pasta: a.pasta} : {})};
+  }
+  return {
+    ...(a.nome ? {nome: a.nome} : {}),
+    modelo: a.modelo ?? 'video-branco',
+    ...(a.formato ? {formato: a.formato} : a.largura && a.altura ? {formato: {largura: a.largura, altura: a.altura}} : {}),
+    ...(a.marca ? {marca: a.marca} : {}),
+    ...(a.pasta ? {pasta: a.pasta} : {}),
+  };
+};
 
 export const registrarTrocaDeProjeto = (servidor: McpServer, t: TrocadorDeProjeto) => {
   servidor.registerTool('criar_projeto', {
-    description: 'Cria um projeto novo do Estúdio, numa pasta própria dentro da pasta de projetos da pessoa (ou em "pasta"), e o abre: com o app aberto, o app troca para ele (o projeto aberto fecha, com as conversas dele); com o app fechado, veja a resposta. "formato": reels, feed, quadrado, youtube, story… (ou largura e altura). "marca": id de um kit (listar_marcas). Pede a permissão da pessoa.',
+    description: 'Cria um projeto novo do Estúdio, numa pasta própria dentro da pasta de projetos da pessoa (ou em "pasta"), e o abre: com o app aberto, o app troca para ele (o projeto aberto fecha, com as conversas dele); com o app fechado, veja a resposta. "formato": reels, feed, quadrado, youtube, story… (ou largura e altura). "marca": id de um kit (listar_marcas). "modelo_proprio": id de um modelo da pessoa (listar_modelos) em vez do de fábrica; o tamanho vem do modelo. Pede a permissão da pessoa.',
     inputSchema: {
       nome: z.string().max(120).optional(),
-      modelo: z.enum(IDS_MODELO).optional().describe('padrão video-branco'),
+      modelo: z.enum(IDS_MODELO).optional().describe('modelo de fábrica; padrão video-branco'),
+      modelo_proprio: z.string().optional().describe('id de um modelo da pessoa (listar_modelos); não vale com modelo, formato, largura nem altura'),
       formato: z.string().optional().describe('id do formato, ex.: reels'),
       largura: z.number().int().min(16).max(7680).optional(),
       altura: z.number().int().min(16).max(7680).optional(),
       marca: z.string().optional().describe('id do kit de marca'),
       pasta: z.string().optional().describe('pasta absoluta onde criar a pasta do projeto'),
     },
-  }, seguro((a: {nome?: string; modelo?: IdModelo; formato?: string; largura?: number; altura?: number; marca?: string; pasta?: string}) => t.criar(pedidoDoCriar(a))));
+  }, seguro((a: ArgsCriar) => t.criar(pedidoDoCriar(a))));
 
   servidor.registerTool('abrir_projeto', {
     description: 'Abre outro projeto do Estúdio: com o app aberto, o app troca para ele (o projeto aberto fecha, com as conversas dele); com o app fechado, veja a resposta. Aceita o nome (listar_projetos) ou a pasta. Pede a permissão da pessoa.',
@@ -199,6 +212,8 @@ export const trocadorSemApp = (o: {
   /** Claude Desktop: o projeto pelo nome (listar_projetos) ou pela pasta. */
   resolver?: (pedido: string) => {pasta: string; nome: string} | {erro: string};
   marcas?: PastaMarcas;
+  /** A pasta de modelos da pessoa (criar_projeto com modelo_proprio). */
+  modelos?: PastaModelos;
 }): TrocadorDeProjeto => {
   const marcas = o.marcas ?? new PastaMarcas();
   const depois = (raiz: string) => {
@@ -210,6 +225,10 @@ export const trocadorSemApp = (o: {
   };
   return {
     criar: async (p) => {
+      if (p.modeloProprio) {
+        const {raiz} = criarPastaDoModelo({modelos: o.modelos ?? new PastaModelos(), id: p.modeloProprio, nome: p.nome, marca: p.marca ? marcas.ler(p.marca) : null, pasta: p.pasta || o.pastaProjetos});
+        return {ok: true, ...resumoDoProjeto(raiz), ...depois(raiz)};
+      }
       const modelo = p.modelo ?? 'video-branco';
       const formato = formatoDoPedido(modelo, p.formato);
       const {raiz} = criarPastaDoProjeto({nome: p.nome, modelo, formato, marca: p.marca ? marcas.ler(p.marca) : null, pasta: p.pasta || o.pastaProjetos});
