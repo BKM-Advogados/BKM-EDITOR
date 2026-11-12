@@ -42,6 +42,7 @@ import {registrarNarracao} from './mcp-narracao'; // narração por IA (docs/nar
 import type {ServicoNarracao} from './narracao-servico';
 import {registrarPrevia} from './mcp-previa'; // frente IDE: ver_quadro, ver_cenas e ver_trecho (docs/ide.md)
 import {USER_AGENT_ESTUDIO} from './versao';
+import {registrarProjeto} from './mcp-projeto'; // frente 2: importar_midia, renomear_documento, ponto de restauração
 import {registrarMarcaEdicao} from './mcp-marca-edicao'; // frente 2: os kits de marca da pessoa
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x, null, 2)}]});
@@ -333,6 +334,7 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   registrarTela(servidor, projeto, autor); // mostrar_documento: leva a tela da pessoa a um documento (mcp-tela.ts)
   registrarNarracao(servidor, projeto, autor, origem, narrador); // narração por IA (docs/narracao.md): vozes, narrar, pronúncias, ajustar cenas à fala
   registrarPrevia(servidor, projeto); // frente IDE: prévias do vídeo em saidas/previas/ (src/nucleo/mcp-previa.ts)
+  registrarProjeto(servidor, projeto); // frente 2: importar_midia, renomear_documento e marcar_ponto_de_restauracao (mcp-projeto.ts)
   registrarMarcaEdicao(servidor); // frente 2: listar, criar e editar kits de marca, logo e fontes (mcp-marca-edicao.ts)
 };
 

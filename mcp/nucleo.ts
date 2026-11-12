@@ -24,6 +24,11 @@ import {servicoDeRender} from '../src/main/musica-render';
 import {servicoDoAmbiente} from '../src/main/narracao';
 import {definirServicoPrevia} from '../src/nucleo/mcp-previa'; // frente IDE: ver_quadro, ver_cenas, ver_trecho
 import {servicoDePreviaStdio} from '../src/main/previa-stdio';
+// frente 2: ponto de restauração com o app fechado (o mesmo commit do Ctrl+S) e o áudio importado já medido
+import {definirMedidorDeEnvelope, definirPontoDeRestauracao, mensagemDoPonto, respostaDoPonto, registrarTrocaDeProjeto, trocadorSemApp} from '../src/nucleo/mcp-projeto';
+import {SessaoProjeto} from '../src/main/sessao-projeto';
+import {medirEnvelopeDoArquivo} from '../src/main/ipc-audio';
+import {pastaPadraoProjetos, sistemaAtual} from '../src/nucleo/claude-desktop';
 
 const arg = (nome: string) => {
   const i = process.argv.indexOf(nome);
@@ -41,6 +46,11 @@ const servidor = new McpServer({name: 'estudio', version: '0.1.0'}, {instruction
 definirServicoMusica(servicoDeRender());
 // frente IDE: as prévias renderizam com o app de onde veio este arquivo (src/main/previa-stdio.ts)
 definirServicoPrevia(servicoDePreviaStdio(path.resolve(__dirname, '..')));
+definirPontoDeRestauracao(async (raiz, mensagem) => {
+  const r = await SessaoProjeto.pontoSemApp(raiz, mensagemDoPonto(mensagem));
+  return respostaDoPonto(r.ok, r.temGit);
+});
+definirMedidorDeEnvelope((p, arquivo) => medirEnvelopeDoArquivo(p, arquivo));
 // a transcrição local acha o ffmpeg no node_modules do repositório (dist-mcp/ fica na raiz)
 const raiz = pasta;
 // um processo por conversa da IDE: a mesma origem (ide-<id>) no diário com o app aberto ou fechado (mcp-app.ts)
@@ -49,6 +59,9 @@ if (rotulo !== undefined && !rotuloAceito(rotulo)) process.stderr.write(`estudio
 const quem = {conversa: novaConversaIde(), autor: arg('--autor') ?? 'agente', ...(rotuloAceito(rotulo) ? {rotulo} : {})};
 registrarFerramentas(servidor, new Projeto(raiz), quem.autor, origemDaIde(quem.conversa, quem.rotulo), criarRede(),
   new Transcritor({raizApp: path.resolve(__dirname, '..')}), undefined, servicoDoAmbiente());
+// frente 2: criar e duplicar projeto com o app fechado gravam a pasta nova; abrir e fechar explicam que este MCP fica na pasta
+// da IDE. Com o app aberto neste projeto, as quatro vão a ele, que troca de projeto (mcp-projeto.ts)
+registrarTrocaDeProjeto(servidor, trocadorSemApp({pastaProjetos: pastaPadraoProjetos(sistemaAtual()), atual: () => raiz}));
 
 const transporte = new StdioServerTransport();
 servidor.connect(transporte).then(() => repassarAoAppQuandoAberto(transporte, raiz, {quem})).catch((e: unknown) => {

@@ -1,18 +1,18 @@
 // Processo principal do Estúdio: uma janela, o projeto aberto, os terminais, o servidor de mídia e a exportação.
 import {app, BrowserWindow, dialog, ipcMain, Menu, net, safeStorage, shell, systemPreferences, type IpcMainInvokeEvent} from 'electron';
-import {copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {CANAL, type InfoProjeto, type Metricas, type NovoProjeto, type Perfil, type Preferencias, type Progresso, type ResultadoExportacao, type Retangulo} from '../compartilhado/api';
 import {contaClaude} from './conversa';
-import type {Comentario, EstadoEditor, Manifesto, Modulo, OperacaoPatch} from '../nucleo/documentos';
-import {aplicarMarcaAoPlano, dentroDoOneDrive, documentoNovo, gravarPlano, nomePadrao, pastaLivre, planoDoExemplo, planoDoProjeto, regerarClaudeMd, regerarGuias} from '../nucleo/criar-projeto';
+import type {Comentario, EstadoEditor, Modulo, OperacaoPatch} from '../nucleo/documentos';
+import {dentroDoOneDrive, documentoNovo, gravarPlano, pastaLivre, planoDoExemplo, regerarClaudeMd, regerarGuias} from '../nucleo/criar-projeto';
 import {EXEMPLO} from '../nucleo/exemplo';
 import {MODELOS} from '../nucleo/modelos';
 import {FORMATO_PADRAO, type Formato} from '../nucleo/formatos';
 import {argumentosDoRender, destinoDoFormato, estimarExportacao, fontesDaMarcaDagua, FORMATOS_IMAGEM_SAIDA, legendasDasProps, marcaDaguaDoDestino, nomesDosArquivos,
   type OpcoesExportarImagem, type OpcoesExportarVideo} from '../nucleo/exportacao';
-import {ErroProjeto, Projeto, serializar} from '../nucleo/projeto';
+import {ErroProjeto, Projeto} from '../nucleo/projeto';
 import {criarRede} from '../nucleo/ferramentas-mcp';
 import {discoCheio, encerrarRender, faltaEspaco, prepararRender, renderizarVideo, type Preparado} from './exportar';
 import {registrarIpcMarcas} from './ipc-marcas';
@@ -50,7 +50,12 @@ import {criarServicoPrevia} from './previa'; // frente IDE
 import {criarIde} from './ide'; // frente IDE: projetos prontos para IDE de agentes
 import {scriptDoMcp} from '../nucleo/ide'; // frente IDE
 import {criarClaudeDesktop} from './claude-desktop'; // Claude Desktop (docs/claude-desktop.md)
-import {SCRIPT_DESKTOP} from '../nucleo/claude-desktop';
+import {listarProjetos, resolverProjeto, SCRIPT_DESKTOP} from '../nucleo/claude-desktop';
+// frente 2: importar mídia, criar, abrir, duplicar e fechar projeto e o ponto de restauração, os mesmos pela tela e pelo MCP
+import {EXTENSOES_IMPORTAVEIS, importarMidia, NOME_DO_TIPO, type TipoImportavel} from '../nucleo/importar-midia';
+import {criarPastaDoProjeto, duplicarPastaDoProjeto, formatoDoPedido, resumoDoProjeto} from '../nucleo/novo-projeto';
+import {definirMedidorDeEnvelope, definirPontoDeRestauracao, mensagemDoPonto, respostaDoPonto, type TrocadorDeProjeto} from '../nucleo/mcp-projeto';
+import {medirEnvelopeDoArquivo} from './ipc-audio';
 import {criarAtualizador} from './atualizacao'; // atualização do app (docs/atualizacao.md)
 import {motorWindows, type UpdaterNsis} from './atualizacao-windows';
 import {limparSobras, motorLinux} from './atualizacao-linux';
@@ -235,11 +240,9 @@ const abrirProjeto = async (raiz: string) => {
 
 const criarProjeto = async (o: NovoProjeto) => {
   const prefs = memoria.prefs();
-  const nome = o.nome?.trim() || nomePadrao(new Date());
-  const destino = pastaLivre(o.pasta || prefs.pasta_projetos, nome);
-  const plano = planoDoProjeto({nome, modelo: o.modelo, formato: o.formato});
-  if (o.marca) aplicarMarcaAoPlano(plano, marcas.ler(o.marca));
-  gravarPlano(destino, plano);
+  // a mesma pasta para a tela inicial e para o criar_projeto do MCP (src/nucleo/novo-projeto.ts)
+  const {raiz: destino} = criarPastaDoProjeto({nome: o.nome, modelo: o.modelo, formato: o.formato, marca: o.marca ? marcas.ler(o.marca) : null,
+    pasta: o.pasta || prefs.pasta_projetos});
   const modulo = MODELOS.find((m) => m.id === o.modelo)?.modulo;
   if (o.formato_id && modulo === 'video') memoria.gravarPrefs({formato_video: o.formato_id});
   if (o.formato_id && modulo === 'imagem') memoria.gravarPrefs({formato_imagem: o.formato_id});
@@ -348,18 +351,14 @@ lidar(CANAL.abrirProjeto, (raiz: string) => emFila(() => abrirProjeto(raiz)));
 lidar(CANAL.projetoAtual, () => info());
 lidar(CANAL.criarProjeto, (o: NovoProjeto) => emFila(() => criarProjeto(o)));
 lidar(CANAL.fecharProjeto, () => emFila(() => fecharSessao()));
-lidar(CANAL.duplicarProjeto, (o: {raiz?: string; nome: string}) => emFila(async () => {
+const duplicarProjeto = async (o: {raiz?: string; nome?: string}) => {
   const origem = o.raiz ?? exigirProjeto().raiz;
   if (!existsSync(path.join(origem, 'estudio.json'))) throw new Error(`a pasta do projeto não existe mais: ${origem}`);
   if (sessao && path.resolve(sessao.projeto.raiz) === path.resolve(origem)) await sessao.marcarVersao('estúdio: antes de duplicar');
-  const nome = o.nome.trim() || `${new Projeto(origem).manifesto().nome} (cópia)`;
-  const destino = pastaLivre(path.dirname(origem), nome);
-  // sem histórico, diário, estado e saídas: a cópia começa limpa
-  cpSync(origem, destino, {recursive: true, filter: (src) => !['.git', '.estudio', 'saidas'].includes(path.relative(origem, src).split(path.sep)[0])});
-  const arq = path.join(destino, 'estudio.json');
-  writeFileSync(arq, serializar({...(JSON.parse(readFileSync(arq, 'utf-8')) as Manifesto), nome}), 'utf-8');
-  return abrirProjeto(destino);
-}));
+  // sem histórico, diário, estado e saídas: a cópia começa limpa (a mesma do duplicar_projeto do MCP, novo-projeto.ts)
+  return abrirProjeto(duplicarPastaDoProjeto(origem, o.nome).raiz);
+};
+lidar(CANAL.duplicarProjeto, (o: {raiz?: string; nome: string}) => emFila(() => duplicarProjeto(o)));
 lidar(CANAL.renomearProjeto, (nome: string) => {
   const m = exigirProjeto().renomear(nome);
   memoria.lembrar(sessao!.projeto.raiz, m.nome);
@@ -393,32 +392,29 @@ lidar(CANAL.escolherPasta, async (titulo?: string) => {
   const r = await dialog.showOpenDialog(janela!, {properties: ['openDirectory', 'createDirectory'], title: titulo ?? 'Escolher pasta'});
   return r.canceled || !r.filePaths[0] ? null : r.filePaths[0];
 });
-lidar(CANAL.marcarVersao, async () => {
+// Ctrl+S e o marcar_ponto_de_restauracao do MCP (mcp-projeto.ts): o mesmo commit, na fila do git da sessão
+const pontoDeRestauracao = async (mensagem?: string) => {
   exigirProjeto();
-  const ok = await sessao!.marcarVersao();
-  if (ok) return {ok, mensagem: 'Ponto de restauração criado'};
-  return {ok, mensagem: sessao?.temGit ? 'O Git não conseguiu criar o ponto de restauração agora; o histórico continua no diário'
-    : 'Sem o Git instalado não há pontos de restauração; o histórico continua no diário'};
+  const ok = await sessao!.marcarVersao(mensagemDoPonto(mensagem));
+  return respostaDoPonto(ok, Boolean(sessao?.temGit));
+};
+lidar(CANAL.marcarVersao, () => pontoDeRestauracao());
+definirPontoDeRestauracao(async (raiz, mensagem) => {
+  if (sessao && path.resolve(sessao.projeto.raiz) === path.resolve(raiz)) return pontoDeRestauracao(mensagem);
+  const r = await SessaoProjeto.pontoSemApp(raiz, mensagemDoPonto(mensagem)); // outro projeto (não acontece pelo HTTP, que é do aberto)
+  return respostaDoPonto(r.ok, r.temGit);
 });
-lidar(CANAL.escolherMidia, async (tipo: 'imagem' | 'audio' | 'video') => {
+// o áudio importado pelo MCP já sai medido (duração e forma de onda), como o que a tela traz para a linha do tempo
+definirMedidorDeEnvelope((p, arquivo) => medirEnvelopeDoArquivo(p, arquivo));
+lidar(CANAL.escolherMidia, async (tipo: TipoImportavel) => {
   const p = exigirProjeto();
-  const filtros = {
-    imagem: {name: 'Imagens', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg', 'avif']},
-    audio: {name: 'Áudio', extensions: ['wav', 'mp3', 'm4a', 'ogg', 'aac']},
-    video: {name: 'Vídeo', extensions: ['mp4', 'webm', 'mov']},
-  };
-  const r = await dialog.showOpenDialog(janela!, {properties: ['openFile'], title: 'Escolher arquivo', filters: [filtros[tipo]]});
+  const r = await dialog.showOpenDialog(janela!, {properties: ['openFile'], title: 'Escolher arquivo',
+    filters: [{name: NOME_DO_TIPO[tipo], extensions: EXTENSOES_IMPORTAVEIS[tipo]}]});
   const arq = r.filePaths[0];
   if (r.canceled || !arq) return null;
-  // o que já está dentro do projeto é usado no lugar; o que vem de fora é copiado para midia/
-  const dentro = path.relative(p.raiz, arq);
-  if (!dentro.startsWith('..') && !path.isAbsolute(dentro)) return dentro.split(path.sep).join('/');
-  const ext = path.extname(arq).slice(1).toLowerCase();
-  const destino = arquivoLivre(p.caminho('midia'), path.basename(arq, path.extname(arq)), ext);
-  p.caminhoParaGravar(path.relative(p.raiz, destino)); // midia/ ligada para fora por link: só leitura, não copia para lá
-  mkdirSync(path.dirname(destino), {recursive: true});
-  copyFileSync(arq, destino);
-  return path.relative(p.raiz, destino).split(path.sep).join('/');
+  // o que já está dentro do projeto é usado no lugar; o que vem de fora é copiado para midia/ (a mesma regra do
+  // importar_midia do MCP: src/nucleo/importar-midia.ts)
+  return importarMidia(p, arq, {tipo}).caminho;
 });
 lidar(CANAL.lerDocumento, (documento: string) => {
   const p = exigirProjeto();
@@ -694,6 +690,37 @@ function abrirDeFora(pasta: string) {
     if (janela && !janela.isDestroyed()) void dialog.showMessageBox(janela, {type: 'warning', title: 'Estúdio', message: e.message});
   });
 }
+// frente 2: criar_projeto, abrir_projeto, duplicar_projeto e fechar_projeto pedidos de fora do app (Claude Desktop, apps de
+// fora, IDE; mcp-projeto.ts). A troca é a mesma da tela; depois, a tela recarrega e abre o projeto novo, como no abrirDeFora.
+// A conversa que pediu está fora do app e segue viva: o token fixo dela não cai no fecharSessao.
+const trocadorDoApp = (quem: {ide: boolean}): TrocadorDeProjeto => {
+  const avisoIde = quem.ide ? {aviso: 'Este é o MCP da IDE: as próximas ferramentas desta conversa continuam no projeto da pasta da IDE, que não está mais aberto no app.'} : {};
+  const recarregar = () => setImmediate(() => janela && !janela.isDestroyed() && janela.webContents.reload());
+  const pronto = (i: InfoProjeto) => {
+    recarregar();
+    return {ok: true, aberto_no_app: true, ...resumoDoProjeto(i.raiz), ...avisoIde};
+  };
+  return {
+    criar: async (o) => {
+      const modelo = o.modelo ?? 'video-branco';
+      const formato = formatoDoPedido(modelo, o.formato); // antes da fila: pedido inválido não fecha o projeto aberto
+      return pronto(await emFila(() => criarProjeto({nome: o.nome, modelo, formato, marca: o.marca, pasta: o.pasta})));
+    },
+    abrir: async (pedido) => {
+      const r = resolverProjeto(pedido, listarProjetos({dados: app.getPath('userData'), pastas: [memoria.prefs().pasta_projetos]}));
+      if ('erro' in r) throw new Error(r.erro);
+      return pronto(await emFila(() => abrirProjeto(r.pasta)));
+    },
+    duplicar: async (o) => pronto(await emFila(() => duplicarProjeto(o))),
+    fechar: () => emFila(async () => {
+      const fechado = sessao?.projeto.raiz ?? null;
+      await fecharSessao();
+      recarregar();
+      return {ok: true, fechado, ...(fechado ? {} : {aviso: 'não havia projeto aberto no app'})};
+    }),
+  };
+};
+
 // Mac: pasta solta no ícone do Dock ou "Abrir com" (Info.plist, build/mac.ts). Chega antes do ready quando é ela que abre o app.
 app.on('open-file', (e, caminho) => {
   e.preventDefault();
@@ -711,6 +738,7 @@ app.on('ready', async () => {
   // a rede do ler_fonte no app: net.fetch do Electron (proxy e certificados do sistema), assíncrono, 40 s e 20 MB no máximo
   mcpHttp = new McpHttp(path.join(app.getPath('userData'), 'mcp'), () => sessao?.projeto ?? null, criarRede((url, init) => net.fetch(url, init)),
     perguntarAPessoa); // frente IA: o portão de permissão pergunta à pessoa pela tela
+  mcpHttp.definirTrocador(trocadorDoApp); // frente 2: criar e abrir projeto pedidos de fora do app
   await iniciarAppsDeFora(); // frente IA: apps de IA de fora (tokens de volta ao MCP e, se ligada, a porta fixa)
   midia.rota((req, res) => mcpHttp!.atender(req, res));
   claudeDesktop.registrarInstalacao(); // onde este Estúdio está, para a extensão achar com o app fechado (sem token)

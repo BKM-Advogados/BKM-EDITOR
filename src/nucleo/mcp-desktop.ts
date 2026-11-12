@@ -12,6 +12,10 @@
 // Nos dois casos a origem no diário e no Histórico é "Claude Desktop". As ferramentas sensíveis (classe "cartao" do
 // portão) pedem permissão: pelo app quando ele atende; aqui, pelo pedido de confirmação do próprio Claude Desktop
 // (elicitação do MCP) quando ele oferece; sem os dois, não rodam, e a resposta diz para abrir o Estúdio.
+// Frente 2: criar_projeto, abrir_projeto, duplicar_projeto e fechar_projeto (mcp-projeto.ts) são ferramentas deste servidor.
+// Com o app vivo, vão a ele (que as atende mesmo sem projeto aberto, pelo token fixo do Claude Desktop, que sobrevive à
+// troca) e a escolha daqui passa a ser o projeto do app; com o app fechado, rodam aqui (trocadorSemApp): criar e duplicar
+// gravam a pasta e a escolhem, abrir escolhe, fechar esquece a escolha.
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -25,12 +29,13 @@ import {listarProjetos, ORIGEM_CLAUDE_DESKTOP, resolverProjeto, type Descoberta}
 import {appAberto, encaminharAoApp, novaConversaIde, PRAZO_DO_APP_MS, type DestinoApp} from './mcp-app';
 import {INSTRUCOES_MCP} from './mcp-ia';
 import {ESPERA_DO_CARTAO_MS, type Portao} from './portao';
+import {ehTrocaDeProjeto, registrarTrocaDeProjeto, trocadorSemApp} from './mcp-projeto'; // frente 2
 import {Projeto} from './projeto';
 
 export const INSTRUCOES_DESKTOP = `${INSTRUCOES_MCP}
 
 Pelo Claude Desktop: com o Estúdio aberto num projeto, as ferramentas operam nesse projeto, e o pedido de permissão aparece
-na tela do app. Com o app fechado, chame listar_projetos e escolher_projeto antes das outras ferramentas.`;
+na tela do app. Com o app fechado, chame listar_projetos e escolher_projeto (ou criar_projeto) antes das outras ferramentas.`;
 
 export const SEM_PROJETO = 'Nenhum projeto escolhido e o Estúdio não está aberto num projeto. Chame listar_projetos e depois '
   + 'escolher_projeto com o nome ou a pasta; ou peça à pessoa para abrir o projeto no Estúdio.';
@@ -140,6 +145,7 @@ export const criarServidorDesktop = (o: OpcoesDesktop) => {
   const ferramentasDoEstudio = () => (catalogo ??= (async () => {
     const s = new McpServer({name: 'estudio', version: o.versao ?? '0.1.0'});
     o.registrar(s, new Projeto(path.join(os.tmpdir(), 'estudio-catalogo-sem-projeto')), ORIGEM_CLAUDE_DESKTOP, {perguntar: async () => false});
+    registrarTrocaDeProjeto(s, trocaLocal); // frente 2: criar, abrir, duplicar e fechar projeto
     const [a, b] = InMemoryTransport.createLinkedPair();
     await s.connect(a);
     const c = new Client({name: 'estudio-catalogo', version: o.versao ?? '0.1.0'});
@@ -159,6 +165,39 @@ export const criarServidorDesktop = (o: OpcoesDesktop) => {
   };
 
   const listar = () => listarProjetos({dados: o.dados, pastas: o.pastas});
+
+  // frente 2: trocar de projeto com o app fechado, aqui mesmo (mcp-projeto.ts)
+  const trocaLocal = trocadorSemApp({
+    pastaProjetos: o.pastas[0] ?? path.join(os.homedir(), 'Estudio'),
+    atual: () => escolhido,
+    usar: (raiz) => {
+      escolhido = raiz;
+      ultimo = raiz; // escolha explícita: a troca não precisa de aviso
+    },
+    resolver: (pedido) => resolverProjeto(pedido, listar()),
+  });
+  // criar e duplicar gravam uma pasta nova: pedem a permissão pela confirmação do Claude Desktop; abrir e fechar só escolhem
+  const MOTIVO_LOCAL: Record<string, string> = {criar_projeto: 'criar um projeto novo do Estúdio numa pasta nova', duplicar_projeto: 'copiar o projeto do Estúdio para uma pasta nova'};
+  let servidorDaTroca: Promise<Client> | null = null;
+  const clienteDaTroca = () => (servidorDaTroca ??= (async () => {
+    const s = new McpServer({name: 'estudio', version: o.versao ?? '0.1.0'});
+    registrarTrocaDeProjeto(s, trocaLocal);
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    await s.connect(a);
+    const c = new Client({name: 'estudio-troca', version: o.versao ?? '0.1.0'});
+    await c.connect(b);
+    return c;
+  })());
+  /** A pasta que a ferramenta de troca devolveu (o JSON do primeiro texto), para seguir no projeto novo. */
+  const pastaDoResultado = (r: CallToolResult): string | null => {
+    try {
+      const t = (r.content?.[0] as {text?: string} | undefined)?.text;
+      const x = t ? (JSON.parse(t) as {pasta?: unknown}) : null;
+      return typeof x?.pasta === 'string' ? x.pasta : null;
+    } catch {
+      return null;
+    }
+  };
 
   servidor.setRequestHandler(CallToolRequestSchema, async (req, extra) => {
     const {name: nome, arguments: args} = req.params;
@@ -187,6 +226,36 @@ export const criarServidorDesktop = (o: OpcoesDesktop) => {
 
     const msg = {jsonrpc: '2.0', id: extra.requestId, method: 'tools/call', params: req.params} as JSONRPCMessage;
     const peloApp = async (destino: DestinoApp, quem?: typeof conversa) => encaminhar(destino, msg, quem, prazo, undefined, extra.signal);
+
+    // frente 2: trocar de projeto. Com o app vivo, ele troca (com ou sem projeto aberto) e as próximas chamadas seguem no
+    // projeto do app; com o app fechado (ou numa versão que não troca sem projeto: 409), aqui.
+    if (ehTrocaDeProjeto(nome)) {
+      if (app) {
+        let r = await peloApp(app);
+        if (r === 'recusado') {
+          const deNovo = o.descoberta();
+          r = deNovo && deNovo.token !== app.token ? await peloApp(deNovo) : 'recusado';
+          if (r === 'recusado') return texto(RECUSADO_DESKTOP, true);
+        }
+        if (r) {
+          const res = resultadoDoApp(r);
+          if (!res.isError) {
+            escolhido = null; // o projeto do app manda daqui em diante
+            ultimo = nome === 'fechar_projeto' ? null : pastaDoResultado(res) ?? ultimo;
+          }
+          return res;
+        }
+      }
+      const motivo = MOTIVO_LOCAL[nome];
+      try {
+        if (motivo && !(await portaoLocal.perguntar({ferramenta: nome, entrada: (args ?? {}) as Record<string, unknown>, motivo, sinal: extra.signal}))) {
+          return texto('A pessoa negou esta ação no Claude Desktop. Não tente de novo sem ela pedir.', true);
+        }
+      } catch (e) {
+        return texto((e as Error).message, true); // sem como perguntar (SEM_PORTAO)
+      }
+      return (await (await clienteDaTroca()).callTool(req.params, CallToolResultSchema, {signal: extra.signal})) as CallToolResult;
+    }
 
     // o projeto em que a chamada vai rodar: o do app, se ele está aberto num projeto; senão, o escolhido
     const alvo = app?.projeto ?? escolhido;
@@ -228,6 +297,7 @@ export const criarServidorDesktop = (o: OpcoesDesktop) => {
     escolhido: () => escolhido,
     async fechar() {
       for (const c of internos.values()) await (await c).close().catch(() => undefined);
+      if (servidorDaTroca) await (await servidorDaTroca).close().catch(() => undefined);
       await servidor.close();
     },
   };

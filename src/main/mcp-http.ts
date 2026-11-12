@@ -11,7 +11,8 @@ import {StreamableHTTPServerTransport} from '@modelcontextprotocol/sdk/server/st
 import {registrarFerramentas, type Rede, type TranscritorMcp} from '../nucleo/ferramentas-mcp';
 import {INSTRUCOES_MCP} from '../nucleo/mcp-ia';
 import {autorAceito, CABECALHO_AUTOR, CABECALHO_CONVERSA, CABECALHO_ORIGEM, conversaValida, origemDaIde, rotuloAceito} from '../nucleo/mcp-app';
-import type {PedidoPortao, Portao} from '../nucleo/portao';
+import {instalarPortao, type PedidoPortao, type Portao} from '../nucleo/portao';
+import {ehTrocaDeProjeto, registrarTrocaDeProjeto, type TrocadorDeProjeto} from '../nucleo/mcp-projeto'; // frente 2
 import type {Projeto} from '../nucleo/projeto';
 import type {ServicoNarracao} from '../nucleo/narracao-servico';
 
@@ -33,9 +34,26 @@ export const definirNarradorMcp = (s: ServicoNarracao) => {
   narradorMcp = s;
 };
 
+/** Frente 2: um tools/call de criar, abrir, duplicar ou fechar projeto (o que o app atende mesmo sem projeto aberto). */
+const ehChamadaDeTroca = (m: unknown) => {
+  const x = m as {method?: unknown; params?: {name?: unknown}} | undefined;
+  return x?.method === 'tools/call' && ehTrocaDeProjeto(x.params?.name);
+};
+
+/** Sem projeto aberto não há diário: o portão só pergunta. */
+const SEM_DIARIO = {marcaDoDiario: () => 0, entradasDesde: () => []};
+
 export class McpHttp {
   private abas = new Map<string, Aba>();
   private sempre = new Map<string, Set<string>>(); // por conversa (token, e a conversa da IDE): ferramentas que a pessoa liberou
+  // frente 2: quem cria, abre, duplica e fecha projeto no app (main.ts). Só para as conexões de fora do app (token fixo
+  // do Claude Desktop e dos apps de fora, e o da IDE), cuja conversa sobrevive à troca; as conversas de dentro do app não
+  // recebem estas ferramentas (mcp-projeto.ts)
+  private trocador?: (quem: {ide: boolean}) => TrocadorDeProjeto;
+
+  definirTrocador(t: (quem: {ide: boolean}) => TrocadorDeProjeto) {
+    this.trocador = t;
+  }
 
   constructor(private readonly pastaConfig: string, private readonly projeto: () => Projeto | null, private readonly rede?: Rede,
     private readonly perguntador?: Perguntador) {}
@@ -118,7 +136,9 @@ export class McpHttp {
     const token = /^Bearer\s+(\S+)$/.exec(req.headers.authorization ?? '')?.[1];
     const aba = token ? this.abas.get(token) : undefined;
     const projeto = this.projeto();
-    if (!aba || !projeto) {
+    // frente 2: de fora do app, criar e abrir projeto valem também sem projeto aberto (conferido depois de ler o corpo)
+    const deFora = Boolean(aba && (aba.fixo || aba.ide) && this.trocador);
+    if (!aba || (!projeto && !deFora)) {
       res.writeHead(aba ? 409 : 401, {'Content-Type': 'application/json'}).end(JSON.stringify({erro: aba ? 'nenhum projeto aberto' : 'token inválido'}));
       return true;
     }
@@ -140,6 +160,10 @@ export class McpHttp {
         .end(JSON.stringify({jsonrpc: '2.0', id: null, error: {code: -32700, message: 'o corpo não é JSON válido'}}));
       return true;
     }
+    if (!projeto && !ehChamadaDeTroca(mensagem)) {
+      res.writeHead(409, {'Content-Type': 'application/json'}).end(JSON.stringify({erro: 'nenhum projeto aberto'}));
+      return true;
+    }
     const quem = this.quem(token!, aba, req);
     if ('erro' in quem) {
       res.writeHead(400, {'Content-Type': 'application/json'}).end(JSON.stringify({jsonrpc: '2.0', id: null, error: {code: -32600, message: quem.erro}}));
@@ -157,7 +181,9 @@ export class McpHttp {
         return r.permitir;
       },
     };
-    registrarFerramentas(servidor, projeto, quem.autor, quem.origem, this.rede, transcritorMcp, portao, narradorMcp);
+    if (projeto) registrarFerramentas(servidor, projeto, quem.autor, quem.origem, this.rede, transcritorMcp, portao, narradorMcp);
+    else instalarPortao(servidor, {projeto: SEM_DIARIO, origem: quem.origem, portao}); // frente 2: só as de trocar de projeto
+    if (deFora) registrarTrocaDeProjeto(servidor, this.trocador!({ide: Boolean(aba.ide)})); // frente 2 (mcp-projeto.ts)
     const transporte = new StreamableHTTPServerTransport({sessionIdGenerator: undefined, enableJsonResponse: true});
     res.on('close', () => {
       void transporte.close();
