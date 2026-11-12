@@ -292,7 +292,8 @@ renderiza um vídeo de cenas de teste em 9:16, 4:5 e 16:9 fora do Electron, em `
 - **Pesquisa de qualidade** (`tasks/estudio-qualidade-2026-11-07`): defeitos conferidos no código e a barra do que falta.
 - **Onda B** (briefing): importar mídia e painel Mídia, o carrossel narrado como
   modelo do tipo cenas, um projeto de exemplo neutro para o "Ver um exemplo", o Claude que planeja (perguntas e Plano do vídeo
-  antes de montar), chip de formato no monitor, primeiros passos e "Salvar como modelo".
+  antes de montar; **feito**: `plano.json`, `escrever_plano`/`ler_plano`/`aprovar_plano` e o cartão na conversa,
+  `docs/ia.md`), chip de formato no monitor, primeiros passos e "Salvar como modelo".
 - **Memória (app empacotado, 05/11/2026):** 307 MB parado no vídeo; 547 MB com as quatro áreas e o 3D. A tela inicial
   agora abre sem o editor (falta medir a linha "Início parado").
 - **Fontes** do Google (Inter, Archivo, IBM Plex) baixam na primeira vez (precisa de internet); as de arquivo do kit não.
