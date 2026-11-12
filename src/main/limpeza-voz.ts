@@ -7,7 +7,7 @@
 // primeira limpeza acrescenta as regras ao .gitignore, em projeto novo ou antigo. Na abertura do projeto, a versão que
 // nem os documentos nem o diário (o Ctrl+Z) citam é apagada: na prática, a que sobrou de uma limpeza que não chegou ao
 // documento.
-import {createHash} from 'node:crypto';
+import {createHash, randomBytes} from 'node:crypto';
 import {mkdirSync, readdirSync, renameSync, rmSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import {CANAL, type ResultadoLimpezaVoz} from '../compartilhado/api';
@@ -131,7 +131,9 @@ export const limparArquivo = async (p: Projeto, arquivo: string, intensidade: In
   const abs = p.caminhoParaGravar(destino);
   garantirForaDoGit(p); // antes do WAV: o commit automático nunca chega a vê-lo
   mkdirSync(path.dirname(abs), {recursive: true});
-  const tmp = `${abs}.${process.pid}.tmp`; // o observador da pasta ignora .tmp: a interface só vê o arquivo inteiro
+  // o observador da pasta ignora .tmp: a interface só vê o arquivo inteiro. O sufixo aleatório separa a limpeza da tela e
+  // a do MCP (limpar_voz) do mesmo arquivo no mesmo processo: cada uma escreve o seu e a última troca
+  const tmp = `${abs}.${process.pid}-${randomBytes(4).toString('hex')}.tmp`;
   const wav = gravarWav(r.canais, fonte.taxa);
   writeFileSync(tmp, wav);
   renameSync(tmp, abs);
