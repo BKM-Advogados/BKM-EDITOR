@@ -18,8 +18,11 @@
 //
 // Os efeitos sonoros usam os arquivos que o projeto tem em `midia/sfx/` (os nomes do carrossel: whoosh.wav, pop.wav,
 // swell.wav e impacto_grave.wav); o que falta é pulado. O volume é baixo de fábrica (metade do que o carrossel usa) e cada
-// efeito cai sob a narração com o mesmo ducking da música (calcularDucking, audio.ts), 14 LU abaixo da voz.
-import {calcularDucking, dbDeGanho, type AudioP, type ClipeAudioP, type Envelope, type FaixaAudioP, type TrechoDeVoz} from './audio';
+// efeito cai sob a narração com o mesmo ducking da música (calcularDucking, audio.ts), 20 LU abaixo da voz, a medida da
+// casa para efeito (docs/audio.md, som-D4). Efeito ainda não medido conta como −6 dB (efeito curto e forte: o whoosh
+// medido dá −3 dB), para o ducking pecar por baixar demais, não de menos.
+import {calcularDucking, dbDeGanho, DUCKING_PADRAO, JANELA_MS, VERSAO_ENVELOPE, type AudioP, type ClipeAudioP, type Envelope, type FaixaAudioP,
+  type TrechoDeVoz} from './audio';
 import type {CenaCenasP, TemaCenas} from './cenas';
 import {caixaDaLegenda} from './exportacao';
 import type {Formato} from './formatos';
@@ -42,7 +45,8 @@ export const VINHETA_MAX_MS = 5000;
 export const CARTAO_MIN_MS = 1000;
 export const CARTAO_MAX_MS = 10000;
 export const VOLUME_SONS_PADRAO = 0.5;
-export const ALVO_SONS_LU = 14; // o efeito fica 14 LU abaixo da voz quando cai sobre ela
+export const ALVO_SONS_LU = DUCKING_PADRAO.alvo_lu; // o efeito fica 20 LU abaixo da voz quando cai sobre ela (a medida da casa)
+export const NIVEL_SOM_SEM_MEDIDA_DB = -6; // efeito ainda não medido: o nível suposto (o whoosh do carrossel mede −3 dB)
 export const TITULO_CARTAO_PADRAO = 'Salve e compartilhe com quem precisa';
 /** Os efeitos de midia/sfx/ que o acabamento usa (os nomes do carrossel narrado). */
 export const SONS_ACABAMENTO = {passagem: 'whoosh.wav', entrada: 'pop.wav', subida: 'swell.wav', impacto: 'impacto_grave.wav'} as const;
@@ -129,7 +133,9 @@ const sonsDoAcabamento = (o: {volume: number; disponiveis: Set<string>; cenas: C
     const volume = Math.round(limitar(e.vol * o.volume, 0, 1) * 1000) / 1000;
     const c: ClipeAudioP = {origem: `/acabamento/sons/${i}`, id: `acabamento-som-${i + 1}`, arquivo, nome: e.som, em: e.em, duracao_ms, corte_ms: 0, volume,
       fade_in_ms: 0, fade_out_ms: 0, mudo: false, fora: false, ...(env ? {envelope: env} : {})};
-    if (vozes.length) c.ducking = calcularDucking({musica: {em: e.em, duracao_ms, corte_ms: 0, ganho_db: dbDeGanho(volume), env}, vozes, alvo_lu: ALVO_SONS_LU});
+    // sem medida, um envelope suposto no nível de um efeito forte (o calcularDucking supõe −14 dB, o de música)
+    const medida = env ?? {versao: VERSAO_ENVELOPE, janela_ms: JANELA_MS, duracao_ms, db: new Array<number>(Math.ceil(duracao_ms / JANELA_MS)).fill(NIVEL_SOM_SEM_MEDIDA_DB)};
+    if (vozes.length) c.ducking = calcularDucking({musica: {em: e.em, duracao_ms, corte_ms: 0, ganho_db: dbDeGanho(volume), env: medida}, vozes, alvo_lu: ALVO_SONS_LU});
     return c;
   });
   return {origem: '/acabamento/sons', id: 'acabamento-sons', nome: 'Efeitos do acabamento', papel: 'efeitos', volume: 1, mudo: false, clipes};

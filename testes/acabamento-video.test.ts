@@ -202,7 +202,8 @@ describe('efeitos sonoros', () => {
     expect(avisos.join('\n')).toMatch(/volume dos efeitos vai de 0 a 1; vai com 1/);
     const pop = props.acabamento!.sons!.clipes.find((c) => c.em === 4500)!;
     expect(pop.ducking?.reducao_db).toBeGreaterThan(0);
-    expect(ALVO_SONS_LU).toBeGreaterThan(0);
+    expect(ALVO_SONS_LU).toBe(20); // a medida da casa para efeito (docs/audio.md, som-D4)
+    expect(pop.ducking!.musica_db).toBeCloseTo(-6 + 20 * Math.log10(0.3 * 1), 1); // sem envelope, o efeito conta como −6 dB
   });
 });
 

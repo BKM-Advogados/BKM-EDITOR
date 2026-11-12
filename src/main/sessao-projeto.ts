@@ -13,7 +13,7 @@ import {ehDocAnimacao, resolverAnimacao} from '../nucleo/animacao';
 import {FORMATO_PADRAO} from '../nucleo/formatos';
 import type {DocVideo} from '../nucleo/documentos';
 import type {PropsVideo} from '../compartilhado/api';
-import {lerEnvelopes} from './ipc-audio';
+import {lerEnvelope, lerEnvelopes} from './ipc-audio';
 import {arquivosDaMidia, gitignoreComMidiaPesada} from '../nucleo/midia-git'; // frente Casca (transversal-D7)
 import {gitignoreComRegrasInternas} from '../nucleo/criar-projeto';
 import {publicarMcpApp, retirarMcpApp} from '../nucleo/mcp-app';
@@ -194,7 +194,9 @@ export const propsDoVideo = (projeto: Projeto, documento: string, base: string):
     if (ehDocCenas(doc)) {
       // os envelopes medidos (midia/*.envelope.json) entram nas props: prévia e exportação veem o mesmo ducking; os efeitos
       // de midia/sfx/ que o projeto tem servem aos efeitos sonoros do acabamento (acabamento-video.ts)
-      const {props, avisos} = resolverCenas(doc, {envelopes: lerEnvelopes(projeto, doc), sfx: arquivosDaPasta(projeto.raiz, 'midia/sfx')});
+      const sfx = arquivosDaPasta(projeto.raiz, 'midia/sfx');
+      const envelopes = {...lerEnvelopes(projeto, doc), ...Object.fromEntries(sfx.map((n) => [`midia/sfx/${n}`, lerEnvelope(projeto, `midia/sfx/${n}`)]))};
+      const {props, avisos} = resolverCenas(doc, {envelopes, sfx});
       return {props: {...props, base_midia: base}, avisos};
     }
     // o carrossel narrado: 1080×1920 a 30 qps até a animação dele aceitar outro formato
