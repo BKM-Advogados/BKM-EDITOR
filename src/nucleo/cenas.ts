@@ -8,6 +8,7 @@
 // âncora do carrossel narrado ("palavra@ms", ms contados do começo da cena; ancora-palavra.ts), resolvida pelas palavras
 // das legendas que caem dentro da cena. Sem fala transcrita ou sem achar a palavra, vale o `em`/`sai` em ms, com aviso.
 import {tempoDaAncora, type Palavra} from './ancora-palavra';
+import {duracaoDoCartao, resolverAcabamento, type AcabamentoCenas, type AcabamentoP} from './acabamento-video'; // Onda B: vinheta, rodapé, cartão final e efeitos
 import {resolverAudio, type AudioCenas, type AudioP, type Envelope} from './audio';
 import {efeitosValidos, problemasDosEfeitos, type Efeito} from './efeitos';
 import {formatoDoVideo, type Formato} from './formatos';
@@ -62,6 +63,7 @@ export type DocCenas = {tipo: 'cenas'; formato: Formato; tema: TemaCenas; cenas:
   legendas?: LegendasCenas; // frente Fala: segmentos com tempo, palavras e falante, e o estilo (legendas.ts)
   teleprompter?: Teleprompter; // frente Som (rodada 3): o texto que a pessoa lê ao gravar a narração (gravacao.ts)
   narracao?: ConfigNarracao; // narração por IA: provedor, modelo, voz, estilo, velocidade, folga, margem e o dicionário de pronúncia (narracao.ts)
+  acabamento?: AcabamentoCenas; // Onda B: vinheta do logo, rodapé com a marca, cartão final e efeitos de midia/sfx/ (acabamento-video.ts)
 };
 
 // destaque branco (o peso é que marca: VideoCenas engrossa o trecho quando o destaque não tem cor); não é o azul de
@@ -153,10 +155,12 @@ export type PropsCenas = {
   audio?: AudioP;
   base_midia?: string;
   legendas_cenas?: LegendasP; // frente Fala (o nome não é "legendas" porque a linha do tempo lê esse do carrossel narrado)
+  acabamento?: AcabamentoP; // Onda B: só quando alguma peça está ligada (acabamento-video.ts)
 };
 
-/** O que o resolvedor recebe de fora do documento: os envelopes já medidos, por arquivo (midia/x.wav). */
-export type OpcoesResolver = {envelopes?: Record<string, Envelope | undefined>};
+/** O que o resolvedor recebe de fora do documento: os envelopes já medidos, por arquivo (midia/x.wav), e os arquivos de
+ *  midia/sfx/ (só o nome), para os efeitos sonoros do acabamento; sem `sfx`, o acabamento sai sem efeitos. */
+export type OpcoesResolver = {envelopes?: Record<string, Envelope | undefined>; sfx?: string[]};
 
 const numero = (v: unknown, padrao: number) => (typeof v === 'number' && Number.isFinite(v) ? v : padrao);
 
@@ -197,7 +201,8 @@ export const resolverCenas = (doc: DocCenas, opcoes: OpcoesResolver = {}): {prop
   const lista = Array.isArray(doc.cenas) ? doc.cenas : [];
   // o tempo das cenas vem antes dos blocos: as legendas (que a âncora de palavra lê) dependem da duração do vídeo
   const total = lista.reduce((soma, c) => soma + duracaoDaCena(c), 0);
-  const duracao_ms = Math.max(1000, total);
+  // o cartão final do acabamento soma ao fim: as cenas, o som e as legendas não andam (acabamento-video.ts)
+  const duracao_ms = Math.max(1000, total) + duracaoDoCartao(doc.acabamento);
   const som = resolverAudio(doc.audio, duracao_ms, opcoes.envelopes);
   const avisosLegendas: string[] = [];
   const legendas = resolverLegendas(doc.legendas, {audio: som.audio, largura: formato.largura, altura: formato.altura, tema, duracao_ms, fala: doc.audio}, avisosLegendas); // frente Fala
@@ -227,9 +232,10 @@ export const resolverCenas = (doc: DocCenas, opcoes: OpcoesResolver = {}): {prop
   avisos.push(...problemasDosEfeitos(doc.efeitos).map((p) => `Efeitos: ${p}`)); // frente C (tres-efeitos-D1, D2)
   avisos.push(...problemasDaNarracao(doc)); // narração por IA: campo fora do lugar vira aviso
   avisos.push(...avisosLegendas);
+  const acabamento = resolverAcabamento(doc.acabamento, {tema, formato, cenas, total: duracao_ms, legendas, audio: som.audio, sfx: opcoes.sfx, envelopes: opcoes.envelopes}, avisos);
   return {
     props: {composicao: 'VideoCenas', duracao_ms, largura: formato.largura, altura: formato.altura, fps: formato.fps, tema, cenas,
-      efeitos: efeitosValidos(doc.efeitos), ...(som.audio ? {audio: som.audio} : {}), ...(legendas ? {legendas_cenas: legendas} : {})},
+      efeitos: efeitosValidos(doc.efeitos), ...(som.audio ? {audio: som.audio} : {}), ...(legendas ? {legendas_cenas: legendas} : {}), ...(acabamento ? {acabamento} : {})},
     avisos,
   };
 };

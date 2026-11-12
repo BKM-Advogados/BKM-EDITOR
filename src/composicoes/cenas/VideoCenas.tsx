@@ -3,7 +3,10 @@
 // o mesmo documento serve a 9:16 e a 16:9. Cada bloco leva `data-origem` (o caminho dele no documento) para a prévia
 // achar o que foi clicado; o atributo não muda nenhum pixel. Tempos em ms de saída (src/nucleo/cenas.ts). O som são
 // os clipes das faixas (src/nucleo/audio.ts), cada um num Html5Audio dentro de uma Sequence, com o volume por quadro
-// (faixa × clipe × fades × ducking); o renderMedia da exportação mixa tudo no MP4.
+// (faixa × clipe × fades × ducking); o renderMedia da exportação mixa tudo no MP4. O acabamento (Onda B, opcional:
+// src/nucleo/acabamento-video.ts) põe por cima a vinheta do logo no começo da primeira cena, o rodapé com a marca durante
+// as cenas e o cartão final depois da última, com as peças comuns do carrossel narrado (../marca-video.tsx), e toca os
+// efeitos de midia/sfx/ como mais uma faixa de efeitos; fica fora da pilha de efeitos, como o logo no carrossel.
 import React from 'react';
 import {AbsoluteFill, Easing, getRemotionEnvironment, Html5Audio, Img, interpolate, Sequence, spring, useCurrentFrame, useVideoConfig} from 'remotion';
 import {CamadaEfeitos} from '../efeitos/CamadaEfeitos';
@@ -15,6 +18,9 @@ import {TIPOS_BLOCO_CENAS, type BlocoCenasP, type CenaCenasP, type PropsCenas, t
 import {transformDoMovimento} from './movimento';
 import {casasDoNumero, formatarNumero} from '../formatar-numero';
 import {tempoDoBloco} from './continuidade';
+import {misturar} from '../../nucleo/acabamento';
+import type {AcabamentoP} from '../../nucleo/acabamento-video';
+import {CartaoFinal, SeloRodape, Vinheta, type CoresMarcaVideo} from '../marca-video';
 
 const clamp = {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'} as const;
 
@@ -150,18 +156,69 @@ export const quadrosDaCena = (c: {t_in: number; t_out: number}, ultima: boolean,
   return {de, dur: Math.max(1, (ultima ? Math.max(totalQuadros, q(c.t_out)) : q(c.t_out)) - de)};
 };
 
+/** Vinheta, rodapé e cartão final do acabamento, no tamanho do quadro: `u` é o lado menor sobre 1080 (o carrossel narrado,
+ *  em 1080×1920, é a medida 1). Em pé (altura 1,2 vez a largura ou mais), as posições do carrossel, com a marca do cartão
+ *  abaixo da faixa que a rede cobre em cima; deitado ou quadrado, a marca menor e o texto no meio. */
+export const medidasDoAcabamento = (W: number, H: number) => {
+  const menor = Math.min(W, H);
+  const u = menor / 1080;
+  const empe = H / W >= 1.2;
+  const tamVinheta = empe ? 1 : 0.6;
+  const meioLinha = Math.min(0.36 * menor * tamVinheta, H * 0.27);
+  const topoMarca = (empe ? 0.14 : 0.12) * H;
+  const topoTexto = (empe ? 0.427 : 0.5) * H;
+  return {u, tamVinheta, topoLinha: H / 2 + meioLinha, altoVinheta: 2 * meioLinha - 0.04 * H, topoMarca, topoTexto, tamMarca: empe ? 0.62 : 0.4,
+    altoMarca: topoTexto - topoMarca - 0.04 * H};
+};
+
+const Acabamento: React.FC<{a: AcabamentoP; tema: PropsCenas['tema']; familia: string}> = ({a, tema, familia}) => {
+  const {width: W, height: H, fps, durationInFrames} = useVideoConfig();
+  const q = (ms: number) => Math.round((ms / 1000) * fps);
+  const m = medidasDoAcabamento(W, H);
+  const cores: CoresMarcaVideo = {destaque: tema.destaque, destaqueClaro: misturar(tema.destaque, '#FFFFFF', 0.35), destaqueProfundo: misturar(tema.destaque, '#000000', 0.35),
+    claro: tema.texto, fundo: tema.fundo};
+  const fontes = {titulo: familia, texto: familia};
+  const {logo, nome, assinatura} = a.marca;
+  const r = a.rodape;
+  return (
+    <>
+      {r && q(r.t_out) > q(r.t_in) && (
+        <Sequence from={q(r.t_in)} durationInFrames={q(r.t_out) - q(r.t_in)} layout="none" name="Rodapé da marca">
+          <SeloRodape t_in={r.t_in} t_out={r.t_out} x={r.x * W} y={r.y * H} altura={r.altura * H} maxLargura={r.largura * W} tam={r.tam * Math.min(W, H)}
+            logo={logo} nome={nome} assinatura={assinatura} fontes={fontes} cores={{...cores, suave: tema.suave, fundo: tema.fundo}} />
+        </Sequence>
+      )}
+      {a.vinheta && (
+        <Sequence from={0} durationInFrames={Math.max(1, q(a.vinheta.t_out))} name="Vinheta">
+          <Vinheta t_in={0} t_out={a.vinheta.t_out} logo={logo} nome={nome ?? assinatura} fonte={familia} cores={cores} u={m.u} tam={m.tamVinheta}
+            topoLinha={m.topoLinha} altoMax={m.altoVinheta} />
+        </Sequence>
+      )}
+      {a.cartao && (
+        <Sequence from={q(a.cartao.t_in)} durationInFrames={Math.max(1, durationInFrames - q(a.cartao.t_in))} name="Cartão final">
+          <CartaoFinal t_in={a.cartao.t_in} logo={logo} nome={nome} titulo={a.cartao.titulo} contato={assinatura ?? ''} aviso={a.cartao.aviso} fontes={fontes} cores={cores}
+            u={m.u} topoMarca={m.topoMarca} topoTexto={m.topoTexto} tamMarca={m.tamMarca} altoMax={m.altoMarca} />
+        </Sequence>
+      )}
+      {a.sons?.clipes.map((c) => <Clipe key={c.origem} c={c} f={a.sons!} />)}
+    </>
+  );
+};
+
 export const VideoCenas: React.FC<PropsCenas> = (p) => {
   definirBaseMidia(p.base_midia);
   const frame = useCurrentFrame();
   const {fps, durationInFrames} = useVideoConfig();
   const familia = fonte(p.tema.fonte || 'Inter');
+  // com o cartão final, as cenas acabam onde ele começa (a última não se estende até o fim do vídeo)
+  const fimDasCenas = p.acabamento?.cartao ? Math.round((p.acabamento.cartao.t_in / 1000) * fps) : durationInFrames;
   return (
     <AbsoluteFill style={{backgroundColor: p.tema.fundo}}>
       <CamadaEfeitos efeitos={p.efeitos} quadro={frame} largura={p.largura} altura={p.altura}>
         {/* o fundo do tema também dentro da camada: os efeitos valem nele (tres-efeitos-D4) */}
         <AbsoluteFill style={{backgroundColor: p.tema.fundo}} />
         {p.cenas.map((c, i) => {
-          const {de, dur} = quadrosDaCena(c, i === p.cenas.length - 1, fps, durationInFrames);
+          const {de, dur} = quadrosDaCena(c, i === p.cenas.length - 1, fps, fimDasCenas);
           return (
             <Sequence key={c.id ?? i} from={de} durationInFrames={dur}>
               <Cena c={c} tema={p.tema} familia={familia} />
@@ -170,6 +227,7 @@ export const VideoCenas: React.FC<PropsCenas> = (p) => {
         })}
       </CamadaEfeitos>
       <Legendas legendas={p.legendas_cenas} />
+      {p.acabamento && <Acabamento a={p.acabamento} tema={p.tema} familia={familia} />}
       <Som audio={p.audio} duracao_ms={p.duracao_ms} />
     </AbsoluteFill>
   );

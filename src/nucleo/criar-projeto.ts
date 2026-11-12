@@ -8,10 +8,10 @@
 import {copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import jsonpatch, {type Operation} from 'fast-json-patch';
-import type {DocImagem, EntradaDocumento, Manifesto, Modulo} from './documentos';
+import type {DocImagem, EntradaDocumento, Manifesto, Modulo, OperacaoPatch} from './documentos';
 import {novoDoc3d} from './cena3d';
 import {novoDocCenas} from './cenas';
-import {modeloCarrosselNarrado} from './modelo-carrossel-narrado';
+import {modeloCarrosselNarrado, patchDoModeloComMarca} from './modelo-carrossel-narrado';
 import {novaAnimacao, modeloAnimacaoLogoPixel} from './animacao';
 import {novaMusica} from './musica'; // frente Música
 import {EFEITOS} from './efeitos';
@@ -342,6 +342,12 @@ export const guiaDoProjeto = (modulos: Modulo[], arquivo: ArquivoDeGuia = 'CLAUD
       '  erre agá). A fala gerada é um WAV em `midia/narracao/<hash>.wav` num clipe de voz com `narracao_ia` {cena, hash}:',
       '  não escreva `narracao_ia` nem esses clipes à mão; use `narrar`. O trecho de uma gravação inteira dividida nas cenas',
       '  é um clipe com `narracao_gravada` {cena} (`dividir_narracao`); a cena com ele não vai à IA sem ser pedida.',
+      '  Acabamento (opcional): `acabamento` {`nome`, `vinheta` {`ligada`, `duracao_ms`}, `rodape` {`ligado`},',
+      '  `cartao_final` {`ligado`, `titulo`, `aviso`, `duracao_ms`}, `sons` {`ligados`, `volume`}}. A vinheta mostra o logo do',
+      '  kit (`tema.logo`; sem ele, `nome` ou `tema.assinatura`) por cima do começo da primeira cena; o rodapé, o nome e a',
+      '  assinatura durante as cenas, fora das zonas da rede e da legenda; o cartão final vem depois da última cena (o vídeo',
+      '  fica mais longo); `sons` toca os efeitos de `midia/sfx/` (whoosh, pop, swell), baixos e sob a voz. Grave o bloco',
+      '  inteiro em `/acabamento` por `aplicar_patch`; `aplicar_marca {acabamento: true}` liga vinheta, rodapé e cartão.',
     );
   }
   if (tem('imagem')) linhas.push(...linhasDaImagem());
@@ -557,7 +563,10 @@ export type OpcoesProjeto = {nome: string; modelo: IdModelo; formato?: Formato |
 /** `copiar` traz arquivos de fora do projeto (logo e fontes do kit de marca): `de` absoluto, `para` relativo ao projeto.
  *  `acrescentarAoClaudeMd` vai no fim do CLAUDE.md copiado do exemplo (a seção "Pesquisa"), se ele ainda não a tiver. */
 export type Plano = {manifesto: Manifesto; arquivos: Record<string, string>; pastas: string[]; copiarDoExemplo?: string[]; copiar?: {de: string; para: string}[];
-  acrescentarAoClaudeMd?: string};
+  acrescentarAoClaudeMd?: string;
+  /** O que um kit de marca com logo ou assinatura acrescenta a um documento (caminho → patch), depois do tema: o modelo
+   *  "Carrossel narrado" ganha a cena de abertura e o acabamento ligado (modelo-carrossel-narrado.ts). */
+  comMarca?: Record<string, OperacaoPatch[]>};
 
 /** O projeto de exemplo inteiro (exemplo.ts) com o nome novo; `gravarPlano` copia a pasta dele. */
 export const planoDoExemplo = (nome: string): Plano => ({
@@ -591,6 +600,7 @@ export const planoDoProjeto = (o: OpcoesProjeto): Plano => {
       manifesto,
       arquivos: {'estudio.json': serializar(manifesto), [entrada.caminho]: serializar(modeloCarrosselNarrado()), '.gitignore': GITIGNORE, 'CLAUDE.md': claudeMd(['video'])},
       pastas,
+      comMarca: {[entrada.caminho]: patchDoModeloComMarca()},
     };
   }
   const vazio: Manifesto = {formato: 1, nome, documentos: []};
@@ -617,7 +627,8 @@ export const aplicarMarcaAoPlano = (plano: Plano, marca: MarcaLida, existe: (p: 
     const texto = plano.arquivos[e.caminho];
     if (!texto) continue;
     const doc = JSON.parse(texto) as unknown;
-    const patch = patchDaMarca(doc, marca, tema);
+    const extra = tema.logo || tema.assinatura ? plano.comMarca?.[e.caminho] ?? [] : []; // sem logo nem assinatura, não há o que assinar
+    const patch = [...patchDaMarca(doc, marca, tema), ...extra];
     if (patch.length) plano.arquivos[e.caminho] = serializar(jsonpatch.applyPatch(doc, patch as Operation[], true, false).newDocument);
   }
   if (copiar.length) plano.copiar = [...(plano.copiar ?? []), ...copiar];

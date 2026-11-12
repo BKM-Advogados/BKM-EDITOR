@@ -210,7 +210,7 @@ Texto para o `claudeMd` do projeto (a coordenação junta em `criar-projeto.ts`)
 | `inserir_icone` | Insere um ícone como forma na página, na cor do kit (`@destaque`), com posição, tamanho, cor e traço opcionais. | `livre` |
 | `inserir_linha` | Insere linha ou seta do ponto (x1, y1) ao (x2, y2), com estilo, pontas, junção e setas opcionais; o ângulo vai em `rotacao`. | `livre` |
 | `fazer_lista` | Faz de um texto uma lista com marcadores ou numerada (um item por linha, recuo pendente) ou o volta a texto livre. | `livre` |
-| `aplicar_marca` (rodada 1) | Aplica um kit ao documento; na imagem, por papel. | `livre` |
+| `aplicar_marca` (rodada 1) | Aplica um kit ao documento; na imagem, por papel. No vídeo de cenas, `acabamento: true` liga também vinheta, rodapé e cartão final. | `livre` |
 
 Todas gravam no diário com o autor e têm Reverter; nenhuma lê a web nem traz arquivo de fora do projeto.
 
@@ -218,7 +218,16 @@ Todas gravam no diário com o autor e têm Reverter; nenhuma lê a web nem traz 
 
 Vídeo → imagem: o kit do projeto vale nos dois; "Mais opções → Marca" na tela inicial aplica em todos os documentos
 novos, e o painel Marca (menu → Marca…) aplica ao documento ativo de qualquer área. Imagem → vídeo: `aplicar_marca`
-com o `documento` do vídeo. Volta: Ctrl+Z desfaz o patch do kit (a troca é um patch só, no diário).
+com o `documento` do vídeo.
+
+## A marca no vídeo de cenas: vinheta, rodapé e cartão final
+
+O vídeo de cenas guarda o kit no `tema` (`logo`, `assinatura`, cores e fonte) e, no bloco opcional `acabamento`, liga a
+vinheta do logo, o rodapé com a marca, o cartão final e os efeitos sonoros (`docs/carrossel-narrado.md`). As peças são as
+do carrossel narrado (`src/composicoes/marca-video.tsx`) nas cores do kit: o destaque, as versões clara e profunda dele
+(35% para o branco e para o preto) e o texto do kit sobre o fundo do kit. O logo não leva efeito nem gira. Trocar de kit
+troca o que as peças mostram sem tocar no `acabamento`. `aplicar_marca {acabamento: true}` aplica o kit e liga vinheta,
+rodapé e cartão no mesmo patch; o modelo "Carrossel narrado" criado com um kit que tem logo ou assinatura já vem assim. Volta: Ctrl+Z desfaz o patch do kit (a troca é um patch só, no diário).
 
 ## Licenças desta frente
 

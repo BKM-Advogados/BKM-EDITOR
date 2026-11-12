@@ -6,7 +6,8 @@
 // clicar leva ao fato no painel Pesquisa e o × tira um da lista. O som tem ainda o loudness (o alvo do arquivo exportado
 // e os medidores da narração e da mistura no resumo do vídeo; o da faixa no inspetor dela) e, no clipe de voz, a limpeza.
 // No tempo do bloco, "Entra na palavra" e "Sai na palavra" prendem o bloco a uma palavra da fala da cena (as palavras das
-// legendas que caem nela); mudar o tempo em segundos, aqui ou na linha do tempo, solta o bloco da palavra.
+// legendas que caem nela); mudar o tempo em segundos, aqui ou na linha do tempo, solta o bloco da palavra. No resumo do
+// vídeo, "Marca no vídeo" liga a vinheta do logo, o rodapé, o cartão final e os efeitos sonoros (acabamento-video.ts).
 import React, {useEffect, useState, useSyncExternalStore} from 'react';
 import {rotuloDoAtalho} from '../../teclas';
 import {Clapperboard, CopyPlus, Film, FileAudio, FileJson, ImagePlus, Link, Quote, Scissors, Shuffle, Sparkles, Trash2, Undo2, X} from 'lucide-react';
@@ -31,6 +32,8 @@ import {itensDaNarracao, ROTULO_ESTADO} from '../../../nucleo/narracao-cenas';
 import {aplicarNaTela, gravacoesDoProjeto, proporNaTela, textoDoTrecho, type GravacaoEscolhivel, type PropostaNaTela} from './acoes-narracao-inteira'; // Onda B
 import {lufsTexto, MedidorLoudness, useMedidasLoudness} from './MedidorLoudness';
 import {MudancasNoInspetor} from '../../componentes/Agente';
+import {CARTAO_MAX_MS, CARTAO_MIN_MS, CARTAO_MS, patchDoAcabamento, SONS_ACABAMENTO, TITULO_CARTAO_PADRAO, VINHETA_MAX_MS, VINHETA_MIN_MS, VINHETA_MS, VOLUME_SONS_PADRAO,
+  type AcabamentoCenas} from '../../../nucleo/acabamento-video';
 
 const CURVAS_OPCOES: [CurvaFade, string][] = [['linear', 'Linear'], ['suave', 'Suave'], ['potencia', 'Potência igual']]; // frente Som: forma do fade
 const pct = (v: number | undefined, padrao: number) => Math.round((v ?? padrao) * 1000) / 10;
@@ -142,6 +145,51 @@ const NarracaoInteira: React.FC<{documento: string; doc: DocCenas}> = ({document
   );
 };
 
+/** Vinheta do logo, rodapé com a marca, cartão final e efeitos sonoros (o acabamento do vídeo). Cada mudança grava o bloco
+ *  `acabamento` inteiro, num patch só (Ctrl+Z desfaz). O logo e a assinatura vêm do kit do `tema` (menu → Marca…). */
+const SecaoAcabamento: React.FC<{documento: string; doc: DocCenas}> = ({documento, doc}) => {
+  const a: AcabamentoCenas = doc.acabamento && typeof doc.acabamento === 'object' ? doc.acabamento : {};
+  const tema = (doc.tema ?? {}) as {logo?: string; assinatura?: string};
+  const mudar = (f: (x: AcabamentoCenas) => AcabamentoCenas, rotulo: string) => void aplicar(documento, patchDoAcabamento(doc, f(structuredClone(a))), rotulo);
+  const liga = (o: object | undefined, k: string) => Boolean(o) && (o as Record<string, unknown>)[k] !== false;
+  const vinheta = liga(a.vinheta, 'ligada');
+  const rodape = liga(a.rodape, 'ligado');
+  const cartao = liga(a.cartao_final, 'ligado');
+  const sons = liga(a.sons, 'ligados');
+  const seg = (ms: number) => numeroBr(ms / 1000, 1);
+  const duracao = (v: number, min: number, max: number, nome: string, gravar: (ms: number) => void) =>
+    v * 1000 >= min && v * 1000 <= max ? gravar(Math.round(v * 1000)) : avisar(`${nome} vai de ${seg(min)} a ${seg(max)} s`, 'erro');
+  const kit = tema.logo || tema.assinatura ? [tema.logo ? 'logo' : '', tema.assinatura ? `assinatura ${tema.assinatura}` : ''].filter(Boolean).join(' e ') : '';
+  return (
+    <Secao titulo="Marca no vídeo" chave="cenas:acabamento" fechadaDePadrao={!vinheta && !rodape && !cartao && !sons}>
+      <div className="vazio">{kit ? `Do kit de marca: ${kit}.` : 'O vídeo não tem kit com logo nem assinatura (menu → Marca…); a vinheta e o rodapé usam o nome abaixo.'}</div>
+      <CampoTexto rotulo="Quem assina" valor={a.nome ?? ''} dica="O nome por extenso, no rodapé e na vinheta sem logo"
+        aoMudar={(v) => mudar((x) => ({...x, nome: v.trim() || undefined}), v.trim() ? `quem assina: ${v.trim()}` : 'sem nome de quem assina')} />
+      <CampoInterruptor rotulo="Vinheta do logo" valor={vinheta} dica="O logo no começo, por cima dos primeiros segundos da primeira cena (o vídeo não fica mais longo)"
+        aoMudar={(v) => mudar((x) => ({...x, vinheta: {...x.vinheta, ligada: v}}), v ? 'liga a vinheta do logo' : 'desliga a vinheta do logo')} />
+      {vinheta && <CampoNumero rotulo="Duração da vinheta" unidade="s" passo={0.1} valor={(a.vinheta?.duracao_ms ?? VINHETA_MS) / 1000} padrao={VINHETA_MS / 1000}
+        aoMudar={(v) => duracao(v, VINHETA_MIN_MS, VINHETA_MAX_MS, 'A vinheta', (ms) => mudar((x) => ({...x, vinheta: {...x.vinheta, duracao_ms: ms}}), `vinheta: ${seg(ms)} s`))} />}
+      <CampoInterruptor rotulo="Rodapé com a marca" valor={rodape} dica="O nome e a assinatura (ou o logo) embaixo, durante as cenas, fora das zonas da rede e da legenda"
+        aoMudar={(v) => mudar((x) => ({...x, rodape: {...x.rodape, ligado: v}}), v ? 'liga o rodapé com a marca' : 'desliga o rodapé com a marca')} />
+      <CampoInterruptor rotulo="Cartão final" valor={cartao} dica="Um cartão com a marca depois da última cena: o vídeo fica esse tanto mais longo"
+        aoMudar={(v) => mudar((x) => ({...x, cartao_final: {...x.cartao_final, ligado: v}}), v ? 'liga o cartão final' : 'desliga o cartão final')} />
+      {cartao && <>
+        <CampoTexto rotulo="Título do cartão" valor={a.cartao_final?.titulo ?? TITULO_CARTAO_PADRAO}
+          aoMudar={(v) => mudar((x) => ({...x, cartao_final: {...x.cartao_final, titulo: v.trim() && v.trim() !== TITULO_CARTAO_PADRAO ? v.trim() : undefined}}), 'título do cartão final')} />
+        <CampoTexto rotulo="Aviso" valor={a.cartao_final?.aviso ?? ''} dica="Uma linha pequena embaixo (ex.: Conteúdo informativo)"
+          aoMudar={(v) => mudar((x) => ({...x, cartao_final: {...x.cartao_final, aviso: v.trim() || undefined}}), 'aviso do cartão final')} />
+        <CampoNumero rotulo="Duração do cartão" unidade="s" passo={0.5} valor={(a.cartao_final?.duracao_ms ?? CARTAO_MS) / 1000} padrao={CARTAO_MS / 1000}
+          aoMudar={(v) => duracao(v, CARTAO_MIN_MS, CARTAO_MAX_MS, 'O cartão final', (ms) => mudar((x) => ({...x, cartao_final: {...x.cartao_final, duracao_ms: ms}}), `cartão final: ${seg(ms)} s`))} />
+      </>}
+      <CampoInterruptor rotulo="Efeitos sonoros" valor={sons} dica={`Os de midia/sfx/ (${Object.values(SONS_ACABAMENTO).join(', ')}) nas trocas de cena e nas entradas, baixos e sob a narração`}
+        aoMudar={(v) => mudar((x) => ({...x, sons: {...x.sons, ligados: v}}), v ? 'liga os efeitos sonoros' : 'desliga os efeitos sonoros')} />
+      {sons && <CampoDeslizante rotulo="Volume dos efeitos" valor={a.sons?.volume ?? VOLUME_SONS_PADRAO} min={0} max={1} passo={0.05} padrao={VOLUME_SONS_PADRAO}
+        formatar={(v) => `${Math.round(v * 100)}%`}
+        aoMudar={(v) => mudar((x) => ({...x, sons: {...x.sons, volume: Math.round(v * 100) / 100}}), `volume dos efeitos: ${Math.round(v * 100)}%`)} />}
+    </Secao>
+  );
+};
+
 const ResumoVideo: React.FC<{documento: string; doc: DocCenas; titulo: string; duracao: number; avisos: string[]; erro?: string}> = ({documento, doc, titulo, duracao, avisos, erro}) => {
   const f = formatoDoVideo(doc);
   const preset = FORMATOS_VIDEO.find((p) => p.largura === f.largura && p.altura === f.altura);
@@ -173,6 +221,7 @@ const ResumoVideo: React.FC<{documento: string; doc: DocCenas; titulo: string; d
           <CampoCor rotulo="Destaque" valor={tema.destaque ?? TEMA_NEUTRO.destaque} aoMudar={(v) => void trocar(documento, '/tema/destaque', v, 'cor de destaque')} />
           <CampoCor rotulo="Texto suave" valor={tema.suave ?? TEMA_NEUTRO.suave} aoMudar={(v) => void trocar(documento, '/tema/suave', v, 'cor do texto suave')} />
         </Secao>
+        <SecaoAcabamento documento={documento} doc={doc} />
         {nClipes > 0 && <SecaoLoudness documento={documento} doc={doc} />}
         <NarracaoInteira documento={documento} doc={doc} />
         {erro && <Secao titulo="Não deu para montar o vídeo"><div className="texto-livre" style={{color: 'var(--erro)'}}>{erro}</div></Secao>}
