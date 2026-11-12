@@ -6,7 +6,7 @@
 // Som: "escolher arquivo de áudio" devolve um WAV sintético (uma narração, depois uma música, alternando), como URL de
 // blob que o <audio> e o Web Audio tocam de verdade; o envelope medido fica em memória e entra nas props como no app.
 import jsonpatch, {type Operation} from 'fast-json-patch';
-import type {ApiEstudio, EstadoProvedor, InfoProjeto, PedidoPortaoTela, MarcaInfo, Mudanca, NovoProjeto, Preferencias, Progresso, ProgressoTranscricao, Recente, ResultadoLimpezaVoz, Trilha, RespostaJanela} from '../../src/compartilhado/api';
+import type {ApiEstudio, EstadoProvedor, InfoProjeto, PedidoPortaoTela, MarcaInfo, ModeloInfo, Mudanca, NovoProjeto, Preferencias, Progresso, ProgressoTranscricao, Recente, ResultadoLimpezaVoz, Trilha, RespostaJanela} from '../../src/compartilhado/api';
 import type {EntradaDocumento, Manifesto, Modulo} from '../../src/nucleo/documentos';
 import type {ApiAtualizacao, EstadoAtualizacao} from '../../src/compartilhado/atualizacao';
 import type {Envelope, IntensidadeLimpeza} from '../../src/nucleo/audio';
@@ -44,7 +44,10 @@ const projetos = new Map<string, Proj>();
 let aberto: Proj | null = null;
 const PASTA_MARCAS = 'C:\\Users\\pessoa\\Estudio\\marcas';
 let prefs: Preferencias = {pasta_projetos: 'C:\\Users\\pessoa\\Estudio', ao_iniciar: 'inicio', formato_video: 'reels', formato_imagem: 'feed',
-  boas_vindas_vista: new URLSearchParams(location.search).has('vista'), pasta_trilhas: 'C:\\Users\\pessoa\\Estudio\\trilhas', pasta_marcas: PASTA_MARCAS};
+  boas_vindas_vista: new URLSearchParams(location.search).has('vista'), pasta_trilhas: 'C:\\Users\\pessoa\\Estudio\\trilhas', pasta_marcas: PASTA_MARCAS,
+  pasta_modelos: 'C:\\Users\\pessoa\\Estudio\\modelos'};
+// modelos da pessoa (Salvar como modelo), em memória: os documentos guardados em cópia, como a pasta modelos/ do app
+const modelosProprios: {info: ModeloInfo; manifesto: Manifesto; docs: Record<string, unknown>}[] = [];
 
 // ---------- som sintético ----------
 const audios = new Map<string, {url: string; nome: string}>(); // url do blob → nome que o clipe mostra
@@ -220,6 +223,12 @@ const criar = (o: NovoProjeto): InfoProjeto => {
 };
 
 const nada = () => undefined;
+const idDoModelo = (nome: string) => {
+  const base = idDeMarca(nome).replace(/^marca$/, 'modelo');
+  let id = base;
+  for (let n = 2; modelosProprios.some((m) => m.info.id === id); n++) id = `${base}-${n}`;
+  return id;
+};
 const api: ApiEstudio = {
   abrirPasta: async () => null,
   abrirExemplo: async () => {
@@ -379,6 +388,45 @@ const api: ApiEstudio = {
       const url = URL.createObjectURL(new Blob([wav], {type: 'audio/wav'}));
       audios.set(url, {url, nome: 'narração gravada.wav'});
       return url;
+    },
+  },
+  modelos: {
+    listar: async () => structuredClone(modelosProprios.map((m) => m.info)).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
+    salvar: async ({nome, descricao, documento}) => {
+      if (!aberto) throw new Error('nenhum projeto aberto');
+      const entradas = aberto.manifesto.documentos.filter((d) => !documento || d.id === documento || d.caminho === documento);
+      const id = idDoModelo(nome);
+      const primeiro = aberto.docs[entradas[0].id] as {formato?: {largura?: number; altura?: number}; largura?: number; altura?: number};
+      const largura = primeiro?.formato?.largura ?? primeiro?.largura;
+      const altura = primeiro?.formato?.altura ?? primeiro?.altura;
+      const info: ModeloInfo = {formato: 1, id, nome: nome.trim(), ...(descricao ? {descricao} : {}), modulo: entradas[0].modulo,
+        ...(largura && altura ? {largura, altura} : {}), documentos: entradas.map((e) => ({id: e.id, modulo: e.modulo, titulo: e.titulo})),
+        criado_em: new Date().toISOString(), de_projeto: aberto.manifesto.nome, pasta: `${prefs.pasta_modelos}\\${id}`};
+      modelosProprios.push({info, manifesto: structuredClone({...aberto.manifesto, documentos: entradas}),
+        docs: Object.fromEntries(entradas.map((e) => [e.id, structuredClone(aberto!.docs[e.id])]))});
+      return {...structuredClone(info), copiados: [], faltando: []};
+    },
+    renomear: async (id, nome) => {
+      const m = modelosProprios.find((x) => x.info.id === id);
+      if (!m) throw new Error(`modelo não achado: ${id}`);
+      m.info.nome = nome.trim();
+      return structuredClone(m.info);
+    },
+    remover: async (id) => {
+      const i = modelosProprios.findIndex((x) => x.info.id === id);
+      if (i >= 0) modelosProprios.splice(i, 1);
+    },
+    criarProjeto: async (o) => {
+      const m = modelosProprios.find((x) => x.info.id === o.id);
+      if (!m) throw new Error(`modelo não achado: ${o.id}`);
+      const nome = o.nome || m.info.nome;
+      const p: Proj = {raiz: `${prefs.pasta_projetos}\\${nome}`, manifesto: {...structuredClone(m.manifesto), nome}, docs: structuredClone(m.docs), versao: 1};
+      if (o.marca) for (const d of p.manifesto.documentos) aplicarMarca(p, o.marca, d.id);
+      projetos.set(p.raiz, p);
+      aberto = p;
+      diarioPrevia.length = 0;
+      recentes.unshift({raiz: p.raiz, nome, aberto_em: new Date().toISOString(), existe: true, modulos: [m.info.modulo]});
+      return info()!;
     },
   },
   marcas: {

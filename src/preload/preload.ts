@@ -106,6 +106,13 @@ const api: ApiEstudio = {
     aplicar: (id, documento) => ipcRenderer.invoke(CANAL.marcasAplicar, id, documento),
     fontesDoProjeto: () => ipcRenderer.invoke(CANAL.fontesDoProjeto),
   },
+  modelos: {
+    listar: () => ipcRenderer.invoke(CANAL.modelosListar),
+    salvar: (o) => ipcRenderer.invoke(CANAL.modelosSalvar, o),
+    renomear: (id, nome) => ipcRenderer.invoke(CANAL.modelosRenomear, id, nome),
+    remover: (id) => ipcRenderer.invoke(CANAL.modelosRemover, id),
+    criarProjeto: (o) => ipcRenderer.invoke(CANAL.modelosCriarProjeto, o),
+  },
   exportarPaginas: (o) => ipcRenderer.invoke(CANAL.exportarPaginas, o),
   cancelarExportacao: () => ipcRenderer.send(CANAL.exportarCancelar),
   mostrarArquivo: (caminho) => ipcRenderer.send(CANAL.mostrarArquivo, caminho),

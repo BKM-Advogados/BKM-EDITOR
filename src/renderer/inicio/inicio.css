@@ -73,6 +73,14 @@
 .cartao-modelo:hover { border-color: var(--borda-forte); }
 .cartao-modelo:hover .poster { background: var(--fundo-3); }
 .cartao-modelo:disabled { opacity: 0.6; cursor: default; }
+/* modelo da pessoa: o cartão é uma caixa com o botão que cria e o menu (Renomear, Remover) no canto */
+.cartao-modelo.proprio { position: relative; cursor: default; }
+.cm-criar { display: flex; flex-direction: column; flex: 1; border: 0; padding: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.cm-criar:hover .poster { background: var(--fundo-3); }
+.cm-criar:disabled { opacity: 0.6; cursor: default; }
+.cartao-modelo.proprio .poster img { max-width: 100%; max-height: 96px; object-fit: contain; border-radius: 3px; }
+.cm-menu { position: absolute; top: 6px; right: 6px; opacity: 0; transition: opacity 0.12s; }
+.cartao-modelo.proprio:hover .cm-menu, .cm-menu:focus-within { opacity: 1; }
 .poster { height: 104px; display: grid; place-items: center; background: var(--fundo-2); }
 .poster-peca { display: flex; flex-direction: column; justify-content: center; gap: 5px; padding: 0 8px; border-radius: 3px; background: var(--fundo-4); color: var(--texto-3); }
 .poster-peca.musica, .poster-peca.\33 d { align-items: center; }

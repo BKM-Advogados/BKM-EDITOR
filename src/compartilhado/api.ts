@@ -7,6 +7,7 @@ import type {Envelope, IntensidadeLimpeza, LimpezaClipe} from '../nucleo/audio';
 import type {FichaFaixa} from '../nucleo/biblioteca-musicas';
 import type {MedidasLoudness} from '../nucleo/loudness';
 import type {FonteArquivo, Marca} from '../nucleo/marca';
+import type {ModeloLido} from '../nucleo/pasta-modelos';
 import type {OpcoesExportarImagem, OpcoesExportarVideo, PrefsExportacao} from '../nucleo/exportacao';
 import type {PedidoContrasteDestino, ResultadoContraste} from '../nucleo/contraste'; // só os tipos (frente C)
 import type {Pesquisa} from '../nucleo/pesquisa';
@@ -92,6 +93,12 @@ export const CANAL = {
   marcasImportarLogo: 'estudio:marcas-importar-logo',
   marcasImportarFonte: 'estudio:marcas-importar-fonte',
   marcasAplicar: 'estudio:marcas-aplicar',
+  // modelos da pessoa (Salvar como modelo; pasta-modelos.ts e ipc-modelos.ts)
+  modelosListar: 'estudio:modelos-listar',
+  modelosSalvar: 'estudio:modelos-salvar',
+  modelosRenomear: 'estudio:modelos-renomear',
+  modelosRemover: 'estudio:modelos-remover',
+  modelosCriarProjeto: 'estudio:modelos-criar-projeto',
   fontesDoProjeto: 'estudio:fontes-do-projeto',
   exportarPaginas: 'estudio:exportar-paginas',
   exportarCancelar: 'estudio:exportar-cancelar',
@@ -190,11 +197,15 @@ export type Recente = {raiz: string; nome: string; aberto_em: string; existe: bo
 export type Preferencias = {pasta_projetos: string; ao_iniciar: 'inicio' | 'ultimo'; formato_video: string; formato_imagem: string; boas_vindas_vista: boolean;
   pasta_trilhas: string; // biblioteca de músicas e efeitos da pessoa (padrão: Estudio/trilhas)
   pasta_marcas: string;
+  pasta_modelos: string; // os modelos da pessoa (Salvar como modelo; padrão: Estudio/modelos)
   projetos_ide?: boolean; // frente IDE e harnesses: guias e MCP de cada harness em cada projeto (padrão: ligado; docs/ide.md)
   procurar_atualizacoes?: boolean; versao_pulada?: string}; // atualização do app (padrão: procura; "Pular esta versão")
 
 /** `marca` é o id do kit de marca que entra no tema do documento novo (sem ele, o tema neutro). */
 export type NovoProjeto = {nome?: string; modelo: IdModelo; formato?: Formato | {largura: number; altura: number}; pasta?: string; formato_id?: string; marca?: string};
+
+/** Modelo da pessoa como a interface o vê (pasta-modelos.ts): nome, tipo, tamanho, documentos e a miniatura (data URL). */
+export type ModeloInfo = ModeloLido;
 
 /** Kit de marca como a interface o vê: o kit, a pasta dele e o endereço no servidor local (logo e fontes para a prévia). */
 export type MarcaInfo = Marca & {pasta: string; url: string};
@@ -338,6 +349,16 @@ export type ApiEstudio = {
     /** Copia logo e fontes para o projeto e troca o tema do documento (vai para o diário). */
     aplicar: (id: string, documento: string) => Promise<{versao: string; marca: string; nome: string; copiados: string[]; atualizados: string[]}>;
     fontesDoProjeto: () => Promise<FonteArquivo[]>;
+  };
+  // modelos da pessoa (pasta modelos/ das preferências): aparecem em Novo na tela inicial, ao lado dos de fábrica
+  modelos: {
+    listar: () => Promise<ModeloInfo[]>;
+    /** Salva o projeto aberto (ou só `documento`) como modelo: os documentos e a mídia que eles citam, sem diário, git nem conversas. */
+    salvar: (o: {nome: string; descricao?: string; documento?: string}) => Promise<ModeloInfo & {copiados: string[]; faltando: string[]}>;
+    renomear: (id: string, nome: string) => Promise<ModeloInfo>;
+    remover: (id: string) => Promise<void>;
+    /** Cria e abre um projeto a partir do modelo (com o kit por cima, se vier). */
+    criarProjeto: (o: {id: string; nome?: string; pasta?: string; marca?: string}) => Promise<InfoProjeto>;
   };
   /** Carrossel: PNG por página em saidas/<nome>/01.png… e, com `pdf`, saidas/<nome>.pdf (uma página por imagem, sem margem). */
   exportarPaginas: (o: PedidoExportarPaginas) => Promise<ResultadoExportarPaginas>;
