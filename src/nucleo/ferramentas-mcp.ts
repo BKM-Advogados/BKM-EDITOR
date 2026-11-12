@@ -45,6 +45,8 @@ import {registrarExportacaoFinal} from './mcp-exportacao-final'; // exportar_vid
 import {USER_AGENT_ESTUDIO} from './versao';
 import {registrarProjeto} from './mcp-projeto'; // frente 2: importar_midia, renomear_documento, ponto de restauração
 import {registrarMarcaEdicao} from './mcp-marca-edicao'; // frente 2: os kits de marca da pessoa
+import {registrarMedidas} from './mcp-medidas'; // frente 3 do MCP: medir_loudness, medir_envelope, limpar_voz
+import {registrarPreviaJanela} from './mcp-previa-janela'; // frente 3 do MCP: ver_imagem, ver_cena_3d
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x, null, 2)}]});
 const erro = (e: unknown) => ({
@@ -338,6 +340,8 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   registrarExportacaoFinal(servidor, projeto, autor, origem); // o arquivo final em saidas/ sem clicar em Exportar (mcp-exportacao-final.ts)
   registrarProjeto(servidor, projeto); // frente 2: importar_midia, renomear_documento e marcar_ponto_de_restauracao (mcp-projeto.ts)
   registrarMarcaEdicao(servidor); // frente 2: listar, criar e editar kits de marca, logo e fontes (mcp-marca-edicao.ts)
+  registrarPreviaJanela(servidor, projeto); // frente 3: prévias da imagem e da cena 3D pela janela (mcp-previa-janela.ts)
+  registrarMedidas(servidor, projeto, autor, origem); // frente 3: loudness, envelope e limpeza de voz (mcp-medidas.ts)
 };
 
 // ---------- pesquisa: fontes e fatos (src/nucleo/pesquisa.ts, docs/pesquisa.md) ----------

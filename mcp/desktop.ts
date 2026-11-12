@@ -21,6 +21,8 @@ import {servicoDeExportacaoStdio} from '../src/main/exportacao-servico';
 import {definirMedidorDeEnvelope, definirPontoDeRestauracao, mensagemDoPonto, respostaDoPonto} from '../src/nucleo/mcp-projeto';
 import {SessaoProjeto} from '../src/main/sessao-projeto';
 import {medirEnvelopeDoArquivo} from '../src/main/ipc-audio';
+import {definirServicoMedidas} from '../src/nucleo/medidas-som'; // frente 3: loudness, envelope e limpeza com o app fechado
+import {pastaDoFfmpegDoApp, servicoDeMedidas} from '../src/main/medidas';
 
 const raizApp = path.resolve(__dirname, '..');
 definirServicoMusica(servicoDeRender());
@@ -31,6 +33,8 @@ definirPontoDeRestauracao(async (raiz, mensagem) => {
   return respostaDoPonto(r.ok, r.temGit);
 });
 definirMedidorDeEnvelope((p, arquivo) => medirEnvelopeDoArquivo(p, arquivo));
+const ffmpeg = pastaDoFfmpegDoApp(raizApp);
+definirServicoMedidas(servicoDeMedidas({binarios: () => ffmpeg}));
 const transcritor = new Transcritor({raizApp});
 const rede = criarRede();
 const narrador = servicoDoAmbiente();

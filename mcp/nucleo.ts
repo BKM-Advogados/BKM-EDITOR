@@ -31,6 +31,8 @@ import {definirMedidorDeEnvelope, definirPontoDeRestauracao, mensagemDoPonto, re
 import {SessaoProjeto} from '../src/main/sessao-projeto';
 import {medirEnvelopeDoArquivo} from '../src/main/ipc-audio';
 import {pastaPadraoProjetos, sistemaAtual} from '../src/nucleo/claude-desktop';
+import {definirServicoMedidas} from '../src/nucleo/medidas-som'; // frente 3: loudness, envelope e limpeza com o app fechado
+import {pastaDoFfmpegDoApp, servicoDeMedidas} from '../src/main/medidas';
 
 const arg = (nome: string) => {
   const i = process.argv.indexOf(nome);
@@ -55,6 +57,10 @@ definirPontoDeRestauracao(async (raiz, mensagem) => {
   return respostaDoPonto(r.ok, r.temGit);
 });
 definirMedidorDeEnvelope((p, arquivo) => medirEnvelopeDoArquivo(p, arquivo));
+// frente 3: as medidas do som com o ffmpeg do app de onde veio este arquivo (ver_imagem e ver_cena_3d precisam da janela:
+// sem o app aberto, respondem pedindo para abrir o projeto)
+const ffmpeg = pastaDoFfmpegDoApp(path.resolve(__dirname, '..'));
+definirServicoMedidas(servicoDeMedidas({binarios: () => ffmpeg}));
 // a transcrição local acha o ffmpeg no node_modules do repositório (dist-mcp/ fica na raiz)
 const raiz = pasta;
 // um processo por conversa da IDE: a mesma origem (ide-<id>) no diário com o app aberto ou fechado (mcp-app.ts)

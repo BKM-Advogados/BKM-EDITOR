@@ -81,7 +81,7 @@ describe('CLAUDE.md do projeto', () => {
     const md = claudeMd(['video', 'imagem']);
     const numeros = [...md.split('## Como trabalhar')[1].split('## Pesquisa')[0].matchAll(/^(\d+)\. /gm)].map((m) => Number(m[1]));
     expect(numeros).toEqual(numeros.map((_, i) => i + 1));
-    expect(numeros.length).toBe(22); // + a narração por IA; + exportar_video e exportar_imagem/carrossel (exportação final); + mídia, marca e projeto (frente 2)
+    expect(numeros.length).toBe(24); // + a narração por IA; + exportar_video e exportar_imagem/carrossel (exportação final); + mídia, marca e projeto (frente 2); + medidas do som e ver_imagem (frente 3)
   });
 
   it('sem arquivo, grava o texto gerado; igual, não grava', () => {

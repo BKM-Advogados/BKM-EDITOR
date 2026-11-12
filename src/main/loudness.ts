@@ -152,12 +152,15 @@ export const igualarLoudness = async (o: {arquivo: string; props: Record<string,
     pico_dbtp: audio.pico_dbtp});
 };
 
-// ---------- medidor da tela ----------
+// ---------- medidor da tela e do MCP ----------
 const LIMITE_CACHE = 16_000_000; // amostras decodificadas guardadas entre medições (~64 MB): cabe na máquina de 8 GB
 
-type Lidar = <A extends unknown[], R>(canal: string, f: (...a: A) => R | Promise<R>) => void;
-
-export const registrarIpcLoudness = (lidar: Lidar, projeto: () => Projeto, propsDe: (documento: string) => PropsVideo) => {
+/** Mede a mistura de um vídeo montado (props da composição) como o render vai soar, com os arquivos decodificados
+ *  guardados entre medições (até `limite` amostras). Um pedido novo passa na frente do que estiver em curso (o vídeo
+ *  mudou): o antigo responde "medição substituída". O medidor da tela (registrarIpcLoudness) e o medir_loudness do MCP
+ *  (src/main/medidas.ts) usam cada um o seu, para um não cancelar o outro. */
+export const criarMedidorDeLoudness = (o: {limite?: number; binarios?: () => string | null | undefined} = {}) => {
+  const limite = o.limite ?? LIMITE_CACHE;
   const fontes = new Map<string, FonteAudio>(); // por arquivo + data + tamanho, o mais recente no fim
   let ultima: {chave: string; r: MedidasLoudness} | null = null;
   let geracao = 0;
@@ -167,19 +170,17 @@ export const registrarIpcLoudness = (lidar: Lidar, projeto: () => Projeto, props
     const chave = `${abs}|${st.mtimeMs}|${st.size}`;
     let f = fontes.get(chave);
     if (f) fontes.delete(chave);
-    else f = await decodificarAudio(abs, {taxa: TAXA, canais: 2, cancelado});
+    else f = await decodificarAudio(abs, {taxa: TAXA, canais: 2, cancelado, binarios: o.binarios?.()});
     fontes.set(chave, f);
     let total = [...fontes.values()].reduce((s, x) => s + x.canais.length * (x.canais[0]?.length ?? 0), 0);
     for (const [k, x] of fontes) {
-      if (total <= LIMITE_CACHE || k === chave) break;
+      if (total <= limite || k === chave) break;
       total -= x.canais.length * (x.canais[0]?.length ?? 0);
       fontes.delete(k);
     }
     return {f, chave};
   };
-  lidar(CANAL.audioMedirLoudness, async (documento: string): Promise<MedidasLoudness | {erro: string}> => {
-    const p = projeto();
-    const montado = propsDe(documento);
+  return async (p: Projeto, montado: PropsVideo): Promise<MedidasLoudness | {erro: string}> => {
     if ('erro' in montado) return {erro: montado.erro};
     const audio = montado.props.audio as AudioP | undefined;
     if (!audio?.faixas?.length) return {erro: 'este vídeo não tem som'};
@@ -211,5 +212,12 @@ export const registrarIpcLoudness = (lidar: Lidar, projeto: () => Projeto, props
       if (cancelado()) return {erro: 'medição substituída por uma mais nova'};
       throw e;
     }
-  });
+  };
+};
+
+type Lidar = <A extends unknown[], R>(canal: string, f: (...a: A) => R | Promise<R>) => void;
+
+export const registrarIpcLoudness = (lidar: Lidar, projeto: () => Projeto, propsDe: (documento: string) => PropsVideo) => {
+  const medir = criarMedidorDeLoudness();
+  lidar(CANAL.audioMedirLoudness, (documento: string): Promise<MedidasLoudness | {erro: string}> => medir(projeto(), propsDe(documento)));
 };

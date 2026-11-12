@@ -46,6 +46,10 @@ import {registrarIpcNarracao} from './ipc-narracao'; // narração por IA (docs/
 import {aoAbrirMusica, registrarIpcMusica} from './ipc-musica'; // frente Música
 import {criarPonteJanela} from './ponte-janela';
 import {definirServicoPrevia} from '../nucleo/mcp-previa'; // frente IDE: prévias do MCP
+import {definirServicoMedidas} from '../nucleo/medidas-som'; // frente 3 do MCP: medidas do som
+import {definirServicoPreviaJanela} from '../nucleo/mcp-previa-janela'; // frente 3 do MCP: prévias pela janela
+import {servicoDeMedidas} from './medidas';
+import {servicoDePreviaJanela} from './previa-janela';
 import {criarServicoPrevia} from './previa'; // frente IDE
 import {criarIde} from './ide'; // frente IDE: projetos prontos para IDE de agentes
 import {scriptDoMcp} from '../nucleo/ide'; // frente IDE
@@ -545,6 +549,11 @@ definirServicoPrevia(criarServicoPrevia({preparar: (aviso) => prepararRender({ra
 // frente Som (rodada 2): limpeza de voz (limpeza-voz.ts) e medidor de loudness da mistura (loudness.ts)
 registrarIpcLimpeza(lidar, exigirProjeto, enviar);
 registrarIpcLoudness(lidar, exigirProjeto, (documento) => (exigirProjeto(), sessao!.propsVideo(documento, midia.base)));
+// frente 3 do MCP: medir_loudness, medir_envelope e limpar_voz com as funções da tela; ver_imagem e ver_cena_3d desenhados
+// pela janela, por uma ponte só delas (cada ponte responde só aos pedidos que fez)
+definirServicoMedidas(servicoDeMedidas());
+definirServicoPreviaJanela(servicoDePreviaJanela(criarPonteJanela({enviar, temJanela: () => Boolean(janela && !janela.isDestroyed()),
+  ouvir: (canal, f) => ipcMain.on(canal, (e, ...a) => (confiavel(e), f(...(a as never[]))))})));
 registrarIpcMidia(lidar, exigirProjeto); // frente Casca: painel de mídia (lista de midia/ e marcas das tomadas)
 // frente IA: Configurações › IA (provedores, chaves cifradas pelo safeStorage em userData/ia, modelos, uso do mês)
 registrarIpcIa({lidar, claudeInstalado: () => claude, pasta: path.join(app.getPath('userData'), 'ia'), conversas: () => conversas,

@@ -287,7 +287,7 @@ export const guiaDoProjeto = (modulos: Modulo[], arquivo: ArquivoDeGuia = 'CLAUD
       '  `clipes[]` com `id`, `arquivo` (em `midia/`), `em` (ms na linha do tempo), `duracao_ms`, `corte_ms`, `volume`,',
       '  `fade_in_ms`, `fade_out_ms` e `mudo`. O que ficar fora do vídeo vira aviso, não erro (detalhe em docs/audio.md do app).',
       '  Loudness: `audio.alvo_lufs` (padrão −14) e `audio.pico_dbtp` (padrão −1) são o alvo do arquivo exportado; a exportação',
-      '  mede o arquivo final e corrige o ganho. A limpeza de voz se faz na tela, por clipe: o app troca o `arquivo` pelo WAV',
+      '  mede o arquivo final e corrige o ganho. A limpeza de voz é por clipe (na tela ou `limpar_voz`): troca o `arquivo` pelo WAV',
       '  limpo, guarda o da pessoa em `original` e as medidas em `limpeza`. Não escreva `original` nem `limpeza` à mão.',
       '  Movimento no bloco `imagem` (zoom dinâmico): `movimento` {`tipo` (`aproximar`, `afastar`, `esquerda`, `direita`,',
       '  `cima`, `baixo`), `intensidade` (0,05 a 0,4; padrão 0,15), `suave` (padrão sim)}. Fica limpo com `ajuste: "cobrir"`.',
@@ -386,13 +386,16 @@ export const guiaDoProjeto = (modulos: Modulo[], arquivo: ArquivoDeGuia = 'CLAUD
     passos.push('Narração por IA: escreva `cenas[i].narracao.texto`, ajuste a voz com `configurar_narracao` e as pronúncias com\n   `pronuncias_narracao`; mostre à pessoa `narrar` com `previa: true` (texto final e custo, sem gastar) e depois\n   gere com `narrar` (cache: só a cena que mudou vai ao Google). `ajustar_cenas_a_fala` faz a cena durar a fala;\n   `transcrever`, depois, cria as legendas.');
     passos.push('`propor_cortes_fala` propõe tirar pausas longas e "ãh" de um clipe de voz e `aplicar_cortes_fala` grava a\n   narração emendada (as legendas vão junto). `preparar_teleprompter` grava o texto que a pessoa lê ao gravar.');
     passos.push('Som: `adicionar_clipe_audio` põe um áudio do projeto numa faixa; `dividir_clipe`, `copiar_clipe` e `crossfade`\n   editam os clipes. `listar_trilhas` mostra a pasta de trilhas da pessoa e `escolher_trilha` traz uma para o vídeo\n   (pede a permissão dela); `creditos_das_musicas` dá os créditos que as licenças pedem.');
+    passos.push('`medir_loudness` mede o som do vídeo como o render vai soar (LUFS da mistura contra o alvo, a voz e quanto a\n   música fica abaixo dela). `medir_envelope` mede um áudio novo (duração e forma de onda), o que a tela faz ao ver o\n   arquivo: chame com o app fechado. `limpar_voz` limpa a voz de um clipe sem tocar no original (`voltar: true` desfaz).');
     passos.push('`marca_dagua` lê ou muda a marca d\'água de cada destino da exportação; `medir_contraste_marca` confere se ela lê\n   sobre o fundo (só com o app aberto).');
   }
   if (tem('imagem')) {
     passos.push('`remover_fundo` tira o fundo de uma foto de pessoa com o modelo local; com `voltar: true`, volta ao original.');
     passos.push('`selecionar_camadas` mostra camadas na tela da pessoa; `alinhar_camadas`, `distribuir_camadas`, `agrupar_camadas`\n   e `desagrupar_camadas` arrumam o layout; `travar_camadas` trava e `destravar_camadas` destrava (pede a permissão\n   da pessoa: a trava é dela).');
+    passos.push('`ver_imagem` desenha a imagem (ou uma página do carrossel) como sai na exportação e devolve a imagem para\n   você ver; só com o projeto aberto no app.');
     passos.push('`ver_marca` mostra o kit da imagem; `cor_da_marca` e `fonte_da_marca` põem a cor (`@destaque`) ou a fonte\n   (`@titulo`) do kit numa camada. `buscar_icone` e `inserir_icone` (Lucide), `inserir_linha` (linha e seta) e\n   `fazer_lista` (marcadores ou números num texto) criam as peças já no kit.');
   }
+  if (tem('3d')) passos.push('`ver_cena_3d` tira um instantâneo da cena 3D pela câmera do documento ou por outra, sem mudá-la; só com o\n   projeto aberto no app.');
   if (tem('animacao')) passos.push('`criar_animacao`, `adicionar_camada_animacao`, `animar`, `pixelizar_imagem`, `efeito_pixel` e `ver_animacao` montam e animam a animação (docs/animacao.md).');
   if (tem('video') || tem('animacao')) passos.push('`exportar_video` exporta o vídeo para `saidas/` como o botão Exportar (destinos, codec, qualidade, trecho,\n   legendas e marca d\'água; pede a permissão da pessoa). Render longo devolve um id: `situacao_exportacao` acompanha.');
   if (tem('imagem')) passos.push('`exportar_imagem` (PNG, JPG ou WebP) e `exportar_carrossel` (PNG por página e PDF) gravam em `saidas/`; só com o\n   projeto aberto no app, que desenha a imagem.');

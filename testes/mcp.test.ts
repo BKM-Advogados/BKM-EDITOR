@@ -54,6 +54,7 @@ describe('MCP estudio', () => {
       'reverter', 'selecionar_camadas', 'texto_da_fonte', 'transcrever', 'travar_camadas', 'trocar_kit', 'ver_animacao', 'ver_cenas', 'ver_marca', 'ver_quadro',
       'ver_trecho', 'vozes_narracao',
       'exportar_carrossel', 'exportar_imagem', 'exportar_video', 'situacao_exportacao', // exportação final (docs/exportacao.md)
+      'limpar_voz', 'medir_envelope', 'medir_loudness', 'ver_cena_3d', 'ver_imagem', // frente 3 do MCP
     ].sort());
   });
 
