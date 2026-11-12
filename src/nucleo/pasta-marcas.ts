@@ -177,11 +177,11 @@ export class PastaMarcas {
 
   /** Aplica o kit a um documento do projeto: copia o logo (midia/) e as fontes (fontes/) que faltam, troca os que mudaram
    *  no kit (`atualizados`) e troca o tema por patch, que vai para o diário com o autor. */
-  aplicar(projeto: Projeto, id: string, documento: string, o: {autor: string; origem: string}) {
+  aplicar(projeto: Projeto, id: string, documento: string, o: {autor: string; origem: string; acabamento?: boolean}) {
     return projeto.comTrava(() => this.aplicarSemTrava(projeto, id, documento, o));
   }
 
-  private aplicarSemTrava(projeto: Projeto, id: string, documento: string, o: {autor: string; origem: string}) {
+  private aplicarSemTrava(projeto: Projeto, id: string, documento: string, o: {autor: string; origem: string; acabamento?: boolean}) {
     const m = this.ler(id);
     const rel = projeto.arquivoDoDocumento(documento);
     const {doc} = projeto.lerJson<unknown>(rel);
@@ -195,7 +195,7 @@ export class PastaMarcas {
     });
     const presentes = new Set(validos.map((c) => c.para));
     const tema = temaDaMarca(m, {logo: logo && presentes.has(logo) ? logo : undefined, fontes_arquivos: fontes_arquivos.filter((f) => presentes.has(f.arquivo))});
-    const patch = patchDaMarca(doc, m, tema);
+    const patch = patchDaMarca(doc, m, tema, {acabamento: o.acabamento});
     // recusa antes de copiar: documento que não recebe kit não ganha logo nem fonte no projeto
     if (!patch.length) throw new ErroProjeto(`o documento ${documento} não recebe kit de marca (só vídeo de cenas, imagem e animação)`, 'patch');
     for (const c of validos) {
@@ -207,7 +207,7 @@ export class PastaMarcas {
       copyFileSync(de, para); // o kit manda: logo e fonte novos com o mesmo nome trocam os que o projeto já tinha
       (jaTem ? atualizados : copiados).push(c.para);
     }
-    const r = projeto.aplicarPatch({documento, patch, autor: o.autor, origem: o.origem, rotulo: `kit de marca: ${m.nome}`});
+    const r = projeto.aplicarPatch({documento, patch, autor: o.autor, origem: o.origem, rotulo: `kit de marca: ${m.nome}${o.acabamento ? ' (com vinheta, rodapé e cartão final)' : ''}`});
     return {versao: r.versao, seq: r.entrada.seq, marca: m.id, nome: m.nome, copiados, atualizados, tema};
   }
 
