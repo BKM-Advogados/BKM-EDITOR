@@ -120,7 +120,22 @@ const TEXTO_CAMARA = [
   'I - em dinheiro, depósito bancário ou cheque visado, conforme acordem as partes; ou (Incluído pela Lei nº 13.467, de 2017)',
   'II - em dinheiro ou depósito bancário quando o empregado for analfabeto. (Incluído pela Lei nº 13.467, de 2017)',
 ].join('\n');
-const textosFonte: Record<string, string> = {f1: TEXTO_CLT, f2: TEXTO_CAMARA};
+// um PDF de duas páginas, como o ler_fonte grava (src/nucleo/pdf-texto.ts): uma linha por linha do PDF e um "\f" entre
+// as páginas; o F4 atravessa a quebra de página
+const TEXTO_PDF = [
+  'TRIBUNAL SUPERIOR DO TRABALHO',
+  'SÚMULA Nº 462',
+  '',
+  'MULTA DO ART. 477, § 8º, DA CLT. INCIDÊNCIA. RECONHECIMENTO JUDICIAL DA RELAÇÃO DE',
+  'EMPREGO. A circunstância de a relação de emprego ter sido reconhecida apenas em juízo',
+  'não tem o condão de afastar a incidência da multa prevista no art. 477, §8º, da CLT. A referida',
+  'multa não será devida apenas quando, comprovadamente, o empregado der causa à mora',
+  '\f',
+  'no pagamento das verbas rescisórias.',
+  'Res. 209/2016, DEJT divulgado em 01, 02 e 03.06.2016',
+].join('\n');
+const textosFonte: Record<string, string> = {f1: TEXTO_CLT, f2: TEXTO_CAMARA, f3: TEXTO_PDF};
+const TRECHO_MORA = 'o empregado der causa à mora no pagamento das verbas rescisórias.';
 const TRECHO_PRAZO = 'deverão ser efetuados até dez dias contados a partir do término do contrato.';
 const TRECHO_ANALFABETO = 'II - em dinheiro ou depósito bancário quando o empregado for analfabeto.';
 const fatoDeExemplo = (f: Omit<Fato, 'inicio' | 'fim' | 'criado_em' | 'autor'>, texto: string, achado: string): Fato => ({
@@ -135,6 +150,9 @@ const fontesDeExemplo: Fonte[] = [
     titulo: 'Decreto-Lei nº 5.452, de 1º de maio de 1943', orgao: 'Câmara dos Deputados', nivel: 1, catalogo: 'camara-legin',
     acessado_em: new Date(Date.now() - 45 * 60e3).toISOString(), http: 200, bytes: 48211, sha256: '1'.repeat(64), arquivo: 'pesquisa/fontes/f2.txt',
     sinais_vigencia: ['Redação dada pela', '(Incluído'], autor: 'Claude 1'},
+  {id: 'f3', url: 'https://www.tst.jus.br/documents/10157/63003/Livro-Internet.pdf', titulo: 'Súmulas do TST', orgao: 'Tribunal Superior do Trabalho',
+    nivel: 1, catalogo: 'tst', acessado_em: new Date(Date.now() - 30 * 60e3).toISOString(), http: 200, bytes: 2_310_442, tipo: 'pdf', paginas_pdf: 2,
+    sha256: '2'.repeat(64), arquivo: 'pesquisa/fontes/f3.txt', sinais_vigencia: [], autor: 'Claude 1'},
 ];
 const fatosDeExemplo: Fato[] = [
   fatoDeExemplo({id: 'F1', afirmacao: 'A empresa tem até 10 dias, contados do fim do contrato, para pagar a rescisão.', fonte_id: 'f1',
@@ -146,6 +164,10 @@ const fatosDeExemplo: Fato[] = [
   fatoDeExemplo({id: 'F3', afirmacao: 'Trabalhador analfabeto recebe a rescisão em dinheiro ou depósito no banco.', fonte_id: 'f2',
     localizador: 'CLT, art. 477, § 4º, II', trecho: 'II – em dinheiro ou deposito bancario quando o empregado for analfabeto', achado: 'parecido',
     digitos: {afirmacao: [], faltando: []}, vigencia: ['(Incluído'], estado: 'a_revisar'}, TEXTO_CAMARA, TRECHO_ANALFABETO),
+  // no texto gravado o trecho atravessa a quebra de página; inicio e fim apontam para ele como o acharTrecho faria
+  {...fatoDeExemplo({id: 'F4', afirmacao: 'A multa do art. 477 só não é devida quando o empregado deu causa ao atraso.', fonte_id: 'f3',
+    localizador: 'Súmula 462 do TST', trecho: TRECHO_MORA, achado: 'exato', digitos: {afirmacao: [], faltando: []}, vigencia: [], estado: 'trecho_confere'}, TEXTO_PDF, ''),
+  inicio: TEXTO_PDF.indexOf('o empregado der causa'), fim: TEXTO_PDF.indexOf('rescisórias.') + 'rescisórias.'.length},
 ];
 const pesquisaDeExemplo: Pesquisa = {formato: 1, fontes: fontesDeExemplo, fatos: fatosDeExemplo};
 

@@ -22,7 +22,7 @@ import {arquivoDaFala, arquivoDasPalavras, clipesDeVoz, comTexto, CPS_MAX, cpsDe
 import {CATALOGO_FONTES} from './catalogo-fontes';
 import {
   acharTrecho, caminhoTextoFonte, conferirDigitos, decodificarComAviso, entorno, estadoDoFato, hashTexto, limparHtml, nivelDe, numerosDe, paginar, proximoId,
-  sinaisDeVigencia, tituloDoHtml, TAMANHO_PAGINA, type Fato, type Fonte,
+  sinaisDeVigencia, tituloDoHtml, TAMANHO_PAGINA, type Fato, type Fonte, type TipoFonte,
 } from './pesquisa';
 import {checarTexto, REGRAS_CONTEUDO, terminaComUltimaFrase, type Aviso} from './regras';
 import {registrarMidia} from './mcp-midia'; // frente Casca
@@ -44,6 +44,7 @@ import {registrarPrevia} from './mcp-previa'; // frente IDE: ver_quadro, ver_cen
 import {registrarExportacaoFinal} from './mcp-exportacao-final'; // exportar_video, exportar_imagem, exportar_carrossel (docs/exportacao.md)
 import {registrarEdicaoFina} from './mcp-edicao-fina'; // frente 4: edição fina (cenas, legendas, páginas, entradas e efeitos)
 import {USER_AGENT_ESTUDIO} from './versao';
+import {ErroPdf, textoDoPdf} from './pdf-texto'; // ler_fonte de PDF: a camada de texto, sem OCR
 import {registrarProjeto} from './mcp-projeto'; // frente 2: importar_midia, renomear_documento, ponto de restauração
 import {registrarMarcaEdicao} from './mcp-marca-edicao'; // frente 2: os kits de marca da pessoa
 import {registrarModelos} from './mcp-modelos'; // Onda B: salvar_como_modelo (pasta-modelos.ts)
@@ -97,7 +98,7 @@ export const criarRede = (buscar: Buscar = (url, init) => fetch(url, init), opco
       const r = await buscar(endereco.href, {
         redirect: 'follow',
         signal: parar.signal,
-        headers: {'User-Agent': USER_AGENT, Accept: 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5', 'Accept-Language': 'pt-BR,pt;q=0.9'},
+        headers: {'User-Agent': USER_AGENT, Accept: 'text/html,application/xhtml+xml,application/pdf;q=0.9,text/plain;q=0.9,*/*;q=0.5', 'Accept-Language': 'pt-BR,pt;q=0.9'},
       });
       const declarado = Number(r.headers.get('content-length'));
       if (declarado > limite) throw new Error(`a página tem ${megas(declarado)}, acima do limite de ${megas(limite)}`);
@@ -372,7 +373,7 @@ const fonteDe = (projeto: Projeto, id: string): Fonte => {
 const ehPdf = (bytes: Uint8Array, contentType: string | undefined) =>
   (contentType ?? '').toLowerCase().includes('pdf') || (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46);
 
-/** HTML vira texto limpo; texto puro fica como veio. PDF ainda não se lê (quem chama confere antes, com ehPdf). */
+/** HTML vira texto limpo; texto puro fica como veio. PDF vai por textoDoPdf (quem chama confere antes, com ehPdf). */
 const textoDaResposta = (bytes: Uint8Array, contentType: string | undefined) => {
   const tipo = (contentType ?? '').toLowerCase();
   const {texto: bruto, aviso: avisoCharset} = decodificarComAviso(bytes, contentType);
@@ -383,9 +384,10 @@ const textoDaResposta = (bytes: Uint8Array, contentType: string | undefined) => 
 // Página de bloqueio que chega com HTTP 200 (o F5 do Planalto, o filtro de um tribunal): vira fonte normal, porque a
 // pesquisa só mostra, mas o retorno do ler_fonte avisa para o Claude conferir o texto antes de citar.
 const BLOQUEIO = /request rejected|requested url was rejected|acesso negado|access denied|captcha/i;
-const avisoDoTexto = (texto: string): string | undefined => {
+const avisoDoTexto = (texto: string, tipo: TipoFonte = 'html'): string | undefined => {
   const tamanho = texto.trim().length;
   if (BLOQUEIO.test(texto.slice(0, 3000))) return 'o texto parece uma página de bloqueio do site ("Request Rejected", "Acesso Negado"): confira em texto_da_fonte antes de registrar fatos';
+  if (tamanho < 500 && tipo === 'pdf') return `o PDF deu só ${tamanho} caracteres de texto: parte dele pode ser imagem (digitalizada), que o Estúdio não lê; confira antes de registrar fatos`;
   if (tamanho < 500) return `o texto tem só ${tamanho} caracteres: pode ser página de bloqueio ou montada por JavaScript; confira antes de registrar fatos`;
   return undefined;
 };
@@ -423,7 +425,7 @@ const textoDoBloco = (b: DocCenas['cenas'][number]['blocos'][number]) => [
 
 const registrarPesquisa = (servidor: McpServer, projeto: Projeto, autor: string, origem: string, rede: Rede | undefined) => {
   servidor.registerTool('ler_fonte', {
-    description: 'Baixa uma página (lei, súmula, decisão, notícia de tribunal) e a guarda na pesquisa do projeto: texto limpo em pesquisa/fontes/<id>.txt, sha256, nível pelo catálogo de fontes e marcas de vigência ("(Revogado", "Redação dada pela"…). Devolve a fonte, os 3.000 primeiros caracteres e quantas páginas de 6.000 há (o resto vem por texto_da_fonte), e um "aviso" quando o texto parece página de bloqueio. A mesma url de novo atualiza a fonte com o mesmo id; se o texto mudou, os fatos dela são procurados de novo no texto novo ("fatos_reconferidos") e o texto antigo fica guardado ao lado ("texto_anterior"). "observacao" é a observação de quem baixou: texto livre que fica junto da fonte. Nada do texto é cortado nem anonimizado.',
+    description: 'Baixa uma página ou um PDF (lei, súmula, decisão, notícia de tribunal) e a guarda na pesquisa do projeto: texto limpo em pesquisa/fontes/<id>.txt (do PDF, a camada de texto, uma linha por linha do PDF e "\\f" entre as páginas; PDF só de imagem, sem texto, dá erro: não há OCR), sha256, nível pelo catálogo de fontes e marcas de vigência ("(Revogado", "Redação dada pela"…). Devolve a fonte, os 3.000 primeiros caracteres e quantas páginas de 6.000 há (o resto vem por texto_da_fonte), e um "aviso" quando o texto parece página de bloqueio. A mesma url de novo atualiza a fonte com o mesmo id; se o texto mudou, os fatos dela são procurados de novo no texto novo ("fatos_reconferidos") e o texto antigo fica guardado ao lado ("texto_anterior"). "observacao" é a observação de quem baixou: texto livre que fica junto da fonte. Nada do texto é cortado nem anonimizado.',
     inputSchema: {
       url: z.string().url(),
       observacao: z.string().optional().describe('observação de quem baixou sobre a fonte'),
@@ -437,14 +439,24 @@ const registrarPesquisa = (servidor: McpServer, projeto: Projeto, autor: string,
       const comeco = ehPdf(r.bytes, r.content_type) ? '(um PDF)' : textoDaResposta(r.bytes, r.content_type).texto.replace(/\s+/g, ' ').trim().slice(0, 200);
       throw new ErroProjeto(`o site respondeu HTTP ${r.status} e nada foi gravado. Começo da resposta: ${comeco}`, 'nao_achado');
     }
+    // PDF: o texto sai da camada de texto do arquivo (sem OCR; digitalizado dá erro) e segue o mesmo caminho do HTML
+    let pdf: Awaited<ReturnType<typeof textoDoPdf>> | undefined;
     if (ehPdf(r.bytes, r.content_type)) {
-      throw new ErroProjeto('esta url é um PDF, e o Estúdio ainda não lê PDF: procure a versão em HTML da mesma norma ou decisão', 'patch');
+      try {
+        pdf = await textoDoPdf(r.bytes);
+      } catch (e) {
+        if (e instanceof ErroPdf) throw new ErroProjeto(`${e.message}. Nada foi gravado.`, 'patch');
+        throw e;
+      }
     }
-    const {bruto, ehHtml, avisoCharset, texto} = textoDaResposta(r.bytes, r.content_type);
+    const lido = pdf ? undefined : textoDaResposta(r.bytes, r.content_type);
+    const texto = pdf ? pdf.texto : lido!.texto;
+    const ehHtml = lido?.ehHtml ?? false;
+    const tipo: TipoFonte = pdf ? 'pdf' : ehHtml ? 'html' : 'texto';
     const sha256 = hashTexto(texto);
     const {nivel, catalogo} = nivelDe(r.url_final || url);
     const orgao = CATALOGO_FONTES.find((c) => c.id === catalogo)?.orgao;
-    const nome = titulo?.trim() || (ehHtml ? tituloDoHtml(bruto) : undefined);
+    const nome = titulo?.trim() || (pdf ? pdf.titulo : ehHtml ? tituloDoHtml(lido!.bruto) : undefined);
     const fonte = projeto.alterarPesquisa((p) => {
       const existente = p.fontes.find((f) => f.url === url);
       const id = existente?.id ?? proximoId(p, 'fonte');
@@ -460,6 +472,8 @@ const registrarPesquisa = (servidor: McpServer, projeto: Projeto, autor: string,
         acessado_em: new Date().toISOString(),
         http: r.status,
         bytes: r.bytes.byteLength,
+        tipo,
+        ...(pdf ? {paginas_pdf: pdf.paginas} : {}),
         sha256,
         arquivo: caminhoTextoFonte(id),
         sinais_vigencia: sinaisDeVigencia(texto),
@@ -487,13 +501,18 @@ const registrarPesquisa = (servidor: McpServer, projeto: Projeto, autor: string,
       }
       return {fonte: nova, reconferidos, textoAnterior};
     }, {autor, origem, rotulo: `fonte lida: ${new URL(url).hostname}`});
-    const aviso = [avisoCharset, avisoDoTexto(texto)].filter(Boolean).join('; ');
+    const semTexto = pdf?.sem_texto ?? [];
+    const avisoPdf = semTexto.length
+      ? `${semTexto.length === 1 ? `a página ${semTexto[0]} do PDF não tem` : `as páginas ${semTexto.join(', ')} do PDF não têm`} texto (parece imagem, e o Estúdio não faz OCR): o que está nela${semTexto.length === 1 ? '' : 's'} não foi lido`
+      : undefined;
+    const aviso = [lido?.avisoCharset, avisoPdf, avisoDoTexto(texto, tipo)].filter(Boolean).join('; ');
     return {
       ...fonte.fonte,
       caracteres: texto.length,
       paginas: paginar(texto).paginas,
       ...(fonte.reconferidos.length ? {fatos_reconferidos: fonte.reconferidos} : {}),
       ...(fonte.textoAnterior ? {texto_anterior: fonte.textoAnterior} : {}),
+      ...(pdf?.repetidos.length ? {repetidos_do_pdf: pdf.repetidos} : {}),
       ...(aviso ? {aviso} : {}),
       texto: texto.slice(0, CARACTERES_NA_LEITURA),
     };

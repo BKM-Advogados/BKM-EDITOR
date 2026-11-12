@@ -72,6 +72,26 @@ const lerTexto = async (f: Fonte) => {
   return texto;
 };
 
+// O texto de um PDF traz um "\f" entre as páginas do arquivo (src/nucleo/pdf-texto.ts): na tela vira uma linha
+// "página N do PDF". Na conferência do trecho o "\f" vale espaço, então a marca pode atravessar a quebra.
+const QUEBRA_PDF = /\n?\f\n?/;
+/** Página do PDF onde cai a posição `i` do texto (1 + quantos "\f" vêm antes). */
+export const paginaPdfEm = (texto: string, i: number): number => {
+  let n = 1;
+  for (let k = texto.indexOf('\f'); k >= 0 && k < i; k = texto.indexOf('\f', k + 1)) n++;
+  return n;
+};
+/** O pedaço de texto com cada "\f" trocado pelo aviso da página nova; `pagina` é a página do PDF onde ele começa. */
+export const comPaginasPdf = (pedaco: string, pagina: number): React.ReactNode => {
+  if (!pedaco.includes('\f')) return pedaco;
+  return pedaco.split(QUEBRA_PDF).map((parte, k) => (
+    <React.Fragment key={k}>
+      {k > 0 && <span className="pesq-quebra-pdf">página {pagina + k} do PDF</span>}
+      {parte}
+    </React.Fragment>
+  ));
+};
+
 /** Texto limpo da fonte, 6.000 caracteres por página; com destaque, abre na página do trecho e o marca. */
 const TextoFonte: React.FC<{fonte: Fonte; destaque?: {inicio: number; fim: number}}> = ({fonte, destaque}) => {
   const [texto, setTexto] = useState<string | null>(null);
@@ -103,17 +123,21 @@ const TextoFonte: React.FC<{fonte: Fonte; destaque?: {inicio: number; fim: numbe
   // o trecho que passa da borda da página vem inteiro, para não cortar a marca ao meio
   const fim = Math.min(texto.length, Math.max(ini + PAGINA, destaque && destaque.inicio >= ini && destaque.inicio < ini + PAGINA ? destaque.fim : 0));
   const pedaco = texto.slice(ini, fim);
-  let corpo: React.ReactNode = pedaco;
+  const pdf = fonte.tipo === 'pdf';
+  const paginaPdf = pdf ? paginaPdfEm(texto, ini) : 1;
+  // no PDF, cada parte leva a página do arquivo onde começa (a marca do trecho pode atravessar a quebra)
+  const parte = (de: number, ate: number) => (pdf ? comPaginasPdf(pedaco.slice(de, ate), paginaPdfEm(texto, ini + de)) : pedaco.slice(de, ate));
+  let corpo: React.ReactNode = parte(0, pedaco.length);
   if (destaque && destaque.fim > ini && destaque.inicio < fim) {
     const a = Math.max(0, destaque.inicio - ini);
     const b = Math.min(pedaco.length, destaque.fim - ini);
-    corpo = <>{pedaco.slice(0, a)}<mark ref={marca}>{pedaco.slice(a, b)}</mark>{pedaco.slice(b)}</>;
+    corpo = <>{parte(0, a)}<mark ref={marca}>{parte(a, b)}</mark>{parte(b, pedaco.length)}</>;
   }
   return (
     <div className="pesq-texto">
       <div className="pesq-paginas">
         <button className="bt mini fantasma" disabled={pagina === 0} onClick={() => setPagina(pagina - 1)} title="Página anterior"><ChevronLeft size={13} /></button>
-        <span className="rotulo">página {pagina + 1} de {paginas} · {texto.length.toLocaleString('pt-BR')} caracteres</span>
+        <span className="rotulo">página {pagina + 1} de {paginas} · {texto.length.toLocaleString('pt-BR')} caracteres{pdf ? ` · começa na página ${paginaPdf} do PDF` : ''}</span>
         <button className="bt mini fantasma" disabled={pagina >= paginas - 1} onClick={() => setPagina(pagina + 1)} title="Próxima página"><ChevronRight size={13} /></button>
         {destaque && Math.floor(destaque.inicio / PAGINA) !== pagina && (
           <button className="bt mini fantasma" onClick={() => setPagina(Math.floor(destaque.inicio / PAGINA))}>Ir ao trecho</button>
@@ -149,9 +173,10 @@ export const tituloLegivel = (f: Pick<Fonte, 'titulo' | 'url' | 'url_final' | 'o
   return `${f.orgao || site} · ${frase}`;
 };
 
-/** "baixada · 1,4 MB"; se o site respondeu fora do normal, diz o código (a fonte foi gravada assim mesmo). */
-const baixada = (f: Fonte) => {
-  const t = tamanho(f.bytes);
+/** "baixada · 1,4 MB" ("PDF de 12 páginas · 1,4 MB"); se o site respondeu fora do normal, diz o código (a fonte foi
+ *  gravada assim mesmo). */
+export const baixada = (f: Pick<Fonte, 'bytes' | 'http' | 'tipo' | 'paginas_pdf'>) => {
+  const t = [f.tipo === 'pdf' ? (f.paginas_pdf ? `PDF de ${plural(f.paginas_pdf, 'página', 'páginas')}` : 'PDF') : '', tamanho(f.bytes)].filter(Boolean).join(' · ');
   const ok = f.http === undefined || (f.http >= 200 && f.http < 300);
   return ok ? (t ? `baixada · ${t}` : 'baixada') : `o site respondeu com o código ${f.http}${t ? ` · ${t}` : ''}`;
 };
@@ -169,6 +194,7 @@ const CartaoFonte: React.FC<{f: Fonte; nFatos: number; aberto: boolean; destaque
       <div className="pesq-cabeca">
         <b>{f.id}</b>
         <span className={`pesq-selo nivel-${f.nivel}`} title={cat ? `${nivel.dica}: ${cat.nome}` : nivel.dica}>{nivel.texto}</span>
+        {f.tipo === 'pdf' && <span className="pesq-selo" title="A fonte é um PDF: o texto saiu da camada de texto do arquivo (sem OCR); o original abre em Abrir">PDF</span>}
         <span className="esp" />
         <span className="rotulo" title="Quando o texto foi baixado">acessado em {quando(f.acessado_em)}</span>
       </div>
@@ -190,7 +216,7 @@ const CartaoFonte: React.FC<{f: Fonte; nFatos: number; aberto: boolean; destaque
         </span>
         <span className="esp" />
         <button className="bt mini" onClick={() => void abrirNoNavegador(f.url)} title={`Abrir ${f.url} no navegador`}><ExternalLink size={13} />Abrir</button>
-        <button className={`bt mini${aberto ? ' ligado' : ''}`} onClick={aoAlternar} title="Mostra o texto limpo que foi baixado"><FileText size={13} />{aberto ? 'Fechar texto' : 'Ver texto'}</button>
+        <button className={`bt mini${aberto ? ' ligado' : ''}`} onClick={aoAlternar} title={f.tipo === 'pdf' ? 'Mostra o texto tirado do PDF, com a quebra de cada página' : 'Mostra o texto limpo que foi baixado'}><FileText size={13} />{aberto ? 'Fechar texto' : 'Ver texto'}</button>
       </div>
       {aberto && <TextoFonte fonte={f} destaque={destaque} />}
     </div>
