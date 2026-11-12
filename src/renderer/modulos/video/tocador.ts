@@ -3,6 +3,7 @@
 // escreve no DOM por ref. A taxa (shuttle J/K/L) e o repetir são estado pequeno, com assinatura própria.
 import type {PlayerRef} from '@remotion/player';
 import {avisar, loja} from '../../estado/loja';
+import {fatoDoEditor} from '../../estado/primeiros-passos';
 
 // quadros por segundo do vídeo aberto (o monitor troca ao abrir um vídeo de outro formato); o carrossel é 30
 export let FPS = 30;
@@ -20,6 +21,7 @@ export const registrarPlayer = (p: PlayerRef | null) => {
     ouvintes.forEach((f) => f(ms));
   };
   p.addEventListener('frameupdate', aoQuadro);
+  p.addEventListener('play', () => fatoDoEditor('tocou')); // primeiros passos: "tocar a prévia"
   // o estado global só guarda o tempo quando a pessoa para (tocando, 30 atualizações por segundo seriam desperdício)
   p.addEventListener('pause', () => {
     loja.definir({tempo_ms: Math.round(((p.getCurrentFrame() ?? 0) / FPS) * 1000)});

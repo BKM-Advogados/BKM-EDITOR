@@ -21,6 +21,7 @@ import {comando, comModificador, rotuloDoAtalho} from '../teclas';
 import {SeloSalvo} from './SeloSalvo';
 import {faixaAtual, gravarLayout, layoutPadrao, lerLayout, type Faixa, type Orientacao} from './arranjos';
 import {PainelPreferencias} from './Preferencias';
+import {PrimeirosPassos} from './PrimeirosPassos';
 import {Midia} from '../paineis/Midia'; // frente Casca (rodada 3): painel de mídia
 import type {PaineisDoModulo} from './contrato';
 import {PaineisVideo} from '../modulos/video/paineis';
@@ -486,6 +487,7 @@ export const Casca: React.FC = () => {
           ))}
         </nav>
         <div className="acoes">
+          <PrimeirosPassos />
           <button className={`bti${modoComentario ? ' ligado' : ''}`} onClick={() => loja.definir((s) => ({modoComentario: !s.modoComentario}))} title="Comentar na tela (M)"
             aria-label="Comentar na tela" aria-pressed={modoComentario}>
             <MessageSquarePlus size={15} />

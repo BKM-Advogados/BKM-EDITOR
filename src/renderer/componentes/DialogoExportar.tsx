@@ -31,6 +31,7 @@ import {Caixa, Escolha, Segmentado} from './Controles';
 import {usarOcupado} from '../estado/ocupado'; // segura o reinício para atualizar
 import '../modulos/video/zonas-seguras.css';
 import './dialogo-exportar.css';
+import {fatoDoEditor} from '../estado/primeiros-passos';
 
 let aberto: string | null = null;
 const ouvintes = new Set<() => void>();
@@ -462,6 +463,7 @@ const ExportarVideo: React.FC<{documento: string; fechar: () => void}> = ({docum
     if (Object.keys(marcas).length) window.estudio.gravarPrefsExportacao({marca_dagua: marcas}).catch(() => undefined);
     const r = await window.estudio.exportarVideo(documento, opcoes);
     setFase({tipo: 'pronto', r});
+    if (r.ok) fatoDoEditor('exportou'); // primeiros passos
     if (r.ok) avisar(`Exportado: ${(r.arquivos ?? []).map(nomeDoArquivo).join(', ')}${r.avisos?.length ? `. Atenção: ${r.avisos.join('; ')}` : ''}`, r.avisos?.length ? 'info' : 'ok');
     else avisar(r.cancelado ? 'Exportação cancelada.' : `Exportação: ${r.mensagem}`, r.cancelado ? 'info' : 'erro');
   };
@@ -637,6 +639,7 @@ const ExportarImagem: React.FC<{documento: string; fechar: () => void}> = ({docu
     setFase({tipo: 'exportando'});
     const r = await exportarPng(documento, {formato, qualidade: qualidade / 100, escala, nome: nome.trim() || undefined, revelar: false});
     setFase({tipo: 'pronto', r});
+    if (r.ok) fatoDoEditor('exportou'); // primeiros passos
   };
 
   const sub = doc ? `${doc.largura}×${doc.altura}` : undefined;

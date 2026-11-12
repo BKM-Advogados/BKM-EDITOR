@@ -1,6 +1,7 @@
 // Tocador e controle de tempo para o módulo Animação (Remotion Player)
 import type {PlayerRef} from "@remotion/player";
 import {loja} from "../../estado/loja";
+import {fatoDoEditor} from "../../estado/primeiros-passos";
 
 export let FPS = 30;
 export const definirFps = (fps: number) => {
@@ -36,6 +37,7 @@ export const registrarPlayer = (p: PlayerRef | null) => {
   };
   p.addEventListener("frameupdate", onFrame);
   p.addEventListener("play", () => {
+    fatoDoEditor("tocou"); // primeiros passos: "tocar a prévia"
     controle = {...controle, tocando: true};
     avisarControle();
   });

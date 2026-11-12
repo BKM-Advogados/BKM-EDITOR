@@ -173,6 +173,12 @@ recente, Duplicar projeto, Salvar como modelo, Mostrar na pasta, Marcar ponto de
 hora. **Exportar** (Ctrl+Shift+E) abre o diálogo de exportação do documento da área (abaixo). O projeto reabre na área, no
 documento, na seleção e no tempo em que a pessoa parou.
 
+No alto do monitor, o **chip de formato** diz o formato pelo destino ("Reels 9:16", "Feed 4:5", "Personalizado 1200×800");
+clicar troca o formato do vídeo ou da imagem (entra no Histórico, com Reverter). Na animação e no 3D o chip só informa. Quem
+abre um projeto pela primeira vez vê na barra os **primeiros passos** (trazer uma mídia, escrever o texto da primeira cena,
+tocar a prévia, pedir algo ao Claude, exportar), que se marcam sozinhos conforme a pessoa faz e somem ao concluir ou com
+"Não mostrar mais" (Preferências traz de volta).
+
 **Kit de marca:** cores, fontes, logo e assinatura de cada escritório ficam em `%USERPROFILE%\Estudio\marcas\<id>\`
 (`marca.json`, `logo.*`, `fontes/*.ttf|otf|woff|woff2`; a pasta troca no painel). Na primeira abertura nasce o `neutro`
 (o único kit de fábrica; destaque branco, marcado pelo peso); kits que já estão na pasta ficam como estão. O kit entra em "Mais opções →
@@ -303,7 +309,8 @@ renderiza um vídeo de cenas de teste em 9:16, 4:5 e 16:9 fora do Electron, em `
   falta o bloco preso a uma palavra dentro da cena, `docs/carrossel-narrado.md`), um projeto de exemplo neutro para o
   "Ver um exemplo" (feito), o Claude que planeja (perguntas e Plano do vídeo antes de montar; feito: `plano.json`,
   `escrever_plano`/`ler_plano`/`aprovar_plano` e o cartão na conversa, `docs/ia.md`), chip de formato no
-  monitor, primeiros passos e "Salvar como modelo" (feito; criar projeto de um modelo seu pelo MCP ainda não).
+  monitor e primeiros passos (feitos, `docs/casca.md`) e "Salvar como modelo" (feito; criar projeto de um modelo seu
+  pelo MCP ainda não). A interface nova foi vista só na prévia web; falta conferir no app aberto.
 - **Memória (app empacotado, 05/11/2026):** 307 MB parado no vídeo; 547 MB com as quatro áreas e o 3D. A tela inicial
   agora abre sem o editor (falta medir a linha "Início parado").
 - **Fontes** do Google (Inter, Archivo, IBM Plex) baixam na primeira vez (precisa de internet); as de arquivo do kit não.

@@ -96,6 +96,8 @@ Este documento conversa com `docs/desempenho.md` (orçamentos de RAM e GPU) e co
   - `titleBarStyle: 'hidden'` + `titleBarOverlay: {height: 36, color: '#111111', symbolColor: '#b4b4b4'}`;
   - `-webkit-app-region: drag` na barra e `no-drag` nos controles;
   - margens com `env(titlebar-area-x)` e `env(titlebar-area-width)`. No macOS, os semáforos ficam à esquerda e o ≡ vem logo depois.
+- **Primeiros passos (Onda B):** enquanto a pessoa não fez os cinco passos nem dispensou a lista, uma ficha "Primeiros passos ·
+  N de 5" fica à esquerda das ações da barra e abre um cartão não modal. Detalhes em `casca.md`.
 - **Não há faixa extra de cabeçalho:** a altura extra que o Premiere 22.3 acrescentou foi criticada [A5]. Na faixa C, o nome do projeto encurta (reticências), e o estado do agente vira só os pontos.
 
 ### 2.2 Barra de status (22 px na P; na C, oculta por padrão, com Janela › Barra de status)
@@ -185,6 +187,7 @@ Abas de painel: 28 px (C) / 30 px (P).
 - **Conta:** 260 + 740 + 320 + 600 = 1920. A altura do monitor é 974 − 260 (linha do tempo) − 30 (aba) − 32 (transporte) = 652, o que dá **367×652 em 9:16**.
 - **O terminal desce até a barra de status.** A linha do tempo vai da borda esquerda até o fim de Propriedades (1320 px, cerca de 16 px/s para os 80,7 s do carrossel de referência).
 - **Trilho de ferramentas (36 px) dentro do monitor:** V seleção · C lâmina · H mão · M comentário. O trilho e o transporte fazem parte do componente Monitor e não são painéis, como no Blender e no Photoshop [B §12].
+- **Chip de formato (Onda B):** no canto de cima do monitor, fora do quadro, "Reels 9:16" (ou "Feed 4:5", "Personalizado 1200×800"); clicar troca o formato por patch, como o inspetor. Na imagem fica na linha do rótulo da peça; na animação e no 3D só informa. Detalhes em `casca.md`.
 - **Os blocos encaixam nas palavras** (a âncora `palavra@ms`). A tecla S liga e desliga o encaixe, como no Premiere [conhecimento prévio].
 
 ### 3.2 Vídeo, 1366×768 (faixa C, variante retrato, que é a do carrossel de referência)
