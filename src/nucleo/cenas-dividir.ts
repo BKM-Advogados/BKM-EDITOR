@@ -2,7 +2,11 @@
 // fica com os blocos que começam antes do corte, a segunda com os que começam depois (tempos contados do novo começo), e
 // um bloco que atravessa o corte vai para as duas, aparado em `sai` numa e em `em` na outra. A segunda cena nasce com
 // ids novos (comIdsNovos), como uma cena duplicada. Sai como JSON Patch, o mesmo caminho das outras edições (diário,
-// desfazer, o Claude vê). Fica fora de cenas.ts de propósito: este arquivo só lê o modelo.
+// desfazer, o Claude vê). Fica fora de cenas.ts de propósito: este arquivo só lê o modelo. A âncora de palavra do bloco
+// (`em_palavra`, `sai_palavra`) conta o `ms` de busca do começo da cena: na segunda cena ele anda junto com o corte; o
+// pedaço que continua do outro lado do corte larga a âncora da ponta que o corte define (a saída na primeira, a entrada
+// na segunda).
+import {deslocarAncora} from './ancora-palavra';
 import {comIdsNovos, DURACAO_CENA_PADRAO, type BlocoCenas, type CenaCenas, type DocCenas} from './cenas';
 import type {OperacaoPatch} from './documentos';
 
@@ -12,6 +16,17 @@ export const PEDACO_MIN_MS = 300;
 export type Divisao = {indice: number; primeira: CenaCenas; segunda: CenaCenas; patch: OperacaoPatch[]};
 
 const numero = (v: unknown, padrao: number) => (typeof v === 'number' && Number.isFinite(v) ? v : padrao);
+
+/** O bloco com as âncoras de palavra contadas de `t` ms depois (o começo da segunda cena) e sem as que `largar` pede. */
+const ancorasDepoisDoCorte = (b: BlocoCenas, t: number, largar: 'em_palavra' | null): BlocoCenas => {
+  const r: BlocoCenas = {...b};
+  for (const k of ['em_palavra', 'sai_palavra'] as const) {
+    if (r[k] === undefined) continue;
+    if (k === largar) delete r[k];
+    else if (typeof r[k] === 'string') r[k] = deslocarAncora(r[k], -t);
+  }
+  return r;
+};
 
 /**
  * Divide a cena `idCena` em `tMs` (ms contados do começo da cena). Devolve null quando a cena não existe ou quando o
@@ -33,15 +48,17 @@ export const dividirCena = (doc: DocCenas, idCena: string, tMs: number): Divisao
     const sai = b.sai === undefined ? undefined : numero(b.sai, dur);
     if (em >= t) {
       // começa depois do corte: vai inteiro para a segunda, com os tempos contados do novo começo
-      depois.push({...b, em: em - t, ...(sai !== undefined ? {sai: Math.max(em - t, sai - t)} : {})});
+      depois.push({...ancorasDepoisDoCorte(b, t, null), em: em - t, ...(sai !== undefined ? {sai: Math.max(em - t, sai - t)} : {})});
     } else if (sai === undefined || sai > t) {
       // atravessa o corte: fica nas duas; na primeira acaba no corte (sai explícito vira o fim dela, sem sai já é o fim),
       // na segunda começa no zero. As duas ficam marcadas para a composição emendar o bloco (video-D1): a primeira não o
       // apaga no corte (`segue_ms`) e a segunda não o faz entrar de novo nem reconta o número ou recomeça o Ken Burns
       // (`desde_ms`); as marcas somam se o bloco já vinha de outro corte
       const resto = (sai ?? dur) - t;
-      antes.push({...b, ...(sai !== undefined ? {sai: t} : {}), segue_ms: resto + numero(b.segue_ms, 0)});
-      depois.push({...b, em: 0, desde_ms: numero(b.desde_ms, 0) + (t - em), ...(sai !== undefined ? {sai: sai - t} : {})});
+      const primeiro: BlocoCenas = {...b};
+      delete primeiro.sai_palavra; // a primeira acaba no corte, não na palavra
+      antes.push({...primeiro, ...(sai !== undefined ? {sai: t} : {}), segue_ms: resto + numero(b.segue_ms, 0)});
+      depois.push({...ancorasDepoisDoCorte(b, t, 'em_palavra'), em: 0, desde_ms: numero(b.desde_ms, 0) + (t - em), ...(sai !== undefined ? {sai: sai - t} : {})});
     } else antes.push(b); // termina antes do corte
   }
   const primeira: CenaCenas = {...cena, duracao_ms: t, blocos: antes};
