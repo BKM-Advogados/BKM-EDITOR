@@ -61,7 +61,9 @@ muda por `aplicar_patch` (`/cenas/i/blocos/j/em_palavra`).
 
 O que falta para chegar ao carrossel do roteiro:
 
-- **Narração gravada inteira.** Hoje a fala gravada é uma por cena; dividir uma gravação longa em cenas pela transcrição
-  ainda não existe.
+- **Narração gravada inteira (feito).** Quem grava a fala inteira de uma vez divide a gravação nas cenas pela transcrição:
+  o texto falado de cada cena é alinhado às palavras transcritas (ou, sem texto, os cortes caem nas pausas mais longas), e
+  cada cena passa a tocar o trecho dela da mesma gravação, com a duração ajustada e as legendas que a âncora de palavra
+  usa. Tela: inspetor do vídeo, "Narração gravada inteira"; MCP: `dividir_narracao` (`docs/narracao.md`).
 - **Vinheta do logo, rodapé com a marca, cartão final e os efeitos sonoros de `midia/sfx/`**, que o `CarrosselTema` desenha
   e o vídeo de cenas não.
