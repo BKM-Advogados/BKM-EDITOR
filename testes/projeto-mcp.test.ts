@@ -338,6 +338,19 @@ describe('trocar de projeto pelo Claude Desktop', () => {
     await d.fechar();
   });
 
+  it('com o app fechado, a pasta de modelos vem da preferência pasta_modelos do app (pasta de dados)', async () => {
+    const outra = path.join(dados, 'modelos-da-preferencia');
+    const m = new PastaModelos({pasta: () => outra}).salvar(new Projeto(path.join(projetos, 'Alfa')), {nome: 'Da preferência'});
+    writeFileSync(path.join(dados, 'preferencias.json'), JSON.stringify({pasta_modelos: outra}), 'utf-8');
+    const {c, d} = await conectarDesktop(() => null); // sem a opção modelos: lê as preferências
+    const lista = jsonDe(await c.callTool({name: 'listar_modelos', arguments: {}}));
+    expect(lista.modelos.map((x: {id: string}) => x.id)).toEqual([m.id]);
+    const criado = jsonDe(await c.callTool({name: 'criar_projeto', arguments: {modelo_proprio: m.id, nome: 'Pela preferência'}}));
+    expect(criado).toMatchObject({ok: true, nome: 'Pela preferência'});
+    await d.fechar();
+    rmSync(path.join(dados, 'preferencias.json'), {force: true});
+  });
+
   it('com o app fechado, criar negado pela pessoa no Claude Desktop não grava nada', async () => {
     const {c, d} = await conectarDesktop(() => null, false);
     const r = await c.callTool({name: 'criar_projeto', arguments: {nome: 'Negado'}});
