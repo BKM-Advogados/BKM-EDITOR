@@ -314,7 +314,6 @@ renderiza um vídeo de cenas de teste em 9:16, 4:5 e 16:9 fora do Electron, em `
 - **Memória (app empacotado, 05/11/2026):** 307 MB parado no vídeo; 547 MB com as quatro áreas e o 3D. A tela inicial
   agora abre sem o editor (falta medir a linha "Início parado").
 - **Fontes** do Google (Inter, Archivo, IBM Plex) baixam na primeira vez (precisa de internet); as de arquivo do kit não.
-  O seletor de fonte da camada de texto da imagem ainda lista só as quatro fixas.
 - **Licença do Remotion:** o escritório que usa o app passa de 3 pessoas; uso fora da avaliação pede a Company License.
 
 ## Pastas

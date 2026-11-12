@@ -5,6 +5,7 @@ import {useSyncExternalStore} from 'react';
 import type {CamadaImagem, DocImagem, MarcaDoDocumento, PaginaImagem} from '../../../nucleo/documentos';
 import {baseCamadas, idLivre, indiceNaBase, paginaDoCaminho, paginasDe, slug} from '../../../nucleo/carrossel';
 import {aguardarFontes, fonte, listarFontes} from '../../../composicoes/fontes';
+import {FONTE_RESERVA, familiasParaEsperar, fonteExiste, montarGrupos, opcoesComTitulos, pilhaDeFontes} from '../../../nucleo/fontes-imagem';
 import {loja, useLoja, type Estado} from '../../estado/loja';
 
 export const ENTRELINHA = 1.15;
@@ -104,30 +105,22 @@ export const idNovo = (base: string, camadas: CamadaImagem[]) => idLivre(camadas
 // O font-family vem do carregador das composições (fonte()), que funciona fora do Remotion: o delayRender só conta
 // um handle quando não há render. Para exportar é preciso esperar os arquivos (as quatro famílias do app e as de arquivo
 // do kit ou do projeto): aguardarFontes espera cada variante terminar de carregar, ou de falhar e cair na fonte do sistema.
-/** As fontes do seletor da imagem: primeiro as do kit da peça ("@titulo" e as outras, que seguem o kit), depois as de
- *  arquivo (do kit e do projeto), as do Google que o app tem e a do sistema. A fonte que a camada já usa entra mesmo que
- *  não seja de nenhuma lista, para o seletor nunca ficar em branco. */
-export const opcoesDeFonte = (marca: MarcaDoDocumento | undefined, atual?: string): [string, string][] => {
-  const lista: [string, string][] = [];
-  if (marca) {
-    lista.push(['@titulo', `Título do kit · ${marca.fontes.titulo}`], ['@texto', `Texto do kit · ${marca.fontes.texto}`], ['@mono', `Mono do kit · ${marca.fontes.mono ?? marca.fontes.texto}`]);
-  }
-  const doKit = new Set(marca ? [marca.fontes.titulo, marca.fontes.texto, marca.fontes.mono ?? marca.fontes.texto] : []);
-  const todas = listarFontes();
-  const ordenadas = [...todas.filter((f) => doKit.has(f.nome)), ...todas.filter((f) => !doKit.has(f.nome))];
-  for (const f of ordenadas) lista.push([f.nome, `${f.nome}${f.origem === 'arquivo' ? ' · arquivo' : ''}${doKit.has(f.nome) ? ' · do kit' : ''}`]);
-  lista.push(['system-ui', 'Fonte do sistema']);
-  if (atual && !lista.some(([v]) => v === atual)) lista.push([atual, atual]);
-  return lista;
-};
+/** O seletor da imagem em grupos (lógica em nucleo/fontes-imagem.ts): "Do kit", "Da marca" (fontes de arquivo do kit e do
+ *  projeto), "Do app" e "Sistema". A fonte gravada que não existe mais entra marcada, para o seletor nunca ficar em branco. */
+export const opcoesDeFonte = (marca: MarcaDoDocumento | undefined, atual?: string) => opcoesComTitulos(montarGrupos(marca, listarFontes(), atual));
 
+/** O font-family de uma camada: a família e, atrás dela, a Inter. Fonte que sumiu (kit trocado) cai na Inter sem quebrar. */
 export const familiaCss = (nome?: string) => {
   const n = nome || PADRAO.fonte;
-  return GENERICAS.has(n) ? n : `"${fonte(n)}", system-ui, sans-serif`;
+  if (!GENERICAS.has(n)) {
+    fonte(n);
+    if (!fonteExiste(n, listarFontes())) fonte(FONTE_RESERVA);
+  }
+  return pilhaDeFontes(nome, PADRAO.fonte);
 };
 
 export const esperarFontes = async (nomes: string[]) => {
-  await aguardarFontes(nomes.map((n) => (GENERICAS.has(n) ? '' : n)).filter(Boolean));
+  await aguardarFontes(familiasParaEsperar(nomes, listarFontes()));
   await document.fonts.ready;
 };
 
