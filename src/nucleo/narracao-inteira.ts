@@ -23,7 +23,7 @@ import {novaFaixaAudio, novoAudioCenas, papelDe, type AudioCenas, type ClipeAudi
 import {idLivre, type DocCenas} from './cenas';
 import type {OperacaoPatch} from './documentos';
 import {formatoDoVideo} from './formatos';
-import {aplicarDicionario, arquivoDaFala, DICIONARIO_CASA, legendasDaFala, type LegendasCenas, type PalavraLegenda} from './legendas';
+import {aplicarDicionario, arquivoDaFala, clipesDeVoz, DICIONARIO_CASA, legendasDaFala, type LegendasCenas, type PalavraLegenda} from './legendas';
 import {configDaNarracao} from './narracao';
 import {ajustarCenasAFala, ehMarcaGravada, temposDasCenas} from './narracao-cenas';
 
@@ -267,11 +267,14 @@ const resumo = (ps: readonly PalavraLegenda[], i0: number, i1: number) => {
 /** A proposta de divisão da gravação nas cenas (ver o começo do arquivo). `palavras`: a transcrição, ms do arquivo;
  *  `cenas`: as cenas em ordem, com o texto falado quando houver. Nunca grava nada. */
 export const proporDivisao = (palavras: readonly PalavraLegenda[], cenas: readonly CenaParaDividir[], o: OpcoesDivisao = {}): PropostaDivisao => {
-  const ps = palavrasEmOrdem(palavras);
+  const fimDoArquivo = typeof o.duracao_ms === 'number' && Number.isFinite(o.duracao_ms) && o.duracao_ms > 0 ? o.duracao_ms : Infinity;
+  const todas = palavrasEmOrdem(palavras);
+  const ps = todas.filter((p) => p.s < fimDoArquivo); // transcrição de outra tomada, mais longa: o que passa do fim não toca
   const M = cenas.length;
   const margem = Math.max(0, o.margem_ms ?? MARGEM_CORTE_MS);
   const minPausa = Math.max(0, o.pausa_min_ms ?? PAUSA_MIN_MS);
   const avisos: string[] = [];
+  if (ps.length < todas.length) avisos.push(`${todas.length - ps.length} palavras da transcrição começam depois do fim do arquivo e ficaram de fora: a transcrição pode ser de outra tomada`);
   if (!ps.length) throw new Error('a transcrição não tem palavras: transcreva a gravação antes (transcrever)');
   if (!M) throw new Error('o vídeo não tem cenas');
   const textos = cenas.map((c) => palavrasDoTexto(c.texto));
@@ -304,7 +307,6 @@ export const proporDivisao = (palavras: readonly PalavraLegenda[], cenas: readon
     return (prox ?? ps.length) - 1;
   });
   const meioDaPausa = (k: number) => (ps[k - 1].e + ps[k].s) / 2;
-  const fimDoArquivo = typeof o.duracao_ms === 'number' && Number.isFinite(o.duracao_ms) && o.duracao_ms > 0 ? o.duracao_ms : Infinity;
   const trechos: TrechoDaCena[] = cenas.map((c, i): TrechoDaCena => {
     const i0 = inicio[i];
     const i1 = fins[i];
@@ -332,6 +334,31 @@ export const proporDivisao = (palavras: readonly PalavraLegenda[], cenas: readon
 };
 
 // ---------- aplicar: um clipe da mesma gravação em cada cena ----------
+
+/** A gravação a dividir e o clipe dela no vídeo (se houver um só): o pedido, ou a única gravação nos clipes de voz. */
+export const gravacaoDe = (doc: DocCenas, o: {arquivo?: string; clipe?: string}): {arquivo: string; clipe?: string} => {
+  const voz = clipesDeVoz(doc).filter(({clipe}) => !clipe.narracao_ia);
+  if (o.clipe) {
+    const c = clipesDeVoz(doc, {clipe: o.clipe})[0]?.clipe;
+    if (!c) throw new Error(`clipe não achado: ${o.clipe}`);
+    return {arquivo: arquivoDaFala(c), clipe: c.id};
+  }
+  const inteiros = (arquivo: string) => voz.filter(({clipe}) => arquivoDaFala(clipe) === arquivo && !clipe.narracao_gravada).map(({clipe}) => clipe.id);
+  if (o.arquivo) {
+    const arquivo = o.arquivo.replace(/\\/g, '/');
+    const ids = inteiros(arquivo);
+    if (ids.length > 1) throw new Error(`a gravação ${arquivo} está em ${ids.length} clipes (${ids.join(', ')}): diga qual em "clipe"`);
+    return {arquivo, ...(ids.length ? {clipe: ids[0]} : {})};
+  }
+  const arquivos = [...new Set(voz.map(({clipe}) => arquivoDaFala(clipe)))];
+  if (arquivos.length !== 1) {
+    throw new Error(arquivos.length ? `diga a gravação em "arquivo": há ${arquivos.length} nos clipes de voz (${arquivos.join(', ')})`
+      : 'diga a gravação em "arquivo" (um áudio de midia/, ex.: midia/narracao.wav)');
+  }
+  const ids = inteiros(arquivos[0]);
+  return {arquivo: arquivos[0], ...(ids.length === 1 ? {clipe: ids[0]} : {})};
+};
+
 
 export {ehMarcaGravada};
 

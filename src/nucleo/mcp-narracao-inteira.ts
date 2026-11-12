@@ -5,10 +5,9 @@
 // a mesma da tela. Registrado com uma linha em registrarFerramentas.
 import type {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {z} from 'zod';
-import type {DocCenas} from './cenas';
-import {arquivoDaFala, arquivoDasPalavras, clipesDeVoz, fonteDaFala, palavrasValidas} from './legendas';
+import {arquivoDasPalavras, fonteDaFala, palavrasValidas} from './legendas';
 import {videoDeCenasDe} from './narracao-servico';
-import {patchDaDivisao, proporDivisao, type PropostaDivisao} from './narracao-inteira';
+import {gravacaoDe, patchDaDivisao, proporDivisao, type PropostaDivisao} from './narracao-inteira';
 import {ErroProjeto, type Projeto} from './projeto';
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x, null, 2)}]});
@@ -24,30 +23,6 @@ const seguro = <A,>(f: (a: A) => unknown) => async (a: A) => {
   }
 };
 const seg = (ms: number) => (ms / 1000).toLocaleString('pt-BR', {minimumFractionDigits: 1, maximumFractionDigits: 1});
-
-/** A gravação a dividir e o clipe dela no vídeo (se houver um só): o pedido, ou a única gravação nos clipes de voz. */
-export const gravacaoDe = (doc: DocCenas, o: {arquivo?: string; clipe?: string}): {arquivo: string; clipe?: string} => {
-  const voz = clipesDeVoz(doc).filter(({clipe}) => !clipe.narracao_ia);
-  if (o.clipe) {
-    const c = clipesDeVoz(doc, {clipe: o.clipe})[0]?.clipe;
-    if (!c) throw new ErroProjeto(`clipe não achado: ${o.clipe}`, 'nao_achado');
-    return {arquivo: arquivoDaFala(c), clipe: c.id};
-  }
-  const inteiros = (arquivo: string) => voz.filter(({clipe}) => arquivoDaFala(clipe) === arquivo && !clipe.narracao_gravada).map(({clipe}) => clipe.id);
-  if (o.arquivo) {
-    const arquivo = o.arquivo.replace(/\\/g, '/');
-    const ids = inteiros(arquivo);
-    if (ids.length > 1) throw new ErroProjeto(`a gravação ${arquivo} está em ${ids.length} clipes (${ids.join(', ')}): diga qual em "clipe"`, 'patch');
-    return {arquivo, ...(ids.length ? {clipe: ids[0]} : {})};
-  }
-  const arquivos = [...new Set(voz.map(({clipe}) => arquivoDaFala(clipe)))];
-  if (arquivos.length !== 1) {
-    throw new ErroProjeto(arquivos.length ? `diga a gravação em "arquivo": há ${arquivos.length} nos clipes de voz (${arquivos.join(', ')})`
-      : 'diga a gravação em "arquivo" (um áudio de midia/, ex.: midia/narracao.wav)', 'nao_achado');
-  }
-  const ids = inteiros(arquivos[0]);
-  return {arquivo: arquivos[0], ...(ids.length === 1 ? {clipe: ids[0]} : {})};
-};
 
 /** A proposta em segundos, curta, para a IA mostrar à pessoa. */
 export const resumoDaProposta = (p: PropostaDivisao) => ({
@@ -74,7 +49,12 @@ export const registrarNarracaoInteira = (servidor: McpServer, projeto: Projeto, 
   }, seguro(({arquivo, clipe, previa, cortes, margem_corte_ms, margem_ms, documento}: {arquivo?: string; clipe?: string; previa?: boolean; cortes?: number[];
     margem_corte_ms?: number; margem_ms?: number; documento?: string}) => {
     const {alvo, rel, doc, versao} = videoDeCenasDe(projeto, documento);
-    const g = gravacaoDe(doc, {arquivo, clipe});
+    let g: ReturnType<typeof gravacaoDe>;
+    try {
+      g = gravacaoDe(doc, {arquivo, clipe});
+    } catch (e) {
+      throw new ErroProjeto((e as Error).message, /não achado|diga a gravação/.test((e as Error).message) ? 'nao_achado' : 'patch');
+    }
     const caminho = arquivoDasPalavras(g.arquivo);
     if (!projeto.existe(caminho)) {
       if (!projeto.existe(g.arquivo)) throw new ErroProjeto(`a gravação ${g.arquivo} não está no projeto`, 'nao_achado');

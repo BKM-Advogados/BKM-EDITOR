@@ -180,6 +180,10 @@ describe('proporDivisao: sem texto', () => {
     const ps = gravar(FRASES);
     const fim = ps.at(-1)!.e + 50;
     expect(proporDivisao(ps, [{id: 'a'}], {duracao_ms: fim}).trechos[0].ate_ms).toBe(fim);
+    // a transcrição que passa do fim (de outra tomada, mais longa): as palavras de depois do fim ficam de fora, com aviso
+    const curta = proporDivisao(ps, [{id: 'a'}, {id: 'b'}, {id: 'c'}], {duracao_ms: ps[20].e + 300});
+    expect(curta.trechos.filter((t) => t.palavras).map((t) => t.texto)).toEqual([FRASES[0].texto, FRASES[1].texto]);
+    expect(curta.avisos.some((a) => /depois do fim do arquivo/.test(a))).toBe(true);
   });
 });
 
