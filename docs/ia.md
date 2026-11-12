@@ -90,7 +90,8 @@ Envolve o `registerTool`: toda ferramenta registrada depois dele passa por ele, 
     `exportar_musica`, `importar_midi`, `escolher_trilha`, `narrar` e `vozes_narracao` (narração por IA);
     `exportar_video`, `exportar_imagem` e `exportar_carrossel` (exportação final, `docs/exportacao.md`);
     `importar_midia`, `criar_projeto`, `abrir_projeto`, `duplicar_projeto`, `fechar_projeto`, `criar_marca`,
-    `editar_marca`, `importar_logo_marca` e `importar_fonte_marca` (mídia, projeto e marca);
+    `editar_marca`, `importar_logo_marca` e `importar_fonte_marca` (mídia, projeto e marca); `salvar_como_modelo`
+    (grava na pasta de modelos da pessoa, `docs/casca.md`);
   - ou quem declara `annotations: {openWorldHint: true}` (sai do PC ou do projeto) ou `destructiveHint: true` (apaga)
     no `registerTool`.
 - **Classe "livre"**: o resto. Quando muda um documento que já existe, grava no diário e tem Reverter. Criar documento
@@ -164,6 +165,7 @@ documento sem ser objeto ou fora do formato do módulo dele, e devolve os avisos
 | `editar_marca` | `{marca, nome?, fundo?, texto?, destaque?, suave?, fonte_titulo?, fonte_texto?, fonte_mono?, assinatura?, notas?}` | cartao: idem |
 | `importar_logo_marca` | `{marca, caminho}` | cartao: traz arquivo de fora para o kit |
 | `importar_fonte_marca` | `{marca, caminho, familia?, peso?, estilo?}` | cartao: idem |
+| `salvar_como_modelo` | `{nome, descricao?, documento?}` | cartao: grava na pasta de modelos da pessoa, fora do projeto e sem diário (Onda B) |
 
 - **Uma regra para a tela e para a IA.** `importar_midia` e o botão de escolher arquivo da tela (`escolherMidia`, no
   `main.ts`) usam `importarMidia` (`src/nucleo/importar-midia.ts`): as extensões do filtro do diálogo, o arquivo que já
