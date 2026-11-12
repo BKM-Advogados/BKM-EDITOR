@@ -2,12 +2,15 @@
 // fala no PC (window.estudio.fala), gerar as legendas das transcrições, editar, juntar, dividir, excluir, localizar e
 // substituir em lote, trocar o estilo e ir e voltar de SRT e VTT. O cálculo é do núcleo (src/nucleo/legendas.ts).
 import type {PedidoTranscricao, ProgressoTranscricao} from '../../../compartilhado/api';
-import {idLivre, type DocCenas, type PropsCenas} from '../../../nucleo/cenas';
+import type {DocCenas, PropsCenas} from '../../../nucleo/cenas';
 import {formatoDoVideo} from '../../../nucleo/formatos';
 import {
-  arquivoDaFala, arquivoDasPalavras, clipesDeVoz, comTexto, palavrasValidas, termosDoDicionario, type EntradaDicionario, type PalavraLegenda, legendasDeOutraTomada, limitesDoArrasto, dividirSegmento, juntarSegmentos, legendasDeArquivo, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt,
-  requebrar, substituirEmLote, type EstadoDaFala, type EstiloLegenda, type LegendasCenas, type OpcoesBusca, type SegmentoLegenda,
+  arquivoDaFala, arquivoDasPalavras, clipesDeVoz, comTexto, palavrasValidas, termosDoDicionario, type PalavraLegenda, legendasDeOutraTomada, limitesDoArrasto, legendasDeArquivo, legendasDoDocumento, nomeDoArquivoDeLegenda, paraSrt, paraVtt,
+  type EstadoDaFala, type EstiloLegenda, type LegendasCenas, type OpcoesBusca, type SegmentoLegenda,
 } from '../../../nucleo/legendas';
+import {
+  legendasComPredefinicao, legendasComSubstituicao, patchDividirLegenda, patchExcluirLegenda, patchJuntarLegendas, patchNovaLegenda, recusouLegenda,
+} from '../../../nucleo/legendas-edicao';
 import {confirmar} from '../../componentes/Dialogo';
 import {acharClipe, patchDosCortes, patchSemCortes, proporCortes, trechoDoClipe, type CorteFala} from '../../../nucleo/cortes-fala';
 import {aplicar, avisar, loja, mensagemDe, selecionar, trocar} from '../../estado/loja';
@@ -193,38 +196,27 @@ export const moverSegmento = async (documento: string, id: string, modo: 'mover'
 };
 
 export const juntarComProxima = async (documento: string, id: string) => {
-  const segs = [...(legendasDe(documento)?.segmentos ?? [])];
-  const i = segs.findIndex((s) => s.id === id);
-  if (i < 0 || i >= segs.length - 1) return avisar('Não há legenda depois desta para juntar.', 'info');
-  const junta = juntarSegmentos(segs[i], segs[i + 1]);
-  await aplicar(documento, [
-    {op: 'test', path: `${caminhoSeg(i + 1)}/id`, value: segs[i + 1].id},
-    {op: 'remove', path: caminhoSeg(i + 1)},
-    {op: 'replace', path: caminhoSeg(i), value: junta},
-  ], 'juntar legendas');
+  const d = docDe(documento);
+  if (!d) return;
+  const r = patchJuntarLegendas(d, id);
+  if (recusouLegenda(r)) return avisar('Não há legenda depois desta para juntar.', 'info');
+  await aplicar(documento, r.patch, 'juntar legendas');
 };
 
 /** Divide no tempo `ms` (a palavra mais perto) ou, sem ele, no meio do texto. */
 export const dividir = async (documento: string, id: string, ms?: number) => {
   const d = docDe(documento);
-  const segs = d?.legendas?.segmentos ?? [];
-  const i = segs.findIndex((s) => s.id === id);
-  const s = segs[i];
-  if (!s || !d) return;
-  let indice: number | undefined;
-  if (ms !== undefined && Array.isArray(s.palavras) && ms > s.em && ms < s.sai) {
-    const k = s.palavras.findIndex((p) => p.s >= ms);
-    if (k > 0) indice = k;
-  }
-  const r = dividirSegmento(s, idLivre(d, 'leg'), indice);
-  if (!r) return avisar('Uma palavra só não se divide.', 'info');
-  await aplicar(documento, [{op: 'replace', path: caminhoSeg(i), value: r[0]}, {op: 'add', path: caminhoSeg(i + 1), value: r[1]}], 'dividir legenda');
+  if (!d) return;
+  const r = patchDividirLegenda(d, id, ms);
+  if (recusouLegenda(r)) return r.erro === 'uma palavra só não se divide' ? avisar('Uma palavra só não se divide.', 'info') : undefined;
+  await aplicar(documento, r.patch, 'dividir legenda');
 };
 
 export const excluirSegmento = async (documento: string, id: string) => {
-  const i = indiceDe(documento, id);
-  if (i < 0) return;
-  if (await aplicar(documento, [{op: 'test', path: `${caminhoSeg(i)}/id`, value: id}, {op: 'remove', path: caminhoSeg(i)}], 'excluir legenda')) {
+  const d = docDe(documento);
+  const r = d ? patchExcluirLegenda(d, id) : null;
+  if (!r || recusouLegenda(r)) return;
+  if (await aplicar(documento, r.patch, 'excluir legenda')) {
     selecionar({documento, caminho: '/legendas'});
     avisar('Legenda excluída. Ctrl+Z desfaz.', 'ok');
   }
@@ -234,15 +226,8 @@ export const excluirSegmento = async (documento: string, id: string) => {
 export const novaLegenda = async (documento: string, ms: number) => {
   const d = docDe(documento);
   if (!d) return;
-  const segs = d.legendas?.segmentos ?? [];
-  const prox = segs.filter((s) => s.em > ms).reduce((m, s) => Math.min(m, s.em), Infinity);
-  const em = Math.round(ms);
-  const nova: SegmentoLegenda = {id: idLivre(d, 'leg'), em, sai: Math.max(em + 500, Math.min(em + 2000, prox)), texto: 'Nova legenda'};
-  const i = segs.filter((s) => s.em <= ms).length;
-  const patch = d.legendas
-    ? [{op: 'add' as const, path: caminhoSeg(i), value: nova}]
-    : [{op: 'add' as const, path: '/legendas', value: {estilo: {predefinicao: 'classica'}, segmentos: [nova]} satisfies LegendasCenas}];
-  if (await aplicar(documento, patch, 'nova legenda')) selecionar({documento, caminho: caminhoSeg(i)});
+  const r = patchNovaLegenda(d, ms);
+  if (await aplicar(documento, r.patch, 'nova legenda')) selecionar({documento, caminho: `/legendas/segmentos/${r.indice}`});
 };
 
 /** Substitui em todas as legendas; com `guardar`, a troca entra no dicionário do vídeo e volta a valer quando as
@@ -250,12 +235,9 @@ export const novaLegenda = async (documento: string, ms: number) => {
 export const substituirTudo = async (documento: string, procurar: string, troca: string, o: OpcoesBusca & {guardar?: boolean}) => {
   const leg = legendasDe(documento);
   if (!leg || !procurar) return;
-  const r = substituirEmLote(leg.segmentos, procurar, troca, o);
+  const r = legendasComSubstituicao(leg, procurar, troca, o);
   if (!r.trocas && !o.guardar) return avisar(`"${procurar}" não aparece nas legendas.`, 'info');
-  const entrada: EntradaDicionario = {de: procurar, para: troca, ...(o.palavra_inteira ? {} : {palavra_inteira: false}), ...(o.caixa ? {caixa: true} : {})};
-  const dicionario = o.guardar ? [...(leg.dicionario ?? []).filter((e) => e.de !== procurar), entrada] : leg.dicionario;
-  const novo: LegendasCenas = {...leg, segmentos: r.segmentos, ...(dicionario ? {dicionario} : {})};
-  if (await gravarLegendas(documento, novo, `substituir "${procurar}" por "${troca}" (${r.trocas})${o.guardar ? ' e guardar no dicionário' : ''}`)) {
+  if (await gravarLegendas(documento, r.legendas, `substituir "${procurar}" por "${troca}" (${r.trocas})${o.guardar ? ' e guardar no dicionário' : ''}`)) {
     avisar(`${r.trocas} ${r.trocas === 1 ? 'troca' : 'trocas'}${o.guardar ? '; guardada no dicionário do vídeo' : ''}. Ctrl+Z desfaz.`, 'ok');
   }
 };
@@ -273,9 +255,8 @@ export const tirarDoDicionario = async (documento: string, de: string) => {
 /** Troca a predefinição e quebra as legendas de novo para a largura e as palavras por vez dela. */
 export const trocarPredefinicao = async (documento: string, estilo: EstiloLegenda) => {
   const d = docDe(documento);
-  if (!d?.legendas) return;
-  const f = formatoDoVideo(d);
-  const quebradas = requebrar(d.legendas, estilo, f.largura, f.altura, d.tema?.fonte);
+  const quebradas = d ? legendasComPredefinicao(d, estilo) : null;
+  if (!quebradas) return;
   await gravarLegendas(documento, quebradas, `estilo das legendas: ${estilo.predefinicao}`);
 };
 
