@@ -12,7 +12,8 @@ o som.
 | `grafo.ts` | `Grafo`: nós, ligações com ganho, automações por endereço, ordem topológica estável |
 | `executor.ts` | `executarOffline`: o laço por blocos (128 por padrão), PDC, estágios, cache por chave |
 | `processadores.ts` | nativos: `Fonte`, `Passa`, `Ganho`, `VolumePan`, `Atraso`; e `panLei` e `ganhoDeDb` (a conta única do motor) |
-| `adaptadores.ts` | `AdaptadorEq3`, `AdaptadorCompressor`, `AdaptadorFreeverb`, `AdaptadorDelay`, `AdaptadorLimitador` |
+| `eq3.ts`, `compressor.ts`, `limitador.ts` | `Eq3`, `Compressor`, `Limitador`: os efeitos nativos por bloco |
+| `adaptadores.ts` | `AdaptadorFreeverb`, `AdaptadorDelay` (ainda de buffer inteiro) |
 | `musica.ts` | `grafoDaMusica` (documento → grafo) e `renderizarMusicaGrafo` (o render canônico) |
 
 `renderizarMusica`, exportado de `musica-som.ts`, é o `renderizarMusicaGrafo`. Ele tem a mesma assinatura e o mesmo
@@ -103,13 +104,13 @@ latencia, estagios}`.
 
 ```
 canal:<id> (Fonte: som seco)  →  faixa:<id>/entrada (Passa, soma dos canais na ordem dos canais)
-  → faixa:<id>/eq (AdaptadorEq3, se alguma banda ≠ 0) → faixa:<id>/compressor (se ligado)
+  → faixa:<id>/eq (Eq3, se alguma banda ≠ 0) → faixa:<id>/compressor (se ligado)
   → faixa:<id>/volume_pan (0 dB se há automação) → faixa:<id>/sidechain (Ganho, curva por notas)
   → faixa:<id>/automacao (Ganho ligado a faixa:<id>/volume_db)
   ─┬→ master (soma 'zero': faixas na ordem do mixer, depois o delay e o reverb com o volume de cada um)
    ├→ retorno:delay  (AdaptadorDelay,    soma 'zero' dos envios × envio)
    └→ retorno:reverb (AdaptadorFreeverb, soma 'zero' dos envios × envio)
-master → master/automacao (Ganho ligado a master/volume_db) ou master/volume → master/limitador (AdaptadorLimitador)
+master → master/automacao (Ganho ligado a master/volume_db) ou master/volume → master/limitador (Limitador)
 ```
 
 - Os instrumentos (bateria, sintetizador e clipes de áudio) ainda são de buffer inteiro. O som seco de cada canal é feito
@@ -124,8 +125,9 @@ master → master/automacao (Ganho ligado a master/volume_db) ou master/volume �
 
 ## Converter um efeito em processador nativo
 
-Os cinco adaptadores (EQ, compressor, Freeverb, delay e limitador) só envolvem as funções de `musica-som.ts`. Converter
-um deles é escrever o mesmo efeito como `Processador`, trocar o adaptador em `musica.ts` e provar com o oráculo que o PCM
+O EQ, o compressor e o limitador já foram convertidos (`eq3.ts`, `compressor.ts`, `limitador.ts`, testados em
+`testes/audio-grafo-efeitos.test.ts`). O Freeverb e o delay ainda são adaptadores que envolvem as funções de
+`musica-som.ts`. Converter um deles é escrever o mesmo efeito como `Processador`, trocar o adaptador em `musica.ts` e provar com o oráculo que o PCM
 não mudou.
 
 1. **Escreva o processador** em `src/nucleo/audio-grafo/` (um arquivo por efeito, por exemplo `eq3.ts`). Passe para
@@ -173,11 +175,32 @@ não mudou.
   tamanho de bloco que não muda nada, estado em JSON. Ele entra no grafo de um documento só quando o documento pedir,
   para os antigos continuarem iguais.
 
+## EQ, compressor e limitador nativos
+
+Os três saem com **o mesmo PCM, bit a bit**, do motor antigo, inclusive o `limitador_db`. Nenhuma tolerância foi
+precisa, e o limitador por bloco não muda o hash (conferido pelo oráculo, pelos hashes da M0 e por
+`testes/audio-grafo-efeitos.test.ts`, que compara com `filtrarNoLugar`, `comprimir` e `limitarNoLugar` em blocos de 1
+amostra a maiores que o sinal, sinal mais curto que o lookahead, pico na primeira e na última amostra, −0 e estado em JSON).
+
+- **`Eq3`**: parâmetros `graves_db`, `medios_db`, `agudos_db` (`faixa:<id>/eq/<banda>_db`). Um biquad por banda e canal
+  com `x1 x2 y1 y2` em `number`; a saída de cada banda é float32 e entra na banda seguinte. Banda em 0 dB fica fora do
+  caminho, como antes. O coeficiente é refeito quando o valor muda; com curva de automação ele usa o valor do começo do
+  bloco (a interpolação por amostra do EQ é decisão da X-08).
+- **`Compressor`**: parâmetros `limiar_db`, `razao`, `ataque_ms`, `soltura_ms`, `ganho_db`. O envelope é `number` e
+  atravessa os blocos. Sem lookahead: latência 0. Parâmetros com curva valem o do começo do bloco (X-08).
+- **`Limitador`**: parâmetros `teto_db` e `soltura_ms`. Causal, com `latencia = max(1, round(0,0015·taxa))` (72
+  amostras a 48 kHz). O pedido de cada amostra entra numa fila monotônica (mínimo da janela `[i, i + la]`, float32 como o
+  motor antigo) e a entrada espera numa linha de `la` amostras. O executor desconta a latência e manda `la` amostras de
+  silêncio depois do fim, que pedem 1 e completam a janela da cauda. Diferença medida contra o motor antigo: **0 dB**
+  (zero amostras diferentes), então não há tolerância a aprovar pelo dono. Se uma versão futura do limitador mudar a
+  conta (mais lookahead, true peak), aí sim a tolerância da M1 volta à mesa. `reducao_db` (o `limitador_db` do resultado)
+  é lido do processador depois do render.
+
 ## O que ainda não é
 
 - Os instrumentos são `Fonte` de buffer inteiro (I-01).
-- Os cinco efeitos são adaptadores, então o render ainda usa memória da música inteira por faixa com EQ ou compressor e
-  por retorno. A memória limitada (M-04) vem com a conversão deles.
+- O Freeverb e o delay são adaptadores, então o render ainda usa memória da música inteira por retorno e quebra o
+  render em estágios. A memória limitada (M-04) vem com a conversão deles.
 - O worklet (M-06) vai usar o mesmo `Processador`. O executor de tempo real ainda não existe, e os adaptadores não rodam
   nele.
 - O track delay manual e o PDC visível na tela são da M-07. O PDC automático do executor já existe.

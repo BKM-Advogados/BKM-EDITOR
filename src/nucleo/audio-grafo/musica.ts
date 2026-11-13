@@ -6,8 +6,8 @@
 // Os nós e os ids (que são os endereços da M-02 quando há um):
 //   canal:<id>                     Fonte: o som seco do canal (instrumento ainda de buffer inteiro, guardado no cache)
 //   faixa:<id>/entrada             Passa: soma dos canais da faixa, na ordem dos canais
-//   faixa:<id>/eq                  AdaptadorEq3 (só se alguma banda ≠ 0)
-//   faixa:<id>/compressor          AdaptadorCompressor (só se ligado)
+//   faixa:<id>/eq                  Eq3 (só se alguma banda ≠ 0)
+//   faixa:<id>/compressor          Compressor (só se ligado)
 //   faixa:<id>/volume_pan          VolumePan (volume 0 dB quando há automação: a curva toma o lugar do fader)
 //   faixa:<id>/sidechain           Ganho com a curva do sidechain por notas
 //   faixa:<id>/automacao           Ganho ligado ao endereço faixa:<id>/volume_db (a automação de volume de hoje)
@@ -20,7 +20,10 @@ import {resolverMusica, type DocMusica} from '../musica';
 import {escreverEndereco} from '../musica-param';
 import {chaveDoCanal, disparosDoSidechain, ganhoDaAutomacao, ganhoDoSidechain, renderAudio, renderBateria, renderSintetizador, TAXA_MUSICA, type CacheSom,
   type ResultadoSom} from '../musica-som';
-import {AdaptadorCompressor, AdaptadorDelay, AdaptadorEq3, AdaptadorFreeverb, AdaptadorLimitador} from './adaptadores';
+import {AdaptadorDelay, AdaptadorFreeverb} from './adaptadores';
+import {Compressor} from './compressor';
+import {Eq3} from './eq3';
+import {Limitador} from './limitador';
 import {BLOCO_PADRAO, executarOffline} from './executor';
 import {Grafo} from './grafo';
 import {Fonte, Ganho, ganhoDeDb, Passa, VolumePan} from './processadores';
@@ -47,7 +50,7 @@ export type GrafoDaMusica = {
   /** Nó final de cada faixa que toca (o stem) e de cada retorno. */
   faixas: Record<string, string>;
   retornos: Partial<Record<'reverb' | 'delay', {no: string; ganho: number}>>;
-  limitador?: AdaptadorLimitador;
+  limitador?: Limitador;
   avisos: string[];
   faltando: Set<string>;
   /** Chaves do cache que a montagem usou (os canais secos). */
@@ -120,8 +123,16 @@ export const grafoDaMusica = (doc: DocMusica, fontes: Record<string, FonteAudio 
     const cadeia: string[] = [g.no(`${base}/entrada`, new Passa(2))];
     for (const e of entram) g.ligar(e.no, cadeia[0]);
     const {graves_db, medios_db, agudos_db} = f.eq;
-    if (graves_db || medios_db || agudos_db) cadeia.push(g.no(`${base}/eq`, new AdaptadorEq3(f.eq)));
-    if (f.compressor.ativo) cadeia.push(g.no(`${base}/compressor`, new AdaptadorCompressor(f.compressor)));
+    const sem = base.replace(/#\d+$/, ''); // o endereço da M-02 não leva o `#2` dos ids repetidos
+    if (graves_db || medios_db || agudos_db) {
+      cadeia.push(g.no(`${base}/eq`, new Eq3(), {params: Object.fromEntries((['graves_db', 'medios_db', 'agudos_db'] as const)
+        .map((b) => [b, {endereco: `${sem}/eq/${b}`, valor: f.eq[b]}]))}));
+    }
+    if (f.compressor.ativo) {
+      const c = f.compressor;
+      cadeia.push(g.no(`${base}/compressor`, new Compressor(), {params: Object.fromEntries((['limiar_db', 'razao', 'ataque_ms', 'soltura_ms', 'ganho_db'] as const)
+        .map((p) => [p, {endereco: `${sem}/compressor/${p}`, valor: c[p]}]))}));
+    }
     // os parâmetros levam o endereço da M-02 (a automação geral da X-08 liga aqui); a de volume de hoje é um ganho linear
     // depois do fader (nó `automacao`), como no motor antigo, então com ela o fader fica em 0 dB e sem endereço
     const endVolume = `${base.replace(/#\d+$/, '')}/volume_db`;
@@ -183,10 +194,11 @@ export const grafoDaMusica = (doc: DocMusica, fontes: Record<string, FonteAudio 
     }
   }
   const lim = m.master.limitador;
-  let limitador: AdaptadorLimitador | undefined;
+  let limitador: Limitador | undefined;
   if (lim.ativo) {
-    limitador = new AdaptadorLimitador(lim.teto_db, lim.soltura_ms);
-    const no = g.no('master/limitador', limitador);
+    limitador = new Limitador(taxa);
+    const no = g.no('master/limitador', limitador, {params: {teto_db: {endereco: 'master/limitador/teto_db', valor: lim.teto_db},
+      soltura_ms: {endereco: 'master/limitador/soltura_ms', valor: lim.soltura_ms}}});
     g.ligar(saida, no);
     saida = no;
   }
