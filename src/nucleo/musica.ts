@@ -17,6 +17,7 @@ export const BPM_PADRAO = 120;
 export const VOLUME_DB_MIN = -60;
 export const VOLUME_DB_MAX = 12;
 export const GANHO_EQ_DB = 18; // cada banda do EQ vai de −18 a +18 dB
+export const ATRASO_FAIXA_MS = 500; // o atraso manual de uma faixa vai de −500 a +500 ms (M-07)
 export const DUR_MIN = 1 / 16; // o menor clipe ou padrão: 1/16 de batida (a semicolcheia é 1/4)
 
 export type PecaBateria = 'bumbo' | 'caixa' | 'palma' | 'aro' | 'chimbal_fechado' | 'chimbal_aberto' | 'prato' | 'tom_grave' | 'tom_agudo' | 'shaker';
@@ -85,9 +86,10 @@ export type EqFaixa = {graves_db?: number; medios_db?: number; agudos_db?: numbe
 export type CompressorFaixa = {ativo?: boolean; limiar_db?: number; razao?: number; ataque_ms?: number; soltura_ms?: number; ganho_db?: number};
 
 /** Faixa do mixer: volume em dB, pan, mudo, solo, EQ, compressor e quanto vai para cada retorno (0 a 1, depois do
- *  volume): `reverb` (retorno 1) e `delay` (retorno 2). Os presets (PRESETS_FAIXA) só escrevem estes campos. */
+ *  volume): `reverb` (retorno 1) e `delay` (retorno 2). Os presets (PRESETS_FAIXA) só escrevem estes campos.
+ *  `atraso_ms` (M-07, "track delay"): desloca o som da faixa no tempo, de −500 a +500 ms; negativo adianta. */
 export type FaixaMixer = {id: string; nome?: string; volume_db?: number; pan?: number; mudo?: boolean; solo?: boolean; eq?: EqFaixa; compressor?: CompressorFaixa; reverb?: number;
-  delay?: number; sidechain?: SidechainFaixa};
+  delay?: number; sidechain?: SidechainFaixa; atraso_ms?: number};
 /** Sidechain (item 22): a faixa abaixa `quanto_db` a cada nota da peça `peca` do canal `de` (o bumbo, por padrão), e volta
  *  em `soltura_ms`. Dispara pelas notas, não pelo som: o bumbo mudo também dispara. */
 export type SidechainFaixa = {de: string; peca?: PecaBateria; quanto_db?: number; ataque_ms?: number; soltura_ms?: number};
@@ -268,7 +270,7 @@ export type ClipeMusicaP = {
 };
 
 export type FaixaMixerP = {id: string; nome: string; volume_db: number; pan: number; mudo: boolean; solo: boolean; eq: Required<EqFaixa>; compressor: Required<CompressorFaixa>; reverb: number;
-  delay: number; sidechain: Required<SidechainFaixa> | null};
+  delay: number; sidechain: Required<SidechainFaixa> | null; atraso_ms: number};
 export type CanalMusicaP = {id: string; nome: string; tipo: 'audio' | 'bateria' | 'sintetizador'; faixa_mixer: string; kit: string; pecas: Partial<Record<PecaBateria, AjustePeca>>;
   preset: PresetSintetizador; macros: Required<MacrosSintetizador>; mudo: boolean; solo: boolean};
 
@@ -330,10 +332,11 @@ export const resolverMusica = (doc: DocMusica): {musica: MusicaP; avisos: string
     reverb: limitar(numero(f.reverb, 0), 0, 1),
     delay: limitar(numero(f.delay, 0), 0, 1),
     sidechain: null,
+    atraso_ms: limitar(numero(f.atraso_ms, 0), -ATRASO_FAIXA_MS, ATRASO_FAIXA_MS),
   }));
   for (const c of canais) {
     if (!faixas.some((f) => f.id === c.faixa_mixer)) {
-      faixas.push({id: c.faixa_mixer, nome: c.nome, volume_db: 0, pan: 0, mudo: false, solo: false, eq: {graves_db: 0, medios_db: 0, agudos_db: 0}, compressor: {...COMPRESSOR_PADRAO}, reverb: 0, delay: 0, sidechain: null});
+      faixas.push({id: c.faixa_mixer, nome: c.nome, volume_db: 0, pan: 0, mudo: false, solo: false, eq: {graves_db: 0, medios_db: 0, agudos_db: 0}, compressor: {...COMPRESSOR_PADRAO}, reverb: 0, delay: 0, sidechain: null, atraso_ms: 0});
     }
   }
 

@@ -451,13 +451,15 @@ export const disparosDoSidechain = (m: MusicaP, sc: NonNullable<FaixaMixerP['sid
 };
 
 /** Ganho do sidechain por amostra: desce até −quanto_db numa rampa de ataque_ms que acaba na nota e volta numa curva
- *  (quadrática) em soltura_ms; notas perto umas das outras valem pela maior redução. */
-export const ganhoDoSidechain = (disparos: number[], sc: {quanto_db: number; ataque_ms: number; soltura_ms: number}, n: number, taxa: number): Float32Array => {
+ *  (quadrática) em soltura_ms; notas perto umas das outras valem pela maior redução. `deslocamento` (amostras, pode ser
+ *  negativo) move todos os disparos: é o atraso manual da faixa do canal que dispara (M-07). */
+export const ganhoDoSidechain = (disparos: number[], sc: {quanto_db: number; ataque_ms: number; soltura_ms: number}, n: number, taxa: number,
+  deslocamento = 0): Float32Array => {
   const red = new Float32Array(n);
   const at = Math.round((sc.ataque_ms / 1000) * taxa);
   const so = Math.max(1, Math.round((sc.soltura_ms / 1000) * taxa));
   for (const t of disparos) {
-    const i0 = Math.round(t * taxa);
+    const i0 = Math.round(t * taxa) + deslocamento;
     for (let i = Math.max(0, i0 - at); i < Math.min(n, i0); i++) {
       const v = (i - (i0 - at)) / at;
       if (v > red[i]) red[i] = v;

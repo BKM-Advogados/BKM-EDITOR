@@ -14,7 +14,7 @@
 // A tabela PARAMETROS diz, de cada parâmetro que existe hoje, o tipo, a faixa de valores, o padrão e onde ele mora no
 // documento. Os padrões e as faixas são os mesmos de resolverMusica (os testes conferem um contra o outro).
 import type {Operation} from 'fast-json-patch';
-import {GANHO_EQ_DB, PECAS, TEMPOS_DELAY, VOLUME_DB_MAX, VOLUME_DB_MIN, BPM_MAX, BPM_MIN, BPM_PADRAO, type DocMusica, type PecaBateria} from './musica';
+import {ATRASO_FAIXA_MS, GANHO_EQ_DB, PECAS, TEMPOS_DELAY, VOLUME_DB_MAX, VOLUME_DB_MIN, BPM_MAX, BPM_MIN, BPM_PADRAO, type DocMusica, type PecaBateria} from './musica';
 import {GRUPO_PADRAO} from './musica-som';
 
 // ---------- notação ----------
@@ -140,6 +140,8 @@ export const PARAMETROS: DefParam[] = [
   num('faixa:*/compressor/ganho_db', 'Ganho do compressor', ['compressor', 'ganho_db'], 0, 24, 0, {unidade: 'dB'}),
   num('faixa:*/envio/reverb', 'Envio ao reverb', ['reverb'], 0, 1, 0),
   num('faixa:*/envio/delay', 'Envio ao delay', ['delay'], 0, 1, 0),
+  // o "track delay" (M-07): desloca a faixa inteira no tempo; não é automatizável (mudar no meio pularia o som)
+  num('faixa:*/atraso_ms', 'Atraso da faixa', ['atraso_ms'], -ATRASO_FAIXA_MS, ATRASO_FAIXA_MS, 0, {unidade: 'ms', automatizavel: false}),
   num('faixa:*/sidechain/quanto_db', 'Sidechain: quanto abaixa', ['sidechain', 'quanto_db'], 0, 24, 6, {unidade: 'dB', pai_obrigatorio: 'sidechain'}),
   num('faixa:*/sidechain/ataque_ms', 'Sidechain: ataque', ['sidechain', 'ataque_ms'], 0, 50, 5, {unidade: 'ms', pai_obrigatorio: 'sidechain'}),
   num('faixa:*/sidechain/soltura_ms', 'Sidechain: soltura', ['sidechain', 'soltura_ms'], 20, 2000, 180, {unidade: 'ms', curva: 'log', pai_obrigatorio: 'sidechain'}),
