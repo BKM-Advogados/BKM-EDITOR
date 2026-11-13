@@ -13,7 +13,7 @@ import {grafoDaMusica, renderizarMusicaGrafo} from '../src/nucleo/audio-grafo/mu
 import {Fonte, Ganho} from '../src/nucleo/audio-grafo/processadores';
 import type {Processador} from '../src/nucleo/audio-grafo/tipos';
 import {abrirWav} from '../src/nucleo/amostras-wav';
-import {CacheAudioDisco, PASTA_CACHE_AUDIO, cacheAudioDoProjeto, tetoDoAmbiente, TETO_CACHE_AUDIO} from '../src/nucleo/cache-audio';
+import {CacheAudioDisco, PASTA_CACHE_AUDIO, cacheAudioDoProjeto, impressaoDasFontes, tetoDoAmbiente, TETO_CACHE_AUDIO} from '../src/nucleo/cache-audio';
 import {audiosDaMusica, resolverMusica, type DocMusica} from '../src/nucleo/musica';
 import {hashDoPcm} from '../src/nucleo/musica-hash';
 import {geradorDe, ganhoDaAutomacao, ganhoDoSidechain, renderAudio, renderBateria, renderSintetizador, TAXA_MUSICA} from '../src/nucleo/musica-som';
@@ -364,5 +364,24 @@ describe('WAV lido por trecho (base do sampler)', () => {
     }
     writeFileSync(path.join(pasta, 'nao.wav'), 'isto não é um wav');
     expect(() => abrirWav(path.join(pasta, 'nao.wav'))).toThrow('não é um WAV');
+  });
+});
+
+describe('cache de áudio em disco: o conteúdo das fontes', () => {
+  it('um áudio trocado por outro do mesmo tamanho e taxa não traz a faixa velha', () => {
+    const nome = nomes.find((x) => audiosDaMusica(lerDoc(x)).length > 0)!;
+    expect(nome, 'precisa de um documento de referência com áudio').toBeTruthy();
+    const doc = lerDoc(nome);
+    const fontes = fontesDe(doc);
+    const raiz = pastaTemp();
+    const render = (f: Record<string, FonteAudio>) =>
+      renderizarMusicaGrafo(doc, f, {armazem: cacheAudioDoProjeto(raiz, {teto_bytes: 1e9, sal: impressaoDasFontes(f)})});
+    expect(hashDoPcm(render(fontes).canais)).toBe(HASHES.musicas[nome].pcm_sha256);
+    // o mesmo arquivo com o sinal invertido: mesmo nome, mesmo tamanho, mesma taxa
+    const trocadas = Object.fromEntries(Object.entries(fontes).map(([k, f]) => [k, {...f, canais: f.canais.map((c) => c.map((v) => -v))}]));
+    const esperado = renderizarMusicaGrafo(doc, trocadas);
+    mesmoPcm(render(trocadas).canais, esperado.canais, 'áudio trocado');
+    expect(impressaoDasFontes(trocadas)).not.toBe(impressaoDasFontes(fontes));
+    expect(impressaoDasFontes(fontesDe(doc))).toBe(impressaoDasFontes(fontes));
   });
 });

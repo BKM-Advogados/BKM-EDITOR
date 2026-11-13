@@ -25,7 +25,7 @@ import {hashesDaMusica} from '../nucleo/musica-projeto';
 import {comprovanteDeLicencas, licencasDaMusica, textoDosCreditos} from '../nucleo/musica-licencas';
 import {gravarEnvelope} from './ipc-audio';
 import {hashDoPcm} from '../nucleo/musica-hash';
-import {cacheAudioDoProjeto} from '../nucleo/cache-audio';
+import {cacheAudioDoProjeto, impressaoDasFontes} from '../nucleo/cache-audio';
 
 const lerMusica = (p: Projeto, id: string) => {
   const {doc} = p.lerJson<unknown>(p.arquivoDoDocumento(id));
@@ -50,10 +50,11 @@ export const decodificarParaMusica = async (p: Projeto, arquivo: string, binario
 };
 
 /** O cache de áudio em disco do projeto (.estudio/cache-audio/, fora do git): o render daqui reaproveita as faixas que
- *  não mudaram desde o último render, sem guardá-las na memória. */
-const armazemDe = (p: Projeto) => {
+ *  não mudaram desde o último render, sem guardá-las na memória. O conteúdo dos áudios entra no nome dos arquivos: um
+ *  áudio trocado por outro do mesmo tamanho não traz a faixa velha. */
+const armazemDe = (p: Projeto, fontes: Record<string, FonteAudio | undefined>) => {
   garantirMusicaForaDoGit(p);
-  return cacheAudioDoProjeto(p.raiz);
+  return cacheAudioDoProjeto(p.raiz, {sal: impressaoDasFontes(fontes)});
 };
 
 const fontesDe = async (p: Projeto, doc: DocMusica, binarios?: string | null) => {
@@ -105,7 +106,8 @@ export const servicoDeRender = (o: {binarios?: () => string | null | undefined; 
       m = r.medida;
       envelope = r.envelope;
     } else {
-      const feito = renderizarMusica(doc, await fontesDe(p, doc, o.binarios?.()), {taxa: TAXA_MUSICA, armazem: armazemDe(p)});
+      const fontes = await fontesDe(p, doc, o.binarios?.());
+      const feito = renderizarMusica(doc, fontes, {taxa: TAXA_MUSICA, armazem: armazemDe(p, fontes)});
       canais = feito.canais;
       gravarBinario(p, alvo.arquivo, gravarWav(feito.canais, feito.taxa));
       som = feito;
@@ -132,7 +134,8 @@ export const servicoDeRender = (o: {binarios?: () => string | null | undefined; 
       if (r.medida && (!opcoes.hash || r.pcm_sha256)) return {...r.medida, duracao_ms: Math.round((r.duracao_s ?? 0) * 1000), ...(r.faixas ? {faixas: r.faixas} : {}), avisos: r.avisos ?? [],
         ...(opcoes.hash ? {pcm_sha256: r.pcm_sha256, amostras: r.amostras, feito_por: 'janela' as const} : {})};
     }
-    const som = renderizarMusica(doc, await fontesDe(p, doc, o.binarios?.()), {taxa: TAXA_MUSICA, porFaixa: opcoes.porFaixa, armazem: armazemDe(p)});
+    const fontes = await fontesDe(p, doc, o.binarios?.());
+    const som = renderizarMusica(doc, fontes, {taxa: TAXA_MUSICA, porFaixa: opcoes.porFaixa, armazem: armazemDe(p, fontes)});
     const m = medirAmostras(som.canais, som.taxa);
     const faixas = som.faixas
       ? Object.fromEntries(Object.entries(som.faixas).map(([f, c]) => {
@@ -176,8 +179,11 @@ export const exportarMusica = async (p: Projeto, id: string, pedido: PedidoExpor
   const folga_db = pedido.formato === 'wav' ? 0 : 0.5; // o codificador sobe um pouco o pico verdadeiro
   const entregaPedido = {stems: pedido.stems, alvo_lufs: pedido.alvo_lufs, folga_db};
   const daJanela = o.janela ? await o.janela('musica:exportar', {doc, pedido: entregaPedido}, {tempo_ms: 300_000}) : null;
-  const e: EntregaEmBytes = daJanela?.ok && daJanela.dados ? (daJanela.dados as EntregaEmBytes)
-    : entregaEmBytes(doc, await fontesDe(p, doc, o.binarios?.()), {...entregaPedido, armazem: armazemDe(p)});
+  const doProcesso = async () => {
+    const fontes = await fontesDe(p, doc, o.binarios?.());
+    return entregaEmBytes(doc, fontes, {...entregaPedido, armazem: armazemDe(p, fontes)});
+  };
+  const e: EntregaEmBytes = daJanela?.ok && daJanela.dados ? (daJanela.dados as EntregaEmBytes) : await doProcesso();
   const buf = (b: Uint8Array) => Buffer.from(b.buffer, b.byteOffset, b.byteLength);
   const arquivos: string[] = [];
   const avisos = [...e.avisos];

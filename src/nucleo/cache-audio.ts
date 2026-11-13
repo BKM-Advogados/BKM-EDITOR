@@ -16,8 +16,9 @@ import {fontePorTrechos, type ArmazemAudio, type FonteAmostras, type GravadorAmo
 export const PASTA_CACHE_AUDIO = '.estudio/cache-audio';
 /** Teto padrão: 2 GB (o do perfil leve em docs/desempenho.md). `ESTUDIO_CACHE_AUDIO_MB` muda (0 desliga o cache). */
 export const TETO_CACHE_AUDIO = 2 * 1024 ** 3;
-/** Muda quando muda a conta de algum processador: os arquivos antigos deixam de casar e saem pelo LRU. */
-export const VERSAO_CACHE_AUDIO = 'grafo-1';
+/** Muda quando muda a conta de algum processador: os arquivos antigos deixam de casar e saem pelo LRU. ('grafo-2': a
+ *  reamostragem sinc da M-11, o atraso manual da M-07 e a impressão das fontes no nome do arquivo.) */
+export const VERSAO_CACHE_AUDIO = 'grafo-2';
 const MAGICO = 0x31434145; // "EAC1" em little-endian
 const CABECALHO = 16;
 /** Amostras por canal lidas ou gravadas de uma vez (0,68 s a 48 kHz). */
@@ -30,17 +31,35 @@ export const tetoDoAmbiente = (env: Record<string, string | undefined> = process
 
 const bytesDe = (f: Float32Array, off: number, qtd: number) => new Uint8Array(f.buffer, f.byteOffset + off * 4, qtd * 4);
 
-export type OpcoesCacheAudio = {teto_bytes?: number};
+/** `sal`: entra no nome de cada arquivo junto com a chave. O render passa a impressão das fontes de áudio
+ *  (`impressaoDasFontes`): a chave do canal só leva nome, tamanho e taxa de cada áudio, o que basta para a prévia (o cache
+ *  dela vive enquanto a janela está aberta), mas não para um cache que dura entre sessões, em que um WAV trocado por
+ *  outro do mesmo tamanho daria a faixa velha. */
+export type OpcoesCacheAudio = {teto_bytes?: number; sal?: string};
+
+/** SHA-256 do conteúdo das fontes de áudio (nome, taxa e cada canal em float32), na ordem dos nomes. Qualquer áudio do
+ *  documento que mude invalida o cache inteiro do render, o que é grosso, mas sempre certo. */
+export const impressaoDasFontes = (fontes: Record<string, {taxa: number; canais: Float32Array[]} | undefined>) => {
+  const h = createHash('sha256');
+  for (const nome of Object.keys(fontes).sort()) {
+    const f = fontes[nome];
+    h.update(`${nome}\n${f ? `${f.taxa}:${f.canais.length}` : 'falta'}\n`);
+    if (f) for (const c of f.canais) h.update(new Uint8Array(c.buffer, c.byteOffset, c.byteLength));
+  }
+  return h.digest('hex');
+};
 
 export class CacheAudioDisco implements ArmazemAudio {
   readonly teto: number;
+  readonly sal: string;
   constructor(readonly pasta: string, o: OpcoesCacheAudio = {}) {
     this.teto = o.teto_bytes ?? tetoDoAmbiente();
+    this.sal = o.sal ?? '';
   }
 
   /** O arquivo de uma chave. */
   arquivo(chave: string) {
-    return path.join(this.pasta, `${createHash('sha256').update(`${VERSAO_CACHE_AUDIO}\n${chave}`).digest('hex')}.f32`);
+    return path.join(this.pasta, `${createHash('sha256').update(`${VERSAO_CACHE_AUDIO}\n${this.sal}\n${chave}`).digest('hex')}.f32`);
   }
 
   abrir(chave: string, canais: number, n: number): FonteAmostras | null {

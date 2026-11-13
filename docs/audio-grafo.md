@@ -238,7 +238,10 @@ seção 4.10](desempenho.md#410-música-memória-do-render-m-04)):
   amostras. Grava num `.tmp` e renomeia no fim (dois processos não se atrapalham; render que falhou não deixa nada). O
   teto é de 2 GB, ou `ESTUDIO_CACHE_AUDIO_MB` (0 desliga). Passou do teto, sai o arquivo usado há mais tempo (a data de
   modificação, que cada leitura renova); um item maior que metade do teto não é guardado. `VERSAO_CACHE_AUDIO` muda
-  quando muda a conta de algum processador. O processo principal e o MCP por stdio usam o cache em `renderizar`, `medir`
+  quando muda a conta de algum processador. O nome do arquivo leva também o `sal` do cache, que o render do processo
+  preenche com `impressaoDasFontes` (SHA-256 do PCM dos áudios do documento): a chave do canal só tem nome, tamanho e
+  taxa de cada áudio, e sem o sal um WAV trocado por outro do mesmo tamanho traria a faixa velha de um render anterior.
+  Mudou um áudio, o cache do documento inteiro se refaz. O processo principal e o MCP por stdio usam o cache em `renderizar`, `medir`
   e `exportar` (`src/main/musica-render.ts`), e `.estudio/cache-audio/` entra no `.gitignore` do projeto com as outras
   regras da música.
 - **A prévia** (worker da janela) continua com o cache em Map, de buffers inteiros por camada: o navegador não tem o
