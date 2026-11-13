@@ -25,6 +25,7 @@ import {hashesDaMusica} from '../nucleo/musica-projeto';
 import {comprovanteDeLicencas, licencasDaMusica, textoDosCreditos} from '../nucleo/musica-licencas';
 import {gravarEnvelope} from './ipc-audio';
 import {hashDoPcm} from '../nucleo/musica-hash';
+import {cacheAudioDoProjeto} from '../nucleo/cache-audio';
 
 const lerMusica = (p: Projeto, id: string) => {
   const {doc} = p.lerJson<unknown>(p.arquivoDoDocumento(id));
@@ -46,6 +47,13 @@ export const decodificarParaMusica = async (p: Projeto, arquivo: string, binario
     }
   }
   return decodificarAudio(abs, {taxa: TAXA_MUSICA, binarios});
+};
+
+/** O cache de áudio em disco do projeto (.estudio/cache-audio/, fora do git): o render daqui reaproveita as faixas que
+ *  não mudaram desde o último render, sem guardá-las na memória. */
+const armazemDe = (p: Projeto) => {
+  garantirMusicaForaDoGit(p);
+  return cacheAudioDoProjeto(p.raiz);
 };
 
 const fontesDe = async (p: Projeto, doc: DocMusica, binarios?: string | null) => {
@@ -97,7 +105,7 @@ export const servicoDeRender = (o: {binarios?: () => string | null | undefined; 
       m = r.medida;
       envelope = r.envelope;
     } else {
-      const feito = renderizarMusica(doc, await fontesDe(p, doc, o.binarios?.()), {taxa: TAXA_MUSICA});
+      const feito = renderizarMusica(doc, await fontesDe(p, doc, o.binarios?.()), {taxa: TAXA_MUSICA, armazem: armazemDe(p)});
       canais = feito.canais;
       gravarBinario(p, alvo.arquivo, gravarWav(feito.canais, feito.taxa));
       som = feito;
@@ -124,7 +132,7 @@ export const servicoDeRender = (o: {binarios?: () => string | null | undefined; 
       if (r.medida && (!opcoes.hash || r.pcm_sha256)) return {...r.medida, duracao_ms: Math.round((r.duracao_s ?? 0) * 1000), ...(r.faixas ? {faixas: r.faixas} : {}), avisos: r.avisos ?? [],
         ...(opcoes.hash ? {pcm_sha256: r.pcm_sha256, amostras: r.amostras, feito_por: 'janela' as const} : {})};
     }
-    const som = renderizarMusica(doc, await fontesDe(p, doc, o.binarios?.()), {taxa: TAXA_MUSICA, porFaixa: opcoes.porFaixa});
+    const som = renderizarMusica(doc, await fontesDe(p, doc, o.binarios?.()), {taxa: TAXA_MUSICA, porFaixa: opcoes.porFaixa, armazem: armazemDe(p)});
     const m = medirAmostras(som.canais, som.taxa);
     const faixas = som.faixas
       ? Object.fromEntries(Object.entries(som.faixas).map(([f, c]) => {
@@ -169,7 +177,7 @@ export const exportarMusica = async (p: Projeto, id: string, pedido: PedidoExpor
   const entregaPedido = {stems: pedido.stems, alvo_lufs: pedido.alvo_lufs, folga_db};
   const daJanela = o.janela ? await o.janela('musica:exportar', {doc, pedido: entregaPedido}, {tempo_ms: 300_000}) : null;
   const e: EntregaEmBytes = daJanela?.ok && daJanela.dados ? (daJanela.dados as EntregaEmBytes)
-    : entregaEmBytes(doc, await fontesDe(p, doc, o.binarios?.()), entregaPedido);
+    : entregaEmBytes(doc, await fontesDe(p, doc, o.binarios?.()), {...entregaPedido, armazem: armazemDe(p)});
   const buf = (b: Uint8Array) => Buffer.from(b.buffer, b.byteOffset, b.byteLength);
   const arquivos: string[] = [];
   const avisos = [...e.avisos];

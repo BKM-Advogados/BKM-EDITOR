@@ -3,8 +3,8 @@
 O motor da Música roda num grafo de processadores por bloco (M-01, decisão [A2](adr/A2-motor-em-grafo-por-bloco.md)).
 O código fica em `src/nucleo/audio-grafo/`, em TypeScript puro: sem Node, DOM nem Web Audio. Ele roda igual no worker da
 janela, no processo principal e no MCP por stdio, e vai rodar num AudioWorklet na onda M5. Este texto é para quem vai
-mexer no motor. Ele mostra a API, como o documento vira grafo e como converter um efeito em processador nativo sem mudar
-o som.
+mexer no motor. Ele mostra a API, como o documento vira grafo, como converter um efeito em processador nativo sem mudar
+o som e como a memória do render fica limitada (M-04).
 
 | Arquivo | O que tem |
 |---|---|
@@ -12,8 +12,13 @@ o som.
 | `grafo.ts` | `Grafo`: nós, ligações com ganho, automações por endereço, ordem topológica estável |
 | `executor.ts` | `executarOffline`: o laço por blocos (128 por padrão), PDC, estágios, cache por chave |
 | `processadores.ts` | nativos: `Fonte`, `Passa`, `Ganho`, `VolumePan`, `Atraso`; e `panLei` e `ganhoDeDb` (a conta única do motor) |
-| `adaptadores.ts` | `AdaptadorEq3`, `AdaptadorCompressor`, `AdaptadorFreeverb`, `AdaptadorDelay`, `AdaptadorLimitador` |
+| `eq3.ts`, `compressor.ts`, `freeverb.ts`, `delay.ts`, `limitador.ts` | os efeitos do mixer, nativos (M-04); o limitador é causal, com 1,5 ms de latência |
+| `amostras.ts` | `FonteAmostras` (leitura por trecho), `fontePorTrechos` (carga preguiçosa), `ArmazemAudio`, `armazemDeMemoria` |
+| `instrumentos.ts` | bateria, sintetizador, áudio, sidechain e automação renderizados por trecho |
 | `musica.ts` | `grafoDaMusica` (documento → grafo) e `renderizarMusicaGrafo` (o render canônico) |
+
+Fora da pasta, porque usam o disco (Node): `src/nucleo/cache-audio.ts` (`CacheAudioDisco`, o cache em disco com LRU) e
+`src/nucleo/amostras-wav.ts` (`abrirWav`, um WAV lido por trecho).
 
 `renderizarMusica`, exportado de `musica-som.ts`, é o `renderizarMusicaGrafo`. Ele tem a mesma assinatura e o mesmo
 resultado de antes: mistura, stems por faixa, retornos, `limitador_db`, avisos, `faltando` e o cache por camada da prévia.
@@ -79,8 +84,8 @@ g.automatizar('faixa:baixo/volume_db', curva);                 // endereço da M
 
 ## O executor
 
-`executarOffline(grafo, {taxa, n, saida, bloco?, coletar?, cache?})` devolve `{canais, coletados, chavesUsadas,
-latencia, estagios}`.
+`executarOffline(grafo, {taxa, n, saida, bloco?, coletar?, cache?, armazem?, aoBloco?})` devolve `{canais, coletados,
+chavesUsadas, latencia, estagios, armazem}`.
 
 - **Blocos fixos** de `bloco` amostras (128 por padrão). O último bloco é menor. O tamanho do bloco não muda um bit da
   saída, e os testes conferem com blocos de 1 a maior que a música.
@@ -92,41 +97,55 @@ latencia, estagios}`.
 - **Cache**: com `cache` (um `Map`, o mesmo `CacheSom` da prévia), um nó com `chave` já guardada não roda, nem o que só
   ele usava. Um nó com chave nova tem a saída guardada. A chave tem que mudar sempre que muda algo que muda o som que sai
   dali, o que vem antes incluído. `chavesUsadas` diz o que este render usou, e o resto pode sair do cache.
+- **Armazém** (M-04): com `armazem` (um `ArmazemAudio`, como o cache em disco), um nó com chave já guardada vira uma
+  fonte lida por trecho, bloco a bloco, sem ficar inteira na memória. Um nó com chave nova é gravado enquanto roda,
+  também por bloco. Se o render falhar, o que estava sendo gravado é descartado. `armazem.lidas` e `armazem.gravadas`
+  no resultado dizem o que veio de lá e o que foi para lá. Com `cache` e `armazem` juntos, o Map vale primeiro.
+- **Saída bloco a bloco**: com `aoBloco(canais, inicio, qtd)`, a saída vai em pedaços alinhados no tempo da música, em
+  ordem, e `canais` volta vazio. É o caminho do WAV em streaming (M-10): a mistura nunca fica inteira na memória.
 - **Estágios**: um `ProcessadorInteiro` (adaptador) só sabe processar a música inteira. O executor roda por bloco tudo
   que vem antes dele e junta a entrada inteira. No fim do estágio, chama `processarTudo` e usa a saída como fonte do
   estágio seguinte. Uma saída por bloco que um estágio posterior lê é gravada inteira. Sem adaptadores, há um estágio só
-  e a memória fica no que se pede para coletar. `estagios` no resultado mostra quantos houve.
+  e a memória fica no que se pede para coletar. `estagios` no resultado mostra quantos houve. Desde a M-04, nenhum nó
+  da música é adaptador: o render dela roda num estágio só. O mecanismo fica para um efeito novo que ainda não tenha
+  versão por bloco.
 
 ## O documento como grafo
 
-`grafoDaMusica(doc, fontes, {taxa?, cache?, duracao_s?})` monta, na ordem do motor antigo:
+`grafoDaMusica(doc, fontes, {taxa?, cache?, duracao_s?, trecho?})` monta, na ordem do motor antigo:
 
 ```
 canal:<id> (Fonte: som seco)  →  faixa:<id>/entrada (Passa, soma dos canais na ordem dos canais)
-  → faixa:<id>/eq (AdaptadorEq3, se alguma banda ≠ 0) → faixa:<id>/compressor (se ligado)
+  → faixa:<id>/eq (Eq3, se alguma banda ≠ 0) → faixa:<id>/compressor (Compressor, se ligado)
   → faixa:<id>/volume_pan (0 dB se há automação) → faixa:<id>/sidechain (Ganho, curva por notas)
   → faixa:<id>/automacao (Ganho ligado a faixa:<id>/volume_db)
   ─┬→ master (soma 'zero': faixas na ordem do mixer, depois o delay e o reverb com o volume de cada um)
-   ├→ retorno:delay  (AdaptadorDelay,    soma 'zero' dos envios × envio)
-   └→ retorno:reverb (AdaptadorFreeverb, soma 'zero' dos envios × envio)
-master → master/automacao (Ganho ligado a master/volume_db) ou master/volume → master/limitador (AdaptadorLimitador)
+   ├→ retorno:delay  (Delay,    soma 'zero' dos envios × envio)
+   └→ retorno:reverb (Freeverb, soma 'zero' dos envios × envio)
+master → master/automacao (Ganho ligado a master/volume_db) ou master/volume → master/limitador (Limitador)
 ```
 
-- Os instrumentos (bateria, sintetizador e clipes de áudio) ainda são de buffer inteiro. O som seco de cada canal é feito
-  na montagem, pelo cache, e entra como `Fonte`. Viram processadores na I-01.
+- Os instrumentos (bateria, sintetizador e clipes de áudio) ainda não são processadores (isso vem na I-01): o som seco de
+  cada canal entra como `Fonte`. Com `cache` (a prévia), ele é feito inteiro na montagem e guardado, como antes. Sem
+  `cache` (o processo, o MCP, a entrega, o hash), ele é uma fonte preguiçosa (`fontePorTrechos` sobre
+  `instrumentos.ts`), feita em trechos de `trecho` amostras (32768 por padrão) só quando o executor lê.
+- O ganho do sidechain por notas e a automação de volume são curvas calculadas por bloco (`curvaDoSidechain`,
+  `curvaDaAutomacao`), nunca a música inteira.
 - A automação de volume de hoje é um ganho linear depois do fader, como no motor antigo: o nó `automacao`. Com ela, o
   `volume_pan` fica em 0 dB e sem endereço. A automação geral (X-08) vai ligar curvas nos endereços que os parâmetros
   já levam.
 - As chaves do cache são as do motor antigo (`canal:`, `faixa:`, `delay:`, `reverb:`). A prévia continua refazendo só o
   que mudou, e o teste confere que o cache termina com as mesmas chaves do motor antigo.
 - Medido (este PC, Node 26, sem cache): `trilha-video` (43 s) em 1,4 s no grafo e 1,3 a 1,6 s no antigo; `batida`
-  (19 s) em 0,8 s nos dois. Mexer num volume com o cache: 0,2 a 0,4 s nos dois.
+  (19 s) em 0,8 s nos dois. Mexer num volume com o cache: 0,2 a 0,4 s nos dois. Com 24 faixas, a memória e o tempo
+  estão em [`docs/desempenho.md`, seção 4.10](desempenho.md#410-música-memória-do-render-m-04).
 
 ## Converter um efeito em processador nativo
 
-Os cinco adaptadores (EQ, compressor, Freeverb, delay e limitador) só envolvem as funções de `musica-som.ts`. Converter
-um deles é escrever o mesmo efeito como `Processador`, trocar o adaptador em `musica.ts` e provar com o oráculo que o PCM
-não mudou.
+Os cinco efeitos de hoje (EQ, compressor, Freeverb, delay e limitador) já foram convertidos na M-04, deste jeito, e o
+`testes/audio-grafo-efeitos.test.ts` compara cada um com a função de buffer inteiro de `musica-som.ts`. O roteiro fica
+para o próximo efeito que nascer de buffer inteiro: escrever o mesmo efeito como `Processador`, pôr no lugar do
+adaptador e provar com o oráculo que o PCM não mudou.
 
 1. **Escreva o processador** em `src/nucleo/audio-grafo/` (um arquivo por efeito, por exemplo `eq3.ts`). Passe para
    campos o que a função guardava em variáveis locais entre amostras: os `x1 x2 y1 y2` de cada biquad por canal, o
@@ -140,12 +159,14 @@ não mudou.
    - Coeficientes que não mudam no tempo vão para o `preparar`. Os que mudam (EQ automatizado, X-08) são recalculados no
      `processar`, e um coeficiente constante tem que sair igual ao do motor antigo.
 2. **Declare a latência** se o efeito olha para a frente. O limitador lê 1,5 ms adiante (`la = round(0,0015·taxa)`
-   amostras). Por bloco, ele vira um processador causal com `latencia = la`: guarda a entrada numa linha de `la + 1`
-   amostras, calcula o pedido de cada amostra que entra e devolve a de `la` amostras atrás. O executor compensa e
-   descarta o atraso. A cauda bate: no fim, o motor antigo tomava o mínimo só do pedido que restava, o que é o mesmo que
-   completar a janela com 1, e depois do fim o executor manda silêncio, que pede 1. O `if (!algum) return 0` também sai igual, porque sem redução o ganho é 1 exato.
-   Então o limitador por bloco pode dar o mesmo hash. Se algum efeito não puder (por exemplo, um compressor com
-   lookahead novo), pare e leve ao dono: a M1 prevê uma tolerância só para compressor e limitador, a aprovar.
+   amostras). Por bloco, ele virou um processador causal com `latencia = la` (`limitador.ts`): guarda a entrada numa
+   linha de `la + 1` amostras, calcula o pedido de cada amostra que entra e devolve a de `la` amostras atrás. O executor
+   compensa e descarta o atraso, e o hash bateu. Duas armadilhas da cauda: o antigo tomava, no fim, o mínimo só do pedido
+   que restava, o que é o mesmo que completar a janela com 1; e, depois do fim, o executor ainda manda ao limitador o
+   que vem antes dele (a cauda do reverb), que o antigo não via. Por isso o `Limitador` recebe `fim` (as amostras da
+   música) e trata como "pede 1" tudo que entra depois. O `if (!algum) return 0` sai igual sem nada especial: sem
+   redução, o ganho é 1 exato. Se algum efeito não puder dar o mesmo hash (por exemplo, um compressor com lookahead
+   novo), pare e leve ao dono: a M1 prevê uma tolerância só para compressor e limitador, a aprovar.
 3. **Parâmetros**: declare em `parametros` os que a automação geral vai mexer (com o nome do segmento da M-02:
    `graves_db`, `limiar_db`). Ligue-os em `musica.ts` com `{endereco, valor}`, usando o endereço do `musica-param.ts`.
 4. **Estado**: `estado()` devolve as linhas e envelopes em listas de números, e `restaurar()` os põe de volta. Teste a
@@ -167,17 +188,50 @@ não mudou.
   um teste passar: mudar o som de um documento antigo pede aprovação do dono (A4).
 - `npx vitest run testes/audio-grafo.test.ts` cobre o núcleo: ordem estável, soma com ganho, portas múltiplas
   (sidechain e multi-saída), PDC com impulso, automação amostra a amostra depois de latência, estágios, cache e estado.
+- `npx vitest run testes/audio-grafo-efeitos.test.ts` compara cada efeito por bloco com a função de buffer inteiro, em
+  blocos de 1 amostra a maior que o sinal e com o estado salvo em JSON no meio; o limitador, com a latência descontada.
+- `npx vitest run testes/audio-memoria.test.ts` cobre a memória: fontes por trecho, instrumentos e curvas por trecho
+  contra os de buffer inteiro, o tamanho do trecho que não muda o hash, o armazém, a saída bloco a bloco, o cache em
+  disco (hash de referência, LRU, teto) e o WAV lido por trecho.
 - Depois do `npm run mcp:build`, `node scripts/hashes-musica.mjs --sem-vitest` confere os mesmos hashes pelo MCP por
   stdio.
 - Para um efeito novo (não convertido), que não tem oráculo, teste o processador isolado: impulso, resposta conhecida,
   tamanho de bloco que não muda nada, estado em JSON. Ele entra no grafo de um documento só quando o documento pedir,
   para os antigos continuarem iguais.
 
+## Memória
+
+O render canônico não guarda nada da música inteira além do que devolve (M-04, medido em [`docs/desempenho.md`,
+seção 4.10](desempenho.md#410-música-memória-do-render-m-04)):
+
+- **Streaming**: os efeitos rodam por bloco, os canais são lidos por trecho e as curvas são calculadas por bloco. Na
+  memória ficam a mistura do master (o resultado) e, se pedidos, os stems e os retornos (`porFaixa`).
+- **Carga preguiçosa** (`amostras.ts`): `FonteAmostras` é qualquer som lido por trecho: `ler(inicio, qtd, dest, off)`,
+  com silêncio fora de `[0, n)`. `fonteDeMemoria` envolve buffers prontos; `fontePorTrechos({canais, n, trecho,
+  fazer})` faz o som por trechos só quando alguém lê e segura no máximo dois; `abrirWav(caminho)` (Node) lê um WAV do
+  disco por trecho, com os mesmos valores do `lerWav`. É a base do sampler da M2: uma amostra grande entra como fonte e
+  só o trecho tocado vem para a memória. A `Fonte` aceita buffers ou uma `FonteAmostras`.
+- **Instrumentos por trecho** (`instrumentos.ts`): `bateriaPorTrecho`, `sintetizadorPorTrecho` e `audioPorTrecho`
+  preparam a lista de vozes, notas e clipes uma vez e somam só o trecho pedido. A ordem das somas é a das funções de
+  buffer inteiro (que ficam como estão, para o motor antigo), então cada amostra sai igual em qualquer tamanho de trecho.
+  Uma nota do sintetizador que cruza a borda é feita uma vez e guardada até acabar.
+- **Cache em disco** (`src/nucleo/cache-audio.ts`): `CacheAudioDisco` é o `ArmazemAudio` do Node. Cada saída de nó com
+  chave (as faixas processadas e os retornos) vira um arquivo `.f32` em `.estudio/cache-audio/` do projeto, com o
+  SHA-256 da versão e da chave no nome: cabeçalho de 16 bytes e cada canal em float32, lido de volta em trechos de 32768
+  amostras. Grava num `.tmp` e renomeia no fim (dois processos não se atrapalham; render que falhou não deixa nada). O
+  teto é de 2 GB, ou `ESTUDIO_CACHE_AUDIO_MB` (0 desliga). Passou do teto, sai o arquivo usado há mais tempo (a data de
+  modificação, que cada leitura renova); um item maior que metade do teto não é guardado. `VERSAO_CACHE_AUDIO` muda
+  quando muda a conta de algum processador. O processo principal e o MCP por stdio usam o cache em `renderizar`, `medir`
+  e `exportar` (`src/main/musica-render.ts`), e `.estudio/cache-audio/` entra no `.gitignore` do projeto com as outras
+  regras da música.
+- **A prévia** (worker da janela) continua com o cache em Map, de buffers inteiros por camada: o navegador não tem o
+  disco do projeto, e a prévia precisa refazer só o que mudou em décimos de segundo. Levar esse cache para o OPFS fica
+  para quando a memória da prévia apertar.
+
 ## O que ainda não é
 
-- Os instrumentos são `Fonte` de buffer inteiro (I-01).
-- Os cinco efeitos são adaptadores, então o render ainda usa memória da música inteira por faixa com EQ ou compressor e
-  por retorno. A memória limitada (M-04) vem com a conversão deles.
-- O worklet (M-06) vai usar o mesmo `Processador`. O executor de tempo real ainda não existe, e os adaptadores não rodam
-  nele.
+- Os instrumentos são fontes (lidas por trecho), não processadores (I-01).
+- O worklet (M-06) vai usar o mesmo `Processador`. O executor de tempo real ainda não existe.
+- O WAV em streaming até o disco (M-10) tem o caminho pronto (`aoBloco`), mas quem chama o render ainda pede a mistura
+  inteira: a medida de loudness e o hash leem tudo.
 - O track delay manual e o PDC visível na tela são da M-07. O PDC automático do executor já existe.

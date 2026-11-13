@@ -18,7 +18,8 @@ import {ARQUIVO_TRANSICOES, lerRegistro, type BaseProjeto} from './transicoes';
 
 // ---------- .gitignore ----------
 const TITULO_GIT = '# Estúdio · Música: o registro das transições e os renders se refazem e ficam fora do histórico';
-export const REGRAS_GIT_MUSICA = [ARQUIVO_TRANSICOES, 'midia/musica/'];
+/** O cache de áudio em disco (src/nucleo/cache-audio.ts) também se refaz. */
+export const REGRAS_GIT_MUSICA = [ARQUIVO_TRANSICOES, 'midia/musica/', '.estudio/cache-audio/'];
 
 export const garantirMusicaForaDoGit = (p: Projeto) => p.comTrava(() => {
   const atual = p.existe('.gitignore') ? p.lerTexto('.gitignore') : '';

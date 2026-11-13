@@ -2,6 +2,7 @@
 // (o ponto de soma de uma faixa ou do master), o ganho com automação e o volume com pan de uma faixa. As contas são as
 // mesmas de musica-som.ts, operação por operação, para o PCM sair igual ao do motor antigo (o oráculo dos testes).
 // Ver docs/audio-grafo.md.
+import {fonteDeMemoria, type FonteAmostras} from './amostras';
 import type {ContextoBloco, EstadoProcessador, Processador} from './tipos';
 
 /** dB → ganho linear (a conta do motor inteiro: 10^(dB/20)). */
@@ -21,31 +22,21 @@ abstract class SemEstado {
   restaurar(_e: EstadoProcessador) {}
 }
 
-/** Toca buffers prontos (o som seco de um canal, uma saída guardada no cache): a amostra `ctx.inicio + i` do buffer, e
- *  silêncio fora dele. Sem entrada. */
+/** Toca um som pronto (o som seco de um canal, uma saída guardada no cache): a amostra `ctx.inicio + i`, e silêncio fora
+ *  dele. Sem entrada. Aceita buffers inteiros ou uma `FonteAmostras` lida por trecho (carga preguiçosa, cache em disco). */
 export class Fonte extends SemEstado implements Processador {
   readonly tipo = 'fonte';
   readonly entradas: number[] = [];
   readonly saidas: number[];
   readonly latencia = 0;
-  constructor(readonly canais: readonly Float32Array[]) {
+  readonly fonte: FonteAmostras;
+  constructor(som: readonly Float32Array[] | FonteAmostras) {
     super();
-    this.saidas = [canais.length];
+    this.fonte = Array.isArray(som) ? fonteDeMemoria(som as readonly Float32Array[]) : (som as FonteAmostras);
+    this.saidas = [this.fonte.canais];
   }
   processar(_e: readonly (readonly Float32Array[])[], saidas: readonly Float32Array[][], n: number, ctx: ContextoBloco) {
-    const out = saidas[0];
-    for (let k = 0; k < out.length; k++) {
-      const src = this.canais[k], o = out[k];
-      const ini = ctx.inicio, fim = ini + n;
-      if (ini >= 0 && fim <= src.length) {
-        o.set(src.subarray(ini, fim));
-        continue;
-      }
-      for (let i = 0; i < n; i++) {
-        const j = ini + i;
-        o[i] = j >= 0 && j < src.length ? src[j] : 0;
-      }
-    }
+    this.fonte.ler(ctx.inicio, n, saidas[0], 0);
   }
 }
 
