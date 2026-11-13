@@ -9,7 +9,7 @@ import {resolverMusica, type IdLicenca, type CanalMusicaP, type ClipeMusicaP, ty
   type PresetSintetizador} from './musica';
 
 export const TAXA_MUSICA = 48000; // a do render do vídeo
-const MONO_EM_ESTEREO = Math.SQRT1_2; // como o ffmpeg abre o mono em estéreo (−3 dB por lado)
+export const MONO_EM_ESTEREO = Math.SQRT1_2; // como o ffmpeg abre o mono em estéreo (−3 dB por lado)
 const DUAS_PI = 2 * Math.PI;
 
 // ---------- ruído com semente ----------
@@ -236,7 +236,7 @@ export const notasDoClipe = (m: MusicaP, c: ClipeMusicaP): EventoNota[] => {
 /** Sons das peças guardados por (peça, afinação, semente, taxa): a mesma batida não se sintetiza duas vezes. */
 export type CacheSom = Map<string, Float32Array | Float32Array[]>;
 
-const somDaPeca = (cache: CacheSom, peca: PecaBateria, afinacao: number, semente: number, taxa: number) => {
+export const somDaPeca = (cache: CacheSom, peca: PecaBateria, afinacao: number, semente: number, taxa: number) => {
   const chave = `peca:${peca}:${afinacao}:${semente}:${taxa}`;
   let s = cache.get(chave) as Float32Array | undefined;
   if (!s) cache.set(chave, (s = sintetizarPeca(peca, taxa, afinacao, semente)));
