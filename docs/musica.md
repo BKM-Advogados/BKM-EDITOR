@@ -254,6 +254,13 @@ congelada em WAV; isso só chega na onda M8. As outras decisões do roadmap (`do
 - Nenhuma dependência nova no instalador. O que o Tone.js traz e falta aqui (sintetizadores prontos, agendador de tempo
   real) entra pelos itens do plano, escrito na mesma conta.
 
+**Grafo de processadores** (M-01, [A2](adr/A2-motor-em-grafo-por-bloco.md)): o render (`renderizarMusica`) monta o
+documento como um grafo (canais → faixas → retornos → master → limitador) e o roda em blocos de 128 amostras, com soma em
+ordem fixa, PDC e parâmetros pelo endereço da M-02 (`src/nucleo/audio-grafo/`, ver [`docs/audio-grafo.md`](audio-grafo.md)).
+O EQ, o compressor, o Freeverb, o delay e o limitador ainda entram como adaptadores das funções de antes, e os
+instrumentos como o som seco de cada canal. O PCM é o mesmo do motor antigo bit a bit: ele continua em `musica-som.ts`
+(`renderizarMusicaAntigo`) só como oráculo de `testes/audio-grafo-oraculo.test.ts`.
+
 **Fora da thread da interface.** Na janela, o som é feito no Web Worker `src/renderer/modulos/musica/render.worker.ts`,
 que guarda os áudios decodificados e o cache por camada. O render que vai para o vídeo também sai dele: o processo
 principal pede pela ponte com a janela (`src/main/ponte-janela.ts`, os canais `estudio:mcp-pedido` e
@@ -369,7 +376,7 @@ o oráculo.
 | `sintetizadores-audio` | os quatro sintetizadores com macros nos extremos, swing 0,6, canal e faixa mudos, clipes de áudio (`midia/ref-ruido.wav`) com corte, ganho e fades |
 
 `hashes.json` guarda o hash, as amostras e os canais de cada um. **Esses hashes são o oráculo da migração da M1**: o motor
-por blocos tem que dar os mesmos números. A exceção prevista é o compressor e o limitador, que ficam dentro de uma
+por blocos tem que dar os mesmos números (o grafo da M-01 já dá: os seis batem pelo vitest e pelo MCP por stdio). A exceção prevista é o compressor e o limitador, que ficam dentro de uma
 tolerância a aprovar.
 
 **Como conferir:**
