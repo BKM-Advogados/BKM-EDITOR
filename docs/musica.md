@@ -191,6 +191,42 @@ toca como guia, fora da música.
 - Fora do lugar vira aviso, nunca erro: canal, padrão ou áudio que faltam deixam o clipe calado; números fora da faixa
   voltam para dentro.
 
+**Esquema versionado** (M-02, `src/nucleo/musica-migrar.ts`): o `formato` diz a versão do documento (hoje 1; sem o campo,
+ou com um valor que não é inteiro, vale 0). Cada mudança de esquema entra como um migrador puro de um formato para o
+seguinte, na lista `MIGRADORES`; `migrarMusica` encadeia os que faltam até o formato atual. Regras:
+
+- O migrador nunca muda o som: o documento migrado renderiza o mesmo PCM que o original (os testes comparam o SHA-256).
+- Cada migrador é idempotente, e `migrarMusica` não toca no documento recebido (devolve o mesmo objeto quando nada muda).
+- Documento de formato mais novo que o do app fica como está, com aviso.
+- `patchDaMigracao` dá o JSON Patch da migração, para gravar pelo `aplicar_patch` com diário. Ainda ninguém chama a
+  migração ao abrir: o único migrador de hoje (0 → 1) só escreve o `formato`, e o motor já lê os dois iguais.
+
+**Endereço de parâmetro** (M-02, `src/nucleo/musica-param.ts`): um nome estável para cada botão da música, o mesmo para
+a automação geral, o MIDI learn, o MCP e a tela. É o alvo e os segmentos, separados por `/`:
+
+| Alvo | Exemplos |
+|---|---|
+| `faixa:<id>` (faixa do mixer) | `faixa:bateria/volume_db`, `faixa:bateria/eq/graves_db`, `faixa:bateria/compressor/razao`, `faixa:bateria/envio/reverb`, `faixa:baixo/sidechain/quanto_db` |
+| `canal:<id>` | `canal:lead/macro/brilho`, `canal:bateria/peca:caixa/afinacao`, `canal:bateria/mudo` |
+| `master` | `master/volume_db`, `master/reverb/tamanho`, `master/delay/tempo`, `master/limitador/teto_db` |
+| `musica` (o documento) | `musica/bpm`, `musica/swing` |
+
+- Um segmento é `nome` ou `nome:chave`. No id e na chave, `%`, `/` e `:` vão como `%25`, `%2F` e `%3A`.
+- O endereço usa ids, nunca posições: mover a faixa no mixer muda o caminho JSON, não o endereço.
+- `faixa:<id>/efeito:<slot>/<param>` já se lê e se escreve, mas só resolve quando houver inserts (X-01).
+- `lerEndereco` e `escreverEndereco` fazem a ida e a volta do texto.
+- `resolverParametro` dá o JSON Pointer do campo e o que falta criar. Cria a faixa que só existe pelo canal e os objetos
+  pais. O sidechain não nasce sem o canal que dispara.
+- `lerParametro` dá o valor efetivo (como o motor usa), o gravado e se o campo está no documento.
+- `patchDoParametro` dá o JSON Patch: número fora da faixa volta para dentro com aviso, tipo errado é erro.
+- `paraNormalizado` e `deNormalizado` levam a 0..1 e de volta (log nos tempos e na razão), para o MIDI learn.
+- `enderecosDoDocumento` lista o que um documento tem; `enderecoDaAutomacao` liga a automação de volume de hoje ao
+  endereço dela.
+
+A tabela `PARAMETROS` diz de cada parâmetro o tipo, a faixa, o padrão, a unidade, a curva e se é automatizável. Os
+padrões e as faixas são os do `resolverMusica`, e um teste confere um contra o outro. Nas peças do kit, a faixa é a da
+tela e do MCP: o motor não traz o valor de volta para dentro.
+
 **No vídeo** (`src/nucleo/audio.ts`): o `ClipeAudio` ganha `musica` (id do documento) e `musica_original`
 (`{arquivo, corte_ms?, duracao_ms}`, o áudio de antes do "Editar em Música"). `arquivo` aponta o render; o volume, os
 fades e o ducking do clipe continuam valendo, porque para o vídeo é um clipe como outro qualquer.
