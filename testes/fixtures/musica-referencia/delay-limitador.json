@@ -1,0 +1,294 @@
+{
+  "formato": 1,
+  "tipo": "musica",
+  "titulo": "Delay e limitador",
+  "bpm": 95,
+  "compasso": [
+    3,
+    4
+  ],
+  "tom": "C",
+  "escala": "maior",
+  "swing": 0,
+  "semente": 1,
+  "canais": [
+    {
+      "id": "lead",
+      "nome": "Lead",
+      "tipo": "sintetizador",
+      "faixa_mixer": "lead",
+      "preset": "lead",
+      "macros": {
+        "brilho": 0.8,
+        "soltura": 0.2
+      }
+    },
+    {
+      "id": "pluck",
+      "nome": "Pluck",
+      "tipo": "sintetizador",
+      "faixa_mixer": "pluck",
+      "preset": "pluck",
+      "macros": {
+        "cor": 0.9
+      }
+    },
+    {
+      "id": "bateria",
+      "nome": "Bateria",
+      "tipo": "bateria",
+      "faixa_mixer": "bateria"
+    }
+  ],
+  "padroes": [
+    {
+      "id": "p1",
+      "canal": "lead",
+      "dur": 3,
+      "notas": [
+        {
+          "nota": 72,
+          "em": 0,
+          "dur": 0.4,
+          "forca": 90
+        },
+        {
+          "nota": 74,
+          "em": 0.5,
+          "dur": 0.4,
+          "forca": 95
+        },
+        {
+          "nota": 76,
+          "em": 1,
+          "dur": 0.4,
+          "forca": 100
+        },
+        {
+          "nota": 79,
+          "em": 1.5,
+          "dur": 0.4,
+          "forca": 105
+        },
+        {
+          "nota": 76,
+          "em": 2,
+          "dur": 0.4,
+          "forca": 110
+        },
+        {
+          "nota": 74,
+          "em": 2.5,
+          "dur": 0.4,
+          "forca": 115
+        }
+      ]
+    },
+    {
+      "id": "p2",
+      "canal": "pluck",
+      "dur": 3,
+      "notas": [
+        {
+          "nota": 48,
+          "em": 0,
+          "dur": 0.2,
+          "forca": 60
+        },
+        {
+          "nota": 55,
+          "em": 0.25,
+          "dur": 0.2,
+          "forca": 80
+        },
+        {
+          "nota": 60,
+          "em": 0.5,
+          "dur": 0.2,
+          "forca": 100
+        },
+        {
+          "nota": 64,
+          "em": 0.75,
+          "dur": 0.2,
+          "forca": 60
+        },
+        {
+          "nota": 48,
+          "em": 1,
+          "dur": 0.2,
+          "forca": 80
+        },
+        {
+          "nota": 55,
+          "em": 1.25,
+          "dur": 0.2,
+          "forca": 100
+        },
+        {
+          "nota": 60,
+          "em": 1.5,
+          "dur": 0.2,
+          "forca": 60
+        },
+        {
+          "nota": 64,
+          "em": 1.75,
+          "dur": 0.2,
+          "forca": 80
+        },
+        {
+          "nota": 48,
+          "em": 2,
+          "dur": 0.2,
+          "forca": 100
+        },
+        {
+          "nota": 55,
+          "em": 2.25,
+          "dur": 0.2,
+          "forca": 60
+        },
+        {
+          "nota": 60,
+          "em": 2.5,
+          "dur": 0.2,
+          "forca": 80
+        },
+        {
+          "nota": 64,
+          "em": 2.75,
+          "dur": 0.2,
+          "forca": 100
+        }
+      ]
+    },
+    {
+      "id": "p3",
+      "canal": "bateria",
+      "dur": 3,
+      "notas": [
+        {
+          "peca": "bumbo",
+          "em": 0,
+          "forca": 127
+        },
+        {
+          "peca": "aro",
+          "em": 1
+        },
+        {
+          "peca": "aro",
+          "em": 2,
+          "forca": 70
+        },
+        {
+          "peca": "shaker",
+          "em": 0.5
+        },
+        {
+          "peca": "shaker",
+          "em": 1.5
+        },
+        {
+          "peca": "shaker",
+          "em": 2.5
+        },
+        {
+          "peca": "tom_agudo",
+          "em": 2.75,
+          "forca": 90
+        }
+      ]
+    }
+  ],
+  "arranjo": {
+    "clipes": [
+      {
+        "id": "c1",
+        "canal": "lead",
+        "em": 0,
+        "dur": 6,
+        "padrao": "p1"
+      },
+      {
+        "id": "c2",
+        "canal": "pluck",
+        "em": 3,
+        "dur": 9,
+        "padrao": "p2"
+      },
+      {
+        "id": "c3",
+        "canal": "bateria",
+        "em": 0,
+        "dur": 12,
+        "padrao": "p3"
+      },
+      {
+        "id": "c4",
+        "canal": "lead",
+        "em": 9,
+        "dur": 1.5,
+        "padrao": "p1",
+        "inicio": 1.5
+      }
+    ]
+  },
+  "mixer": {
+    "faixas": [
+      {
+        "id": "lead",
+        "nome": "Lead",
+        "volume_db": 0,
+        "pan": -0.4,
+        "delay": 0.7,
+        "reverb": 0.2
+      },
+      {
+        "id": "pluck",
+        "nome": "Pluck",
+        "volume_db": 0,
+        "pan": 0.5,
+        "delay": 0.35,
+        "eq": {
+          "medios_db": 4
+        }
+      },
+      {
+        "id": "bateria",
+        "nome": "Bateria",
+        "volume_db": 2,
+        "pan": 0,
+        "reverb": 0.25
+      }
+    ],
+    "master": {
+      "volume_db": 9,
+      "reverb": {
+        "tamanho": 0.85,
+        "amortecimento": 0.2,
+        "volume_db": -4
+      },
+      "delay": {
+        "tempo": "1/8.",
+        "realimentacao": 0.7,
+        "brilho": 0.25,
+        "pingue_pongue": true,
+        "volume_db": 0
+      },
+      "limitador": {
+        "ativo": true,
+        "teto_db": -3,
+        "soltura_ms": 60
+      }
+    }
+  },
+  "marcadores": [
+    {
+      "id": "m1",
+      "em": 3,
+      "nome": "entra o pluck"
+    }
+  ]
+}

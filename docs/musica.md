@@ -341,6 +341,56 @@ duração do clipe acompanha a música, salvo quando a pessoa aparou o clipe no 
 mais sai na hora; na abertura do projeto, o que falta no disco (pasta clonada) é gravado e as sobras saem. Sem a janela
 (MCP por stdio), as ferramentas fazem o mesmo, com o ffmpeg do `node_modules` para áudios que não são WAV a 48 kHz.
 
+## Determinismo
+
+Contrato da M-03 (ADR A4 de `docs/musica-daw.md`), em duas classes:
+
+- **Canônico**: o render offline que vai para o vídeo, a exportação e o MCP. O mesmo documento dá o mesmo PCM, bit a bit,
+  na janela (Web Worker), no processo principal e no MCP por stdio. É o que se confere por hash.
+- **Prévia viva**: o que tocar em tempo real (worklet, knob mexido na hora, entrada de áudio, onda M5 em diante). É
+  declarada aproximada. Hoje a prévia ainda é o próprio render canônico, tocado em buffer, então ainda não há diferença.
+
+**A impressão digital** (`src/nucleo/musica-hash.ts`) é o SHA-256 dos bytes float32 little-endian, com os canais
+intercalados (L0 R0 L1 R1 ...), da mistura final a 48 kHz: depois do master e do limitador, antes da conversão para 16 ou
+24 bits. Os bits vão como estão, então −0 e +0 contam diferente. O SHA-256 é escrito em TypeScript puro (sem
+`node:crypto` nem `crypto.subtle`) para rodar igual nos quatro lugares. `hashDaMusica(doc, fontes)` renderiza sem cache e
+devolve `{pcm_sha256, amostras, canais, taxa}`. `hashDoPcm(canais)` serve para um render já feito.
+
+**Documentos de referência** (`testes/fixtures/musica-referencia/`), congelados em JSON: mudar um modelo depois não muda
+o oráculo.
+
+| Documento | O que exercita |
+|---|---|
+| `batida` | o modelo Batida: bateria pop, baixo em oitavas com sidechain do bumbo, acordes, presets de faixa |
+| `trilha-video` | o modelo Trilha para vídeo: pad, arpejo, baixo, bateria calma, "Cama sob a voz", fade por automação no master |
+| `efeito-sonoro` | o modelo Efeito sonoro: subida de notas, rufar, impacto, reverb e delay pingue-pongue |
+| `sidechain-automacao` | swing 0,35, semente 7, ajuste de peças, EQ e compressor, dois sidechains (bumbo e caixa), automação de duas faixas, clipe com `inicio` |
+| `delay-limitador` | compasso 3/4, delay pingue-pongue de colcheia pontuada com realimentação 0,7, reverb grande, master +9 dB no limitador a −3 dB (13 dB de redução), pan |
+| `sintetizadores-audio` | os quatro sintetizadores com macros nos extremos, swing 0,6, canal e faixa mudos, clipes de áudio (`midia/ref-ruido.wav`) com corte, ganho e fades |
+
+`hashes.json` guarda o hash, as amostras e os canais de cada um. **Esses hashes são o oráculo da migração da M1**: o motor
+por blocos tem que dar os mesmos números. A exceção prevista é o compressor e o limitador, que ficam dentro de uma
+tolerância a aprovar.
+
+**Como conferir:**
+- `npx vitest run testes/musica-determinismo.test.ts`: renderiza cada documento pelo motor de agora e confere o hash. Confere
+  também o SHA-256 contra o `node:crypto`, a prévia com cache (mexer num volume e voltar dá o mesmo PCM) e o
+  `medir_musica {hash: true}` pelo registro do MCP.
+- `node scripts/hashes-musica.mjs` (depois do `npm run mcp:build`): roda o vitest, monta um projeto temporário com os
+  documentos e pede `medir_musica {hash: true}` a cada um pelo MCP por stdio (`dist-mcp/nucleo.cjs`). Com `--executavel
+  <Estúdio>`, roda pelo executável do app em modo Node, que usa o V8 do Electron. `--sem-vitest` pula o vitest.
+- Na janela: com o app aberto no projeto, o MCP por stdio repassa ao app, e o `medir_musica {hash: true}` sai do Web Worker
+  (`feito_por: "janela"`).
+
+**Regravar o oráculo** só quando uma mudança de som foi decidida e aprovada pelo dono:
+`ESTUDIO_GRAVAR_HASHES=1 npx vitest run testes/musica-determinismo.test.ts`. O diff do `hashes.json` vai no mesmo commit,
+com o motivo.
+
+**Medido** (este PC, Linux, Node 26): os seis hashes do vitest batem com os do MCP por stdio. O SHA-256 em TS puro leva
+0,08 s para 40 s de música estéreo. O `npm test` do CI roda o mesmo teste no Linux, no Windows e no Mac (Intel e Apple
+Silicon), então um hash que mude por sistema ou processador quebra o CI. Ainda falta conferir na janela (o V8 do
+Electron) e pelo executável do app com `--executavel`.
+
 ## Ferramentas MCP
 
 Em `src/nucleo/mcp-musica.ts`, registradas por uma linha em `registrarFerramentas`. Servem a qualquer IA: esquema Zod sem
@@ -352,7 +402,7 @@ Em `src/nucleo/mcp-musica.ts`, registradas por uma linha em `registrarFerramenta
 |---|---|---|---|
 | `ler_musica` | `documento?, eventos?, de?, ate?` | BPM, compasso, duração, canais, padrões, clipes (batidas e segundos), mixer, onde toca no vídeo e se o render está em dia, cortes das cenas e avisos; com `eventos`, as notas do trecho em segundos | livre |
 | `arranjar` | `documento?, acao: por\|mover\|aparar\|dividir\|apagar\|ajustar\|repetir\|secao\|mover_secao, clipe?, canal?, audio?, padrao?, em?, dur?, corte_s?, ganho_db?, fade_in?, fade_out?, mudo?, vezes?, secao?, nome?` | Põe, move, apara, divide, apaga, ajusta e repete clipes; cria, renomeia e move seções (mover leva os clipes); aparar o começo anda o corte do áudio ou o início do padrão | livre |
-| `medir_musica` | `documento?, por_faixa?` | LUFS integrado e pico da música e de cada faixa | livre |
+| `medir_musica` | `documento?, por_faixa?, hash?` | LUFS integrado e pico da música e de cada faixa; com `hash`, o SHA-256 do PCM, as amostras e quem fez a conta (seção Determinismo) | livre |
 | `por_no_video` | `musica?, video?, faixa?, em_ms?, substituir?` | Clipe novo ligado à música, ou liga um clipe que existe | livre |
 | `levar_para` | `modulo, alvo: {documento, caminho}, intencao?, tempo?: {em_ms?, dur_ms?}, modelo?` | Abre a Música com o clipe ou a faixa do vídeo e guarda de onde veio; ao criar, `modelo` (`vazio`, `batida`, `trilha_video`, `efeito_sonoro`) escolhe a música nova | livre |
 | `concluir_transicao` | `transicao, aplicar?, resultado?: {documento?, midia?}` | Põe a música no vídeo por patch e volta | livre |

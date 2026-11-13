@@ -1,0 +1,364 @@
+{
+  "formato": 1,
+  "tipo": "musica",
+  "titulo": "Efeito sonoro",
+  "bpm": 120,
+  "compasso": [
+    4,
+    4
+  ],
+  "tom": "C",
+  "escala": "maior",
+  "swing": 0,
+  "semente": 1,
+  "canais": [
+    {
+      "id": "subida",
+      "nome": "Subida",
+      "tipo": "sintetizador",
+      "faixa_mixer": "subida",
+      "preset": "lead",
+      "macros": {
+        "brilho": 0.7
+      }
+    },
+    {
+      "id": "bateria",
+      "nome": "Bateria",
+      "tipo": "bateria",
+      "faixa_mixer": "bateria",
+      "kit": "eletronico"
+    },
+    {
+      "id": "grave",
+      "nome": "Grave",
+      "tipo": "sintetizador",
+      "faixa_mixer": "grave",
+      "preset": "baixo"
+    }
+  ],
+  "padroes": [
+    {
+      "id": "p1",
+      "nome": "Subida",
+      "canal": "subida",
+      "dur": 6,
+      "passos": 24,
+      "notas": [
+        {
+          "nota": 60,
+          "em": 0,
+          "dur": 0.25,
+          "forca": 40
+        },
+        {
+          "nota": 61,
+          "em": 0.25,
+          "dur": 0.25,
+          "forca": 43
+        },
+        {
+          "nota": 62,
+          "em": 0.5,
+          "dur": 0.25,
+          "forca": 47
+        },
+        {
+          "nota": 63,
+          "em": 0.75,
+          "dur": 0.25,
+          "forca": 50
+        },
+        {
+          "nota": 64,
+          "em": 1,
+          "dur": 0.25,
+          "forca": 54
+        },
+        {
+          "nota": 65,
+          "em": 1.25,
+          "dur": 0.25,
+          "forca": 57
+        },
+        {
+          "nota": 66,
+          "em": 1.5,
+          "dur": 0.25,
+          "forca": 61
+        },
+        {
+          "nota": 67,
+          "em": 1.75,
+          "dur": 0.25,
+          "forca": 64
+        },
+        {
+          "nota": 68,
+          "em": 2,
+          "dur": 0.25,
+          "forca": 68
+        },
+        {
+          "nota": 69,
+          "em": 2.25,
+          "dur": 0.25,
+          "forca": 71
+        },
+        {
+          "nota": 70,
+          "em": 2.5,
+          "dur": 0.25,
+          "forca": 75
+        },
+        {
+          "nota": 71,
+          "em": 2.75,
+          "dur": 0.25,
+          "forca": 78
+        },
+        {
+          "nota": 73,
+          "em": 3,
+          "dur": 0.25,
+          "forca": 82
+        },
+        {
+          "nota": 74,
+          "em": 3.25,
+          "dur": 0.25,
+          "forca": 85
+        },
+        {
+          "nota": 75,
+          "em": 3.5,
+          "dur": 0.25,
+          "forca": 89
+        },
+        {
+          "nota": 76,
+          "em": 3.75,
+          "dur": 0.25,
+          "forca": 92
+        },
+        {
+          "nota": 77,
+          "em": 4,
+          "dur": 0.25,
+          "forca": 96
+        },
+        {
+          "nota": 78,
+          "em": 4.25,
+          "dur": 0.25,
+          "forca": 99
+        },
+        {
+          "nota": 79,
+          "em": 4.5,
+          "dur": 0.25,
+          "forca": 103
+        },
+        {
+          "nota": 80,
+          "em": 4.75,
+          "dur": 0.25,
+          "forca": 106
+        },
+        {
+          "nota": 81,
+          "em": 5,
+          "dur": 0.25,
+          "forca": 110
+        },
+        {
+          "nota": 82,
+          "em": 5.25,
+          "dur": 0.25,
+          "forca": 113
+        },
+        {
+          "nota": 83,
+          "em": 5.5,
+          "dur": 0.25,
+          "forca": 117
+        },
+        {
+          "nota": 84,
+          "em": 5.75,
+          "dur": 0.25,
+          "forca": 120
+        }
+      ]
+    },
+    {
+      "id": "p2",
+      "nome": "Rufar e impacto",
+      "canal": "bateria",
+      "dur": 8,
+      "passos": 32,
+      "notas": [
+        {
+          "peca": "caixa",
+          "em": 3,
+          "forca": 77
+        },
+        {
+          "peca": "caixa",
+          "em": 3.25,
+          "forca": 81
+        },
+        {
+          "peca": "caixa",
+          "em": 3.5,
+          "forca": 85
+        },
+        {
+          "peca": "caixa",
+          "em": 3.75,
+          "forca": 89
+        },
+        {
+          "peca": "caixa",
+          "em": 4,
+          "forca": 93
+        },
+        {
+          "peca": "caixa",
+          "em": 4.25,
+          "forca": 97
+        },
+        {
+          "peca": "caixa",
+          "em": 4.5,
+          "forca": 100
+        },
+        {
+          "peca": "caixa",
+          "em": 4.75,
+          "forca": 104
+        },
+        {
+          "peca": "caixa",
+          "em": 5,
+          "forca": 108
+        },
+        {
+          "peca": "caixa",
+          "em": 5.25,
+          "forca": 112
+        },
+        {
+          "peca": "caixa",
+          "em": 5.5,
+          "forca": 116
+        },
+        {
+          "peca": "caixa",
+          "em": 5.75,
+          "forca": 120
+        },
+        {
+          "peca": "bumbo",
+          "em": 6,
+          "forca": 127
+        },
+        {
+          "peca": "prato",
+          "em": 6,
+          "forca": 120
+        },
+        {
+          "peca": "tom_grave",
+          "em": 6,
+          "forca": 110
+        }
+      ]
+    },
+    {
+      "id": "p3",
+      "nome": "Grave",
+      "canal": "grave",
+      "dur": 8,
+      "passos": 32,
+      "notas": [
+        {
+          "nota": 28,
+          "em": 6,
+          "dur": 2,
+          "forca": 127
+        }
+      ]
+    }
+  ],
+  "arranjo": {
+    "clipes": [
+      {
+        "id": "c1",
+        "canal": "subida",
+        "em": 0,
+        "dur": 6,
+        "padrao": "p1"
+      },
+      {
+        "id": "c2",
+        "canal": "bateria",
+        "em": 0,
+        "dur": 8,
+        "padrao": "p2"
+      },
+      {
+        "id": "c3",
+        "canal": "grave",
+        "em": 0,
+        "dur": 8,
+        "padrao": "p3"
+      }
+    ]
+  },
+  "mixer": {
+    "faixas": [
+      {
+        "id": "subida",
+        "nome": "Subida",
+        "volume_db": -4,
+        "pan": 0,
+        "reverb": 0.3,
+        "delay": 0.3
+      },
+      {
+        "id": "bateria",
+        "nome": "Bateria",
+        "volume_db": 0,
+        "pan": 0,
+        "reverb": 0.35
+      },
+      {
+        "id": "grave",
+        "nome": "Grave",
+        "volume_db": -2,
+        "pan": 0
+      }
+    ],
+    "master": {
+      "volume_db": 0,
+      "reverb": {
+        "tamanho": 0.6,
+        "amortecimento": 0.4,
+        "volume_db": 0
+      },
+      "delay": {
+        "tempo": "1/8",
+        "realimentacao": 0.4,
+        "brilho": 0.4,
+        "pingue_pongue": true,
+        "volume_db": -3
+      },
+      "limitador": {
+        "ativo": true,
+        "teto_db": -1
+      }
+    }
+  },
+  "marcadores": []
+}

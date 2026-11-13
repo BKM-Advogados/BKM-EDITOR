@@ -12,6 +12,7 @@ import {audiosDaMusica, partesDoSom, resolverMusica, type AjustePeca, type DocMu
 import {codificarWav16, notaDoSintetizador, receitaDe, renderizarMusica, somDeUmaBatida, TAXA_MUSICA, type CacheSom} from '../../../nucleo/musica-som';
 import type {NiveisSom, PedidoRender, RespostaRender} from './render.worker';
 import {entregaEmBytes, type PedidoEntrega} from '../../../nucleo/musica-entrega';
+import {hashDoPcm} from '../../../nucleo/musica-hash';
 
 type SemId<T> = T extends unknown ? Omit<T, 'id'> : never;
 import {loja} from '../../estado/loja';
@@ -100,7 +101,7 @@ class MotorMusica {
     if (!p.paraVideo) return {id: p.id, ok: true, canais: r.canais, duracao_s: r.duracao_s, avisos: r.avisos, faltando: r.faltando, ms, limitador_db: r.limitador_db};
     const m = medirAmostras(r.canais, p.taxa);
     return {id: p.id, ok: true, duracao_s: r.duracao_s, avisos: r.avisos, faltando: r.faltando, ms, medida: {integrado_lufs: m.integrado_lufs, pico_dbtp: m.pico_dbtp},
-      envelope: envelopeDeAmostras(r.canais, p.taxa), wav: codificarWav16(r.canais, p.taxa)};
+      envelope: envelopeDeAmostras(r.canais, p.taxa), wav: codificarWav16(r.canais, p.taxa), ...(p.hash ? {pcm_sha256: hashDoPcm(r.canais), amostras: r.canais[0].length} : {})};
   }
 
   contexto() {
@@ -193,9 +194,9 @@ class MotorMusica {
 
   /** O render que vai para o vídeo (pedido do processo principal pela ponte com a janela): WAV, medida e envelope,
    *  feitos no worker com os mesmos áudios e o mesmo cache da prévia. */
-  async renderParaVideo(doc: DocMusica, porFaixa = false) {
+  async renderParaVideo(doc: DocMusica, porFaixa = false, hash = false) {
     await Promise.all(audiosDaMusica(doc).map((a) => this.levarAoWorker(a)));
-    return this.pedir({tipo: 'render', doc, taxa: TAXA_MUSICA, paraVideo: true, porFaixa});
+    return this.pedir({tipo: 'render', doc, taxa: TAXA_MUSICA, paraVideo: true, porFaixa, hash});
   }
 
   /** A música em arquivo (pedido do processo principal): mistura no alvo e stems em WAV de 24 bits, feitos no worker. */

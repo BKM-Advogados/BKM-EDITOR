@@ -227,10 +227,11 @@ export const observarMusica = () => {
   });
   // o render que vai para o vídeo: o processo principal pede, o Web Worker da janela faz (motor.ts carrega só aqui)
   const largarRender = atender('musica:render', async (dados) => {
-    const {doc, porFaixa, sohMedir} = dados as {doc: DocMusica; porFaixa?: boolean; sohMedir?: boolean};
-    const r = await (await import('./motor')).motor.renderParaVideo(doc, porFaixa);
+    const {doc, porFaixa, sohMedir, hash} = dados as {doc: DocMusica; porFaixa?: boolean; sohMedir?: boolean; hash?: boolean};
+    const r = await (await import('./motor')).motor.renderParaVideo(doc, porFaixa, hash);
     if (!r.ok) throw new Error(r.mensagem);
-    return {duracao_s: r.duracao_s, avisos: r.avisos, faltando: r.faltando, medida: r.medida, faixas: r.faixas, ...(sohMedir ? {} : {wav: r.wav, envelope: r.envelope})};
+    return {duracao_s: r.duracao_s, avisos: r.avisos, faltando: r.faltando, medida: r.medida, faixas: r.faixas, ...(sohMedir ? {} : {wav: r.wav, envelope: r.envelope}),
+      ...(r.pcm_sha256 ? {pcm_sha256: r.pcm_sha256, amostras: r.amostras} : {})};
   });
   // exportar a música em arquivo (item 23): a conta no worker; o processo principal grava e codifica
   const largarEntrega = atender('musica:exportar', async (dados) => {

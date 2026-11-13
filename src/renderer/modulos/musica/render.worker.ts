@@ -7,16 +7,18 @@ import {medirAmostras, type FonteAudio} from '../../../nucleo/loudness';
 import type {DocMusica} from '../../../nucleo/musica';
 import {codificarWav16, renderizarMusica, type CacheSom} from '../../../nucleo/musica-som';
 import {entregaEmBytes, type EntregaEmBytes, type PedidoEntrega} from '../../../nucleo/musica-entrega';
+import {hashDoPcm} from '../../../nucleo/musica-hash';
 
 export type PedidoRender =
   | {id: number; tipo: 'fonte'; arquivo: string; canais: Float32Array[]; taxa: number}
   | {id: number; tipo: 'esquecer'; arquivo?: string}
-  | {id: number; tipo: 'render'; doc: DocMusica; taxa: number; paraVideo?: boolean; porFaixa?: boolean}
+  | {id: number; tipo: 'render'; doc: DocMusica; taxa: number; paraVideo?: boolean; porFaixa?: boolean; hash?: boolean}
   | {id: number; tipo: 'entrega'; doc: DocMusica; pedido: PedidoEntrega};
 export type MedidaSom = {integrado_lufs: number | null; pico_dbtp: number | null};
 export type RespostaRender =
   | {id: number; ok: true; canais?: Float32Array[]; duracao_s?: number; avisos?: string[]; faltando?: string[]; ms?: number; medida?: MedidaSom;
-    faixas?: Record<string, MedidaSom>; envelope?: Envelope; wav?: Uint8Array; niveis?: NiveisSom; entrega?: EntregaEmBytes; limitador_db?: number}
+    faixas?: Record<string, MedidaSom>; envelope?: Envelope; wav?: Uint8Array; niveis?: NiveisSom; entrega?: EntregaEmBytes; limitador_db?: number;
+    pcm_sha256?: string; amostras?: number}
   | {id: number; ok: false; mensagem: string};
 
 /** Pico em dBFS a cada 50 ms, por faixa do mixer (depois do volume e do pan) e do master: o medidor ao vivo lê na cabeça. */
@@ -66,7 +68,7 @@ self.addEventListener('message', (e: MessageEvent<PedidoRender>) => {
     if (p.paraVideo) {
       const wav = codificarWav16(r.canais, p.taxa);
       return responder({id: p.id, ok: true, duracao_s: r.duracao_s, avisos: r.avisos, faltando: r.faltando, ms, medida: medir(r.canais),
-        envelope: envelopeDeAmostras(r.canais, p.taxa), wav, ...(r.faixas ? {faixas: Object.fromEntries(Object.entries(r.faixas).map(([k, c]) => [k, medir(c)]))} : {})},
+        envelope: envelopeDeAmostras(r.canais, p.taxa), wav, ...(p.hash ? {pcm_sha256: hashDoPcm(r.canais), amostras: r.canais[0].length} : {}), ...(r.faixas ? {faixas: Object.fromEntries(Object.entries(r.faixas).map(([k, c]) => [k, medir(c)]))} : {})},
       [wav.buffer]);
     }
     // a mistura é nova a cada render (o cache guarda as camadas, não ela): vai transferida, sem cópia
