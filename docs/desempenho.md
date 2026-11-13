@@ -224,6 +224,57 @@ A proposta:
 
 ---
 
+### 4.10 Música: memória do render (M-04)
+
+O render da música (`renderizarMusica`, `src/nucleo/audio-grafo/`) roda em streaming: os efeitos processam blocos de 128
+amostras, cada canal é feito por trechos de 32768 amostras enquanto o grafo lê, e na memória ficam só a mistura do master
+e, se pedidos, os stems. O processo principal e o MCP por stdio guardam cada faixa processada e cada retorno num cache em
+disco com LRU (`.estudio/cache-audio/`, fora do git, teto de 2 GB como o cache em disco do perfil leve da seção 1;
+`ESTUDIO_CACHE_AUDIO_MB` muda e 0 desliga). Como funciona: [`docs/audio-grafo.md`, seção Memória](audio-grafo.md#memória).
+
+**Orçamento** (pico de memória residente do processo Node que renderiza, sem a prévia): música de 5 min e 24 faixas,
+mistura só (render para o vídeo, medida, hash): alvo 300 MB, teto 450 MB. Com stems, soma-se o que eles ocupam inteiros
+(2 canais × 4 bytes × 48 000 × duração por faixa e por retorno: 115 MB por stem de 5 min), até o WAV em streaming da
+M-10.
+
+**Medido** em 12/11/2026 (este PC: Linux, 12 núcleos, 31 GB, Node 26), com `scripts/medir-memoria-musica.mts --tudo`.
+Documento sintético de 24 faixas a 120 BPM: 6 baterias e 18 sintetizadores (os quatro presets), EQ em metade, compressor
+num terço, envios ao reverb em metade e ao delay num quarto, 4 faixas com sidechain, 3 com automação de volume, automação
+no master e limitador. Cada linha roda num processo novo; o pico é o `maxRSS` do processo inteiro (Node e tsx incluídos,
+uns 100 MB). "Antes" é a M-01 (branch `m/grafo`: efeitos como adaptadores de buffer inteiro). O hash do PCM é o mesmo nos
+três motores, nas duas durações.
+
+| Motor | Duração | Stems | Tempo | Pico de RSS |
+|---|---|---|---|---|
+| antigo (oráculo, buffer inteiro) | 60 s | não | 10,2 s | 1 298 MB |
+| antigo | 60 s | sim | 10,6 s | 1 308 MB |
+| grafo, antes (M-01) | 60 s | não | 10,8 s | 1 672 MB |
+| grafo, antes (M-01) | 60 s | sim | 10,8 s | 1 780 MB |
+| **grafo, depois (M-04)** | 60 s | não | 11,5 s | **170 MB** |
+| **grafo, depois (M-04)** | 60 s | sim | 11,9 s | 782 MB |
+| antigo | 5 min | não | 56,9 s | 5 916 MB |
+| antigo | 5 min | sim | 56,7 s | 6 080 MB |
+| grafo, antes (M-01) | 5 min | não | 53,7 s | 7 970 MB |
+| grafo, antes (M-01) | 5 min | sim | 54,6 s | 8 390 MB |
+| **grafo, depois (M-04)** | 5 min | não | 52,3 s | **289 MB** |
+| **grafo, depois (M-04)** | 5 min | sim | 55,1 s | 3 420 MB |
+
+Com o cache em disco (pasta temporária, mistura só): 60 s em 12,0 s gravando e **0,75 s** no segundo render, que lê as
+24 faixas e os 2 retornos do disco, com pico de 205 MB; 5 min em 53,9 s gravando e **3,3 s** lendo, pico de 347 MB.
+
+- A memória do render sem stems fica quase constante: de 60 s para 5 min, o pico sobe 119 MB, que são a mistura (2
+  canais de 5 min em float32, 115 MB). Antes ela crescia com faixas × duração.
+- O tempo não mudou: o custo está nos instrumentos (o sintetizador é dois terços do perfil), não no grafo. As
+  diferenças de ±10 % entre as linhas são ruído de uma rodada só.
+- Com stems, quem pede (a exportação com stems, `medir_musica` por faixa) ainda recebe tudo inteiro. Para caber no
+  orçamento nesse caso, a entrega tem que gravar cada stem em WAV bloco a bloco (`aoBloco` do executor já existe; falta
+  a M-10 usá-lo).
+- O cache em disco grava 115 MB por faixa de 5 min (2,8 GB para estas 24 + 2 retornos), acima do teto padrão: as
+  faixas mais antigas saem pelo LRU no mesmo render e o segundo render refaz parte delas. Para projetos desse tamanho,
+  suba `ESTUDIO_CACHE_AUDIO_MB`.
+- A prévia da janela continua com o cache em memória de buffers inteiros por camada (o navegador não tem o disco do
+  projeto). É O(faixas × duração), como antes; levá-la ao OPFS fica para quando ela apertar.
+
 ## 5. Medição no próprio app
 
 - **Módulo `perf`**, igual nos dois lados:

@@ -257,9 +257,17 @@ congelada em WAV; isso só chega na onda M8. As outras decisões do roadmap (`do
 **Grafo de processadores** (M-01, [A2](adr/A2-motor-em-grafo-por-bloco.md)): o render (`renderizarMusica`) monta o
 documento como um grafo (canais → faixas → retornos → master → limitador) e o roda em blocos de 128 amostras, com soma em
 ordem fixa, PDC e parâmetros pelo endereço da M-02 (`src/nucleo/audio-grafo/`, ver [`docs/audio-grafo.md`](audio-grafo.md)).
-O EQ, o compressor, o Freeverb, o delay e o limitador ainda entram como adaptadores das funções de antes, e os
-instrumentos como o som seco de cada canal. O PCM é o mesmo do motor antigo bit a bit: ele continua em `musica-som.ts`
-(`renderizarMusicaAntigo`) só como oráculo de `testes/audio-grafo-oraculo.test.ts`.
+O EQ, o compressor, o Freeverb, o delay e o limitador são processadores por bloco (o limitador com 1,5 ms de latência
+compensada), e os instrumentos entram como o som seco de cada canal. O PCM é o mesmo do motor antigo bit a bit: ele
+continua em `musica-som.ts` (`renderizarMusicaAntigo`) só como oráculo de `testes/audio-grafo-oraculo.test.ts`.
+
+**Memória do render** (M-04): fora da prévia, o render não guarda o som da música inteira por canal nem por faixa. Cada
+canal é feito por trechos enquanto o grafo lê, e na memória ficam só a mistura e, se pedidos, os stems: 24 faixas de
+5 min passaram de 5,9 GB no motor antigo (8 GB no grafo da M-01) para 290 MB ([`docs/desempenho.md`, seção
+4.10](desempenho.md#410-música-memória-do-render-m-04)). No processo principal e no MCP por stdio, cada faixa
+processada e cada retorno ficam num **cache em disco** em `.estudio/cache-audio/` do projeto (fora do git, teto de 2 GB,
+LRU; `ESTUDIO_CACHE_AUDIO_MB` muda o teto e 0 desliga): renderizar, medir ou exportar de novo depois de mexer numa faixa
+refaz só ela. Detalhes em [`docs/audio-grafo.md`, seção Memória](audio-grafo.md#memória).
 
 **Fora da thread da interface.** Na janela, o som é feito no Web Worker `src/renderer/modulos/musica/render.worker.ts`,
 que guarda os áudios decodificados e o cache por camada. O render que vai para o vídeo também sai dele: o processo
