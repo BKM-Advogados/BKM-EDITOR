@@ -12,6 +12,7 @@ import {audioPorTrecho, bateriaPorTrecho, curvaDaAutomacao, curvaDoSidechain, si
 import {grafoDaMusica, renderizarMusicaGrafo} from '../src/nucleo/audio-grafo/musica';
 import {Fonte, Ganho} from '../src/nucleo/audio-grafo/processadores';
 import type {Processador} from '../src/nucleo/audio-grafo/tipos';
+import {abrirWav} from '../src/nucleo/amostras-wav';
 import {CacheAudioDisco, PASTA_CACHE_AUDIO, cacheAudioDoProjeto, tetoDoAmbiente, TETO_CACHE_AUDIO} from '../src/nucleo/cache-audio';
 import {audiosDaMusica, resolverMusica, type DocMusica} from '../src/nucleo/musica';
 import {hashDoPcm} from '../src/nucleo/musica-hash';
@@ -305,5 +306,63 @@ describe('cache de áudio em disco', () => {
     disco.aparar();
     expect(existsSync(velho)).toBe(false);
     expect(statSync(pasta).isDirectory()).toBe(true);
+  });
+});
+
+describe('WAV lido por trecho (base do sampler)', () => {
+  /** Um WAV com `nc` canais em `bits` (formato 1 = PCM, 3 = float; extensível opcional) e um bloco "LIST" antes do "data". */
+  const wav = (nc: number, n: number, bits: number, formato: 1 | 3, extensivel = false) => {
+    const g = geradorDe(bits + nc);
+    const bpa = bits / 8, dados = n * nc * bpa;
+    const fmtTam = extensivel ? 40 : 16;
+    const b = Buffer.alloc(12 + 8 + fmtTam + 8 + 6 + 8 + dados);
+    b.write('RIFF', 0, 'ascii');
+    b.writeUInt32LE(b.length - 8, 4);
+    b.write('WAVE', 8, 'ascii');
+    let p = 12;
+    b.write('fmt ', p, 'ascii');
+    b.writeUInt32LE(fmtTam, p + 4);
+    b.writeUInt16LE(extensivel ? 0xfffe : formato, p + 8);
+    b.writeUInt16LE(nc, p + 10);
+    b.writeUInt32LE(44100, p + 12);
+    b.writeUInt16LE(bits, p + 22);
+    if (extensivel) b.writeUInt16LE(formato, p + 8 + 24);
+    p += 8 + fmtTam;
+    b.write('LIST', p, 'ascii');
+    b.writeUInt32LE(6, p + 4);
+    p += 14;
+    b.write('data', p, 'ascii');
+    b.writeUInt32LE(dados, p + 4);
+    p += 8;
+    for (let i = 0; i < n * nc; i++, p += bpa) {
+      const x = g() * 0.999;
+      if (formato === 3) b.writeFloatLE(x, p);
+      else if (bits === 16) b.writeInt16LE(Math.round(x * 32767), p);
+      else if (bits === 24) b.writeIntLE(Math.round(x * 8388607), p, 3);
+      else b.writeInt32LE(Math.round(x * 2147483647), p);
+    }
+    return b;
+  };
+
+  it('dá os mesmos valores do lerWav em 16, 24 e 32 bits, float e extensível, lendo só o que se pede', () => {
+    const pasta = pastaTemp();
+    const casos = [[2, 16, 1, false], [1, 24, 1, false], [2, 32, 1, true], [3, 32, 3, false], [2, 32, 3, true]] as const;
+    for (const [nc, bits, formato, ext] of casos) {
+      const arq = path.join(pasta, `t-${nc}-${bits}-${formato}-${ext}.wav`);
+      writeFileSync(arq, wav(nc, 5000, bits, formato, ext));
+      const inteiro = lerWav(readFileSync(arq));
+      const f = abrirWav(arq, {trecho: 1000});
+      expect([f.canais, f.n, f.taxa, f.bits]).toEqual([nc, 5000, 44100, bits]);
+      const juntos = Array.from({length: nc}, () => new Float32Array(5000));
+      for (let i = 0; i < 5000; i += 333) f.ler(i, Math.min(333, 5000 - i), juntos, i);
+      mesmoPcm(juntos, inteiro.canais, `${bits} bits, formato ${formato}${ext ? ', extensível' : ''}`);
+      const fora = Array.from({length: nc}, () => new Float32Array(10).fill(7));
+      f.ler(4995, 10, fora);
+      expect(Array.from(fora[0].subarray(5))).toEqual([0, 0, 0, 0, 0]);
+      f.fechar!();
+      expect(() => f.ler(0, 1, fora)).toThrow();
+    }
+    writeFileSync(path.join(pasta, 'nao.wav'), 'isto não é um wav');
+    expect(() => abrirWav(path.join(pasta, 'nao.wav'))).toThrow('não é um WAV');
   });
 });
