@@ -111,6 +111,11 @@ Envolve o `registerTool`: toda ferramenta registrada depois dele passa por ele, 
   pessoa permitir, repassa ao app com `_meta["estudio/permitido_no_cliente"] = true`. O app só aceita essa marca nas
   conexões que ele mesmo criou para as pontes (token da IDE e token da descoberta do Claude Desktop); um app de fora que
   mande a marca continua passando pelo cartão. Cliente sem elicitação: vai como antes, com o cartão do app.
+- **Confiar na permissão do cliente**: o Code do app Claude Desktop anuncia a elicitação, mas recusa sem mostrar nada
+  (medido em 13/11/2026). Para esse caso, a pessoa liga `"mcp_confiar_no_cliente": true` no `preferencias.json` da
+  pasta de dados do Estúdio (ou `ESTUDIO_CONFIAR_NO_CLIENTE=1` na configuração do servidor MCP). A ponte então roda as
+  ações sensíveis sem perguntar de novo: o cliente já controla a permissão de cada ferramenta. Lido a cada chamada,
+  vale sem reiniciar a ponte. O padrão continua perguntando.
 - **Reverter por `seq`**: o cartão de qualquer provedor e o Histórico usam `Projeto.reverter`. Antes de reverter, ele
   confere que os valores trocados ainda estão lá. Se mudaram, devolve `mudou_depois`, e só passa por cima com
   `forcar`. O Ctrl+Z (`desfazerUltima`) lembra o que já desfez pelo campo `desfaz` da entrada.

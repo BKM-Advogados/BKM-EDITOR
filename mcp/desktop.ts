@@ -8,6 +8,7 @@ import path from 'node:path';
 import {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
 import {arquivoDescoberta, descobertaViva, pastaDadosEstudio, pastaPadraoProjetos, sistemaAtual} from '../src/nucleo/claude-desktop';
 import {criarServidorDesktop} from '../src/nucleo/mcp-desktop';
+import {confiarNoClienteNasPreferencias} from '../src/nucleo/preferencias-arquivo';
 import {criarRede, registrarFerramentas} from '../src/nucleo/ferramentas-mcp';
 import {Transcritor} from '../src/main/transcricao';
 import {definirServicoMusica} from '../src/nucleo/musica-projeto';
@@ -49,6 +50,9 @@ const {servidor} = criarServidorDesktop({
   pastas: [pastaPadraoProjetos(sistema)],
   descoberta: () => descobertaViva(arquivo),
   registrar: (s, projeto, origem, portao) => registrarFerramentas(s, projeto, 'agente', origem, rede, transcritor, portao, narrador),
+  // a pessoa liga na configuração do servidor quando o cliente não sabe perguntar (o Code do app Claude Desktop recusa a
+  // elicitação sem mostrar): o próprio cliente já controla a permissão das ferramentas
+  confiarNoCliente: () => process.env.ESTUDIO_CONFIAR_NO_CLIENTE === '1' || confiarNoClienteNasPreferencias(dados),
 });
 
 // o Claude Desktop fechou a conversa (stdin acabou): sai, para o processo não sobrar no Windows, onde fechar o lançador

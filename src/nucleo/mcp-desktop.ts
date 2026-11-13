@@ -74,6 +74,10 @@ export type OpcoesDesktop = {
   /** A pasta de modelos (listar_modelos sem projeto e criar_projeto com modelo_proprio); padrão: a pasta_modelos das preferências
    *  do app (em `dados`), e sem ela ESTUDIO_MODELOS ou ~/Estudio/meus-modelos. */
   modelos?: PastaModelos;
+  /** ESTUDIO_CONFIAR_NO_CLIENTE=1 na configuração do servidor: o cliente (Claude Code, Claude Desktop) já controla a
+   *  permissão de cada ferramenta, e a pessoa escolheu não ser perguntada de novo. As ações sensíveis rodam sem a
+   *  elicitação e sem o cartão do app. Só quem edita a configuração do MCP liga; o padrão continua perguntando. */
+  confiarNoCliente?: boolean | (() => boolean);
 };
 
 const texto = (t: unknown, erro = false): CallToolResult => ({...(erro ? {isError: true} : {}),
@@ -107,6 +111,7 @@ export const criarServidorDesktop = (o: OpcoesDesktop) => {
   const encaminhar = o.encaminhar ?? encaminharAoApp;
   const appDoProjeto = o.appDoProjeto ?? appAberto;
   const prazo = o.prazo ?? PRAZO_DO_APP_MS;
+  const confia = () => (typeof o.confiarNoCliente === 'function' ? o.confiarNoCliente() : Boolean(o.confiarNoCliente));
   // o rótulo leva "Claude Desktop" ao diário também pelo .estudio/mcp-app.json (a origem fica ide-<id> Claude Desktop, e o
   // Histórico mostra o nome)
   const conversa = {conversa: novaConversaIde(), autor: 'agente', rotulo: ORIGEM_CLAUDE_DESKTOP};
@@ -117,6 +122,7 @@ export const criarServidorDesktop = (o: OpcoesDesktop) => {
   // o portão daqui (app fechado): a confirmação do próprio Claude Desktop, quando ele oferece; sem ela, não roda
   const portaoLocal: Portao = {
     perguntar: async (p) => {
+      if (confia()) return true;
       if (!servidor.getClientCapabilities()?.elicitation) throw new Error(SEM_PORTAO);
       const r = await servidor.elicitInput({
         message: `O Claude quer ${p.motivo} (${p.ferramenta}) no projeto do Estúdio. Permitir?`,
@@ -239,10 +245,10 @@ export const criarServidorDesktop = (o: OpcoesDesktop) => {
     // confirmação no cliente, vai como antes e o app mostra o cartão dele. Uma pergunta por chamada, mesmo com o reenvio.
     let permissao: Promise<{tipo: 'sim' | 'nao' | 'app'} | {tipo: 'erro'; mensagem: string}> | null = null;
     const perguntarNoCliente = () => (permissao ??= (async () => {
-      if (!servidor.getClientCapabilities()?.elicitation) return {tipo: 'app' as const};
       const entrada = (args ?? {}) as Record<string, unknown>;
       const anotacoes = (await ferramentasDoEstudio()).find((t) => t.name === nome)?.annotations;
       if (!precisaDePermissao(nome, entrada, anotacoes)) return {tipo: 'app' as const};
+      if (!confia() && !servidor.getClientCapabilities()?.elicitation) return {tipo: 'app' as const};
       try {
         const ok = await portaoLocal.perguntar({ferramenta: nome, entrada, motivo: motivoDe(nome, anotacoes), sinal: extra.signal});
         return {tipo: ok ? 'sim' as const : 'nao' as const};

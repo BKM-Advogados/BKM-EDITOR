@@ -74,8 +74,8 @@ const abrirApp = (pastaDados: string, raiz: string | null) => {
   return cd;
 };
 
-const conectar = async (descoberta: () => Descoberta | null, o: {elicitar?: (msg: string) => {action: 'accept' | 'decline'; content?: Record<string, unknown>}} = {}) => {
-  const d = criarServidorDesktop({dados, pastas: [projetos], descoberta,
+const conectar = async (descoberta: () => Descoberta | null, o: {elicitar?: (msg: string) => {action: 'accept' | 'decline'; content?: Record<string, unknown>}; confiarNoCliente?: boolean | (() => boolean)} = {}) => {
+  const d = criarServidorDesktop({dados, pastas: [projetos], descoberta, confiarNoCliente: o.confiarNoCliente,
     registrar: (s, projeto, origem, portao) => registrarFerramentas(s, projeto, 'agente', origem, undefined, undefined, portao)});
   const [a, b] = InMemoryTransport.createLinkedPair();
   await d.servidor.connect(a);
@@ -214,6 +214,31 @@ describe('permissão na tela do cliente, com o app aberto', () => {
     expect(textoDe(r)).toBe(SEM_RESPOSTA);
     app.retirar();
     await d.fechar();
+  });
+
+  it('ESTUDIO_CONFIAR_NO_CLIENTE: sem elicitação, roda sem perguntar no cliente nem no app (app aberto e fechado)', async () => {
+    const pastaDados = mkdtempSync(path.join(casa, 'dados-confia-'));
+    const app = abrirApp(pastaDados, path.join(projetos, 'Alfa'));
+    const {c, d} = await conectar(() => descobertaViva(app.arquivoDescoberta), {confiarNoCliente: true});
+    pedidos.length = 0;
+    permitir = false;
+    const r = await c.callTool({name: 'ler_fonte', arguments: {url: 'https://exemplo.invalid/'}});
+    expect(pedidos).toHaveLength(0);
+    expect(textoDe(r)).not.toMatch(/negou|ninguém respondeu/i);
+    app.retirar();
+    await d.fechar();
+
+    // lido a cada chamada (preferências do app): desligado, volta a pedir; ligado, roda
+    let liga = false;
+    const fechado = await conectar(() => null, {confiarNoCliente: () => liga});
+    await fechado.c.callTool({name: 'escolher_projeto', arguments: {projeto: 'Alfa'}});
+    expect(textoDe(await fechado.c.callTool({name: 'ler_fonte', arguments: {url: 'https://exemplo.invalid/'}}))).toBe(SEM_PORTAO);
+    liga = true;
+    await fechado.c.callTool({name: 'escolher_projeto', arguments: {projeto: 'Alfa'}});
+    const r2 = await fechado.c.callTool({name: 'ler_fonte', arguments: {url: 'https://exemplo.invalid/'}});
+    expect(textoDe(r2)).not.toBe(SEM_PORTAO);
+    expect(textoDe(r2)).not.toMatch(/negou/);
+    await fechado.d.fechar();
   });
 
   it('um app de fora que manda a marca no _meta não pula o cartão', async () => {

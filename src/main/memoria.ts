@@ -50,6 +50,7 @@ export class Memoria {
       projetos_ide: p.projetos_ide !== false, // frente IDE: ligado até a pessoa desligar
       procurar_atualizacoes: p.procurar_atualizacoes !== false, // atualização do app: procura até a pessoa desligar
       ...(typeof p.versao_pulada === 'string' && p.versao_pulada ? {versao_pulada: p.versao_pulada} : {}),
+      ...(p.mcp_confiar_no_cliente === true ? {mcp_confiar_no_cliente: true} : {}), // a ponte do Claude Code lê (preferencias-arquivo.ts)
       primeiros_passos: normalizarPassos(p.primeiros_passos), // Onda B: o que já se marcou e o "Não mostrar mais"
     };
   }
