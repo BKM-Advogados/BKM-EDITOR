@@ -188,12 +188,52 @@ As ondas vêm ordenadas por dependência e, entre itens livres, por valor para o
 - **Itens:** ADRs A1-A8; M-02, M-03, M-14, F-13 (parte automática); N-10 (política e campos). Mais uma **espícula de som** fora do app: KS + amp + IR num script vitest, renderizando um riff de 30 s, para validar a qualidade de ouvido e medir o RTF (portão da A3). Mais o teste de COOP/COEP (A8).
 - **Pronto quando:** os ADRs estiverem aprovados pelo dono. Os hashes de referência dos documentos atuais batem nos 4 ambientes. A FFT é um módulo comum com teste. A espícula tem áudio ouvido e aprovado, e o RTF está registrado.
 - **Sonnet:** M-14, F-13 (hashes), N-10 (campos). **Opus:** ADRs, M-02, M-03, espícula.
+- **Estado em 12/11/2026** (branch `musica/m0-m1`, ainda fora da `main`):
+  - **Feito:** ADRs A1 a A8 em `docs/adr/`, aprovados pelo dono com as recomendações da seção 2. M-02 (esquema
+    versionado, migradores, endereços de parâmetro em `musica-param.ts`). M-03 (SHA-256 do PCM em TS puro, 6 documentos de
+    referência em `testes/fixtures/musica-referencia/`, conferidos pelo vitest e pelo MCP por stdio com
+    `scripts/hashes-musica.mjs`). M-14 (`src/nucleo/fft.ts`, com teste; a `limpeza-voz.ts` usa ela). N-10 (política e
+    campos de licença, `NOTICE`). F-13, parte automática (`testes/aceitacao-som/`, `docs/aceitacao-som.md`).
+  - **Parcial:** hashes nos 4 ambientes: batem no vitest (Linux, e o CI roda Windows e Mac) e no MCP por stdio; falta
+    conferir na janela (V8 do Electron) e pelo executável do app (`--executavel`). Espícula: RTF registrado em
+    `scripts/espicula-metal/RESULTADO.md` (RTF 0,20 no cenário do portão, TS passa e WASM não é preciso na M1), mas o
+    resultado ainda não entrou no ADR A3, e uma v2 da espícula está em andamento na branch `m/espicula`, ainda sem merge.
+  - **Pendente:** teste de COOP/COEP da A8 (nenhum resultado registrado; o ADR ainda espera por ele).
+  - **Para o dono aprovar:** ouvir e aprovar o áudio da espícula (`saida/riff.wav`, ninguém ouviu ainda); o alvo de RTF
+    proposto no `RESULTADO.md` (≤ 0,5 numa thread no cenário do portão); as tolerâncias da suíte de aceitação sonora
+    (banda 1,5 dB, LUFS 0,5 LU, picos 0,7 dB, crest 1 dB, correlação 0,05, lado/meio 1,5 dB) e o roteiro de audição de
+    `docs/aceitacao-som.md`, que ainda não foi executado.
 
 ### Onda M1: motor por blocos
 - **Objetivo:** trocar o coração sem mudar o som.
 - **Itens:** M-01, M-04, M-07, M-11. Migração de EQ, compressor, Freeverb, delay e limitador para processadores. M-05 só se a espícula reprovar o TS.
 - **Pronto quando:** os documentos antigos dão hash idêntico. A exceção é compressor e limitador (o lookahead vira latência), que ficam dentro de uma tolerância aprovada pelo dono. Uma música de 5 min e 24 faixas cabe no orçamento do `docs/desempenho.md`. O PDC alinha as faixas num teste de impulso.
 - **Sonnet:** migração de cada efeito para processador, com teste de oráculo. **Opus:** M-01, M-04, M-07, M-05.
+- **Estado em 12/11/2026** (branch `musica/m0-m1`, ainda fora da `main`):
+  - **Feito:** M-01 (`src/nucleo/audio-grafo/`, `docs/audio-grafo.md`): o render canônico roda pelo grafo, e o motor
+    antigo fica só como oráculo (`renderizarMusicaAntigo`). Os 5 efeitos são processadores nativos por bloco, com PCM
+    idêntico bit a bit: EQ e compressor com parâmetros nos endereços da M-02, Freeverb, delay e limitador causal com
+    1,5 ms de latência declarada. Os 6 hashes da M0 não mudaram (vitest e MCP por stdio). M-07: PDC provado com impulso
+    em `testes/audio-grafo-pdc.test.ts`, e atraso manual por faixa (`atraso_ms`, −500 a +500 ms). M-11: reamostragem sinc
+    Kaiser (canônico) e Hermite (`src/nucleo/reamostrar.ts`) no `naTaxa`. M-04: render em streaming (canais por trecho,
+    curvas por bloco, um estágio só), cache em disco com LRU (`src/nucleo/cache-audio.ts`, que leva no nome a impressão
+    do PCM dos áudios), WAV lido por trecho (`amostras-wav.ts`). 5 min e 24 faixas sem stems: pico de 289 MB, dentro do
+    orçamento de 300 MB de `docs/desempenho.md` (seção 4.10). Antes eram 5,9 GB.
+  - **Parcial:** M-04 com stems: 3,4 GB para 5 min e 24 faixas, porque os stems ainda voltam inteiros (falta a entrega
+    gravar cada stem em WAV bloco a bloco, M-10). A prévia da janela segue com o cache em memória de buffers inteiros
+    (OPFS fica para depois). O cache em disco tem teto padrão de 2 GB, e um projeto de 24 faixas de 5 min ocupa 2,8 GB.
+    M-07: o atraso manual não tem campo na tela, que também não mostra a latência de cada faixa. O motor antigo não
+    conhece `atraso_ms`, então o oráculo só vale para documentos sem atraso. M-11: nenhum chamador pede Hermite ainda.
+  - **Não precisou:** M-05 (WASM), porque a espícula aprovou o TS pelo RTF. A tolerância do compressor e do limitador
+    também não foi necessária: os dois dão o mesmo PCM do motor antigo (diferença medida de 0 dB, inclusive no
+    `limitador_db`).
+  - **Pendente:** parâmetros com curva de automação no EQ, no compressor e no limitador valem o valor do começo do bloco
+    (a interpolação por amostra é decisão da X-08). Freeverb e delay ainda sem endereço da M-02. Os instrumentos são
+    fontes lidas por trecho, não processadores (I-01). Não há executor de tempo real (M-06). O grafo não foi conferido
+    na janela do app (V8 do Electron).
+  - **Para o dono aprovar:** nenhuma tolerância de som (o PCM não mudou). Pode decidir se o teto padrão do cache em
+    disco sobe (hoje 2 GB) e se os clipes de áudio fora de 48 kHz, que só aparecem quando o ffmpeg falha e o WAV cai no
+    fallback, podem soar diferente do motor antigo: hoje usam o sinc da M-11 em vez da interpolação linear, de propósito.
 
 ### Onda M2: instrumentos e notas
 - **Objetivo:** ter um sampler e um modelo de nota que aguentem guitarra e bateria.
