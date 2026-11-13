@@ -71,8 +71,12 @@ mesmas oitavas e a mesma semente; ao exportar em escala 2 o grão cresce com a i
 Euler XYZ em graus; ao girar um objeto pelo gizmo além de 90° em Y, o app grava a forma da mesma pose mais perto da rotação de antes
 (25° + 100° vira `[0, 125, 0]`, não `[180, 55, 180]`), e você pode escrever ângulos de qualquer tamanho (125, 385, −170).
 
-**Permissão.** Nenhuma ferramenta MCP nova nesta parte: o que a IA grava passa por `aplicar_patch` (classe `livre`: vai ao
-diário e tem Reverter).
+**Pela IA sem patch à mão** (frente 4): `adicionar_efeito` {tipo, valor?, cor?} põe um efeito com id livre e o valor preso à
+faixa; {preajuste: `cinema`, `quente` ou `preto_e_branco`} põe os da área Efeitos de uma vez; `remover_efeito` {id} tira. Os
+pré-ajustes e o patch de pôr e tirar ficam em `src/nucleo/efeitos.ts` (`PREAJUSTES_EFEITOS`, `patchAdicionarEfeitos`,
+`patchRemoverEfeito`), que a área Efeitos também usa.
+
+**Permissão.** Tudo `livre`: o que a IA grava vai ao diário e tem Reverter.
 
 ## Como se chega e como se volta
 

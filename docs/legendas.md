@@ -204,6 +204,7 @@ arquivo de fora do projeto, exporta, apaga ou reverte mudança de outro autor.
 | `propor_cortes_fala` | `livre` (só lê) | `documento?`, `clipe?`, `silencio_min_ms?`, `pausa_ms?`, `preenchimento?`, `pontas?` | os cortes que a fala do clipe sugere (ms do arquivo), com o motivo, o "ãh" tirado, o contexto (três palavras antes e depois) e quanto encurta |
 | `aplicar_cortes_fala` | `livre` (grava um WAV novo em `midia/` e o patch no diário; Reverter desfaz) | `documento?`, `clipe?`, `cortes?`, `voltar?` | emenda a narração sem os cortes (os pedidos ou os sugeridos), troca o arquivo do clipe e leva as legendas; recusa corte a menos de 80 ms de palavra; `voltar: true` volta ao arquivo de antes |
 | `importar_legendas` | `livre` | `arquivo`, `documento?`, `estilo?` | lê um SRT ou VTT do projeto (UTF-8, UTF-16 ou Windows-1252, pelos bytes) e troca as legendas |
+| `editar_legendas` | `livre` | `op` (`dividir`, `juntar`, `excluir`, `criar`, `substituir`, `estilo`), `id?`, `em_ms?`, `texto?`, `duracao_ms?`, `procurar?`, `trocar_por?`, `palavra_inteira?`, `caixa?`, `guardar?`, `predefinicao?`, `documento?` | os botões do painel numa mudança só: dividir em `em_ms` (tempo da tela, convertido como no `editar_legenda`; sem ele, no meio do texto), juntar com a seguinte, excluir, criar em `em_ms`, substituir em todas (com `guardar`, no dicionário do vídeo) e trocar a predefinição (quebrando de novo). A conta é a da tela: `src/nucleo/legendas-edicao.ts` (frente 4) |
 
 O `transcrever` pedido pela IA mostra o andamento e o Cancelar no painel das legendas ("A IA pediu: …"), como o do
 botão. O pedido leva o sinal do MCP: Esc na conversa, ou a conexão que cai, para o whisper e o ffmpeg sem gravar nada;
@@ -290,7 +291,7 @@ grade antiga), ou na área de título de 90% com `estilo.no_quadrado: false` ("N
 (fala-D8). Com `legendas_youtube`, a área do 16:9 fica acima da faixa das legendas automáticas do YouTube, para quando o
 SRT sobe junto (a exportação liga isso por destino).
 
-**Em cada destino da exportação** (`legendasNoDestino`, no laço do `main.ts`): o vídeo 16:9 exportado também em 9:16
+**Em cada destino da exportação** (`legendasNoDestino`, no laço de `src/main/exportacao-video.ts`): o vídeo 16:9 exportado também em 9:16
 leva a legenda para a área do 9:16, e a legenda que não cabe nas linhas do estilo nesse tamanho é dividida em pedaços
 que cabem, pela mesma regra da quebra e dentro dela (nada se junta com a vizinha; o que a pessoa dividiu, juntou ou
 corrigiu fica). No caminho contrário, só a área muda. Na mesma proporção do documento o arquivo sai igual à prévia. A

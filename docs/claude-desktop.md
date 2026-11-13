@@ -116,6 +116,29 @@ Desktop (elicitação do MCP), se ele oferecer. Sem a elicitação, a ferramenta
 Estúdio com o projeto. As ferramentas livres (ler, aplicar patch, desfazer) rodam direto nos dois casos, com diário e
 Reverter.
 
+## Criar, abrir e trocar de projeto (frente 2 do MCP)
+
+`criar_projeto`, `abrir_projeto`, `duplicar_projeto` e `fechar_projeto` (`src/nucleo/mcp-projeto.ts`) mudam o projeto
+inteiro. O perigo é a conversa que pede a troca morrer no meio: abrir projeto no app chama `fecharSessao`, que fecha as
+conversas do projeto e esquece os tokens das abas (`src/main/main.ts`), e o MCP por HTTP do app é por projeto (responde
+409 sem projeto aberto). Por isso as quatro só existem onde a conversa vive fora do app:
+
+| Quem pede | App aberto | App fechado |
+|---|---|---|
+| **Claude Desktop** (ferramentas do próprio servidor, `mcp-desktop.ts`) | vão ao app pelo token fixo do Claude Desktop, que não cai na troca. O app as atende mesmo sem projeto aberto (só estas quatro; o resto continua 409). Depois, o servidor segue no projeto do app, sem o aviso de "projeto mudou" | rodam no servidor: `criar_projeto` e `duplicar_projeto` gravam a pasta (na pasta de projetos, `~/Estudio`) e a escolhem; `abrir_projeto` é o `escolher_projeto`; `fechar_projeto` esquece a escolha |
+| **IDE** (`mcp/nucleo.ts`) | com o app no projeto da IDE, vão ao app, que troca. As próximas chamadas da IDE seguem na pasta dela, agora sem passar pelo app (a resposta avisa) | `criar_projeto` e `duplicar_projeto` gravam a pasta e dizem para abri-la na IDE; `abrir_projeto` e `fechar_projeto` explicam que o MCP da IDE fica na pasta da IDE |
+| **App de IA de fora** (token fixo, `docs/ia.md`) | vão ao app, como o Claude Desktop | — |
+| **Conversa dentro do app** (aba do Claude, laço próprio, agente ACP) | as quatro não aparecem na lista; o guia do projeto diz para pedir à pessoa | — |
+
+No app, a troca é a mesma da tela (`criarProjeto`, `abrirProjeto`, `duplicarProjeto` e `fecharSessao` do `main.ts`,
+na fila de troca de projeto), e depois a tela recarrega, como quando uma pasta chega de fora (`abrirDeFora`). As
+quatro são "cartao": com o app aberto, a pessoa permite na tela, e o motivo avisa que o projeto aberto fecha, com as
+conversas dele. Com o app fechado, `criar_projeto` e `duplicar_projeto` pedem a confirmação pelo Claude Desktop
+(elicitação); `abrir_projeto` e `fechar_projeto` só escolhem, como o `escolher_projeto`, e não perguntam.
+
+Limites: com o app fechado, o projeto novo nasce sem git (o app inicia o git na primeira abertura) e na pasta padrão
+(`~/Estudio`), não na pasta de projetos das preferências, que o MCP fora do app não lê; `"pasta"` escolhe outra.
+
 ## O arquivo de descoberta
 
 Ao abrir, o app grava `claude-desktop.json` na pasta de dados dele:
@@ -271,6 +294,7 @@ O teste "extensão .mcpb de ponta a ponta" faz o caminho do Claude Desktop:
 |---|---|
 | `src/nucleo/claude-desktop.ts` | caminhos dos três sistemas, mesclagem do `claude_desktop_config.json`, descoberta, lista de projetos |
 | `src/nucleo/mcp-desktop.ts` | o servidor: catálogo, `listar_projetos` e `escolher_projeto`, pelo app ou local, portão local |
+| `src/nucleo/mcp-projeto.ts`, `src/nucleo/novo-projeto.ts` | frente 2: criar, abrir, duplicar e fechar projeto, no app e sem ele |
 | `mcp/desktop.ts` | a entrada por stdio (vira `dist-mcp/desktop.cjs` no `mcp:build`) |
 | `src/main/claude-desktop.ts` | no app: descoberta (publicar e retirar) e o botão (conectar, desconectar, estado) |
 | `mcpb/manifest.json`, `mcpb/lancador.ts`, `mcpb/index.ts`, `mcpb/zip.ts`, `mcpb/icone.png` | a extensão |

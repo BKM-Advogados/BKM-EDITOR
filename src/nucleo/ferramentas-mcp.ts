@@ -41,7 +41,13 @@ import {ARQUIVO_TRANSICOES, lerRegistro, transicaoEmCurso} from './transicoes'; 
 import {registrarNarracao} from './mcp-narracao'; // narração por IA (docs/narracao.md)
 import type {ServicoNarracao} from './narracao-servico';
 import {registrarPrevia} from './mcp-previa'; // frente IDE: ver_quadro, ver_cenas e ver_trecho (docs/ide.md)
+import {registrarExportacaoFinal} from './mcp-exportacao-final'; // exportar_video, exportar_imagem, exportar_carrossel (docs/exportacao.md)
+import {registrarEdicaoFina} from './mcp-edicao-fina'; // frente 4: edição fina (cenas, legendas, páginas, entradas e efeitos)
 import {USER_AGENT_ESTUDIO} from './versao';
+import {registrarProjeto} from './mcp-projeto'; // frente 2: importar_midia, renomear_documento, ponto de restauração
+import {registrarMarcaEdicao} from './mcp-marca-edicao'; // frente 2: os kits de marca da pessoa
+import {registrarMedidas} from './mcp-medidas'; // frente 3 do MCP: medir_loudness, medir_envelope, limpar_voz
+import {registrarPreviaJanela} from './mcp-previa-janela'; // frente 3 do MCP: ver_imagem, ver_cena_3d
 
 const texto = (x: unknown) => ({content: [{type: 'text' as const, text: typeof x === 'string' ? x : JSON.stringify(x, null, 2)}]});
 const erro = (e: unknown) => ({
@@ -332,6 +338,12 @@ export const registrarFerramentas = (servidor: McpServer, projeto: Projeto, auto
   registrarTela(servidor, projeto, autor); // mostrar_documento: leva a tela da pessoa a um documento (mcp-tela.ts)
   registrarNarracao(servidor, projeto, autor, origem, narrador); // narração por IA (docs/narracao.md): vozes, narrar, pronúncias, ajustar cenas à fala
   registrarPrevia(servidor, projeto); // frente IDE: prévias do vídeo em saidas/previas/ (src/nucleo/mcp-previa.ts)
+  registrarExportacaoFinal(servidor, projeto, autor, origem); // o arquivo final em saidas/ sem clicar em Exportar (mcp-exportacao-final.ts)
+  registrarProjeto(servidor, projeto); // frente 2: importar_midia, renomear_documento e marcar_ponto_de_restauracao (mcp-projeto.ts)
+  registrarMarcaEdicao(servidor); // frente 2: listar, criar e editar kits de marca, logo e fontes (mcp-marca-edicao.ts)
+  registrarPreviaJanela(servidor, projeto); // frente 3: prévias da imagem e da cena 3D pela janela (mcp-previa-janela.ts)
+  registrarMedidas(servidor, projeto, autor, origem); // frente 3: loudness, envelope e limpeza de voz (mcp-medidas.ts)
+  registrarEdicaoFina(servidor, projeto, autor, origem); // frente 4: lâmina, legendas, páginas, entradas e efeitos (mcp-edicao-fina.ts)
 };
 
 // ---------- pesquisa: fontes e fatos (src/nucleo/pesquisa.ts, docs/pesquisa.md) ----------
@@ -751,7 +763,7 @@ const registrarFala = (servidor: McpServer, projeto: Projeto, autor: string, ori
     if (texto === undefined && em === undefined && sai === undefined) throw new ErroProjeto('diga o texto, o em ou o sai novos', 'patch');
     let s = segs[i];
     if (texto !== undefined) {
-      if (!texto.trim()) throw new ErroProjeto('texto vazio: para tirar a legenda, use aplicar_patch com remove em /legendas/segmentos/N', 'patch');
+      if (!texto.trim()) throw new ErroProjeto('texto vazio: para tirar a legenda, use editar_legendas com op excluir', 'patch');
       s = comTexto(s, texto);
     }
     if (em !== undefined || sai !== undefined) {

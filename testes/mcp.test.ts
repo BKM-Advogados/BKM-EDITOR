@@ -45,15 +45,19 @@ describe('MCP estudio', () => {
   it('lista as ferramentas', async () => {
     const {tools} = await cliente.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
-      'adicionar_camada_animacao', 'adicionar_clipe_audio', 'agrupar_camadas', 'ajustar_cenas_a_fala', 'alinhar_camadas', 'animar', 'anotar_fonte', 'aplicar_cortes_fala', 'aplicar_marca', 'aplicar_patch', 'aplicar_progressao', 'arranjar', 'buscar_icone',
-      'cancelar_transicao', 'checar_texto', 'concluir_transicao', 'configurar_narracao', 'copiar_clipe', 'cor_da_marca', 'creditos_das_musicas', 'criar_animacao', 'criar_comentario', 'criar_documento', 'criar_padrao', 'crossfade', 'desagrupar_camadas',
-      'desfazer', 'destravar_camadas', 'distribuir_camadas', 'dividir_clipe', 'editar_legenda', 'editar_notas', 'efeito_pixel', 'encaixar_no_video', 'escolher_trilha', 'escrever_notas', 'estado_do_editor', 'exportar_legendas',
-      'exportar_musica', 'fazer_lista', 'fonte_da_marca', 'gerar_notas', 'guia_do_projeto', 'importar_legendas', 'importar_midi', 'inserir_icone', 'inserir_linha', 'ler_comentario', 'ler_documento', 'ler_fonte',
-      'ler_legendas', 'ler_musica', 'levar_para', 'licencas_do_projeto', 'listar_comentarios', 'listar_midia', 'listar_mudancas', 'listar_pesquisa', 'listar_trilhas', 'marca_dagua', 'marcar_midia', 'medir_contraste_marca',
-      'medir_musica', 'mostrar_documento', 'narrar', 'pixelizar_imagem', 'por_no_video', 'preparar_teleprompter', 'projeto_info', 'pronuncias_narracao', 'propor_cortes_fala', 'reabrir_comentario', 'registrar_fato', 'remover_fundo', 'renomear_projeto', 'resolver_comentario', 'responder_comentario',
+      'abrir_projeto', 'adicionar_camada_animacao', 'adicionar_clipe_audio', 'agrupar_camadas', 'ajustar_cenas_a_fala', 'alinhar_camadas', 'animar', 'anotar_fonte', 'aplicar_cortes_fala', 'aplicar_marca', 'aplicar_patch', 'aplicar_progressao', 'arranjar', 'buscar_icone',
+      'cancelar_transicao', 'checar_texto', 'concluir_transicao', 'configurar_narracao', 'copiar_clipe', 'cor_da_marca', 'creditos_das_musicas', 'criar_animacao', 'criar_comentario', 'criar_documento', 'criar_marca', 'criar_padrao', 'criar_projeto', 'crossfade', 'desagrupar_camadas',
+      'desfazer', 'destravar_camadas', 'distribuir_camadas', 'dividir_clipe', 'duplicar_projeto', 'editar_legenda', 'editar_marca', 'editar_notas', 'efeito_pixel', 'encaixar_no_video', 'escolher_trilha', 'escrever_notas', 'estado_do_editor', 'exportar_legendas',
+      'exportar_musica', 'fazer_lista', 'fechar_projeto', 'fonte_da_marca', 'gerar_notas', 'guia_do_projeto', 'importar_fonte_marca', 'importar_legendas', 'importar_logo_marca', 'importar_midi', 'importar_midia', 'inserir_icone', 'inserir_linha', 'ler_comentario', 'ler_documento', 'ler_fonte',
+      'ler_legendas', 'ler_musica', 'levar_para', 'licencas_do_projeto', 'listar_comentarios', 'listar_marcas', 'listar_midia', 'listar_mudancas', 'listar_pesquisa', 'listar_trilhas', 'marca_dagua', 'marcar_midia', 'marcar_ponto_de_restauracao', 'medir_contraste_marca',
+      'medir_musica', 'mostrar_documento', 'narrar', 'pixelizar_imagem', 'por_no_video', 'preparar_teleprompter', 'projeto_info', 'pronuncias_narracao', 'propor_cortes_fala', 'reabrir_comentario', 'registrar_fato', 'remover_fundo', 'renomear_documento', 'renomear_projeto', 'resolver_comentario', 'responder_comentario',
       'reverter', 'selecionar_camadas', 'texto_da_fonte', 'transcrever', 'travar_camadas', 'trocar_kit', 'ver_animacao', 'ver_cenas', 'ver_marca', 'ver_quadro',
       'ver_trecho', 'vozes_narracao',
-    ]);
+      'exportar_carrossel', 'exportar_imagem', 'exportar_video', 'situacao_exportacao', // exportação final (docs/exportacao.md)
+      'limpar_voz', 'medir_envelope', 'medir_loudness', 'ver_cena_3d', 'ver_imagem', // frente 3 do MCP
+      // frente 4: edição fina (mcp-edicao-fina.ts)
+      'adicionar_efeito', 'animar_entrada', 'animar_saida', 'dividir_cena', 'duplicar_cena', 'editar_legendas', 'editar_paginas', 'remover_efeito',
+    ].sort());
   });
 
   it('resolve um comentário da pessoa com patch, e a mudança vai para o diário', async () => {

@@ -8,7 +8,8 @@
 //    com as legendas) e o que vem depois anda para a frente;
 //  - cena que ficou mais curta (ou excluída) tira o trecho do fim dela do som: os clipes dentro dele saem (com as legendas),
 //    os que o atravessam são cortados, e o que vem depois anda para trás;
-//  - cena dividida (mesmo total de tempo) não mexe no som; o patch que já mexe em /audio ou /legendas, também não (quem o fez
+//  - cena dividida (mesmo total de tempo) não mexe no som, nem a divisão desfeita (a cena de antes cresce o que a seguinte, que
+//    sai, tinha: o Ctrl+Z da lâmina); o patch que já mexe em /audio ou /legendas, também não (quem o fez
 //    cuida do som); trocar a ordem das cenas, ou trocar todas por cenas de ids novos, também não (não há como saber para onde o
 //    som vai); `audio.acompanha_cenas: false` desliga.
 import jsonpatch, {type Operation} from 'fast-json-patch';
@@ -57,7 +58,10 @@ export const edicoesDeTempo = (antes: DocCenas, depois: DocCenas): Edicao[] | nu
     const d = duracaoDe(c);
     const fim = t + d;
     const n = agora.get(c.id);
-    if (n === undefined) out.push({tipo: 'tirar', de: t, ate: fim});
+    const ultima = out[out.length - 1];
+    // a cena de antes cresceu exatamente o que esta tinha, e esta sumiu: é a divisão desfeita (juntar de volta), e o som fica
+    if (n === undefined && ultima?.tipo === 'abrir' && Math.abs(ultima.t - t) < 0.5 && Math.abs(ultima.ms - d) < 0.5) out.pop();
+    else if (n === undefined) out.push({tipo: 'tirar', de: t, ate: fim});
     else if (n > d + 0.5) out.push({tipo: 'abrir', t: fim, ms: n - d});
     else if (n < d - 0.5) out.push({tipo: 'tirar', de: t + n, ate: fim});
     t = fim;

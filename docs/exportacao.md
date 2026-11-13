@@ -86,7 +86,7 @@ lista.
   no `main.ts` com uma linha). A assinatura de `renderizarVideo` não mudou: a frente Som entra depois do render.
 - `ZonaSegura` ganhou `miolo` (o contorno é o que sobra do corte); a sobreposição do monitor não mudou.
 - `posicaoSegura` aceita `evitar` (retângulos em frações, tratados como zonas cobertas), e `marcaDaguaDoDestino`
-  aceita as legendas do destino (`LegendasP`, de `legendasDasProps`). No laço de exportação do `main.ts`, a marca lê a
+  aceita as legendas do destino (`LegendasP`, de `legendasDasProps`). No laço de exportação (`src/main/exportacao-video.ts`, antes no `main.ts`), a marca lê a
   legenda das mesmas props que vão ao `renderizarVideo`.
 - Nenhuma dependência nova. O `Thumbnail` da miniatura é do `@remotion/player`, que o app já usa.
 
@@ -172,3 +172,44 @@ pediu e rode `medir_contraste_marca`: abaixo de 3:1 a marca não lê no fundo (l
 qual placa pôr atrás (`placa: "escura"` ou `"clara"`); depois de pôr, meça de novo. Sem logo nem assinatura no kit do projeto, a
 exportação sai sem marca e a medida avisa. A largura da assinatura é medida no diálogo (canvas); pela ferramenta vale a estimativa de
 0,6 da letra por caractere para o encaixe, e o contraste, que é lido nos pixels, não depende dela.
+
+## Pelo MCP: o arquivo final sem clicar em Exportar
+
+O agente entrega o vídeo, a imagem ou o carrossel pelas ferramentas abaixo, com o mesmo resultado do diálogo. Código:
+`src/nucleo/mcp-exportacao-final.ts` (as ferramentas, uma linha em `registrarFerramentas`), `src/main/exportacao-video.ts` (a
+exportação do vídeo, a mesma do diálogo), `src/main/exportacao-servico.ts` (o serviço montado no app e fora dele) e
+`src/renderer/modulos/imagem/exportarPeloMcp.ts` (a janela desenha a imagem e o carrossel). Teste:
+`testes/exportacao-mcp.test.ts`.
+
+| ferramenta | classe | parâmetros | com o app fechado |
+|---|---|---|---|
+| `exportar_video` | `cartao` | `{documento?, destinos?, codec?, qualidade?, escala?, trecho?, nome?, legendas?, marca_dagua?}` | roda no processo do MCP |
+| `situacao_exportacao` | `livre` | `{exportacao?, cancelar?}` | a do próprio processo |
+| `exportar_imagem` | `cartao` | `{documento?, formato?, qualidade?, escala?, nome?}` | erro: "abra o projeto no Estúdio" |
+| `exportar_carrossel` | `cartao` | `{documento?, pdf?, nome?}` | erro: "abra o projeto no Estúdio" |
+
+- **`exportar_video`**: vídeo de cenas, carrossel narrado e animação. `destinos` são os ids da tela (`reels`, `feed`,
+  `quadrado`, `youtube`) ou `LARGURAxALTURA` (16 a 7680, um personalizado por vez); só o vídeo de cenas muda de
+  proporção, e o carrossel narrado e a animação saem no tamanho deles (a resposta avisa). `codec` `h264`, `h265` ou
+  `webm`; `qualidade` `alta`, `media` ou `leve`; `escala` 1, 0,75 ou 0,5; `trecho` `{de_ms, ate_ms}` (trecho fora do
+  vídeo é recusado, não vira o vídeo inteiro); `legendas` `video`, `srt` ou `ambos`, para todos os destinos; a marca
+  d'água de cada destino é a guardada em `.estudio/exportacao.json` (ferramenta `marca_dagua`) e `marca_dagua: false`
+  tira. A proporção do logo, que o diálogo mede na tela, aqui sai do cabeçalho do arquivo (PNG, JPEG, GIF, WebP; SVG fica
+  na estimativa de 3). Uma exportação por vez, somando a da tela: com uma em curso, a outra é recusada.
+- **Vídeo longo**: o MCP da IDE espera o app aberto por no máximo 15 min (`PRAZO_DO_APP_MS`, em `mcp-app.ts`), e até 10
+  deles podem ir no cartão do portão. Por isso `exportar_video` espera o arquivo até 4 min (`ESPERA_PADRAO_MS`); se o
+  render passar disso, devolve `{exportacao, situacao: "renderizando", andamento}` e o render segue no processo que o
+  começou (o app, ou o MCP da IDE com o app fechado). `situacao_exportacao` diz o andamento (arquivo, etapa e
+  porcentagem), a lista de arquivos quando fica pronta ou o motivo da falha, e `cancelar: true` para o render. Escolhemos
+  devolver cedo em vez de só mandar progresso por notificação MCP: o repasse da IDE ao app lê a resposta HTTP inteira (a
+  notificação não chegaria antes do fim) e o prazo de 15 min corre igual. As notificações (`progressToken`) também saem,
+  enquanto a chamada está aberta, para o cliente que fala direto com o processo que renderiza. As exportações ficam na
+  memória do processo (as últimas 20): se o app fecha no meio, o render para e o id some.
+- **`exportar_imagem` e `exportar_carrossel`**: desenhados no canvas da janela, pelas mesmas funções do diálogo
+  (`exportarPng`, `exportarCarrossel`), com o documento relido antes. O processo principal pede pela ponte com a janela
+  (`exportar:imagem`, `exportar:carrossel`) e espera até 4 min. Imagem com páginas é carrossel (`exportar_imagem`
+  recusa e indica a outra). O carrossel aceita `pdf: false` (só os PNG) e `nome` para a pasta e o PDF.
+- **Permissão**: as três que gravam pedem o cartão no app. Com o app fechado, o MCP da IDE roda sem perguntar (o
+  `portao` é `undefined` em `mcp/nucleo.ts`): a permissão é a do harness, de propósito.
+- **Resposta**: caminhos absolutos (`arquivos`, `arquivo`, `pdf`), os mesmos relativos ao projeto (`em_saidas`) e, no
+  vídeo e na imagem, um `markdown` para a pessoa abrir no chat da IDE.

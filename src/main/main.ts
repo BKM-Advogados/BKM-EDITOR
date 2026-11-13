@@ -1,20 +1,22 @@
 // Processo principal do Estúdio: uma janela, o projeto aberto, os terminais, o servidor de mídia e a exportação.
 import {app, BrowserWindow, dialog, ipcMain, Menu, net, safeStorage, shell, systemPreferences, type IpcMainInvokeEvent} from 'electron';
-import {copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, statSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import {CANAL, type InfoProjeto, type Metricas, type NovoProjeto, type Perfil, type Preferencias, type Progresso, type ResultadoExportacao, type Retangulo} from '../compartilhado/api';
+import {CANAL, type InfoProjeto, type Metricas, type NovoProjeto, type Perfil, type Preferencias, type ResultadoExportacao, type Retangulo} from '../compartilhado/api';
 import {contaClaude} from './conversa';
-import type {Comentario, EstadoEditor, Manifesto, Modulo, OperacaoPatch} from '../nucleo/documentos';
-import {aplicarMarcaAoPlano, dentroDoOneDrive, documentoNovo, gravarPlano, nomePadrao, pastaLivre, planoDoExemplo, planoDoProjeto, regerarClaudeMd, regerarGuias} from '../nucleo/criar-projeto';
+import type {Comentario, EstadoEditor, Modulo, OperacaoPatch} from '../nucleo/documentos';
+import {dentroDoOneDrive, documentoNovo, gravarPlano, pastaLivre, planoDoExemplo, regerarClaudeMd, regerarGuias} from '../nucleo/criar-projeto';
 import {EXEMPLO} from '../nucleo/exemplo';
 import {MODELOS} from '../nucleo/modelos';
-import {FORMATO_PADRAO, type Formato} from '../nucleo/formatos';
-import {argumentosDoRender, destinoDoFormato, estimarExportacao, fontesDaMarcaDagua, FORMATOS_IMAGEM_SAIDA, legendasDasProps, marcaDaguaDoDestino, nomesDosArquivos,
-  type OpcoesExportarImagem, type OpcoesExportarVideo} from '../nucleo/exportacao';
-import {ErroProjeto, Projeto, serializar} from '../nucleo/projeto';
+import type {Formato} from '../nucleo/formatos';
+import {FORMATOS_IMAGEM_SAIDA, type OpcoesExportarImagem, type OpcoesExportarVideo} from '../nucleo/exportacao';
+import {ErroProjeto, Projeto} from '../nucleo/projeto';
 import {criarRede} from '../nucleo/ferramentas-mcp';
-import {discoCheio, encerrarRender, faltaEspaco, prepararRender, renderizarVideo, type Preparado} from './exportar';
+import {prepararRender} from './exportar';
+import {criarExportadorVideo, tituloDoDocumento} from './exportacao-video'; // a exportação do vídeo, a mesma do MCP (exportar_video)
+import {servicoDeExportacao} from './exportacao-servico'; // exportação final pelo MCP
+import {definirServicoExportacao} from '../nucleo/mcp-exportacao-final';
 import {registrarIpcMarcas} from './ipc-marcas';
 import {arquivoLivre, registrarExportarPaginas} from './exportar-paginas';
 import {lerJsonDaTela} from './ler-json';
@@ -31,8 +33,6 @@ import {registrarIpcGravacao} from './ipc-gravacao'; // frente Som (rodada 3)
 import {definirPastaTrilhas} from '../nucleo/pasta-trilhas';
 import {somAcompanhaCenas} from '../nucleo/som-com-cenas';
 import {cancelarFala, registrarIpcFala} from './ipc-fala'; // frente Fala
-import {legendasNoDestino, type LegendasP} from '../nucleo/legendas'; // frente Fala: legendas no tamanho de cada destino
-import {arquivosDeLegendaDoVideo, planoDasLegendas} from '../nucleo/legendas-exportacao'; // frente Fala: queimar ou SRT por destino
 import {registrarPrefsExportacao} from './ipc-exportacao';
 import {registrarContrasteMarca} from './contraste-marca';
 import {apagarLimposSemUso, registrarIpcLimpeza} from './limpeza-voz';
@@ -46,11 +46,20 @@ import {registrarIpcNarracao} from './ipc-narracao'; // narração por IA (docs/
 import {aoAbrirMusica, registrarIpcMusica} from './ipc-musica'; // frente Música
 import {criarPonteJanela} from './ponte-janela';
 import {definirServicoPrevia} from '../nucleo/mcp-previa'; // frente IDE: prévias do MCP
+import {definirServicoMedidas} from '../nucleo/medidas-som'; // frente 3 do MCP: medidas do som
+import {definirServicoPreviaJanela} from '../nucleo/mcp-previa-janela'; // frente 3 do MCP: prévias pela janela
+import {servicoDeMedidas} from './medidas';
+import {servicoDePreviaJanela} from './previa-janela';
 import {criarServicoPrevia} from './previa'; // frente IDE
 import {criarIde} from './ide'; // frente IDE: projetos prontos para IDE de agentes
 import {scriptDoMcp} from '../nucleo/ide'; // frente IDE
 import {criarClaudeDesktop} from './claude-desktop'; // Claude Desktop (docs/claude-desktop.md)
-import {SCRIPT_DESKTOP} from '../nucleo/claude-desktop';
+import {listarProjetos, resolverProjeto, SCRIPT_DESKTOP} from '../nucleo/claude-desktop';
+// frente 2: importar mídia, criar, abrir, duplicar e fechar projeto e o ponto de restauração, os mesmos pela tela e pelo MCP
+import {EXTENSOES_IMPORTAVEIS, importarMidia, NOME_DO_TIPO, type TipoImportavel} from '../nucleo/importar-midia';
+import {criarPastaDoProjeto, duplicarPastaDoProjeto, formatoDoPedido, resumoDoProjeto} from '../nucleo/novo-projeto';
+import {definirMedidorDeEnvelope, definirPontoDeRestauracao, mensagemDoPonto, respostaDoPonto, type TrocadorDeProjeto} from '../nucleo/mcp-projeto';
+import {medirEnvelopeDoArquivo} from './ipc-audio';
 import {criarAtualizador} from './atualizacao'; // atualização do app (docs/atualizacao.md)
 import {motorWindows, type UpdaterNsis} from './atualizacao-windows';
 import {limparSobras, motorLinux} from './atualizacao-linux';
@@ -235,18 +244,14 @@ const abrirProjeto = async (raiz: string) => {
 
 const criarProjeto = async (o: NovoProjeto) => {
   const prefs = memoria.prefs();
-  const nome = o.nome?.trim() || nomePadrao(new Date());
-  const destino = pastaLivre(o.pasta || prefs.pasta_projetos, nome);
-  const plano = planoDoProjeto({nome, modelo: o.modelo, formato: o.formato});
-  if (o.marca) aplicarMarcaAoPlano(plano, marcas.ler(o.marca));
-  gravarPlano(destino, plano);
+  // a mesma pasta para a tela inicial e para o criar_projeto do MCP (src/nucleo/novo-projeto.ts)
+  const {raiz: destino} = criarPastaDoProjeto({nome: o.nome, modelo: o.modelo, formato: o.formato, marca: o.marca ? marcas.ler(o.marca) : null,
+    pasta: o.pasta || prefs.pasta_projetos});
   const modulo = MODELOS.find((m) => m.id === o.modelo)?.modulo;
   if (o.formato_id && modulo === 'video') memoria.gravarPrefs({formato_video: o.formato_id});
   if (o.formato_id && modulo === 'imagem') memoria.gravarPrefs({formato_imagem: o.formato_id});
   return abrirProjeto(destino);
 };
-
-const tituloDoDocumento = (p: Projeto, id: string) => p.manifesto().documentos.find((d) => d.id === id)?.titulo ?? id;
 
 const criarJanela = () => {
   janela = new BrowserWindow({
@@ -348,18 +353,14 @@ lidar(CANAL.abrirProjeto, (raiz: string) => emFila(() => abrirProjeto(raiz)));
 lidar(CANAL.projetoAtual, () => info());
 lidar(CANAL.criarProjeto, (o: NovoProjeto) => emFila(() => criarProjeto(o)));
 lidar(CANAL.fecharProjeto, () => emFila(() => fecharSessao()));
-lidar(CANAL.duplicarProjeto, (o: {raiz?: string; nome: string}) => emFila(async () => {
+const duplicarProjeto = async (o: {raiz?: string; nome?: string}) => {
   const origem = o.raiz ?? exigirProjeto().raiz;
   if (!existsSync(path.join(origem, 'estudio.json'))) throw new Error(`a pasta do projeto não existe mais: ${origem}`);
   if (sessao && path.resolve(sessao.projeto.raiz) === path.resolve(origem)) await sessao.marcarVersao('estúdio: antes de duplicar');
-  const nome = o.nome.trim() || `${new Projeto(origem).manifesto().nome} (cópia)`;
-  const destino = pastaLivre(path.dirname(origem), nome);
-  // sem histórico, diário, estado e saídas: a cópia começa limpa
-  cpSync(origem, destino, {recursive: true, filter: (src) => !['.git', '.estudio', 'saidas'].includes(path.relative(origem, src).split(path.sep)[0])});
-  const arq = path.join(destino, 'estudio.json');
-  writeFileSync(arq, serializar({...(JSON.parse(readFileSync(arq, 'utf-8')) as Manifesto), nome}), 'utf-8');
-  return abrirProjeto(destino);
-}));
+  // sem histórico, diário, estado e saídas: a cópia começa limpa (a mesma do duplicar_projeto do MCP, novo-projeto.ts)
+  return abrirProjeto(duplicarPastaDoProjeto(origem, o.nome).raiz);
+};
+lidar(CANAL.duplicarProjeto, (o: {raiz?: string; nome: string}) => emFila(() => duplicarProjeto(o)));
 lidar(CANAL.renomearProjeto, (nome: string) => {
   const m = exigirProjeto().renomear(nome);
   memoria.lembrar(sessao!.projeto.raiz, m.nome);
@@ -393,32 +394,29 @@ lidar(CANAL.escolherPasta, async (titulo?: string) => {
   const r = await dialog.showOpenDialog(janela!, {properties: ['openDirectory', 'createDirectory'], title: titulo ?? 'Escolher pasta'});
   return r.canceled || !r.filePaths[0] ? null : r.filePaths[0];
 });
-lidar(CANAL.marcarVersao, async () => {
+// Ctrl+S e o marcar_ponto_de_restauracao do MCP (mcp-projeto.ts): o mesmo commit, na fila do git da sessão
+const pontoDeRestauracao = async (mensagem?: string) => {
   exigirProjeto();
-  const ok = await sessao!.marcarVersao();
-  if (ok) return {ok, mensagem: 'Ponto de restauração criado'};
-  return {ok, mensagem: sessao?.temGit ? 'O Git não conseguiu criar o ponto de restauração agora; o histórico continua no diário'
-    : 'Sem o Git instalado não há pontos de restauração; o histórico continua no diário'};
+  const ok = await sessao!.marcarVersao(mensagemDoPonto(mensagem));
+  return respostaDoPonto(ok, Boolean(sessao?.temGit));
+};
+lidar(CANAL.marcarVersao, () => pontoDeRestauracao());
+definirPontoDeRestauracao(async (raiz, mensagem) => {
+  if (sessao && path.resolve(sessao.projeto.raiz) === path.resolve(raiz)) return pontoDeRestauracao(mensagem);
+  const r = await SessaoProjeto.pontoSemApp(raiz, mensagemDoPonto(mensagem)); // outro projeto (não acontece pelo HTTP, que é do aberto)
+  return respostaDoPonto(r.ok, r.temGit);
 });
-lidar(CANAL.escolherMidia, async (tipo: 'imagem' | 'audio' | 'video') => {
+// o áudio importado pelo MCP já sai medido (duração e forma de onda), como o que a tela traz para a linha do tempo
+definirMedidorDeEnvelope((p, arquivo) => medirEnvelopeDoArquivo(p, arquivo));
+lidar(CANAL.escolherMidia, async (tipo: TipoImportavel) => {
   const p = exigirProjeto();
-  const filtros = {
-    imagem: {name: 'Imagens', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg', 'avif']},
-    audio: {name: 'Áudio', extensions: ['wav', 'mp3', 'm4a', 'ogg', 'aac']},
-    video: {name: 'Vídeo', extensions: ['mp4', 'webm', 'mov']},
-  };
-  const r = await dialog.showOpenDialog(janela!, {properties: ['openFile'], title: 'Escolher arquivo', filters: [filtros[tipo]]});
+  const r = await dialog.showOpenDialog(janela!, {properties: ['openFile'], title: 'Escolher arquivo',
+    filters: [{name: NOME_DO_TIPO[tipo], extensions: EXTENSOES_IMPORTAVEIS[tipo]}]});
   const arq = r.filePaths[0];
   if (r.canceled || !arq) return null;
-  // o que já está dentro do projeto é usado no lugar; o que vem de fora é copiado para midia/
-  const dentro = path.relative(p.raiz, arq);
-  if (!dentro.startsWith('..') && !path.isAbsolute(dentro)) return dentro.split(path.sep).join('/');
-  const ext = path.extname(arq).slice(1).toLowerCase();
-  const destino = arquivoLivre(p.caminho('midia'), path.basename(arq, path.extname(arq)), ext);
-  p.caminhoParaGravar(path.relative(p.raiz, destino)); // midia/ ligada para fora por link: só leitura, não copia para lá
-  mkdirSync(path.dirname(destino), {recursive: true});
-  copyFileSync(arq, destino);
-  return path.relative(p.raiz, destino).split(path.sep).join('/');
+  // o que já está dentro do projeto é usado no lugar; o que vem de fora é copiado para midia/ (a mesma regra do
+  // importar_midia do MCP: src/nucleo/importar-midia.ts)
+  return importarMidia(p, arq, {tipo}).caminho;
 });
 lidar(CANAL.lerDocumento, (documento: string) => {
   const p = exigirProjeto();
@@ -475,86 +473,21 @@ lidar(CANAL.conversaAbrir, (o: {sessao?: string; provedor?: string; modelo?: str
 lidar(CANAL.conversaEnviar, (id: number, texto: string) => conversas.enviar(id, texto, PERFIL.sessoes_claude));
 lidar(CANAL.conversaHibernar, (id: number) => conversas.hibernar(id));
 // ---------- exportação: um ou mais arquivos em saidas/, com andamento na interface e na barra de tarefas, e Cancelar ----------
-// Sem opções (chamada antiga), sai o MP4 H.264 no formato do documento. Com elas, um arquivo por destino: o vídeo de cenas
-// é relativo ao quadro, então basta trocar largura e altura nas props; o carrossel narrado é fixo em 1080×1920 e só
-// aceita escala. O diálogo mostra os arquivos e "Mostrar na pasta" ao fim, então a pasta não abre sozinha.
-let cancelarExportacao: (() => void) | null = null;
-lidar(CANAL.exportar, async (documento: string, opcoes?: OpcoesExportarVideo): Promise<ResultadoExportacao> => {
-  const p = exigirProjeto();
-  if (cancelarExportacao) return {ok: false, mensagem: 'já há uma exportação em andamento'};
-  const montado = sessao!.propsVideo(documento, midia.base);
-  if ('erro' in montado) return {ok: false, mensagem: montado.erro};
-  const props = montado.props;
-  const formato: Formato = {largura: Number(props.largura) || FORMATO_PADRAO.largura, altura: Number(props.altura) || FORMATO_PADRAO.altura, fps: Number(props.fps) || FORMATO_PADRAO.fps};
-  // a animação, como o carrossel, tem tamanho fixo (camadas em pixels): o diálogo só oferece o tamanho dela e a escala vai no `scale` do render
-  const fixo = props.composicao !== 'VideoCenas';
-  const o: OpcoesExportarVideo = {codec: 'h264', qualidade: 'alta', escala: 1, ...opcoes, destinos: fixo || !opcoes?.destinos?.length ? [destinoDoFormato(formato)] : opcoes.destinos};
-  const pasta = p.pastaDeSaidas(); // saidas/ por link para outro disco grava lá (a exceção, em Projeto.pastaDeSaidas)
-  mkdirSync(pasta, {recursive: true});
-  const planos = nomesDosArquivos(o.nome?.trim() || tituloDoDocumento(p, documento), o.destinos, formato);
-  const comAudio = fixo || Boolean(['audio', 'trilha', 'narracao', 'sons'].some((k) => (Array.isArray(props[k]) ? (props[k] as unknown[]).length > 0 : Boolean(props[k]))));
-  const {makeCancelSignal} = await import('@remotion/renderer');
-  const {cancelSignal, cancel} = makeCancelSignal();
-  cancelarExportacao = cancel;
-  const arquivos: string[] = [];
-  const avisos: string[] = [];
-  let parcial: string | undefined;
-  // o andamento de cada arquivo vai à interface com o nome dele; a barra de tarefas mostra o andamento geral
-  const avisoDe = (indice: number, arquivo: string) => (x: Progresso) => {
-    enviar(CANAL.progresso, {...x, arquivo, indice: indice + 1, total: planos.length});
-    if (x.tipo === 'progresso' && x.progresso !== undefined) janela?.setProgressBar((indice + x.progresso / 100) / planos.length);
-  };
-  const fontesMarca = fontesDaMarcaDagua(props);
-  let preparado: Preparado | null = null;
-  try {
-    // dentro do try: a trava de "já há uma exportação" já vale, e a mensagem chega como as outras falhas
-    const semEspaco = await faltaEspaco(pasta, estimarExportacao(o, formato, Number(props.duracao_ms) || 0, comAudio).porDestino.map((d) => d.bytes), comAudio);
-    if (semEspaco) throw new Error(semEspaco);
-    const pronto = await prepararRender({raizApp: app.getAppPath(), empacotado: app.isPackaged, aviso: avisoDe(0, '')});
-    preparado = pronto;
-    for (const [i, plano] of planos.entries()) {
-      const args = argumentosDoRender(o, plano.destino, formato, Number(props.duracao_ms) || 0);
-      const destino = arquivoLivre(pasta, plano.nome, args.ext);
-      parcial = destino;
-      // legendas na área segura e na quebra do destino, não do documento (frente Fala; a área fica em legendas_cenas.area)
-      // queimar, só o SRT ou os dois, por destino (frente Fala); no 16:9 com o SRT junto, acima das legendas do YouTube
-      const planoLeg = planoDasLegendas(o.legendas?.[plano.destino.id], args);
-      const legendas = !fixo && props.legendas_cenas ? legendasNoDestino(props.legendas_cenas as LegendasP, args.largura, args.altura, formato,
-        {legendas_youtube: planoLeg.legendas_youtube}) : undefined;
-      const propsDestino = {...(fixo ? props : {...props, largura: args.largura, altura: args.altura}),
-        ...(legendas ? {legendas_cenas: planoLeg.queimar ? legendas : {...legendas, oculto: true}} : {})};
-      // marca d'água do destino, se ligada: posicionada no tamanho do destino, em frações (vale com qualquer escala), fora
-      // da legenda que vai neste render (a das props do destino, já recalculada acima)
-      const marca = marcaDaguaDoDestino(o.marca_dagua?.[plano.destino.id], plano.destino, fontesMarca, o.proporcao_logo, legendasDasProps(propsDestino), o.proporcao_texto);
-      await renderizarVideo(pronto, {
-        props: {...propsDestino, ...(marca ? {marca_dagua: marca} : {})},
-        arquivo: destino, codec: args.codec, videoBitrate: args.videoBitrate, escala: fixo ? args.escala : 1, quadros: args.frameRange, cancelSignal, avisos,
-      }, avisoDe(i, path.basename(destino)));
-      arquivos.push(destino);
-      parcial = undefined;
-      // o SRT ao lado do vídeo, com o mesmo nome (e o .pt_BR.srt do Facebook e o .vtt), sem gravar por cima (frente Fala)
-      if (planoLeg.srt && legendas && !legendas.oculto) {
-        for (const a of arquivosDeLegendaDoVideo(path.basename(destino, `.${args.ext}`), legendas.segmentos, args.frameRange ? o.trecho : null, (n) => existsSync(path.join(pasta, n)))) {
-          writeFileSync(path.join(pasta, a.nome), a.texto, 'utf-8');
-          arquivos.push(path.join(pasta, a.nome));
-        }
-      }
-    }
-    enviar(CANAL.progresso, {tipo: 'status', mensagem: `Exportado: ${arquivos.map((a) => path.relative(p.raiz, a)).join(', ')}${avisos.length ? `. Atenção: ${avisos.join('; ')}` : ''}`});
-    return {ok: true, arquivo: arquivos[0], arquivos, pasta, ...(avisos.length ? {avisos} : {})};
-  } catch (e) {
-    const mensagem = discoCheio((e as Error).message) ? 'o disco encheu durante a exportação; libere espaço e tente de novo' : (e as Error).message;
-    const cancelado = /cancel/i.test(mensagem);
-    if (parcial) rmSync(parcial, {force: true}); // o arquivo pela metade não fica em saidas/
-    enviar(CANAL.progresso, {tipo: 'status', mensagem: cancelado ? 'Exportação cancelada' : `Falhou: ${mensagem}`});
-    return {ok: false, cancelado, mensagem: cancelado ? 'Exportação cancelada' : mensagem, arquivos, pasta, ...(avisos.length ? {avisos} : {})};
-  } finally {
-    await encerrarRender(preparado); // o Chrome que serviu a todos os destinos
-    cancelarExportacao = null;
+// O exportador (exportacao-video.ts) é o mesmo do MCP (exportar_video): a tela e o agente dividem a trava de uma exportação
+// por vez. O diálogo mostra os arquivos e "Mostrar na pasta" ao fim, então a pasta não abre sozinha.
+const exportador = criarExportadorVideo({
+  preparar: (aviso) => prepararRender({raizApp: app.getAppPath(), empacotado: app.isPackaged, aviso}),
+  comMidia: (_raiz, f) => f(midia.base),
+  aoAndamento: (x) => {
+    enviar(CANAL.progresso, x);
+    if (x.geral !== undefined) janela?.setProgressBar(x.geral);
+  },
+  aoTerminar: () => {
     janela?.setProgressBar(-1);
     atualizador.livre(); // um reinício para atualizar que esperava a exportação segue agora
-  }
+  },
 });
+lidar(CANAL.exportar, (documento: string, opcoes?: OpcoesExportarVideo): Promise<ResultadoExportacao> => exportador.exportar(exigirProjeto(), documento, opcoes));
 // a interface manda a imagem já desenhada (PNG, JPG ou WebP em data URL); aqui só grava com o nome livre em saidas/
 lidar(CANAL.exportarImagem, (documento: string, dados: string, opcoes?: OpcoesExportarImagem) => {
   const p = exigirProjeto();
@@ -600,7 +533,7 @@ ipcMain.on(CANAL.terminalFechar, (e, id: number) => (confiavel(e), terminais.fec
 ipcMain.on(CANAL.conversaPermitir, (e, id: number, pedido: string, decisao: 'permitir' | 'negar', sempre?: boolean) => (confiavel(e), conversas.permitir(id, pedido, decisao, sempre)));
 ipcMain.on(CANAL.conversaParar, (e, id: number) => (confiavel(e), conversas.parar(id)));
 ipcMain.on(CANAL.conversaFechar, (e, id: number) => (confiavel(e), conversas.fechar(id)));
-ipcMain.on(CANAL.exportarCancelar, (e) => (confiavel(e), cancelarExportacao?.()));
+ipcMain.on(CANAL.exportarCancelar, (e) => (confiavel(e), exportador.cancelar()));
 ipcMain.on(CANAL.mostrarArquivo, (e, caminho: string) => {
   confiavel(e);
   if (typeof caminho === 'string' && existsSync(caminho)) shell.showItemInFolder(caminho);
@@ -616,6 +549,11 @@ definirServicoPrevia(criarServicoPrevia({preparar: (aviso) => prepararRender({ra
 // frente Som (rodada 2): limpeza de voz (limpeza-voz.ts) e medidor de loudness da mistura (loudness.ts)
 registrarIpcLimpeza(lidar, exigirProjeto, enviar);
 registrarIpcLoudness(lidar, exigirProjeto, (documento) => (exigirProjeto(), sessao!.propsVideo(documento, midia.base)));
+// frente 3 do MCP: medir_loudness, medir_envelope e limpar_voz com as funções da tela; ver_imagem e ver_cena_3d desenhados
+// pela janela, por uma ponte só delas (cada ponte responde só aos pedidos que fez)
+definirServicoMedidas(servicoDeMedidas());
+definirServicoPreviaJanela(servicoDePreviaJanela(criarPonteJanela({enviar, temJanela: () => Boolean(janela && !janela.isDestroyed()),
+  ouvir: (canal, f) => ipcMain.on(canal, (e, ...a) => (confiavel(e), f(...(a as never[]))))})));
 registrarIpcMidia(lidar, exigirProjeto); // frente Casca: painel de mídia (lista de midia/ e marcas das tomadas)
 // frente IA: Configurações › IA (provedores, chaves cifradas pelo safeStorage em userData/ia, modelos, uso do mês)
 registrarIpcIa({lidar, claudeInstalado: () => claude, pasta: path.join(app.getPath('userData'), 'ia'), conversas: () => conversas,
@@ -634,8 +572,11 @@ registrarIpcNarracao({lidar, enviar, projeto: exigirProjeto, pasta: path.join(ap
   canais: {estado: CANAL.narracaoEstado, gravarChave: CANAL.narracaoGravarChave, apagarChave: CANAL.narracaoApagarChave, vozes: CANAL.narracaoVozes,
     previa: CANAL.narracaoPrevia, gerar: CANAL.narracaoGerar, cancelar: CANAL.narracaoCancelar, andamento: CANAL.narracaoAndamento, amostra: CANAL.narracaoAmostra}});
 // frente Música: ida e volta com o vídeo e o render ligado, feito no Web Worker da janela pela ponte com a janela
-registrarIpcMusica(lidar, exigirProjeto, criarPonteJanela({enviar, temJanela: () => Boolean(janela && !janela.isDestroyed()),
-  ouvir: (canal, f) => ipcMain.on(canal, (e, ...a) => (confiavel(e), f(...(a as never[]))))}));
+const pedirAJanela = criarPonteJanela({enviar, temJanela: () => Boolean(janela && !janela.isDestroyed()),
+  ouvir: (canal, f) => ipcMain.on(canal, (e, ...a) => (confiavel(e), f(...(a as never[]))))});
+registrarIpcMusica(lidar, exigirProjeto, pedirAJanela);
+// exportação final pelo MCP: o vídeo pelo exportador da tela; a imagem e o carrossel desenhados pela janela (mesma ponte)
+definirServicoExportacao(servicoDeExportacao(exportador, pedirAJanela));
 
 // ---------- atualização do app (docs/atualizacao.md) ----------
 // Windows: electron-updater (baixa sozinho, instala ao fechar ou no "Reiniciar e atualizar"). Mac e Linux: aviso com as
@@ -652,7 +593,7 @@ const atualizador = criarAtualizador({
   buscar: (url, init) => net.fetch(url, init),
   abrirNoNavegador: (url) => void shell.openExternal(url),
   avisarTela: (e) => enviar(CANAL.atualizacaoMudou, e),
-  ocupadoNoPrincipal: () => (cancelarExportacao ? 'a exportação' : null),
+  ocupadoNoPrincipal: () => (exportador.ocupado() ? 'a exportação' : null),
   // o mesmo que fechar a janela faz (window-all-closed), antes de o app sair para trocar de versão: o app.quit() do
   // atualizador não passa pelo window-all-closed, e o instalador do Windows derruba o app que demora a sair
   encerrar: async () => {
@@ -694,6 +635,37 @@ function abrirDeFora(pasta: string) {
     if (janela && !janela.isDestroyed()) void dialog.showMessageBox(janela, {type: 'warning', title: 'Estúdio', message: e.message});
   });
 }
+// frente 2: criar_projeto, abrir_projeto, duplicar_projeto e fechar_projeto pedidos de fora do app (Claude Desktop, apps de
+// fora, IDE; mcp-projeto.ts). A troca é a mesma da tela; depois, a tela recarrega e abre o projeto novo, como no abrirDeFora.
+// A conversa que pediu está fora do app e segue viva: o token fixo dela não cai no fecharSessao.
+const trocadorDoApp = (quem: {ide: boolean}): TrocadorDeProjeto => {
+  const avisoIde = quem.ide ? {aviso: 'Este é o MCP da IDE: as próximas ferramentas desta conversa continuam no projeto da pasta da IDE, que não está mais aberto no app.'} : {};
+  const recarregar = () => setImmediate(() => janela && !janela.isDestroyed() && janela.webContents.reload());
+  const pronto = (i: InfoProjeto) => {
+    recarregar();
+    return {ok: true, aberto_no_app: true, ...resumoDoProjeto(i.raiz), ...avisoIde};
+  };
+  return {
+    criar: async (o) => {
+      const modelo = o.modelo ?? 'video-branco';
+      const formato = formatoDoPedido(modelo, o.formato); // antes da fila: pedido inválido não fecha o projeto aberto
+      return pronto(await emFila(() => criarProjeto({nome: o.nome, modelo, formato, marca: o.marca, pasta: o.pasta})));
+    },
+    abrir: async (pedido) => {
+      const r = resolverProjeto(pedido, listarProjetos({dados: app.getPath('userData'), pastas: [memoria.prefs().pasta_projetos]}));
+      if ('erro' in r) throw new Error(r.erro);
+      return pronto(await emFila(() => abrirProjeto(r.pasta)));
+    },
+    duplicar: async (o) => pronto(await emFila(() => duplicarProjeto(o))),
+    fechar: () => emFila(async () => {
+      const fechado = sessao?.projeto.raiz ?? null;
+      await fecharSessao();
+      recarregar();
+      return {ok: true, fechado, ...(fechado ? {} : {aviso: 'não havia projeto aberto no app'})};
+    }),
+  };
+};
+
 // Mac: pasta solta no ícone do Dock ou "Abrir com" (Info.plist, build/mac.ts). Chega antes do ready quando é ela que abre o app.
 app.on('open-file', (e, caminho) => {
   e.preventDefault();
@@ -711,6 +683,7 @@ app.on('ready', async () => {
   // a rede do ler_fonte no app: net.fetch do Electron (proxy e certificados do sistema), assíncrono, 40 s e 20 MB no máximo
   mcpHttp = new McpHttp(path.join(app.getPath('userData'), 'mcp'), () => sessao?.projeto ?? null, criarRede((url, init) => net.fetch(url, init)),
     perguntarAPessoa); // frente IA: o portão de permissão pergunta à pessoa pela tela
+  mcpHttp.definirTrocador(trocadorDoApp); // frente 2: criar e abrir projeto pedidos de fora do app
   await iniciarAppsDeFora(); // frente IA: apps de IA de fora (tokens de volta ao MCP e, se ligada, a porta fixa)
   midia.rota((req, res) => mcpHttp!.atender(req, res));
   claudeDesktop.registrarInstalacao(); // onde este Estúdio está, para a extensão achar com o app fechado (sem token)

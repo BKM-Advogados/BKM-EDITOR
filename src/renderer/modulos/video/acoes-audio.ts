@@ -8,6 +8,7 @@ import {DURACAO_CLIPE_MIN, nivelDeReferencia, nomeDoClipe, novaFaixaAudio, novoA
   type PapelFaixa} from '../../../nucleo/audio';
 import {copiarClipe, crossfadeEntre, dividirClipe, nivelDaVoz, recusou, volumeDoEfeito} from '../../../nucleo/clipes-audio';
 import type {OperacaoPatch} from '../../../nucleo/documentos';
+import {origemDaLimpeza, patchLimpezaDoClipe, patchVoltarAoOriginalDoClipe} from '../../../nucleo/medidas-som'; // frente 3 do MCP: a mesma conta do limpar_voz
 import {aplicar, avisar, loja, mensagemDe, patchTrocar, selecionar, valorEm} from '../../estado/loja';
 import {msAtual} from './tocador';
 import {garantirEnvelope} from './envelope';
@@ -293,7 +294,7 @@ export const limparVozDoClipe = async (documento: string, caminho: string, inten
   const c = valorEm(docDe(documento), caminho) as ClipeAudio | undefined;
   if (!c) return;
   if (andamento) return avisar('Já há uma limpeza de voz em andamento; espere ou cancele.', 'info');
-  const origem = c.original ?? c.arquivo;
+  const origem = origemDaLimpeza(c);
   ouvirProgresso();
   mudouLimpeza({arquivo: origem, progresso: 0, documento, caminho});
   try {
@@ -302,8 +303,8 @@ export const limparVozDoClipe = async (documento: string, caminho: string, inten
     const d = docDe(documento); // o documento pode ter mudado enquanto limpava
     const agora = valorEm(d, caminho) as ClipeAudio | undefined;
     if (!agora || agora.id !== c.id) return avisar(`A voz limpa ficou em ${r.arquivo}, mas o clipe mudou de lugar; troque o arquivo dele à mão.`, 'info');
-    const patch = [...testeId(caminho, c.id), ...patchTrocar(d, `${caminho}/arquivo`, r.arquivo), ...patchTrocar(d, `${caminho}/original`, origem),
-      ...patchTrocar(d, `${caminho}/limpeza`, r.medidas)];
+    // o mesmo patch do limpar_voz do MCP (src/nucleo/medidas-som.ts)
+    const patch = patchLimpezaDoClipe(d, caminho, c, r);
     if (await aplicar(documento, patch, `limpar voz (${intensidade}): ${nomeDoClipe(c)}`)) {
       avisar(`Voz limpa: ruído nas pausas de ${db1(r.medidas.ruido_antes_db)} para ${db1(r.medidas.ruido_depois_db)} dB. "Voltar ao original" desfaz.`, 'ok');
     }
@@ -319,8 +320,7 @@ export const voltarAoOriginal = async (documento: string, caminho: string) => {
   const d = docDe(documento);
   const c = valorEm(d, caminho) as ClipeAudio | undefined;
   if (!c?.original) return;
-  const patch = [...testeId(caminho, c.id), ...patchTrocar(d, `${caminho}/arquivo`, c.original), ...patchTrocar(d, `${caminho}/original`, undefined),
-    ...patchTrocar(d, `${caminho}/limpeza`, undefined)];
+  const patch = patchVoltarAoOriginalDoClipe(d, caminho, c);
   if (await aplicar(documento, patch, `voltar ao original: ${nomeDoClipe(c)}`)) avisar('O clipe voltou ao arquivo original. Ctrl+Z desfaz.', 'ok');
 };
 

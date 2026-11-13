@@ -3,6 +3,7 @@
 // PNG vão ao processo principal, que grava saidas/<nome>/01.png… e o PDF (exportar-paginas.ts). Uma página de cada
 // vez, em partes (imagem-D19): desenha, manda e solta antes da próxima, para o carrossel de 20 páginas não segurar 20
 // imagens em resolução cheia (nem 20 PNG em base64 num pedido só).
+import type {ResultadoExportarPaginas} from '../../../compartilhado/api';
 import type {DocImagem} from '../../../nucleo/documentos';
 import {paginasDe, vistaDaPagina} from '../../../nucleo/carrossel';
 import {avisar, loja} from '../../estado/loja';
@@ -22,17 +23,25 @@ const desenharPagina = async (doc: DocImagem, p: number) => {
   return {png, faltaram};
 };
 
-/** Todas as páginas em PNG numerado e o PDF, em saidas/ (um reinício para atualizar espera terminar). */
-export const exportarCarrossel = (documento: string) => ocupadoDurante('exportando', () => exportarCarrosselAgora(documento));
+export type OpcoesCarrossel = {pdf?: boolean; nome?: string};
+export type SaidaCarrossel = ResultadoExportarPaginas & {faltaram: string[]};
 
-const exportarCarrosselAgora = async (documento: string) => {
+/** Todas as páginas em PNG numerado e o PDF, em saidas/ (um reinício para atualizar espera terminar). O diálogo pede o
+ *  padrão; o MCP (exportar_carrossel, exportarPeloMcp.ts) pode tirar o PDF e dar outro nome. */
+export const exportarCarrossel = (documento: string, opcoes: OpcoesCarrossel = {}) => ocupadoDurante('exportando', () => exportarCarrosselAgora(documento, opcoes));
+
+const exportarCarrosselAgora = async (documento: string, opcoes: OpcoesCarrossel): Promise<SaidaCarrossel> => {
   const doc = loja.get().docs[documento]?.doc as DocImagem | undefined;
-  if (!doc) return avisar('A imagem ainda não carregou.', 'erro');
+  if (!doc) {
+    avisar('A imagem ainda não carregou.', 'erro');
+    return {ok: false, mensagem: 'a imagem ainda não carregou', faltaram: []};
+  }
+  const pdf = opcoes.pdf ?? true;
   const paginas = paginasDe(doc);
-  avisar(`Exportando ${paginas.length} ${paginas.length === 1 ? 'página' : 'páginas'} em ${doc.largura}×${doc.altura} e o PDF…`);
+  avisar(`Exportando ${paginas.length} ${paginas.length === 1 ? 'página' : 'páginas'} em ${doc.largura}×${doc.altura}${pdf ? ' e o PDF' : ''}…`);
   try {
     const partes = window.estudio.exportarPaginasEmPartes;
-    const {sessao} = await partes.abrir({documento, pdf: true});
+    const {sessao} = await partes.abrir({documento, pdf, ...(opcoes.nome ? {nome: opcoes.nome} : {})});
     const faltaram: string[] = [];
     for (let p = 0; p < paginas.length; p++) {
       const pagina = await desenharPagina(doc, p);
@@ -43,10 +52,10 @@ const exportarCarrosselAgora = async (documento: string) => {
     const falta = faltaram.length ? ` (sem imagem: ${faltaram.join(', ')})` : '';
     if (r.ok) avisar(`Carrossel exportado: ${r.pdf ?? r.pasta}${falta}`, faltaram.length ? 'erro' : 'ok');
     else avisar(r.mensagem ? `Exportação: ${r.mensagem}` : 'Exportação cancelada.', r.mensagem ? 'erro' : 'info');
-    return r;
+    return {...r, faltaram};
   } catch (e) {
     avisar(`Exportação do carrossel falhou: ${(e as Error).message}`, 'erro');
-    return null;
+    return {ok: false, mensagem: (e as Error).message, faltaram: []};
   }
 };
 

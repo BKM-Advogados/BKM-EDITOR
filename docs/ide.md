@@ -130,7 +130,7 @@ escritor só. Não achou (app fechado): as ferramentas falam direto com os arqui
 - **Documento.** Sem `documento`, vale o primeiro vídeo do projeto ou, sem vídeo, a primeira animação.
   - `ver_quadro` e `ver_trecho` servem ao vídeo de cenas, ao carrossel narrado e à animação.
   - `ver_cenas` precisa de cenas.
-  - Imagem e 3D ficam de fora.
+  - Imagem e 3D têm as prévias delas, desenhadas pela janela do app (abaixo).
 - **Mostrar à pessoa.** O chat do T3 mostra imagem e vídeo quando o agente escreve `![alt](/caminho/absoluto)`. O campo
   `markdown` vem pronto. Caminho com espaço vai entre `< >`, como nas pastas "Sem título · …" que o app cria.
 - **O agente vê o quadro.** A imagem vai como conteúdo `image` do MCP; o vídeo não tem esse tipo de conteúdo.
@@ -171,6 +171,26 @@ escritor só. Não achou (app fechado): as ferramentas falam direto com os arqui
   - quadros seguintes: menos de 1 s;
   - folha de 3 cenas: cerca de 3 s;
   - trecho de 3 s: cerca de 2 a 4 s.
+
+
+### Imagem e cena 3D (`src/nucleo/mcp-previa-janela.ts`, frente 3 do MCP)
+
+| Ferramenta | Parâmetros | Grava em `saidas/previas/` | Na resposta |
+|---|---|---|---|
+| `ver_imagem` | `documento?`, `pagina?` (no carrossel, 1 é a primeira), `escala?` (padrão: lado maior em 1600 px) | `imagem-<doc>[-p<n>]-<carimbo>.png` | caminho, `markdown`, tamanho, as camadas cuja imagem não carregou, e a imagem (JPEG até 1024 px) |
+| `ver_cena_3d` | `documento?`, `camera?` {`posicao`, `alvo`, `fov`}, `largura?` e `altura?` (padrão 1280 × 720) | `cena3d-<doc>[-camera]-<carimbo>.png` | caminho, `markdown`, a câmera usada, e a imagem |
+
+- **Quem desenha é a janela.** A imagem sai do mesmo canvas da exportação (`desenharDocumento`, com acabamento e a pilha
+  de efeitos; cada página pela `vistaDaPagina`). A cena 3D sai de um `WebGLRenderer` só dela, com a `CenaDoc` e o
+  ambiente do monitor 3D, descartado ao fim. O Three.js e o código da imagem carregam sob demanda.
+- **O documento vai do disco.** O núcleo lê o JSON e manda pela ponte (`src/main/previa-janela.ts` →
+  `src/renderer/previas-janela.ts`, ações `previa:imagem` e `previa:cena3d`). A janela desenha o que está gravado, não
+  o que estiver na tela, e recusa o pedido de outro projeto.
+- **Com o app fechado.** O MCP por stdio não liga o serviço, e as duas respondem "abra o projeto no Estúdio". A
+  descrição de cada uma já avisa. Com o app aberto no mesmo projeto, o stdio repassa a chamada ao app (`mcp-app.ts`).
+- **Câmera.** `camera` vale campo a campo por cima da do documento e não muda o documento; para gravar, `aplicar_patch`
+  em `/camera`.
+- Classe **livre**, como as outras prévias.
 
 ## Abrir no T3 Code
 

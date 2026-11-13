@@ -88,6 +88,9 @@ Envolve o `registerTool`: toda ferramenta registrada depois dele passa por ele, 
 - **Classe "cartao"** (pergunta à pessoa antes de rodar):
   - a tabela `CLASSES`: `ler_fonte`, `transcrever`, `remover_fundo`, `exportar_legendas`, `destravar_camadas`,
     `exportar_musica`, `importar_midi`, `escolher_trilha`, `narrar` e `vozes_narracao` (narração por IA);
+    `exportar_video`, `exportar_imagem` e `exportar_carrossel` (exportação final, `docs/exportacao.md`);
+    `importar_midia`, `criar_projeto`, `abrir_projeto`, `duplicar_projeto`, `fechar_projeto`, `criar_marca`,
+    `editar_marca`, `importar_logo_marca` e `importar_fonte_marca` (mídia, projeto e marca);
   - ou quem declara `annotations: {openWorldHint: true}` (sai do PC ou do projeto) ou `destructiveHint: true` (apaga)
     no `registerTool`.
 - **Classe "livre"**: o resto. Quando muda um documento que já existe, grava no diário e tem Reverter. Criar documento
@@ -125,7 +128,9 @@ Envolve o `registerTool`: toda ferramenta registrada depois dele passa por ele, 
   Desktop" e o mesmo portão. A configuração stdio antiga, com a ponte, segue funcionando, e o botão a troca pela nova.
   Detalhes em `docs/claude-desktop.md`.
 - **IDE de agentes** (T3 Code, Claude Code, Cursor): cada projeto leva um `.mcp.json` com o MCP por stdio, sem token e sem
-  o app aberto, e o agente vê o vídeo por `ver_quadro`, `ver_cenas` e `ver_trecho`. Detalhes em `docs/ide.md`. Desde a
+  o app aberto, e o agente vê o vídeo por `ver_quadro`, `ver_cenas` e `ver_trecho` (a imagem e a cena 3D, por `ver_imagem`
+  e `ver_cena_3d`, com o app aberto). Mede o som por `medir_loudness` e `medir_envelope` e limpa a voz por `limpar_voz`
+  (`docs/audio.md`). Detalhes em `docs/ide.md`. Desde a
   2.0.1, também o guia em `AGENTS.md` e `GEMINI.md` e o MCP de Codex, Gemini CLI, Antigravity, Cursor, VS Code e
   opencode, com a origem de cada um no diário (`--origem`): `docs/harnesses.md`.
 
@@ -142,6 +147,58 @@ Envolve o `registerTool`: toda ferramenta registrada depois dele passa por ele, 
 O servidor também manda `instructions` na abertura, para todo cliente MCP. O `listar_mudancas` traz no máximo 50
 entradas e filtra por documento. O `aplicar_patch` exige `versao_base` não vazia, recusa o patch que deixaria o
 documento sem ser objeto ou fora do formato do módulo dele, e devolve os avisos do resolvedor no vídeo de cenas.
+
+## Mídia, projeto e marca (frente 2: `src/nucleo/mcp-projeto.ts`, `src/nucleo/mcp-marca-edicao.ts`)
+
+| Ferramenta | Parâmetros | Classe |
+|---|---|---|
+| `importar_midia` | `{caminho, pasta?, nome?}` | cartao: traz arquivo de fora |
+| `renomear_documento` | `{documento, titulo}` | livre (o manifesto, como `renomear_projeto`; fora do diário) |
+| `marcar_ponto_de_restauracao` | `{mensagem?}` | livre: o Ctrl+S, um commit no git do projeto |
+| `criar_projeto` | `{nome?, modelo?, formato?, largura?, altura?, marca?, pasta?}` | cartao; só fora do app (abaixo) |
+| `abrir_projeto` | `{projeto}` (nome ou pasta) | cartao; só fora do app |
+| `duplicar_projeto` | `{nome?}` | cartao; só fora do app |
+| `fechar_projeto` | — | cartao; só fora do app |
+| `listar_marcas` | — | livre: só lê |
+| `criar_marca` | `{nome, a_partir_de?}` | cartao: grava na pasta dos kits, fora do projeto e sem diário |
+| `editar_marca` | `{marca, nome?, fundo?, texto?, destaque?, suave?, fonte_titulo?, fonte_texto?, fonte_mono?, assinatura?, notas?}` | cartao: idem |
+| `importar_logo_marca` | `{marca, caminho}` | cartao: traz arquivo de fora para o kit |
+| `importar_fonte_marca` | `{marca, caminho, familia?, peso?, estilo?}` | cartao: idem |
+
+- **Uma regra para a tela e para a IA.** `importar_midia` e o botão de escolher arquivo da tela (`escolherMidia`, no
+  `main.ts`) usam `importarMidia` (`src/nucleo/importar-midia.ts`): as extensões do filtro do diálogo, o arquivo que já
+  está no projeto usado no lugar, o nome livre em `midia/` e a recusa quando `midia/` é link para fora. Criar e
+  duplicar projeto, na tela e pelo MCP, passam por `src/nucleo/novo-projeto.ts`; o Ctrl+S e o
+  `marcar_ponto_de_restauracao`, pelo mesmo commit da sessão (`SessaoProjeto.marcarVersao`; com o app fechado,
+  `SessaoProjeto.pontoSemApp`).
+- **Áudio importado já medido.** `importar_midia` chama o medidor do envelope (`definirMedidorDeEnvelope`; no app e no
+  stdio, `medirEnvelopeDoArquivo` de `src/main/ipc-audio.ts`) e devolve a duração. Se a medida falha, o arquivo fica e
+  a resposta avisa que a linha do tempo mede depois.
+- **Trocar de projeto só onde a conversa sobrevive.** As quatro de projeto não aparecem para as conversas de dentro do
+  app (trocar de projeto as fecharia no meio da resposta). O McpHttp as registra só para os tokens de fora (fixo do
+  Claude Desktop e dos apps de fora, e o da IDE) e as atende também sem projeto aberto. A decisão completa, com o app
+  aberto e fechado, está em `docs/claude-desktop.md`, "Criar, abrir e trocar de projeto".
+- **Kits de marca.** Mesma pasta do painel Marca (`PastaMarcas`: a das preferências no app, `ESTUDIO_MARCAS` ou
+  `~/Estudio/marcas` fora dele). Um kit editado não muda sozinho os documentos que já o receberam: `aplicar_marca` de
+  novo leva a mudança.
+
+## Edição fina (`src/nucleo/mcp-edicao-fina.ts`, frente 4)
+
+O que antes só saía de um `aplicar_patch` grande montado à mão. Cada ferramenta usa a mesma conta do núcleo que o botão
+da tela e grava **uma** entrada no diário (desfazer e Reverter voltam a chamada inteira). Todas `livre`: só mexem no
+documento. Sem `documento`, valem no que a pessoa está vendo (se for do módulo) ou no primeiro do módulo.
+
+| Ferramenta | Parâmetros | O que faz | Conta (núcleo) |
+|---|---|---|---|
+| `dividir_cena` | `{em_ms?, cena?, documento?}` | a lâmina (Ctrl+K), no tempo do vídeo; sem `em_ms`, na cabeça | `cenas-dividir.ts` |
+| `duplicar_cena` | `{cena, documento?}` | cópia logo depois, com ids novos | `comIdsNovos` (`cenas.ts`) |
+| `editar_legendas` | `{op: dividir, juntar, excluir, criar, substituir, estilo, …}` | os botões do painel Legendas; tempos como na tela | `legendas-edicao.ts` |
+| `editar_paginas` | `{op: nova, duplicar, mover, excluir, renomear, pagina?, para?, nome?}` | a barra de páginas do carrossel | `carrossel.ts` |
+| `animar_entrada`, `animar_saida` | `{camada, preajuste, duracao_ms?, em_ms?}` | as entradas e saídas prontas do inspetor | `animacao-preajustes.ts` |
+| `adicionar_efeito` | `{tipo, valor?, cor?}` ou `{preajuste}` | põe na pilha de efeitos do vídeo ou da imagem | `efeitos.ts` |
+| `remover_efeito` | `{id}` | tira da pilha | `efeitos.ts` |
+
+Testes: `testes/edicao-fina-mcp.test.ts` (uma entrada no diário por chamada e o desfazer de cada uma).
 
 ## A tela da pessoa (`src/nucleo/mcp-tela.ts`)
 
@@ -176,6 +233,8 @@ O pedido de navegação é o `.estudio/selecao.json` (`{documento, caminhos, tem
 | `testes/apps-de-fora.test.ts` | porta fixa, token por app, Origin e Host, ponte stdio, revogar |
 | `testes/claude-desktop.test.ts`, `testes/claude-desktop-mcp.test.ts` | Claude Desktop: três sistemas, mesclagem do config, descoberta, lançador, manifesto, ponta a ponta com o `.mcpb` |
 | `testes/prova-acp-qwen.test.ts` | opcional: o Qwen Code real dirigido pela API falsa |
+| `testes/projeto-mcp.test.ts` | frente 2: importar mídia (filtro, nome livre, link para fora, medida do áudio, portão), renomear documento, ponto de restauração com git, criar, abrir, duplicar e fechar projeto no app, no Claude Desktop e na IDE |
+| `testes/marca-mcp.test.ts` | frente 2: listar, criar, editar, importar logo e fonte de kit de marca, e o kit editado no `aplicar_marca` |
 | `testes/narracao-chaves.test.ts` | chave do Google Cloud TTS (aceita, recusada, API desativada, sem rede), estado sem a chave, stdio pelo ambiente |
 
 ## Licenças

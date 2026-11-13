@@ -297,6 +297,32 @@ Classe **livre**: grava no diário como o agente e tem Reverter. Nenhuma lê a w
 fora do projeto. Como chegar vindo de outro módulo: a seleção de um clipe de áudio (`estado_do_editor`) diz o `clipe`; o
 `em_ms` omitido usa a cabeça gravada em `estado.json`. Como voltar: `listar_mudancas` + Reverter, ou Ctrl+Z na tela.
 
+## Medir e limpar pelo MCP (`src/nucleo/mcp-medidas.ts`, frente 3 do MCP)
+
+O agente mede o som que montou e limpa a voz sem a tela. As contas são as mesmas da tela, no processo principal e sem
+Electron (`src/main/medidas.ts`: `medirEnvelopeDoArquivo`, `criarMedidorDeLoudness`, `limparArquivo`), injetadas no núcleo
+por `definirServicoMedidas` (`src/nucleo/medidas-som.ts`). O app liga o serviço no `main.ts`; o MCP por stdio
+(`mcp/nucleo.ts`, `mcp/desktop.ts`) liga o mesmo com o ffmpeg do `node_modules` ou do app instalado
+(`pastaDoFfmpegDoApp`). Assim tudo roda também com o app fechado.
+
+| ferramenta | o que faz | classe |
+|---|---|---|
+| `medir_loudness` | `{documento?, curva?}`: o número do medidor do inspetor. Mistura (integrado contra `alvo_lufs`, `diferenca_do_alvo_lu`, `no_alvo` a ±1 LU, curto prazo e momentâneo máximos, pico verdadeiro e `pico_alto`), voz e cada faixa com `sob_voz_lufs` e `abaixo_da_voz_lu`. Sem a curva de 100 ms; `curva: true` traz o curto prazo da mistura a cada segundo | livre (só lê) |
+| `medir_envelope` | `{arquivo}`: mede e grava `<arquivo>.envelope.json` carimbado, o mesmo que a linha do tempo grava; devolve `duracao_ms`, `nivel_db` e `forma_db` (48 pontos) | livre |
+| `limpar_voz` | `{clipe \| arquivo, intensidade?, voltar?, documento?}`: com `clipe`, grava o `.limpo*.wav` a partir do original e troca o clipe por `aplicarPatch` (o patch de `patchLimpezaDoClipe`, o mesmo do botão); `voltar: true` põe o original de volta. Com `arquivo`, só grava o limpo ao lado | livre |
+
+- **Envelope com o app fechado.** Antes, o `.envelope.json` só nascia quando a linha do tempo via o arquivo. Áudio posto
+  pelo agente com o app fechado ficava sem duração medida, forma de onda e ducking até a tela abrir. Quem traz áudio ao
+  projeto pelo núcleo chama `medirEnvelopeDoAudio(projeto, arquivo)` (`src/nucleo/medidas-som.ts`); ela lança se o
+  serviço não estiver ligado, então quem só quer tentar põe um `catch`.
+- **Loudness.** O MCP tem o seu medidor (`criarMedidorDeLoudness`, com cache menor), para um pedido do agente não
+  cancelar o medidor da tela. As props vêm de `propsDoVideo` com base vazia: o som só precisa dos caminhos no projeto.
+- **Limpeza.** O clipe é lido de novo depois da limpeza (que leva segundos); se ele mudou de lugar ou de original, nada é
+  gravado no documento e a resposta diz onde ficou o WAV. O `.tmp` da gravação tem sufixo aleatório: a limpeza da tela e
+  a do MCP do mesmo arquivo não se atropelam. O teto de 20 min de estéreo vale igual.
+- **Testes.** `testes/medidas-mcp.test.ts`: WAV sintético, ffmpeg do `node_modules`, o tom de 997 Hz a −20 dBFS medido em
+  −20 LUFS e o mesmo número do medidor da tela.
+
 ## Gravar a narração com teleprompter (rodada 3)
 
 "+ Áudio" › "Gravar narração…" abre o gravador (`GravadorNarracao.tsx`). **Texto:** vem do campo `teleprompter` do vídeo
@@ -382,6 +408,7 @@ igual para a pessoa (inspetor, linha do tempo, Ctrl+K…) e para a IA (`aplicar_
 - **Cena mais curta ou excluída**: tira esse trecho do som. Os clipes inteiros dentro dele saem (com as legendas e os efeitos), os que o
   atravessam são cortados, e o que vem depois anda para trás.
 - **Dividir a cena** (Ctrl+K): a metade de baixo é uma cena nova logo depois da antiga, o total é o mesmo e o som não muda.
+  Desfazer a divisão (a cena de antes cresce o que a seguinte tinha, e a seguinte sai) também não muda o som.
 - **Não age:** quando o patch já mexe em `/audio` ou `/legendas` (quem o fez cuida do som, e é o que faz o Ctrl+Z não somar duas
   vezes); quando a ordem das cenas muda; quando nenhuma cena de antes sobra (todas trocadas por ids novos: não há como saber para onde
   o som vai); e com `audio.acompanha_cenas: false` (campo opcional, padrão: acompanha).

@@ -15,10 +15,26 @@ import {servicoDeRender} from '../src/main/musica-render';
 import {servicoDoAmbiente} from '../src/main/narracao';
 import {definirServicoPrevia} from '../src/nucleo/mcp-previa';
 import {servicoDePreviaStdio} from '../src/main/previa-stdio';
+import {definirServicoExportacao} from '../src/nucleo/mcp-exportacao-final';
+import {servicoDeExportacaoStdio} from '../src/main/exportacao-servico';
+// frente 2: ponto de restauração com o app fechado (o mesmo commit do Ctrl+S) e o áudio importado já medido
+import {definirMedidorDeEnvelope, definirPontoDeRestauracao, mensagemDoPonto, respostaDoPonto} from '../src/nucleo/mcp-projeto';
+import {SessaoProjeto} from '../src/main/sessao-projeto';
+import {medirEnvelopeDoArquivo} from '../src/main/ipc-audio';
+import {definirServicoMedidas} from '../src/nucleo/medidas-som'; // frente 3: loudness, envelope e limpeza com o app fechado
+import {pastaDoFfmpegDoApp, servicoDeMedidas} from '../src/main/medidas';
 
 const raizApp = path.resolve(__dirname, '..');
 definirServicoMusica(servicoDeRender());
 definirServicoPrevia(servicoDePreviaStdio(raizApp));
+definirServicoExportacao(servicoDeExportacaoStdio(raizApp));
+definirPontoDeRestauracao(async (raiz, mensagem) => {
+  const r = await SessaoProjeto.pontoSemApp(raiz, mensagemDoPonto(mensagem));
+  return respostaDoPonto(r.ok, r.temGit);
+});
+definirMedidorDeEnvelope((p, arquivo) => medirEnvelopeDoArquivo(p, arquivo));
+const ffmpeg = pastaDoFfmpegDoApp(raizApp);
+definirServicoMedidas(servicoDeMedidas({binarios: () => ffmpeg}));
 const transcritor = new Transcritor({raizApp});
 const rede = criarRede();
 const narrador = servicoDoAmbiente();

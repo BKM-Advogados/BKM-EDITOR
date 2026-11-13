@@ -130,6 +130,11 @@ Na casca do app, a área Animação é acessada pelo atalho **6** ou pelo botão
 | `pixelizar_imagem` | `documento, camada_id, imagem_src, colunas?, linhas?, cores?, usar_paleta_marca?, cobertura_min?` | Converte foto/logo (PNG ou JPG) em pixel art; só em camada pixel |
 | `efeito_pixel` | `documento, camada_id, efeito, semente?, animar_progresso?, inicio_ms?, duracao_ms?` | Configura revelação determinística do pixel; só em camada pixel |
 | `ver_animacao` | `documento, tempo_ms?` | Resumo e valores calculados de cada camada no tempo |
+| `animar_entrada` | `camada, preajuste, duracao_ms?, em_ms?, documento?` | Entrada pronta (surgir, subir, descer, crescer, girar), como os botões do inspetor; padrão: 600 ms a partir de 0 |
+| `animar_saida` | `camada, preajuste, duracao_ms?, em_ms?, documento?` | Saída pronta; padrão: termina no fim da animação |
+
+Os pré-ajustes de entrada e saída moram em `src/nucleo/animacao-preajustes.ts`: o inspetor e o MCP gravam as mesmas
+trilhas (os quadros-chave que já havia nessas propriedades dentro do trecho saem; os de fora ficam).
 
 ---
 

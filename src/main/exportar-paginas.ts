@@ -128,9 +128,9 @@ type Lidar = <A extends unknown[], R>(canal: string, f: (...a: A) => R | Promise
  *  (shell.showItemInFolder). */
 export const registrarExportarPaginas = (lidar: Lidar, canal: string, deps: {projeto: () => Projeto; mostrar: (arquivo: string) => void}) => {
   // saidas/ por link para outro disco grava lá: a exceção à regra dos links está em Projeto.pastaDeSaidas
-  lidar(CANAL.exportarPaginasAbrir, (o: {documento: string; pdf: boolean}) => {
+  lidar(CANAL.exportarPaginasAbrir, (o: {documento: string; pdf: boolean; nome?: string}) => {
     const p = deps.projeto();
-    const nome = p.manifesto().documentos.find((d) => d.id === o.documento)?.titulo ?? o.documento;
+    const nome = (typeof o.nome === 'string' && o.nome.trim()) || p.manifesto().documentos.find((d) => d.id === o.documento)?.titulo || o.documento;
     return {sessao: abrirExportacao({saidas: p.pastaDeSaidas(), nome, pdf: o.pdf, ptPorPx: ptPorPxDe(p, o.documento)}).sessao};
   });
   lidar(CANAL.exportarPaginasParte, (sessao: string, pagina: {png: string; numero: number}) => gravarParte(sessao, {numero: pagina.numero, png: dataUrlParaBuffer(pagina.png)}));
