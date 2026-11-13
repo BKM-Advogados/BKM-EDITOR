@@ -106,13 +106,14 @@ export const modelosDe = async (id: string, f?: typeof fetch) => {
 };
 
 // ---------- portão de permissão (src/nucleo/portao.ts): a pergunta vai à tela e a resposta volta por IPC ----------
-type Espera = {origem: string; ok: (r: {permitir: boolean; sempre?: boolean}) => void; relogio: NodeJS.Timeout};
+type Resposta = {permitir: boolean; sempre?: boolean; semResposta?: boolean};
+type Espera = {origem: string; ok: (r: Resposta) => void; relogio: NodeJS.Timeout};
 const esperas = new Map<string, Espera>();
 let enviarATela: ((canal: string, ...a: unknown[]) => void) | null = null;
 let canalPedido = '';
 let canalCancelado = '';
 
-const encerrarEspera = (id: string, r: {permitir: boolean; sempre?: boolean}, avisarTela: boolean) => {
+const encerrarEspera = (id: string, r: Resposta, avisarTela: boolean) => {
   const e = esperas.get(id);
   if (!e) return;
   esperas.delete(id);
@@ -125,7 +126,7 @@ const encerrarEspera = (id: string, r: {permitir: boolean; sempre?: boolean}, av
 export const perguntarAPessoa: Perguntador = (p) => new Promise((ok) => {
   if (!enviarATela) return ok({permitir: false});
   const id = randomUUID();
-  const relogio = setTimeout(() => encerrarEspera(id, {permitir: false}, true), ESPERA_DO_CARTAO_MS);
+  const relogio = setTimeout(() => encerrarEspera(id, {permitir: false, semResposta: true}, true), ESPERA_DO_CARTAO_MS);
   esperas.set(id, {origem: p.origem, ok, relogio});
   p.sinal?.addEventListener('abort', () => encerrarEspera(id, {permitir: false}, true), {once: true});
   // a entrada vai curta: o cartão mostra o essencial (endereço, arquivo), nunca megabytes

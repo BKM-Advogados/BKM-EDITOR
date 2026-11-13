@@ -104,8 +104,13 @@ Envolve o `registerTool`: toda ferramenta registrada depois dele passa por ele, 
 - **`livreSe`** na linha de `CLASSES`: o pedido que não sai do PC roda sem cartão. Hoje vale para `narrar` com
   `previa: true`, que só devolve o texto final e o custo estimado.
 - **Onde aparece o pedido**: na conversa da aba ou, sem conversa (terminal, app de fora), num cartão solto no canto da
-  tela. "Sempre nesta conversa" vale para o token. O Parar da conversa cancela. Sem resposta em 10 minutos, o pedido é
-  negado.
+  tela. "Sempre nesta conversa" vale para o token. O Parar da conversa cancela. Sem resposta em 10 minutos, nada roda
+  e a IA recebe `SEM_RESPOSTA` ("ninguém respondeu"), não "a pessoa negou".
+- **Pedido vindo do Claude Code ou do Claude Desktop (13/11/2026)**: a pessoa está olhando o cliente, não a janela do
+  app. A ponte (`mcp-desktop.ts`) pergunta na tela do cliente pela confirmação do próprio MCP (elicitação) e, se a
+  pessoa permitir, repassa ao app com `_meta["estudio/permitido_no_cliente"] = true`. O app só aceita essa marca nas
+  conexões que ele mesmo criou para as pontes (token da IDE e token da descoberta do Claude Desktop); um app de fora que
+  mande a marca continua passando pelo cartão. Cliente sem elicitação: vai como antes, com o cartão do app.
 - **Reverter por `seq`**: o cartão de qualquer provedor e o Histórico usam `Projeto.reverter`. Antes de reverter, ele
   confere que os valores trocados ainda estão lá. Se mudaram, devolve `mudou_depois`, e só passa por cima com
   `forcar`. O Ctrl+Z (`desfazerUltima`) lembra o que já desfez pelo campo `desfaz` da entrada.

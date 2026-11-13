@@ -19,7 +19,7 @@ export type {EstadoClaudeDesktop};
 import {gravarAtomico, gravarAtomicoNoLugar} from '../nucleo/gravar-seguro';
 import {emTranslocacao} from './ide';
 
-type Mcp = {registrarFixo: (token: string, origem: string) => void; esquecerFixo: (token: string) => void};
+type Mcp = {registrarFixo: (token: string, origem: string, o?: {perguntaNoCliente?: boolean}) => void; esquecerFixo: (token: string) => void};
 
 /** Grava só para o usuário (0600): o arquivo tem o token. No Windows o modo não vale, e a pasta do perfil já é só dele. */
 const gravarPrivado = (arquivo: string, texto: string) => {
@@ -86,7 +86,7 @@ export const criarClaudeDesktop = (o: {dados: string; executavel: string; script
       if (!url || !mcp) return false;
       if (!token) {
         token = randomBytes(24).toString('hex');
-        mcp.registrarFixo(token, ORIGEM_CLAUDE_DESKTOP);
+        mcp.registrarFixo(token, ORIGEM_CLAUDE_DESKTOP, {perguntaNoCliente: true}); // a ponte pergunta na tela do cliente
       }
       const d: Descoberta = {formato: 1, url: `${url}/mcp`, token, pid: o.pid ?? process.pid, host: os.hostname(), executavel: o.executavel,
         script: o.script, versao: o.versao, projeto, em: new Date().toISOString()};

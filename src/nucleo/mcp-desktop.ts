@@ -28,7 +28,7 @@ import path from 'node:path';
 import {listarProjetos, ORIGEM_CLAUDE_DESKTOP, resolverProjeto, type Descoberta} from './claude-desktop';
 import {appAberto, encaminharAoApp, novaConversaIde, PRAZO_DO_APP_MS, type DestinoApp} from './mcp-app';
 import {INSTRUCOES_MCP} from './mcp-ia';
-import {ESPERA_DO_CARTAO_MS, type Portao} from './portao';
+import {ESPERA_DO_CARTAO_MS, META_PERMITIDO_NO_CLIENTE, motivoDe, precisaDePermissao, type Portao} from './portao';
 import {modelosDaPessoa} from './mcp-modelos';
 import {pastaPadraoModelos, PastaModelos} from './pasta-modelos';
 import {pastaDasPreferencias} from './preferencias-arquivo';
@@ -42,6 +42,7 @@ na tela do app. Com o app fechado, chame listar_projetos e escolher_projeto (ou 
 
 export const SEM_PROJETO = 'Nenhum projeto escolhido e o Estúdio não está aberto num projeto. Chame listar_projetos e depois '
   + 'escolher_projeto com o nome ou a pasta; ou peça à pessoa para abrir o projeto no Estúdio.';
+export const NEGADO_NO_CLIENTE = 'A pessoa negou esta ação na tela do cliente. Não tente de novo sem ela pedir.';
 export const SEM_PORTAO = 'Esta ação precisa da permissão da pessoa, e o Claude Desktop não ofereceu como perguntar com o Estúdio '
   + 'fechado. Peça à pessoa para abrir o Estúdio com o projeto e tente de novo: o pedido de permissão aparece na tela do app.';
 /** O app está aberto num projeto e o Claude escolheu outro: nada roda. */
@@ -233,7 +234,30 @@ export const criarServidorDesktop = (o: OpcoesDesktop) => {
     }
 
     const msg = {jsonrpc: '2.0', id: extra.requestId, method: 'tools/call', params: req.params} as JSONRPCMessage;
-    const peloApp = async (destino: DestinoApp, quem?: typeof conversa) => encaminhar(destino, msg, quem, prazo, undefined, extra.signal);
+    // A pessoa está olhando o cliente (Claude Code, Claude Desktop), não a janela do app: a ação que precisa de permissão
+    // pergunta aqui, pela confirmação do próprio MCP, e segue ao app marcada (META_PERMITIDO_NO_CLIENTE). Sem essa
+    // confirmação no cliente, vai como antes e o app mostra o cartão dele. Uma pergunta por chamada, mesmo com o reenvio.
+    let permissao: Promise<{tipo: 'sim' | 'nao' | 'app'} | {tipo: 'erro'; mensagem: string}> | null = null;
+    const perguntarNoCliente = () => (permissao ??= (async () => {
+      if (!servidor.getClientCapabilities()?.elicitation) return {tipo: 'app' as const};
+      const entrada = (args ?? {}) as Record<string, unknown>;
+      const anotacoes = (await ferramentasDoEstudio()).find((t) => t.name === nome)?.annotations;
+      if (!precisaDePermissao(nome, entrada, anotacoes)) return {tipo: 'app' as const};
+      try {
+        const ok = await portaoLocal.perguntar({ferramenta: nome, entrada, motivo: motivoDe(nome, anotacoes), sinal: extra.signal});
+        return {tipo: ok ? 'sim' as const : 'nao' as const};
+      } catch (e) {
+        return {tipo: 'erro' as const, mensagem: (e as Error).message};
+      }
+    })());
+    const peloApp = async (destino: DestinoApp, quem?: typeof conversa): Promise<JSONRPCMessage | 'recusado' | null> => {
+      const p = await perguntarNoCliente();
+      const id = extra.requestId;
+      if (p.tipo === 'nao') return {jsonrpc: '2.0', id, result: texto(NEGADO_NO_CLIENTE, true)} as JSONRPCMessage;
+      if (p.tipo === 'erro') return {jsonrpc: '2.0', id, result: texto(`Não deu para perguntar à pessoa: ${p.mensagem}`, true)} as JSONRPCMessage;
+      const params = p.tipo === 'sim' ? {...req.params, _meta: {...(req.params._meta ?? {}), [META_PERMITIDO_NO_CLIENTE]: true}} : req.params;
+      return encaminhar(destino, {...msg, params} as JSONRPCMessage, quem, prazo, undefined, extra.signal);
+    };
 
     // frente 2: trocar de projeto. Com o app vivo, ele troca (com ou sem projeto aberto) e as próximas chamadas seguem no
     // projeto do app; com o app fechado (ou numa versão que não troca sem projeto: 409), aqui.

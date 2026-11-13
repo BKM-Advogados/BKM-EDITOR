@@ -14,7 +14,9 @@ import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import {ElicitRequestSchema} from '@modelcontextprotocol/sdk/types.js';
 import {arquivoDescoberta, descobertaViva, instalacoesPadrao, pastaDadosEstudio, type Descoberta, type Sistema} from '../src/nucleo/claude-desktop';
-import {criarServidorDesktop, SEM_PORTAO, SEM_PROJETO, type Registrar} from '../src/nucleo/mcp-desktop';
+import {criarServidorDesktop, NEGADO_NO_CLIENTE, SEM_PORTAO, SEM_PROJETO, type Registrar} from '../src/nucleo/mcp-desktop';
+import {StreamableHTTPClientTransport} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import {META_PERMITIDO_NO_CLIENTE, SEM_RESPOSTA} from '../src/nucleo/portao';
 import {registrarFerramentas} from '../src/nucleo/ferramentas-mcp';
 import {McpHttp, type Perguntador} from '../src/main/mcp-http';
 import {criarClaudeDesktop} from '../src/main/claude-desktop';
@@ -39,6 +41,7 @@ const novoProjeto = (nome: string) => {
 // o "app": o McpHttp de verdade num servidor HTTP local, com o portão perguntando a uma lista
 const pedidos: Parameters<Perguntador>[0][] = [];
 let permitir = false;
+let semResposta = false;
 let projetoDoApp: Projeto | null = null;
 let servidorApp: http.Server;
 let mcpApp: McpHttp;
@@ -51,7 +54,7 @@ beforeAll(async () => {
   mkdirSync(dados, {recursive: true});
   novoProjeto('Alfa');
   novoProjeto('Beta');
-  mcpApp = new McpHttp(path.join(casa, 'cfg-app'), () => projetoDoApp, undefined, async (p) => (pedidos.push(p), {permitir}));
+  mcpApp = new McpHttp(path.join(casa, 'cfg-app'), () => projetoDoApp, undefined, async (p) => (pedidos.push(p), {permitir, ...(semResposta ? {semResposta: true} : {})}));
   servidorApp = http.createServer((req, res) => void mcpApp.atender(req, res).then((ok) => ok || res.writeHead(404).end()));
   await new Promise<void>((ok) => servidorApp.listen(0, '127.0.0.1', ok));
   urlApp = `http://127.0.0.1:${(servidorApp.address() as {port: number}).port}`;
@@ -165,6 +168,66 @@ describe('MCP do Claude Desktop com o app aberto (descoberta, sem token colado)'
     expect(JSON.parse(textoDe(await c.callTool({name: 'projeto_info', arguments: {}}))).nome).toBe('Beta');
     app.retirar();
     await d.fechar();
+  });
+});
+
+// 13/11/2026: no Claude Code a pessoa olha o terminal, não a janela do app; o cartão do canto do app vencia em 10 min e
+// voltava como "a pessoa negou". Agora a ponte pergunta no cliente (elicitação) e o app aceita a marca só das pontes dele.
+describe('permissão na tela do cliente, com o app aberto', () => {
+  it('pergunta no cliente e não no app; negou lá, nada vai ao app; ferramenta livre não pergunta', async () => {
+    const pastaDados = mkdtempSync(path.join(casa, 'dados-cliente-'));
+    const alfa = path.join(projetos, 'Alfa');
+    const app = abrirApp(pastaDados, alfa);
+    const perguntas: string[] = [];
+    let resposta = true;
+    const {c, d} = await conectar(() => descobertaViva(app.arquivoDescoberta),
+      {elicitar: (m) => (perguntas.push(m), {action: 'accept', content: {permitir: resposta}})});
+    pedidos.length = 0;
+    permitir = false; // se o app perguntasse, negaria: o teste prova que ele não pergunta
+    const ok = await c.callTool({name: 'ler_fonte', arguments: {url: 'https://exemplo.invalid/'}});
+    expect(textoDe(ok)).not.toMatch(/negou/);
+    expect(pedidos).toHaveLength(0);
+    expect(perguntas[0]).toMatch(/abrir uma página da internet \(ler_fonte\)/);
+
+    resposta = false;
+    const negado = await c.callTool({name: 'ler_fonte', arguments: {url: 'https://exemplo.invalid/'}});
+    expect(textoDe(negado)).toBe(NEGADO_NO_CLIENTE);
+    expect(pedidos).toHaveLength(0);
+
+    perguntas.length = 0;
+    expect(JSON.parse(textoDe(await c.callTool({name: 'projeto_info', arguments: {}}))).nome).toBe('Alfa');
+    expect(perguntas).toHaveLength(0);
+    app.retirar();
+    await d.fechar();
+  });
+
+  it('cliente sem confirmação: segue para o cartão do app; prazo vencido não diz que a pessoa negou', async () => {
+    const pastaDados = mkdtempSync(path.join(casa, 'dados-prazo-'));
+    const app = abrirApp(pastaDados, path.join(projetos, 'Alfa'));
+    const {c, d} = await conectar(() => descobertaViva(app.arquivoDescoberta));
+    pedidos.length = 0;
+    semResposta = true;
+    const r = await c.callTool({name: 'ler_fonte', arguments: {url: 'https://exemplo.invalid/'}});
+    semResposta = false;
+    expect(pedidos).toHaveLength(1);
+    expect(r.isError).toBe(true);
+    expect(textoDe(r)).toBe(SEM_RESPOSTA);
+    app.retirar();
+    await d.fechar();
+  });
+
+  it('um app de fora que manda a marca no _meta não pula o cartão', async () => {
+    projetoDoApp = new Projeto(path.join(projetos, 'Alfa'));
+    mcpApp.registrarFixo('token-app-de-fora', 'Cursor');
+    const c = new Client({name: 'app-de-fora', version: '0'});
+    await c.connect(new StreamableHTTPClientTransport(new URL(`${urlApp}/mcp`), {requestInit: {headers: {Authorization: 'Bearer token-app-de-fora'}}}));
+    pedidos.length = 0;
+    permitir = false;
+    const r = await c.callTool({name: 'ler_fonte', arguments: {url: 'https://exemplo.invalid/'}, _meta: {[META_PERMITIDO_NO_CLIENTE]: true}});
+    expect(pedidos).toHaveLength(1);
+    expect(textoDe(r)).toMatch(/negou/);
+    await c.close();
+    mcpApp.esquecerFixo('token-app-de-fora');
   });
 });
 

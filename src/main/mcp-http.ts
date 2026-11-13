@@ -11,17 +11,19 @@ import {StreamableHTTPServerTransport} from '@modelcontextprotocol/sdk/server/st
 import {registrarFerramentas, type Rede, type TranscritorMcp} from '../nucleo/ferramentas-mcp';
 import {INSTRUCOES_MCP} from '../nucleo/mcp-ia';
 import {autorAceito, CABECALHO_AUTOR, CABECALHO_CONVERSA, CABECALHO_ORIGEM, conversaValida, origemDaIde, rotuloAceito} from '../nucleo/mcp-app';
-import {instalarPortao, type PedidoPortao, type Portao} from '../nucleo/portao';
+import {instalarPortao, META_PERMITIDO_NO_CLIENTE, SemResposta, type PedidoPortao, type Portao} from '../nucleo/portao';
 import {ehTrocaDeProjeto, registrarTrocaDeProjeto, type TrocadorDeProjeto} from '../nucleo/mcp-projeto'; // frente 2
 import type {Projeto} from '../nucleo/projeto';
 import type {ServicoNarracao} from '../nucleo/narracao-servico';
 
 /** Quem pergunta à pessoa no app (ipc-ia.ts). sempre: a pessoa marcou "Sempre nesta conversa". */
-export type Perguntador = (p: PedidoPortao & {origem: string}) => Promise<{permitir: boolean; sempre?: boolean}>;
+/** semResposta: o prazo do cartão venceu sem ninguém responder (não é "negou"). */
+export type Perguntador = (p: PedidoPortao & {origem: string}) => Promise<{permitir: boolean; sempre?: boolean; semResposta?: boolean}>;
 
 // fixo: app de IA de fora, com token que sobrevive a trocar de projeto; ide: o token do MCP da IDE (mcp-app.ts), um só
-// para todas as conversas dela, que se distinguem pelo cabeçalho X-Estudio-Conversa
-type Aba = {origem: string; arquivo?: string; fixo?: boolean; ide?: boolean};
+// para todas as conversas dela, que se distinguem pelo cabeçalho X-Estudio-Conversa; perguntaNoCliente: o token da ponte do
+// Claude Desktop (claude-desktop.ts), que pergunta à pessoa na tela do cliente e marca o _meta (portao.ts)
+type Aba = {origem: string; arquivo?: string; fixo?: boolean; ide?: boolean; perguntaNoCliente?: boolean};
 
 // frente Fala: o transcritor local (transcricao.ts) chega depois do construtor, pelo registro do IPC da fala
 let transcritorMcp: TranscritorMcp | undefined;
@@ -92,8 +94,8 @@ export class McpHttp {
 
   /** Padrão Screenpipe (frente IA): um app de IA de fora (Cursor, Cline, Claude Desktop) entra com um token próprio, que
    *  vira a origem no diário e passa pelo mesmo portão de permissão. */
-  registrarFixo(token: string, origem: string) {
-    this.abas.set(token, {origem, fixo: true});
+  registrarFixo(token: string, origem: string, o: {perguntaNoCliente?: boolean} = {}) {
+    this.abas.set(token, {origem, fixo: true, ...(o.perguntaNoCliente ? {perguntaNoCliente: true} : {})});
   }
 
   esquecerFixo(token: string) {
@@ -174,9 +176,12 @@ export class McpHttp {
     const perguntar = this.perguntador;
     const portao: Portao | undefined = perguntar && {
       perguntar: async (p) => {
+        // a ponte da IDE e a do Claude Desktop já perguntaram na tela do cliente (a pessoa está olhando para lá, não para o app)
+        if ((aba.ide || aba.perguntaNoCliente) && p.meta?.[META_PERMITIDO_NO_CLIENTE] === true) return true;
         const lembradas = this.sempre.get(quem.chave);
         if (lembradas?.has(p.ferramenta)) return true;
         const r = await perguntar({...p, origem: quem.origem});
+        if (r.semResposta) throw new SemResposta();
         if (r.permitir && r.sempre) this.sempre.set(quem.chave, new Set([...(this.sempre.get(quem.chave) ?? []), p.ferramenta]));
         return r.permitir;
       },
