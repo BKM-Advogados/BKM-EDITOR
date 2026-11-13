@@ -11,7 +11,7 @@
 //   faixa:<id>/volume_pan          VolumePan (volume 0 dB quando há automação: a curva toma o lugar do fader)
 //   faixa:<id>/sidechain           Ganho com a curva do sidechain por notas
 //   faixa:<id>/automacao           Ganho ligado ao endereço faixa:<id>/volume_db (a automação de volume de hoje)
-//   retorno:delay, retorno:reverb  AdaptadorDelay, AdaptadorFreeverb (os envios entram com o ganho do envio)
+//   retorno:delay (DelayEstereo), retorno:reverb (Freeverb) (os envios entram com o ganho do envio)
 //   master                         Passa: faixas na ordem do mixer, depois o delay e o reverb, cada um com o seu volume
 //   master/automacao | master/volume, master/limitador
 // Ver docs/audio-grafo.md.
@@ -20,10 +20,12 @@ import {resolverMusica, type DocMusica} from '../musica';
 import {escreverEndereco} from '../musica-param';
 import {chaveDoCanal, disparosDoSidechain, ganhoDaAutomacao, ganhoDoSidechain, renderAudio, renderBateria, renderSintetizador, TAXA_MUSICA, type CacheSom,
   type ResultadoSom} from '../musica-som';
-import {AdaptadorCompressor, AdaptadorDelay, AdaptadorEq3, AdaptadorFreeverb, AdaptadorLimitador} from './adaptadores';
+import {AdaptadorCompressor, AdaptadorEq3, AdaptadorLimitador} from './adaptadores';
 import {BLOCO_PADRAO, executarOffline} from './executor';
 import {Grafo} from './grafo';
 import {Fonte, Ganho, ganhoDeDb, Passa, VolumePan} from './processadores';
+import {DelayEstereo} from './delay';
+import {Freeverb} from './freeverb';
 import type {CurvaParam} from './tipos';
 
 /** Uma curva calculada inteira só na primeira leitura (se o nó vier do cache, nem isso). Fora dela vale a ponta. */
@@ -149,7 +151,7 @@ export const grafoDaMusica = (doc: DocMusica, fontes: Record<string, FonteAudio 
   if (enviosDelay.length) {
     const d = m.master.delay;
     const atraso_s = d.batidas * m.seg_por_batida;
-    const no = g.no('retorno:delay', new AdaptadorDelay(atraso_s, d.realimentacao, d.brilho, d.pingue_pongue),
+    const no = g.no('retorno:delay', new DelayEstereo(atraso_s, d.realimentacao, d.brilho, d.pingue_pongue),
       {soma: 'zero', chave: `delay:${JSON.stringify({d: [atraso_s, d.realimentacao, d.brilho, d.pingue_pongue], e: enviosDelay.map((e) => [e.chave, e.quanto]), taxa})}`});
     for (const e of enviosDelay) g.ligar(e.no, no, {ganho: e.quanto});
     const ganho = ganhoDeDb(d.volume_db);
@@ -158,7 +160,7 @@ export const grafoDaMusica = (doc: DocMusica, fontes: Record<string, FonteAudio 
   }
   if (envios.length) {
     const r = m.master.reverb;
-    const no = g.no('retorno:reverb', new AdaptadorFreeverb(r.tamanho, r.amortecimento),
+    const no = g.no('retorno:reverb', new Freeverb(r.tamanho, r.amortecimento),
       {soma: 'zero', chave: `reverb:${JSON.stringify({r: [r.tamanho, r.amortecimento], e: envios.map((e) => [e.chave, e.quanto]), taxa})}`});
     for (const e of envios) g.ligar(e.no, no, {ganho: e.quanto});
     const ganho = ganhoDeDb(r.volume_db);

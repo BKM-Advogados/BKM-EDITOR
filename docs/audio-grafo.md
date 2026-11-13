@@ -12,7 +12,8 @@ o som.
 | `grafo.ts` | `Grafo`: nós, ligações com ganho, automações por endereço, ordem topológica estável |
 | `executor.ts` | `executarOffline`: o laço por blocos (128 por padrão), PDC, estágios, cache por chave |
 | `processadores.ts` | nativos: `Fonte`, `Passa`, `Ganho`, `VolumePan`, `Atraso`; e `panLei` e `ganhoDeDb` (a conta única do motor) |
-| `adaptadores.ts` | `AdaptadorEq3`, `AdaptadorCompressor`, `AdaptadorFreeverb`, `AdaptadorDelay`, `AdaptadorLimitador` |
+| `freeverb.ts`, `delay.ts` | nativos por bloco: `Freeverb` (retorno 1) e `DelayEstereo` com pingue-pongue (retorno 2) |
+| `adaptadores.ts` | `AdaptadorEq3`, `AdaptadorCompressor`, `AdaptadorLimitador` |
 | `musica.ts` | `grafoDaMusica` (documento → grafo) e `renderizarMusicaGrafo` (o render canônico) |
 
 `renderizarMusica`, exportado de `musica-som.ts`, é o `renderizarMusicaGrafo`. Ele tem a mesma assinatura e o mesmo
@@ -107,8 +108,8 @@ canal:<id> (Fonte: som seco)  →  faixa:<id>/entrada (Passa, soma dos canais na
   → faixa:<id>/volume_pan (0 dB se há automação) → faixa:<id>/sidechain (Ganho, curva por notas)
   → faixa:<id>/automacao (Ganho ligado a faixa:<id>/volume_db)
   ─┬→ master (soma 'zero': faixas na ordem do mixer, depois o delay e o reverb com o volume de cada um)
-   ├→ retorno:delay  (AdaptadorDelay,    soma 'zero' dos envios × envio)
-   └→ retorno:reverb (AdaptadorFreeverb, soma 'zero' dos envios × envio)
+   ├→ retorno:delay  (DelayEstereo,      soma 'zero' dos envios × envio)
+   └→ retorno:reverb (Freeverb, soma 'zero' dos envios × envio)
 master → master/automacao (Ganho ligado a master/volume_db) ou master/volume → master/limitador (AdaptadorLimitador)
 ```
 
@@ -124,7 +125,7 @@ master → master/automacao (Ganho ligado a master/volume_db) ou master/volume �
 
 ## Converter um efeito em processador nativo
 
-Os cinco adaptadores (EQ, compressor, Freeverb, delay e limitador) só envolvem as funções de `musica-som.ts`. Converter
+Os três adaptadores que restam (EQ, compressor e limitador) só envolvem as funções de `musica-som.ts`. Converter
 um deles é escrever o mesmo efeito como `Processador`, trocar o adaptador em `musica.ts` e provar com o oráculo que o PCM
 não mudou.
 
@@ -176,8 +177,9 @@ não mudou.
 ## O que ainda não é
 
 - Os instrumentos são `Fonte` de buffer inteiro (I-01).
-- Os cinco efeitos são adaptadores, então o render ainda usa memória da música inteira por faixa com EQ ou compressor e
-  por retorno. A memória limitada (M-04) vem com a conversão deles.
+- EQ, compressor e limitador ainda são adaptadores, então o render ainda usa memória da música inteira por faixa com EQ
+  ou compressor e no master. O Freeverb e o delay já são nativos por bloco (`testes/audio-grafo-retornos.test.ts` os
+  compara com `reverberar` e `atrasar`, bit a bit). A memória limitada (M-04) vem com a conversão deles.
 - O worklet (M-06) vai usar o mesmo `Processador`. O executor de tempo real ainda não existe, e os adaptadores não rodam
   nele.
 - O track delay manual e o PDC visível na tela são da M-07. O PDC automático do executor já existe.
