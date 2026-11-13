@@ -379,6 +379,10 @@ o oráculo.
 por blocos tem que dar os mesmos números (o grafo da M-01 já dá: os seis batem pelo vitest e pelo MCP por stdio). A exceção prevista é o compressor e o limitador, que ficam dentro de uma
 tolerância a aprovar.
 
+**Aceitação sonora** (F-13): `testes/aceitacao-som/` analisa cada referência (espectro em 1/3 de oitava, crest, LUFS, pico,
+correlação estéreo) com tolerâncias, e `docs/aceitacao-som.md` traz o roteiro de audição humana. É o que diz o quanto o som
+mudou quando o hash muda de propósito.
+
 **Como conferir:**
 - `npx vitest run testes/musica-determinismo.test.ts`: renderiza cada documento pelo motor de agora e confere o hash. Confere
   também o SHA-256 contra o `node:crypto`, a prévia com cache (mexer num volume e voltar dá o mesmo PCM) e o
