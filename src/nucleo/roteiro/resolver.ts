@@ -6,7 +6,11 @@
 // Âncora "palavra@ms": a primeira palavra que começa com `palavra` a partir de `ms` do vídeo-fonte (sem diferença de
 // acento, caixa ou pontuação), com deslocamento opcional ("multa@16000+120") e "$" para ancorar no fim da palavra.
 
+import {acharPalavra, ErroRoteiro, lerAncora, palavrasPerto, type Palavra} from '../ancora-palavra';
 import {temaDoCarrossel} from './tema';
+
+// a âncora mora em ancora-palavra.ts (o vídeo de cenas usa a mesma); quem já importava daqui continua importando
+export {ErroRoteiro, lerAncora, norm, type Palavra} from '../ancora-palavra';
 
 export const ABERTURA_MS = 1600; // vinheta do logo antes da narração
 export const FINAL_MS = 3500; // cartão final parado depois da narração
@@ -16,10 +20,6 @@ export const MARCA_VAZIA = {nome: '', site: '', insta: ''};
 export const FINAL_PADRAO = {titulo: 'SALVE E COMPARTILHE COM QUEM PRECISA', aviso: 'Conteúdo informativo. Não substitui a análise de cada caso.'};
 export const DUVIDA_PADRAO = {pergunta: 'Ficou com alguma dúvida?', resposta: 'Procure um advogado trabalhista.'};
 
-const ANCORA = /^(?<w>[^@]+?)(?<fim>\$)?@(?<ms>\d+)(?<d>[+-]\d+)?$/;
-const PONTUACAO = '.,;:!?"\'“”()…';
-
-export type Palavra = {w: string; s: number; e: number};
 export type TrechoNarracao = {de: number; ate: number; em: number}; // ms do vídeo-fonte [de, ate) tocado em `em` (saída)
 export type Som = {src: string; t: number; vol: number};
 
@@ -51,8 +51,6 @@ export type Roteiro = {
 /** O que o roteiro não diz e o projeto pode suprir: o logo e a foto padrão que estão em midia/ (ver sessao-projeto.ts). */
 export type PadroesRoteiro = {logo?: string; foto?: FotoRoteiro};
 
-export class ErroRoteiro extends Error {}
-
 const IMAGEM = /\.(png|jpe?g|webp|svg)$/i;
 /** O logo e a foto padrão pelos arquivos da raiz de midia/: o logo é o primeiro "logo*" (o kit de marca copia como
  *  logo-<kit>.png); a foto, a primeira outra imagem. Sem crédito: quem quiser crédito põe `foto` no roteiro. */
@@ -76,35 +74,14 @@ export const arredondar = (x: number): number => {
   return piso % 2 === 0 ? piso : piso + 1;
 };
 
-export const norm = (w: string): string => {
-  let s = w.trim().toLowerCase().normalize('NFD').replace(/\p{Mn}/gu, '');
-  let a = 0;
-  let z = s.length;
-  while (a < z && PONTUACAO.includes(s[a])) a++;
-  while (z > a && PONTUACAO.includes(s[z - 1])) z--;
-  s = s.slice(a, z);
-  return s;
-};
-
-export const lerAncora = (a: string) => {
-  const m = ANCORA.exec(a.trim());
-  if (!m?.groups) throw new ErroRoteiro(`âncora mal escrita: '${a}' (use palavra@ms, palavra@ms+120 ou palavra$@ms)`);
-  return {w: m.groups.w, fim: Boolean(m.groups.fim), ms: Number(m.groups.ms), d: Number(m.groups.d ?? 0)};
-};
-
 export class Narracao {
   cortes: [number, number][] = [];
   constructor(readonly p: Palavra[]) {}
 
   indice(w: string, depois: number): number {
-    const alvo = norm(w);
-    const i = this.p.findIndex((p) => p.s >= depois && norm(p.w).startsWith(alvo));
+    const i = acharPalavra(this.p, w, depois);
     if (i >= 0) return i;
-    const perto = this.p
-      .filter((p) => depois - 1500 <= p.s && p.s <= depois + 6000)
-      .map((p) => `${p.w.trim()}@${p.s}`)
-      .join(' ');
-    throw new ErroRoteiro(`âncora não achada: '${w}' a partir de ${depois} ms. Perto: ${perto}`);
+    throw new ErroRoteiro(`âncora não achada: '${w}' a partir de ${depois} ms. Perto: ${palavrasPerto(this.p, depois)}`);
   }
 
   corteAntes(i: number): number {

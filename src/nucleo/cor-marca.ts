@@ -89,7 +89,10 @@ export const resolverMarcaNoDoc = (doc: DocImagem): DocImagem => {
   const camadas = Array.isArray(doc.camadas) ? resolverCamadas(doc.camadas, marca) : doc.camadas;
   const paginas = doc.paginas?.map((p) => {
     const cs = Array.isArray(p.camadas) ? resolverCamadas(p.camadas, marca) : p.camadas;
-    return cs === p.camadas ? p : {...p, camadas: cs};
+    const pf = typeof p.fundo === 'string' ? cor(p.fundo, marca) ?? p.fundo : p.fundo;
+    const pd = resolverDegrade(p.fundo_degrade, marca);
+    if (cs === p.camadas && pf === p.fundo && pd === p.fundo_degrade) return p;
+    return {...p, camadas: cs, ...(pf !== p.fundo ? {fundo: pf} : {}), ...(pd !== p.fundo_degrade ? {fundo_degrade: pd} : {})};
   });
   const paginasIguais = !paginas || paginas.every((p, i) => p === doc.paginas![i]);
   if (fundo === doc.fundo && fundoDegrade === doc.fundo_degrade && camadas === doc.camadas && paginasIguais) return doc;

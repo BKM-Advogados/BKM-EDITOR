@@ -94,6 +94,10 @@ export type PaginaImagem = {
   id: string;
   nome: string;
   camadas: CamadaImagem[]; // de baixo para cima
+  /** Fundo próprio da página (opcional, no formato do `fundo` e do `fundo_degrade` do documento). Com um dos dois, a página
+   *  deixa de usar o fundo do documento (cor e degradê juntos); sem nenhum, herda o do documento (docs/imagem.md). */
+  fundo?: string;
+  fundo_degrade?: Degrade;
 };
 
 // Uma prancheta só tem `camadas` na raiz (as capas e os projetos de antes). O carrossel tem `paginas`, cada uma

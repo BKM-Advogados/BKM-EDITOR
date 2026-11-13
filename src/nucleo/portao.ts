@@ -31,6 +31,8 @@ export const CLASSES: Record<string, {classe: Classe; motivo: string; livreSe?: 
   // narração por IA (docs/narracao.md): vai ao Google com a chave da pessoa; a prévia (previa: true) não sai do PC
   narrar: {classe: 'cartao', motivo: 'gerar a narração com a IA do Google (sai do PC, usa a sua chave e pode ter custo)', livreSe: (e) => e.previa === true},
   vozes_narracao: {classe: 'cartao', motivo: 'listar as vozes de narração do Google (usa a sua chave, sem custo)'},
+  // Onda B (mcp-narracao-inteira.ts): só mexe no documento (diário, Reverter); a prévia nem isso
+  dividir_narracao: {classe: 'livre', motivo: 'dividir a narração gravada inteira nas cenas (vai para o histórico; Reverter desfaz)'},
   // exportação final pelo MCP (src/nucleo/mcp-exportacao-final.ts): grava o arquivo final em saidas/
   exportar_video: {classe: 'cartao', motivo: 'exportar o vídeo para saidas/ (leva de segundos a minutos)'},
   exportar_imagem: {classe: 'cartao', motivo: 'exportar a imagem para saidas/'},
@@ -46,6 +48,7 @@ export const CLASSES: Record<string, {classe: Classe; motivo: string; livreSe?: 
   importar_logo_marca: {classe: 'cartao', motivo: 'trazer uma imagem do seu computador como logo de um kit de marca'},
   importar_fonte_marca: {classe: 'cartao', motivo: 'trazer um arquivo de fonte do seu computador para um kit de marca'},
   // Onda B (mcp-modelos.ts): grava na pasta de modelos da pessoa, fora do projeto e sem Reverter
+  listar_modelos: {classe: 'livre', motivo: 'listar os modelos que você salvou (só leitura)'},
   salvar_como_modelo: {classe: 'cartao', motivo: 'salvar o projeto como modelo na sua pasta de modelos (fora do projeto, aparece em Novo)'},
   // Onda B (mcp-plano.ts): a aprovação é da pessoa; com o app aberto ela confirma aqui (ou aprova pelo botão do cartão)
   aprovar_plano: {classe: 'cartao', motivo: 'registrar que você aprovou o Plano do vídeo (depois disso a IA começa a montar)'},

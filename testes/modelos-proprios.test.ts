@@ -14,6 +14,7 @@ import type {DocCenas} from '../src/nucleo/cenas';
 import {claudeMd, documentoNovo, gravarPlano, planoDoProjeto} from '../src/nucleo/criar-projeto';
 import type {Manifesto} from '../src/nucleo/documentos';
 import {registrarModelos} from '../src/nucleo/mcp-modelos';
+import {registrarTrocaDeProjeto, trocadorSemApp} from '../src/nucleo/mcp-projeto';
 import {MODELOS} from '../src/nucleo/modelos';
 import {criarPastaDoModelo} from '../src/nucleo/novo-projeto';
 import {PastaMarcas} from '../src/nucleo/pasta-marcas';
@@ -206,6 +207,65 @@ describe('salvar_como_modelo pelo MCP', () => {
     expect(modelos.listar().map((m) => m.id)).toContain('pelo-agente');
     const vazio = (await c.callTool({name: 'salvar_como_modelo', arguments: {nome: 'X', documento: 'nao-existe'}})) as {isError?: boolean};
     expect(vazio.isError).toBe(true);
+    await c.close();
+  });
+});
+
+describe('criar projeto a partir de um modelo seu pelo MCP', () => {
+  const conectar = async (pastaProjetos: string) => {
+    const s = new McpServer({name: 'estudio', version: '0'});
+    registrarModelos(s, projeto);
+    registrarTrocaDeProjeto(s, trocadorSemApp({pastaProjetos, atual: () => null, usar: () => undefined, modelos}));
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    await s.connect(a);
+    const c = new Client({name: 'teste', version: '0'});
+    await c.connect(b);
+    return c;
+  };
+  const jsonDe = (r: unknown) => JSON.parse((r as {content: {text: string}[]}).content[0].text);
+
+  it('listar_modelos é livre e mostra os modelos da pessoa; criar_projeto {modelo_proprio} cria a partir de um', async () => {
+    expect(classeDe('listar_modelos')).toBe('livre');
+    const destino = path.join(tmp, 'projetos-mcp');
+    const c = await conectar(destino);
+    const lista = jsonDe(await c.callTool({name: 'listar_modelos', arguments: {}}));
+    expect(lista.modelos.map((m: {id: string}) => m.id)).toEqual(modelos.listar().map((m) => m.id));
+    expect(lista.modelos.length).toBeGreaterThan(0);
+    const id = lista.modelos[0].id as string;
+    expect(lista.modelos[0]).toMatchObject({id, nome: modelos.ler(id).nome, modulo: modelos.ler(id).modulo});
+    const r = jsonDe(await c.callTool({name: 'criar_projeto', arguments: {modelo_proprio: id, nome: 'Do meu modelo'}}));
+    expect(r).toMatchObject({ok: true, nome: 'Do meu modelo', pasta: path.join(destino, 'Do meu modelo')});
+    expect(existsSync(path.join(destino, 'Do meu modelo', 'estudio.json'))).toBe(true);
+    expect(r.documentos.length).toBe(modelos.ler(id).documentos.length);
+    await c.close();
+  });
+
+  it('id inexistente dá erro claro, sem criar pasta; modelo_proprio com modelo ou formato é recusado', async () => {
+    const destino = path.join(tmp, 'projetos-mcp-erro');
+    const c = await conectar(destino);
+    const nada = (await c.callTool({name: 'criar_projeto', arguments: {modelo_proprio: 'nao-existe'}})) as {isError?: boolean; content: {text: string}[]};
+    expect(nada.isError).toBe(true);
+    expect(nada.content[0].text).toMatch(/modelo não achado: nao-existe/);
+    expect(existsSync(destino) ? readdirSync(destino) : []).toEqual([]);
+    const dois = (await c.callTool({name: 'criar_projeto', arguments: {modelo_proprio: 'x', modelo: 'video-branco'}})) as {isError?: boolean; content: {text: string}[]};
+    expect(dois.isError).toBe(true);
+    expect(dois.content[0].text).toMatch(/modelo_proprio/);
+    const fmt = (await c.callTool({name: 'criar_projeto', arguments: {modelo_proprio: 'x', formato: 'reels'}})) as {isError?: boolean};
+    expect(fmt.isError).toBe(true);
+    await c.close();
+  });
+
+  it('com a pasta de modelos vazia, listar_modelos avisa em vez de falhar', async () => {
+    const vazia = new PastaModelos({pasta: () => path.join(tmp, 'sem-modelos')});
+    const s = new McpServer({name: 'estudio', version: '0'});
+    registrarModelos(s, projeto, vazia);
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    await s.connect(a);
+    const c = new Client({name: 'teste', version: '0'});
+    await c.connect(b);
+    const r = jsonDe(await c.callTool({name: 'listar_modelos', arguments: {}}));
+    expect(r.modelos).toEqual([]);
+    expect(r.aviso).toMatch(/salvar_como_modelo/);
     await c.close();
   });
 });

@@ -16,7 +16,7 @@ import {comando} from '../../teclas';
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import {Check, ChevronDown, Download, Hand, ImagePlus, Lock, Magnet, MessageSquarePlus, MousePointer2, MoveUpRight, Shapes, Square, Type, X, ZoomIn} from 'lucide-react';
 import type {CamadaImagem, Comentario, DocImagem} from '../../../nucleo/documentos';
-import {caminhoDoAlvo, paginaDoAlvo, paginaDoCaminho, temPaginas} from '../../../nucleo/carrossel';
+import {caminhoDoAlvo, fundoDaPagina, paginaDoAlvo, paginaDoCaminho, temFundoProprio, temPaginas} from '../../../nucleo/carrossel';
 import {caixaDe, caixaDeVarias, comAcompanhantes, membrosDoGrupo, patchMover, redimensionarGirada, tocadasPor, travada, type Caixa} from '../../../nucleo/layout-imagem';
 import {mascarasEmUso} from '../../../nucleo/acabamento';
 import {resolverCamada, resolverCor, resolverDegrade} from '../../../nucleo/cor-marca';
@@ -254,9 +254,14 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
   if (!doc) return <div className="vazio">carregando…</div>;
   if (!valido || !ativa) return <div className="vazio" style={{color: 'var(--erro)'}}>o documento {documento} não tem a lista "camadas" nem "paginas"</div>;
 
-  const fundo = resolverCor(previa && previa.documento === documento && previa.caminho === '/fundo' ? String(previa.valor) : doc.fundo, doc.marca);
-  const fundoDegrade = resolverDegrade(previa && previa.documento === documento && previa.caminho.startsWith('/fundo_degrade/')
-    ? comValor(doc.fundo_degrade, previa.caminho.slice('/fundo_degrade/'.length), previa.valor) : doc.fundo_degrade, doc.marca);
+  // fundo da página ativa: o próprio ou, sem ele, o do documento (fundoDaPagina); a prévia ao vivo vale para o fundo que a página mostra
+  const prop = fundoDaPagina(doc, ativa.pagina);
+  const proprio = temFundoProprio(ativa.pagina);
+  const caminhoFundo = proprio && temPaginas(doc) ? `/paginas/${ativa.p}/fundo` : '/fundo';
+  const caminhoDegrade = proprio && temPaginas(doc) ? `/paginas/${ativa.p}/fundo_degrade/` : '/fundo_degrade/';
+  const fundo = resolverCor(previa && previa.documento === documento && previa.caminho === caminhoFundo ? String(previa.valor) : prop.fundo, doc.marca);
+  const fundoDegrade = resolverDegrade(previa && previa.documento === documento && previa.caminho.startsWith(caminhoDegrade)
+    ? comValor(prop.fundo_degrade, previa.caminho.slice(caminhoDegrade.length), previa.valor) : prop.fundo_degrade, doc.marca);
   // a seleção na página ativa: todas (`idxSel`) e, com uma só, a que ganha a alça (`sel`)
   const caminhosSel = editavel ? caminhosDaSelecao(selecao, documento) : [];
   const idxSel = caminhosSel.map((c) => indiceDe(c, base)).filter((i) => i >= 0 && camadas[i]);

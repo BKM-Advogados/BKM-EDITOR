@@ -5,6 +5,7 @@
 import {hex} from './acabamento';
 import {nomeDeFonteVariavel} from './fonte-variavel';
 import {ehDocCenas, TEMA_NEUTRO, type TemaCenas} from './cenas';
+import {acabamentoLigado, patchDoAcabamento} from './acabamento-video';
 import type {CamadaImagem, Degrade, DocImagem, MarcaDoDocumento, OperacaoPatch} from './documentos';
 
 /** As quatro cores que todo tema usa e, por nome, as de apoio da paleta (terracota, grafite, areia…). */
@@ -260,6 +261,10 @@ const patchDaImagem = (doc: DocImagem, m: Marca): OperacaoPatch[] => {
   cor(doc.fundo, '/fundo');
   degrade(doc.fundo_degrade, '/fundo_degrade');
   doc.camadas.forEach((c, i) => camada(c, `/camadas/${i}`));
+  doc.paginas?.forEach((p, i) => {
+    cor(p.fundo, `/paginas/${i}/fundo`);
+    degrade(p.fundo_degrade, `/paginas/${i}/fundo_degrade`);
+  });
   doc.paginas?.forEach((p, i) => p.camadas?.forEach((c, j) => camada(c, `/paginas/${i}/camadas/${j}`)));
   ops.push(por(doc.marca, '/marca', marcaDoKit(m)));
   return ops;
@@ -267,10 +272,13 @@ const patchDaImagem = (doc: DocImagem, m: Marca): OperacaoPatch[] => {
 
 /** Patch que aplica o kit a um documento: o vídeo de cenas troca o `tema` inteiro; a imagem passa cada cor e fonte para
  *  o mesmo papel no kit novo (ver acima) e guarda o kit em `marca`; a animação troca o `tema` (que resolve as cores de
- *  referência @destaque etc.). Outro tipo de documento: lista vazia (não recebe kit). */
-export const patchDaMarca = (doc: unknown, m: Marca, tema: TemaDeMarca = temaDaMarca(m)): OperacaoPatch[] => {
+ *  referência @destaque etc.). Outro tipo de documento: lista vazia (não recebe kit). `acabamento` (só no vídeo de
+ *  cenas): liga também a vinheta do logo, o rodapé e o cartão final (acabamento-video.ts), guardando o que já havia. */
+export const patchDaMarca = (doc: unknown, m: Marca, tema: TemaDeMarca = temaDaMarca(m), o: {acabamento?: boolean} = {}): OperacaoPatch[] => {
   if (ehDocCenas(doc)) {
-    return doc.tema === undefined ? [{op: 'add', path: '/tema', value: tema}] : [{op: 'test', path: '/tema', value: doc.tema}, {op: 'replace', path: '/tema', value: tema}];
+    const ops: OperacaoPatch[] = doc.tema === undefined ? [{op: 'add', path: '/tema', value: tema}]
+      : [{op: 'test', path: '/tema', value: doc.tema}, {op: 'replace', path: '/tema', value: tema}];
+    return o.acabamento ? [...ops, ...patchDoAcabamento(doc, acabamentoLigado(doc.acabamento))] : ops;
   }
   // a animação antes da imagem: ela também tem camadas e largura, mas lê o kit só do `tema`
   if (ehDocAnimacao(doc)) {

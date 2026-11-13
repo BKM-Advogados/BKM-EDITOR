@@ -32,6 +32,7 @@ export type ClipeAudio = {
   musica?: string;
   musica_original?: {arquivo: string; corte_ms?: number; duracao_ms: number};
   narracao_ia?: {cena: string; hash: string}; // narração por IA (narracao.ts): a fala de qual cena e o hash do pedido (texto, provedor, voz…)
+  narracao_gravada?: {cena: string}; // narração gravada inteira (narracao-inteira.ts): o trecho da gravação que é a fala de qual cena
 };
 
 /** Forma do fade. `linear`: o ganho sobe em linha reta (dois clipes iguais somam o mesmo nível; música diferente cai 3 dB

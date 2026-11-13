@@ -21,6 +21,7 @@ import {criarServidorDesktop} from '../src/nucleo/mcp-desktop';
 import {descobertaViva} from '../src/nucleo/claude-desktop';
 import {encaminharAoApp} from '../src/nucleo/mcp-app';
 import {classeDe} from '../src/nucleo/portao';
+import {PastaModelos} from '../src/nucleo/pasta-modelos';
 import {Projeto} from '../src/nucleo/projeto';
 import {McpHttp, type Perguntador} from '../src/main/mcp-http';
 import {criarClaudeDesktop} from '../src/main/claude-desktop';
@@ -286,8 +287,8 @@ describe('trocar de projeto pelo Claude Desktop', () => {
     novoProjeto(projetos, 'Alfa');
   });
 
-  const conectarDesktop = async (descoberta: () => ReturnType<typeof descobertaViva>, aceitar = true) => {
-    const d = criarServidorDesktop({dados, pastas: [projetos], descoberta,
+  const conectarDesktop = async (descoberta: () => ReturnType<typeof descobertaViva>, aceitar = true, modelos?: PastaModelos) => {
+    const d = criarServidorDesktop({dados, pastas: [projetos], descoberta, modelos,
       registrar: (s, projeto, origem, portao) => registrarFerramentas(s, projeto, 'agente', origem, undefined, undefined, portao)});
     const [a, b] = InMemoryTransport.createLinkedPair();
     await d.servidor.connect(a);
@@ -314,6 +315,40 @@ describe('trocar de projeto pelo Claude Desktop', () => {
     expect(textoDe(await c.callTool({name: 'projeto_info', arguments: {}}))).toMatch(/Nenhum projeto escolhido/);
     expect((await c.callTool({name: 'abrir_projeto', arguments: {projeto: 'Nao Existe'}})).isError).toBe(true);
     await d.fechar();
+  });
+
+  it('com o app fechado, listar_modelos responde sem projeto escolhido e criar_projeto cria de um modelo seu', async () => {
+    const pastaModelos = path.join(dados, 'meus-modelos');
+    const modelos = new PastaModelos({pasta: () => pastaModelos});
+    const {c, d} = await conectarDesktop(() => null, true, modelos);
+    // sem modelo salvo: lista vazia com aviso, ainda sem projeto escolhido
+    const vazio = jsonDe(await c.callTool({name: 'listar_modelos', arguments: {}}));
+    expect(vazio.modelos).toEqual([]);
+    expect(d.escolhido()).toBeNull();
+    const m = modelos.salvar(new Projeto(path.join(projetos, 'Alfa')), {nome: 'Meu modelo'});
+    const lista = jsonDe(await c.callTool({name: 'listar_modelos', arguments: {}}));
+    expect(lista.modelos.map((x: {id: string}) => x.id)).toEqual([m.id]);
+    expect(d.escolhido()).toBeNull();
+    const criado = jsonDe(await c.callTool({name: 'criar_projeto', arguments: {modelo_proprio: m.id, nome: 'Do modelo'}}));
+    expect(criado).toMatchObject({ok: true, nome: 'Do modelo', pasta: path.join(projetos, 'Do modelo')});
+    expect(d.escolhido()).toBe(path.join(projetos, 'Do modelo'));
+    const nada = await c.callTool({name: 'criar_projeto', arguments: {modelo_proprio: 'nao-existe'}});
+    expect(nada.isError).toBe(true);
+    expect(textoDe(nada)).toMatch(/modelo não achado/);
+    await d.fechar();
+  });
+
+  it('com o app fechado, a pasta de modelos vem da preferência pasta_modelos do app (pasta de dados)', async () => {
+    const outra = path.join(dados, 'modelos-da-preferencia');
+    const m = new PastaModelos({pasta: () => outra}).salvar(new Projeto(path.join(projetos, 'Alfa')), {nome: 'Da preferência'});
+    writeFileSync(path.join(dados, 'preferencias.json'), JSON.stringify({pasta_modelos: outra}), 'utf-8');
+    const {c, d} = await conectarDesktop(() => null); // sem a opção modelos: lê as preferências
+    const lista = jsonDe(await c.callTool({name: 'listar_modelos', arguments: {}}));
+    expect(lista.modelos.map((x: {id: string}) => x.id)).toEqual([m.id]);
+    const criado = jsonDe(await c.callTool({name: 'criar_projeto', arguments: {modelo_proprio: m.id, nome: 'Pela preferência'}}));
+    expect(criado).toMatchObject({ok: true, nome: 'Pela preferência'});
+    await d.fechar();
+    rmSync(path.join(dados, 'preferencias.json'), {force: true});
   });
 
   it('com o app fechado, criar negado pela pessoa no Claude Desktop não grava nada', async () => {

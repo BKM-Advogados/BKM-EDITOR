@@ -549,10 +549,12 @@ ipcMain.on(CANAL.mostrarArquivo, (e, caminho: string) => {
 const marcas = registrarIpcMarcas({lidar, janela: () => janela, memoria, midia, exigirProjeto});
 // modelos da pessoa (ipc-modelos.ts): salvar o projeto como modelo; criar a partir dele abre o projeto novo aqui
 const modelos = registrarIpcModelos({lidar, memoria, exigirProjeto});
-lidar(CANAL.modelosCriarProjeto, (o: {id: string; nome?: string; pasta?: string; marca?: string}) => emFila(() => {
+// a mesma função para a tela inicial e para o criar_projeto do MCP com modelo_proprio (trocadorDoApp)
+const criarProjetoDoModelo = (o: {id: string; nome?: string; pasta?: string; marca?: string}) => {
   const {raiz} = criarPastaDoModelo({modelos, id: o.id, nome: o.nome, marca: o.marca ? marcas.ler(o.marca) : null, pasta: o.pasta || memoria.prefs().pasta_projetos});
   return abrirProjeto(raiz);
-}));
+};
+lidar(CANAL.modelosCriarProjeto, (o: {id: string; nome?: string; pasta?: string; marca?: string}) => emFila(() => criarProjetoDoModelo(o)));
 
 registrarPrefsExportacao(lidar, exigirProjeto); // marca d'água por destino, lembrada no projeto (frente C)
 registrarContrasteMarca(lidar, exigirProjeto, (documento) => (exigirProjeto(), sessao!.propsVideo(documento, midia.base)), (aviso) => prepararRender({raizApp: app.getAppPath(), empacotado: app.isPackaged, aviso})); // contraste 3:1 da marca (frente C)
@@ -659,6 +661,7 @@ const trocadorDoApp = (quem: {ide: boolean}): TrocadorDeProjeto => {
   };
   return {
     criar: async (o) => {
+      if (o.modeloProprio) return pronto(await emFila(() => criarProjetoDoModelo({id: o.modeloProprio!, nome: o.nome, marca: o.marca, pasta: o.pasta})));
       const modelo = o.modelo ?? 'video-branco';
       const formato = formatoDoPedido(modelo, o.formato); // antes da fila: pedido inválido não fecha o projeto aberto
       return pronto(await emFila(() => criarProjeto({nome: o.nome, modelo, formato, marca: o.marca, pasta: o.pasta})));

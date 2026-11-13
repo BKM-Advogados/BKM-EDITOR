@@ -4,6 +4,11 @@
 // traz faixas (narração, música, efeitos) com clipes em ms da linha do tempo (audio.ts); a transcrição da narração fica
 // para a Onda B. O carrossel narrado continua no resolvedor de roteiro. `refs` (opcional, no bloco e na cena) cita
 // os fatos da pesquisa (`F3`, em pesquisa/pesquisa.json) que sustentam o que está escrito; o resolvedor só repassa.
+// `em_palavra` e `sai_palavra` (opcionais) prendem a entrada e a saída do bloco a uma palavra da fala da cena, com a
+// âncora do carrossel narrado ("palavra@ms", ms contados do começo da cena; ancora-palavra.ts), resolvida pelas palavras
+// das legendas que caem dentro da cena. Sem fala transcrita ou sem achar a palavra, vale o `em`/`sai` em ms, com aviso.
+import {tempoDaAncora, type Palavra} from './ancora-palavra';
+import {duracaoDoCartao, resolverAcabamento, type AcabamentoCenas, type AcabamentoP} from './acabamento-video'; // Onda B: vinheta, rodapé, cartão final e efeitos
 import {resolverAudio, type AudioCenas, type AudioP, type Envelope} from './audio';
 import {efeitosValidos, problemasDosEfeitos, type Efeito} from './efeitos';
 import {formatoDoVideo, type Formato} from './formatos';
@@ -40,6 +45,8 @@ export type BlocoCenas = {
   desde_ms?: number; // lâmina: o bloco já estava na tela há tanto quando esta cena começa (a segunda metade continua a primeira) (frente C)
   segue_ms?: number; // lâmina: o bloco continua na cena seguinte por mais tanto depois do `sai` (não some no corte) (frente C)
   casas?: number; // número: casas decimais (0 a 4); sem ele, as dos valores, e duas em dinheiro (R$) com centavos (frente C)
+  em_palavra?: string; // entra presa a uma palavra da fala da cena: "palavra@ms" (ms desde o começo da cena), "palavra$@ms" no fim dela, "+120" desloca; sem achar, vale `em`
+  sai_palavra?: string; // sai presa a uma palavra da fala da cena, na mesma forma; sem achar, vale `sai`
 };
 
 /** Ken Burns do bloco de imagem (composicoes/cenas/movimento.ts): aproximar, afastar ou deslizar para um lado.
@@ -56,6 +63,7 @@ export type DocCenas = {tipo: 'cenas'; formato: Formato; tema: TemaCenas; cenas:
   legendas?: LegendasCenas; // frente Fala: segmentos com tempo, palavras e falante, e o estilo (legendas.ts)
   teleprompter?: Teleprompter; // frente Som (rodada 3): o texto que a pessoa lê ao gravar a narração (gravacao.ts)
   narracao?: ConfigNarracao; // narração por IA: provedor, modelo, voz, estilo, velocidade, folga, margem e o dicionário de pronúncia (narracao.ts)
+  acabamento?: AcabamentoCenas; // Onda B: vinheta do logo, rodapé com a marca, cartão final e efeitos de midia/sfx/ (acabamento-video.ts)
 };
 
 // destaque branco (o peso é que marca: VideoCenas engrossa o trecho quando o destaque não tem cor); não é o azul de
@@ -147,10 +155,12 @@ export type PropsCenas = {
   audio?: AudioP;
   base_midia?: string;
   legendas_cenas?: LegendasP; // frente Fala (o nome não é "legendas" porque a linha do tempo lê esse do carrossel narrado)
+  acabamento?: AcabamentoP; // Onda B: só quando alguma peça está ligada (acabamento-video.ts)
 };
 
-/** O que o resolvedor recebe de fora do documento: os envelopes já medidos, por arquivo (midia/x.wav). */
-export type OpcoesResolver = {envelopes?: Record<string, Envelope | undefined>};
+/** O que o resolvedor recebe de fora do documento: os envelopes já medidos, por arquivo (midia/x.wav), e os arquivos de
+ *  midia/sfx/ (só o nome), para os efeitos sonoros do acabamento; sem `sfx`, o acabamento sai sem efeitos. */
+export type OpcoesResolver = {envelopes?: Record<string, Envelope | undefined>; sfx?: string[]};
 
 const numero = (v: unknown, padrao: number) => (typeof v === 'number' && Number.isFinite(v) ? v : padrao);
 
@@ -159,37 +169,73 @@ const numero = (v: unknown, padrao: number) => (typeof v === 'number' && Number.
 export const duracaoDaCena = (c: {duracao_ms?: unknown} | null | undefined): number =>
   Math.min(DURACAO_MAX, Math.max(DURACAO_MIN, numero(c?.duracao_ms, DURACAO_CENA_PADRAO)));
 
+/** As palavras transcritas que começam dentro da cena [t_in, t_out), com o tempo contado do começo dela: é nelas que a
+ *  âncora do bloco (`em_palavra`, `sai_palavra`) procura. Vêm das legendas já resolvidas (andam com o clipe de voz). */
+export const palavrasDaCena = (legendas: Pick<LegendasP, 'segmentos'> | undefined, t_in: number, t_out: number): Palavra[] =>
+  (legendas?.segmentos ?? [])
+    .flatMap((s) => s.palavras)
+    .filter((p) => Number.isFinite(p.s) && Number.isFinite(p.e) && p.s >= t_in && p.s < t_out)
+    .map((p) => ({w: p.w, s: p.s - t_in, e: p.e - t_in}))
+    .sort((a, b) => a.s - b.s);
+
+/** Onde a âncora de palavra pôs o bloco (ms desde o começo da cena), ou null para ficar no tempo em ms; o motivo de não
+ *  dar vira aviso. `qual`: "entra" ou "sai", para a mensagem. */
+export const tempoDaPalavraNoBloco = (ancora: unknown, palavras: readonly Palavra[], qual: 'entra' | 'sai', onde: string, avisos: string[]): number | null => {
+  if (ancora === undefined) return null;
+  if (typeof ancora !== 'string' || !ancora.trim()) {
+    avisos.push(`${onde} ${qual} preso a uma palavra, mas a âncora não é um texto "palavra@ms": ${qual} no tempo em ms`);
+    return null;
+  }
+  const r = tempoDaAncora(ancora, palavras);
+  if ('ms' in r) return r.ms;
+  const motivo = !palavras.length && !r.erro.startsWith('âncora mal escrita') ? 'a cena não tem fala transcrita (transcreva a fala para gerar as legendas)' : r.erro;
+  avisos.push(`${onde} ${qual} preso a "${ancora}", mas ${motivo}: ${qual} no tempo em ms`);
+  return null;
+};
+
 /** Props da composição VideoCenas, em ms de saída. Valores fora do lugar viram aviso, não erro: o vídeo sempre toca. */
 export const resolverCenas = (doc: DocCenas, opcoes: OpcoesResolver = {}): {props: PropsCenas; avisos: string[]} => {
   const avisos: string[] = [];
   const formato = formatoDoVideo(doc);
   const tema = {...TEMA_NEUTRO, ...(doc.tema ?? {})};
+  const lista = Array.isArray(doc.cenas) ? doc.cenas : [];
+  // o tempo das cenas vem antes dos blocos: as legendas (que a âncora de palavra lê) dependem da duração do vídeo
+  const total = lista.reduce((soma, c) => soma + duracaoDaCena(c), 0);
+  // o cartão final do acabamento soma ao fim: as cenas, o som e as legendas não andam (acabamento-video.ts)
+  const duracao_ms = Math.max(1000, total) + duracaoDoCartao(doc.acabamento);
+  const som = resolverAudio(doc.audio, duracao_ms, opcoes.envelopes);
+  const avisosLegendas: string[] = [];
+  const legendas = resolverLegendas(doc.legendas, {audio: som.audio, largura: formato.largura, altura: formato.altura, tema, duracao_ms, fala: doc.audio}, avisosLegendas); // frente Fala
   let t = 0;
-  const cenas: CenaCenasP[] = (Array.isArray(doc.cenas) ? doc.cenas : []).map((c, i) => {
+  const cenas: CenaCenasP[] = lista.map((c, i) => {
     const pedida = numero(c.duracao_ms, DURACAO_CENA_PADRAO);
     const dur = duracaoDaCena(c);
     if (dur !== pedida) avisos.push(`a cena ${i + 1} tem duração ${pedida} ms; vai com ${dur} ms`);
     const t_in = t;
     const t_out = t + dur;
     t = t_out;
-    const blocos = (Array.isArray(c.blocos) ? c.blocos : []).map((b, j): BlocoCenasP => {
-      const em = Math.max(0, Math.min(dur, numero(b.em, 0)));
-      const sai = Math.max(em + 100, Math.min(dur, numero(b.sai, dur)));
-      if (numero(b.em, 0) > dur) avisos.push(`o bloco ${j + 1} da cena ${i + 1} entra depois do fim da cena`);
+    const blocos0 = Array.isArray(c.blocos) ? c.blocos : [];
+    const palavras = blocos0.some((b) => b?.em_palavra !== undefined || b?.sai_palavra !== undefined) ? palavrasDaCena(legendas, t_in, t_out) : [];
+    const blocos = blocos0.map((b, j): BlocoCenasP => {
+      const onde = `o bloco ${j + 1} da cena ${i + 1}`;
+      const emPedido = tempoDaPalavraNoBloco(b.em_palavra, palavras, 'entra', onde, avisos) ?? numero(b.em, 0);
+      const saiPedido = tempoDaPalavraNoBloco(b.sai_palavra, palavras, 'sai', onde, avisos) ?? numero(b.sai, dur);
+      const em = Math.max(0, Math.min(dur, emPedido));
+      const sai = Math.max(em + 100, Math.min(dur, saiPedido));
+      if (emPedido > dur) avisos.push(`${onde} entra depois do fim da cena`);
       return {...b, x: numero(b.x, 0.1), y: numero(b.y, 0.4), largura: numero(b.largura, 0.8), origem: `/cenas/${i}/blocos/${j}`, em: t_in + em, sai: t_in + sai};
     });
     return {origem: `/cenas/${i}`, id: c.id, nome: c.nome, tipo: 'cena', n: i + 1, t_in, t_out, fundo: c.fundo ?? tema.fundo, blocos,
       ...(Array.isArray(c.refs) ? {refs: c.refs} : {})};
   });
-  const duracao_ms = Math.max(1000, t);
-  const som = resolverAudio(doc.audio, duracao_ms, opcoes.envelopes);
   avisos.push(...som.avisos);
   avisos.push(...problemasDosEfeitos(doc.efeitos).map((p) => `Efeitos: ${p}`)); // frente C (tres-efeitos-D1, D2)
   avisos.push(...problemasDaNarracao(doc)); // narração por IA: campo fora do lugar vira aviso
-  const legendas = resolverLegendas(doc.legendas, {audio: som.audio, largura: formato.largura, altura: formato.altura, tema, duracao_ms, fala: doc.audio}, avisos); // frente Fala
+  avisos.push(...avisosLegendas);
+  const acabamento = resolverAcabamento(doc.acabamento, {tema, formato, cenas, total: duracao_ms, legendas, audio: som.audio, sfx: opcoes.sfx, envelopes: opcoes.envelopes}, avisos);
   return {
     props: {composicao: 'VideoCenas', duracao_ms, largura: formato.largura, altura: formato.altura, fps: formato.fps, tema, cenas,
-      efeitos: efeitosValidos(doc.efeitos), ...(som.audio ? {audio: som.audio} : {}), ...(legendas ? {legendas_cenas: legendas} : {})},
+      efeitos: efeitosValidos(doc.efeitos), ...(som.audio ? {audio: som.audio} : {}), ...(legendas ? {legendas_cenas: legendas} : {}), ...(acabamento ? {acabamento} : {})},
     avisos,
   };
 };

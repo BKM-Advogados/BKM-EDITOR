@@ -114,14 +114,15 @@ export type Previa = {
   tem_chave: boolean;
 };
 
-/** Quais cenas vão ser geradas: as pedidas (com texto) ou, sem pedido, as que estão a gerar ou desatualizadas. `refazer`: todas
- *  as pedidas com texto, mesmo as geradas, e sem usar o cache. */
+/** Quais cenas vão ser geradas: as pedidas (com texto) ou, sem pedido, as que estão a gerar ou desatualizadas (a cena com a
+ *  fala gravada, da narração inteira dividida nas cenas, só vai pedida). `refazer`: todas as pedidas com texto, mesmo as
+ *  geradas, e sem usar o cache. */
 const selecionar = (doc: DocCenas, itens: ItemNarracao[], o: {cenas?: string[]; refazer?: boolean}) => {
   const {ids, nao_achadas} = escolherCenas(doc, o.cenas);
   const pedidas = itens.filter((i) => ids.includes(i.cena));
-  const comTexto = pedidas.filter((i) => i.estado !== 'sem_texto');
-  const alvo = o.refazer || o.cenas?.length ? comTexto : comTexto.filter((i) => i.estado !== 'gerada');
-  return {alvo, sem_texto: pedidas.filter((i) => i.estado === 'sem_texto').map((i) => i.n), nao_achadas};
+  const comTexto = pedidas.filter((i) => i.texto_final);
+  const alvo = o.refazer || o.cenas?.length ? comTexto : comTexto.filter((i) => i.estado !== 'gerada' && i.estado !== 'gravada');
+  return {alvo, sem_texto: pedidas.filter((i) => !i.texto_final).map((i) => i.n), nao_achadas};
 };
 
 export const previaDaNarracao = (projeto: Projeto, documento: string, doc: DocCenas, o: {cenas?: string[]; refazer?: boolean}, servico?: ServicoNarracao): Previa => {
@@ -190,7 +191,8 @@ export const gerarNarracao = async (projeto: Projeto, servico: ServicoNarracao, 
   const {alvo: fila, sem_texto, nao_achadas} = selecionar(doc, itens, o);
   const base: ResultadoNarracao = {ok: true, documento: alvo, provedor: cfg.provedor, modelo: cfg.modelo, voz: cfg.voz, geradas: [], avisos: [], sem_texto,
     ...(nao_achadas.length ? {nao_achadas} : {})};
-  if (!fila.length) return {...base, avisos: [sem_texto.length && !itens.some((i) => i.estado !== 'sem_texto') ? 'nenhuma cena tem texto de narração (cenas[i].narracao.texto)' : 'nada a gerar: as falas pedidas já estão geradas']};
+  if (!fila.length) return {...base, avisos: [sem_texto.length && !itens.some((i) => i.texto_final) ? 'nenhuma cena tem texto de narração (cenas[i].narracao.texto)'
+    : `nada a gerar: as falas pedidas já estão geradas${itens.some((i) => i.estado === 'gravada') ? ' (ou gravadas: a cena com a fala gravada só vai à IA pedida pelo número)' : ''}`]};
   // sem chave e com alguma fora do cache: avisa antes de gastar tempo
   const precisaApi = fila.some((i) => o.refazer || duracaoNoCache(projeto, i.arquivo!) === null);
   if (precisaApi) exigirChave(servico, cfg.provedor);

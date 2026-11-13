@@ -37,9 +37,11 @@ Todo fato jurídico, número, prazo ou decisão que entrar numa cena precisa de 
 `pesquisa/pesquisa.json` e aparece no painel Pesquisa do app; você a grava pelas ferramentas abaixo, nunca à mão.
 
 1. **Ler a fonte.** `ler_fonte` {url, observacao?, titulo?} baixa a página, guarda o texto limpo, o sha256, o nível pelo
-   catálogo e as marcas de vigência, e devolve a fonte (`f1`, `f2`…) com o começo do texto. `texto_da_fonte` {fonte_id,
-   pagina? ou inicio? e fim?} lê o resto, 6.000 caracteres por página. `anotar_fonte` {fonte_id, observacao} acrescenta
-   à observação da fonte (a "observação de quem baixou": contexto, ressalva, de onde veio); nunca apaga o que havia.
+   catálogo e as marcas de vigência, e devolve a fonte (`f1`, `f2`…) com o começo do texto. PDF também: o texto sai da
+   camada de texto do arquivo, com `\f` entre as páginas; PDF digitalizado (só imagem) dá erro, porque não há OCR.
+   `texto_da_fonte` {fonte_id, pagina? ou inicio? e fim?} lê o resto, 6.000 caracteres por página. `anotar_fonte`
+   {fonte_id, observacao} acrescenta à observação da fonte (a "observação de quem baixou": contexto, ressalva, de onde
+   veio); nunca apaga o que havia.
 2. **Fontes por nível.** Regra jurídica só com fonte de nível 1: Planalto (lei compilada), Câmara, Senado, LexML, Diário
    Oficial da União, TST, STF, STJ, TRT-3, CNJ/DJEN. Governo e agências (MTE, gov.br, Agência Brasil, Agência Senado e
    Câmara) são nível 2 e servem para notícia e contexto. Fora do catálogo vira nível 0. Fato de empresa ou de setor:
@@ -78,7 +80,7 @@ Todo fato jurídico, número, prazo ou decisão que entrar numa cena precisa de 
   Acabamento por camada: `sombra` {cor, opacidade, desfoque, x, y}; `contorno` {cor, espessura, posicao: `fora`,
   `centro` ou `dentro`}; `degrade` {`tipo` (`linear` ou `radial`), `angulo` (180 = de cima para baixo), `centro` {x, y},
   `paradas` [{cor, posicao de 0 a 1, opacidade}]}, no lugar da cor em texto e forma. `fundo_degrade`, na raiz do
-  documento, vai por cima do `fundo` em todas as páginas. Foto dentro de forma ou texto: na camada de imagem, `mascara`
-  é o id da forma ou do texto logo acima dela. `remover_fundo` troca o `src` pelo recorte e guarda o original em
+  documento, vai por cima do `fundo` em todas as páginas; uma página pode ter `fundo` e/ou `fundo_degrade` próprios.
+  Foto dentro de forma ou texto: na camada de imagem, `mascara` é o id da forma ou do texto logo acima dela. `remover_fundo` troca o `src` pelo recorte e guarda o original em
   `src_original`. A pessoa exporta PNG por página e PDF pelo app; o MCP não exporta.
 <!-- estudio:imagem:fim -->

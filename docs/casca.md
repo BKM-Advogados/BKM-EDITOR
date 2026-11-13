@@ -182,7 +182,14 @@ não tem forma de onda nelas.
 - **Carrossel narrado.** Modelo de fábrica do vídeo, 9:16 fixo (`src/nucleo/modelo-carrossel-narrado.ts`; a decisão
   está em `docs/carrossel-narrado.md`).
 - **MCP.** `salvar_como_modelo {nome, descricao?, documento?}`, classe cartão (grava fora do projeto, sem Reverter),
-  citada no passo das marcas do guia do projeto. `src/nucleo/mcp-modelos.ts`.
+  citada no passo das marcas do guia do projeto. `listar_modelos {}` (livre, só lê) mostra os modelos da pessoa (id, nome,
+  descrição, módulo, tamanho, documentos); `criar_projeto {modelo_proprio: <id>}` cria o projeto a partir de um deles, pela
+  mesma `criarPastaDoModelo` da tela inicial (`criarProjetoDoModelo` no `main.ts` com o app aberto; `trocadorSemApp` com ele
+  fechado). `modelo_proprio` não vale com `modelo`, `formato`, `largura` nem `altura` (o tamanho vem do modelo); `nome`,
+  `marca` e `pasta` valem; id que não existe dá `nao_achado: modelo não achado: <id>`. Com o app fechado no Claude Desktop,
+  `listar_modelos` responde antes de escolher projeto (como `listar_projetos`; a pasta é a `pasta_modelos` das preferências do app, lida de `preferencias.json` na pasta de dados por
+  `preferencias-arquivo.ts`, e só sem ela vale `ESTUDIO_MODELOS` ou `~/Estudio/meus-modelos`; `modelosDaPessoa` em `mcp-modelos.ts`, atendida
+  em `mcp-desktop.ts`), então dá para pedir "cria um projeto do meu modelo X" sem projeto aberto. `src/nucleo/mcp-modelos.ts`.
 - **Prévia web.** `scripts/previa-web/ponte.ts` abre o exemplo de verdade (mídia servida de `exemplos/exemplo`), cria o
   carrossel narrado e guarda os modelos da pessoa em memória.
 

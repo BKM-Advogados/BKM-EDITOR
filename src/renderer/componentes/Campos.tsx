@@ -8,7 +8,7 @@ import {amostrasDaMarca, avisoDeContraste, ehReferenciaCor, nomeDaCor, resolverC
 import {avisar} from '../estado/loja';
 import {usarPaleta} from '../estado/paleta';
 import {BotaoMenu, type ItemMenu} from './Menu';
-import {Caixa, Escolha} from './Controles';
+import {Caixa, Escolha, type OpcaoControle} from './Controles';
 
 /** Número no jeito brasileiro (vírgula decimal), sem casas sobrando. */
 export const numeroBr = (n: number, casas = 3) => String(Number(n.toFixed(casas))).replace('.', ',');
@@ -187,12 +187,12 @@ export const CampoCor: React.FC<{rotulo: string; valor: string; aoMudar: (v: str
   );
 };
 
-export const CampoSelecao = <T extends string>({rotulo, valor, opcoes, aoMudar, padrao, marcador}: {rotulo: string; valor: T; opcoes: [T, string][]; aoMudar: (v: T) => void; padrao?: T;
+export const CampoSelecao = <T extends string>({rotulo, valor, opcoes, aoMudar, padrao, marcador}: {rotulo: string; valor: T; opcoes: OpcaoControle<T>[]; aoMudar: (v: T) => void; padrao?: T;
   marcador?: React.ReactNode}) => (
-  <LinhaCampo rotulo={rotulo} marcador={marcador} difere={padrao !== undefined && valor !== padrao} padrao={opcoes.find(([v]) => v === padrao)?.[1]}
+  <LinhaCampo rotulo={rotulo} marcador={marcador} difere={padrao !== undefined && valor !== padrao} padrao={(() => { const o = opcoes.map((x) => (Array.isArray(x) ? {valor: x[0], rotulo: x[1]} : x)).find((x) => x.valor === padrao); return typeof o?.rotulo === 'string' ? o.rotulo : undefined; })()}
     aoRedefinir={padrao !== undefined ? () => aoMudar(padrao) : undefined}>
     <Escolha valor={valor} rotulo={rotulo} aoMudar={aoMudar}
-      opcoes={[...(opcoes.some(([v]) => v === valor) ? [] : [[valor, valor] as [T, string]]), ...opcoes]} />
+      opcoes={[...(opcoes.some((o) => (Array.isArray(o) ? o[0] : o.valor) === valor) ? [] : [[valor, valor] as [T, string]]), ...opcoes]} />
   </LinhaCampo>
 );
 

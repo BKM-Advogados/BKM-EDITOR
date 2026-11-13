@@ -99,6 +99,8 @@ Envolve o `registerTool`: toda ferramenta registrada depois dele passa por ele, 
   documento novo aparece na tela da pessoa (veja "A tela da pessoa" abaixo).
 - **Para declarar a classe de uma ferramenta nova**: uma linha em `CLASSES` ou a anotação. Não precisa devolver o
   `seq`: o portão acrescenta ao resultado `{"estudio_mudancas":[{seq, documento, rotulo}]}`.
+- **Livres declaradas em `CLASSES`**, para constar: `listar_modelos` (só lê) e `dividir_narracao` (a narração gravada
+  inteira dividida nas cenas: só muda o documento, com diário e Reverter; `docs/narracao.md`).
 - **`livreSe`** na linha de `CLASSES`: o pedido que não sai do PC roda sem cartão. Hoje vale para `narrar` com
   `previa: true`, que só devolve o texto final e o custo estimado.
 - **Onde aparece o pedido**: na conversa da aba ou, sem conversa (terminal, app de fora), num cartão solto no canto da
@@ -156,7 +158,7 @@ documento sem ser objeto ou fora do formato do módulo dele, e devolve os avisos
 | `importar_midia` | `{caminho, pasta?, nome?}` | cartao: traz arquivo de fora |
 | `renomear_documento` | `{documento, titulo}` | livre (o manifesto, como `renomear_projeto`; fora do diário) |
 | `marcar_ponto_de_restauracao` | `{mensagem?}` | livre: o Ctrl+S, um commit no git do projeto |
-| `criar_projeto` | `{nome?, modelo?, formato?, largura?, altura?, marca?, pasta?}` | cartao; só fora do app (abaixo) |
+| `criar_projeto` | `{nome?, modelo? ou modelo_proprio?, formato?, largura?, altura?, marca?, pasta?}` (`modelo_proprio`: id de `listar_modelos`) | cartao; só fora do app (abaixo) |
 | `abrir_projeto` | `{projeto}` (nome ou pasta) | cartao; só fora do app |
 | `duplicar_projeto` | `{nome?}` | cartao; só fora do app |
 | `fechar_projeto` | — | cartao; só fora do app |
@@ -165,6 +167,7 @@ documento sem ser objeto ou fora do formato do módulo dele, e devolve os avisos
 | `editar_marca` | `{marca, nome?, fundo?, texto?, destaque?, suave?, fonte_titulo?, fonte_texto?, fonte_mono?, assinatura?, notas?}` | cartao: idem |
 | `importar_logo_marca` | `{marca, caminho}` | cartao: traz arquivo de fora para o kit |
 | `importar_fonte_marca` | `{marca, caminho, familia?, peso?, estilo?}` | cartao: idem |
+| `listar_modelos` | `{}` | livre: lista os modelos da pessoa (id, nome, módulo, tamanho); o id vai em `criar_projeto {modelo_proprio}` |
 | `salvar_como_modelo` | `{nome, descricao?, documento?}` | cartao: grava na pasta de modelos da pessoa, fora do projeto e sem diário (Onda B) |
 
 - **Uma regra para a tela e para a IA.** `importar_midia` e o botão de escolher arquivo da tela (`escolherMidia`, no

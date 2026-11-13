@@ -305,16 +305,17 @@ renderiza um vídeo de cenas de teste em 9:16, 4:5 e 16:9 fora do Electron, em `
 - **Rodada 2 sem teste no app real:** o remover fundo só rodou com um modelo falso, a limpeza de voz foi medida e não
   ouvida, e o IPC da limpeza, do medidor, da transcrição e da marca d'água nunca rodou no Electron.
 - **Pesquisa de qualidade** (`tasks/estudio-qualidade-2026-11-07`): defeitos conferidos no código e a barra do que falta.
-- **Onda B** (briefing): importar mídia e painel Mídia (feitos), o carrossel narrado como modelo do tipo cenas (feito;
-  falta o bloco preso a uma palavra dentro da cena, `docs/carrossel-narrado.md`), um projeto de exemplo neutro para o
-  "Ver um exemplo" (feito), o Claude que planeja (perguntas e Plano do vídeo antes de montar; feito: `plano.json`,
-  `escrever_plano`/`ler_plano`/`aprovar_plano` e o cartão na conversa, `docs/ia.md`), chip de formato no
-  monitor e primeiros passos (feitos, `docs/casca.md`) e "Salvar como modelo" (feito; criar projeto de um modelo seu
-  pelo MCP ainda não). A interface nova foi vista só na prévia web; falta conferir no app aberto.
+- **Onda B** (briefing): importar mídia e painel Mídia (feitos); o carrossel narrado como modelo do tipo cenas (feito,
+  com o bloco preso a uma palavra da fala da cena, a narração gravada inteira dividida nas cenas pela transcrição e a
+  vinheta do logo, o rodapé, o cartão final e os efeitos sonoros no vídeo de cenas, `docs/carrossel-narrado.md` e
+  `docs/narracao.md`); um projeto de exemplo neutro para o "Ver um exemplo" (feito); o Claude que planeja (perguntas e
+  Plano do vídeo antes de montar; feito: `plano.json`, `escrever_plano`/`ler_plano`/`aprovar_plano` e o cartão na
+  conversa, `docs/ia.md`); chip de formato no monitor e primeiros passos (feitos, `docs/casca.md`); "Salvar como modelo"
+  (feito, inclusive criar projeto de um modelo seu pelo MCP: `listar_modelos` e `criar_projeto {modelo_proprio}`). A
+  interface nova foi vista só na prévia web; falta conferir no app aberto.
 - **Memória (app empacotado, 05/11/2026):** 307 MB parado no vídeo; 547 MB com as quatro áreas e o 3D. A tela inicial
   agora abre sem o editor (falta medir a linha "Início parado").
 - **Fontes** do Google (Inter, Archivo, IBM Plex) baixam na primeira vez (precisa de internet); as de arquivo do kit não.
-  O seletor de fonte da camada de texto da imagem ainda lista só as quatro fixas.
 - **Licença do Remotion:** o escritório que usa o app passa de 3 pessoas; uso fora da avaliação pede a Company License.
 
 ## Pastas

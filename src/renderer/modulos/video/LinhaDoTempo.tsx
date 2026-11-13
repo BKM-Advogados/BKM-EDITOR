@@ -30,7 +30,8 @@ import {mudouEm} from '../../estado/agente';
 type BlocoP = {tipo: string; em: number; sai?: number; origem?: string; texto?: string; id?: string};
 type CenaP = {tipo: string; t_in: number; t_out: number; n?: number; titulo?: string; nome?: string; tag?: string; origem?: string; blocos?: BlocoP[]};
 type Legenda = {s: number; e: number; palavras: {w: string; s?: number; e?: number}[]};
-type PropsLt = {duracao_ms: number; cenas: CenaP[]; legendas?: Legenda[]; narracao?: {trechos: TrechoNarracao[]}; composicao?: string; audio?: AudioP | string};
+type PropsLt = {duracao_ms: number; cenas: CenaP[]; legendas?: Legenda[]; narracao?: {trechos: TrechoNarracao[]}; composicao?: string; audio?: AudioP | string;
+  acabamento?: {cartao?: {t_in: number; t_out: number}}}; // o cartão final do acabamento, depois da última cena (acabamento-video.ts)
 type ArrastoCena = {origem: string; x0: number; dms: number; dur: number};
 type Arrasto = {origem: string; modo: 'mover' | 'ini' | 'fim'; x0: number; dms: number; em: number; fim: number};
 
@@ -336,7 +337,7 @@ export const LinhaDoTempo: React.FC = () => {
     const cena = props.cenas.find((c) => a.origem.startsWith(`${c.origem}/`));
     if (!cena) return;
     const doc = loja.get().docs[documento]?.doc;
-    const b = valorEm(doc, a.origem) as {em?: number; sai?: number} | undefined;
+    const b = valorEm(doc, a.origem) as {em?: number; sai?: number; em_palavra?: string; sai_palavra?: string} | undefined;
     if (!b) return;
     const dur = cena.t_out - cena.t_in;
     const r50 = (v: number) => Math.round(v / 50) * 50;
@@ -352,6 +353,9 @@ export const LinhaDoTempo: React.FC = () => {
       const sai = Math.max(emRel + 100, Math.min(dur, r50(fimRel + a.dms)));
       patch = patchTrocar(doc, `${a.origem}/sai`, sai >= dur ? undefined : sai);
     }
+    // arrastar solta o bloco da palavra da fala (em_palavra, sai_palavra) na ponta que mudou; senão a palavra mandaria
+    const soltas = [...(a.modo !== 'fim' && b.em_palavra !== undefined ? ['em_palavra'] : []), ...(a.modo !== 'ini' && b.sai_palavra !== undefined ? ['sai_palavra'] : [])];
+    patch = [...patch, ...soltas.flatMap((k) => patchTrocar(doc, `${a.origem}/${k}`, undefined))];
     await aplicar(documento, patch, a.modo === 'mover' ? 'mover bloco no tempo' : a.modo === 'ini' ? 'onde o bloco entra' : 'onde o bloco sai');
   };
   const soltarCena = async () => {
@@ -439,6 +443,15 @@ export const LinhaDoTempo: React.FC = () => {
                 </div>
               );
             })}
+            {props.acabamento?.cartao && (
+              <div className="cena" style={{left: x(props.acabamento.cartao.t_in), width: Math.max(2, x(props.acabamento.cartao.t_out) - x(props.acabamento.cartao.t_in)),
+                background: 'var(--trilha-cena-a)', opacity: 0.6, fontStyle: 'italic'}}
+                title={`Cartão final · ${((props.acabamento.cartao.t_out - props.acabamento.cartao.t_in) / 1000).toLocaleString('pt-BR')} s (no inspetor do vídeo, em Marca no vídeo)`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  irPara(props.acabamento!.cartao!.t_in);
+                }}>Cartão final</div>
+            )}
           </div>
           {(faixas.length ? faixas : [[]]).map((faixa, fi) => (
             <div key={fi} className="trilha" onClick={buscar}>

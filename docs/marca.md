@@ -69,9 +69,14 @@ Camada nova (`textoNovo` e `formaNova`, em `camadas-novas.ts`) e o modelo de car
 - **A exportação da imagem espera** (imagem-D7): `aguardarFontes(nomes)` espera cada variante da família terminar de
   carregar, ou de falhar, antes do PNG e do PDF; antes só as três famílias do Google que a imagem conhecia (sem a
   Inter) eram esperadas e as de arquivo nunca.
-- **Seletor da imagem** (`opcoesDeFonte`, `comum.ts`): primeiro "Título do kit", "Texto do kit" e "Mono do kit"
-  (referências), depois as famílias do kit e do projeto (`fontes/`), as do app e a do sistema. Inclui a Inter, e a
-  fonte que a camada já usa entra sempre (imagem-D10).
+- **Seletor da imagem** (`opcoesDeFonte`, `comum.ts`; a lógica pura está em `nucleo/fontes-imagem.ts`, com testes em
+  `testes/fontes-imagem.test.ts`): em grupos, "Do kit" ("Título do kit", "Texto do kit" e "Mono do kit", as
+  referências), "Da marca" (as famílias de arquivo do kit e do projeto, em `fontes/`), "Do app" (as quatro fixas, com a
+  Inter) e "Sistema". Sem kit e sem fonte de arquivo, só "Do app" e "Sistema" (imagem-D10, imagem-D20).
+- **Fonte que sumiu** (imagem-D20): se a fonte gravada na camada não existe mais (kit trocado, arquivo apagado de
+  `fontes/`), o texto sai na Inter, na tela e no PNG/PDF (`familiaCss` põe a Inter atrás da família pedida e a
+  exportação espera a Inter carregar), e o seletor mostra o nome guardado no grupo "Guardada no documento", com
+  "não encontrada". Escolher outra fonte tira o aviso; o documento não é mudado sozinho.
 - **Fonte variável importada no kit** (imagem-D14): `peso_max` em `FonteArquivo` e `pesoMax` em `FonteDeArquivo`. O
   arquivo é lido (`fonte-variavel.ts`: tabela `fvar`, eixo `wght`, TTF/OTF/WOFF; o WOFF2 só pelo nome, "VariableFont"
   ou "[wght]") e a fonte entra no navegador com `font-weight: 100 900`, não presa no 400. Peso dito à mão vale um só.
@@ -205,7 +210,7 @@ Texto para o `claudeMd` do projeto (a coordenação junta em `criar-projeto.ts`)
 | `inserir_icone` | Insere um ícone como forma na página, na cor do kit (`@destaque`), com posição, tamanho, cor e traço opcionais. | `livre` |
 | `inserir_linha` | Insere linha ou seta do ponto (x1, y1) ao (x2, y2), com estilo, pontas, junção e setas opcionais; o ângulo vai em `rotacao`. | `livre` |
 | `fazer_lista` | Faz de um texto uma lista com marcadores ou numerada (um item por linha, recuo pendente) ou o volta a texto livre. | `livre` |
-| `aplicar_marca` (rodada 1) | Aplica um kit ao documento; na imagem, por papel. | `livre` |
+| `aplicar_marca` (rodada 1) | Aplica um kit ao documento; na imagem, por papel. No vídeo de cenas, `acabamento: true` liga também vinheta, rodapé e cartão final. | `livre` |
 
 Todas gravam no diário com o autor e têm Reverter; nenhuma lê a web nem traz arquivo de fora do projeto.
 
@@ -213,7 +218,16 @@ Todas gravam no diário com o autor e têm Reverter; nenhuma lê a web nem traz 
 
 Vídeo → imagem: o kit do projeto vale nos dois; "Mais opções → Marca" na tela inicial aplica em todos os documentos
 novos, e o painel Marca (menu → Marca…) aplica ao documento ativo de qualquer área. Imagem → vídeo: `aplicar_marca`
-com o `documento` do vídeo. Volta: Ctrl+Z desfaz o patch do kit (a troca é um patch só, no diário).
+com o `documento` do vídeo.
+
+## A marca no vídeo de cenas: vinheta, rodapé e cartão final
+
+O vídeo de cenas guarda o kit no `tema` (`logo`, `assinatura`, cores e fonte) e, no bloco opcional `acabamento`, liga a
+vinheta do logo, o rodapé com a marca, o cartão final e os efeitos sonoros (`docs/carrossel-narrado.md`). As peças são as
+do carrossel narrado (`src/composicoes/marca-video.tsx`) nas cores do kit: o destaque, as versões clara e profunda dele
+(35% para o branco e para o preto) e o texto do kit sobre o fundo do kit. O logo não leva efeito nem gira. Trocar de kit
+troca o que as peças mostram sem tocar no `acabamento`. `aplicar_marca {acabamento: true}` aplica o kit e liga vinheta,
+rodapé e cartão no mesmo patch; o modelo "Carrossel narrado" criado com um kit que tem logo ou assinatura já vem assim. Volta: Ctrl+Z desfaz o patch do kit (a troca é um patch só, no diário).
 
 ## Licenças desta frente
 

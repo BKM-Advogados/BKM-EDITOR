@@ -1,6 +1,6 @@
 # Pesquisa: fontes e fatos
 
-Versão 1, de 06/11/2026 (fase 1 da pesquisa no Estúdio). Liga a pesquisa jurídica do skill `pesquisa-juridica` ao
+Versão 1, de 06/11/2026 (fase 1 da pesquisa no Estúdio); leitura de PDF em 12/11/2026. Liga a pesquisa jurídica do skill `pesquisa-juridica` ao
 projeto: o Claude lê a fonte e registra o fato pelo MCP, o núcleo do app confere o que dá para conferir por programa e
 a pessoa vê tudo no painel Pesquisa.
 
@@ -10,8 +10,9 @@ nota vira aviso para a pessoa decidir. Nenhum dado da fonte é censurado, apagad
 ## O fluxo: o Claude pesquisa, o código prova, a pessoa vê
 
 1. **O Claude pesquisa.** Acha a fonte (catálogo do skill `pesquisa-juridica`) e chama `ler_fonte` com a url. O app
-   baixa a página, decodifica, limpa o HTML, grava o texto em `pesquisa/fontes/<id>.txt`, calcula o sha256 do texto
-   limpo, dá o nível pelo catálogo e anota as marcas de vigência. O Claude lê o texto (`texto_da_fonte`) e chama
+   baixa a página, decodifica, limpa o HTML (ou, se a url é um PDF, tira o texto da camada de texto do arquivo), grava o
+   texto em `pesquisa/fontes/<id>.txt`, calcula o sha256 do texto limpo, dá o nível pelo catálogo e anota as marcas de
+   vigência. O Claude lê o texto (`texto_da_fonte`) e chama
    `registrar_fato` com a afirmação e o trecho literal.
 2. **O código prova.** Para cada fato o núcleo procura o trecho no texto gravado (exato, parecido ou não encontrado),
    confere se todo número da afirmação aparece no trecho (em algarismo ou por extenso) e olha as marcas de vigência a
@@ -28,7 +29,7 @@ nota vira aviso para a pessoa decidir. Nenhum dado da fonte é censurado, apagad
 | Arquivo | O que é | Git |
 |---|---|---|
 | `pesquisa/pesquisa.json` | `{formato: 1, fontes: Fonte[], fatos: Fato[]}` | sim |
-| `pesquisa/fontes/<fonte_id>.txt` | texto limpo de cada fonte, UTF-8, como foi baixado | não (`.gitignore`: `pesquisa/fontes/`) |
+| `pesquisa/fontes/<fonte_id>.txt` | texto limpo de cada fonte, UTF-8, como foi baixado (do PDF, o texto da camada de texto, com `\f` entre as páginas) | não (`.gitignore`: `pesquisa/fontes/`) |
 | `pesquisa/dossie.md` | rascunho do skill `pesquisa-juridica` (lacunas, contexto); continua valendo | sim |
 
 A pasta `pesquisa/` nasce no primeiro uso. Ela **não** é um documento do manifesto (`estudio.json` não muda e o tipo
@@ -44,6 +45,8 @@ type Fonte = {
   url: string; url_final?: string; titulo?: string; orgao?: string;
   nivel: NivelFonte; catalogo?: string;   // id da entrada do catálogo que casou pelo host
   acessado_em: string; http?: number; bytes?: number;
+  tipo?: 'html' | 'texto' | 'pdf'; // o que veio da url; sem o campo, fonte lida antes de 12/11/2026
+  paginas_pdf?: number;    // só no PDF: páginas do arquivo
   sha256: string;          // do texto limpo normalizado
   arquivo: string;         // pesquisa/fontes/<id>.txt
   sinais_vigencia: string[];
@@ -101,6 +104,24 @@ metades e duplicar copia. Um id em `refs` que não existe na pesquisa é só um 
 - **Limpar o HTML:** tira `<script>`, `<style>` e comentários; fim de parágrafo, item, linha de tabela e título vira
   quebra de linha; entidades decodificadas. O texto **riscado** (`<strike>`, `<s>`, `<del>`, `line-through`) é mantido,
   entre "[riscado: " e "]".
+- **Ler o PDF** (`src/nucleo/pdf-texto.ts`): quando o Content-Type diz PDF ou os bytes começam com `%PDF`. Lê a camada
+  de texto do arquivo, **sem OCR**. Uma linha do texto para cada linha do PDF; linha em branco onde o espaço entre linhas
+  passa de 1,6 vez o espaço mais comum da página (parágrafo); `\f` (quebra de página, como no `pdftotext`) entre as
+  páginas. Na conferência do trecho a quebra de linha, a linha em branco e o `\f` valem um espaço só (o `\f` é espaço
+  para o `normalizar`), então um trecho que atravessa linha ou página continua exato, e o sha256 é calculado do mesmo
+  jeito que no HTML. Duas arrumações para o trecho copiado do PDF casar:
+  - **palavra partida no fim da linha** ("Previdên-" + "cia") volta inteira na linha de cima, com a pontuação colada.
+    Só junta quando a linha de baixo começa com minúscula. O hífen fica quando o próprio documento escreve a palavra com
+    hífen em outro lugar numa linha só ("auxílio-doença"); senão sai. O hífen invisível (U+00AD) sempre sai;
+  - **cabeçalho e rodapé repetidos:** a mesma linha (até 160 caracteres, números trocados por `#`) nas 2 primeiras ou 2
+    últimas linhas de pelo menos metade das páginas, a partir de 3 páginas. Fica uma vez só: o cabeçalho na primeira
+    página e o rodapé na última (o texto continua tendo os dois; só a repetição sai). O `ler_fonte` devolve um exemplo
+    de cada em `repetidos_do_pdf`.
+  
+  PDF sem texto nenhum (digitalizado, só imagem) dá erro e não grava nada: "o PDF tem N páginas e nenhum texto: parece
+  digitalizado (só imagem), e o Estúdio não faz OCR". PDF com senha ou que não abre também dá erro. PDF com algumas
+  páginas só de imagem (o anexo digitalizado de uma decisão) é gravado com o que tem texto, e o `aviso` diz quais
+  páginas não foram lidas. O título vem do `Title` do PDF, quando há.
 - **Decodificar:** charset do cabeçalho HTTP; senão o `<meta charset>` dos primeiros 4 KB; senão UTF-8 se os bytes
   forem UTF-8 válido; senão windows-1252, o padrão dos sites antigos de governo (o Planalto é um deles). Quando o
   charset declarado é UTF-8 e os bytes não são UTF-8 válido (site que declara UTF-8 e manda windows-1252), vale o
@@ -111,7 +132,7 @@ metades e duplicar copia. Um id em `refs` que não existe na pesquisa é só um 
 
 | Ferramenta | Entrada | Faz |
 |---|---|---|
-| `ler_fonte` | `url`, `observacao?`, `titulo?` | baixa, limpa, grava o texto, sha256, nível, vigência; devolve a fonte, os 3.000 primeiros caracteres, quantas páginas de 6.000 há e um `aviso` quando o texto parece página de bloqueio ou é curto demais. Url repetida atualiza a mesma fonte (mesmo id, `acessado_em` novo); se o texto mudou, os fatos dela são procurados de novo no texto novo (`fatos_reconferidos`) e o texto antigo fica em `pesquisa/fontes/<id>.<8 primeiros do sha256 antigo>.txt` (`texto_anterior`) |
+| `ler_fonte` | `url`, `observacao?`, `titulo?` | baixa, limpa (HTML) ou tira o texto (PDF), grava o texto, sha256, nível, vigência, `tipo` (`html`, `texto` ou `pdf`) e, no PDF, `paginas_pdf`; devolve a fonte, os 3.000 primeiros caracteres, quantas páginas de 6.000 há, `repetidos_do_pdf` quando tirou cabeçalho ou rodapé repetido e um `aviso` quando o texto parece página de bloqueio, é curto demais ou tem página de PDF sem texto. PDF só de imagem dá erro e não grava nada. Url repetida atualiza a mesma fonte (mesmo id, `acessado_em` novo); se o texto mudou, os fatos dela são procurados de novo no texto novo (`fatos_reconferidos`) e o texto antigo fica em `pesquisa/fontes/<id>.<8 primeiros do sha256 antigo>.txt` (`texto_anterior`) |
 | `anotar_fonte` | `fonte_id`, `observacao` | acrescenta à observação, com data e autor; nunca apaga o que havia |
 | `registrar_fato` | `afirmacao`, `fonte_id`, `trecho`, `localizador?`, `nota?` | confere trecho, dígitos e vigência e grava o fato; nunca recusa (fonte fora da pesquisa ou sem o texto na pasta: grava como não encontrado, com `aviso`) |
 | `listar_pesquisa` | `fonte_id?` | fontes (sem o texto) e fatos; com `fonte_id`, só aquela fonte e os fatos dela |
@@ -205,6 +226,30 @@ O script da medição só lê (gabarito e textos da fase 0) e chama `acharTrecho
   interface por perto de 0,2 a 0,3 s (limpeza, busca do trecho e leitura e gravação síncronas de uns 650 KB). A rede é
   assíncrona. Mover a conferência para um worker fica para depois.
 
+### PDF (12/11/2026)
+
+- **Sem OCR.** PDF digitalizado (só imagem) dá erro; página só de imagem no meio de um PDF com texto fica de fora, com
+  `aviso`. Texto desenhado como curvas (sem fonte) também não é texto para o PDF e não sai.
+- **Ordem de leitura é a do arquivo.** O pdf.js entrega o texto na ordem em que o PDF o desenha. Página em duas colunas
+  (Diário Oficial, alguns acórdãos) costuma vir coluna por coluna, mas um PDF montado fora de ordem sai fora de ordem, e
+  o trecho que atravessa a coluna pode não sair `exato`. Tabela vira uma linha por linha da tabela, com as células
+  separadas por espaço. Nota de rodapé fica onde está na página (no pé, antes do texto da página seguinte), então um
+  trecho que atravessa a página onde há nota de rodapé no meio cai para `nao`.
+- **Hífen:** a regra (junta quando a linha de baixo começa com minúscula; o hífen fica se o documento escreve a palavra
+  com hífen em outro lugar) erra em palavra composta partida no hífen que aparece uma vez só no documento
+  ("auxílio-" + "doença" vira "auxíliodoença"). Nome próprio e sigla depois do hífen (linha de baixo com maiúscula) não
+  juntam. Quem copia o trecho do PDF aberto no navegador traz o hífen do fim da linha ("Previdên- cia"), e esse trecho
+  não casa nem como `parecido`: o trecho vem de `texto_da_fonte`, não do PDF aberto.
+- **Cabeçalho e rodapé:** só a partir de 3 páginas, só nas 2 primeiras e 2 últimas linhas de cada página e só a linha
+  que se repete em pelo menos metade delas. Cabeçalho que varia mais que os números (o nome da parte em cada página, a
+  data por extenso) fica; linha de assinatura do PJe com mais de 160 caracteres fica. A linha com a mesma cara no meio
+  das páginas (uma lista numerada) é texto e não sai.
+- **Marcas de vigência no PDF** são as mesmas do HTML, procuradas no texto. O riscado não existe no PDF como marca: o
+  texto riscado de uma lei compilada em PDF sai como texto comum, sem "[riscado: ]".
+- **Tempo:** num PDF de 300 páginas e 1,4 milhão de caracteres (gerado no teste), a extração levou uns 1,2 a 1,5 s; o
+  `hashTexto` uns 80 ms e o `acharTrecho` sem achar uns 0,4 s. O pdf.js roda no processo principal, sem worker, mas a
+  leitura é assíncrona por página.
+
 ## Notas de implementação
 
 Decisões que vão além do texto do contrato da fase 1, para quem revisa:
@@ -235,14 +280,30 @@ Decisões que vão além do texto do contrato da fase 1, para quem revisa:
   está antes de `</body>`, não depois de `</html>`; o fixture guarda a posição real e o teste do hash cobre as duas.
 - **`ler_fonte`:** HTTP 400 ou mais não grava fonte: devolve erro com o status e os 200 primeiros caracteres da resposta
   ("Acesso Negado!"), para o Claude procurar outro caminho; o status é conferido antes de tudo, então um 403 que devolve
-  PDF diz "HTTP 403". PDF com 200 dá erro claro (o Estúdio ainda não lê PDF). `text/plain` é gravado como veio. Página
+  PDF diz "HTTP 403". PDF com 200 é lido pela camada de texto (veja "Ler o PDF" e a biblioteca abaixo); só o PDF sem
+  texto nenhum, com senha ou estragado dá erro, e nada é gravado. `text/plain` é gravado como veio. Página
   de bloqueio com HTTP 200 ("Request Rejected" do F5) vira fonte, porque a pesquisa só mostra, mas o retorno traz um
   `aviso`. A url repetida mantém o id, o autor original e a observação; uma observação nova entra como linha
   acrescentada. Toda linha da observação tem o carimbo `dd/mm/aaaa hh:mm · autor: texto` (hora local), também no
   `anotar_fonte`. Quando o texto relido muda (outro sha256), cada fato da fonte é procurado de novo: `achado`, `inicio`,
   `fim`, `vigencia` e `estado` saem do texto novo; afirmação, trecho e dígitos ficam. O texto antigo não é apagado:
   antes de gravar o novo, `Projeto.guardarVersaoTextoFonte` o renomeia para `<id>.<sha8>.txt` (também fora do git), e o
-  retorno traz `texto_anterior` com o caminho.
+  retorno traz `texto_anterior` com o caminho. Tudo isso vale igual para o PDF: o hash é do texto extraído normalizado
+  (o mesmo texto em PDF e em `.txt`, com linha em branco no lugar do `\f`, dá o mesmo sha256) e a regravação, os fatos
+  reconferidos e o texto anterior seguem o mesmo caminho do HTML.
+- **A biblioteca do PDF: `unpdf` 1.9.1** (MIT, uns 2,2 MB instalada; põe de 1,7 a 2,4 MB no pacote do processo
+  principal e no do MCP). É o pdf.js da Mozilla (Apache-2.0, a 6.4.299 dentro dela) num arquivo só, feito para rodar fora do
+  navegador, sem worker e sem binário nativo: o `pdf-lib` que o projeto já tinha só escreve PDF, não extrai texto. O
+  `pdfjs-dist` direto pesaria 37 MB, pede um worker que no Node vira `import()` dinâmico de outro arquivo (ruim de
+  empacotar com o esbuild do MCP e o Vite do processo principal) e pede Node 22.13 ou mais novo. Escolhida a 1.9.1 (19/10/2026) e não a 2.x, que tinha duas semanas de vida.
+  O `@napi-rs/canvas` (nativo) é dependência opcional do `unpdf` só para desenhar páginas: não é instalado nem usado.
+  Só `src/nucleo/pdf-texto.ts` importa o `unpdf`; a interface não. Cuidados: o pdf.js avisa por `console.log`, e no MCP
+  por stdio a saída padrão é o protocolo, então ele roda com `verbosity: 0`; ele toma posse do buffer que recebe, então
+  recebe uma cópia; o `unpdf` põe um `DOMMatrix` mínimo em `globalThis` quando não há um (o Node não tem), para o pdf.js
+  carregar. No pacote do Vite o pdf.js sai num pedaço à parte (`pdfjs-*.js`, ao lado do `main.js`), carregado na
+  primeira leitura de PDF; no MCP por stdio, dentro do `nucleo.cjs`. Conferido em 12/11: o pacote do esbuild do MCP
+  roda no Node 24 e no Node do Electron 42 (`ELECTRON_RUN_AS_NODE`) sem escrever nada na saída padrão, e o Vite do
+  processo principal gera o pedaço `pdfjs-*.js` com `require("./pdfjs-….js")`.
 - **`registrar_fato` nunca recusa um fato.** Fonte que não está na pesquisa ou sem o texto na pasta (clone sem
   `pesquisa/fontes/`) ou trecho vazio: grava com `achado: "nao"` (e, nos dois primeiros casos, devolve um `aviso`).
   A afirmação continua obrigatória (sem ela não há fato; vazia, o erro diz "afirmacao vazia: diga o que o trecho
@@ -273,12 +334,17 @@ Decisões que vão além do texto do contrato da fase 1, para quem revisa:
   marcas de vigência aparecem pelo rótulo do mapa `ROTULO_VIGENCIA` do painel (pesquisa.ts guarda o pedaço procurado,
   como "(Revogad"; marca nova sem rótulo sai sem o parêntese), o filtro também acha pelo rótulo, e o cartão de fato com
   marca leva uma linha discreta: "marca de vigência perto do trecho: leia a fonte; a marca sozinha não diz se o trecho
-  vale".
-- **Prévia web:** `scripts/previa-web/ponte.ts` traz uma pesquisa de exemplo (f1 Planalto, f2 Câmara; F1 trecho confere, F2 com
-  dígito faltando, F3 parecido) e o primeiro bloco do vídeo novo já cita `F1`. Na worktree a prévia dá 403 nas fontes de
+  vale". A fonte em PDF leva o selo "PDF" ao lado do nível, o rodapé do cartão diz "PDF de N páginas" e, no texto,
+  cada `\f` vira uma linha discreta "página N do PDF" (o cabeçalho do texto diz em que página do PDF a fatia de 6.000
+  caracteres começa); a marca do trecho atravessa essa linha. Fonte lida antes desta versão não tem `tipo` e aparece
+  como antes.
+- **Prévia web:** `scripts/previa-web/ponte.ts` traz uma pesquisa de exemplo (f1 Planalto, f2 Câmara, f3 PDF do TST de
+  duas páginas; F1 trecho confere, F2 com dígito faltando, F3 parecido, F4 atravessando a quebra de página do PDF) e o
+  primeiro bloco do vídeo novo já cita `F1`. Na worktree a prévia dá 403 nas fontes de
   `node_modules` (a junção aponta para fora da raiz do Vite, `server.fs.allow`); não afeta o painel.
 - **Não conferido:** o `net.fetch` do Electron no app de verdade (os testes usam o `fetch` do Node contra 127.0.0.1) e o
-  painel no app empacotado. A janela só abre `https://` pelo `setWindowOpenHandler`; o `abrirFonte` aceita também
+  painel no app empacotado. Do PDF: o app empacotado lendo um PDF de verdade (só o pacote do MCP e o build do Vite
+  foram conferidos) e PDFs reais de tribunal e do Diário Oficial (os testes geram os PDFs com o `pdf-lib`). A janela só abre `https://` pelo `setWindowOpenHandler`; o `abrirFonte` aceita também
   `http://`, como pede o contrato.
 - **Para depois:** `pesquisa.ts` importa `node:crypto` (só `hashTexto`), e `regras.ts` importa `numerosDe` de
   `pesquisa.ts`; a interface importa os dois só com `import type`. Se o painel precisar rodar `checarTexto` ou

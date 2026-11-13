@@ -8,7 +8,7 @@ cada página) e `src/main/exportar-paginas.ts` (PNG por página e PDF). Testes e
 ## Formato
 
 O documento de imagem ganhou `paginas`. Cada página tem `id`, `nome` e as suas `camadas` (imagem, texto, forma, de
-baixo para cima, como antes). `largura`, `altura`, `fundo` e `efeitos` são do documento e valem para todas as páginas:
+baixo para cima, como antes). `largura`, `altura`, `fundo` e `efeitos` são do documento e valem para todas as páginas (o fundo pode ser próprio de uma página, abaixo):
 um carrossel tem um tamanho só (1080×1350 para o feed 4:5, 1080×1080 para o quadrado; os tamanhos de
 `src/nucleo/formatos.ts`).
 
@@ -126,7 +126,7 @@ num carrossel sai só o fundo. Ao integrar com o diálogo de exportação (sess�
 
 Sombra, contorno, degradê, máscara de recorte e remover fundo (rodada 2, `docs/imagem.md`) valem em qualquer página:
 são campos da camada, e os caminhos levam a página (`/paginas/2/camadas/1/sombra`). O fundo em degradê
-(`fundo_degrade`) é do documento, como o `fundo`: vale em todas as páginas. As miniaturas da barra mostram o
+(`fundo_degrade`) é do documento, como o `fundo`: vale em todas as páginas que não têm fundo próprio (`paginas[i].fundo` e `paginas[i].fundo_degrade`, ver `docs/imagem.md`). As miniaturas da barra mostram o
 acabamento; o "Exportar carrossel" e o PDF saem com ele, pelo mesmo canvas da prévia.
 
 ## Limites conhecidos

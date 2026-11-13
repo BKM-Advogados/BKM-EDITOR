@@ -8,10 +8,10 @@
 import {copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import jsonpatch, {type Operation} from 'fast-json-patch';
-import type {DocImagem, EntradaDocumento, Manifesto, Modulo} from './documentos';
+import type {DocImagem, EntradaDocumento, Manifesto, Modulo, OperacaoPatch} from './documentos';
 import {novoDoc3d} from './cena3d';
 import {novoDocCenas} from './cenas';
-import {modeloCarrosselNarrado} from './modelo-carrossel-narrado';
+import {modeloCarrosselNarrado, patchDoModeloComMarca} from './modelo-carrossel-narrado';
 import {novaAnimacao, modeloAnimacaoLogoPixel} from './animacao';
 import {novaMusica} from './musica'; // frente Música
 import {EFEITOS} from './efeitos';
@@ -147,9 +147,11 @@ const secaoPesquisa = () => [
   '`pesquisa/pesquisa.json` e aparece no painel Pesquisa do app; você a grava pelas ferramentas abaixo, nunca à mão.',
   '',
   '1. **Ler a fonte.** `ler_fonte` {url, observacao?, titulo?} baixa a página, guarda o texto limpo, o sha256, o nível pelo',
-  '   catálogo e as marcas de vigência, e devolve a fonte (`f1`, `f2`…) com o começo do texto. `texto_da_fonte` {fonte_id,',
-  '   pagina? ou inicio? e fim?} lê o resto, 6.000 caracteres por página. `anotar_fonte` {fonte_id, observacao} acrescenta',
-  '   à observação da fonte (a "observação de quem baixou": contexto, ressalva, de onde veio); nunca apaga o que havia.',
+  '   catálogo e as marcas de vigência, e devolve a fonte (`f1`, `f2`…) com o começo do texto. PDF também: o texto sai da',
+  '   camada de texto do arquivo, com `\\f` entre as páginas; PDF digitalizado (só imagem) dá erro, porque não há OCR.',
+  '   `texto_da_fonte` {fonte_id, pagina? ou inicio? e fim?} lê o resto, 6.000 caracteres por página. `anotar_fonte`',
+  '   {fonte_id, observacao} acrescenta à observação da fonte (a "observação de quem baixou": contexto, ressalva, de onde',
+  '   veio); nunca apaga o que havia.',
   '2. **Fontes por nível.** Regra jurídica só com fonte de nível 1: Planalto (lei compilada), Câmara, Senado, LexML, Diário',
   '   Oficial da União, TST, STF, STJ, TRT-3, CNJ/DJEN. Governo e agências (MTE, gov.br, Agência Brasil, Agência Senado e',
   '   Câmara) são nível 2 e servem para notícia e contexto. Fora do catálogo vira nível 0. Fato de empresa ou de setor:',
@@ -215,8 +217,8 @@ export const linhasDaImagem = (): string[] => [
   '  Acabamento por camada: `sombra` {cor, opacidade, desfoque, x, y}; `contorno` {cor, espessura, posicao: `fora`,',
   '  `centro` ou `dentro`}; `degrade` {`tipo` (`linear` ou `radial`), `angulo` (180 = de cima para baixo), `centro` {x, y},',
   '  `paradas` [{cor, posicao de 0 a 1, opacidade}]}, no lugar da cor em texto e forma. `fundo_degrade`, na raiz do',
-  '  documento, vai por cima do `fundo` em todas as páginas. Foto dentro de forma ou texto: na camada de imagem, `mascara`',
-  '  é o id da forma ou do texto logo acima dela. `remover_fundo` troca o `src` pelo recorte e guarda o original em',
+  '  documento, vai por cima do `fundo` em todas as páginas; uma página pode ter `fundo` e/ou `fundo_degrade` próprios.',
+  '  Foto dentro de forma ou texto: na camada de imagem, `mascara` é o id da forma ou do texto logo acima dela. `remover_fundo` troca o `src` pelo recorte e guarda o original em',
   '  `src_original`. A pessoa exporta PNG por página e PDF pelo app; o MCP não exporta.',
 ];
 
@@ -310,6 +312,9 @@ export const guiaDoProjeto = (modulos: Modulo[], arquivo: ArquivoDeGuia = 'CLAUD
       '  `lista` usa `itens` (lista de textos, entram um a um); `numero` conta de `de` até `ate`, com `prefixo`, `sufixo` e',
       '  `rotulo`; `imagem` usa `src` (caminho em `midia/`) e `ajuste` (`cobrir` ou `conter`). `alinhar`: esquerda, centro',
       '  ou direita. Ids novos não podem repetir os que já existem.',
+      '  Bloco preso à fala: `em_palavra` (e `sai_palavra`) "palavra@ms" faz o bloco entrar na primeira palavra transcrita da',
+      '  cena que começa com `palavra` a partir de `ms` (contado do começo da cena); "palavra$@ms" usa o fim dela e',
+      '  "palavra@ms+120" desloca. Sem legendas na cena ou sem achar a palavra, vale `em`/`sai` e o patch devolve um aviso.',
       '  Som (opcional): `audio.faixas[]`, cada faixa com `id`, `nome`, `papel` (`voz`, `musica` ou `efeitos`), `volume` (0 a 1),',
       '  `mudo` e, na música, `ducking` {ativo, alvo_lu (quanto fica abaixo da voz; padrão 20), ataque_ms, soltura_ms}; cada',
       '  `clipes[]` com `id`, `arquivo` (em `midia/`), `em` (ms na linha do tempo), `duracao_ms`, `corte_ms`, `volume`,',
@@ -335,7 +340,14 @@ export const guiaDoProjeto = (modulos: Modulo[], arquivo: ArquivoDeGuia = 'CLAUD
       '  em linguagem natural), `velocidade` (só google-tts, 0,25 a 2), `folga_ms` (a fala entra depois do começo da cena;',
       '  padrão 300), `margem_ms` (padrão 500) e `pronuncias` [{de, para}], o dicionário aplicado antes da voz (ex.: RH →',
       '  erre agá). A fala gerada é um WAV em `midia/narracao/<hash>.wav` num clipe de voz com `narracao_ia` {cena, hash}:',
-      '  não escreva `narracao_ia` nem esses clipes à mão; use `narrar`.',
+      '  não escreva `narracao_ia` nem esses clipes à mão; use `narrar`. O trecho de uma gravação inteira dividida nas cenas',
+      '  é um clipe com `narracao_gravada` {cena} (`dividir_narracao`); a cena com ele não vai à IA sem ser pedida.',
+      '  Acabamento (opcional): `acabamento` {`nome`, `vinheta` {`ligada`, `duracao_ms`}, `rodape` {`ligado`},',
+      '  `cartao_final` {`ligado`, `titulo`, `aviso`, `duracao_ms`}, `sons` {`ligados`, `volume`}}. A vinheta mostra o logo do',
+      '  kit (`tema.logo`; sem ele, `nome` ou `tema.assinatura`) por cima do começo da primeira cena; o rodapé, o nome e a',
+      '  assinatura durante as cenas, fora das zonas da rede e da legenda; o cartão final vem depois da última cena (o vídeo',
+      '  fica mais longo); `sons` toca os efeitos de `midia/sfx/` (whoosh, pop, swell), baixos e sob a voz. Grave o bloco',
+      '  inteiro em `/acabamento` por `aplicar_patch`; `aplicar_marca {acabamento: true}` liga vinheta, rodapé e cartão.',
     );
   }
   if (tem('imagem')) linhas.push(...linhasDaImagem());
@@ -405,7 +417,7 @@ export const guiaDoProjeto = (modulos: Modulo[], arquivo: ArquivoDeGuia = 'CLAUD
     '`listar_midia` mostra os arquivos de `midia/` e onde são usados; `marcar_midia` marca uma tomada como boa ou descartada.',
     // frente 2 (mcp-projeto.ts e mcp-marca-edicao.ts)
     '`importar_midia` traz um arquivo do computador para `midia/` (pede a permissão da pessoa); `renomear_documento` muda o\n   título de um documento; `marcar_ponto_de_restauracao` cria um ponto de restauração (o Ctrl+S) antes de mudança grande.',
-    '`listar_marcas` mostra os kits de marca da pessoa; `criar_marca`, `editar_marca`, `importar_logo_marca` e\n   `importar_fonte_marca` mudam esses kits, fora do projeto e sem Reverter (pedem a permissão dela).\n   `salvar_como_modelo` guarda o projeto (ou um documento) como modelo da pessoa, em Novo na tela inicial (também pede).',
+    '`listar_marcas` mostra os kits de marca da pessoa; `criar_marca`, `editar_marca`, `importar_logo_marca` e\n   `importar_fonte_marca` mudam esses kits, fora do projeto e sem Reverter (pedem a permissão dela).\n   `salvar_como_modelo` guarda o projeto (ou um documento) como modelo da pessoa, em Novo na tela inicial (também pede);\n   `listar_modelos` mostra os modelos dela, e `criar_projeto {modelo_proprio}` cria um projeto novo a partir de um deles.',
     '`criar_projeto`, `abrir_projeto`, `duplicar_projeto` e `fechar_projeto` existem no Claude Desktop e na IDE. Numa conversa\n   dentro do app elas não aparecem (trocar de projeto fecharia a conversa): peça à pessoa para fazer pela tela.',
     '`guia_do_projeto` devolve este guia, se você não o recebeu.',
     '`ler_plano`, `escrever_plano` e `aprovar_plano` cuidam do Plano do vídeo de um pedido novo (seção acima).',
@@ -413,7 +425,7 @@ export const guiaDoProjeto = (modulos: Modulo[], arquivo: ArquivoDeGuia = 'CLAUD
   if (tem('video') || tem('imagem') || tem('animacao')) passos.push('`aplicar_marca` troca o kit de marca (cores, fonte, logo e fontes próprias) de um documento.');
   if (tem('video')) {
     passos.push('`transcrever` transcreve a fala no próprio PC: grava `<arquivo>.palavras.json` e, no vídeo de cenas, gera as\n   legendas que faltam. `ler_legendas` mostra as legendas nos tempos da tela e `editar_legenda` corrige texto e tempo.\n   `exportar_legendas` grava SRT e VTT em `saidas/`; `importar_legendas` lê um SRT ou VTT do projeto.');
-    passos.push('Narração por IA: escreva `cenas[i].narracao.texto`, ajuste a voz com `configurar_narracao` e as pronúncias com\n   `pronuncias_narracao`; mostre à pessoa `narrar` com `previa: true` (texto final e custo, sem gastar) e depois\n   gere com `narrar` (cache: só a cena que mudou vai ao Google). `ajustar_cenas_a_fala` faz a cena durar a fala;\n   `transcrever`, depois, cria as legendas.');
+    passos.push('Narração por IA: escreva `cenas[i].narracao.texto`, ajuste a voz com `configurar_narracao` e as pronúncias com\n   `pronuncias_narracao`; mostre à pessoa `narrar` com `previa: true` (texto final e custo, sem gastar) e depois\n   gere com `narrar` (cache: só a cena que mudou vai ao Google). `ajustar_cenas_a_fala` faz a cena durar a fala;\n   `transcrever`, depois, cria as legendas. Narração gravada inteira (um áudio só): `transcrever {arquivo}` e depois\n   `dividir_narracao`, primeiro com `previa: true` (mostre os cortes à pessoa); cada cena passa a tocar o trecho dela.');
     passos.push('`propor_cortes_fala` propõe tirar pausas longas e "ãh" de um clipe de voz e `aplicar_cortes_fala` grava a\n   narração emendada (as legendas vão junto). `preparar_teleprompter` grava o texto que a pessoa lê ao gravar.');
     passos.push('Som: `adicionar_clipe_audio` põe um áudio do projeto numa faixa; `dividir_clipe`, `copiar_clipe` e `crossfade`\n   editam os clipes. `listar_trilhas` mostra a pasta de trilhas da pessoa e `escolher_trilha` traz uma para o vídeo\n   (pede a permissão dela); `creditos_das_musicas` dá os créditos que as licenças pedem.');
     passos.push('`medir_loudness` mede o som do vídeo como o render vai soar (LUFS da mistura contra o alvo, a voz e quanto a\n   música fica abaixo dela). `medir_envelope` mede um áudio novo (duração e forma de onda), o que a tela faz ao ver o\n   arquivo: chame com o app fechado. `limpar_voz` limpa a voz de um clipe sem tocar no original (`voltar: true` desfaz).');
@@ -551,7 +563,10 @@ export type OpcoesProjeto = {nome: string; modelo: IdModelo; formato?: Formato |
 /** `copiar` traz arquivos de fora do projeto (logo e fontes do kit de marca): `de` absoluto, `para` relativo ao projeto.
  *  `acrescentarAoClaudeMd` vai no fim do CLAUDE.md copiado do exemplo (a seção "Pesquisa"), se ele ainda não a tiver. */
 export type Plano = {manifesto: Manifesto; arquivos: Record<string, string>; pastas: string[]; copiarDoExemplo?: string[]; copiar?: {de: string; para: string}[];
-  acrescentarAoClaudeMd?: string};
+  acrescentarAoClaudeMd?: string;
+  /** O que um kit de marca com logo ou assinatura acrescenta a um documento (caminho → patch), depois do tema: o modelo
+   *  "Carrossel narrado" ganha a cena de abertura e o acabamento ligado (modelo-carrossel-narrado.ts). */
+  comMarca?: Record<string, OperacaoPatch[]>};
 
 /** O projeto de exemplo inteiro (exemplo.ts) com o nome novo; `gravarPlano` copia a pasta dele. */
 export const planoDoExemplo = (nome: string): Plano => ({
@@ -585,6 +600,7 @@ export const planoDoProjeto = (o: OpcoesProjeto): Plano => {
       manifesto,
       arquivos: {'estudio.json': serializar(manifesto), [entrada.caminho]: serializar(modeloCarrosselNarrado()), '.gitignore': GITIGNORE, 'CLAUDE.md': claudeMd(['video'])},
       pastas,
+      comMarca: {[entrada.caminho]: patchDoModeloComMarca()},
     };
   }
   const vazio: Manifesto = {formato: 1, nome, documentos: []};
@@ -611,7 +627,8 @@ export const aplicarMarcaAoPlano = (plano: Plano, marca: MarcaLida, existe: (p: 
     const texto = plano.arquivos[e.caminho];
     if (!texto) continue;
     const doc = JSON.parse(texto) as unknown;
-    const patch = patchDaMarca(doc, marca, tema);
+    const extra = tema.logo || tema.assinatura ? plano.comMarca?.[e.caminho] ?? [] : []; // sem logo nem assinatura, não há o que assinar
+    const patch = [...patchDaMarca(doc, marca, tema), ...extra];
     if (patch.length) plano.arquivos[e.caminho] = serializar(jsonpatch.applyPatch(doc, patch as Operation[], true, false).newDocument);
   }
   if (copiar.length) plano.copiar = [...(plano.copiar ?? []), ...copiar];

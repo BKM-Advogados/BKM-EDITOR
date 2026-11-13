@@ -141,7 +141,9 @@ Reverter. Dois provedores:
   - `sem_texto`;
   - `pendente` ("a gerar"): tem texto e não tem fala;
   - `gerada`: o hash do clipe é o do texto e da voz de agora, e o arquivo existe;
-  - `desatualizada`: o texto, as pronúncias, a voz ou o estilo mudaram, ou o WAV sumiu.
+  - `desatualizada`: o texto, as pronúncias, a voz ou o estilo mudaram, ou o WAV sumiu;
+  - `gravada`: a cena toca um trecho da narração gravada inteira (seção abaixo) e não tem fala gerada. Não vai à IA sem ser
+    pedida pelo número; pedida, a fala gerada entra junto e o `narrar` avisa para silenciar ou tirar uma das duas.
 - Os WAVs caem na regra de mídia pesada do `.gitignore` do projeto (`midia/**/*.wav`). Depois de clonar o projeto noutro PC,
   as cenas aparecem desatualizadas, e `narrar` gera de novo (com custo).
 
@@ -225,6 +227,7 @@ A chave nunca aparece numa mensagem, porque o texto passa por `replaceAll(chave,
 | `pronuncias_narracao` | `{definir?: [{de, para}], tirar?: [de], testar?, documento?}`; sem nada, só lê | livre |
 | `narrar` | `{cenas?, previa?, refazer?, documento?}` | cartão (`openWorldHint`); com `previa: true` roda direto (`livreSe` em `portao.ts`) e não sai do PC |
 | `ajustar_cenas_a_fala` | `{cenas?, margem_ms?, apenas_alongar?, documento?}` | livre |
+| `dividir_narracao` | `{arquivo?, clipe?, previa?, cortes?, margem_corte_ms?, margem_ms?, documento?}` | livre (`src/nucleo/mcp-narracao-inteira.ts`; seção "Narração gravada inteira") |
 
 - `cenas` aceita o id ou o número da cena ("2").
 - `narrar` com `previa: true` devolve, sem chamar a API:
@@ -241,6 +244,65 @@ A chave nunca aparece numa mensagem, porque o texto passa por `replaceAll(chave,
   4. `narrar`;
   5. `ajustar_cenas_a_fala`;
   6. `transcrever`.
+
+## Narração gravada inteira (Onda B)
+
+Quem grava a fala do vídeo de uma vez, num áudio só, divide a gravação nas cenas pela transcrição. O núcleo é
+`src/nucleo/narracao-inteira.ts` (puro: a tela e o MCP fazem a mesma conta).
+
+**A proposta** (`proporDivisao`) recebe as palavras transcritas (`[{w, s, e}]` em ms do arquivo, o `<arquivo>.palavras.json`
+do `transcrever`) e as cenas com o texto falado delas:
+
+- **Com texto** (`cenas[i].narracao.texto`): o texto de todas as cenas, em ordem, é alinhado às palavras (Needleman-Wunsch
+  global, sem diferença de acento, caixa e pontuação; a palavra parecida, com semelhança de 70% ou mais, vale como a
+  mesma; as pausas `[pausa]` e o destaque `**` saem antes). Palavra falada fora do texto custa metade da palavra do texto
+  que não foi falada: quem grava improvisa ("Oi, gente" no começo fica na primeira cena). A cena sem texto entra no
+  alinhamento como um coringa que engole a fala dela.
+- **A fronteira entre duas cenas com texto** cai na maior pausa até duas palavras para cada lado do ponto que o
+  alinhamento achou (a pausa depois de ponto final vale 300 ms a mais; a de vírgula, 100), pagando 400 ms por palavra
+  alinhada que muda de cena. Assim a fronteira dentro de uma frase, sem pausa longa, sai do texto.
+- **Sem texto:** os cortes caem nas pausas mais longas, até o número de cenas. Pausa de menos de 250 ms não vira corte:
+  se a gravação não tem pausas para tantas cenas, as que sobram (no fim) ficam sem fala, com aviso, em vez de cortar no
+  meio da frase.
+- **Com `cortes`** (ms do arquivo, de quem revisou a prévia): cada um vai para a pausa mais perto; o que cai dentro de
+  uma palavra vai para o lado mais perto dela.
+- O texto de uma cena que não foi achado na gravação vira aviso, e a cena vai pelas pausas; achado em menos da metade,
+  aviso para conferir o corte. As palavras que começam depois do fim do arquivo (transcrição de outra tomada) ficam de
+  fora, com aviso.
+
+**O corte nunca cai no meio de uma palavra.** O trecho de cada cena vai de 200 ms antes da primeira palavra dela
+(`margem_corte_ms`) a 200 ms depois da última, sem passar do meio da pausa vizinha nem do fim do arquivo (a medida do
+envelope, quando há). As palavras sobrepostas que o whisper às vezes devolve são postas em ordem antes, e o fim de uma não
+passa do começo da seguinte.
+
+**A aplicação** (`patchDaDivisao`) não corta o arquivo. **Decisão:** o modelo já tem trecho de fonte no clipe
+(`corte_ms` e `duracao_ms`, os mesmos da lâmina do Som), então cada cena ganha um clipe de voz que toca o trecho dela da
+mesma gravação, marcado com `narracao_gravada` {cena} e nomeado "Fala da cena N".
+
+- O clipe da gravação inteira que estava no vídeo sai, e os pedaços herdam dele a faixa, o volume, o mudo e a voz limpa
+  (o `.limpo.wav` tem os mesmos tempos do original). Sem clipe no vídeo, os pedaços vão para a primeira faixa de voz
+  vazia, ou para uma faixa nova "Narração".
+- Dividir de novo a mesma gravação troca os pedaços da divisão anterior, sem duplicar. A fala por IA das cenas que ganham
+  trecho sai, com aviso (o WAV fica no cache; Reverter traz de volta).
+- A duração de cada cena com trecho é a conta do "Ajustar as cenas à fala": folga + trecho + margem (a da configuração,
+  500 ms, ou `margem_ms`). O resto do som anda com as cenas, pela mesma conta. Os pedaços ficam no começo da cena mais
+  a folga, mesmo com `audio.acompanha_cenas: false`. A cena sem fala na proposta fica como estava.
+- As legendas de cada pedaço são geradas da transcrição, no estilo das que já existem (ou o padrão), com o dicionário da
+  casa e o do vídeo; as do clipe inteiro saem. Assim `em_palavra` e `sai_palavra` acham a fala de cada cena.
+- Tudo num patch só: uma entrada no diário, e Ctrl+Z ou Reverter desfaz.
+- Depois, o "Ajustar as cenas à fala" conta os pedaços como a fala da cena, como conta a fala gerada.
+
+**Na tela:** sem nada selecionado, o inspetor do vídeo tem a seção **Narração gravada inteira**. Ela traz a lista das
+gravações (as dos clipes de voz primeiro, depois os áudios e vídeos de `midia/`, sem os da narração por IA) e "Dividir nas
+cenas…", que transcreve no PC se ainda não há transcrição. A proposta mostra o trecho e o que cada cena fala, com os
+avisos, e tem Aplicar e Cancelar. No inspetor da cena, a seção da fala diz "gravada" e não oferece gerar.
+
+**Pelo MCP:** `transcrever {arquivo}` e depois `dividir_narracao`, primeiro com `previa: true` (só a proposta, para mostrar
+à pessoa) e depois sem ela. Sem `arquivo`, vale a única gravação nos clipes de voz; com a gravação em mais de um clipe,
+pede o `clipe`. Sem transcrição, o erro diz o `transcrever` a chamar.
+
+**Não conferido:** com fala de verdade (os testes usam transcrições sintéticas, `testes/narracao-inteira.test.ts`) e no
+app aberto (a tela foi vista na prévia web, com a transcrição simulada).
 
 ## Limites conhecidos
 
@@ -312,6 +374,8 @@ No fim, ele mostra o cabeçalho de cada WAV e a pasta para ouvir. O que conferir
 | `src/nucleo/narracao-cenas.ts` | estado de cada cena, a fala na faixa de voz, ajustar as cenas à fala (puro) |
 | `src/nucleo/narracao-servico.ts` | gerar com cache, envelope, ficha, prévia, vozes, amostra (disco, sem Electron) |
 | `src/nucleo/mcp-narracao.ts` | as cinco ferramentas MCP |
+| `src/nucleo/narracao-inteira.ts`, `src/nucleo/mcp-narracao-inteira.ts` | a narração gravada inteira dividida nas cenas e `dividir_narracao` (Onda B) |
+| `src/renderer/modulos/video/acoes-narracao-inteira.ts` | a seção "Narração gravada inteira" do inspetor do vídeo |
 | `src/nucleo/sha256.ts` | SHA-256 puro |
 | `src/main/narracao.ts` | o serviço do ambiente (stdio) e o do cofre (app) |
 | `src/main/ipc-narracao.ts` | IPC: estado das chaves, chave do Cloud TTS, vozes, prévia, gerar, cancelar, amostra |

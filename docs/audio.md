@@ -275,6 +275,12 @@ Um efeito novo (Efeito sonoro…) entra com o volume do clipe calculado para a m
 sem voz medida, a voz típica de −20 dB. Um efeito que já é mais baixo que o alvo fica a 100 %: não se sobe o volume.
 Medido: whoosh a −3 dB sobre voz a −22,9 dB entra a 1 % e fica 20,08 LU abaixo dela.
 
+Os efeitos do acabamento do vídeo (`acabamento.sons`, `docs/carrossel-narrado.md`: whoosh nas trocas de cena, pop nas
+entradas, swell antes do cartão final, de `midia/sfx/`) não são clipes da linha do tempo: o resolvedor os põe numa faixa
+de efeitos das props, com volume de fábrica 0,5 sobre o de cada um, e cada efeito que cai sobre a narração recebe o
+ducking da música (`calcularDucking`) com alvo de 20 LU abaixo da voz. Sem envelope medido, o efeito conta como −6 dB.
+O medidor de loudness do inspetor não os conta; a exportação mede o arquivo final e corrige o ganho.
+
 ## Música sobre música (som-D7)
 
 Escolher uma segunda música quando a faixa já vai até o fim do vídeo não a põe mais no zero por cima da primeira: ela

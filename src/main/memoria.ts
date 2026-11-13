@@ -5,6 +5,7 @@ import {existsSync, mkdirSync, readFileSync, renameSync, writeFileSync} from 'no
 import path from 'node:path';
 import type {Preferencias, Recente} from '../compartilhado/api';
 import type {Manifesto} from '../nucleo/documentos';
+import {ARQUIVO_PREFERENCIAS} from '../nucleo/preferencias-arquivo';
 import {normalizarPassos} from '../nucleo/primeiros-passos';
 
 const MAX_RECENTES = 24;
@@ -31,7 +32,7 @@ export class Memoria {
   private readonly arqRecentes: string;
 
   constructor(dir: string, private readonly pastaPadrao: string) {
-    this.arqPrefs = path.join(dir, 'preferencias.json');
+    this.arqPrefs = path.join(dir, ARQUIVO_PREFERENCIAS);
     this.arqRecentes = path.join(dir, 'recentes.json');
   }
 

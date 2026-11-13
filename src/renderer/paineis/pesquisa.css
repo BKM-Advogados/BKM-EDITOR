@@ -36,6 +36,7 @@
 .pesq-paginas { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .pesq-texto-corpo { max-height: 360px; overflow: auto; margin-top: 4px; padding: 6px 8px; background: var(--fundo-1); border-radius: var(--raio);
   white-space: pre-wrap; font: var(--tam-2)/1.5 var(--fonte); color: var(--texto); user-select: text; }
+.pesq-quebra-pdf { display: block; margin: 6px 0; border-top: 1px dashed var(--borda); padding-top: 2px; font-size: var(--tam-1); color: var(--texto-3); user-select: none; }
 .pesq-texto-corpo mark { background: color-mix(in srgb, var(--comentario) 35%, transparent); color: var(--texto); border-radius: 2px; }
 .pesq-texto-aviso { color: var(--aviso); font-size: var(--tam-2); padding: 6px 0; }
 .pesq-texto-aviso .rotulo { display: block; text-transform: none; margin-top: 2px; }

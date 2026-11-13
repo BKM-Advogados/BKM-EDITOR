@@ -12,6 +12,7 @@ import {Player, type PlayerRef} from '@remotion/player';
 import {ChevronDown, Frame, MessageSquarePlus, MousePointer2, Pause, Play, Plus, Repeat2, SkipBack, SkipForward, StepBack, StepForward} from 'lucide-react';
 import {COMPOSICOES, composicaoDe} from '../../../composicoes/registro';
 import {etiquetasDeAudio, type AudioP} from '../../../nucleo/audio';
+import {audioComSons, type AcabamentoP} from '../../../nucleo/acabamento-video';
 import {FORMATO_PADRAO} from '../../../nucleo/formatos';
 import {ChipFormato, TOPO_CHIP} from '../../componentes/ChipFormato';
 import {classeDoQuadro, conjuntoDaClasse, CONJUNTO_QUADRADO, ZONAS_SEGURAS, type ClasseDoQuadro} from '../../../nucleo/zonas-seguras';
@@ -135,7 +136,8 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
   const Componente = COMPOSICOES[composicaoDe(props)];
   const duracaoMs = props?.duracao_ms ?? 0;
   const duracao = props ? Math.max(1, Math.ceil((props.duracao_ms / 1000) * FPS)) : 1;
-  const etiquetas = etiquetasDeAudio((props as {audio?: AudioP} | null)?.audio); // som-D10: o pool de <audio> cobre o pico de clipes
+  // som-D10: o pool de <audio> cobre o pico de clipes, com os efeitos do acabamento (acabamento-video.ts)
+  const etiquetas = etiquetasDeAudio(audioComSons((props as {audio?: AudioP} | null)?.audio, (props as {acabamento?: AcabamentoP} | null)?.acabamento));
   const previa = useLoja((e) => (e.previaEfeitos && e.previaEfeitos.documento === documento ? e.previaEfeitos.efeitos : undefined));
   const inputProps = useMemo(() => (props ? (previa ? {...props, efeitos: previa} : props) : {}), [props, previa]);
 

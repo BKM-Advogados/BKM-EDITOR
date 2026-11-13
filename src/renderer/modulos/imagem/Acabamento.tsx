@@ -4,12 +4,13 @@
 // marca) saem do kit cuja cor de fundo é a da imagem, ou, sem nenhum, do neutro (acabamento.ts, kitDaImagem).
 import React from 'react';
 import {Plus, Minus} from 'lucide-react';
-import type {CamadaImagem, Degrade, DocImagem} from '../../../nucleo/documentos';
+import type {CamadaImagem, Degrade, DocImagem, PaginaImagem} from '../../../nucleo/documentos';
 import {
   CONTORNO_PADRAO, ESTILOS_TRACO, JUNCOES_TRACO, POSICOES_CONTORNO, PONTAS_TRACO, SOMBRA_PADRAO, SOMBRA_SUAVE, contornoDaMarca, degradeDaMarca, degradeDe, ehVetorial, kitDaImagem,
 } from '../../../nucleo/acabamento';
 import {MARCA_NEUTRO, type Marca} from '../../../nucleo/marca';
-import {avisar, trocar} from '../../estado/loja';
+import {aplicar, avisar, loja, patchTrocar, trocar} from '../../estado/loja';
+import {temFundoProprio} from '../../../nucleo/carrossel';
 import {usarKits} from '../../estado/kits';
 import {CampoCor, CampoDeslizante, CampoNumero, CampoSelecao, Secao} from '../../componentes/Campos';
 import {definirPrevia} from './comum';
@@ -138,6 +139,47 @@ export const SecaoFundoDegrade: React.FC<{documento: string; doc: DocImagem; kit
       acao={<Pronto rotulo="Da marca" dica={`Fundo de ${kit.nome} esquentando para baixo com o destaque`} aoClicar={() => void trocar(documento, '/fundo_degrade', degradeDaMarca(kit, 'fundo', Boolean(doc.marca)), 'fundo em degradê da marca')} />}>
       {!d ? <div className="vazio" style={{padding: '4px 0'}}>Fundo de uma cor só. "Da marca" põe um degradê.</div>
         : <EditorDegrade documento={documento} caminho="/fundo_degrade" d={d} />}
+    </Secao>
+  );
+};
+
+/** Fundo da página ativa de um carrossel: "igual ao documento" (sem campos na página) ou "próprio" (cor e degradê da página,
+ *  com os mesmos editores do fundo do documento). Ao passar para próprio, começa com o fundo que a página já mostra. */
+export const SecaoFundoDaPagina: React.FC<{documento: string; doc: DocImagem; p: number; pagina: PaginaImagem; kit: Marca}> = ({documento, doc, p, pagina, kit}) => {
+  const proprio = temFundoProprio(pagina);
+  const base = `/paginas/${p}`;
+  const mudar = (v: string) => {
+    const atual = loja.get().docs[documento]?.doc;
+    if (v === 'proprio' && !proprio) {
+      void aplicar(documento, [...patchTrocar(atual, `${base}/fundo`, doc.fundo), ...(doc.fundo_degrade ? patchTrocar(atual, `${base}/fundo_degrade`, structuredClone(doc.fundo_degrade)) : [])], `fundo próprio na página ${p + 1}`);
+    } else if (v === 'igual' && proprio) {
+      void aplicar(documento, [...patchTrocar(atual, `${base}/fundo`, undefined), ...patchTrocar(atual, `${base}/fundo_degrade`, undefined)], `página ${p + 1} volta ao fundo do documento`);
+    }
+  };
+  const d = pagina.fundo_degrade;
+  return (
+    <Secao titulo="Fundo desta página" chave="imagem:fundo-pagina">
+      <CampoSelecao rotulo="Fundo" valor={proprio ? 'proprio' : 'igual'} opcoes={[['igual', 'Igual ao documento'], ['proprio', 'Próprio']]} aoMudar={mudar} />
+      {proprio && (
+        <>
+          <CampoCor rotulo="Cor" valor={pagina.fundo ?? doc.fundo} aoVer={(valor) => definirPrevia({documento, caminho: `${base}/fundo`, valor})}
+            aoMudar={(v) => void trocar(documento, `${base}/fundo`, v, `fundo da página ${p + 1}`)} />
+          {!d ? (
+            <div style={{display: 'flex', justifyContent: 'flex-end', padding: '4px 0'}}>
+              <Pronto rotulo="Degradê da marca" dica={`Fundo de ${kit.nome} esquentando para baixo com o destaque`}
+                aoClicar={() => void trocar(documento, `${base}/fundo_degrade`, degradeDaMarca(kit, 'fundo', Boolean(doc.marca)), `fundo em degradê da página ${p + 1}`)} />
+            </div>
+          ) : (
+            <>
+              <EditorDegrade documento={documento} caminho={`${base}/fundo_degrade`} d={d} />
+              <div style={{display: 'flex', justifyContent: 'flex-end', padding: '4px 0'}}>
+                <Pronto rotulo="Sem degradê" dica="A página fica só com a cor" aoClicar={() => void trocar(documento, `${base}/fundo_degrade`, undefined, `página ${p + 1} sem degradê`)} />
+              </div>
+            </>
+          )}
+        </>
+      )}
+      {!proprio && <div className="vazio" style={{padding: '4px 0'}}>Esta página usa a cor e o degradê do documento (a seção Prancheta).</div>}
     </Secao>
   );
 };

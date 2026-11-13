@@ -5,15 +5,19 @@
 // Bloco e cena mostram em "Fatos citados" os `refs` (ids dos fatos da pesquisa) como etiquetas, com a afirmação ao lado;
 // clicar leva ao fato no painel Pesquisa e o × tira um da lista. O som tem ainda o loudness (o alvo do arquivo exportado
 // e os medidores da narração e da mistura no resumo do vídeo; o da faixa no inspetor dela) e, no clipe de voz, a limpeza.
-import React, {useState, useSyncExternalStore} from 'react';
+// No tempo do bloco, "Entra na palavra" e "Sai na palavra" prendem o bloco a uma palavra da fala da cena (as palavras das
+// legendas que caem nela); mudar o tempo em segundos, aqui ou na linha do tempo, solta o bloco da palavra. No resumo do
+// vídeo, "Marca no vídeo" liga a vinheta do logo, o rodapé, o cartão final e os efeitos sonoros (acabamento-video.ts).
+import React, {useEffect, useState, useSyncExternalStore} from 'react';
 import {rotuloDoAtalho} from '../../teclas';
 import {Clapperboard, CopyPlus, Film, FileAudio, FileJson, ImagePlus, Link, Quote, Scissors, Shuffle, Sparkles, Trash2, Undo2, X} from 'lucide-react';
 import {ALVO_LU_MAX, ALVO_LU_MIN, ALVO_LUFS_MAX, ALVO_LUFS_MIN, ALVO_LUFS_PADRAO, DUCKING_PADRAO, PAPEIS, PICO_DBTP_MAX, PICO_DBTP_MIN, PICO_DBTP_PADRAO, type AudioP,
   type ClipeAudio, type ClipeAudioP, type CurvaFade, type FaixaAudio, type FaixaAudioP, type IntensidadeLimpeza, type PapelFaixa} from '../../../nucleo/audio';
 import {INTENSIDADE_PADRAO, INTENSIDADES} from '../../../nucleo/limpeza-voz';
-import {TEMA_NEUTRO, TIPOS_BLOCO_CENAS, type BlocoCenas, type CenaCenas, type DocCenas, type PropsCenas} from '../../../nucleo/cenas';
+import {palavrasDaCena, TEMA_NEUTRO, TIPOS_BLOCO_CENAS, type BlocoCenas, type CenaCenas, type CenaCenasP, type DocCenas, type PropsCenas} from '../../../nucleo/cenas';
+import {ancoraDaPalavra, tempoDaAncora, type Palavra} from '../../../nucleo/ancora-palavra';
 import {FORMATOS_VIDEO, formatoDoVideo, rotuloFormato} from '../../../nucleo/formatos';
-import {avisar, mensagemDe, trocar, useLoja, valorEm, verFato} from '../../estado/loja';
+import {aplicar, avisar, loja, mensagemDe, patchTrocar, trocar, useLoja, valorEm, verFato} from '../../estado/loja';
 import {CriarEmMusica, MusicaDoClipe} from '../musica/NoVideo'; // frente Música
 import {CabecalhoInspector, CampoCor, CampoDeslizante, CampoInterruptor, CampoLeitura, CampoNumero, CampoSelecao, CampoTexto, Secao, copiar, numeroBr} from '../../componentes/Campos';
 import type {ItemMenu} from '../../componentes/Menu';
@@ -25,8 +29,11 @@ import {andamentoLimpeza, assinarLimpeza, cancelarLimpeza, crossfadeComSeguinte,
 import {CamposMovimento} from './CamposMovimento';
 import {abrirNarracaoIA, gerarFalas, narracaoTela, trocarTextoDaCena} from './acoes-narracao'; // narração por IA (docs/narracao.md)
 import {itensDaNarracao, ROTULO_ESTADO} from '../../../nucleo/narracao-cenas';
+import {aplicarNaTela, gravacoesDoProjeto, proporNaTela, textoDoTrecho, type GravacaoEscolhivel, type PropostaNaTela} from './acoes-narracao-inteira'; // Onda B
 import {lufsTexto, MedidorLoudness, useMedidasLoudness} from './MedidorLoudness';
 import {MudancasNoInspetor} from '../../componentes/Agente';
+import {CARTAO_MAX_MS, CARTAO_MIN_MS, CARTAO_MS, patchDoAcabamento, SONS_ACABAMENTO, TITULO_CARTAO_PADRAO, VINHETA_MAX_MS, VINHETA_MIN_MS, VINHETA_MS, VOLUME_SONS_PADRAO,
+  type AcabamentoCenas} from '../../../nucleo/acabamento-video';
 
 const CURVAS_OPCOES: [CurvaFade, string][] = [['linear', 'Linear'], ['suave', 'Suave'], ['potencia', 'Potência igual']]; // frente Som: forma do fade
 const pct = (v: number | undefined, padrao: number) => Math.round((v ?? padrao) * 1000) / 10;
@@ -63,6 +70,126 @@ const SecaoLoudness: React.FC<{documento: string; doc: DocCenas}> = ({documento,
   );
 };
 
+/** Narração gravada inteira (Onda B): a pessoa escolhe a gravação já importada, vê a proposta de cortes (o trecho de cada
+ *  cena e o que ela fala) e aplica; cada cena passa a tocar o trecho dela da mesma gravação. */
+const NarracaoInteira: React.FC<{documento: string; doc: DocCenas}> = ({documento, doc}) => {
+  const [lista, setLista] = useState<GravacaoEscolhivel[] | null>(null);
+  const [escolhida, setEscolhida] = useState('');
+  const [ocupado, setOcupado] = useState<string | null>(null);
+  const [proposta, setProposta] = useState<PropostaNaTela | null>(null);
+  const nVoz = (doc.audio?.faixas ?? []).reduce((n, f) => n + (f.clipes?.length ?? 0), 0);
+  useEffect(() => {
+    let vivo = true;
+    void gravacoesDoProjeto(doc).then((l) => vivo && setLista(l));
+    return () => {
+      vivo = false;
+    };
+  }, [documento, nVoz]); // eslint-disable-line react-hooks/exhaustive-deps
+  const g = lista?.find((x) => x.arquivo === escolhida) ?? lista?.[0];
+  const propor = async () => {
+    if (!g) return;
+    setOcupado('Lendo a transcrição…');
+    const p = await proporNaTela(documento, g, () => setOcupado(`Transcrevendo ${g.nome} no PC…`));
+    setOcupado(null);
+    setProposta(p);
+  };
+  const aplicarProposta = async () => {
+    if (!proposta) return;
+    setOcupado('Dividindo…');
+    const ok = await aplicarNaTela(documento, proposta);
+    setOcupado(null);
+    if (ok) setProposta(null);
+  };
+  return (
+    <Secao titulo="Narração gravada inteira" chave="cenas:narracao-inteira">
+      {!lista ? <div className="vazio">Procurando as gravações…</div> : !lista.length ? (
+        <div className="vazio">Importe a gravação da fala inteira (um áudio só) e ela aparece aqui para dividir nas cenas.</div>
+      ) : (
+        <>
+          <CampoSelecao rotulo="Gravação" valor={g?.arquivo ?? ''} aoMudar={(v) => (setEscolhida(v), setProposta(null))}
+            opcoes={lista.map((x): [string, string] => [x.arquivo, `${x.nome}${x.no_video ? ' · no vídeo' : ''}${x.duracao_ms ? ` · ${formatarTempo(x.duracao_ms)}` : ''}`])} />
+          {!proposta && (
+            <div style={{padding: '2px 10px 6px 18px', display: 'flex', gap: 6, alignItems: 'center'}}>
+              <button className="bt mini" disabled={Boolean(ocupado) || !g} onClick={() => void propor()}
+                title="Acha onde cada cena começa e termina na gravação: pelo texto falado das cenas, ou pelas pausas. Nada muda antes de aplicar.">
+                <Scissors size={12} />Dividir nas cenas…</button>
+              {ocupado && <span className="meta">{ocupado}</span>}
+            </div>
+          )}
+          {proposta && (
+            <>
+              <div className="vazio">
+                {proposta.proposta.metodo === 'pausas' ? 'Pelas pausas mais longas (as cenas não têm texto falado).' : proposta.proposta.metodo === 'texto'
+                  ? 'Pelo texto falado de cada cena.' : 'Pelo texto falado e, nas cenas sem texto, pelas pausas.'} Cada cena vai tocar o trecho dela:
+              </div>
+              <div className="proposta-divisao">
+                {proposta.proposta.trechos.map((t) => (
+                  <div key={t.cena} title={t.texto} className={t.palavras ? undefined : 'sem-fala'}>
+                    <b>Cena {t.n}</b> · {textoDoTrecho(t)}{t.texto ? ` · ${t.texto.length > 70 ? `${t.texto.slice(0, 69)}…` : t.texto}` : ''}
+                  </div>
+                ))}
+                {proposta.proposta.avisos.map((a, i) => <div key={`a${i}`} className="aviso">{a[0].toUpperCase()}{a.slice(1)}.</div>)}
+              </div>
+              <div style={{padding: '2px 10px 6px 18px', display: 'flex', gap: 6, alignItems: 'center'}}>
+                <button className="bt principal mini" disabled={Boolean(ocupado)} onClick={() => void aplicarProposta()}
+                  title={`Cada cena ganha um clipe com o trecho dela, a duração da cena se ajusta à fala e as legendas saem da transcrição. ${rotuloDoAtalho('Ctrl+Z')} desfaz.`}>
+                  Aplicar</button>
+                <button className="bt mini fantasma" disabled={Boolean(ocupado)} onClick={() => setProposta(null)}>Cancelar</button>
+                {ocupado && <span className="meta">{ocupado}</span>}
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </Secao>
+  );
+};
+
+/** Vinheta do logo, rodapé com a marca, cartão final e efeitos sonoros (o acabamento do vídeo). Cada mudança grava o bloco
+ *  `acabamento` inteiro, num patch só (Ctrl+Z desfaz). O logo e a assinatura vêm do kit do `tema` (menu → Marca…). */
+const SecaoAcabamento: React.FC<{documento: string; doc: DocCenas}> = ({documento, doc}) => {
+  const a: AcabamentoCenas = doc.acabamento && typeof doc.acabamento === 'object' ? doc.acabamento : {};
+  const tema = (doc.tema ?? {}) as {logo?: string; assinatura?: string};
+  const mudar = (f: (x: AcabamentoCenas) => AcabamentoCenas, rotulo: string) => void aplicar(documento, patchDoAcabamento(doc, f(structuredClone(a))), rotulo);
+  const liga = (o: object | undefined, k: string) => Boolean(o) && (o as Record<string, unknown>)[k] !== false;
+  const vinheta = liga(a.vinheta, 'ligada');
+  const rodape = liga(a.rodape, 'ligado');
+  const cartao = liga(a.cartao_final, 'ligado');
+  const sons = liga(a.sons, 'ligados');
+  const seg = (ms: number) => numeroBr(ms / 1000, 1);
+  const duracao = (v: number, min: number, max: number, nome: string, gravar: (ms: number) => void) =>
+    v * 1000 >= min && v * 1000 <= max ? gravar(Math.round(v * 1000)) : avisar(`${nome} vai de ${seg(min)} a ${seg(max)} s`, 'erro');
+  const kit = tema.logo || tema.assinatura ? [tema.logo ? 'logo' : '', tema.assinatura ? `assinatura ${tema.assinatura}` : ''].filter(Boolean).join(' e ') : '';
+  return (
+    <Secao titulo="Marca no vídeo" chave="cenas:acabamento" fechadaDePadrao={!vinheta && !rodape && !cartao && !sons}>
+      <div className="vazio">{kit ? `Do kit de marca: ${kit}.` : 'O vídeo não tem kit com logo nem assinatura (menu → Marca…); a vinheta e o rodapé usam o nome abaixo.'}</div>
+      <CampoTexto rotulo="Quem assina" valor={a.nome ?? ''} dica="O nome por extenso, no rodapé e na vinheta sem logo"
+        aoMudar={(v) => mudar((x) => ({...x, nome: v.trim() || undefined}), v.trim() ? `quem assina: ${v.trim()}` : 'sem nome de quem assina')} />
+      <CampoInterruptor rotulo="Vinheta do logo" valor={vinheta} dica="O logo no começo, por cima dos primeiros segundos da primeira cena (o vídeo não fica mais longo)"
+        aoMudar={(v) => mudar((x) => ({...x, vinheta: {...x.vinheta, ligada: v}}), v ? 'liga a vinheta do logo' : 'desliga a vinheta do logo')} />
+      {vinheta && <CampoNumero rotulo="Duração da vinheta" unidade="s" passo={0.1} valor={(a.vinheta?.duracao_ms ?? VINHETA_MS) / 1000} padrao={VINHETA_MS / 1000}
+        aoMudar={(v) => duracao(v, VINHETA_MIN_MS, VINHETA_MAX_MS, 'A vinheta', (ms) => mudar((x) => ({...x, vinheta: {...x.vinheta, duracao_ms: ms}}), `vinheta: ${seg(ms)} s`))} />}
+      <CampoInterruptor rotulo="Rodapé com a marca" valor={rodape} dica="O nome e a assinatura (ou o logo) embaixo, durante as cenas, fora das zonas da rede e da legenda"
+        aoMudar={(v) => mudar((x) => ({...x, rodape: {...x.rodape, ligado: v}}), v ? 'liga o rodapé com a marca' : 'desliga o rodapé com a marca')} />
+      <CampoInterruptor rotulo="Cartão final" valor={cartao} dica="Um cartão com a marca depois da última cena: o vídeo fica esse tanto mais longo"
+        aoMudar={(v) => mudar((x) => ({...x, cartao_final: {...x.cartao_final, ligado: v}}), v ? 'liga o cartão final' : 'desliga o cartão final')} />
+      {cartao && <>
+        <CampoTexto rotulo="Título do cartão" valor={a.cartao_final?.titulo ?? TITULO_CARTAO_PADRAO}
+          aoMudar={(v) => mudar((x) => ({...x, cartao_final: {...x.cartao_final, titulo: v.trim() && v.trim() !== TITULO_CARTAO_PADRAO ? v.trim() : undefined}}), 'título do cartão final')} />
+        <CampoTexto rotulo="Aviso" valor={a.cartao_final?.aviso ?? ''} dica="Uma linha pequena embaixo (ex.: Conteúdo informativo)"
+          aoMudar={(v) => mudar((x) => ({...x, cartao_final: {...x.cartao_final, aviso: v.trim() || undefined}}), 'aviso do cartão final')} />
+        <CampoNumero rotulo="Duração do cartão" unidade="s" passo={0.5} valor={(a.cartao_final?.duracao_ms ?? CARTAO_MS) / 1000} padrao={CARTAO_MS / 1000}
+          aoMudar={(v) => duracao(v, CARTAO_MIN_MS, CARTAO_MAX_MS, 'O cartão final', (ms) => mudar((x) => ({...x, cartao_final: {...x.cartao_final, duracao_ms: ms}}), `cartão final: ${seg(ms)} s`))} />
+      </>}
+      <CampoInterruptor rotulo="Efeitos sonoros" valor={sons} dica={`Os de midia/sfx/ (${Object.values(SONS_ACABAMENTO).join(', ')}) nas trocas de cena e nas entradas, baixos e sob a narração`}
+        aoMudar={(v) => mudar((x) => ({...x, sons: {...x.sons, ligados: v}}), v ? 'liga os efeitos sonoros' : 'desliga os efeitos sonoros')} />
+      {sons && <CampoDeslizante rotulo="Volume dos efeitos" valor={a.sons?.volume ?? VOLUME_SONS_PADRAO} min={0} max={1} passo={0.05} padrao={VOLUME_SONS_PADRAO}
+        formatar={(v) => `${Math.round(v * 100)}%`}
+        aoMudar={(v) => mudar((x) => ({...x, sons: {...x.sons, volume: Math.round(v * 100) / 100}}), `volume dos efeitos: ${Math.round(v * 100)}%`)} />}
+    </Secao>
+  );
+};
+
 const ResumoVideo: React.FC<{documento: string; doc: DocCenas; titulo: string; duracao: number; avisos: string[]; erro?: string}> = ({documento, doc, titulo, duracao, avisos, erro}) => {
   const f = formatoDoVideo(doc);
   const preset = FORMATOS_VIDEO.find((p) => p.largura === f.largura && p.altura === f.altura);
@@ -94,7 +221,9 @@ const ResumoVideo: React.FC<{documento: string; doc: DocCenas; titulo: string; d
           <CampoCor rotulo="Destaque" valor={tema.destaque ?? TEMA_NEUTRO.destaque} aoMudar={(v) => void trocar(documento, '/tema/destaque', v, 'cor de destaque')} />
           <CampoCor rotulo="Texto suave" valor={tema.suave ?? TEMA_NEUTRO.suave} aoMudar={(v) => void trocar(documento, '/tema/suave', v, 'cor do texto suave')} />
         </Secao>
+        <SecaoAcabamento documento={documento} doc={doc} />
         {nClipes > 0 && <SecaoLoudness documento={documento} doc={doc} />}
+        <NarracaoInteira documento={documento} doc={doc} />
         {erro && <Secao titulo="Não deu para montar o vídeo"><div className="texto-livre" style={{color: 'var(--erro)'}}>{erro}</div></Secao>}
         {avisos.length > 0 && <Secao titulo={`Avisos (${avisos.length})`}><div className="avisos-roteiro">{avisos.map((a, i) => <div key={i}>{a}</div>)}</div></Secao>}
         <div className="vazio">Clique num bloco no monitor, na lista ou na linha do tempo para editar. "**trecho**" no texto sai na cor de destaque.</div>
@@ -146,12 +275,12 @@ const FalaDaCena: React.FC<{documento: string; n: number}> = ({documento, n}) =>
   const it = doc ? itensDaNarracao(doc)[n - 1] : undefined;
   if (!doc || !it) return null;
   return (
-    <Secao titulo={`Fala (narração por IA) · ${ROTULO_ESTADO[it.estado]}`} chave="cenas:fala">
+    <Secao titulo={it.estado === 'gravada' ? 'Fala · gravada (trecho da narração inteira)' : `Fala (narração por IA) · ${ROTULO_ESTADO[it.estado]}`} chave="cenas:fala">
       <CampoTexto rotulo="Texto falado" multilinha dica="O que a voz fala nesta cena; o texto da tela pode ser outro. [pausa] e [pausa longa] fazem pausa."
         valor={doc.cenas[n - 1]?.narracao?.texto ?? ''} aoMudar={(v) => void trocarTextoDaCena(documento, n - 1, v)} />
       {it.clipe && <CampoLeitura rotulo="Fala gerada">{numeroBr(it.clipe.duracao_ms / 1000, 1)} s{it.clipe.em + it.clipe.duracao_ms > it.t_out + 1 ? ' · passa do fim da cena' : ''}</CampoLeitura>}
       <div style={{padding: '2px 10px 6px 18px', display: 'flex', gap: 6}}>
-        {it.estado !== 'sem_texto' && <button className="bt mini" disabled={Boolean(andamento)} onClick={() => void gerarFalas(documento, {cenas: [it.cena], refazer: it.estado === 'gerada'})}
+        {it.estado !== 'sem_texto' && it.estado !== 'gravada' && <button className="bt mini" disabled={Boolean(andamento)} onClick={() => void gerarFalas(documento, {cenas: [it.cena], refazer: it.estado === 'gerada'})}
           title={it.estado === 'gerada' ? `Pede outra tomada ao Google (tem custo; ${rotuloDoAtalho('Ctrl+Z')} volta à anterior)` : undefined}>{it.estado === 'gerada' ? 'Outra tomada' : 'Gerar esta cena'}</button>}
         <button className="bt mini fantasma" onClick={() => abrirNarracaoIA(documento)}>Narração por IA…</button>
       </div>
@@ -182,13 +311,59 @@ const PropsCena: React.FC<{documento: string; caminho: string; c: CenaCenas; n: 
   </div>
 );
 
-const PropsBloco: React.FC<{documento: string; caminho: string; b: BlocoCenas; formato: {largura: number; altura: number}; durCena: number; menu: ItemMenu[]; sub: string}> =
-  ({documento, caminho, b, formato, durCena, menu, sub}) => {
+/** Prende a entrada ou a saída do bloco a uma palavra da fala da cena: a lista traz as palavras transcritas que caem na
+ *  cena, com o segundo em que cada uma começa (ou acaba, na saída). Escolher grava a âncora (`em_palavra`/`sai_palavra`)
+ *  e põe o tempo em ms no mesmo ponto, que vale quando a palavra some (fala trocada, legendas apagadas). "Nenhuma" solta. */
+const CampoPalavra: React.FC<{documento: string; caminho: string; b: BlocoCenas; qual: 'em' | 'sai'; palavras: Palavra[]; durCena: number}> =
+  ({documento, caminho, b, qual, palavras, durCena}) => {
+    const chave = qual === 'em' ? 'em_palavra' : 'sai_palavra';
+    const atual = b[chave];
+    const fim = qual === 'sai';
+    const verbo = qual === 'em' ? 'entra' : 'sai';
+    const opcoes: [string, string][] = [['', 'Nenhuma (tempo em s)'],
+      ...palavras.flatMap((p): [string, string][] => {
+        const a = ancoraDaPalavra(p, fim);
+        return a ? [[a, `${p.w.trim()} · ${numeroBr((fim ? p.e : p.s) / 1000, 1)} s`]] : [];
+      })];
+    const r = typeof atual === 'string' && atual ? tempoDaAncora(atual, palavras) : null;
+    const escolher = (v: string) => {
+      if (!v) return void trocar(documento, `${caminho}/${chave}`, undefined, `bloco solto da palavra (${qual === 'em' ? 'entrada' : 'saída'})`);
+      const doc = loja.get().docs[documento]?.doc;
+      const achado = tempoDaAncora(v, palavras);
+      const ms = 'ms' in achado ? Math.round(Math.max(0, Math.min(durCena, achado.ms))) : undefined;
+      const w = 'ms' in achado ? achado.palavra.w.trim() : v;
+      const tempo = ms === undefined ? []
+        : qual === 'em' ? patchTrocar(doc, `${caminho}/em`, Math.min(ms, durCena - 100))
+          : patchTrocar(doc, `${caminho}/sai`, ms >= durCena ? undefined : Math.max((b.em ?? 0) + 100, ms));
+      void aplicar(documento, [...patchTrocar(doc, `${caminho}/${chave}`, v), ...tempo], `bloco ${verbo} em "${w}"`);
+    };
+    return (
+      <>
+        <CampoSelecao rotulo={qual === 'em' ? 'Entra na palavra' : 'Sai na palavra'} valor={typeof atual === 'string' ? atual : ''} opcoes={opcoes} padrao=""
+          aoMudar={escolher} />
+        {r && 'erro' in r && (
+          <div className="vazio">{palavras.length ? `Não achei a palavra (${r.erro}); o bloco ${verbo} no tempo em segundos.`
+            : `A cena não tem fala transcrita; o bloco ${verbo} no tempo em segundos até a fala ser transcrita.`}</div>
+        )}
+      </>
+    );
+  };
+
+const PropsBloco: React.FC<{documento: string; caminho: string; b: BlocoCenas; formato: {largura: number; altura: number}; durCena: number; menu: ItemMenu[]; sub: string;
+  palavras: Palavra[]}> =
+  ({documento, caminho, b, formato, durCena, menu, sub, palavras}) => {
     const t = tipoDe(b.tipo);
     const Icone = t.icone;
     const padrao = TIPOS_BLOCO_CENAS[b.tipo] ?? TIPOS_BLOCO_CENAS.texto;
     const menor = Math.min(formato.largura, formato.altura);
     const campo = (k: keyof BlocoCenas, rotulo: string) => (v: unknown) => void trocar(documento, `${caminho}/${k}`, v, `${rotulo} do bloco`);
+    // o tempo em segundos escolhido à mão solta o bloco da palavra naquela ponta (senão a palavra continuaria mandando)
+    const tempoEmMs = (k: 'em' | 'sai', v: number | undefined, rotulo: string) => {
+      const ancora = k === 'em' ? 'em_palavra' : 'sai_palavra';
+      if (b[ancora] === undefined) return campo(k, rotulo)(v);
+      const doc = loja.get().docs[documento]?.doc;
+      void aplicar(documento, [...patchTrocar(doc, `${caminho}/${k}`, v), ...patchTrocar(doc, `${caminho}/${ancora}`, undefined)], `${rotulo} do bloco (solto da palavra)`);
+    };
     const fracao = (k: 'x' | 'y' | 'largura' | 'altura', rotulo: string, p: number) => (
       <CampoNumero rotulo={rotulo} unidade="%" passo={1} valor={pct(b[k], p)} aoMudar={(v) => campo(k, rotulo.toLowerCase())(Math.round(v * 10) / 1000)} />
     );
@@ -233,10 +408,16 @@ const PropsBloco: React.FC<{documento: string; caminho: string; b: BlocoCenas; f
           </Secao>
           <Secao titulo="Tempo" chave="cenas:tempo">
             <CampoNumero rotulo="Entra" unidade="s" passo={0.1} valor={(b.em ?? 0) / 1000}
-              aoMudar={(v) => campo('em', 'entrada')(Math.max(0, Math.min(durCena - 100, Math.round(v * 1000))))} />
+              aoMudar={(v) => tempoEmMs('em', Math.max(0, Math.min(durCena - 100, Math.round(v * 1000))), 'entrada')} />
             <CampoNumero rotulo="Sai" unidade="s" passo={0.1} valor={(b.sai ?? durCena) / 1000} padrao={durCena / 1000}
-              aoRedefinir={b.sai !== undefined ? () => campo('sai', 'saída')(undefined) : undefined}
-              aoMudar={(v) => campo('sai', 'saída')(v * 1000 >= durCena ? undefined : Math.max((b.em ?? 0) + 100, Math.round(v * 1000)))} />
+              aoRedefinir={b.sai !== undefined ? () => tempoEmMs('sai', undefined, 'saída') : undefined}
+              aoMudar={(v) => tempoEmMs('sai', v * 1000 >= durCena ? undefined : Math.max((b.em ?? 0) + 100, Math.round(v * 1000)), 'saída')} />
+            {palavras.length || b.em_palavra !== undefined || b.sai_palavra !== undefined ? (
+              <>
+                <CampoPalavra documento={documento} caminho={caminho} b={b} qual="em" palavras={palavras} durCena={durCena} />
+                <CampoPalavra documento={documento} caminho={caminho} b={b} qual="sai" palavras={palavras} durCena={durCena} />
+              </>
+            ) : <div className="vazio">Com a fala da cena transcrita (legendas), dá para prender o bloco a uma palavra.</div>}
           </Secao>
           <Secao titulo="Posição e tamanho" chave="cenas:posicao">
             {fracao('x', 'X', 0.1)}
@@ -473,7 +654,9 @@ export const InspectorCenas: React.FC<{documento: string}> = ({documento}) => {
     {rotulo: 'Copiar JSON', icone: <FileJson className="i14" />, acao: () => copiar(JSON.stringify(obj, null, 2), 'JSON copiado')},
   ];
   if (m[2] === undefined) return <PropsCena documento={documento} caminho={caminho} c={obj as CenaCenas} n={n} menu={menu} />;
+  const cenaP: CenaCenasP | undefined = (props as PropsCenas | null)?.cenas?.[Number(m[1])];
+  const palavras = cenaP ? palavrasDaCena((props as PropsCenas).legendas_cenas, cenaP.t_in, cenaP.t_out) : [];
   return <PropsBloco documento={documento} caminho={caminho} b={obj as BlocoCenas} formato={formatoDoVideo(doc)} durCena={cena?.duracao_ms ?? 4000} menu={menu}
-    sub={`Cena ${n}${cena?.nome ? ` · ${cena.nome}` : ''} · bloco ${Number(m[2]) + 1}`} />;
+    sub={`Cena ${n}${cena?.nome ? ` · ${cena.nome}` : ''} · bloco ${Number(m[2]) + 1}`} palavras={palavras} />;
 };
 
