@@ -6,21 +6,25 @@
 // Os nós e os ids (que são os endereços da M-02 quando há um):
 //   canal:<id>                     Fonte: o som seco do canal (instrumento ainda de buffer inteiro, guardado no cache)
 //   faixa:<id>/entrada             Passa: soma dos canais da faixa, na ordem dos canais
-//   faixa:<id>/eq                  AdaptadorEq3 (só se alguma banda ≠ 0)
-//   faixa:<id>/compressor          AdaptadorCompressor (só se ligado)
+//   faixa:<id>/eq                  Eq3 (só se alguma banda ≠ 0)
+//   faixa:<id>/compressor          Compressor (só se ligado)
 //   faixa:<id>/volume_pan          VolumePan (volume 0 dB quando há automação: a curva toma o lugar do fader)
 //   faixa:<id>/sidechain           Ganho com a curva do sidechain por notas
 //   faixa:<id>/automacao           Ganho ligado ao endereço faixa:<id>/volume_db (a automação de volume de hoje)
-//   retorno:delay, retorno:reverb  AdaptadorDelay, AdaptadorFreeverb (os envios entram com o ganho do envio)
+//   retorno:delay, retorno:reverb  Delay, Freeverb (os envios entram com o ganho do envio)
 //   master                         Passa: faixas na ordem do mixer, depois o delay e o reverb, cada um com o seu volume
-//   master/automacao | master/volume, master/limitador
+//   master/automacao | master/volume, master/limitador (Limitador, causal, com 1,5 ms de latência)
 // Ver docs/audio-grafo.md.
 import type {FonteAudio} from '../loudness';
 import {resolverMusica, type DocMusica} from '../musica';
 import {escreverEndereco} from '../musica-param';
 import {chaveDoCanal, disparosDoSidechain, ganhoDaAutomacao, ganhoDoSidechain, renderAudio, renderBateria, renderSintetizador, TAXA_MUSICA, type CacheSom,
   type ResultadoSom} from '../musica-som';
-import {AdaptadorCompressor, AdaptadorDelay, AdaptadorEq3, AdaptadorFreeverb, AdaptadorLimitador} from './adaptadores';
+import {Compressor} from './compressor';
+import {Delay} from './delay';
+import {Eq3} from './eq3';
+import {Freeverb} from './freeverb';
+import {Limitador} from './limitador';
 import {BLOCO_PADRAO, executarOffline} from './executor';
 import {Grafo} from './grafo';
 import {Fonte, Ganho, ganhoDeDb, Passa, VolumePan} from './processadores';
@@ -47,7 +51,7 @@ export type GrafoDaMusica = {
   /** Nó final de cada faixa que toca (o stem) e de cada retorno. */
   faixas: Record<string, string>;
   retornos: Partial<Record<'reverb' | 'delay', {no: string; ganho: number}>>;
-  limitador?: AdaptadorLimitador;
+  limitador?: Limitador;
   avisos: string[];
   faltando: Set<string>;
   /** Chaves do cache que a montagem usou (os canais secos). */
@@ -120,8 +124,8 @@ export const grafoDaMusica = (doc: DocMusica, fontes: Record<string, FonteAudio 
     const cadeia: string[] = [g.no(`${base}/entrada`, new Passa(2))];
     for (const e of entram) g.ligar(e.no, cadeia[0]);
     const {graves_db, medios_db, agudos_db} = f.eq;
-    if (graves_db || medios_db || agudos_db) cadeia.push(g.no(`${base}/eq`, new AdaptadorEq3(f.eq)));
-    if (f.compressor.ativo) cadeia.push(g.no(`${base}/compressor`, new AdaptadorCompressor(f.compressor)));
+    if (graves_db || medios_db || agudos_db) cadeia.push(g.no(`${base}/eq`, new Eq3(f.eq)));
+    if (f.compressor.ativo) cadeia.push(g.no(`${base}/compressor`, new Compressor(f.compressor)));
     // os parâmetros levam o endereço da M-02 (a automação geral da X-08 liga aqui); a de volume de hoje é um ganho linear
     // depois do fader (nó `automacao`), como no motor antigo, então com ela o fader fica em 0 dB e sem endereço
     const endVolume = `${base.replace(/#\d+$/, '')}/volume_db`;
@@ -149,7 +153,7 @@ export const grafoDaMusica = (doc: DocMusica, fontes: Record<string, FonteAudio 
   if (enviosDelay.length) {
     const d = m.master.delay;
     const atraso_s = d.batidas * m.seg_por_batida;
-    const no = g.no('retorno:delay', new AdaptadorDelay(atraso_s, d.realimentacao, d.brilho, d.pingue_pongue),
+    const no = g.no('retorno:delay', new Delay(atraso_s, d.realimentacao, d.brilho, d.pingue_pongue),
       {soma: 'zero', chave: `delay:${JSON.stringify({d: [atraso_s, d.realimentacao, d.brilho, d.pingue_pongue], e: enviosDelay.map((e) => [e.chave, e.quanto]), taxa})}`});
     for (const e of enviosDelay) g.ligar(e.no, no, {ganho: e.quanto});
     const ganho = ganhoDeDb(d.volume_db);
@@ -158,7 +162,7 @@ export const grafoDaMusica = (doc: DocMusica, fontes: Record<string, FonteAudio 
   }
   if (envios.length) {
     const r = m.master.reverb;
-    const no = g.no('retorno:reverb', new AdaptadorFreeverb(r.tamanho, r.amortecimento),
+    const no = g.no('retorno:reverb', new Freeverb(r.tamanho, r.amortecimento),
       {soma: 'zero', chave: `reverb:${JSON.stringify({r: [r.tamanho, r.amortecimento], e: envios.map((e) => [e.chave, e.quanto]), taxa})}`});
     for (const e of envios) g.ligar(e.no, no, {ganho: e.quanto});
     const ganho = ganhoDeDb(r.volume_db);
@@ -183,9 +187,9 @@ export const grafoDaMusica = (doc: DocMusica, fontes: Record<string, FonteAudio 
     }
   }
   const lim = m.master.limitador;
-  let limitador: AdaptadorLimitador | undefined;
+  let limitador: Limitador | undefined;
   if (lim.ativo) {
-    limitador = new AdaptadorLimitador(lim.teto_db, lim.soltura_ms);
+    limitador = new Limitador(lim.teto_db, lim.soltura_ms, n);
     const no = g.no('master/limitador', limitador);
     g.ligar(saida, no);
     saida = no;
