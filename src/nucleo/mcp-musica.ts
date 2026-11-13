@@ -125,7 +125,7 @@ export const registrarMusica = (servidor: McpServer, projeto: Projeto, autor: st
         ...(c.ganho_db ? {ganho_db: c.ganho_db} : {}), ...(c.mudo ? {mudo: true} : {})})),
       mixer: r.faixas.map((f) => ({id: f.id, volume_db: f.volume_db, pan: f.pan, ...(f.mudo ? {mudo: true} : {}), ...(f.solo ? {solo: true} : {}),
         ...(f.eq.graves_db || f.eq.medios_db || f.eq.agudos_db ? {eq: f.eq} : {}), ...(f.compressor.ativo ? {compressor: f.compressor} : {}), ...(f.reverb ? {reverb: f.reverb} : {}),
-        ...(f.delay ? {delay: f.delay} : {}), ...(f.sidechain ? {sidechain: f.sidechain} : {})})),
+        ...(f.delay ? {delay: f.delay} : {}), ...(f.sidechain ? {sidechain: f.sidechain} : {}), ...(f.atraso_ms ? {atraso_ms: f.atraso_ms} : {})})),
       master: r.master,
       ...(m.doc.automacoes?.length ? {automacoes: m.doc.automacoes} : {}),
       licencas: (() => {

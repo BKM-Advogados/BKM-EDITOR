@@ -89,10 +89,13 @@ chavesUsadas, latencia, estagios, armazem}`.
 
 - **Blocos fixos** de `bloco` amostras (128 por padrão). O último bloco é menor. O tamanho do bloco não muda um bit da
   saída, e os testes conferem com blocos de 1 a maior que a música.
-- **PDC**: a latência que chega a um nó é a maior das entradas, e a que sai é essa mais a do processador. Cada ligação
-  que vem de um caminho mais curto passa por uma `Atraso` com a diferença. A saída e os coletados voltam alinhados no
-  tempo da música: o executor roda `latência` amostras a mais e descarta o começo. Depois do fim, as fontes tocam
-  silêncio.
+- **PDC** (M-07): a latência que chega a um nó é a maior das entradas, de todas as portas, e a que sai é essa mais a do
+  processador. Cada ligação que vem de um caminho mais curto passa por uma `Atraso` com a diferença, então todo caminho
+  chega junto ao somador: faixas paralelas, envios aos retornos e a porta de sidechain de um processador. A saída e os
+  coletados (os stems) voltam alinhados no tempo da música: o executor roda `latência` amostras a mais e descarta o
+  começo. Depois do fim, as fontes tocam silêncio. A automação de um nó também segue o tempo da música
+  (`ctx.inicio` já desconta a latência). Na fronteira de um estágio (adaptador de buffer inteiro, cache), as saídas
+  gravadas já estão no tempo da música, então o estágio seguinte recomeça de latência 0.
 - **Coletar**: `coletar: [id]` devolve a saída inteira (porta 0) desses nós. São os stems das faixas e dos retornos.
 - **Cache**: com `cache` (um `Map`, o mesmo `CacheSom` da prévia), um nó com `chave` já guardada não roda, nem o que só
   ele usava. Um nó com chave nova tem a saída guardada. A chave tem que mudar sempre que muda algo que muda o som que sai
@@ -116,6 +119,7 @@ chavesUsadas, latencia, estagios, armazem}`.
 
 ```
 canal:<id> (Fonte: som seco)  →  faixa:<id>/entrada (Passa, soma dos canais na ordem dos canais)
+  → faixa:<id>/atraso (AtrasoFaixa, só se atraso_ms ≠ 0)
   → faixa:<id>/eq (Eq3, se alguma banda ≠ 0) → faixa:<id>/compressor (Compressor, se ligado)
   → faixa:<id>/volume_pan (0 dB se há automação) → faixa:<id>/sidechain (Ganho, curva por notas)
   → faixa:<id>/automacao (Ganho ligado a faixa:<id>/volume_db)
@@ -134,6 +138,13 @@ master → master/automacao (Ganho ligado a master/volume_db) ou master/volume �
 - A automação de volume de hoje é um ganho linear depois do fader, como no motor antigo: o nó `automacao`. Com ela, o
   `volume_pan` fica em 0 dB e sem endereço. A automação geral (X-08) vai ligar curvas nos endereços que os parâmetros
   já levam.
+- **Atraso manual da faixa** (track delay, M-07): `atraso_ms` na faixa do mixer, de −500 a +500 ms, arredondado para
+  amostras inteiras. Vira o nó `faixa:<id>/atraso` (`AtrasoFaixa`) logo depois da soma dos canais. Positivo é uma linha
+  de atraso de verdade, sem latência declarada. Negativo passa direto e declara a latência: o PDC atrasa todo o resto e
+  o executor descarta no fim, então a faixa soa antes. O que cairia antes do zero se perde. O som da faixa e os envios
+  aos retornos andam juntos. A automação e o sidechain da própria faixa ficam no tempo da música. Já o sidechain que
+  essa faixa dispara anda com ela, porque `ganhoDoSidechain` recebe o deslocamento da faixa do canal que dispara. Sem o
+  campo, ou com 0, não entra nó nenhum e o PCM é o de antes. O motor antigo (o oráculo) não conhece o campo.
 - As chaves do cache são as do motor antigo (`canal:`, `faixa:`, `delay:`, `reverb:`). A prévia continua refazendo só o
   que mudou, e o teste confere que o cache termina com as mesmas chaves do motor antigo.
 - Medido (este PC, Node 26, sem cache): `trilha-video` (43 s) em 1,4 s no grafo e 1,3 a 1,6 s no antigo; `batida`
@@ -194,6 +205,11 @@ adaptador e provar com o oráculo que o PCM não mudou.
 - `npx vitest run testes/audio-memoria.test.ts` cobre a memória: fontes por trecho, instrumentos e curvas por trecho
   contra os de buffer inteiro, o tamanho do trecho que não muda o hash, o armazém, a saída bloco a bloco, o cache em
   disco (hash de referência, LRU, teto) e o WAV lido por trecho.
+- `npx vitest run testes/audio-grafo-pdc.test.ts` prova o PDC com impulso e um processador de latência artificial
+  (`Latente`, que atrasa e declara o atraso), amostra a amostra e com blocos de 1 a 333: caminhos paralelos de latências
+  diferentes, envios a retornos por bloco e de buffer inteiro, sidechain com latência num lado ou no outro, latência
+  antes e depois de um adaptador, automação depois da latência e stems coletados. Também cobre o atraso manual da faixa
+  no documento, pelo endereço da M-02 e pelo JSON Patch.
 - Depois do `npm run mcp:build`, `node scripts/hashes-musica.mjs --sem-vitest` confere os mesmos hashes pelo MCP por
   stdio.
 - Para um efeito novo (não convertido), que não tem oráculo, teste o processador isolado: impulso, resposta conhecida,
@@ -259,4 +275,6 @@ amostra a maiores que o sinal, sinal mais curto que o lookahead, pico na primeir
   inteira: a medida de loudness e o hash leem tudo.
 - O tamanho e o amortecimento do Freeverb e o atraso, a realimentação e o brilho do delay são argumentos do construtor,
   sem endereço da M-02 nem automação. Viram parâmetros quando a X-08 definir os endereços dos retornos.
-- O track delay manual e o PDC visível na tela são da M-07. O PDC automático do executor já existe.
+- O atraso manual ainda não tem campo na tela (só no documento, no `aplicar_patch` e pelo endereço
+  `faixa:<id>/atraso_ms`), e a tela ainda não mostra a latência de cada faixa. Um `ProcessadorInteiro` não declara
+  latência: ele já devolve a saída no tempo da música.

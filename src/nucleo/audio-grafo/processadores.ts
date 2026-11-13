@@ -154,3 +154,35 @@ export class Atraso implements Processador {
     if (linhas) linhas.forEach((l, c) => this.linhas[c]?.set(l.slice(0, this.linhas[c].length)));
   }
 }
+
+/** O atraso manual de uma faixa ("track delay", M-07), em amostras. Positivo atrasa de verdade: uma linha de atraso sem
+ *  latência declarada, que o PDC não desfaz. Negativo adianta: o sinal passa direto e o nó declara `−amostras` de
+ *  latência, então o PDC atrasa todos os outros caminhos até o somador e, no fim, o executor descarta esse atraso da
+ *  saída; o efeito é esta faixa soar `−amostras` antes (o que cairia antes do zero se perde). Com 0, é uma passagem. */
+export class AtrasoFaixa implements Processador {
+  readonly tipo = 'atraso_faixa';
+  readonly entradas: number[];
+  readonly saidas: number[];
+  readonly latencia: number;
+  private readonly linha: Atraso;
+  constructor(readonly amostras: number, canais = 2) {
+    if (!Number.isInteger(amostras)) throw new Error(`atraso_faixa: ${amostras} amostras não é inteiro`);
+    this.entradas = [canais];
+    this.saidas = [canais];
+    this.latencia = Math.max(0, -amostras);
+    this.linha = new Atraso(Math.max(0, amostras), canais);
+  }
+  preparar() {}
+  processar(entradas: readonly (readonly Float32Array[])[], saidas: readonly Float32Array[][], n: number) {
+    this.linha.processar(entradas, saidas, n);
+  }
+  resetar() {
+    this.linha.resetar();
+  }
+  estado(): EstadoProcessador {
+    return this.linha.estado();
+  }
+  restaurar(e: EstadoProcessador) {
+    this.linha.restaurar(e);
+  }
+}

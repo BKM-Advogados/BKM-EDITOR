@@ -148,10 +148,11 @@ const curvaPorTrecho = (n: number, fazer: (de: number, ate: number, out: Float32
 };
 
 /** O ganho do sidechain por notas (ganhoDoSidechain), por trecho. `disparos` em ordem crescente. */
-export const curvaDoSidechain = (disparos: number[], sc: {quanto_db: number; ataque_ms: number; soltura_ms: number}, n: number, taxa: number): CurvaParam => {
+export const curvaDoSidechain = (disparos: number[], sc: {quanto_db: number; ataque_ms: number; soltura_ms: number}, n: number, taxa: number,
+  deslocamento = 0): CurvaParam => {
   const at = Math.round((sc.ataque_ms / 1000) * taxa);
   const so = Math.max(1, Math.round((sc.soltura_ms / 1000) * taxa));
-  const centros = disparos.map((t) => Math.round(t * taxa));
+  const centros = disparos.map((t) => Math.round(t * taxa) + deslocamento); // o atraso manual de quem dispara (M-07)
   let red = new Float32Array(0);
   return curvaPorTrecho(n, (de, ate, out) => {
     const tam = ate - de;

@@ -6,6 +6,7 @@
 // Os nós e os ids (que são os endereços da M-02 quando há um):
 //   canal:<id>                     Fonte: o som seco do canal (instrumento ainda de buffer inteiro, guardado no cache)
 //   faixa:<id>/entrada             Passa: soma dos canais da faixa, na ordem dos canais
+//   faixa:<id>/atraso              AtrasoFaixa: o atraso manual da faixa (só se atraso_ms ≠ 0; negativo vira latência)
 //   faixa:<id>/eq                  Eq3 (só se alguma banda ≠ 0)
 //   faixa:<id>/compressor          Compressor (só se ligado)
 //   faixa:<id>/volume_pan          VolumePan (volume 0 dB quando há automação: a curva toma o lugar do fader)
@@ -28,7 +29,7 @@ import {Limitador} from './limitador';
 import {BLOCO_PADRAO, executarOffline} from './executor';
 import {Grafo} from './grafo';
 import {audioPorTrecho, bateriaPorTrecho, curvaDaAutomacao, curvaDoSidechain, sintetizadorPorTrecho} from './instrumentos';
-import {Fonte, Ganho, ganhoDeDb, Passa, VolumePan} from './processadores';
+import {AtrasoFaixa, Fonte, Ganho, ganhoDeDb, Passa, VolumePan} from './processadores';
 
 /** Tamanho do trecho em que o som seco de um canal é feito quando não há cache em Map (o render do processo, do MCP e da
  *  entrega): 32768 amostras, 0,68 s a 48 kHz; dois trechos por canal na memória. */
@@ -116,15 +117,25 @@ export const grafoDaMusica = (doc: DocMusica, fontes: Record<string, FonteAudio 
   const envios: {no: string; chave: string; quanto: number}[] = [];
   const enviosDelay: typeof envios = [];
   const faixas: Record<string, string> = {};
+  // o atraso manual (M-07) em amostras inteiras, por faixa (a primeira com o id, como o resto do motor acha a faixa)
+  const atrasoDe = (id: string) => Math.round(((m.faixas.find((x) => x.id === id)?.atraso_ms ?? 0) * taxa) / 1000);
   for (const f of m.faixas) {
     const entram = secos.get(f.id);
     if (!entram || f.mudo || (algumSoloFaixa && !f.solo)) continue;
     const auto = m.automacoes[f.id];
     const disparos = f.sidechain ? disparosDoSidechain(m, f.sidechain) : [];
-    const chave = `faixa:${JSON.stringify({f: {...f, mudo: false, solo: false, reverb: 0, delay: 0}, de: entram.map((e) => e.chave), auto, disparos})}`;
+    // o sidechain segue o som de quem dispara: o atraso manual da faixa do canal que dispara move os disparos junto
+    const canalSc = f.sidechain ? m.canais.find((c) => c.id === f.sidechain!.de) : undefined;
+    const deslSc = canalSc ? atrasoDe(canalSc.faixa_mixer) : 0;
+    const chave = `faixa:${JSON.stringify({f: {...f, mudo: false, solo: false, reverb: 0, delay: 0}, de: entram.map((e) => e.chave), auto, disparos,
+      ...(deslSc ? {deslSc} : {}), ...(f.atraso_ms ? {taxa} : {})})}`;
     const base = alvo('faixa', f.id);
     const cadeia: string[] = [g.no(`${base}/entrada`, new Passa(2))];
     for (const e of entram) g.ligar(e.no, cadeia[0]);
+    // o atraso manual vem logo depois da soma dos canais: desloca o som da faixa (e o que ela manda aos retornos), mas a
+    // automação e o sidechain da própria faixa ficam no tempo da música
+    const atraso = Math.round((f.atraso_ms * taxa) / 1000);
+    if (atraso) cadeia.push(g.no(`${base}/atraso`, new AtrasoFaixa(atraso)));
     const {graves_db, medios_db, agudos_db} = f.eq;
     const sem = base.replace(/#\d+$/, ''); // o endereço da M-02 não leva o `#2` dos ids repetidos
     if (graves_db || medios_db || agudos_db) {
@@ -143,7 +154,7 @@ export const grafoDaMusica = (doc: DocMusica, fontes: Record<string, FonteAudio 
       pan: {endereco: `${base.replace(/#\d+$/, '')}/pan`, valor: f.pan}}}));
     if (f.sidechain && disparos.length) {
       const sc = f.sidechain;
-      cadeia.push(g.no(`${base}/sidechain`, new Ganho(2), {params: {ganho: {curva: curvaDoSidechain(disparos, sc, n, taxa)}}}));
+      cadeia.push(g.no(`${base}/sidechain`, new Ganho(2), {params: {ganho: {curva: curvaDoSidechain(disparos, sc, n, taxa, deslSc)}}}));
     }
     if (auto) {
       g.automatizar(endVolume, curvaDaAutomacao(auto, n, taxa));
