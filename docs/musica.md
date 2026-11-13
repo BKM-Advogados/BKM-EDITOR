@@ -203,7 +203,11 @@ e quadradas desafinadas, sem arquivo nem licença de terceiros), os clipes de á
 domínio público) no master. A mesma conta roda na janela, num Web Worker (o Web Audio só decodifica a 48 kHz e toca o
 resultado), no render que vai para o vídeo e no MCP por stdio, então a prévia e o render saem iguais amostra por amostra.
 
-**Por que um motor próprio e não o Tone.js** (decisão da frente, dentro da D1: só Web Audio, sem módulo nativo nem VST):
+**Por que um motor próprio e não o Tone.js** (decisão da frente, dentro da D1: só Web Audio, sem módulo nativo nem VST).
+A D1 foi revista em 12/11/2026 em duas camadas ([A1](adr/A1-d1-em-duas-camadas.md)): o render canônico (vídeo,
+exportação, MCP) continua só TypeScript/WASM, e código nativo só entra na periferia, em processo separado, com a saída
+congelada em WAV; isso só chega na onda M8. As outras decisões do roadmap (`docs/musica-daw.md`) estão em
+[`docs/adr/`](adr/README.md). Os motivos abaixo seguem valendo:
 - O Tone.js toca no Web Audio da janela e renderiza com o `OfflineAudioContext`, que só existe no navegador. O MCP por
   stdio (outro app de IA, sem a janela do Estúdio) e o processo principal não teriam como fazer o render para o vídeo; a
   ligação viva dependeria da janela aberta.
