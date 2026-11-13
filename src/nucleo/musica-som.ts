@@ -4,6 +4,7 @@
 // (src/main/musica-render.ts) e no MCP por stdio, então a prévia e o render saem iguais amostra por amostra. Nada de
 // Math.random: o ruído vem da semente do documento. Ver docs/musica.md.
 import type {FonteAudio} from './loudness';
+import {ganhoDeDb, panLei} from './audio-grafo/processadores';
 import {resolverMusica, type IdLicenca, type CanalMusicaP, type ClipeMusicaP, type DocMusica, type FaixaMixerP, type MacrosSintetizador, type MusicaP, type NotaMusica, type PecaBateria,
   type PresetSintetizador} from './musica';
 
@@ -242,13 +243,11 @@ const somDaPeca = (cache: CacheSom, peca: PecaBateria, afinacao: number, semente
   return s;
 };
 
-// balanço de potência igual: no centro os dois lados ficam inteiros; todo de um lado, o outro cala (0 exato)
-const ladoDoPan = (p: number) => (p >= 1 ? 0 : Math.cos((p * Math.PI) / 2));
-const panLei = (p: number): [number, number] => [p > 0 ? ladoDoPan(p) : 1, p < 0 ? ladoDoPan(-p) : 1];
-const ganhoDeDb = (db: number) => Math.pow(10, db / 20);
+// o pan de potência igual (panLei) e o dB em ganho (ganhoDeDb) moram em audio-grafo/processadores.ts: uma conta só para
+// o motor antigo e o grafo
 
 /** Canal de bateria: cada nota é a peça do kit com força, volume e pan da peça; o grupo de corte cala a anterior. */
-const renderBateria = (m: MusicaP, canal: CanalMusicaP, n: number, taxa: number, cache: CacheSom): Float32Array[] => {
+export const renderBateria = (m: MusicaP, canal: CanalMusicaP, n: number, taxa: number, cache: CacheSom): Float32Array[] => {
   const L = new Float32Array(n), R = new Float32Array(n);
   const eventos = m.clipes.filter((c) => c.canal === canal.id && !c.mudo).flatMap((c) => notasDoClipe(m, c)).sort((a, b) => a.s - b.s);
   // fim de cada voz: o natural ou a próxima peça do mesmo grupo
@@ -298,7 +297,7 @@ export const naTaxa = (f: FonteAudio, taxa: number): Float32Array[] => {
 };
 
 /** Canal de áudio: cada clipe é o arquivo a partir do corte, com o ganho e os fades (lineares, como no vídeo). */
-const renderAudio = (m: MusicaP, canal: CanalMusicaP, n: number, taxa: number, fontes: Record<string, FonteAudio | undefined>, faltando: Set<string>): Float32Array[] => {
+export const renderAudio = (m: MusicaP, canal: CanalMusicaP, n: number, taxa: number, fontes: Record<string, FonteAudio | undefined>, faltando: Set<string>): Float32Array[] => {
   const L = new Float32Array(n), R = new Float32Array(n);
   for (const c of m.clipes) {
     if (c.canal !== canal.id || c.mudo || !c.audio) continue;
@@ -331,7 +330,7 @@ const renderAudio = (m: MusicaP, canal: CanalMusicaP, n: number, taxa: number, f
 
 // ---------- mixer ----------
 /** Compressor de alimentação direta, com detector de pico ligado nos dois lados (não mexe na imagem estéreo). */
-const comprimir = (canais: Float32Array[], c: FaixaMixerP['compressor'], taxa: number) => {
+export const comprimir = (canais: Float32Array[], c: FaixaMixerP['compressor'], taxa: number) => {
   const at = Math.exp(-1 / ((c.ataque_ms / 1000) * taxa));
   const so = Math.exp(-1 / ((c.soltura_ms / 1000) * taxa));
   const [L, R] = canais;
@@ -637,7 +636,7 @@ export const notaDoSintetizador = (midi: number, dur_s: number, r: ReceitaSint, 
 };
 
 /** Canal de sintetizador: cada nota do padrão (MIDI), com a duração dela (padrão: um passo da grade), até o fim do clipe. */
-const renderSintetizador = (m: MusicaP, canal: CanalMusicaP, n: number, taxa: number): Float32Array[] => {
+export const renderSintetizador = (m: MusicaP, canal: CanalMusicaP, n: number, taxa: number): Float32Array[] => {
   const L = new Float32Array(n), R = new Float32Array(n);
   const r = receitaDe(canal.preset, canal.macros);
   for (const c of m.clipes) {
@@ -666,17 +665,21 @@ export type ResultadoSom = {canais: Float32Array[]; taxa: number; duracao_s: num
   retornos?: Partial<Record<'reverb' | 'delay', Float32Array[]>>; limitador_db?: number};
 
 /** Chave do som seco de um canal: o que muda o que ele toca (não o mixer). */
-const chaveDoCanal = (m: MusicaP, canal: CanalMusicaP, n: number, taxa: number, fontes: Record<string, FonteAudio | undefined>) => {
+export const chaveDoCanal = (m: MusicaP, canal: CanalMusicaP, n: number, taxa: number, fontes: Record<string, FonteAudio | undefined>) => {
   const clipes = m.clipes.filter((c) => c.canal === canal.id);
   const padroes = canal.tipo !== 'audio' ? [...new Set(clipes.map((c) => c.padrao))].map((p) => (p ? m.padroes[p] : null)) : [];
   const audios = canal.tipo === 'audio' ? clipes.map((c) => (c.audio ? `${c.audio}:${fontes[c.audio]?.canais[0]?.length ?? 'falta'}:${fontes[c.audio]?.taxa ?? 0}` : '')) : [];
   return `canal:${JSON.stringify({c: {...canal, mudo: false, solo: false}, clipes, padroes, audios, bpm: m.bpm, swing: m.swing, semente: m.semente, n, taxa})}`;
 };
 
-/** A música inteira, em estéreo: cada canal seco (guardado em `cache` pela chave, para a prévia só refazer o que mudou),
+/** O MOTOR ANTIGO, de buffer inteiro, guardado como oráculo da migração para o grafo (M-01): os testes comparam o PCM do
+ *  grafo com o dele (testes/audio-grafo-oraculo.test.ts). Ninguém do app chama isto; o render é `renderizarMusica`, que
+ *  agora monta e roda o grafo (audio-grafo/musica.ts). Não mude a conta daqui: ela é a referência.
+ *
+ *  A música inteira, em estéreo: cada canal seco (guardado em `cache` pela chave, para a prévia só refazer o que mudou),
  *  as faixas do mixer e o master. Mudo e solo valem por canal e por faixa: havendo solo, só toca o que tem solo.
  *  `fontes` vem por arquivo (o que faltar fica calado e volta em `faltando`). */
-export const renderizarMusica = (doc: DocMusica, fontes: Record<string, FonteAudio | undefined>,
+export const renderizarMusicaAntigo = (doc: DocMusica, fontes: Record<string, FonteAudio | undefined>,
   o: {taxa?: number; cache?: CacheSom; porFaixa?: boolean; duracao_s?: number} = {}): ResultadoSom => {
   const taxa = o.taxa ?? TAXA_MUSICA;
   const cache = o.cache ?? new Map();
@@ -794,6 +797,10 @@ export const renderizarMusica = (doc: DocMusica, fontes: Record<string, FonteAud
   return {canais: [L, R], taxa, duracao_s: n / taxa, avisos, faltando: [...faltando], ...(o.porFaixa ? {faixas, retornos} : {}),
     ...(limitador_db !== undefined ? {limitador_db} : {})};
 };
+
+/** A música inteira, em estéreo, pelo grafo de processadores (M-01; ver audio-grafo/musica.ts e docs/audio-grafo.md):
+ *  a mesma assinatura, o mesmo resultado e o mesmo PCM do motor antigo (`renderizarMusicaAntigo`). */
+export {renderizarMusicaGrafo as renderizarMusica} from './audio-grafo/musica';
 
 /** Uma batida só, para o pad e a prévia de som: a peça com o ajuste do canal, em estéreo. */
 export const somDeUmaBatida = (peca: PecaBateria, aj: {volume_db?: number; pan?: number; afinacao?: number} = {}, forca = 100, semente = 1, taxa = TAXA_MUSICA) => {
