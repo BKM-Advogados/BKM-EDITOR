@@ -107,3 +107,60 @@ export const definirLicenca = (doc: DocMusica, l: LicencaSom): Edicao => {
     : i >= 0 ? [{op: 'replace', path: `/licencas/${i}`, value: valor}] : [{op: 'add', path: '/licencas/-', value: valor}];
   return {patch, rotulo: `licença ${NOME_LICENCA[l.licenca]} em ${l.arquivo?.split('/').pop() ?? `kit ${l.kit}`}`, caminho: `/licencas/${i >= 0 ? i : lista.length}`};
 };
+
+// ---- Origens estendidas e política de dependências (N-10, decisão A6 de docs/musica-daw.md) ----
+// Só tipos, constantes e funções puras novas: nada do que está acima muda, então documentos antigos soam e licenciam igual.
+
+/** Origens de conteúdo que a DAW vai ter além do kit, do sintetizador da casa e do áudio do projeto. */
+export type TipoOrigem = 'amostra' | 'ir' | 'preset' | 'modelo_nam' | 'modulo_wasm';
+export const TIPOS_ORIGEM: TipoOrigem[] = ['amostra', 'ir', 'preset', 'modelo_nam', 'modulo_wasm'];
+export const NOME_TIPO_ORIGEM: Record<TipoOrigem, string> = {amostra: 'amostra', ir: 'resposta ao impulso (IR)', preset: 'preset', modelo_nam: 'modelo NAM', modulo_wasm: 'módulo WASM'};
+
+/** Origem de um conteúdo de terceiros: `spdx` é o identificador SPDX da licença, `sha256` o hash do arquivo (64 hex). */
+export type OrigemConteudo = {tipo: TipoOrigem; id: string; nome: string; spdx: string; sha256: string; autor?: string; titulo?: string; link?: string; credito?: string};
+
+/** A política A6. `permitida`: pode ir no bundle; `separada`: só como módulo separado e substituível, com parecer;
+ *  `proibida`: fora do bundle e do WASM. */
+export type ClassePolitica = 'permitida' | 'separada' | 'proibida' | 'desconhecida';
+export const POLITICA_LICENCAS = {
+  permitidas: ['MIT', 'BSD-2-Clause', 'BSD-3-Clause', 'Apache-2.0', 'CC0-1.0', 'CC-BY-4.0'],
+  separada: ['LGPL-2.1', 'LGPL-3.0'],
+  proibidas: ['GPL-2.0', 'GPL-3.0', 'AGPL-3.0'],
+} as const;
+const BASE_SPDX = (s: string) => s.trim().replace(/-(only|or-later)$/i, '').replace(/\+$/, '');
+export const classeDaPolitica = (spdx: string): ClassePolitica => {
+  const b = BASE_SPDX(spdx).toLowerCase();
+  const tem = (l: readonly string[]) => l.some((x) => x.toLowerCase() === b);
+  if (tem(POLITICA_LICENCAS.permitidas)) return 'permitida';
+  if (tem(POLITICA_LICENCAS.separada) || /^lgpl-/.test(b)) return 'separada';
+  if (tem(POLITICA_LICENCAS.proibidas) || /^a?gpl-/.test(b)) return 'proibida';
+  return 'desconhecida';
+};
+/** Pode ir no bundle? `modulo_separado` diz que o conteúdo entra como módulo à parte (único caso em que LGPL passa). */
+export const podeEntrarNoBundle = (spdx: string, o: {modulo_separado?: boolean} = {}) => {
+  const c = classeDaPolitica(spdx);
+  return c === 'permitida' || (c === 'separada' && !!o.modulo_separado);
+};
+
+const SHA256 = /^[0-9a-f]{64}$/;
+/** Confere uma origem: campos obrigatórios, hash SHA-256 e a política A6. Devolve os problemas em português (vazio = ok). */
+export const conferirOrigem = (o: OrigemConteudo, opcoes: {modulo_separado?: boolean} = {}): string[] => {
+  const p: string[] = [];
+  if (!TIPOS_ORIGEM.includes(o.tipo)) p.push(`tipo desconhecido: ${String(o.tipo)}`);
+  if (!o.id?.trim()) p.push('falta o id');
+  if (!o.nome?.trim()) p.push('falta o nome');
+  if (!o.spdx?.trim()) p.push(`${o.nome || o.id}: falta a licença (SPDX)`);
+  else if (classeDaPolitica(o.spdx) === 'desconhecida') p.push(`${o.nome || o.id}: licença ${o.spdx} fora da política (conferir antes de adotar)`);
+  else if (!podeEntrarNoBundle(o.spdx, opcoes)) p.push(`${o.nome || o.id}: licença ${o.spdx} não pode ir no bundle (${classeDaPolitica(o.spdx) === 'separada' ? 'LGPL só em módulo separado' : 'GPL e AGPL são proibidas'})`);
+  if (!SHA256.test(o.sha256 ?? '')) p.push(`${o.nome || o.id}: SHA-256 ausente ou inválido`);
+  if (o.spdx === 'CC-BY-4.0' && !(o.credito?.trim() || o.autor?.trim())) p.push(`${o.nome || o.id}: CC BY pede autor ou crédito`);
+  return p;
+};
+
+/** A linha de crédito de uma origem estendida (reaproveita textoDoCredito quando a licença é uma das já conhecidas). */
+export const creditoDaOrigem = (o: OrigemConteudo) => {
+  if (o.credito?.trim()) return o.credito.trim();
+  const conhecida = (LICENCAS as string[]).includes(o.spdx) ? (o.spdx as IdLicenca) : undefined;
+  if (conhecida) return textoDoCredito({licenca: conhecida, titulo: o.titulo ?? `${NOME_TIPO_ORIGEM[o.tipo]} ${o.nome}`, autor: o.autor, link: o.link});
+  return [`${NOME_TIPO_ORIGEM[o.tipo]} "${o.titulo ?? o.nome}"`, o.autor ? `por ${o.autor}` : '', o.link ? `(${o.link})` : '', `licença ${o.spdx}`].filter(Boolean).join(' ');
+};
