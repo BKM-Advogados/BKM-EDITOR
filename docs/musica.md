@@ -162,8 +162,9 @@ toca como guia, fora da música.
 - **Peças do canal**: `volume_db`, `pan`, `afinacao` (semitons) e `grupo` (peças do mesmo grupo se calam: os dois
   chimbais vêm no grupo 1).
 - **Mixer**: por faixa, `volume_db`, `pan` (−1 a 1), `mudo`, `solo`, `eq` (graves 200 Hz, médios 1 kHz, agudos 5 kHz,
-  de −18 a +18 dB), `compressor`, `reverb` e `delay` (quanto vai a cada retorno, de 0 a 1, depois do volume). Havendo
-  solo, só toca o que tem solo (por canal e por faixa).
+  de −18 a +18 dB), `compressor`, `reverb` e `delay` (quanto vai a cada retorno, de 0 a 1, depois do volume) e
+  `atraso_ms` (o track delay, de −500 a +500 ms; negativo adianta a faixa, ver [`docs/audio-grafo.md`](audio-grafo.md)).
+  Havendo solo, só toca o que tem solo (por canal e por faixa).
 - **Master**: `volume_db`; `reverb` (`tamanho`, `amortecimento`, `volume_db`); `delay` (`tempo`: `1/16`, `1/8`, `1/8.`,
   `1/4`, `1/4.` ou `1/2`, a figura em semínimas; `realimentacao` de 0 a 0,9; `brilho` de 0 a 1; `pingue_pongue`;
   `volume_db`); `limitador` (`ativo`, `teto_db` de −12 a 0, `soltura_ms`). Sem o campo, o limitador fica desligado (o
@@ -206,7 +207,7 @@ a automação geral, o MIDI learn, o MCP e a tela. É o alvo e os segmentos, sep
 
 | Alvo | Exemplos |
 |---|---|
-| `faixa:<id>` (faixa do mixer) | `faixa:bateria/volume_db`, `faixa:bateria/eq/graves_db`, `faixa:bateria/compressor/razao`, `faixa:bateria/envio/reverb`, `faixa:baixo/sidechain/quanto_db` |
+| `faixa:<id>` (faixa do mixer) | `faixa:bateria/volume_db`, `faixa:bateria/atraso_ms`, `faixa:bateria/eq/graves_db`, `faixa:bateria/compressor/razao`, `faixa:bateria/envio/reverb`, `faixa:baixo/sidechain/quanto_db` |
 | `canal:<id>` | `canal:lead/macro/brilho`, `canal:bateria/peca:caixa/afinacao`, `canal:bateria/mudo` |
 | `master` | `master/volume_db`, `master/reverb/tamanho`, `master/delay/tempo`, `master/limitador/teto_db` |
 | `musica` (o documento) | `musica/bpm`, `musica/swing` |
