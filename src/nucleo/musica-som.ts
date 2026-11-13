@@ -4,6 +4,7 @@
 // (src/main/musica-render.ts) e no MCP por stdio, então a prévia e o render saem iguais amostra por amostra. Nada de
 // Math.random: o ruído vem da semente do documento. Ver docs/musica.md.
 import type {FonteAudio} from './loudness';
+import {reamostrar, type QualidadeReamostragem} from './reamostrar';
 import {ganhoDeDb, panLei} from './audio-grafo/processadores';
 import {resolverMusica, type IdLicenca, type CanalMusicaP, type ClipeMusicaP, type DocMusica, type FaixaMixerP, type MacrosSintetizador, type MusicaP, type NotaMusica, type PecaBateria,
   type PresetSintetizador} from './musica';
@@ -280,20 +281,12 @@ export const renderBateria = (m: MusicaP, canal: CanalMusicaP, n: number, taxa: 
   return [L, R];
 };
 
-/** Fonte no ritmo da música: se a taxa for outra, reamostra por interpolação linear (a janela pede 48 kHz ao
- *  navegador e o processo principal ao ffmpeg, então isto só vale para o que vier de fora). */
-export const naTaxa = (f: FonteAudio, taxa: number): Float32Array[] => {
+/** Fonte no ritmo da música: se a taxa for outra, reamostra (sinc com janela Kaiser no canônico, Hermite na prévia; ver
+ *  reamostrar.ts). A janela pede 48 kHz ao navegador e o processo principal ao ffmpeg, então isto só vale para o que
+ *  vier de fora. Na mesma taxa devolve os canais como estão, sem conta. */
+export const naTaxa = (f: FonteAudio, taxa: number, qualidade: QualidadeReamostragem = 'sinc'): Float32Array[] => {
   if (f.taxa === taxa) return f.canais;
-  const razao = f.taxa / taxa;
-  return f.canais.map((c) => {
-    const n = Math.floor(c.length / razao);
-    const out = new Float32Array(n);
-    for (let i = 0; i < n; i++) {
-      const x = i * razao, i0 = Math.floor(x), fr = x - i0;
-      out[i] = c[i0] * (1 - fr) + (c[i0 + 1] ?? c[i0]) * fr;
-    }
-    return out;
-  });
+  return f.canais.map((c) => reamostrar(c, f.taxa, taxa, qualidade));
 };
 
 /** Canal de áudio: cada clipe é o arquivo a partir do corte, com o ganho e os fades (lineares, como no vídeo). */
