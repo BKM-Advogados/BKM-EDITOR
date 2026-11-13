@@ -20,6 +20,9 @@ const pastaNova = (nome: string) => {
   return p;
 };
 
+// Os links deste arquivo são de pasta: 'junction' faz o Windows criá-los sem o Modo de Desenvolvedor (o symlink comum dá
+// EPERM), e o Linux e o Mac ignoram o tipo.
+
 /** Projeto cujo midia/ inteiro é um link para uma pasta de fora (um disco de vídeo bruto). */
 const comMidiaFora = () => {
   const pasta = pastaNova('links');
@@ -27,7 +30,7 @@ const comMidiaFora = () => {
   mkdirSync(path.join(pasta, '.estudio'));
   const fora = pastaNova('fora');
   writeFileSync(path.join(fora, 'ana.jpg'), 'jpg');
-  symlinkSync(fora, path.join(pasta, 'midia'));
+  symlinkSync(fora, path.join(pasta, 'midia'), 'junction');
   return {p: new Projeto(pasta), fora, antes: readdirSync(fora).sort()};
 };
 
@@ -69,7 +72,7 @@ describe('saidas/ por link para outro disco: a exceção das exportações (Proj
     const pasta = pastaNova('saidas-link');
     writeFileSync(path.join(pasta, 'estudio.json'), serializar({formato: 1, nome: 't', documentos: []}));
     const fora = pastaNova('outro-disco');
-    symlinkSync(fora, path.join(pasta, 'saidas'));
+    symlinkSync(fora, path.join(pasta, 'saidas'), 'junction');
     return {p: new Projeto(pasta), fora};
   };
 

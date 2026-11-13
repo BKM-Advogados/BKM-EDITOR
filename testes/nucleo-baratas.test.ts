@@ -127,13 +127,15 @@ describe('N9 .gitignore com caracteres especiais no nome', () => {
   });
 });
 
+// Os links deste bloco são de pasta: 'junction' faz o Windows criá-los sem o Modo de Desenvolvedor (o symlink comum dá
+// EPERM), e o Linux e o Mac ignoram o tipo. O Node vê a junção como link (lstat, realpath), como o app.
 describe('N10 link simbólico em midia/ para fora do projeto: só leitura', () => {
   const comLink = () => {
     const {pasta, p} = projetoMinimo();
     const fora = pastaNova('fora');
     writeFileSync(path.join(fora, 'bruto.wav'), 'RIFF');
     mkdirSync(path.join(pasta, 'midia'));
-    symlinkSync(fora, path.join(pasta, 'midia', 'externo'));
+    symlinkSync(fora, path.join(pasta, 'midia', 'externo'), 'junction');
     return {pasta, p, fora};
   };
 
@@ -160,7 +162,7 @@ describe('N10 link simbólico em midia/ para fora do projeto: só leitura', () =
     writeFileSync(path.join(base, 'kit', 'marca.json'), JSON.stringify({nome: 'Kit', logo: 'logo.png'}));
     const {pasta, p} = projetoMinimo(novoDocCenas({largura: 1080, altura: 1920, fps: 30}));
     const fora = pastaNova('fora-midia');
-    symlinkSync(fora, path.join(pasta, 'midia'));
+    symlinkSync(fora, path.join(pasta, 'midia'), 'junction');
     expect(() => new PastaMarcas({pasta: () => base}).aplicar(p, 'kit', 'd', {autor: 'agente', origem: 'mcp'})).toThrow(/link simbólico/);
     expect(existsSync(path.join(fora, 'logo-kit.png'))).toBe(false);
   });
@@ -168,7 +170,7 @@ describe('N10 link simbólico em midia/ para fora do projeto: só leitura', () =
   it('um projeto aberto por um caminho com link (a pasta Estudio em outro disco) grava normalmente', () => {
     const {pasta} = projetoMinimo();
     const atalho = path.join(pastaNova('atalho'), 'projeto');
-    symlinkSync(pasta, atalho);
+    symlinkSync(pasta, atalho, 'junction');
     const p = new Projeto(atalho);
     p.aplicarPatch({documento: 'd', patch: [{op: 'replace', path: '/cor', value: 'b'}], autor: 'pessoa', origem: 'interface'});
     expect(p.lerJson<{cor: string}>('d.json').doc.cor).toBe('b');
