@@ -24,6 +24,7 @@ import type {PedidoExportarMusica, ResultadoExportarMusica} from '../nucleo/musi
 import {hashesDaMusica} from '../nucleo/musica-projeto';
 import {comprovanteDeLicencas, licencasDaMusica, textoDosCreditos} from '../nucleo/musica-licencas';
 import {gravarEnvelope} from './ipc-audio';
+import {hashDoPcm} from '../nucleo/musica-hash';
 
 const lerMusica = (p: Projeto, id: string) => {
   const {doc} = p.lerJson<unknown>(p.arquivoDoDocumento(id));
@@ -69,7 +70,7 @@ const gravarBinario = (p: Projeto, rel: string, dados: Buffer) => {
 
 /** O que a janela devolve ao pedido "musica:render" (o Web Worker dela fez a conta). */
 type RenderDaJanela = {wav?: Uint8Array; duracao_s?: number; avisos?: string[]; faltando?: string[]; medida?: {integrado_lufs: number | null; pico_dbtp: number | null};
-  faixas?: Record<string, {integrado_lufs: number | null; pico_dbtp: number | null}>; envelope?: Envelope};
+  faixas?: Record<string, {integrado_lufs: number | null; pico_dbtp: number | null}>; envelope?: Envelope; pcm_sha256?: string; amostras?: number};
 
 /** O serviço que o MCP e o IPC usam (definirServicoMusica). Com a janela (o app aberto), o som é feito no Web Worker
  *  dela, com o cache da prévia, e o processo principal só grava: nada pesado na thread que atende a janela. Sem janela
@@ -116,10 +117,12 @@ export const servicoDeRender = (o: {binarios?: () => string | null | undefined; 
   exportar: (p, id, pedido) => exportarMusica(p, id, pedido, o),
   medir: async (p, id, opcoes = {}): Promise<MedidaMusica> => {
     const doc = lerMusica(p, id);
-    const daJanela = o.janela ? await o.janela('musica:render', {doc, porFaixa: opcoes.porFaixa, sohMedir: true}, {tempo_ms: 120_000}) : null;
+    const daJanela = o.janela ? await o.janela('musica:render', {doc, porFaixa: opcoes.porFaixa, sohMedir: true, hash: opcoes.hash}, {tempo_ms: 120_000}) : null;
     if (daJanela?.ok) {
       const r = daJanela.dados as RenderDaJanela;
-      if (r.medida) return {...r.medida, duracao_ms: Math.round((r.duracao_s ?? 0) * 1000), ...(r.faixas ? {faixas: r.faixas} : {}), avisos: r.avisos ?? []};
+      // a janela de uma versão sem o hash cai na conta daqui (o hash pedido sempre volta)
+      if (r.medida && (!opcoes.hash || r.pcm_sha256)) return {...r.medida, duracao_ms: Math.round((r.duracao_s ?? 0) * 1000), ...(r.faixas ? {faixas: r.faixas} : {}), avisos: r.avisos ?? [],
+        ...(opcoes.hash ? {pcm_sha256: r.pcm_sha256, amostras: r.amostras, feito_por: 'janela' as const} : {})};
     }
     const som = renderizarMusica(doc, await fontesDe(p, doc, o.binarios?.()), {taxa: TAXA_MUSICA, porFaixa: opcoes.porFaixa});
     const m = medirAmostras(som.canais, som.taxa);
@@ -129,7 +132,8 @@ export const servicoDeRender = (o: {binarios?: () => string | null | undefined; 
         return [f, {integrado_lufs: x.integrado_lufs, pico_dbtp: x.pico_dbtp}];
       }))
       : undefined;
-    return {integrado_lufs: m.integrado_lufs, pico_dbtp: m.pico_dbtp, duracao_ms: Math.round(som.duracao_s * 1000), ...(faixas ? {faixas} : {}), avisos: som.avisos};
+    return {integrado_lufs: m.integrado_lufs, pico_dbtp: m.pico_dbtp, duracao_ms: Math.round(som.duracao_s * 1000), ...(faixas ? {faixas} : {}), avisos: som.avisos,
+      ...(opcoes.hash ? {pcm_sha256: hashDoPcm(som.canais), amostras: som.canais[0].length, feito_por: 'processo' as const} : {})};
   },
 });
 

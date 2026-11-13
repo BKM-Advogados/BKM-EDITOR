@@ -67,13 +67,16 @@ export const baseDoProjeto = (p: Projeto, autor: string, origem: string): BasePr
 /** Medida gravada ao lado do render (midia/musica/x.<código>.json). */
 export type MedidaRender = {formato: 1; musica: string; duracao_ms: number; integrado_lufs: number | null; pico_dbtp: number | null; avisos: string[]; faltando: string[]; feito_em: string;
   feito_por?: 'janela' | 'processo'};
-export type MedidaMusica = {integrado_lufs: number | null; pico_dbtp: number | null; duracao_ms: number; faixas?: Record<string, {integrado_lufs: number | null; pico_dbtp: number | null}>; avisos: string[]};
+/** Com `hash` pedido: o SHA-256 do PCM da mistura (contrato de determinismo, src/nucleo/musica-hash.ts), quantas amostras por
+ *  canal e quem fez a conta (a janela, pelo worker, ou o processo). */
+export type MedidaMusica = {integrado_lufs: number | null; pico_dbtp: number | null; duracao_ms: number; faixas?: Record<string, {integrado_lufs: number | null; pico_dbtp: number | null}>; avisos: string[];
+  pcm_sha256?: string; amostras?: number; feito_por?: 'janela' | 'processo'};
 
 export type ServicoMusica = {
   /** Grava o WAV do documento como ele está (ou reaproveita, pelo código) e a medida ao lado. */
   renderizar: (p: Projeto, id: string) => Promise<{arquivo: string; duracao_ms: number; novo: boolean; medida: MedidaRender}>;
   /** LUFS e pico da mistura e, com porFaixa, de cada faixa do mixer. */
-  medir: (p: Projeto, id: string, o?: {porFaixa?: boolean}) => Promise<MedidaMusica>;
+  medir: (p: Projeto, id: string, o?: {porFaixa?: boolean; hash?: boolean}) => Promise<MedidaMusica>;
   /** A música em arquivo em saidas/ (item 23): WAV de 24 bits, M4A ou Opus no alvo de loudness, stems em WAV, ou MIDI. */
   exportar?: (p: Projeto, id: string, pedido: PedidoExportarMusica) => Promise<ResultadoExportarMusica>;
 };
