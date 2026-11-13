@@ -126,8 +126,16 @@ export const grafoDaMusica = (doc: DocMusica, fontes: Record<string, FonteAudio 
     const cadeia: string[] = [g.no(`${base}/entrada`, new Passa(2))];
     for (const e of entram) g.ligar(e.no, cadeia[0]);
     const {graves_db, medios_db, agudos_db} = f.eq;
-    if (graves_db || medios_db || agudos_db) cadeia.push(g.no(`${base}/eq`, new Eq3(f.eq)));
-    if (f.compressor.ativo) cadeia.push(g.no(`${base}/compressor`, new Compressor(f.compressor)));
+    const sem = base.replace(/#\d+$/, ''); // o endereço da M-02 não leva o `#2` dos ids repetidos
+    if (graves_db || medios_db || agudos_db) {
+      cadeia.push(g.no(`${base}/eq`, new Eq3(), {params: Object.fromEntries((['graves_db', 'medios_db', 'agudos_db'] as const)
+        .map((b) => [b, {endereco: `${sem}/eq/${b}`, valor: f.eq[b]}]))}));
+    }
+    if (f.compressor.ativo) {
+      const c = f.compressor;
+      cadeia.push(g.no(`${base}/compressor`, new Compressor(), {params: Object.fromEntries((['limiar_db', 'razao', 'ataque_ms', 'soltura_ms', 'ganho_db'] as const)
+        .map((p) => [p, {endereco: `${sem}/compressor/${p}`, valor: c[p]}]))}));
+    }
     // os parâmetros levam o endereço da M-02 (a automação geral da X-08 liga aqui); a de volume de hoje é um ganho linear
     // depois do fader (nó `automacao`), como no motor antigo, então com ela o fader fica em 0 dB e sem endereço
     const endVolume = `${base.replace(/#\d+$/, '')}/volume_db`;
@@ -191,8 +199,9 @@ export const grafoDaMusica = (doc: DocMusica, fontes: Record<string, FonteAudio 
   const lim = m.master.limitador;
   let limitador: Limitador | undefined;
   if (lim.ativo) {
-    limitador = new Limitador(lim.teto_db, lim.soltura_ms, n);
-    const no = g.no('master/limitador', limitador);
+    limitador = new Limitador(n);
+    const no = g.no('master/limitador', limitador, {params: {teto_db: {endereco: 'master/limitador/teto_db', valor: lim.teto_db},
+      soltura_ms: {endereco: 'master/limitador/soltura_ms', valor: lim.soltura_ms}}});
     g.ligar(saida, no);
     saida = no;
   }

@@ -10,18 +10,28 @@
 // - A soltura (r), a média móvel (soma em double, janela em float32) e o corte no teto são os mesmos, na mesma ordem. Sem
 //   nenhum pico acima do teto, o ganho é 1 exato e a saída é a entrada, como o `if (!algum) return 0` do antigo.
 // `reducao_db` é a maior redução de [0, fim), arredondada a 0,1 dB (o `limitador_db` do resultado).
-// Ver docs/audio-grafo.md.
+// O teto e a soltura são parâmetros (endereços master/limitador/teto_db e soltura_ms da M-02); com curva de automação
+// (X-08) vale o valor do começo do bloco. Ver docs/audio-grafo.md.
 import {ganhoDeDb} from './processadores';
 import type {ContextoBloco, EstadoProcessador, Processador} from './tipos';
+
+export const LOOKAHEAD_LIMITADOR_S = 0.0015;
+/** A latência do limitador em amostras: o lookahead de 1,5 ms do motor antigo. */
+export const latenciaDoLimitador = (taxa: number) => Math.max(1, Math.round(LOOKAHEAD_LIMITADOR_S * taxa));
 
 export class Limitador implements Processador {
   readonly tipo = 'limitador';
   readonly entradas = [2];
   readonly saidas = [2];
   latencia = 0;
+  readonly parametros = [{nome: 'teto_db', padrao: -1}, {nome: 'soltura_ms', padrao: 80}];
+  private taxa = 48000;
   private la = 1;
   private teto = 1;
   private so = 0;
+  // os valores com que `teto` e `so` foram calculados (refeitos só quando o parâmetro muda)
+  private tetoDb = NaN;
+  private solturaMs = NaN;
   // a entrada atrasada (la + 1 por canal) e o pedido por amostra que entrou, com a fila monotônica do mínimo
   private linhaL = new Float32Array(2);
   private linhaR = new Float32Array(2);
@@ -35,18 +45,18 @@ export class Limitador implements Processador {
   private janela = new Float32Array(2);
   private w = 0;
   private menor = 1;
-  /** `fim`: amostras da música (o que vem depois só esvazia a linha). */
-  constructor(readonly teto_db: number, readonly soltura_ms: number, readonly fim: number) {}
+  /** `fim`: amostras da música (o que vem depois só esvazia a linha); sem ele, tudo o que entra conta. */
+  constructor(readonly fim = Infinity) {}
 
   get reducao_db() {
     return this.menor < 1 ? Math.round(-20 * Math.log10(this.menor) * 10) / 10 : 0;
   }
 
   preparar(taxa: number, _bloco?: number) {
-    this.la = Math.max(1, Math.round(0.0015 * taxa));
+    this.taxa = taxa;
+    this.la = latenciaDoLimitador(taxa);
     this.latencia = this.la;
-    this.teto = ganhoDeDb(this.teto_db);
-    this.so = Math.exp(-1 / ((this.soltura_ms / 1000) * taxa));
+    this.tetoDb = this.solturaMs = NaN;
     const tam = this.la + 1;
     this.linhaL = new Float32Array(tam);
     this.linhaR = new Float32Array(tam);
@@ -69,6 +79,16 @@ export class Limitador implements Processador {
   }
 
   processar(entradas: readonly (readonly Float32Array[])[], saidas: readonly Float32Array[][], n: number, ctx: ContextoBloco) {
+    const pt = ctx.param('teto_db'), ps = ctx.param('soltura_ms');
+    const tetoDb = typeof pt === 'number' ? pt : pt[0], solturaMs = typeof ps === 'number' ? ps : ps[0];
+    if (tetoDb !== this.tetoDb) {
+      this.teto = ganhoDeDb(tetoDb);
+      this.tetoDb = tetoDb;
+    }
+    if (solturaMs !== this.solturaMs) {
+      this.so = Math.exp(-1 / ((solturaMs / 1000) * this.taxa));
+      this.solturaMs = solturaMs;
+    }
     const [L, R] = entradas[0], [oL, oR] = saidas[0];
     const {la, teto, so, fim, linhaL, linhaR, pedido, fila, janela} = this;
     const tam = la + 1, cap = fila.length;

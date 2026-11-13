@@ -228,6 +228,29 @@ seção 4.10](desempenho.md#410-música-memória-do-render-m-04)):
   disco do projeto, e a prévia precisa refazer só o que mudou em décimos de segundo. Levar esse cache para o OPFS fica
   para quando a memória da prévia apertar.
 
+## EQ, compressor e limitador: parâmetros e limitador causal
+
+Os três saem com **o mesmo PCM, bit a bit**, do motor antigo, inclusive o `limitador_db`. Nenhuma tolerância foi
+precisa, e o limitador por bloco não muda o hash (conferido pelo oráculo, pelos hashes da M0 e por
+`testes/audio-grafo-efeitos.test.ts`, que compara com `filtrarNoLugar`, `comprimir` e `limitarNoLugar` em blocos de 1
+amostra a maiores que o sinal, sinal mais curto que o lookahead, pico na primeira e na última amostra, −0 e estado em JSON).
+
+- **`Eq3`**: parâmetros `graves_db`, `medios_db`, `agudos_db` (`faixa:<id>/eq/<banda>_db`). Um biquad por banda e canal
+  com `x1 x2 y1 y2` em `number`; a saída de cada banda é float32 e entra na banda seguinte. Banda em 0 dB fica fora do
+  caminho, como antes. O coeficiente é refeito quando o valor muda; com curva de automação ele usa o valor do começo do
+  bloco (a interpolação por amostra do EQ é decisão da X-08).
+- **`Compressor`**: parâmetros `limiar_db`, `razao`, `ataque_ms`, `soltura_ms`, `ganho_db`. O envelope é `number` e
+  atravessa os blocos. Sem lookahead: latência 0. Parâmetros com curva valem o do começo do bloco (X-08).
+- **`Limitador`**: parâmetros `teto_db` e `soltura_ms`. Causal, com `latencia = max(1, round(0,0015·taxa))` (72
+  amostras a 48 kHz). O pedido de cada amostra entra numa fila monotônica (mínimo da janela `[i, i + la]`, float32 como o
+  motor antigo) e a entrada espera numa linha de `la` amostras. O executor desconta a latência (PDC). O limitador
+  recebe `fim` (as amostras da música): o que entra depois dele (a cauda do reverb, ou o silêncio que completa a janela)
+  pede 1, como no motor antigo, que completava a janela da cauda sem olhar além do fim; e a redução só conta em
+  `[0, fim)`. Diferença medida contra o motor antigo: **0 dB**
+  (zero amostras diferentes), então não há tolerância a aprovar pelo dono. Se uma versão futura do limitador mudar a
+  conta (mais lookahead, true peak), aí sim a tolerância da M1 volta à mesa. `reducao_db` (o `limitador_db` do resultado)
+  é lido do processador depois do render.
+
 ## O que ainda não é
 
 - Os instrumentos são fontes (lidas por trecho), não processadores (I-01).
