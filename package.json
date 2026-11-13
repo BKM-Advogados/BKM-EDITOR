@@ -1,7 +1,7 @@
 {
   "name": "estudio",
   "productName": "Estudio",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Estúdio criativo desktop: vídeo, imagem, 3D e efeitos, editáveis à mão ou pelo terminal com o Claude",
   "author": "Estúdio",
   "private": true,

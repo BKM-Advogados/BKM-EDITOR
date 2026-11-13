@@ -205,6 +205,7 @@ export type Preferencias = {pasta_projetos: string; ao_iniciar: 'inicio' | 'ulti
   pasta_modelos: string; // os modelos da pessoa (Salvar como modelo; padrão: Estudio/meus-modelos; Estudio/modelos é a do whisper e do MODNet)
   projetos_ide?: boolean; // frente IDE e harnesses: guias e MCP de cada harness em cada projeto (padrão: ligado; docs/ide.md)
   procurar_atualizacoes?: boolean; versao_pulada?: string; // atualização do app (padrão: procura; "Pular esta versão")
+  mcp_confiar_no_cliente?: boolean; // ponte do Claude Code/Desktop roda as ações sensíveis sem perguntar de novo (mcp-desktop.ts)
   primeiros_passos?: EstadoPassos}; // Onda B: os primeiros passos do editor já feitos e o "Não mostrar mais" (nucleo/primeiros-passos.ts)
 
 /** `marca` é o id do kit de marca que entra no tema do documento novo (sem ele, o tema neutro). */

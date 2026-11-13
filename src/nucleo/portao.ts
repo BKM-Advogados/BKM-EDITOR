@@ -11,7 +11,23 @@ import type {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import type {EntradaDiario} from './documentos';
 
 export type Classe = 'livre' | 'cartao';
-export type PedidoPortao = {ferramenta: string; entrada: Record<string, unknown>; motivo: string; sinal?: AbortSignal};
+export type PedidoPortao = {ferramenta: string; entrada: Record<string, unknown>; motivo: string; sinal?: AbortSignal;
+  /** O _meta da chamada: a ponte da IDE e a do Claude Desktop marcam META_PERMITIDO_NO_CLIENTE quando já perguntaram. */
+  meta?: Record<string, unknown>};
+
+/** Marca no _meta do tools/call: a pessoa já permitiu esta chamada na tela do cliente (Claude Code, Claude Desktop), pela
+ *  confirmação do próprio MCP (elicitation). Só vale nas conexões que o app criou para essas pontes (mcp-http.ts); as
+ *  dos apps de fora seguem com o cartão do app. */
+export const META_PERMITIDO_NO_CLIENTE = 'estudio/permitido_no_cliente';
+
+/** Sem resposta no prazo do cartão: ninguém negou, ninguém viu. A IA não deve dizer que a pessoa negou. */
+export const SEM_RESPOSTA = 'Ninguém respondeu ao pedido de permissão na janela do Estúdio em 10 minutos (o cartão fica no canto '
+  + 'da janela do app). Nada rodou. Avise a pessoa e tente de novo quando ela estiver olhando o Estúdio.';
+export class SemResposta extends Error {
+  constructor() {
+    super(SEM_RESPOSTA);
+  }
+}
 /** Quem pergunta à pessoa (o app); sem ele (MCP por stdio, fora do app), nada pergunta. Devolve se pode rodar. */
 export type Portao = {perguntar: (p: PedidoPortao) => Promise<boolean>};
 /** Quanto o cartão espera a pessoa responder no app; sem resposta, nega. O MCP da IDE espera o app por isso e mais uma
@@ -59,7 +75,11 @@ type Anotacoes = {openWorldHint?: boolean; destructiveHint?: boolean};
 export const classeDe = (nome: string, anotacoes?: Anotacoes): Classe =>
   CLASSES[nome]?.classe ?? (anotacoes?.openWorldHint || anotacoes?.destructiveHint ? 'cartao' : 'livre');
 
-const motivoDe = (nome: string, anotacoes?: Anotacoes) =>
+/** A ferramenta, com esta entrada, passa pelo portão (o cartão pergunta à pessoa)? */
+export const precisaDePermissao = (nome: string, entrada: Record<string, unknown> = {}, anotacoes?: Anotacoes) =>
+  classeDe(nome, anotacoes) === 'cartao' && !CLASSES[nome]?.livreSe?.(entrada);
+
+export const motivoDe = (nome: string, anotacoes?: Anotacoes) =>
   CLASSES[nome]?.motivo ?? (anotacoes?.destructiveHint ? `apagar com ${nome.replace(/_/g, ' ')}` : `usar ${nome.replace(/_/g, ' ')}, que sai do projeto`);
 
 /** O que o diário precisa oferecer ao portão: a marca do fim e o que entrou depois dela. */
@@ -73,9 +93,15 @@ export const instalarPortao = (servidor: McpServer, o: {projeto: DiarioDoPortao;
     original(nome, config, async (...a: unknown[]) => {
       // com inputSchema o SDK chama (args, extra); sem ele, só (extra)
       const entrada = (config.inputSchema ? a[0] : {}) as Record<string, unknown>;
-      const extra = (config.inputSchema ? a[1] : a[0]) as {signal?: AbortSignal} | undefined;
-      if (o.portao && classeDe(nome, config.annotations) === 'cartao' && !CLASSES[nome]?.livreSe?.(entrada ?? {})) {
-        const ok = await o.portao.perguntar({ferramenta: nome, entrada: entrada ?? {}, motivo: motivoDe(nome, config.annotations), sinal: extra?.signal});
+      const extra = (config.inputSchema ? a[1] : a[0]) as {signal?: AbortSignal; _meta?: Record<string, unknown>} | undefined;
+      if (o.portao && precisaDePermissao(nome, entrada ?? {}, config.annotations)) {
+        let ok: boolean;
+        try {
+          ok = await o.portao.perguntar({ferramenta: nome, entrada: entrada ?? {}, motivo: motivoDe(nome, config.annotations), sinal: extra?.signal,
+            ...(extra?._meta ? {meta: extra._meta} : {})});
+        } catch (e) {
+          return {isError: true, content: [{type: 'text', text: (e as Error).message}]}; // SemResposta: o prazo do cartão venceu
+        }
         if (!ok) return {isError: true, content: [{type: 'text', text: NEGADO}]};
       }
       const marca = o.projeto.marcaDoDiario();
