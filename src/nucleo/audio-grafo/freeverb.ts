@@ -6,7 +6,7 @@
 // amostra a amostra, os oito pentes somam na mesma ordem num acumulador float32 (Math.fround a cada soma, a partir de +0)
 // e os passa-tudo vêm em seguida, na ordem: dá o mesmo PCM. As linhas são float32 e o filtro de cada pente é double.
 // Ver docs/audio-grafo.md.
-import type {EstadoProcessador, Processador} from './tipos';
+import type {ContextoBloco, EstadoProcessador, Processador} from './tipos';
 
 const PENTES = [1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617];
 const PASSA_TUDO = [556, 441, 341, 225];
@@ -37,7 +37,7 @@ export class Freeverb implements Processador {
       ka: new Int32Array(PASSA_TUDO.length),
     }));
   }
-  processar(entradas: readonly (readonly Float32Array[])[], saidas: readonly Float32Array[][], n: number) {
+  processar(entradas: readonly (readonly Float32Array[])[], saidas: readonly Float32Array[][], n: number, _ctx?: ContextoBloco) {
     const [L, R] = entradas[0];
     const realimentar = this.realimentar, amort = this.amort, fround = Math.fround;
     for (let s = 0; s < 2; s++) {

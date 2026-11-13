@@ -2,7 +2,7 @@
 // realimentação e um passa-baixas de um polo no laço; no pingue-pongue, a entrada em mono começa à esquerda e cada volta
 // troca de lado. Sai só o molhado. A conta é a de atrasar (musica-som.ts), amostra a amostra: as linhas em float32 e os
 // filtros em double. Ver docs/audio-grafo.md.
-import type {EstadoProcessador, Processador} from './tipos';
+import type {ContextoBloco, EstadoProcessador, Processador} from './tipos';
 
 export class Delay implements Processador {
   readonly tipo = 'delay';
@@ -26,7 +26,7 @@ export class Delay implements Processador {
       this.linhaR = new Float32Array(d);
     }
   }
-  processar(entradas: readonly (readonly Float32Array[])[], saidas: readonly Float32Array[][], n: number) {
+  processar(entradas: readonly (readonly Float32Array[])[], saidas: readonly Float32Array[][], n: number, _ctx?: ContextoBloco) {
     const [xL, xR] = entradas[0], [oL, oR] = saidas[0];
     const {a, d, linhaL, linhaR, realimentacao, pingue} = this;
     let {fl, fr, k} = this;

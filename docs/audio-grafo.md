@@ -143,7 +143,8 @@ master → master/automacao (Ganho ligado a master/volume_db) ou master/volume �
 ## Converter um efeito em processador nativo
 
 Os cinco efeitos de hoje (EQ, compressor, Freeverb, delay e limitador) já foram convertidos na M-04, deste jeito, e o
-`testes/audio-grafo-efeitos.test.ts` compara cada um com a função de buffer inteiro de `musica-som.ts`. O roteiro fica
+`testes/audio-grafo-efeitos.test.ts` (com `testes/audio-grafo-retornos.test.ts` para o Freeverb e o delay, em várias
+taxas) compara cada um com a função de buffer inteiro de `musica-som.ts`. O roteiro fica
 para o próximo efeito que nascer de buffer inteiro: escrever o mesmo efeito como `Processador`, pôr no lugar do
 adaptador e provar com o oráculo que o PCM não mudou.
 
@@ -246,10 +247,9 @@ amostra a maiores que o sinal, sinal mais curto que o lookahead, pico na primeir
   motor antigo) e a entrada espera numa linha de `la` amostras. O executor desconta a latência (PDC). O limitador
   recebe `fim` (as amostras da música): o que entra depois dele (a cauda do reverb, ou o silêncio que completa a janela)
   pede 1, como no motor antigo, que completava a janela da cauda sem olhar além do fim; e a redução só conta em
-  `[0, fim)`. Diferença medida contra o motor antigo: **0 dB**
-  (zero amostras diferentes), então não há tolerância a aprovar pelo dono. Se uma versão futura do limitador mudar a
-  conta (mais lookahead, true peak), aí sim a tolerância da M1 volta à mesa. `reducao_db` (o `limitador_db` do resultado)
-  é lido do processador depois do render.
+  `[0, fim)`. Diferença medida contra o motor antigo: **0 dB** (zero amostras diferentes), então não há tolerância a
+  aprovar pelo dono. Se uma versão futura do limitador mudar a conta (mais lookahead, true peak), aí sim a tolerância da
+  M1 volta à mesa. `reducao_db` (o `limitador_db` do resultado) é lido do processador depois do render.
 
 ## O que ainda não é
 
@@ -257,4 +257,6 @@ amostra a maiores que o sinal, sinal mais curto que o lookahead, pico na primeir
 - O worklet (M-06) vai usar o mesmo `Processador`. O executor de tempo real ainda não existe.
 - O WAV em streaming até o disco (M-10) tem o caminho pronto (`aoBloco`), mas quem chama o render ainda pede a mistura
   inteira: a medida de loudness e o hash leem tudo.
+- O tamanho e o amortecimento do Freeverb e o atraso, a realimentação e o brilho do delay são argumentos do construtor,
+  sem endereço da M-02 nem automação. Viram parâmetros quando a X-08 definir os endereços dos retornos.
 - O track delay manual e o PDC visível na tela são da M-07. O PDC automático do executor já existe.
