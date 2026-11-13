@@ -292,6 +292,11 @@ O retorno entra no cache como o do reverb. O limitador fica no fim do master: o 
 rampa (média do mínimo pedido na janela), e volta na soltura; cada ponto da rampa já é menor ou igual ao que o pico
 pede, então nada passa do teto de amostra (o teste mede).
 
+**Reamostragem** (M-11, `src/nucleo/reamostrar.ts`): áudio de clipe que não vem a 48 kHz passa por `reamostrar()`: sinc com
+janela Kaiser (meia-largura 24, beta 9, antialiasing ao baixar a taxa) no render canônico e Hermite cúbico para a prévia
+(`qualidade: 'hermite'`). Fase zero (sem atraso de grupo) e determinística. Na taxa de 48 kHz o vetor passa direto, sem
+conta, então os hashes dos documentos antigos não mudam. Só o que vem de fora em outra taxa deixa de ser interpolação linear.
+
 **A música em arquivo** (item 23, `src/nucleo/musica-entrega.ts`): a mistura é medida (BS.1770, o mesmo medidor do vídeo,
 com o pico verdadeiro por sobreamostragem 4×), recebe o ganho que leva ao alvo e passa por um limitador com teto de
 amostra 0,3 dB abaixo do pico pedido, que desce até o pico verdadeiro caber; até cinco voltas, compensando o que o
