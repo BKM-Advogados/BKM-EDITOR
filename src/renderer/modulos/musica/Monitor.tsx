@@ -19,6 +19,7 @@ import {motor, vozGuiaDe} from './motor';
 import {campo, campoFaixa, estilo, exportarMusica, forcaDaNota, novaBateria, novoPadrao, passo, novaMusicaDoModelo} from './acoes';
 import {Escolha} from '../../componentes/Controles';
 import {AvisoAgente} from '../../componentes/Agente';
+import {fatoDoEditor} from '../../estado/primeiros-passos';
 
 export const useDocMusica = () => {
   const id = useLoja((e) => e.ativo.musica);
@@ -115,6 +116,7 @@ export const tocarOuPausar = () => {
   const de = loop && (e.cabeca_s < loop[0] || e.cabeca_s >= loop[1]) ? loop[0] : e.cabeca_s >= m.duracao_s - 0.01 ? 0 : e.cabeca_s;
   motor.tocar(de, {loop, guia: doc.video?.voz_guia !== false, metronomo: e.metronomo});
   musica.definir({tocando: true});
+  fatoDoEditor('tocou'); // primeiros passos: "tocar a prévia"
 };
 
 export const parar = () => {

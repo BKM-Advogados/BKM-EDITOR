@@ -2,13 +2,14 @@
 // em prosa, cada ação como um cartão legível (com Ver e Reverter quando muda um documento do projeto) e os pedidos de
 // permissão com botões. A caixa de pedido já leva o que está na tela (seleção, comentário, tempo) como contexto.
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore} from 'react';
-import {ArrowUp, CircleAlert, CircleCheck, CircleX, LoaderCircle, ShieldQuestion, Sparkle, SquareTerminal, X} from 'lucide-react';
+import {ArrowUp, CircleAlert, CircleCheck, CircleX, ClipboardList, LoaderCircle, ShieldQuestion, Sparkle, SquareTerminal, X} from 'lucide-react';
 import type {OperacaoPatch} from '../../nucleo/documentos';
 import {FERRAMENTAS_ESTUDIO, normalizarFerramenta} from '../../compartilhado/ferramentas';
 import {mudancasDoResultado} from '../../nucleo/portao';
-import {confirmar} from '../componentes/Dialogo';
+import {ROTULO_ESTADO, type Decisao} from '../../nucleo/plano-video'; // Onda B: o cartão do plano
+import {confirmar, pedirTexto} from '../componentes/Dialogo';
 import {Escolha} from '../componentes/Controles';
-import {avisar, loja, selecionar, useLoja, valorEm, type Area} from '../estado/loja';
+import {avisar, carregarPlano, loja, mensagemDe, selecionar, useLoja, valorEm, type Area} from '../estado/loja';
 import {enviar, estadoConversas, guardarRascunho, lerConta, parar, responderPermissao, trocarModelo, type Anexo, type Bloco, type Conversa as TConversa} from './conversas';
 import {tipoDe} from '../modulos/video/tipos';
 import './conversa.css';
@@ -84,6 +85,13 @@ const descrever = (bruto: string, e: Record<string, any>, resultado?: string): D
   if (mcp === 'ler_documento') return {verbo: 'Leu', alvo: e.documento};
   if (mcp === 'estado_do_editor') return {verbo: 'Viu o que está na tela'};
   if (mcp === 'projeto_info') return {verbo: 'Viu o projeto'};
+  // Onda B: o Plano do vídeo (o cartão com Aprovar e Pedir ajuste vem logo abaixo, CartaoPlano)
+  if (mcp === 'escrever_plano') {
+    const r = revisaoDoResultado(resultado);
+    return {verbo: 'Escreveu o plano do vídeo', alvo: r ? `revisão ${r}` : undefined};
+  }
+  if (mcp === 'ler_plano') return {verbo: 'Leu o plano do vídeo'};
+  if (mcp === 'aprovar_plano') return {verbo: 'Registrou a sua aprovação do plano', alvo: e.revisao ? `revisão ${e.revisao}` : undefined};
   if (mcp === 'listar_mudancas') return {verbo: 'Viu as últimas mudanças'};
   if (mcp) return {verbo: mcp.replace(/_/g, ' ')};
   switch (f.servidor === 'interno' ? nome : '') {
@@ -192,6 +200,85 @@ const CartaoAcao: React.FC<{b: Extract<Bloco, {tipo: 'acao'}>}> = ({b}) => {
       {estado === 'revertido' && <span className="link fraco">Revertido</span>}
       {estado === 'mudou' && <button className="link fraco" onClick={() => void reverter(true)}>Mudou depois · Reverter mesmo assim</button>}
       {estado === 'falhou' && <span className="link fraco" title="Veja o motivo no aviso; o Histórico também reverte">Não revertido</span>}
+    </div>
+  );
+};
+
+// ── o Plano do vídeo (Onda B, src/nucleo/plano-video.ts) ──
+// Abaixo de cada escrever_plano, o plano daquela revisão com "Aprovar plano" e "Pedir ajuste". O plano vem da loja
+// (plano.json, relido quando muda): o cartão de uma revisão que já foi reescrita só diz isso. Decidir grava no diário
+// (com Reverter) e manda a decisão à conversa, para a IA seguir sem a pessoa digitar.
+/** A revisão que um escrever_plano devolveu (o resultado é o JSON do plano, mais as mudanças que o portão acrescenta). */
+function revisaoDoResultado(resultado?: string): number | undefined {
+  const m = resultado ? /"revisao":\s*(\d+)/.exec(resultado) : null;
+  return m ? Number(m[1]) : undefined;
+}
+
+const CartaoPlano: React.FC<{c: TConversa; revisao?: number}> = ({c, revisao}) => {
+  const plano = useLoja((e) => e.plano);
+  const [ocupado, setOcupado] = useState(false);
+  if (!plano) return null; // revertido, ou o arquivo saiu
+  if (revisao !== undefined && plano.revisao !== revisao) {
+    return <div className="plano-cartao velho"><ClipboardList size={14} />Plano do vídeo, revisão {revisao}: substituído pela revisão {plano.revisao}.</div>;
+  }
+  const trabalhando = c.estado === 'trabalhando' || c.estado === 'precisa';
+  const decidir = async (d: Decisao, mensagem: string) => {
+    setOcupado(true);
+    try {
+      await window.estudio.decidirPlano(plano.revisao, d);
+      await carregarPlano();
+      await enviar(c.id, mensagem, []);
+    } catch (e) {
+      avisar(mensagemDe(e), 'erro');
+      void carregarPlano();
+    } finally {
+      setOcupado(false);
+    }
+  };
+  const ajustar = async () => {
+    const t = (await pedirTexto({titulo: 'Pedir ajuste no plano', rotulo: 'O que mudar no plano?', botao: 'Pedir ajuste',
+      texto: `${nomeIA(c)} reescreve o plano com o seu pedido e mostra de novo antes de montar.`}))?.trim();
+    if (t) await decidir({decisao: 'ajustar', ajuste: t}, `Ajuste no plano (revisão ${plano.revisao}): ${t}`);
+  };
+  const soma = plano.roteiro.reduce((s, x) => s + (x.duracao_s ?? 0), 0);
+  return (
+    <div className={`plano-cartao ${plano.estado}`} aria-label="Plano do vídeo">
+      <div className="plano-topo">
+        <ClipboardList size={15} />Plano do vídeo<span className="plano-rev">revisão {plano.revisao}</span>
+        <span className={`plano-estado ${plano.estado}`}>{ROTULO_ESTADO[plano.estado]}</span>
+      </div>
+      <dl className="plano-campos">
+        <dt>Objetivo</dt><dd>{plano.objetivo || '—'}</dd>
+        <dt>Público</dt><dd>{plano.publico || '—'}</dd>
+        <dt>Formato</dt><dd>{plano.formato_e_duracao || '—'}{soma ? ` · roteiro soma ${soma} s` : ''}</dd>
+      </dl>
+      <ol className="plano-roteiro">
+        {plano.roteiro.map((x, i) => (
+          <li key={i}>
+            <b>{x.cena || `Cena ${i + 1}`}</b>{x.duracao_s ? <span className="plano-dur"> · {x.duracao_s} s</span> : null}
+            <div>{x.mostra}</div>
+            {x.fala && <div className="plano-fala">“{x.fala}”</div>}
+          </li>
+        ))}
+      </ol>
+      <dl className="plano-campos">
+        <dt>Mídia</dt><dd>{plano.midia.usar.length ? plano.midia.usar.join(' · ') : 'só texto e formas'}</dd>
+        {plano.midia.falta.length > 0 && <><dt className="falta">Falta</dt><dd className="falta">{plano.midia.falta.join(' · ')}</dd></>}
+        <dt>Narração</dt><dd>{plano.narracao || '—'}</dd>
+        <dt>Música</dt><dd>{plano.musica || '—'}</dd>
+        {plano.notas && <><dt>Notas</dt><dd>{plano.notas}</dd></>}
+      </dl>
+      {plano.estado === 'ajustar' && plano.decisao?.ajuste && <div className="plano-ajuste">Ajuste pedido: {plano.decisao.ajuste}</div>}
+      {plano.estado === 'aguardando' ? (
+        <div className="perm-botoes">
+          <button className="bt principal mini" disabled={ocupado || trabalhando}
+            onClick={() => void decidir({decisao: 'aprovar'}, `Aprovei o plano (revisão ${plano.revisao}). Pode montar.`)}>Aprovar plano</button>
+          <button className="bt mini" disabled={ocupado || trabalhando} onClick={() => void ajustar()}>Pedir ajuste</button>
+          {trabalhando && <span className="plano-nota">espere a resposta terminar</span>}
+        </div>
+      ) : plano.estado === 'aprovado' ? (
+        <div className="perm-decisao"><CircleCheck size={12} /> Aprovado{plano.decisao?.por && plano.decisao.por !== 'pessoa' ? ` (${plano.decisao.por})` : ''}</div>
+      ) : null}
     </div>
   );
 };
@@ -376,7 +463,14 @@ export const Conversa: React.FC<{c: TConversa; abrirTerminal: () => void; libera
                 if (anterior?.tipo === 'acao') return null;
                 const grupo: Extract<Bloco, {tipo: 'acao'}>[] = [];
                 for (let k = j; k < it.blocos.length && it.blocos[k].tipo === 'acao'; k++) grupo.push(it.blocos[k] as Extract<Bloco, {tipo: 'acao'}>);
-                return <div key={j} className="acoes-ag">{grupo.map((g) => <CartaoAcao key={g.uso} b={g} />)}</div>;
+                // Onda B: depois do grupo, o cartão de cada plano escrito nele
+                const planos = grupo.filter((g) => g.ok && normalizarFerramenta(g.nome, FERRAMENTAS_ESTUDIO).nome === 'escrever_plano');
+                return (
+                  <React.Fragment key={j}>
+                    <div className="acoes-ag">{grupo.map((g) => <CartaoAcao key={g.uso} b={g} />)}</div>
+                    {planos.map((g) => <CartaoPlano key={`plano-${g.uso}`} c={c} revisao={revisaoDoResultado(g.resultado)} />)}
+                  </React.Fragment>
+                );
               })}
               {acoes.length === 0 && it.blocos.length === 0 && !it.fim && <div className="prosa ao-vivo"><p> </p></div>}
             </div>

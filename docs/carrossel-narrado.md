@@ -28,3 +28,22 @@ cartão final, legenda palavra a palavra e os efeitos sonoros de `midia/sfx/`.
 Os roteiros de antes do tema neutro abrem como antes, com outra paleta: `"tema": "c2"` vale o neutro, a cor `"cobre"`
 de uma linha do gancho vale o destaque e os tons `"cobre"` e `"grafite"` da régua valem o destaque e o neutro. Sem
 `marca`, `logo` e `foto` no roteiro, o logo e a foto saem da `midia/` do projeto, como descrito acima.
+
+## Modelo "Carrossel narrado" na tela inicial (Onda B)
+
+**Decisão:** o modelo é um vídeo de cenas com a fala de cada cena em `narracao.texto` (narração por IA, ou gravada por cena),
+não um `roteiro.json` novo: o vídeo de cenas já tem a narração, o "Ajustar as cenas à fala" e as legendas palavra a palavra,
+e assim o modelo herda a edição, a exportação e o MCP dele.
+
+O modelo (`src/nucleo/modelo-carrossel-narrado.ts`, id `video-carrossel-narrado`, 9:16 fixo) traz gancho, duas partes
+(lista e número), dúvida e fecho, com a duração de partida estimada pela fala. O caminho é escrever os textos, gerar a
+narração (`narrar`), ajustar as cenas à fala (`ajustar_cenas_a_fala`) e transcrever (`transcrever`, que cria as legendas).
+
+O que falta para chegar ao carrossel do roteiro:
+
+- **Bloco preso a uma palavra.** No vídeo de cenas o bloco entra em ms contados do começo da cena; no roteiro, em
+  `"palavra@ms"`. Falta uma âncora de palavra no `BlocoCenas` (resolvida pelas palavras transcritas da fala da cena).
+- **Narração gravada inteira.** Hoje a fala gravada é uma por cena; dividir uma gravação longa em cenas pela transcrição
+  ainda não existe.
+- **Vinheta do logo, rodapé com a marca, cartão final e os efeitos sonoros de `midia/sfx/`**, que o `CarrosselTema` desenha
+  e o vídeo de cenas não.

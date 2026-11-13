@@ -2,7 +2,7 @@
    usa os tokens dele: fundo-0 vão, fundo-1 barras, fundo-2 corpo, fundo-3 campo/hover, fundo-4 ativo. */
 
 /* ── barra de título própria: a janela não tem moldura do Windows; os botões dela ficam por cima (titleBarOverlay) ── */
-.casca { grid-template-rows: 36px 1fr var(--rodape, 22px); }
+.casca { grid-template-rows: 36px 1fr var(--rodape, 22px); grid-template-columns: minmax(0, 1fr); } /* a coluna não cresce com o conteúdo da barra: sem isto a janela de 1440 px transbordava para o lado */
 .barra { position: relative; height: 36px; display: flex; align-items: center; gap: 10px; padding: 0 0 0 10px; background: var(--fundo-0);
   border-bottom: 0; -webkit-app-region: drag; user-select: none;
   padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 8px);
@@ -120,3 +120,23 @@
 .menu-app .menu-linha { display: flex; flex-wrap: wrap; gap: 2px; padding: 2px 4px 2px 26px; }
 .menu-app .menu-linha button { width: auto; flex: 1; justify-content: center; gap: 5px; height: 26px; border: 1px solid var(--borda); }
 .menu-app button.recente { padding-left: 30px; color: var(--texto-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; line-height: 28px; }
+
+/* primeiros passos (Onda B): a ficha na barra e o cartão que desce dela; não bloqueia nada */
+.passos { position: relative; display: inline-flex; margin-right: 6px; }
+.barra .acoes .passos-bt { height: 24px; padding: 0 9px; gap: 6px; border-radius: 999px; background: var(--acento-fraco); color: var(--texto); border: 1px solid var(--borda); font-size: var(--tam-1); }
+.barra .acoes .passos-bt:hover, .barra .acoes .passos-bt.ligado { background: var(--acento-fundo); }
+.passos-n { font: var(--peso-forte) var(--tam-1) var(--fonte-mono); color: var(--texto-2); }
+.passos-cartao { right: 0; top: calc(100% + 6px); z-index: 45; width: 300px; padding: 10px 12px; white-space: normal; box-shadow: var(--sombra-2); }
+.passos-cartao header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.passos-cartao header b { flex: 1; font-size: var(--tam-2); }
+.passos-cartao ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.passos-cartao li { display: flex; gap: 8px; align-items: flex-start; font-size: var(--tam-2); color: var(--texto); }
+.passos-cartao li > span:last-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.passos-marca { flex: none; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; color: var(--texto-3); border: 1px solid var(--borda); margin-top: 1px; }
+.passos-cartao li.feito .passos-marca { background: var(--ok-fundo); border-color: var(--ok); color: var(--ok); }
+.passos-cartao li.feito .passos-titulo { color: var(--texto-3); text-decoration: line-through; text-decoration-color: var(--texto-3); }
+.passos-cartao li.proximo .passos-marca { border-color: var(--acento); color: var(--acento); }
+.passos-dica { font-size: var(--tam-1); color: var(--texto-3); line-height: 1.35; }
+.passos-cartao footer { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--borda); font-size: var(--tam-1); color: var(--texto-3); }
+.passos-cartao footer span { flex: 1; }
+@media (max-width: 1240px) { .passos-nome { display: none; } }

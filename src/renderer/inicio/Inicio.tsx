@@ -3,20 +3,21 @@
 // pelo nome do destino e os modelos com miniatura. À direita, Continuar (o último projeto, com Abrir), os Recentes em
 // lista e uma linha discreta de estado (Claude, pasta, máquina), que só vira faixa quando falta algo. Clicar no formato
 // marca; clicar no modelo cria; Enter cria em branco. Nada pergunta fps, codec ou pasta: tudo tem padrão e fica em
-// "Mais opções". Esta tela não carrega o editor (Remotion, Player, dockview): a casca vem depois, com React.lazy.
+// "Mais opções". Os modelos da pessoa ("Salvar como modelo", pasta-modelos.ts) entram nos Modelos do tipo deles, depois
+// dos de fábrica, com Renomear e Remover no menu do cartão. Esta tela não carrega o editor (Remotion, Player, dockview): a casca vem depois, com React.lazy.
 import React, {useEffect, useMemo, useState} from 'react';
 import {comando, rotuloDoAtalho} from '../teclas';
 import {usarTemExemplo} from '../estado/exemplo';
-import {ArrowUp, BookOpen, Box, Check, ChevronDown, ChevronRight, Copy, Film, FolderOpen, FolderSearch, Image as ImageIcon, MoreHorizontal, Music, Settings2, Sparkle, Sparkles,
+import {ArrowUp, BookOpen, Box, Check, ChevronDown, ChevronRight, Copy, Film, FolderOpen, FolderSearch, Image as ImageIcon, MoreHorizontal, Music, Pencil, Settings2, Sparkle, Sparkles,
   Trash2, TriangleAlert, X} from 'lucide-react';
-import type {Ambiente, ContaClaude, MarcaInfo, NovoProjeto, Preferencias, Recente} from '../../compartilhado/api';
+import type {Ambiente, ContaClaude, MarcaInfo, ModeloInfo, NovoProjeto, Preferencias, Recente} from '../../compartilhado/api';
 import type {Modulo} from '../../nucleo/documentos';
 import {MODELOS, type IdModelo} from '../../nucleo/modelos';
 import {FORMATOS_IMAGEM, FORMATOS_VIDEO, TAMANHO_MAX, TAMANHO_MIN, limitarTamanho, type PresetFormato} from '../../nucleo/formatos';
 import {abrirProjeto, avisar, loja, mensagemDe, useLoja} from '../estado/loja';
 import {BotaoMenu, type ItemMenu} from '../componentes/Menu';
 import {PainelPreferencias} from '../casca/Preferencias';
-import {pedirTexto} from '../componentes/Dialogo';
+import {confirmar, pedirTexto} from '../componentes/Dialogo';
 import {IconeEstudio} from '../componentes/Icones';
 import {lerConta} from '../paineis/conversas';
 import './inicio.css';
@@ -110,6 +111,31 @@ const Poster: React.FC<{l: number; a: number; modulo: Modulo}> = ({l, a, modulo}
   );
 };
 
+/** Cartão de um modelo da pessoa: clicar cria (como os de fábrica); o menu renomeia ou remove. */
+const CartaoModeloProprio: React.FC<{m: ModeloInfo; ocupado: boolean; aoCriar: () => void; aoRenomear: () => void; aoRemover: () => void}> = ({m, ocupado, aoCriar, aoRenomear, aoRemover}) => {
+  const docs = m.documentos.length;
+  const desc = [m.largura && m.altura ? `${m.largura}×${m.altura}` : '', docs > 1 ? `${docs} documentos` : '', m.descricao ?? ''].filter(Boolean).join(' · ');
+  return (
+    <div className="cartao-modelo proprio">
+      <button className="cm-criar" disabled={ocupado} onClick={aoCriar} title={`Criar um projeto a partir de "${m.nome}"${m.de_projeto ? ` (salvo de ${m.de_projeto})` : ''}`}>
+        {m.miniatura ? <span className="poster"><img src={m.miniatura} alt="" /></span> : <Poster l={m.largura ?? 1} a={m.altura ?? 1} modulo={m.modulo} />}
+        <span className="cm-texto">
+          <span className="cm-nome">{m.nome}</span>
+          <span className="cm-desc">{desc ? `Seu modelo · ${desc}` : 'Seu modelo'}</span>
+        </span>
+      </button>
+      <span className="cm-menu">
+        <BotaoMenu titulo="Mais ações do modelo" icone={<MoreHorizontal size={15} />} itens={[
+          {rotulo: 'Renomear…', icone: <Pencil size={14} />, acao: aoRenomear},
+          {rotulo: 'Mostrar na pasta', icone: <FolderSearch size={14} />, acao: () => window.estudio.mostrarNaPasta(m.pasta)},
+          'sep',
+          {rotulo: 'Remover modelo…', icone: <Trash2 size={14} />, acao: aoRemover},
+        ]} />
+      </span>
+    </div>
+  );
+};
+
 const menuDoRecente = (r: Recente, abrir: () => void, duplicar: () => void, esquecer: () => void): ItemMenu[] => [
   ...(r.existe ? [
     {rotulo: 'Abrir', icone: <FolderOpen size={14} />, acao: abrir},
@@ -174,6 +200,9 @@ export const Inicio: React.FC = () => {
   // kit de marca do projeto novo ('' = tema neutro, como sempre)
   const [marcas, setMarcas] = useState<MarcaInfo[]>([]);
   const [marca, setMarca] = useState('');
+  // modelos da pessoa (Salvar como modelo), em Novo ao lado dos de fábrica
+  const [proprios, setProprios] = useState<ModeloInfo[]>([]);
+  const carregarModelos = () => void window.estudio.modelos.listar().then(setProprios).catch(() => setProprios([]));
 
   const carregarRecentes = () => void window.estudio.recentes().then(setRecentes).catch(() => setRecentes([]));
   useEffect(() => {
@@ -184,6 +213,7 @@ export const Inicio: React.FC = () => {
     void window.estudio.ambiente().then(setAmbiente);
     void lerConta().then(setConta).catch(() => setConta(null));
     void window.estudio.marcas.listar().then(setMarcas).catch(() => setMarcas([]));
+    carregarModelos();
     carregarRecentes();
   }, []);
 
@@ -194,6 +224,7 @@ export const Inicio: React.FC = () => {
   const tamanho = idFormato === PERSONALIZADO ? livre : preset ? {largura: preset.largura, altura: preset.altura, fps: livre.fps} : undefined;
   const modelos = MODELOS.filter((m) => m.modulo === (aba === 'musica' ? 'video' : aba));
   const branco = modelos[0]?.id;
+  const meus = proprios.filter((m) => m.modulo === aba);
   const kit = aba !== '3d' ? marcas.find((m) => m.id === marca) : undefined;
   const nomeDoTipo = TIPOS.find((t) => t.id === aba)!.nome;
   const proporcao = idFormato === PERSONALIZADO ? `${livre.largura}×${livre.altura}` : preset?.proporcao;
@@ -215,6 +246,39 @@ export const Inicio: React.FC = () => {
       avisar(mensagemDe(e), 'erro');
     } finally {
       setOcupado(false);
+    }
+  };
+
+  const criarDoModelo = async (m: ModeloInfo) => {
+    if (ocupado) return;
+    setOcupado(true);
+    try {
+      // o tamanho é o do modelo; o kit escolhido na ficha troca o tema, como nos de fábrica (Neutro: fica o do modelo)
+      await abrirProjeto(await window.estudio.modelos.criarProjeto({id: m.id, nome: nome.trim() || undefined, pasta: pasta || undefined, marca: kit?.id}));
+    } catch (e) {
+      avisar(mensagemDe(e), 'erro');
+    } finally {
+      setOcupado(false);
+    }
+  };
+  const renomearModelo = async (m: ModeloInfo) => {
+    const n = await pedirTexto({titulo: 'Renomear modelo', rotulo: 'Nome do modelo', valor: m.nome, botao: 'Renomear'});
+    if (!n?.trim()) return;
+    try {
+      await window.estudio.modelos.renomear(m.id, n);
+      carregarModelos();
+    } catch (e) {
+      avisar(mensagemDe(e), 'erro');
+    }
+  };
+  const removerModelo = async (m: ModeloInfo) => {
+    if (!(await confirmar({titulo: `Remover o modelo "${m.nome}"?`, texto: 'A pasta do modelo é apagada. Os projetos criados a partir dele continuam como estão.',
+      botao: 'Remover', perigo: true}))) return;
+    try {
+      await window.estudio.modelos.remover(m.id);
+      carregarModelos();
+    } catch (e) {
+      avisar(mensagemDe(e), 'erro');
     }
   };
 
@@ -269,7 +333,7 @@ export const Inicio: React.FC = () => {
       : aba === 'musica' ? `um vídeo em branco (documento "video", ${tamanho?.largura}×${tamanho?.altura}); o pedido é de música: crie a música com criar_documento (módulo música)`
       : `${aba === 'video' ? 'um vídeo de cenas' : aba === 'animacao' ? 'uma animação' : 'uma imagem'} em branco (documento "${aba}", ${tamanho?.largura}×${tamanho?.altura})`;
     void criar(branco, {texto: t, rotulo: `Projeto novo · ${chip}${kit ? ` · ${kit.nome}` : ''}`,
-      contexto: `projeto novo, criado agora com ${doc}. Monte o pedido nesse documento pelas ferramentas do MCP "estudio" (o CLAUDE.md da pasta explica o formato). Faça direto, sem perguntar, e diga no fim o que montou.`});
+      contexto: `projeto novo, criado agora com ${doc}. É um pedido novo: siga "Planejar antes de montar" do CLAUDE.md da pasta (pergunte só o que faltar, até 3 perguntas com sugestão; escreva o plano com escrever_plano e espere a aprovação). Aprovado, monte nesse documento pelas ferramentas do MCP "estudio" e diga no fim o que montou.`});
   };
 
   // Enter cria em branco com o que está marcado (fora de campo de texto e de botão, que já tratam o Enter)
@@ -391,6 +455,8 @@ export const Inicio: React.FC = () => {
                 </button>
               );
             })}
+            {meus.map((m) => <CartaoModeloProprio key={m.id} m={m} ocupado={ocupado} aoCriar={() => void criarDoModelo(m)} aoRenomear={() => void renomearModelo(m)}
+              aoRemover={() => void removerModelo(m)} />)}
           </div>
 
           <button className="mais-opcoes" onClick={() => setMaisOpcoes((x) => !x)} aria-expanded={maisOpcoes}>

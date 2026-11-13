@@ -39,6 +39,7 @@ import {agruparSelecao, alternarTravaSelecao, desagruparSelecao} from './acoesSe
 import {AjudaDoArrasto, Grade, Margem, Reguas, ROTULOS_GUIAS, usarOpcoesGuias} from './Guias';
 import {mudouEm} from '../../estado/agente';
 import {AvisoAgente, MarcasAgente} from '../../componentes/Agente';
+import {ChipFormato} from '../../componentes/ChipFormato';
 
 type Geometria = {x: number; y: number; largura: number; altura: number};
 // uma camada no gesto: índice, id (para o test do patch) e a geometria
@@ -568,7 +569,7 @@ export const MonitorImagem: React.FC<{documento?: string}> = ({documento: forcad
             <span className="rotulo-peca" title="Propriedades da imagem" onClick={(e) => {
               e.stopPropagation();
               if (editavel) selecionar(null);
-            }}><b>{titulo}</b> · {W} × {H}{variasPaginas && <> · {ativa.p + 1}/{ativa.paginas.length} {ativa.pagina.nome}</>}</span>
+            }}><b>{titulo}</b> · <ChipFormato documento={editavel ? documento : undefined} modulo="imagem" doc={doc} className="em-linha" /> · {W} × {H}{variasPaginas && <> · {ativa.p + 1}/{ativa.paginas.length} {ativa.pagina.nome}</>}</span>
             <div style={{position: 'absolute', left: 0, top: 0, width: W, height: H, transform: `scale(${escala})`, transformOrigin: '0 0',
               background: fundo, overflow: 'hidden', userSelect: 'none'}}>
               <CamadaEfeitos efeitos={previaEfeitos ?? doc.efeitos} quadro={0} largura={doc.largura} altura={doc.altura}>

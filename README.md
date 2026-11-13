@@ -148,21 +148,36 @@ O app abre na **tela inicial**:
 - **Novo:** escolha Vídeo, Imagem ou 3D, o formato pelo destino (Reels e Shorts 9:16, Feed 4:5, Quadrado 1:1, YouTube
   16:9 ou Personalizado) e o modelo. Clicar no formato marca; clicar no modelo cria; **Enter** cria em branco. Nome,
   pasta e quadros por segundo têm padrão e ficam em "Mais opções". Os projetos vão para `%USERPROFILE%\Estudio`
-  (troca em Preferências; o app avisa quando a pasta é do OneDrive).
+  (troca em Preferências; o app avisa quando a pasta é do OneDrive). No vídeo há também o modelo **Carrossel narrado**
+  (9:16): gancho, partes, dúvida e fecho, com a fala de cada cena escrita para a narração por IA; depois de narrar,
+  "Ajustar as cenas à fala" e "Transcrever" prendem as cenas e as legendas à voz (`docs/carrossel-narrado.md`).
+- **Seus modelos:** "Salvar como modelo…" no menu do ícone do editor guarda o projeto (ou só o documento aberto) em
+  `%USERPROFILE%\Estudio\meus-modelos` (troca em Preferências), com os documentos e a mídia que eles usam, sem o
+  histórico, o git nem as conversas. O modelo aparece nos Modelos do tipo dele, depois dos de fábrica; o menu do cartão
+  renomeia e remove (os de fábrica não). O kit escolhido na ficha troca o tema; Neutro mantém o do modelo. O Claude
+  faz o mesmo com `salvar_como_modelo`.
 - **Começar conversando:** descreva o vídeo; Enter cria o projeto em branco e abre a conversa com o Claude já com o
   pedido. Sem o Claude Code instalado, o campo fica desligado e o resto funciona.
 - **Continuar e Recentes:** o último projeto com miniatura (a foto do monitor ao fechar) e a grade dos outros, com
   Duplicar, Mostrar na pasta e Remover da lista (nunca apaga a pasta).
-- **Ver um exemplo:** cópia nova do projeto de exemplo a cada clique (o exemplo nunca é editado no lugar). Só aparece
-  quando a instalação traz o exemplo (`exemplos/<pasta>`, com o nome em `src/nucleo/exemplo.ts`).
+- **Ver um exemplo:** cópia nova do projeto de exemplo a cada clique (o exemplo nunca é editado no lugar). O exemplo é
+  um vídeo de cenas vertical curto e neutro (título, texto, lista, número e imagem com movimento, imagens SVG desenhadas
+  no código, sem marca de ninguém). Ele mora em `src/nucleo/exemplo-conteudo.ts`; `npm run exemplo` grava
+  `exemplos/exemplo`, que o pacote leva. Sem essa pasta o botão some.
 - Na primeira vez, a faixa "Antes de começar" mostra o estado do Claude, a pasta dos projetos, o perfil da máquina e
   avisa se falta o Git.
 
 No editor, o menu do ícone tem Novo projeto (Ctrl+N), Novo neste projeto (vídeo, imagem, animação, música, 3D), Abrir (Ctrl+O), Abrir
-recente, Duplicar projeto, Mostrar na pasta, Marcar ponto de restauração (Ctrl+S), Marca, Preferências e Fechar projeto
+recente, Duplicar projeto, Salvar como modelo, Mostrar na pasta, Marcar ponto de restauração (Ctrl+S), Marca, Preferências e Fechar projeto
 (Ctrl+W, volta à tela inicial). O nome do projeto na barra renomeia com um clique; "Salvo" lembra que tudo grava na
 hora. **Exportar** (Ctrl+Shift+E) abre o diálogo de exportação do documento da área (abaixo). O projeto reabre na área, no
 documento, na seleção e no tempo em que a pessoa parou.
+
+No alto do monitor, o **chip de formato** diz o formato pelo destino ("Reels 9:16", "Feed 4:5", "Personalizado 1200×800");
+clicar troca o formato do vídeo ou da imagem (entra no Histórico, com Reverter). Na animação e no 3D o chip só informa. Quem
+abre um projeto pela primeira vez vê na barra os **primeiros passos** (trazer uma mídia, escrever o texto da primeira cena,
+tocar a prévia, pedir algo ao Claude, exportar), que se marcam sozinhos conforme a pessoa faz e somem ao concluir ou com
+"Não mostrar mais" (Preferências traz de volta).
 
 **Kit de marca:** cores, fontes, logo e assinatura de cada escritório ficam em `%USERPROFILE%\Estudio\marcas\<id>\`
 (`marca.json`, `logo.*`, `fontes/*.ttf|otf|woff|woff2`; a pasta troca no painel). Na primeira abertura nasce o `neutro`
@@ -290,9 +305,12 @@ renderiza um vídeo de cenas de teste em 9:16, 4:5 e 16:9 fora do Electron, em `
 - **Rodada 2 sem teste no app real:** o remover fundo só rodou com um modelo falso, a limpeza de voz foi medida e não
   ouvida, e o IPC da limpeza, do medidor, da transcrição e da marca d'água nunca rodou no Electron.
 - **Pesquisa de qualidade** (`tasks/estudio-qualidade-2026-11-07`): defeitos conferidos no código e a barra do que falta.
-- **Onda B** (briefing): importar mídia e painel Mídia, o carrossel narrado como
-  modelo do tipo cenas, um projeto de exemplo neutro para o "Ver um exemplo", o Claude que planeja (perguntas e Plano do vídeo
-  antes de montar), chip de formato no monitor, primeiros passos e "Salvar como modelo".
+- **Onda B** (briefing): importar mídia e painel Mídia (feitos), o carrossel narrado como modelo do tipo cenas (feito;
+  falta o bloco preso a uma palavra dentro da cena, `docs/carrossel-narrado.md`), um projeto de exemplo neutro para o
+  "Ver um exemplo" (feito), o Claude que planeja (perguntas e Plano do vídeo antes de montar; feito: `plano.json`,
+  `escrever_plano`/`ler_plano`/`aprovar_plano` e o cartão na conversa, `docs/ia.md`), chip de formato no
+  monitor e primeiros passos (feitos, `docs/casca.md`) e "Salvar como modelo" (feito; criar projeto de um modelo seu
+  pelo MCP ainda não). A interface nova foi vista só na prévia web; falta conferir no app aberto.
 - **Memória (app empacotado, 05/11/2026):** 307 MB parado no vídeo; 547 MB com as quatro áreas e o 3D. A tela inicial
   agora abre sem o editor (falta medir a linha "Início parado").
 - **Fontes** do Google (Inter, Archivo, IBM Plex) baixam na primeira vez (precisa de internet); as de arquivo do kit não.
@@ -309,7 +327,7 @@ src/nucleo        documentos, patch, diário, comentários, formatos, vídeo de 
 src/composicoes   composições Remotion (VideoCenas, CarrosselTema) e o registro
 src/renderer      interface: tela inicial, casca, estado, módulos (video, imagem, tres, efeitos), painéis
 mcp/nucleo.ts     o mesmo MCP por stdio, para usar o projeto fora do app
-exemplos/        projeto de exemplo do "Ver um exemplo" (opcional; src/nucleo/exemplo.ts)
+exemplos/         projeto de exemplo do "Ver um exemplo" (gerado por npm run exemplo; src/nucleo/exemplo-conteudo.ts)
 testes/fixtures  projeto, roteiro e narração sintéticos dos testes
 scripts/previa-web a interface no navegador com a ponte simulada
 docs/             arquitetura, tela e desempenho

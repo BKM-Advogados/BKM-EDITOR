@@ -15,6 +15,7 @@ import type {LicencaSom, PresetFaixa, SidechainFaixa} from '../../../nucleo/musi
 import type {PedidoExportarMusica} from '../../../nucleo/musica-projeto';
 import {aplicarMusica, docMusica, idMusicaAtiva, musica, selecionarMusica} from './estado';
 import {motor, urlDaMidia} from './motor';
+import {fatoDoEditor} from '../../estado/primeiros-passos';
 
 const fazer = async (f: (doc: DocMusica) => Edicao) => {
   const doc = docMusica();
@@ -180,6 +181,7 @@ export const exportarMusica = async (pedido: PedidoExportarMusica) => {
     // os avisos primeiro: o rodapé mostra o último, e o que a pessoa quer saber é onde o arquivo ficou
     for (const a of r.avisos) avisar(a.replace(' (diga no inspetor do clipe ou em /licencas)', ' (diga a licença no inspetor do clipe)'), 'info');
     const stems = r.arquivos.filter((a) => a.includes(' - stems/')).length;
+    fatoDoEditor('exportou'); // primeiros passos
     avisar(`Exportada em ${r.arquivos[0]}${lufs !== undefined && lufs !== null ? ` (${String(lufs).replace('.', ',')} LUFS)` : ''}${stems ? ` e ${stems} stems` : ''}`, 'ok');
     return r;
   } catch (e) {

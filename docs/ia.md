@@ -90,7 +90,8 @@ Envolve o `registerTool`: toda ferramenta registrada depois dele passa por ele, 
     `exportar_musica`, `importar_midi`, `escolher_trilha`, `narrar` e `vozes_narracao` (narração por IA);
     `exportar_video`, `exportar_imagem` e `exportar_carrossel` (exportação final, `docs/exportacao.md`);
     `importar_midia`, `criar_projeto`, `abrir_projeto`, `duplicar_projeto`, `fechar_projeto`, `criar_marca`,
-    `editar_marca`, `importar_logo_marca` e `importar_fonte_marca` (mídia, projeto e marca);
+    `editar_marca`, `importar_logo_marca` e `importar_fonte_marca` (mídia, projeto e marca); `salvar_como_modelo`
+    (grava na pasta de modelos da pessoa, `docs/casca.md`); `aprovar_plano` (o Plano do vídeo, abaixo);
   - ou quem declara `annotations: {openWorldHint: true}` (sai do PC ou do projeto) ou `destructiveHint: true` (apaga)
     no `registerTool`.
 - **Classe "livre"**: o resto. Quando muda um documento que já existe, grava no diário e tem Reverter. Criar documento
@@ -164,6 +165,7 @@ documento sem ser objeto ou fora do formato do módulo dele, e devolve os avisos
 | `editar_marca` | `{marca, nome?, fundo?, texto?, destaque?, suave?, fonte_titulo?, fonte_texto?, fonte_mono?, assinatura?, notas?}` | cartao: idem |
 | `importar_logo_marca` | `{marca, caminho}` | cartao: traz arquivo de fora para o kit |
 | `importar_fonte_marca` | `{marca, caminho, familia?, peso?, estilo?}` | cartao: idem |
+| `salvar_como_modelo` | `{nome, descricao?, documento?}` | cartao: grava na pasta de modelos da pessoa, fora do projeto e sem diário (Onda B) |
 
 - **Uma regra para a tela e para a IA.** `importar_midia` e o botão de escolher arquivo da tela (`escolherMidia`, no
   `main.ts`) usam `importarMidia` (`src/nucleo/importar-midia.ts`): as extensões do filtro do diálogo, o arquivo que já
@@ -181,6 +183,44 @@ documento sem ser objeto ou fora do formato do módulo dele, e devolve os avisos
 - **Kits de marca.** Mesma pasta do painel Marca (`PastaMarcas`: a das preferências no app, `ESTUDIO_MARCAS` ou
   `~/Estudio/marcas` fora dele). Um kit editado não muda sozinho os documentos que já o receberam: `aplicar_marca` de
   novo leva a mudança.
+
+## O Plano do vídeo (Onda B: `src/nucleo/plano-video.ts`, `src/nucleo/mcp-plano.ts`)
+
+Num pedido novo (uma peça do zero, ou refazer o roteiro), a IA não sai montando: pergunta só o que falta (até 3
+perguntas, com sugestão de resposta), escreve o Plano do vídeo e espera a pessoa aprovar ou pedir ajuste. Pedido
+pequeno (uma cor, um texto, um tempo, um comentário) vai direto. Quem ensina isso é o guia do projeto (seção "Planejar
+antes de montar", antes de "Como trabalhar") e as `instructions` do servidor; nada bloqueia a montagem.
+
+| Ferramenta | Parâmetros | Classe |
+|---|---|---|
+| `ler_plano` | — | livre: o plano, o `estado`, a `revisao`, o texto em markdown e o `proximo_passo` |
+| `escrever_plano` | `{objetivo, publico, formato_e_duracao, roteiro: [{cena, mostra, fala?, duracao_s?}], midia_usar?, midia_falta?, narracao, musica, notas?}` | livre: grava em `plano.json`, com diário e Reverter; a revisão sobe e o estado volta a `aguardando` |
+| `aprovar_plano` | `{revisao}` | cartao: registra a aprovação que a pessoa deu na conversa |
+
+- **Onde mora.** `plano.json`, na raiz do projeto: entra no git com o resto e passa pelo diário como a pesquisa
+  (`Projeto.alterarPlano`, `ARQUIVOS_INTERNOS`): o Histórico mostra quem escreveu e quem decidiu, e o Reverter volta
+  cada passo (reverter a primeira escrita apaga o plano). O `aplicar_patch` não o alcança (não é documento do
+  manifesto). O núcleo é puro, para a tela usar o mesmo tipo e o mesmo texto.
+- **Estados.** `aguardando` (escrito, esperando a pessoa), `aprovado` (a IA pode montar) e `ajustar` (com
+  `decisao.ajuste`, o que a pessoa pediu). Reescrever volta a `aguardando` e tira a decisão anterior.
+- **Revisão.** Cada escrita sobe a `revisao`. Aprovar ou pedir ajuste exige a revisão vista: se a IA reescreveu o plano
+  entretanto, a decisão é recusada (`conflito`) e nada grava, para ninguém aprovar um plano que não leu.
+- **Com o app aberto.** Abaixo de cada `escrever_plano`, a conversa mostra o cartão do plano (`CartaoPlano` em
+  `Conversa.tsx`) com "Aprovar plano" e "Pedir ajuste". O botão grava pelo IPC `decidirPlano` (autor `pessoa`, origem
+  `interface`) e manda a decisão à conversa ("Aprovei o plano (revisão 2). Pode montar." ou "Ajuste no plano (revisão
+  1): …"), para a IA seguir sem a pessoa digitar. O cartão de uma revisão que já foi reescrita só diz isso. Vale para
+  qualquer provedor da conversa (Claude, laço próprio, agente ACP).
+- **Sem a tela** (Claude Desktop ou IDE com o app fechado): a pessoa lê o plano na própria conversa e aprova falando; a
+  IA registra com `aprovar_plano`. Por isso ele é "cartao": com o app aberto, o portão pergunta à pessoa antes (o
+  botão do cartão é o caminho direto); sem o app, não há portão e a aprovação da conversa basta. A decisão fica com
+  `por: "pessoa, pela conversa (<origem>)"`.
+- **Por que um arquivo e não só a conversa.** O plano precisa sobreviver a hibernar a conversa, trocar de provedor e
+  abrir o projeto em outro app (o Claude Desktop lê o mesmo `plano.json`); e o "aprovado" precisa de um lugar que a
+  IA consulte antes de montar (`ler_plano`) em vez de depender da memória da conversa.
+- **Tela inicial.** O pedido de "Começar conversando" chega à primeira conversa mandando seguir "Planejar antes de
+  montar" (antes dizia "faça direto, sem perguntar").
+
+Testes: `testes/plano.test.ts` (núcleo, diário e Reverter, as três ferramentas com e sem portão, e o guia).
 
 ## Edição fina (`src/nucleo/mcp-edicao-fina.ts`, frente 4)
 
@@ -235,6 +275,7 @@ O pedido de navegação é o `.estudio/selecao.json` (`{documento, caminhos, tem
 | `testes/prova-acp-qwen.test.ts` | opcional: o Qwen Code real dirigido pela API falsa |
 | `testes/projeto-mcp.test.ts` | frente 2: importar mídia (filtro, nome livre, link para fora, medida do áudio, portão), renomear documento, ponto de restauração com git, criar, abrir, duplicar e fechar projeto no app, no Claude Desktop e na IDE |
 | `testes/marca-mcp.test.ts` | frente 2: listar, criar, editar, importar logo e fonte de kit de marca, e o kit editado no `aplicar_marca` |
+| `testes/plano.test.ts` | Onda B: o Plano do vídeo (escrever, decidir, revisão velha, diário e Reverter, portão no `aprovar_plano`, seção do guia) |
 | `testes/narracao-chaves.test.ts` | chave do Google Cloud TTS (aceita, recusada, API desativada, sem rede), estado sem a chave, stdio pelo ambiente |
 
 ## Licenças
@@ -246,7 +287,7 @@ Nenhuma dependência nova. O protocolo ACP é Apache-2.0; o cliente foi escrito 
 O laço próprio manda como texto de sistema uma abertura curta (`src/main/ia/guia.ts`) e o `CLAUDE.md` do projeto. A
 abertura diz: usar só o MCP `estudio`, chamar `estado_do_editor` antes de cada pedido, ler com `ler_documento` antes de
 mudar, usar `aplicar_patch` com `test` e `versao_base`, tratar comentário como texto da pessoa e responder em pt-BR.
-Nada muda no `claudeMd`.
+O `claudeMd` traz a seção "Planejar antes de montar" (Onda B), que vale para todos os provedores.
 
 ## Caminho entre módulos
 

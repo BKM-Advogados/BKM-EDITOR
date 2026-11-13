@@ -134,7 +134,7 @@ describe('criar projeto', () => {
   });
 
   it('o exemplo não é modelo, e o nome da pasta dele fica numa constante', () => {
-    expect(MODELOS.map((m) => m.id)).toEqual(['video-branco', 'imagem-branco', '3d-branco', 'animacao-branco', 'animacao-9x16', 'animacao-logo-pixel']);
+    expect(MODELOS.map((m) => m.id)).toEqual(['video-branco', 'video-carrossel-narrado', 'imagem-branco', '3d-branco', 'animacao-branco', 'animacao-9x16', 'animacao-logo-pixel']);
     expect(EXEMPLO_DO_APP.pasta).toMatch(/^[a-z0-9-]+$/);
   });
 
@@ -172,7 +172,8 @@ describe('criar projeto', () => {
     expect(md).toContain('"refs": ["F3", "F7"]');
     expect(md).toContain('observação de quem baixou');
     expect(md).toContain('pesquisa/dossie.md');
-    expect(md).not.toMatch(/aprovad|marque .* como aprovado|a pessoa aprova/i);
+    // fato não se aprova (a pesquisa é só visualizador); o Plano do vídeo, em outra seção, é que tem aprovação (Onda B)
+    expect(md.slice(md.indexOf('## Pesquisa'))).not.toMatch(/aprovad|marque .* como aprovado|a pessoa aprova/i);
     expect(claudeMd(['imagem'])).toContain('## Pesquisa');
     expect(claudeMd(['3d'])).not.toContain('## Pesquisa');
     expect(md.indexOf('## Pesquisa')).toBeGreaterThan(md.indexOf('## Como trabalhar'));

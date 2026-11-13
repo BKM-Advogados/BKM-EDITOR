@@ -12,12 +12,14 @@ import {MODELOS} from '../nucleo/modelos';
 import type {Formato} from '../nucleo/formatos';
 import {FORMATOS_IMAGEM_SAIDA, type OpcoesExportarImagem, type OpcoesExportarVideo} from '../nucleo/exportacao';
 import {ErroProjeto, Projeto} from '../nucleo/projeto';
+import {decidirPlano, type Decisao} from '../nucleo/plano-video'; // Onda B: o Plano do vídeo
 import {criarRede} from '../nucleo/ferramentas-mcp';
 import {prepararRender} from './exportar';
 import {criarExportadorVideo, tituloDoDocumento} from './exportacao-video'; // a exportação do vídeo, a mesma do MCP (exportar_video)
 import {servicoDeExportacao} from './exportacao-servico'; // exportação final pelo MCP
 import {definirServicoExportacao} from '../nucleo/mcp-exportacao-final';
 import {registrarIpcMarcas} from './ipc-marcas';
+import {registrarIpcModelos} from './ipc-modelos';
 import {arquivoLivre, registrarExportarPaginas} from './exportar-paginas';
 import {lerJsonDaTela} from './ler-json';
 import {McpHttp} from './mcp-http';
@@ -57,7 +59,7 @@ import {criarClaudeDesktop} from './claude-desktop'; // Claude Desktop (docs/cla
 import {listarProjetos, resolverProjeto, SCRIPT_DESKTOP} from '../nucleo/claude-desktop';
 // frente 2: importar mídia, criar, abrir, duplicar e fechar projeto e o ponto de restauração, os mesmos pela tela e pelo MCP
 import {EXTENSOES_IMPORTAVEIS, importarMidia, NOME_DO_TIPO, type TipoImportavel} from '../nucleo/importar-midia';
-import {criarPastaDoProjeto, duplicarPastaDoProjeto, formatoDoPedido, resumoDoProjeto} from '../nucleo/novo-projeto';
+import {criarPastaDoModelo, criarPastaDoProjeto, duplicarPastaDoProjeto, formatoDoPedido, resumoDoProjeto} from '../nucleo/novo-projeto';
 import {definirMedidorDeEnvelope, definirPontoDeRestauracao, mensagemDoPonto, respostaDoPonto, type TrocadorDeProjeto} from '../nucleo/mcp-projeto';
 import {medirEnvelopeDoArquivo} from './ipc-audio';
 import {criarAtualizador} from './atualizacao'; // atualização do app (docs/atualizacao.md)
@@ -448,6 +450,10 @@ lidar(CANAL.reabrir, (id: string) => exigirProjeto().reabrir(id));
 lidar(CANAL.diario, (desde?: number) => exigirProjeto().resumoDoDiario(desde ?? 0));
 // pesquisa (docs/pesquisa.md): a interface só lê; o Claude grava pelo MCP e o observador da pasta avisa a tela
 lidar(CANAL.pesquisa, () => exigirProjeto().pesquisa());
+// o Plano do vídeo (Onda B, src/nucleo/plano-video.ts): a pessoa decide a revisão que viu; vai ao diário, com Reverter
+lidar(CANAL.plano, () => exigirProjeto().plano());
+lidar(CANAL.decidirPlano, (revisao: number, d: Decisao) => exigirProjeto().alterarPlano((p) => decidirPlano(p, Number(revisao), d, 'pessoa', new Date().toISOString()),
+  {autor: 'pessoa', origem: 'interface', rotulo: d?.decisao === 'ajustar' ? 'ajuste pedido no plano do vídeo' : `plano do vídeo aprovado (revisão ${revisao})`}));
 // o texto de uma fonte passa de 600 KB (a CLT inteira): lido sem travar o processo principal
 lidar(CANAL.textoFonte, async (fonteId: string, inicio?: number, fim?: number) => {
   const texto = await exigirProjeto().lerTextoFonteSemTravar(fonteId);
@@ -541,6 +547,12 @@ ipcMain.on(CANAL.mostrarArquivo, (e, caminho: string) => {
 
 // kits de marca e fontes próprias (ipc-marcas.ts): a pasta das preferências, servida também pelo servidor de mídia
 const marcas = registrarIpcMarcas({lidar, janela: () => janela, memoria, midia, exigirProjeto});
+// modelos da pessoa (ipc-modelos.ts): salvar o projeto como modelo; criar a partir dele abre o projeto novo aqui
+const modelos = registrarIpcModelos({lidar, memoria, exigirProjeto});
+lidar(CANAL.modelosCriarProjeto, (o: {id: string; nome?: string; pasta?: string; marca?: string}) => emFila(() => {
+  const {raiz} = criarPastaDoModelo({modelos, id: o.id, nome: o.nome, marca: o.marca ? marcas.ler(o.marca) : null, pasta: o.pasta || memoria.prefs().pasta_projetos});
+  return abrirProjeto(raiz);
+}));
 
 registrarPrefsExportacao(lidar, exigirProjeto); // marca d'água por destino, lembrada no projeto (frente C)
 registrarContrasteMarca(lidar, exigirProjeto, (documento) => (exigirProjeto(), sessao!.propsVideo(documento, midia.base)), (aviso) => prepararRender({raizApp: app.getAppPath(), empacotado: app.isPackaged, aviso})); // contraste 3:1 da marca (frente C)

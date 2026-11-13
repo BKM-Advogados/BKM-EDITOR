@@ -8,7 +8,7 @@ import React, {Suspense, useCallback, useEffect, useRef, useState} from 'react';
 import {usarTemExemplo} from '../estado/exemplo';
 import {DockviewReact, type DockviewApi, type DockviewReadyEvent, type DockviewTheme, type IDockviewPanelHeaderProps, type IDockviewPanelProps} from 'dockview-react';
 import 'dockview-react/dist/styles/dockview.css';
-import {Blend, BookMarked, BookOpen, Box, Maximize2, Minimize2, Check, Copy, Download, Film, FilePlus2, FolderOpen, FolderSearch, History, Home, Image as ImageIcon, Images, LayoutPanelLeft, ListTree,
+import {Blend, BookMarked, BookOpen, Box, Maximize2, Minimize2, Check, Copy, Download, Film, FilePlus2, FolderOpen, FolderSearch, History, Home, Image as ImageIcon, Images, LayoutPanelLeft, LayoutTemplate, ListTree,
   MessageSquare, MessageSquarePlus, MonitorPlay, Music, Palette, Plus, Rows3, Settings, SlidersHorizontal, Sparkle, Sparkles, Undo2, X} from 'lucide-react';
 import type {Preferencias, Recente} from '../../compartilhado/api';
 import type {Modulo} from '../../nucleo/documentos';
@@ -21,6 +21,7 @@ import {comando, comModificador, rotuloDoAtalho} from '../teclas';
 import {SeloSalvo} from './SeloSalvo';
 import {faixaAtual, gravarLayout, layoutPadrao, lerLayout, type Faixa, type Orientacao} from './arranjos';
 import {PainelPreferencias} from './Preferencias';
+import {PrimeirosPassos} from './PrimeirosPassos';
 import {Midia} from '../paineis/Midia'; // frente Casca (rodada 3): painel de mídia
 import type {PaineisDoModulo} from './contrato';
 import {PaineisVideo} from '../modulos/video/paineis';
@@ -300,6 +301,20 @@ export const Casca: React.FC = () => {
       avisar(mensagemDe(e), 'erro');
     }
   };
+  // Salvar como modelo (pasta-modelos.ts): o projeto inteiro, ou só o documento ativo; aparece em Novo na tela inicial
+  const salvarComoModelo = async (documento?: {id: string; titulo: string}) => {
+    const n = await pedirTexto({titulo: documento ? 'Salvar documento como modelo' : 'Salvar projeto como modelo', rotulo: 'Nome do modelo',
+      valor: documento?.titulo ?? info?.manifesto.nome ?? 'Meu modelo', botao: 'Salvar modelo',
+      texto: `${documento ? `Só "${documento.titulo}" e a mídia que ele usa` : 'Os documentos e a mídia que eles usam'} vão para a sua pasta de modelos, sem o histórico nem as conversas. O modelo aparece em Novo, na tela inicial.`});
+    if (!n?.trim()) return;
+    try {
+      const m = await window.estudio.modelos.salvar({nome: n, ...(documento ? {documento: documento.id} : {})});
+      avisar(m.faltando.length ? `Modelo "${m.nome}" salvo; ficaram de fora ${m.faltando.length} arquivo(s) que não estão mais em midia/` : `Modelo "${m.nome}" salvo`,
+        m.faltando.length ? 'info' : 'ok');
+    } catch (e) {
+      avisar(mensagemDe(e), 'erro');
+    }
+  };
 
   useEffect(() => {
     const tecla = (ev: KeyboardEvent) => {
@@ -440,6 +455,12 @@ export const Casca: React.FC = () => {
             )}
             <hr />
             <button onClick={item(() => void duplicar())}><Copy size={14} />Duplicar projeto…</button>
+            <button onClick={item(() => void salvarComoModelo())} title="Guarda os documentos e a mídia deles como um modelo seu, em Novo na tela inicial">
+              <LayoutTemplate size={14} />Salvar como modelo…</button>
+            {docAtivo && (info?.manifesto.documentos.length ?? 0) > 1 && (
+              <button onClick={item(() => void salvarComoModelo(docAtivo))} title="Guarda só o documento aberto (e a mídia dele) como modelo">
+                <LayoutTemplate size={14} />Salvar este documento como modelo…</button>
+            )}
             <button onClick={item(() => window.estudio.mostrarNaPasta())}><FolderSearch size={14} />Mostrar na pasta</button>
             <button onClick={item(() => void marcarVersao())}><Check size={14} />Marcar ponto de restauração<kbd>{rotuloDoAtalho('Ctrl+S')}</kbd></button>
             {temExemplo && <button onClick={item(() => void window.estudio.abrirExemplo().then(abrirProjeto).catch((e: Error) => avisar(mensagemDe(e), 'erro')))}><BookOpen size={14} />Ver um exemplo</button>}
@@ -466,6 +487,7 @@ export const Casca: React.FC = () => {
           ))}
         </nav>
         <div className="acoes">
+          <PrimeirosPassos />
           <button className={`bti${modoComentario ? ' ligado' : ''}`} onClick={() => loja.definir((s) => ({modoComentario: !s.modoComentario}))} title="Comentar na tela (M)"
             aria-label="Comentar na tela" aria-pressed={modoComentario}>
             <MessageSquarePlus size={15} />

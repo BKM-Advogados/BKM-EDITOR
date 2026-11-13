@@ -1,0 +1,182 @@
+{
+  "tipo": "cenas",
+  "formato": {
+    "largura": 1080,
+    "altura": 1920,
+    "fps": 30
+  },
+  "tema": {
+    "fundo": "#111418",
+    "texto": "#F2F2F2",
+    "destaque": "#FFFFFF",
+    "suave": "#A3ABB5",
+    "fonte": "Inter"
+  },
+  "cenas": [
+    {
+      "id": "abertura",
+      "nome": "Abertura",
+      "duracao_ms": 4000,
+      "blocos": [
+        {
+          "id": "abertura-titulo-1",
+          "tipo": "titulo",
+          "em": 0,
+          "x": 0.08,
+          "y": 0.36,
+          "largura": 0.84,
+          "alinhar": "centro",
+          "texto": "Seu primeiro vídeo no **Estúdio**"
+        },
+        {
+          "id": "abertura-texto-2",
+          "tipo": "texto",
+          "em": 700,
+          "x": 0.1,
+          "y": 0.56,
+          "largura": 0.8,
+          "alinhar": "centro",
+          "cor": "#A3ABB5",
+          "texto": "Cada cena tem a sua duração e blocos que entram no tempo certo."
+        }
+      ]
+    },
+    {
+      "id": "blocos",
+      "nome": "Blocos",
+      "duracao_ms": 5500,
+      "blocos": [
+        {
+          "id": "blocos-titulo-1",
+          "tipo": "titulo",
+          "em": 0,
+          "x": 0.08,
+          "y": 0.14,
+          "largura": 0.84,
+          "alinhar": "esquerda",
+          "tam": 0.07,
+          "texto": "O que cabe numa cena"
+        },
+        {
+          "id": "blocos-lista-2",
+          "tipo": "lista",
+          "em": 500,
+          "x": 0.08,
+          "y": 0.3,
+          "largura": 0.84,
+          "alinhar": "esquerda",
+          "itens": [
+            "Título e texto, com **destaque**",
+            "Lista como esta",
+            "Número que conta sozinho",
+            "Imagem com movimento"
+          ]
+        },
+        {
+          "id": "blocos-imagem-3",
+          "tipo": "imagem",
+          "em": 1500,
+          "x": 0.18,
+          "y": 0.6,
+          "largura": 0.64,
+          "altura": 0.28,
+          "ajuste": "conter",
+          "src": "midia/exemplo-blocos.svg"
+        }
+      ]
+    },
+    {
+      "id": "numero",
+      "nome": "Número",
+      "duracao_ms": 4500,
+      "blocos": [
+        {
+          "id": "numero-numero-1",
+          "tipo": "numero",
+          "em": 0,
+          "x": 0.1,
+          "y": 0.32,
+          "largura": 0.8,
+          "alinhar": "centro",
+          "de": 0,
+          "ate": 30,
+          "rotulo": "quadros por segundo, como sai na exportação"
+        },
+        {
+          "id": "numero-texto-2",
+          "tipo": "texto",
+          "em": 1800,
+          "x": 0.1,
+          "y": 0.62,
+          "largura": 0.8,
+          "alinhar": "centro",
+          "cor": "#A3ABB5",
+          "texto": "O número conta de um valor a outro enquanto a cena passa."
+        }
+      ]
+    },
+    {
+      "id": "imagem",
+      "nome": "Imagem",
+      "duracao_ms": 5000,
+      "blocos": [
+        {
+          "id": "imagem-imagem-1",
+          "tipo": "imagem",
+          "em": 0,
+          "x": 0,
+          "y": 0,
+          "largura": 1,
+          "altura": 1,
+          "ajuste": "cobrir",
+          "src": "midia/exemplo-paisagem.svg",
+          "movimento": {
+            "tipo": "aproximar",
+            "intensidade": 0.15,
+            "suave": true
+          }
+        },
+        {
+          "id": "imagem-texto-2",
+          "tipo": "texto",
+          "em": 600,
+          "x": 0.08,
+          "y": 0.74,
+          "largura": 0.84,
+          "alinhar": "centro",
+          "peso": 600,
+          "texto": "Imagens entram com **zoom suave**, sem programa de edição."
+        }
+      ]
+    },
+    {
+      "id": "fecho",
+      "nome": "Fecho",
+      "duracao_ms": 4500,
+      "blocos": [
+        {
+          "id": "fecho-titulo-1",
+          "tipo": "titulo",
+          "em": 0,
+          "x": 0.08,
+          "y": 0.36,
+          "largura": 0.84,
+          "alinhar": "centro",
+          "texto": "Agora é com **você**"
+        },
+        {
+          "id": "fecho-texto-2",
+          "tipo": "texto",
+          "em": 600,
+          "x": 0.1,
+          "y": 0.56,
+          "largura": 0.8,
+          "alinhar": "centro",
+          "cor": "#A3ABB5",
+          "texto": "Mude o que quiser: este projeto é uma cópia. Ou peça ao Claude uma peça nova."
+        }
+      ]
+    }
+  ],
+  "efeitos": []
+}

@@ -1,15 +1,18 @@
 // Contrato entre a interface (renderer) e o processo principal. O preload expõe só isto em window.estudio; a interface
 // não tem acesso a Node nem ao disco.
 import type {Comentario, EntradaDocumento, EstadoEditor, Manifesto, Modulo, OperacaoPatch, ResumoDiario} from '../nucleo/documentos';
+import type {EstadoPassos} from '../nucleo/primeiros-passos';
 import type {IdModelo} from '../nucleo/modelos';
 import type {Formato} from '../nucleo/formatos';
 import type {Envelope, IntensidadeLimpeza, LimpezaClipe} from '../nucleo/audio';
 import type {FichaFaixa} from '../nucleo/biblioteca-musicas';
 import type {MedidasLoudness} from '../nucleo/loudness';
 import type {FonteArquivo, Marca} from '../nucleo/marca';
+import type {ModeloLido} from '../nucleo/pasta-modelos';
 import type {OpcoesExportarImagem, OpcoesExportarVideo, PrefsExportacao} from '../nucleo/exportacao';
 import type {PedidoContrasteDestino, ResultadoContraste} from '../nucleo/contraste'; // só os tipos (frente C)
 import type {Pesquisa} from '../nucleo/pesquisa';
+import type {Decisao, PlanoVideo} from '../nucleo/plano-video'; // Onda B: o Plano do vídeo
 import type {EstadoDaTomada, IndiceDaMidia, MarcaDeMidia} from '../nucleo/midia'; // frente Casca
 import type {EstadoModeloFundo} from '../nucleo/remover-fundo';
 import type {EstadoDaFala} from '../nucleo/legendas'; // frente Fala
@@ -92,12 +95,21 @@ export const CANAL = {
   marcasImportarLogo: 'estudio:marcas-importar-logo',
   marcasImportarFonte: 'estudio:marcas-importar-fonte',
   marcasAplicar: 'estudio:marcas-aplicar',
+  // modelos da pessoa (Salvar como modelo; pasta-modelos.ts e ipc-modelos.ts)
+  modelosListar: 'estudio:modelos-listar',
+  modelosSalvar: 'estudio:modelos-salvar',
+  modelosRenomear: 'estudio:modelos-renomear',
+  modelosRemover: 'estudio:modelos-remover',
+  modelosCriarProjeto: 'estudio:modelos-criar-projeto',
   fontesDoProjeto: 'estudio:fontes-do-projeto',
   exportarPaginas: 'estudio:exportar-paginas',
   exportarCancelar: 'estudio:exportar-cancelar',
   mostrarArquivo: 'estudio:mostrar-arquivo',
   // pesquisa do projeto (pesquisa/pesquisa.json e pesquisa/fontes/), só leitura na interface
   pesquisa: 'estudio:pesquisa',
+  // o Plano do vídeo (plano.json, Onda B): a IA escreve pelo MCP; a pessoa aprova ou pede ajuste pela conversa
+  plano: 'estudio:plano',
+  decidirPlano: 'estudio:decidir-plano',
   textoFonte: 'estudio:texto-fonte',
   abrirFonte: 'estudio:abrir-fonte',
   // frente Fala: transcrição local e legendas (src/main/transcricao.ts, docs/legendas.md)
@@ -190,11 +202,16 @@ export type Recente = {raiz: string; nome: string; aberto_em: string; existe: bo
 export type Preferencias = {pasta_projetos: string; ao_iniciar: 'inicio' | 'ultimo'; formato_video: string; formato_imagem: string; boas_vindas_vista: boolean;
   pasta_trilhas: string; // biblioteca de músicas e efeitos da pessoa (padrão: Estudio/trilhas)
   pasta_marcas: string;
+  pasta_modelos: string; // os modelos da pessoa (Salvar como modelo; padrão: Estudio/meus-modelos; Estudio/modelos é a do whisper e do MODNet)
   projetos_ide?: boolean; // frente IDE e harnesses: guias e MCP de cada harness em cada projeto (padrão: ligado; docs/ide.md)
-  procurar_atualizacoes?: boolean; versao_pulada?: string}; // atualização do app (padrão: procura; "Pular esta versão")
+  procurar_atualizacoes?: boolean; versao_pulada?: string; // atualização do app (padrão: procura; "Pular esta versão")
+  primeiros_passos?: EstadoPassos}; // Onda B: os primeiros passos do editor já feitos e o "Não mostrar mais" (nucleo/primeiros-passos.ts)
 
 /** `marca` é o id do kit de marca que entra no tema do documento novo (sem ele, o tema neutro). */
 export type NovoProjeto = {nome?: string; modelo: IdModelo; formato?: Formato | {largura: number; altura: number}; pasta?: string; formato_id?: string; marca?: string};
+
+/** Modelo da pessoa como a interface o vê (pasta-modelos.ts): nome, tipo, tamanho, documentos e a miniatura (data URL). */
+export type ModeloInfo = ModeloLido;
 
 /** Kit de marca como a interface o vê: o kit, a pasta dele e o endereço no servidor local (logo e fontes para a prévia). */
 export type MarcaInfo = Marca & {pasta: string; url: string};
@@ -339,6 +356,16 @@ export type ApiEstudio = {
     aplicar: (id: string, documento: string) => Promise<{versao: string; marca: string; nome: string; copiados: string[]; atualizados: string[]}>;
     fontesDoProjeto: () => Promise<FonteArquivo[]>;
   };
+  // modelos da pessoa (pasta meus-modelos/ das preferências): aparecem em Novo na tela inicial, ao lado dos de fábrica
+  modelos: {
+    listar: () => Promise<ModeloInfo[]>;
+    /** Salva o projeto aberto (ou só `documento`) como modelo: os documentos e a mídia que eles citam, sem diário, git nem conversas. */
+    salvar: (o: {nome: string; descricao?: string; documento?: string}) => Promise<ModeloInfo & {copiados: string[]; faltando: string[]}>;
+    renomear: (id: string, nome: string) => Promise<ModeloInfo>;
+    remover: (id: string) => Promise<void>;
+    /** Cria e abre um projeto a partir do modelo (com o kit por cima, se vier). */
+    criarProjeto: (o: {id: string; nome?: string; pasta?: string; marca?: string}) => Promise<InfoProjeto>;
+  };
   /** Carrossel: PNG por página em saidas/<nome>/01.png… e, com `pdf`, saidas/<nome>.pdf (uma página por imagem, sem margem). */
   exportarPaginas: (o: PedidoExportarPaginas) => Promise<ResultadoExportarPaginas>;
   cancelarExportacao: () => void; // para a exportação em andamento; o exportarVideo resolve com cancelado: true
@@ -346,6 +373,10 @@ export type ApiEstudio = {
   // pesquisa (docs/pesquisa.md): a interface só lê; quem lê fontes e registra fatos é o Claude, pelo MCP
   /** pesquisa/pesquisa.json (vazia se a pasta pesquisa/ ainda não existe). */
   pesquisa: () => Promise<Pesquisa>;
+  /** O Plano do vídeo (plano.json), ou null se não há (src/nucleo/plano-video.ts). */
+  plano: () => Promise<PlanoVideo | null>;
+  /** A pessoa aprova ou pede ajuste da revisão que viu; revisão que não é a atual falha (o plano mudou). Vai ao diário. */
+  decidirPlano: (revisao: number, d: Decisao) => Promise<PlanoVideo>;
   /** Texto limpo da fonte (pesquisa/fontes/<id>.txt), inteiro ou o recorte inicio..fim; falha se o texto não está na pasta. */
   textoFonte: (fonteId: string, inicio?: number, fim?: number) => Promise<string>;
   /** Abre a url da fonte no navegador da pessoa; só http e https (devolve false para o resto). */

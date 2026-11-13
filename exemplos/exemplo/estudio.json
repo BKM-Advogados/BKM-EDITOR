@@ -1,0 +1,12 @@
+{
+  "formato": 1,
+  "nome": "Exemplo",
+  "documentos": [
+    {
+      "id": "video",
+      "modulo": "video",
+      "caminho": "video/video.json",
+      "titulo": "Vídeo de exemplo"
+    }
+  ]
+}

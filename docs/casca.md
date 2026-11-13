@@ -98,6 +98,52 @@ As ferramentas novas da frente são `listar_midia` e `marcar_midia`, as duas `li
 muda a saída de uma que existe: `checar_texto` (classe `livre`, só lê) agora devolve avisos das legendas e `ultima_frase.termina`
 considera a última legenda.
 
+## Chip de formato e primeiros passos (Onda B)
+
+**Chip de formato.** Sobre o monitor do documento ativo, um rótulo discreto diz o formato pelo destino, com os nomes de
+`nucleo/formatos.ts`: "Reels 9:16", "Feed 4:5", "Quadrado 1:1", "YouTube 16:9" no vídeo e na animação; "Post retrato 4:5",
+"Story 9:16", "LinkedIn 1,91:1", "A4" na imagem; "Personalizado 1200×800" para um tamanho fora da lista. A dica traz o nome
+inteiro, o destino, as medidas e o fps.
+
+- **Onde fica:** no vídeo e na animação, no canto de cima do monitor, fora do quadro (o palco deixa 34 px livres em cima,
+  `TOPO_CHIP`, e o aviso "Claude mudou…" desce uma linha para não cobrir o chip). Na imagem, na linha do rótulo da peça, acima da
+  prancheta. No 3D, na barra da vista. Nada fica sobre a zona segura nem sobre o trilho e o transporte.
+- **Trocar:** clicar abre a lista do módulo; a escolha grava por patch (diário, Reverter e Ctrl+Z), a mesma troca do Formato no
+  inspetor do vídeo (`/formato` inteiro, o fps fica) e da Prancheta da imagem (`/largura` e `/altura`). O rótulo no diário é
+  "formato Feed 4:5".
+- **Só informa:** na animação (todos os modelos de animação têm `formato_fixo` em `nucleo/modelos.ts`; a largura e a altura da cena
+  seguem nas Propriedades), no roteiro antigo do carrossel (sempre 1080×1920) e no 3D ("3D · quadro livre": a cena não exporta e o
+  quadro acompanha o monitor). Na área Efeitos, o chip da imagem também só informa. Música não tem chip.
+- **Código:** a regra em `nucleo/chip-formato.ts` (`chipDoFormato`, `trocaDeFormato`; testes em `testes/chip-formato.test.ts`); a
+  casca em `componentes/ChipFormato.tsx`.
+
+**Primeiros passos.** Para quem abre um projeto pela primeira vez, uma ficha na barra ("Primeiros passos · 1 de 5") abre um
+cartão com cinco passos. Não é tutorial nem modal: o cartão abre sozinho só quando nenhum passo foi feito, fecha no ×, na ficha,
+com Esc ou ao clicar fora, e a ficha continua na barra até concluir.
+
+| Passo | Marca quando |
+|---|---|
+| Trazer uma mídia | há arquivo em `midia/` (o índice do painel Mídia) |
+| Escrever o texto da primeira cena | um bloco da primeira cena de um vídeo de cenas tem texto, item de lista ou rótulo que não é o de exemplo ("Seu título", "Escreva o texto aqui"…); sem vídeo de cenas no projeto, uma camada de texto da imagem ou da animação |
+| Tocar a prévia | o Player do vídeo ou da animação, ou o transporte da música, tocou nesta sessão |
+| Pedir algo ao Claude | o diário do projeto tem uma entrada do agente |
+| Exportar | uma exportação terminou bem nesta sessão (vídeo, imagem ou música) |
+
+- Cada passo se marca pelo estado do projeto ou do editor, nunca por um clique no guia. Passo marcado não se desmarca.
+- O que já se marcou e o "Não mostrar mais" ficam nas preferências do app (`primeiros_passos` em `preferencias.json`, lido por
+  `main/memoria.ts`): quem fez uma vez não vê de novo em outro projeto. Ao concluir os cinco, a ficha sai da barra com um aviso no
+  rodapé. Preferências › "Primeiros passos no editor" › Mostrar recomeça a lista (os passos voltam a se marcar conforme a pessoa faz).
+- **Código:** a regra em `nucleo/primeiros-passos.ts` (`passosFeitosAgora`, `juntarPassos`, `normalizarPassos`; testes em
+  `testes/primeiros-passos.test.ts`); os fatos do editor em `estado/primeiros-passos.ts` (o tocador e a exportação avisam); o
+  cartão em `casca/PrimeirosPassos.tsx`.
+- **Barra:** a coluna da casca passou a `minmax(0, 1fr)`. Antes, o nome do projeto sem quebra empurrava a barra e a doca para fora
+  da janela (em 1440 px a casca media 1502 px e a ficha piorava isso).
+
+**Visto na prévia web, não no app:** o chip no vídeo (Reels → YouTube pelo chip, o arranjo virou horizontal e o inspetor
+acompanhou) e os cinco passos se marcando (o do Claude pela mudança simulada da ponte). Falta conferir no Electron: o chip na
+imagem, na animação e no 3D com o app aberto, o Reverter da troca pelo Histórico, as preferências gravadas no disco depois de
+fechar e abrir o app, e a ficha com a janela estreita (abaixo de 1240 px ela mostra só o ícone e a contagem).
+
 ## Para o guia da IA
 
 Texto para a coordenação juntar no `claudeMd` (item 6 da seção "Pesquisa"): "`checar_texto` também confere as legendas do vídeo de
@@ -112,3 +158,36 @@ Alt+seta na pilha de efeitos (sem aviso de "outra mão"); um erro de gravação 
 a aba Mídia, buscar "transcrito", marcar uma tomada com B e conferir no Histórico, usar uma foto em "Usar em…". O painel foi visto
 na prévia web (arquivos de exemplo), não no Electron; as miniaturas são o próprio arquivo (sem cache de miniatura) e o áudio
 não tem forma de onda nelas.
+
+## Tela inicial (Onda B, frente 1: `onda-b/inicio`)
+
+- **Ver um exemplo.** O exemplo é neutro e sintético: um vídeo de cenas vertical de 23 s (abertura, blocos, número,
+  imagem com aproximação e fecho), tema neutro, duas imagens SVG desenhadas no código, sem logo, foto, áudio ou nome de
+  ninguém. O conteúdo mora em `src/nucleo/exemplo-conteudo.ts`; `npm run exemplo` (`scripts/gerar-exemplo.ts`) grava
+  `exemplos/exemplo`, que o `forge.config.ts` empacota. O `CLAUDE.md` não vai junto: o app o escreve ao abrir a cópia,
+  com o texto da versão instalada. `testes/exemplo.test.ts` falha se a pasta versionada não for a do gerador, se o vídeo
+  tiver aviso, se uma imagem citada faltar, se aparecer marca, ou se dois cliques não derem duas pastas.
+- **Salvar como modelo.** Menu do ícone do editor: "Salvar como modelo…" (o projeto) e, com mais de um documento,
+  "Salvar este documento como modelo…". O modelo vai para `%USERPROFILE%\Estudio\meus-modelos\<id>\` (Preferências ›
+  "Pasta dos seus modelos"; `ESTUDIO_MODELOS` fora do app). Não é `Estudio\modelos`, que guarda o whisper e o MODNet. A
+  pasta tem `modelo.json` (nome, tipo, tamanho, documentos), `miniatura.jpg` (a do projeto, se houver) e `projeto/` com o
+  `estudio.json`, os documentos e só a mídia que eles citam (`midia/` e `fontes/`). Diário, `.git`, conversas,
+  `saidas/`, pesquisa e comentários ficam no projeto. `src/nucleo/pasta-modelos.ts`, IPC em `src/main/ipc-modelos.ts`.
+- **Seus modelos em Novo.** A tela inicial lista os modelos da pessoa nos Modelos do tipo deles, depois dos de fábrica,
+  com "Seu modelo · tamanho". Clicar cria o projeto (`criarPastaDoModelo`, `src/nucleo/novo-projeto.ts`): documentos e
+  mídia do modelo, `CLAUDE.md` e `.gitignore` novos, pasta livre ("Nome", "Nome (2)"). O kit escolhido na ficha troca o
+  tema; Neutro mantém o do modelo. O menu do cartão tem Renomear (o id e a pasta ficam), Mostrar na pasta e Remover
+  (apaga a pasta do modelo depois de confirmar; os projetos criados dele não mudam). Os de fábrica (`modelos.ts`) não
+  moram na pasta, então não se renomeiam nem se removem.
+- **Carrossel narrado.** Modelo de fábrica do vídeo, 9:16 fixo (`src/nucleo/modelo-carrossel-narrado.ts`; a decisão
+  está em `docs/carrossel-narrado.md`).
+- **MCP.** `salvar_como_modelo {nome, descricao?, documento?}`, classe cartão (grava fora do projeto, sem Reverter),
+  citada no passo das marcas do guia do projeto. `src/nucleo/mcp-modelos.ts`.
+- **Prévia web.** `scripts/previa-web/ponte.ts` abre o exemplo de verdade (mídia servida de `exemplos/exemplo`), cria o
+  carrossel narrado e guarda os modelos da pessoa em memória.
+
+O que só se confere com o app aberto: "Ver um exemplo" duas vezes no Electron (duas pastas em `~/Estudio`, a prévia toca e
+as imagens SVG aparecem; `scripts/e2e-boas-vindas.mjs` faz isso); "Salvar como modelo" num projeto com mídia, o cartão com a
+miniatura na tela inicial, criar a partir dele, Renomear, Mostrar na pasta e Remover; a pasta trocada nas Preferências; o
+carrossel narrado com a narração gerada de verdade e "Ajustar as cenas à fala". Na prévia web foram vistos o diálogo de
+salvar, o cartão com o menu, o exemplo (as cinco cenas, a lista, o SVG de blocos e a paisagem) e o carrossel narrado.

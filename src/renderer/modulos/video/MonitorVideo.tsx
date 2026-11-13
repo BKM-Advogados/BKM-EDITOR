@@ -13,6 +13,7 @@ import {ChevronDown, Frame, MessageSquarePlus, MousePointer2, Pause, Play, Plus,
 import {COMPOSICOES, composicaoDe} from '../../../composicoes/registro';
 import {etiquetasDeAudio, type AudioP} from '../../../nucleo/audio';
 import {FORMATO_PADRAO} from '../../../nucleo/formatos';
+import {ChipFormato, TOPO_CHIP} from '../../componentes/ChipFormato';
 import {classeDoQuadro, conjuntoDaClasse, CONJUNTO_QUADRADO, ZONAS_SEGURAS, type ClasseDoQuadro} from '../../../nucleo/zonas-seguras';
 import {aplicar, comentar, loja, patchTrocar, selecionar, useLoja, valorEm} from '../../estado/loja';
 import {Trilho, teclaLivre} from '../../componentes/Trilho';
@@ -119,7 +120,8 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
   const W = medidas?.largura ?? FORMATO_PADRAO.largura;
   const H = medidas?.altura ?? FORMATO_PADRAO.altura;
   definirFps(medidas?.fps ?? FORMATO_PADRAO.fps);
-  const escala = Math.max(0.05, Math.min((w - margem * 2) / W, (h - margem * 2) / H));
+  // em cima, o chip de formato fica fora do quadro: o palco centrado deixa pelo menos TOPO_CHIP acima dele
+  const escala = Math.max(0.05, Math.min((w - margem * 2) / W, (h - Math.max(margem, TOPO_CHIP) * 2) / H));
   const cenasRel = props?.composicao === 'VideoCenas'; // posição em frações do quadro (e não em px do 1080×1920)
   const sugerida = classeDoQuadro(W, H);
   // a zona ligada é a do tipo deste quadro, lida de novo quando o formato do vídeo muda (video-D13)
@@ -339,6 +341,7 @@ export const MonitorVideo: React.FC<{documento?: string}> = ({documento: docForc
           ],
         ]} />
         <div className="monitor" ref={area}>
+          <ChipFormato documento={documento} modulo="video" />
           <AvisoAgente />
           {montado && 'erro' in montado && <div className="erro-monitor">{montado.erro}</div>}
           {props && (

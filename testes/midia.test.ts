@@ -294,7 +294,10 @@ describe('desempenho: busca em menos de 100 ms com 500 arquivos', () => {
     const montar = melhor(() => montarIndice(muitos, marcasVazias()));
     const consultas = ['gancho', 'tomadas mp4', 'fecho 4', 'transcrito', 'arquivo 49', 'inexistente'];
     const busca = Math.max(...consultas.map((q) => melhor(() => buscarMidia(indice, q))));
-    expect(montar + busca).toBeLessThan(100);
+    // a marca é de 100 ms na máquina de quem usa; as máquinas do CI (o Mac Intel, sobretudo) são bem mais lentas e
+    // dividem o processador, então lá a folga é maior (o que se quer pegar é a busca que cresce de ordem, não 20 ms)
+    const marca = process.env.CI ? 250 : 100;
+    expect(montar + busca).toBeLessThan(marca);
     expect(busca).toBeLessThan(50);
   });
 });

@@ -6,18 +6,21 @@
 // Som: "escolher arquivo de áudio" devolve um WAV sintético (uma narração, depois uma música, alternando), como URL de
 // blob que o <audio> e o Web Audio tocam de verdade; o envelope medido fica em memória e entra nas props como no app.
 import jsonpatch, {type Operation} from 'fast-json-patch';
-import type {ApiEstudio, EstadoProvedor, InfoProjeto, PedidoPortaoTela, MarcaInfo, Mudanca, NovoProjeto, Preferencias, Progresso, ProgressoTranscricao, Recente, ResultadoLimpezaVoz, Trilha, RespostaJanela} from '../../src/compartilhado/api';
+import type {ApiEstudio, EventoConversa, EstadoProvedor, InfoProjeto, PedidoPortaoTela, MarcaInfo, ModeloInfo, Mudanca, NovoProjeto, Preferencias, Progresso, ProgressoTranscricao, Recente, ResultadoLimpezaVoz, Trilha, RespostaJanela} from '../../src/compartilhado/api';
 import type {EntradaDocumento, Manifesto, Modulo} from '../../src/nucleo/documentos';
 import type {ApiAtualizacao, EstadoAtualizacao} from '../../src/compartilhado/atualizacao';
 import type {Envelope, IntensidadeLimpeza} from '../../src/nucleo/audio';
 import {LimpezaCancelada, limparVoz} from '../../src/nucleo/limpeza-voz';
 import {medirMistura, type FonteAudio, type MedidasLoudness} from '../../src/nucleo/loudness';
 import type {Fato, Fonte, Pesquisa} from '../../src/nucleo/pesquisa';
+import {decidirPlano, escreverPlano, type ConteudoPlano, type PlanoVideo} from '../../src/nucleo/plano-video'; // Onda B
 import {novoDocCenas, resolverCenas, type DocCenas} from '../../src/nucleo/cenas';
 import {novoDoc3d} from '../../src/nucleo/cena3d';
 import {modeloAnimacaoLogoPixel} from '../../src/nucleo/animacao';
 import {idDeMarca, MARCA_NEUTRO, MARCAS_INICIAIS, patchDaMarca, temaDaMarca, type Marca} from '../../src/nucleo/marca';
 import {MODELOS} from '../../src/nucleo/modelos';
+import {modeloCarrosselNarrado} from '../../src/nucleo/modelo-carrossel-narrado';
+import {DOC_DO_EXEMPLO, MANIFESTO_DO_EXEMPLO} from '../../src/nucleo/exemplo-conteudo'; // "Ver um exemplo" com o exemplo de verdade
 import {codificarWav, decodificarWav, musicaSintetica, narracaoSintetica, TAXA} from '../audio-sintetico';
 import {argumentosDoRender, destinoDoFormato, nomesDosArquivos, normalizarPrefsExportacao, type OpcoesExportarVideo, type PrefsExportacao} from '../../src/nucleo/exportacao';
 import {caminhoSemFundo, MODELO_FUNDO} from '../../src/nucleo/remover-fundo';
@@ -39,12 +42,15 @@ import {escolherCenas, itensDaNarracao, patchDasFalas} from '../../src/nucleo/na
 import type {AndamentoNarracao, Previa, ResultadoNarracao} from '../../src/nucleo/narracao-servico';
 import {custoNarracao} from '../../src/main/ia/precos';
 
-type Proj = {raiz: string; manifesto: Manifesto; docs: Record<string, unknown>; versao: number};
+type Proj = {raiz: string; manifesto: Manifesto; docs: Record<string, unknown>; versao: number; base_midia?: string}; // base_midia: o exemplo serve a mídia de exemplos/
 const projetos = new Map<string, Proj>();
 let aberto: Proj | null = null;
 const PASTA_MARCAS = 'C:\\Users\\pessoa\\Estudio\\marcas';
 let prefs: Preferencias = {pasta_projetos: 'C:\\Users\\pessoa\\Estudio', ao_iniciar: 'inicio', formato_video: 'reels', formato_imagem: 'feed',
-  boas_vindas_vista: new URLSearchParams(location.search).has('vista'), pasta_trilhas: 'C:\\Users\\pessoa\\Estudio\\trilhas', pasta_marcas: PASTA_MARCAS};
+  boas_vindas_vista: new URLSearchParams(location.search).has('vista'), pasta_trilhas: 'C:\\Users\\pessoa\\Estudio\\trilhas', pasta_marcas: PASTA_MARCAS,
+  pasta_modelos: 'C:\\Users\\pessoa\\Estudio\\meus-modelos'};
+// modelos da pessoa (Salvar como modelo), em memória: os documentos guardados em cópia, como a pasta modelos/ do app
+const modelosProprios: {info: ModeloInfo; manifesto: Manifesto; docs: Record<string, unknown>}[] = [];
 
 // ---------- som sintético ----------
 const audios = new Map<string, {url: string; nome: string}>(); // url do blob → nome que o clipe mostra
@@ -175,9 +181,54 @@ const ouvintesProgresso = new Set<(p: Progresso) => void>();
 let exportacaoCancelada = false;
 const progresso = (p: Progresso) => ouvintesProgresso.forEach((f) => f(p));
 const esperar = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
+
+// ---------- o Plano do vídeo (Onda B) na conversa simulada ----------
+// A primeira mensagem vira duas perguntas; a segunda, o plano (escrever_plano). "Ajuste no plano…" reescreve com a
+// revisão seguinte; "Aprovei o plano…" responde que vai montar. Só para ver o cartão do plano na prévia web.
+let planoPrevia: PlanoVideo | null = null;
+const ouvintesConversa = new Set<(id: number, e: EventoConversa) => void>();
+const conversasSimuladas = new Map<number, number>(); // id → mensagens recebidas
+const CONTEUDO_PREVIA: ConteudoPlano = {
+  objetivo: 'Explicar em 40 s quem tem direito a férias proporcionais ao sair da empresa',
+  publico: 'trabalhadores da indústria, sem termo jurídico',
+  formato_e_duracao: 'Reels 9:16, cerca de 40 s',
+  roteiro: [
+    {cena: 'Abertura', mostra: 'Título "Saiu antes de um ano?"', fala: 'Saiu da empresa antes de completar um ano?', duracao_s: 5},
+    {cena: 'A regra', mostra: 'Número grande "1/12" e o texto "por mês trabalhado"', fala: 'Você tem férias proporcionais: um doze avos por mês.', duracao_s: 12},
+    {cena: 'O terço', mostra: 'Lista com "férias" e "+ 1/3"', duracao_s: 10},
+    {cena: 'Fecho', mostra: 'Frase de fecho e o logo', fala: 'Ficou com alguma dúvida? Procure um advogado trabalhista.', duracao_s: 8},
+  ],
+  midia: {usar: ['midia/logo.png'], falta: ['uma foto de linha de produção (opcional)']},
+  narracao: 'narração por IA, voz calma, sem pressa',
+  musica: 'trilha leve sob a voz (cama a −20 LU)',
+  notas: 'supus Reels por ser o formato marcado na tela inicial',
+};
+const conversaSimulada = async (id: number, texto: string) => {
+  const ev = (e: EventoConversa) => ouvintesConversa.forEach((f) => f(id, e));
+  const n = (conversasSimuladas.get(id) ?? 0) + 1;
+  conversasSimuladas.set(id, n);
+  await esperar(250);
+  ev({tipo: 'pronto', sessao: 'previa', modelo: 'claude-previa'});
+  const mensagem = (t: string) => ev({tipo: 'mensagem', texto: t});
+  if (/^Aprovei o plano/.test(texto)) {
+    mensagem('Plano aprovado. Montando as 4 cenas agora (na prévia web nada é montado).');
+  } else if (n === 1 && !/^Ajuste no plano/.test(texto)) {
+    mensagem('Antes de montar, duas perguntas:\n\n1. Para quem é? Sugiro: trabalhadores da indústria.\n2. Com narração? Sugiro: narração por IA, voz calma.');
+  } else {
+    const uso = `plano-${Date.now()}`;
+    const ajuste = /^Ajuste no plano[^:]*: (.*)$/s.exec(texto)?.[1];
+    ev({tipo: 'ferramenta', uso, nome: 'mcp__estudio__escrever_plano', entrada: {objetivo: CONTEUDO_PREVIA.objetivo}});
+    await esperar(300);
+    planoPrevia = escreverPlano(planoPrevia, ajuste ? {...CONTEUDO_PREVIA, notas: `ajuste pedido: ${ajuste}`} : CONTEUDO_PREVIA, 'Claude 1', new Date().toISOString());
+    mudou('plano.json');
+    ev({tipo: 'resultado', uso, ok: true, texto: JSON.stringify({existe: true, estado: planoPrevia.estado, revisao: planoPrevia.revisao})});
+    mensagem('Escrevi o plano acima: 4 cenas em cerca de 35 s. Aprove ou peça ajuste antes de eu montar.');
+  }
+  ev({tipo: 'fim', erro: false, duracao_ms: 900});
+};
 const pastaSaidas = () => `${aberto!.raiz}\\saidas`;
 
-const info = (): InfoProjeto | null => aberto && {raiz: aberto.raiz, manifesto: structuredClone(aberto.manifesto), base_midia: `${location.origin}/testes/fixtures/projeto`, claude: true, git: true,
+const info = (): InfoProjeto | null => aberto && {raiz: aberto.raiz, manifesto: structuredClone(aberto.manifesto), base_midia: aberto.base_midia ?? `${location.origin}/testes/fixtures/projeto`, claude: true, git: true,
   perfil: {nome: 'padrao', sessoes_claude: 4, escala_previa: 0.75, pixel_ratio: 1.5}, estado: null};
 
 const docImagem = (l: number, a: number) => ({formato: 1, largura: l, altura: a, fundo: '#111418', camadas: [{id: 'titulo', nome: 'Título', tipo: 'texto',
@@ -211,6 +262,7 @@ const criar = (o: NovoProjeto): InfoProjeto => {
   const nome = o.nome || 'Sem título · 05/11 14:32';
   const p: Proj = {raiz: `${prefs.pasta_projetos}\\${nome}`, manifesto: {formato: 1, nome, documentos: []}, docs: {}, versao: 1};
   const doc = novoDocumento(p, modelo.modulo, o.formato as never);
+  if (modelo.id === 'video-carrossel-narrado') p.docs[doc.id] = modeloCarrosselNarrado(); // o mesmo documento que o app grava
   if (o.marca) aplicarMarca(p, o.marca, doc.id);
   projetos.set(p.raiz, p);
   aberto = p;
@@ -220,12 +272,27 @@ const criar = (o: NovoProjeto): InfoProjeto => {
 };
 
 const nada = () => undefined;
+const idDoModelo = (nome: string) => {
+  const base = idDeMarca(nome).replace(/^marca$/, 'modelo');
+  let id = base;
+  for (let n = 2; modelosProprios.some((m) => m.info.id === id); n++) id = `${base}-${n}`;
+  return id;
+};
 const api: ApiEstudio = {
   abrirPasta: async () => null,
+  // o exemplo de exemplos/exemplo (exemplo-conteudo.ts), em cópia nova a cada clique, com a mídia servida de lá
   abrirExemplo: async () => {
-    throw new Error('Na prévia web o exemplo não abre (precisa do exemplo empacotado).');
+    let raiz = `${prefs.pasta_projetos}\\Exemplo`;
+    for (let n = 2; projetos.has(raiz); n++) raiz = `${prefs.pasta_projetos}\\Exemplo (${n})`;
+    const p: Proj = {raiz, manifesto: structuredClone(MANIFESTO_DO_EXEMPLO), docs: {video: structuredClone(DOC_DO_EXEMPLO)}, versao: 1,
+      base_midia: `${location.origin}/exemplos/exemplo`};
+    projetos.set(raiz, p);
+    aberto = p;
+    diarioPrevia.length = 0;
+    recentes.unshift({raiz, nome: p.manifesto.nome, aberto_em: new Date().toISOString(), existe: true, modulos: ['video']});
+    return info()!;
   },
-  temExemplo: async () => false,
+  temExemplo: async () => true,
   abrirProjeto: async (raiz) => {
     const p = projetos.get(raiz);
     if (!p) throw new Error(`Na prévia web só abrem os projetos criados nesta sessão: ${raiz}`);
@@ -285,7 +352,8 @@ const api: ApiEstudio = {
   propsVideo: async (id) => {
     const d = aberto!.docs[id] as DocCenas;
     const {props, avisos} = resolverCenas(d, {envelopes});
-    return {props: musicaPrevia.paraTela(props) as never, avisos};
+    // o exemplo serve as imagens dele de exemplos/exemplo (como o servidor de mídia do app faz com a pasta do projeto)
+    return {props: musicaPrevia.paraTela(aberto!.base_midia ? {...props, base_midia: aberto!.base_midia} : props) as never, avisos};
   },
   comentarios: async () => [],
   novoComentario: async () => {
@@ -311,12 +379,15 @@ const api: ApiEstudio = {
   conversa: {
     conta: async () => ({instalado: true, logado: true, metodo: 'claude.ai', email: 'pessoa@exemplo.com.br', chave_api: false}),
     abrir: async (o) => ({id: Math.floor(Math.random() * 1000), sessao: 'previa', provedor: o?.provedor ?? 'claude', rotulo: o?.provedor === 'deepseek' ? 'DeepSeek 1' : 'Claude 1'}),
-    enviar: async () => undefined,
+    enviar: async (id, texto) => void conversaSimulada(id, texto),
     permitir: nada,
     parar: nada,
     hibernar: async () => null,
     fechar: nada,
-    aoEvento: () => nada,
+    aoEvento: (cb) => {
+      ouvintesConversa.add(cb);
+      return () => ouvintesConversa.delete(cb);
+    },
   },
   exportarVideo: async (documento, opcoes) => {
     exportacaoCancelada = false;
@@ -381,6 +452,45 @@ const api: ApiEstudio = {
       return url;
     },
   },
+  modelos: {
+    listar: async () => structuredClone(modelosProprios.map((m) => m.info)).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
+    salvar: async ({nome, descricao, documento}) => {
+      if (!aberto) throw new Error('nenhum projeto aberto');
+      const entradas = aberto.manifesto.documentos.filter((d) => !documento || d.id === documento || d.caminho === documento);
+      const id = idDoModelo(nome);
+      const primeiro = aberto.docs[entradas[0].id] as {formato?: {largura?: number; altura?: number}; largura?: number; altura?: number};
+      const largura = primeiro?.formato?.largura ?? primeiro?.largura;
+      const altura = primeiro?.formato?.altura ?? primeiro?.altura;
+      const info: ModeloInfo = {formato: 1, id, nome: nome.trim(), ...(descricao ? {descricao} : {}), modulo: entradas[0].modulo,
+        ...(largura && altura ? {largura, altura} : {}), documentos: entradas.map((e) => ({id: e.id, modulo: e.modulo, titulo: e.titulo})),
+        criado_em: new Date().toISOString(), de_projeto: aberto.manifesto.nome, pasta: `${prefs.pasta_modelos}\\${id}`};
+      modelosProprios.push({info, manifesto: structuredClone({...aberto.manifesto, documentos: entradas}),
+        docs: Object.fromEntries(entradas.map((e) => [e.id, structuredClone(aberto!.docs[e.id])]))});
+      return {...structuredClone(info), copiados: [], faltando: []};
+    },
+    renomear: async (id, nome) => {
+      const m = modelosProprios.find((x) => x.info.id === id);
+      if (!m) throw new Error(`modelo não achado: ${id}`);
+      m.info.nome = nome.trim();
+      return structuredClone(m.info);
+    },
+    remover: async (id) => {
+      const i = modelosProprios.findIndex((x) => x.info.id === id);
+      if (i >= 0) modelosProprios.splice(i, 1);
+    },
+    criarProjeto: async (o) => {
+      const m = modelosProprios.find((x) => x.info.id === o.id);
+      if (!m) throw new Error(`modelo não achado: ${o.id}`);
+      const nome = o.nome || m.info.nome;
+      const p: Proj = {raiz: `${prefs.pasta_projetos}\\${nome}`, manifesto: {...structuredClone(m.manifesto), nome}, docs: structuredClone(m.docs), versao: 1};
+      if (o.marca) for (const d of p.manifesto.documentos) aplicarMarca(p, o.marca, d.id);
+      projetos.set(p.raiz, p);
+      aberto = p;
+      diarioPrevia.length = 0;
+      recentes.unshift({raiz: p.raiz, nome, aberto_em: new Date().toISOString(), existe: true, modulos: [m.info.modulo]});
+      return info()!;
+    },
+  },
   marcas: {
     listar: async () => structuredClone(marcas),
     gravar: async (m) => {
@@ -422,6 +532,12 @@ const api: ApiEstudio = {
   },
   mostrarArquivo: nada,
   pesquisa: async () => structuredClone(pesquisaDeExemplo),
+  plano: async () => structuredClone(planoPrevia),
+  decidirPlano: async (revisao, d) => {
+    planoPrevia = decidirPlano(planoPrevia, revisao, d, 'pessoa', new Date().toISOString());
+    mudou('plano.json');
+    return structuredClone(planoPrevia);
+  },
   textoFonte: async (fonteId, inicio, fim) => {
     const texto = textosFonte[fonteId];
     if (texto === undefined) throw new Error(`o texto da fonte ${fonteId} não está nesta pasta`);
