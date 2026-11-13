@@ -1,0 +1,19 @@
+Estúdio
+Avisos de terceiros das dependências de áudio e mídia (política A6, docs/musica-daw.md).
+
+Política: no bundle entram MIT, BSD, Apache-2.0, CC0 e CC-BY (com crédito). LGPL só em módulo separado e
+substituível. GPL e AGPL ficam fora do bundle e do WASM. A mesma política está em POLITICA_LICENCAS
+(src/nucleo/musica-licencas.ts). O motor de áudio atual é próprio (Web Audio e o sintetizador da casa) e não
+embute biblioteca de DSP de terceiros.
+
+Dependências atuais ligadas a áudio e mídia:
+
+- remotion 4.0.540 (e @remotion/*): prévia e exportação de vídeo e áudio. Licença própria da Remotion
+  (LICENSE.md do pacote), não é SPDX livre: conferir a licença comercial/de empresa antes de distribuir.
+  https://www.remotion.dev/docs/license
+- onnxruntime-web 1.30.0: inferência ONNX no navegador (modelos de IA). MIT.
+  https://github.com/microsoft/onnxruntime
+
+Kits e sons que vêm com o Estúdio: o kit eletrônico e o sintetizador são sintetizados pelo próprio Estúdio, sem
+arquivo nem licença de terceiros. Cada kit, amostra, IR, preset, modelo NAM ou módulo WASM de terceiros declara
+licença SPDX, SHA-256, autor e crédito (OrigemConteudo) e aparece aqui quando for adotado.
