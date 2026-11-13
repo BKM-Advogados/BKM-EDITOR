@@ -1,0 +1,1527 @@
+{
+  "formato": 1,
+  "tipo": "musica",
+  "titulo": "Trilha para vídeo",
+  "bpm": 90,
+  "compasso": [
+    4,
+    4
+  ],
+  "tom": "C",
+  "escala": "maior",
+  "swing": 0,
+  "semente": 1,
+  "canais": [
+    {
+      "id": "acordes",
+      "nome": "Pad",
+      "tipo": "sintetizador",
+      "faixa_mixer": "acordes",
+      "preset": "pad"
+    },
+    {
+      "id": "arpejo",
+      "nome": "Pluck",
+      "tipo": "sintetizador",
+      "faixa_mixer": "arpejo",
+      "preset": "pluck"
+    },
+    {
+      "id": "baixo",
+      "nome": "Baixo",
+      "tipo": "sintetizador",
+      "faixa_mixer": "baixo",
+      "preset": "baixo"
+    },
+    {
+      "id": "bateria",
+      "nome": "Bateria",
+      "tipo": "bateria",
+      "faixa_mixer": "bateria",
+      "kit": "eletronico"
+    }
+  ],
+  "padroes": [
+    {
+      "id": "p1",
+      "nome": "Acordes (longo)",
+      "canal": "acordes",
+      "dur": 64,
+      "passos": 256,
+      "notas": [
+        {
+          "nota": 60,
+          "em": 0,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 64,
+          "em": 0,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 67,
+          "em": 0,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 67,
+          "em": 4,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 71,
+          "em": 4,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 74,
+          "em": 4,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 57,
+          "em": 8,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 60,
+          "em": 8,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 64,
+          "em": 8,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 65,
+          "em": 12,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 69,
+          "em": 12,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 72,
+          "em": 12,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 60,
+          "em": 16,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 64,
+          "em": 16,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 67,
+          "em": 16,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 67,
+          "em": 20,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 71,
+          "em": 20,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 74,
+          "em": 20,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 57,
+          "em": 24,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 60,
+          "em": 24,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 64,
+          "em": 24,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 65,
+          "em": 28,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 69,
+          "em": 28,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 72,
+          "em": 28,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 60,
+          "em": 32,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 64,
+          "em": 32,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 67,
+          "em": 32,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 67,
+          "em": 36,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 71,
+          "em": 36,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 74,
+          "em": 36,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 57,
+          "em": 40,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 60,
+          "em": 40,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 64,
+          "em": 40,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 65,
+          "em": 44,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 69,
+          "em": 44,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 72,
+          "em": 44,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 60,
+          "em": 48,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 64,
+          "em": 48,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 67,
+          "em": 48,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 67,
+          "em": 52,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 71,
+          "em": 52,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 74,
+          "em": 52,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 57,
+          "em": 56,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 60,
+          "em": 56,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 64,
+          "em": 56,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 65,
+          "em": 60,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 69,
+          "em": 60,
+          "dur": 4,
+          "forca": 80
+        },
+        {
+          "nota": 72,
+          "em": 60,
+          "dur": 4,
+          "forca": 80
+        }
+      ]
+    },
+    {
+      "id": "p2",
+      "nome": "Arpejo (sobe)",
+      "canal": "arpejo",
+      "dur": 64,
+      "passos": 256,
+      "notas": [
+        {
+          "nota": 60,
+          "em": 0,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 64,
+          "em": 0.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 67,
+          "em": 1,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 72,
+          "em": 1.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 76,
+          "em": 2,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 79,
+          "em": 2.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 60,
+          "em": 3,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 64,
+          "em": 3.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 67,
+          "em": 4,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 71,
+          "em": 4.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 74,
+          "em": 5,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 79,
+          "em": 5.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 83,
+          "em": 6,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 86,
+          "em": 6.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 67,
+          "em": 7,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 71,
+          "em": 7.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 69,
+          "em": 8,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 72,
+          "em": 8.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 76,
+          "em": 9,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 81,
+          "em": 9.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 84,
+          "em": 10,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 88,
+          "em": 10.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 69,
+          "em": 11,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 72,
+          "em": 11.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 65,
+          "em": 12,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 69,
+          "em": 12.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 72,
+          "em": 13,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 77,
+          "em": 13.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 81,
+          "em": 14,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 84,
+          "em": 14.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 65,
+          "em": 15,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 69,
+          "em": 15.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 60,
+          "em": 16,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 64,
+          "em": 16.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 67,
+          "em": 17,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 72,
+          "em": 17.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 76,
+          "em": 18,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 79,
+          "em": 18.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 60,
+          "em": 19,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 64,
+          "em": 19.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 67,
+          "em": 20,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 71,
+          "em": 20.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 74,
+          "em": 21,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 79,
+          "em": 21.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 83,
+          "em": 22,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 86,
+          "em": 22.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 67,
+          "em": 23,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 71,
+          "em": 23.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 69,
+          "em": 24,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 72,
+          "em": 24.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 76,
+          "em": 25,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 81,
+          "em": 25.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 84,
+          "em": 26,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 88,
+          "em": 26.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 69,
+          "em": 27,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 72,
+          "em": 27.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 65,
+          "em": 28,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 69,
+          "em": 28.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 72,
+          "em": 29,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 77,
+          "em": 29.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 81,
+          "em": 30,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 84,
+          "em": 30.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 65,
+          "em": 31,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 69,
+          "em": 31.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 60,
+          "em": 32,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 64,
+          "em": 32.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 67,
+          "em": 33,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 72,
+          "em": 33.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 76,
+          "em": 34,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 79,
+          "em": 34.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 60,
+          "em": 35,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 64,
+          "em": 35.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 67,
+          "em": 36,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 71,
+          "em": 36.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 74,
+          "em": 37,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 79,
+          "em": 37.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 83,
+          "em": 38,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 86,
+          "em": 38.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 67,
+          "em": 39,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 71,
+          "em": 39.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 69,
+          "em": 40,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 72,
+          "em": 40.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 76,
+          "em": 41,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 81,
+          "em": 41.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 84,
+          "em": 42,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 88,
+          "em": 42.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 69,
+          "em": 43,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 72,
+          "em": 43.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 65,
+          "em": 44,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 69,
+          "em": 44.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 72,
+          "em": 45,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 77,
+          "em": 45.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 81,
+          "em": 46,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 84,
+          "em": 46.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 65,
+          "em": 47,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 69,
+          "em": 47.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 60,
+          "em": 48,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 64,
+          "em": 48.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 67,
+          "em": 49,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 72,
+          "em": 49.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 76,
+          "em": 50,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 79,
+          "em": 50.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 60,
+          "em": 51,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 64,
+          "em": 51.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 67,
+          "em": 52,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 71,
+          "em": 52.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 74,
+          "em": 53,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 79,
+          "em": 53.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 83,
+          "em": 54,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 86,
+          "em": 54.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 67,
+          "em": 55,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 71,
+          "em": 55.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 69,
+          "em": 56,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 72,
+          "em": 56.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 76,
+          "em": 57,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 81,
+          "em": 57.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 84,
+          "em": 58,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 88,
+          "em": 58.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 69,
+          "em": 59,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 72,
+          "em": 59.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 65,
+          "em": 60,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 69,
+          "em": 60.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 72,
+          "em": 61,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 77,
+          "em": 61.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 81,
+          "em": 62,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 84,
+          "em": 62.5,
+          "dur": 0.45,
+          "forca": 80
+        },
+        {
+          "nota": 65,
+          "em": 63,
+          "dur": 0.45,
+          "forca": 95
+        },
+        {
+          "nota": 69,
+          "em": 63.5,
+          "dur": 0.45,
+          "forca": 80
+        }
+      ]
+    },
+    {
+      "id": "p3",
+      "nome": "Baixo (longo)",
+      "canal": "baixo",
+      "dur": 64,
+      "passos": 256,
+      "notas": [
+        {
+          "nota": 36,
+          "em": 0,
+          "dur": 4,
+          "forca": 105
+        },
+        {
+          "nota": 31,
+          "em": 4,
+          "dur": 4,
+          "forca": 105
+        },
+        {
+          "nota": 33,
+          "em": 8,
+          "dur": 4,
+          "forca": 105
+        },
+        {
+          "nota": 29,
+          "em": 12,
+          "dur": 4,
+          "forca": 105
+        },
+        {
+          "nota": 36,
+          "em": 16,
+          "dur": 4,
+          "forca": 105
+        },
+        {
+          "nota": 31,
+          "em": 20,
+          "dur": 4,
+          "forca": 105
+        },
+        {
+          "nota": 33,
+          "em": 24,
+          "dur": 4,
+          "forca": 105
+        },
+        {
+          "nota": 29,
+          "em": 28,
+          "dur": 4,
+          "forca": 105
+        },
+        {
+          "nota": 36,
+          "em": 32,
+          "dur": 4,
+          "forca": 105
+        },
+        {
+          "nota": 31,
+          "em": 36,
+          "dur": 4,
+          "forca": 105
+        },
+        {
+          "nota": 33,
+          "em": 40,
+          "dur": 4,
+          "forca": 105
+        },
+        {
+          "nota": 29,
+          "em": 44,
+          "dur": 4,
+          "forca": 105
+        },
+        {
+          "nota": 36,
+          "em": 48,
+          "dur": 4,
+          "forca": 105
+        },
+        {
+          "nota": 31,
+          "em": 52,
+          "dur": 4,
+          "forca": 105
+        },
+        {
+          "nota": 33,
+          "em": 56,
+          "dur": 4,
+          "forca": 105
+        },
+        {
+          "nota": 29,
+          "em": 60,
+          "dur": 4,
+          "forca": 105
+        }
+      ]
+    },
+    {
+      "id": "p4",
+      "nome": "Calmo (para fundo de fala)",
+      "canal": "bateria",
+      "dur": 4,
+      "passos": 16,
+      "notas": [
+        {
+          "peca": "bumbo",
+          "em": 0,
+          "forca": 85
+        },
+        {
+          "peca": "shaker",
+          "em": 0,
+          "forca": 50
+        },
+        {
+          "peca": "shaker",
+          "em": 0.5,
+          "forca": 65
+        },
+        {
+          "peca": "aro",
+          "em": 1,
+          "forca": 70
+        },
+        {
+          "peca": "shaker",
+          "em": 1,
+          "forca": 50
+        },
+        {
+          "peca": "shaker",
+          "em": 1.5,
+          "forca": 65
+        },
+        {
+          "peca": "shaker",
+          "em": 2,
+          "forca": 50
+        },
+        {
+          "peca": "bumbo",
+          "em": 2.5,
+          "forca": 85
+        },
+        {
+          "peca": "shaker",
+          "em": 2.5,
+          "forca": 65
+        },
+        {
+          "peca": "aro",
+          "em": 3,
+          "forca": 70
+        },
+        {
+          "peca": "shaker",
+          "em": 3,
+          "forca": 50
+        },
+        {
+          "peca": "shaker",
+          "em": 3.5,
+          "forca": 65
+        }
+      ]
+    }
+  ],
+  "arranjo": {
+    "clipes": [
+      {
+        "id": "c1",
+        "canal": "acordes",
+        "em": 0,
+        "dur": 64,
+        "padrao": "p1"
+      },
+      {
+        "id": "c2",
+        "canal": "arpejo",
+        "em": 0,
+        "dur": 64,
+        "padrao": "p2"
+      },
+      {
+        "id": "c3",
+        "canal": "baixo",
+        "em": 0,
+        "dur": 64,
+        "padrao": "p3"
+      },
+      {
+        "id": "c4",
+        "canal": "bateria",
+        "em": 0,
+        "dur": 64,
+        "padrao": "p4"
+      }
+    ]
+  },
+  "mixer": {
+    "faixas": [
+      {
+        "id": "acordes",
+        "nome": "Pad",
+        "volume_db": -3,
+        "pan": 0,
+        "eq": {
+          "graves_db": -3,
+          "medios_db": 0,
+          "agudos_db": 1
+        },
+        "compressor": {
+          "ativo": false
+        },
+        "reverb": 0.4,
+        "delay": 0.15
+      },
+      {
+        "id": "arpejo",
+        "nome": "Pluck",
+        "volume_db": -9,
+        "pan": 0,
+        "eq": {
+          "graves_db": 0,
+          "medios_db": -4,
+          "agudos_db": -2
+        },
+        "compressor": {
+          "ativo": true,
+          "limiar_db": -24,
+          "razao": 2,
+          "ataque_ms": 20,
+          "soltura_ms": 200,
+          "ganho_db": 2
+        },
+        "reverb": 0.15,
+        "delay": 0
+      },
+      {
+        "id": "baixo",
+        "nome": "Baixo",
+        "volume_db": -4,
+        "pan": 0,
+        "eq": {
+          "graves_db": 0,
+          "medios_db": -4,
+          "agudos_db": -2
+        },
+        "compressor": {
+          "ativo": true,
+          "limiar_db": -24,
+          "razao": 2,
+          "ataque_ms": 20,
+          "soltura_ms": 200,
+          "ganho_db": 2
+        },
+        "reverb": 0.15,
+        "delay": 0
+      },
+      {
+        "id": "bateria",
+        "nome": "Bateria",
+        "volume_db": -8,
+        "pan": 0,
+        "eq": {
+          "graves_db": 0,
+          "medios_db": -4,
+          "agudos_db": -2
+        },
+        "compressor": {
+          "ativo": true,
+          "limiar_db": -24,
+          "razao": 2,
+          "ataque_ms": 20,
+          "soltura_ms": 200,
+          "ganho_db": 2
+        },
+        "reverb": 0.15,
+        "delay": 0
+      }
+    ],
+    "master": {
+      "volume_db": 0,
+      "reverb": {
+        "tamanho": 0.6,
+        "amortecimento": 0.4,
+        "volume_db": 0
+      },
+      "delay": {
+        "tempo": "1/8.",
+        "realimentacao": 0.35,
+        "brilho": 0.5,
+        "pingue_pongue": true,
+        "volume_db": 0
+      },
+      "limitador": {
+        "ativo": true,
+        "teto_db": -1
+      }
+    }
+  },
+  "marcadores": [],
+  "acordes": [
+    {
+      "em": 0,
+      "dur": 4,
+      "acorde": "I"
+    },
+    {
+      "em": 4,
+      "dur": 4,
+      "acorde": "V"
+    },
+    {
+      "em": 8,
+      "dur": 4,
+      "acorde": "vi"
+    },
+    {
+      "em": 12,
+      "dur": 4,
+      "acorde": "IV"
+    },
+    {
+      "em": 16,
+      "dur": 4,
+      "acorde": "I"
+    },
+    {
+      "em": 20,
+      "dur": 4,
+      "acorde": "V"
+    },
+    {
+      "em": 24,
+      "dur": 4,
+      "acorde": "vi"
+    },
+    {
+      "em": 28,
+      "dur": 4,
+      "acorde": "IV"
+    },
+    {
+      "em": 32,
+      "dur": 4,
+      "acorde": "I"
+    },
+    {
+      "em": 36,
+      "dur": 4,
+      "acorde": "V"
+    },
+    {
+      "em": 40,
+      "dur": 4,
+      "acorde": "vi"
+    },
+    {
+      "em": 44,
+      "dur": 4,
+      "acorde": "IV"
+    },
+    {
+      "em": 48,
+      "dur": 4,
+      "acorde": "I"
+    },
+    {
+      "em": 52,
+      "dur": 4,
+      "acorde": "V"
+    },
+    {
+      "em": 56,
+      "dur": 4,
+      "acorde": "vi"
+    },
+    {
+      "em": 60,
+      "dur": 4,
+      "acorde": "IV"
+    }
+  ],
+  "automacoes": [
+    {
+      "alvo": "master",
+      "parametro": "volume",
+      "pontos": [
+        {
+          "em": 60,
+          "db": 0
+        },
+        {
+          "em": 64,
+          "db": -40
+        }
+      ]
+    }
+  ]
+}

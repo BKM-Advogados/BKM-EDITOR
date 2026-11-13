@@ -1,0 +1,37 @@
+{
+  "formato": 1,
+  "pcm": "float32 little-endian, canais intercalados, mistura final a 48 kHz",
+  "taxa": 48000,
+  "musicas": {
+    "batida": {
+      "pcm_sha256": "f74f2f9d1699ba1f3b2b5bef53959e4d90abd1f9b022ddc7bf0de1e3107d6a6d",
+      "amostras": 921600,
+      "canais": 2
+    },
+    "delay-limitador": {
+      "pcm_sha256": "5f1a7266b7c92b42a42344cdded1605c2d3bc8cea056a8156bacdabc28751806",
+      "amostras": 363790,
+      "canais": 2
+    },
+    "efeito-sonoro": {
+      "pcm_sha256": "b2e7283bc4dc827491775af37abb69a5486e5784d5df20893d0dceda6fbfcbb3",
+      "amostras": 192000,
+      "canais": 2
+    },
+    "sidechain-automacao": {
+      "pcm_sha256": "6c767f58e51aee6828f9929c65c22fa6e91e03749c94c03f1e29d93135477772",
+      "amostras": 360000,
+      "canais": 2
+    },
+    "sintetizadores-audio": {
+      "pcm_sha256": "c23b361c4f97929aec98edf702a5d43f34e6c402370057d7c8356911c21fec8b",
+      "amostras": 288000,
+      "canais": 2
+    },
+    "trilha-video": {
+      "pcm_sha256": "7d7b03ec525f9c5a35ed540c1722a0f1a97846d02abbfc81df541680b270549f",
+      "amostras": 2048000,
+      "canais": 2
+    }
+  }
+}
