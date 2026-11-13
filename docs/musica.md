@@ -162,8 +162,9 @@ toca como guia, fora da música.
 - **Peças do canal**: `volume_db`, `pan`, `afinacao` (semitons) e `grupo` (peças do mesmo grupo se calam: os dois
   chimbais vêm no grupo 1).
 - **Mixer**: por faixa, `volume_db`, `pan` (−1 a 1), `mudo`, `solo`, `eq` (graves 200 Hz, médios 1 kHz, agudos 5 kHz,
-  de −18 a +18 dB), `compressor`, `reverb` e `delay` (quanto vai a cada retorno, de 0 a 1, depois do volume). Havendo
-  solo, só toca o que tem solo (por canal e por faixa).
+  de −18 a +18 dB), `compressor`, `reverb` e `delay` (quanto vai a cada retorno, de 0 a 1, depois do volume) e
+  `atraso_ms` (o track delay, de −500 a +500 ms; negativo adianta a faixa, ver [`docs/audio-grafo.md`](audio-grafo.md)).
+  Havendo solo, só toca o que tem solo (por canal e por faixa).
 - **Master**: `volume_db`; `reverb` (`tamanho`, `amortecimento`, `volume_db`); `delay` (`tempo`: `1/16`, `1/8`, `1/8.`,
   `1/4`, `1/4.` ou `1/2`, a figura em semínimas; `realimentacao` de 0 a 0,9; `brilho` de 0 a 1; `pingue_pongue`;
   `volume_db`); `limitador` (`ativo`, `teto_db` de −12 a 0, `soltura_ms`). Sem o campo, o limitador fica desligado (o
@@ -191,6 +192,42 @@ toca como guia, fora da música.
 - Fora do lugar vira aviso, nunca erro: canal, padrão ou áudio que faltam deixam o clipe calado; números fora da faixa
   voltam para dentro.
 
+**Esquema versionado** (M-02, `src/nucleo/musica-migrar.ts`): o `formato` diz a versão do documento (hoje 1; sem o campo,
+ou com um valor que não é inteiro, vale 0). Cada mudança de esquema entra como um migrador puro de um formato para o
+seguinte, na lista `MIGRADORES`; `migrarMusica` encadeia os que faltam até o formato atual. Regras:
+
+- O migrador nunca muda o som: o documento migrado renderiza o mesmo PCM que o original (os testes comparam o SHA-256).
+- Cada migrador é idempotente, e `migrarMusica` não toca no documento recebido (devolve o mesmo objeto quando nada muda).
+- Documento de formato mais novo que o do app fica como está, com aviso.
+- `patchDaMigracao` dá o JSON Patch da migração, para gravar pelo `aplicar_patch` com diário. Ainda ninguém chama a
+  migração ao abrir: o único migrador de hoje (0 → 1) só escreve o `formato`, e o motor já lê os dois iguais.
+
+**Endereço de parâmetro** (M-02, `src/nucleo/musica-param.ts`): um nome estável para cada botão da música, o mesmo para
+a automação geral, o MIDI learn, o MCP e a tela. É o alvo e os segmentos, separados por `/`:
+
+| Alvo | Exemplos |
+|---|---|
+| `faixa:<id>` (faixa do mixer) | `faixa:bateria/volume_db`, `faixa:bateria/atraso_ms`, `faixa:bateria/eq/graves_db`, `faixa:bateria/compressor/razao`, `faixa:bateria/envio/reverb`, `faixa:baixo/sidechain/quanto_db` |
+| `canal:<id>` | `canal:lead/macro/brilho`, `canal:bateria/peca:caixa/afinacao`, `canal:bateria/mudo` |
+| `master` | `master/volume_db`, `master/reverb/tamanho`, `master/delay/tempo`, `master/limitador/teto_db` |
+| `musica` (o documento) | `musica/bpm`, `musica/swing` |
+
+- Um segmento é `nome` ou `nome:chave`. No id e na chave, `%`, `/` e `:` vão como `%25`, `%2F` e `%3A`.
+- O endereço usa ids, nunca posições: mover a faixa no mixer muda o caminho JSON, não o endereço.
+- `faixa:<id>/efeito:<slot>/<param>` já se lê e se escreve, mas só resolve quando houver inserts (X-01).
+- `lerEndereco` e `escreverEndereco` fazem a ida e a volta do texto.
+- `resolverParametro` dá o JSON Pointer do campo e o que falta criar. Cria a faixa que só existe pelo canal e os objetos
+  pais. O sidechain não nasce sem o canal que dispara.
+- `lerParametro` dá o valor efetivo (como o motor usa), o gravado e se o campo está no documento.
+- `patchDoParametro` dá o JSON Patch: número fora da faixa volta para dentro com aviso, tipo errado é erro.
+- `paraNormalizado` e `deNormalizado` levam a 0..1 e de volta (log nos tempos e na razão), para o MIDI learn.
+- `enderecosDoDocumento` lista o que um documento tem; `enderecoDaAutomacao` liga a automação de volume de hoje ao
+  endereço dela.
+
+A tabela `PARAMETROS` diz de cada parâmetro o tipo, a faixa, o padrão, a unidade, a curva e se é automatizável. Os
+padrões e as faixas são os do `resolverMusica`, e um teste confere um contra o outro. Nas peças do kit, a faixa é a da
+tela e do MCP: o motor não traz o valor de volta para dentro.
+
 **No vídeo** (`src/nucleo/audio.ts`): o `ClipeAudio` ganha `musica` (id do documento) e `musica_original`
 (`{arquivo, corte_ms?, duracao_ms}`, o áudio de antes do "Editar em Música"). `arquivo` aponta o render; o volume, os
 fades e o ducking do clipe continuam valendo, porque para o vídeo é um clipe como outro qualquer.
@@ -203,7 +240,11 @@ e quadradas desafinadas, sem arquivo nem licença de terceiros), os clipes de á
 domínio público) no master. A mesma conta roda na janela, num Web Worker (o Web Audio só decodifica a 48 kHz e toca o
 resultado), no render que vai para o vídeo e no MCP por stdio, então a prévia e o render saem iguais amostra por amostra.
 
-**Por que um motor próprio e não o Tone.js** (decisão da frente, dentro da D1: só Web Audio, sem módulo nativo nem VST):
+**Por que um motor próprio e não o Tone.js** (decisão da frente, dentro da D1: só Web Audio, sem módulo nativo nem VST).
+A D1 foi revista em 12/11/2026 em duas camadas ([A1](adr/A1-d1-em-duas-camadas.md)): o render canônico (vídeo,
+exportação, MCP) continua só TypeScript/WASM, e código nativo só entra na periferia, em processo separado, com a saída
+congelada em WAV; isso só chega na onda M8. As outras decisões do roadmap (`docs/musica-daw.md`) estão em
+[`docs/adr/`](adr/README.md). Os motivos abaixo seguem valendo:
 - O Tone.js toca no Web Audio da janela e renderiza com o `OfflineAudioContext`, que só existe no navegador. O MCP por
   stdio (outro app de IA, sem a janela do Estúdio) e o processo principal não teriam como fazer o render para o vídeo; a
   ligação viva dependeria da janela aberta.
@@ -213,6 +254,21 @@ resultado), no render que vai para o vídeo e no MCP por stdio, então a prévia
   outro no render) isso viraria teste de semelhança.
 - Nenhuma dependência nova no instalador. O que o Tone.js traz e falta aqui (sintetizadores prontos, agendador de tempo
   real) entra pelos itens do plano, escrito na mesma conta.
+
+**Grafo de processadores** (M-01, [A2](adr/A2-motor-em-grafo-por-bloco.md)): o render (`renderizarMusica`) monta o
+documento como um grafo (canais → faixas → retornos → master → limitador) e o roda em blocos de 128 amostras, com soma em
+ordem fixa, PDC e parâmetros pelo endereço da M-02 (`src/nucleo/audio-grafo/`, ver [`docs/audio-grafo.md`](audio-grafo.md)).
+O EQ, o compressor, o Freeverb, o delay e o limitador são processadores por bloco (o limitador com 1,5 ms de latência
+compensada), e os instrumentos entram como o som seco de cada canal. O PCM é o mesmo do motor antigo bit a bit: ele
+continua em `musica-som.ts` (`renderizarMusicaAntigo`) só como oráculo de `testes/audio-grafo-oraculo.test.ts`.
+
+**Memória do render** (M-04): fora da prévia, o render não guarda o som da música inteira por canal nem por faixa. Cada
+canal é feito por trechos enquanto o grafo lê, e na memória ficam só a mistura e, se pedidos, os stems: 24 faixas de
+5 min passaram de 5,9 GB no motor antigo (8 GB no grafo da M-01) para 290 MB ([`docs/desempenho.md`, seção
+4.10](desempenho.md#410-música-memória-do-render-m-04)). No processo principal e no MCP por stdio, cada faixa
+processada e cada retorno ficam num **cache em disco** em `.estudio/cache-audio/` do projeto (fora do git, teto de 2 GB,
+LRU; `ESTUDIO_CACHE_AUDIO_MB` muda o teto e 0 desliga): renderizar, medir ou exportar de novo depois de mexer numa faixa
+refaz só ela. Detalhes em [`docs/audio-grafo.md`, seção Memória](audio-grafo.md#memória).
 
 **Fora da thread da interface.** Na janela, o som é feito no Web Worker `src/renderer/modulos/musica/render.worker.ts`,
 que guarda os áudios decodificados e o cache por camada. O render que vai para o vídeo também sai dele: o processo
@@ -244,6 +300,11 @@ uma nota nova, 1,0 s. Memória do processo no teste: 414 MB.
 O retorno entra no cache como o do reverb. O limitador fica no fim do master: o ganho desce 1,5 ms antes do pico, numa
 rampa (média do mínimo pedido na janela), e volta na soltura; cada ponto da rampa já é menor ou igual ao que o pico
 pede, então nada passa do teto de amostra (o teste mede).
+
+**Reamostragem** (M-11, `src/nucleo/reamostrar.ts`): áudio de clipe que não vem a 48 kHz passa por `reamostrar()`: sinc com
+janela Kaiser (meia-largura 24, beta 9, antialiasing ao baixar a taxa) no render canônico e Hermite cúbico para a prévia
+(`qualidade: 'hermite'`). Fase zero (sem atraso de grupo) e determinística. Na taxa de 48 kHz o vetor passa direto, sem
+conta, então os hashes dos documentos antigos não mudam. Só o que vem de fora em outra taxa deixa de ser interpolação linear.
 
 **A música em arquivo** (item 23, `src/nucleo/musica-entrega.ts`): a mistura é medida (BS.1770, o mesmo medidor do vídeo,
 com o pico verdadeiro por sobreamostragem 4×), recebe o ganho que leva ao alvo e passa por um limitador com teto de
@@ -301,6 +362,60 @@ duração do clipe acompanha a música, salvo quando a pessoa aparou o clipe no 
 mais sai na hora; na abertura do projeto, o que falta no disco (pasta clonada) é gravado e as sobras saem. Sem a janela
 (MCP por stdio), as ferramentas fazem o mesmo, com o ffmpeg do `node_modules` para áudios que não são WAV a 48 kHz.
 
+## Determinismo
+
+Contrato da M-03 (ADR A4 de `docs/musica-daw.md`), em duas classes:
+
+- **Canônico**: o render offline que vai para o vídeo, a exportação e o MCP. O mesmo documento dá o mesmo PCM, bit a bit,
+  na janela (Web Worker), no processo principal e no MCP por stdio. É o que se confere por hash.
+- **Prévia viva**: o que tocar em tempo real (worklet, knob mexido na hora, entrada de áudio, onda M5 em diante). É
+  declarada aproximada. Hoje a prévia ainda é o próprio render canônico, tocado em buffer, então ainda não há diferença.
+
+**A impressão digital** (`src/nucleo/musica-hash.ts`) é o SHA-256 dos bytes float32 little-endian, com os canais
+intercalados (L0 R0 L1 R1 ...), da mistura final a 48 kHz: depois do master e do limitador, antes da conversão para 16 ou
+24 bits. Os bits vão como estão, então −0 e +0 contam diferente. O SHA-256 é escrito em TypeScript puro (sem
+`node:crypto` nem `crypto.subtle`) para rodar igual nos quatro lugares. `hashDaMusica(doc, fontes)` renderiza sem cache e
+devolve `{pcm_sha256, amostras, canais, taxa}`. `hashDoPcm(canais)` serve para um render já feito.
+
+**Documentos de referência** (`testes/fixtures/musica-referencia/`), congelados em JSON: mudar um modelo depois não muda
+o oráculo.
+
+| Documento | O que exercita |
+|---|---|
+| `batida` | o modelo Batida: bateria pop, baixo em oitavas com sidechain do bumbo, acordes, presets de faixa |
+| `trilha-video` | o modelo Trilha para vídeo: pad, arpejo, baixo, bateria calma, "Cama sob a voz", fade por automação no master |
+| `efeito-sonoro` | o modelo Efeito sonoro: subida de notas, rufar, impacto, reverb e delay pingue-pongue |
+| `sidechain-automacao` | swing 0,35, semente 7, ajuste de peças, EQ e compressor, dois sidechains (bumbo e caixa), automação de duas faixas, clipe com `inicio` |
+| `delay-limitador` | compasso 3/4, delay pingue-pongue de colcheia pontuada com realimentação 0,7, reverb grande, master +9 dB no limitador a −3 dB (13 dB de redução), pan |
+| `sintetizadores-audio` | os quatro sintetizadores com macros nos extremos, swing 0,6, canal e faixa mudos, clipes de áudio (`midia/ref-ruido.wav`) com corte, ganho e fades |
+
+`hashes.json` guarda o hash, as amostras e os canais de cada um. **Esses hashes são o oráculo da migração da M1**: o motor
+por blocos tem que dar os mesmos números (o grafo da M-01 já dá: os seis batem pelo vitest e pelo MCP por stdio). A exceção prevista é o compressor e o limitador, que ficam dentro de uma
+tolerância a aprovar.
+
+**Aceitação sonora** (F-13): `testes/aceitacao-som/` analisa cada referência (espectro em 1/3 de oitava, crest, LUFS, pico,
+correlação estéreo) com tolerâncias, e `docs/aceitacao-som.md` traz o roteiro de audição humana. É o que diz o quanto o som
+mudou quando o hash muda de propósito.
+
+**Como conferir:**
+- `npx vitest run testes/musica-determinismo.test.ts`: renderiza cada documento pelo motor de agora e confere o hash. Confere
+  também o SHA-256 contra o `node:crypto`, a prévia com cache (mexer num volume e voltar dá o mesmo PCM) e o
+  `medir_musica {hash: true}` pelo registro do MCP.
+- `node scripts/hashes-musica.mjs` (depois do `npm run mcp:build`): roda o vitest, monta um projeto temporário com os
+  documentos e pede `medir_musica {hash: true}` a cada um pelo MCP por stdio (`dist-mcp/nucleo.cjs`). Com `--executavel
+  <Estúdio>`, roda pelo executável do app em modo Node, que usa o V8 do Electron. `--sem-vitest` pula o vitest.
+- Na janela: com o app aberto no projeto, o MCP por stdio repassa ao app, e o `medir_musica {hash: true}` sai do Web Worker
+  (`feito_por: "janela"`).
+
+**Regravar o oráculo** só quando uma mudança de som foi decidida e aprovada pelo dono:
+`ESTUDIO_GRAVAR_HASHES=1 npx vitest run testes/musica-determinismo.test.ts`. O diff do `hashes.json` vai no mesmo commit,
+com o motivo.
+
+**Medido** (este PC, Linux, Node 26): os seis hashes do vitest batem com os do MCP por stdio. O SHA-256 em TS puro leva
+0,08 s para 40 s de música estéreo. O `npm test` do CI roda o mesmo teste no Linux, no Windows e no Mac (Intel e Apple
+Silicon), então um hash que mude por sistema ou processador quebra o CI. Ainda falta conferir na janela (o V8 do
+Electron) e pelo executável do app com `--executavel`.
+
 ## Ferramentas MCP
 
 Em `src/nucleo/mcp-musica.ts`, registradas por uma linha em `registrarFerramentas`. Servem a qualquer IA: esquema Zod sem
@@ -312,7 +427,7 @@ Em `src/nucleo/mcp-musica.ts`, registradas por uma linha em `registrarFerramenta
 |---|---|---|---|
 | `ler_musica` | `documento?, eventos?, de?, ate?` | BPM, compasso, duração, canais, padrões, clipes (batidas e segundos), mixer, onde toca no vídeo e se o render está em dia, cortes das cenas e avisos; com `eventos`, as notas do trecho em segundos | livre |
 | `arranjar` | `documento?, acao: por\|mover\|aparar\|dividir\|apagar\|ajustar\|repetir\|secao\|mover_secao, clipe?, canal?, audio?, padrao?, em?, dur?, corte_s?, ganho_db?, fade_in?, fade_out?, mudo?, vezes?, secao?, nome?` | Põe, move, apara, divide, apaga, ajusta e repete clipes; cria, renomeia e move seções (mover leva os clipes); aparar o começo anda o corte do áudio ou o início do padrão | livre |
-| `medir_musica` | `documento?, por_faixa?` | LUFS integrado e pico da música e de cada faixa | livre |
+| `medir_musica` | `documento?, por_faixa?, hash?` | LUFS integrado e pico da música e de cada faixa; com `hash`, o SHA-256 do PCM, as amostras e quem fez a conta (seção Determinismo) | livre |
 | `por_no_video` | `musica?, video?, faixa?, em_ms?, substituir?` | Clipe novo ligado à música, ou liga um clipe que existe | livre |
 | `levar_para` | `modulo, alvo: {documento, caminho}, intencao?, tempo?: {em_ms?, dur_ms?}, modelo?` | Abre a Música com o clipe ou a faixa do vídeo e guarda de onde veio; ao criar, `modelo` (`vazio`, `batida`, `trilha_video`, `efeito_sonoro`) escolhe a música nova | livre |
 | `concluir_transicao` | `transicao, aplicar?, resultado?: {documento?, midia?}` | Põe a música no vídeo por patch e volta | livre |

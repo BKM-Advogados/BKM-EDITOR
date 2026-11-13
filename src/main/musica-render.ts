@@ -24,6 +24,8 @@ import type {PedidoExportarMusica, ResultadoExportarMusica} from '../nucleo/musi
 import {hashesDaMusica} from '../nucleo/musica-projeto';
 import {comprovanteDeLicencas, licencasDaMusica, textoDosCreditos} from '../nucleo/musica-licencas';
 import {gravarEnvelope} from './ipc-audio';
+import {hashDoPcm} from '../nucleo/musica-hash';
+import {cacheAudioDoProjeto, impressaoDasFontes} from '../nucleo/cache-audio';
 
 const lerMusica = (p: Projeto, id: string) => {
   const {doc} = p.lerJson<unknown>(p.arquivoDoDocumento(id));
@@ -45,6 +47,14 @@ export const decodificarParaMusica = async (p: Projeto, arquivo: string, binario
     }
   }
   return decodificarAudio(abs, {taxa: TAXA_MUSICA, binarios});
+};
+
+/** O cache de áudio em disco do projeto (.estudio/cache-audio/, fora do git): o render daqui reaproveita as faixas que
+ *  não mudaram desde o último render, sem guardá-las na memória. O conteúdo dos áudios entra no nome dos arquivos: um
+ *  áudio trocado por outro do mesmo tamanho não traz a faixa velha. */
+const armazemDe = (p: Projeto, fontes: Record<string, FonteAudio | undefined>) => {
+  garantirMusicaForaDoGit(p);
+  return cacheAudioDoProjeto(p.raiz, {sal: impressaoDasFontes(fontes)});
 };
 
 const fontesDe = async (p: Projeto, doc: DocMusica, binarios?: string | null) => {
@@ -69,7 +79,7 @@ const gravarBinario = (p: Projeto, rel: string, dados: Buffer) => {
 
 /** O que a janela devolve ao pedido "musica:render" (o Web Worker dela fez a conta). */
 type RenderDaJanela = {wav?: Uint8Array; duracao_s?: number; avisos?: string[]; faltando?: string[]; medida?: {integrado_lufs: number | null; pico_dbtp: number | null};
-  faixas?: Record<string, {integrado_lufs: number | null; pico_dbtp: number | null}>; envelope?: Envelope};
+  faixas?: Record<string, {integrado_lufs: number | null; pico_dbtp: number | null}>; envelope?: Envelope; pcm_sha256?: string; amostras?: number};
 
 /** O serviço que o MCP e o IPC usam (definirServicoMusica). Com a janela (o app aberto), o som é feito no Web Worker
  *  dela, com o cache da prévia, e o processo principal só grava: nada pesado na thread que atende a janela. Sem janela
@@ -96,7 +106,8 @@ export const servicoDeRender = (o: {binarios?: () => string | null | undefined; 
       m = r.medida;
       envelope = r.envelope;
     } else {
-      const feito = renderizarMusica(doc, await fontesDe(p, doc, o.binarios?.()), {taxa: TAXA_MUSICA});
+      const fontes = await fontesDe(p, doc, o.binarios?.());
+      const feito = renderizarMusica(doc, fontes, {taxa: TAXA_MUSICA, armazem: armazemDe(p, fontes)});
       canais = feito.canais;
       gravarBinario(p, alvo.arquivo, gravarWav(feito.canais, feito.taxa));
       som = feito;
@@ -116,12 +127,15 @@ export const servicoDeRender = (o: {binarios?: () => string | null | undefined; 
   exportar: (p, id, pedido) => exportarMusica(p, id, pedido, o),
   medir: async (p, id, opcoes = {}): Promise<MedidaMusica> => {
     const doc = lerMusica(p, id);
-    const daJanela = o.janela ? await o.janela('musica:render', {doc, porFaixa: opcoes.porFaixa, sohMedir: true}, {tempo_ms: 120_000}) : null;
+    const daJanela = o.janela ? await o.janela('musica:render', {doc, porFaixa: opcoes.porFaixa, sohMedir: true, hash: opcoes.hash}, {tempo_ms: 120_000}) : null;
     if (daJanela?.ok) {
       const r = daJanela.dados as RenderDaJanela;
-      if (r.medida) return {...r.medida, duracao_ms: Math.round((r.duracao_s ?? 0) * 1000), ...(r.faixas ? {faixas: r.faixas} : {}), avisos: r.avisos ?? []};
+      // a janela de uma versão sem o hash cai na conta daqui (o hash pedido sempre volta)
+      if (r.medida && (!opcoes.hash || r.pcm_sha256)) return {...r.medida, duracao_ms: Math.round((r.duracao_s ?? 0) * 1000), ...(r.faixas ? {faixas: r.faixas} : {}), avisos: r.avisos ?? [],
+        ...(opcoes.hash ? {pcm_sha256: r.pcm_sha256, amostras: r.amostras, feito_por: 'janela' as const} : {})};
     }
-    const som = renderizarMusica(doc, await fontesDe(p, doc, o.binarios?.()), {taxa: TAXA_MUSICA, porFaixa: opcoes.porFaixa});
+    const fontes = await fontesDe(p, doc, o.binarios?.());
+    const som = renderizarMusica(doc, fontes, {taxa: TAXA_MUSICA, porFaixa: opcoes.porFaixa, armazem: armazemDe(p, fontes)});
     const m = medirAmostras(som.canais, som.taxa);
     const faixas = som.faixas
       ? Object.fromEntries(Object.entries(som.faixas).map(([f, c]) => {
@@ -129,7 +143,8 @@ export const servicoDeRender = (o: {binarios?: () => string | null | undefined; 
         return [f, {integrado_lufs: x.integrado_lufs, pico_dbtp: x.pico_dbtp}];
       }))
       : undefined;
-    return {integrado_lufs: m.integrado_lufs, pico_dbtp: m.pico_dbtp, duracao_ms: Math.round(som.duracao_s * 1000), ...(faixas ? {faixas} : {}), avisos: som.avisos};
+    return {integrado_lufs: m.integrado_lufs, pico_dbtp: m.pico_dbtp, duracao_ms: Math.round(som.duracao_s * 1000), ...(faixas ? {faixas} : {}), avisos: som.avisos,
+      ...(opcoes.hash ? {pcm_sha256: hashDoPcm(som.canais), amostras: som.canais[0].length, feito_por: 'processo' as const} : {})};
   },
 });
 
@@ -164,8 +179,11 @@ export const exportarMusica = async (p: Projeto, id: string, pedido: PedidoExpor
   const folga_db = pedido.formato === 'wav' ? 0 : 0.5; // o codificador sobe um pouco o pico verdadeiro
   const entregaPedido = {stems: pedido.stems, alvo_lufs: pedido.alvo_lufs, folga_db};
   const daJanela = o.janela ? await o.janela('musica:exportar', {doc, pedido: entregaPedido}, {tempo_ms: 300_000}) : null;
-  const e: EntregaEmBytes = daJanela?.ok && daJanela.dados ? (daJanela.dados as EntregaEmBytes)
-    : entregaEmBytes(doc, await fontesDe(p, doc, o.binarios?.()), entregaPedido);
+  const doProcesso = async () => {
+    const fontes = await fontesDe(p, doc, o.binarios?.());
+    return entregaEmBytes(doc, fontes, {...entregaPedido, armazem: armazemDe(p, fontes)});
+  };
+  const e: EntregaEmBytes = daJanela?.ok && daJanela.dados ? (daJanela.dados as EntregaEmBytes) : await doProcesso();
   const buf = (b: Uint8Array) => Buffer.from(b.buffer, b.byteOffset, b.byteLength);
   const arquivos: string[] = [];
   const avisos = [...e.avisos];

@@ -1,0 +1,446 @@
+{
+  "formato": 1,
+  "tipo": "musica",
+  "titulo": "Sintetizadores e áudio",
+  "bpm": 140,
+  "compasso": [
+    4,
+    4
+  ],
+  "tom": "C",
+  "escala": "maior",
+  "swing": 0.6,
+  "semente": 42,
+  "canais": [
+    {
+      "id": "baixo",
+      "nome": "baixo",
+      "tipo": "sintetizador",
+      "faixa_mixer": "baixo",
+      "preset": "baixo",
+      "macros": {
+        "brilho": 0,
+        "ataque": 0,
+        "soltura": 1,
+        "cor": 1
+      }
+    },
+    {
+      "id": "pad",
+      "nome": "pad",
+      "tipo": "sintetizador",
+      "faixa_mixer": "pad",
+      "preset": "pad",
+      "macros": {
+        "brilho": 0.3333333333333333,
+        "ataque": 1,
+        "soltura": 0.5,
+        "cor": 0.6666666666666667
+      }
+    },
+    {
+      "id": "pluck",
+      "nome": "pluck",
+      "tipo": "sintetizador",
+      "faixa_mixer": "pluck",
+      "preset": "pluck",
+      "macros": {
+        "brilho": 0.6666666666666666,
+        "ataque": 0.1,
+        "soltura": 0,
+        "cor": 0.33333333333333337
+      }
+    },
+    {
+      "id": "lead",
+      "nome": "lead",
+      "tipo": "sintetizador",
+      "faixa_mixer": "lead",
+      "preset": "lead",
+      "macros": {
+        "brilho": 1,
+        "ataque": 0.5,
+        "soltura": 0.3,
+        "cor": 0
+      }
+    },
+    {
+      "id": "mudo",
+      "nome": "Mudo",
+      "tipo": "sintetizador",
+      "faixa_mixer": "lead",
+      "preset": "lead",
+      "mudo": true
+    },
+    {
+      "id": "audio",
+      "nome": "Áudio",
+      "tipo": "audio",
+      "faixa_mixer": "audio"
+    }
+  ],
+  "padroes": [
+    {
+      "id": "p-baixo",
+      "canal": "baixo",
+      "dur": 4,
+      "notas": [
+        {
+          "nota": 36,
+          "em": 0,
+          "dur": 0.5,
+          "forca": 50
+        },
+        {
+          "nota": 39,
+          "em": 0.5,
+          "dur": 0.75,
+          "forca": 60
+        },
+        {
+          "nota": 43,
+          "em": 1,
+          "dur": 0.5,
+          "forca": 70
+        },
+        {
+          "nota": 46,
+          "em": 1.5,
+          "dur": 0.75,
+          "forca": 80
+        },
+        {
+          "nota": 48,
+          "em": 2,
+          "dur": 0.5,
+          "forca": 90
+        },
+        {
+          "nota": 43,
+          "em": 2.5,
+          "dur": 0.75,
+          "forca": 100
+        },
+        {
+          "nota": 39,
+          "em": 3,
+          "dur": 0.5,
+          "forca": 110
+        },
+        {
+          "nota": 41,
+          "em": 3.5,
+          "dur": 0.75,
+          "forca": 120
+        }
+      ]
+    },
+    {
+      "id": "p-pad",
+      "canal": "pad",
+      "dur": 4,
+      "notas": [
+        {
+          "nota": 60,
+          "em": 0,
+          "dur": 0.5,
+          "forca": 50
+        },
+        {
+          "nota": 63,
+          "em": 0.5,
+          "dur": 0.75,
+          "forca": 60
+        },
+        {
+          "nota": 67,
+          "em": 1,
+          "dur": 0.5,
+          "forca": 70
+        },
+        {
+          "nota": 70,
+          "em": 1.5,
+          "dur": 0.75,
+          "forca": 80
+        },
+        {
+          "nota": 72,
+          "em": 2,
+          "dur": 0.5,
+          "forca": 90
+        },
+        {
+          "nota": 67,
+          "em": 2.5,
+          "dur": 0.75,
+          "forca": 100
+        },
+        {
+          "nota": 63,
+          "em": 3,
+          "dur": 0.5,
+          "forca": 110
+        },
+        {
+          "nota": 65,
+          "em": 3.5,
+          "dur": 0.75,
+          "forca": 120
+        }
+      ]
+    },
+    {
+      "id": "p-pluck",
+      "canal": "pluck",
+      "dur": 4,
+      "notas": [
+        {
+          "nota": 67,
+          "em": 0,
+          "dur": 0.5,
+          "forca": 50
+        },
+        {
+          "nota": 70,
+          "em": 0.5,
+          "dur": 0.75,
+          "forca": 60
+        },
+        {
+          "nota": 74,
+          "em": 1,
+          "dur": 0.5,
+          "forca": 70
+        },
+        {
+          "nota": 77,
+          "em": 1.5,
+          "dur": 0.75,
+          "forca": 80
+        },
+        {
+          "nota": 79,
+          "em": 2,
+          "dur": 0.5,
+          "forca": 90
+        },
+        {
+          "nota": 74,
+          "em": 2.5,
+          "dur": 0.75,
+          "forca": 100
+        },
+        {
+          "nota": 70,
+          "em": 3,
+          "dur": 0.5,
+          "forca": 110
+        },
+        {
+          "nota": 72,
+          "em": 3.5,
+          "dur": 0.75,
+          "forca": 120
+        }
+      ]
+    },
+    {
+      "id": "p-lead",
+      "canal": "lead",
+      "dur": 4,
+      "notas": [
+        {
+          "nota": 79,
+          "em": 0,
+          "dur": 0.5,
+          "forca": 50
+        },
+        {
+          "nota": 82,
+          "em": 0.5,
+          "dur": 0.75,
+          "forca": 60
+        },
+        {
+          "nota": 86,
+          "em": 1,
+          "dur": 0.5,
+          "forca": 70
+        },
+        {
+          "nota": 89,
+          "em": 1.5,
+          "dur": 0.75,
+          "forca": 80
+        },
+        {
+          "nota": 91,
+          "em": 2,
+          "dur": 0.5,
+          "forca": 90
+        },
+        {
+          "nota": 86,
+          "em": 2.5,
+          "dur": 0.75,
+          "forca": 100
+        },
+        {
+          "nota": 82,
+          "em": 3,
+          "dur": 0.5,
+          "forca": 110
+        },
+        {
+          "nota": 84,
+          "em": 3.5,
+          "dur": 0.75,
+          "forca": 120
+        }
+      ]
+    },
+    {
+      "id": "p-mudo",
+      "canal": "mudo",
+      "dur": 4,
+      "notas": [
+        {
+          "nota": 90,
+          "em": 0,
+          "dur": 4
+        }
+      ]
+    }
+  ],
+  "arranjo": {
+    "clipes": [
+      {
+        "id": "c-baixo",
+        "canal": "baixo",
+        "em": 0,
+        "dur": 8,
+        "padrao": "p-baixo"
+      },
+      {
+        "id": "c-pad",
+        "canal": "pad",
+        "em": 2,
+        "dur": 8,
+        "padrao": "p-pad"
+      },
+      {
+        "id": "c-pluck",
+        "canal": "pluck",
+        "em": 4,
+        "dur": 8,
+        "padrao": "p-pluck"
+      },
+      {
+        "id": "c-lead",
+        "canal": "lead",
+        "em": 6,
+        "dur": 8,
+        "padrao": "p-lead"
+      },
+      {
+        "id": "c-mudo",
+        "canal": "mudo",
+        "em": 0,
+        "dur": 8,
+        "padrao": "p-mudo"
+      },
+      {
+        "id": "a1",
+        "canal": "audio",
+        "em": 1,
+        "dur": 1,
+        "audio": "midia/ref-ruido.wav",
+        "corte_s": 0.1,
+        "ganho_db": -6,
+        "fade_in": 0.25,
+        "fade_out": 0.25
+      },
+      {
+        "id": "a2",
+        "canal": "audio",
+        "em": 6,
+        "dur": 2,
+        "audio": "midia/ref-ruido.wav",
+        "ganho_db": 3,
+        "fade_out": 1
+      }
+    ]
+  },
+  "mixer": {
+    "faixas": [
+      {
+        "id": "baixo",
+        "nome": "baixo",
+        "volume_db": -3,
+        "pan": -0.8
+      },
+      {
+        "id": "pad",
+        "nome": "pad",
+        "volume_db": -3,
+        "pan": 0.8
+      },
+      {
+        "id": "pluck",
+        "nome": "pluck",
+        "volume_db": -3,
+        "pan": -0.3
+      },
+      {
+        "id": "lead",
+        "nome": "lead",
+        "volume_db": -3,
+        "pan": 0.3
+      },
+      {
+        "id": "audio",
+        "nome": "Áudio",
+        "volume_db": 0,
+        "pan": 0,
+        "eq": {
+          "agudos_db": -9
+        },
+        "delay": 0.2
+      },
+      {
+        "id": "sobra",
+        "nome": "Sobra",
+        "volume_db": 0,
+        "pan": 0,
+        "mudo": true
+      }
+    ],
+    "master": {
+      "volume_db": 0,
+      "reverb": {
+        "tamanho": 0.6,
+        "amortecimento": 0.4,
+        "volume_db": 0
+      },
+      "delay": {
+        "tempo": "1/16",
+        "realimentacao": 0.3,
+        "brilho": 0.9,
+        "pingue_pongue": false,
+        "volume_db": -6
+      },
+      "limitador": {
+        "ativo": true,
+        "teto_db": -1
+      }
+    }
+  },
+  "marcadores": [],
+  "licencas": [
+    {
+      "arquivo": "midia/ref-ruido.wav",
+      "licenca": "proprio"
+    }
+  ]
+}

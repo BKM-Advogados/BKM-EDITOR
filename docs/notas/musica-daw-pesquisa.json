@@ -1,0 +1,2475 @@
+{
+ "resultados": [
+  {
+   "area": "Instrumentos (geração de som: sintetizadores, samplers, kits de bateria com amostras, modelagem física, bibliotecas de samples e presets, guitarra distorcida e bateria acústica convincentes)",
+   "fl_studio": [
+    {
+     "feature": "Lista oficial de geradores",
+     "descricao": "O manual (generator_plugins.htm) divide os instrumentos em três grupos. Automação: Automation Clip, Envelope/Keyboard Controller. Amostras: Audio Clip, BooBass, Channel Sampler, DirectWave, FLEX, FL Keys, FPC, Fruity Granulizer, Fruity Slicer, Fruity Slicer 2, SoundFont Player, Groove Machine, Slicex, Wave Traveller. Síntese: 3x Osc, Autogun, BassDrum, BeepMap, Drumpad, Drumaxx, FL Slayer, Fruit Kick, DrumSynth Live, DX10, Groove Machine Synth, Harmless, Harmor, Kepler, Kepler Exo, MiniSynth, Morphine, Ogun, Plucked!, PoiZone, Sakura, Sawer, SimSynth, Speech Synthesizer, SynthMaker, Sytrus, Toxic Biohazard, Transistor Bass, Wasp/Wasp XT. A disponibilidade varia por edição (página Compare). Fruity: 3xOsc, FPC, FLEX, Granulizer, Slicer 1/2, DirectWave Player, Plucked!, BooBass, FL Keys etc. Producer: Sytrus, Slicex, SoundFont Player, Kepler. Signature: DirectWave Full, Harmless. All Plugins: Harmor, Drumaxx, Sakura, PoiZone, Morphine, Ogun, Toxic Biohazard, Transistor Bass, Kepler Exo, Sawer."
+    },
+    {
+     "feature": "Channel Sampler",
+     "descricao": "Toca uma amostra só: afinação, envelopes, loop, filtro e qualidade de reamostragem configurável. A opção 'Cycle layers' ajuda a variar o timbre em notas repetidas (conforme o manual do DirectWave)."
+    },
+    {
+     "feature": "DirectWave (sampler avançado)",
+     "descricao": "O Zone Mapper espalha as zonas por faixa de tecla e de velocidade (com arrastar e soltar). Grupos de disparo têm os modos Cycle (round robin), Random e Avoid previous. Loops: Forward, One Shot, Sustained e Bounce, com ajuste a cruzamentos por zero. Tem dois filtros de estado variável em série ou paralelo, 2 LFOs, envelopes AMP/ENV1/ENV2, matriz de modulação 4x4, efeitos por zona e globais (delay, chorus, reverb, drive) e interpolação sinc de 16 pontos. Importa SFZ, SF2, EXS24, Kontakt/Kontakt 2, Battery 1-3, Akai AKP, Giga, NN-XT, Recycle e MPC. O Player gratuito só carrega .dwp/.dwb."
+    },
+    {
+     "feature": "FPC (Fruity Pad Controller)",
+     "descricao": "Sampler de bateria no estilo MPC, com 16 pads por banco. Cada pad tem várias camadas por faixa de velocidade e randomização de camadas (Cycle = round robin, Random, avoid previous). Mapeia notas MIDI para os pads."
+    },
+    {
+     "feature": "Slicex / Fruity Slicer / Slicer 2 / Wave Traveller",
+     "descricao": "Fatia loops por transientes e mapeia cada fatia numa nota, para retocar a batida. O Slicex é o fatiador avançado (Producer+). O Fruity Slicer 2 chegou no FL 2025.2. O Wave Traveller faz warp e scratch de amostra."
+    },
+    {
+     "feature": "Fruity Granulizer",
+     "descricao": "Sintetizador granular baseado em amostra."
+    },
+    {
+     "feature": "FLEX / FL Keys / SoundFont Player",
+     "descricao": "O FLEX é um sintetizador/rompler baseado em presets, com pacotes de som e macros. O FL Keys é um rompler de teclas. O SoundFont Player toca SF2 (Producer+)."
+    },
+    {
+     "feature": "3x Osc / MiniSynth / SimSynth / Wasp / PoiZone / Sawer / Transistor Bass / Kepler",
+     "descricao": "Família subtrativa. O 3x Osc tem três osciladores com formas básicas, desafinação, pan e filtro pelo Channel Settings. Os outros cobrem emulações vintage e o 303 (Transistor Bass)."
+    },
+    {
+     "feature": "Sytrus / DX10 / Toxic Biohazard / Groove Machine Synth",
+     "descricao": "Família FM/RM. O Sytrus é híbrido FM/RM/subtrativo com vários operadores e filtros. O DX10 é um FM básico."
+    },
+    {
+     "feature": "Harmor / Harmless / Morphine / Ogun / Autogun / BeepMap",
+     "descricao": "Família aditiva. O Harmor também faz síntese por imagem e ressíntese de áudio. O BeepMap sintetiza a partir de imagem."
+    },
+    {
+     "feature": "Modelagem física",
+     "descricao": "Plucked! (corda pinçada, Karplus-Strong), Sakura (modelagem de cordas), BooBass (baixo), FL Slayer (guitarra elétrica com amp, rack de efeitos e modos Strumming/Powerchords; o manual a marca como DEPRECATED, e no fórum há quem diga que não serve para rock distorcido). Percussão: Drumaxx, Drumpad, BassDrum, Fruit Kick, DrumSynth Live."
+    },
+    {
+     "feature": "Hospedagem e composição de instrumentos",
+     "descricao": "Layer Channel (empilhar canais), Patcher (cadeias de instrumentos e efeitos), Fruity Wrapper (VST/AU), MIDI Out, SynthMaker, VFX Sequencer e FL Studio Mobile Rack."
+    },
+    {
+     "feature": "Conteúdo: Sound Content, FL Cloud e Browser",
+     "descricao": "Todas as edições trazem uma biblioteca royalty-free de amostras, loops e presets, além do Loop Starter. O FL Cloud Sounds tem mais de 1 milhão de loops e one-shots nos planos pagos e cerca de 25 mil no gratuito, segundo o FAQ (os números variam entre as páginas). Os plugins do FL Cloud são 70+, 85+ ou 90+, conforme a página. O Browser busca e pré-escuta amostras e presets."
+    },
+    {
+     "feature": "Guitarra e bateria realistas no FL",
+     "descricao": "Incerteza: o FL não tem nativamente um instrumento de guitarra distorcida moderno nem um kit de metal multi-mic. Na prática, o usuário de FL usa VSTs de terceiros (amp sims, bibliotecas de guitarra/bateria tipo Superior Drummer/EZdrummer/GetGood) via Fruity Wrapper ou grava a guitarra real. O DirectWave e o FPC dão a base de amostra (camadas por velocidade e round robin)."
+    }
+   ],
+   "estudio_ja_tem": [
+    {
+     "item": "Kit de bateria eletrônico sintetizado, estilo 808, com 10 peças fixas: bumbo, caixa, palma, aro, chimbal fechado, chimbal aberto, prato, tom grave, tom agudo e shaker. Por peça: afinação, volume, pan e grupo de corte (os chimbais se calam), e 5 ms de queda no corte. Nenhum kit de amostra existe ainda: KITS só tem 'eletronico', e os kits de terceiros estão previstos para a 'onda 2', com kit.json",
+     "arquivos": "src/nucleo/musica-som.ts (sintetizarPeca, KITS, renderBateria, GRUPO_PADRAO); src/nucleo/musica.ts (PecaBateria, PECAS, AjustePeca); docs/musica.md seção O som e linhas 393-431"
+    },
+    {
+     "item": "Sintetizador da casa com uma receita só e 4 presets (baixo, pad, pluck, lead): 2 osciladores PolyBLEP (serra/quadrada), sub em seno, filtro passa-baixas biquad com envelope, ADSR de volume, vibrato só no lead e 4 macros (brilho, ataque, soltura, cor). A saída é mono duplicada em estéreo, sem pan por voz, unison, LFO livre, glide/legato ou pitch bend",
+     "arquivos": "src/nucleo/musica-som.ts (receitaDe, notaDoSintetizador, renderSintetizador); src/nucleo/musica.ts (PresetSintetizador, MacrosSintetizador)"
+    },
+    {
+     "item": "Canal de áudio com clipes de arquivo (corte, ganho, fades) e reamostragem linear (naTaxa). É a única via para som 'real' hoje (loops/gravações importados), sem afinação por nota",
+     "arquivos": "src/nucleo/musica-som.ts (naTaxa, renderAudio)"
+    },
+    {
+     "item": "Notas com peca|nota, em, dur e forca (1-127, curva de ganho), sem parâmetros por nota (bend, slide, articulação). O mapa GM só cobre as 10 peças",
+     "arquivos": "src/nucleo/musica.ts (NotaMusica); src/nucleo/musica-midi.ts; docs/musica.md (MIDI)"
+    },
+    {
+     "item": "Render offline determinístico em TS puro (mesmo código na janela, no Web Worker, no processo principal e no MCP stdio). Cache por canal, faixa e retorno, aleatoriedade por semente (geradorDe). Base boa para instrumentos novos, mas mudar uma nota re-renderiza o canal inteiro",
+     "arquivos": "src/nucleo/musica-som.ts (renderizarMusica, geradorDe, CacheSom); src/renderer/modulos/musica/render.worker.ts; src/renderer/modulos/musica/motor.ts"
+    },
+    {
+     "item": "Rastreamento de licenças por som (proprio, CC0, MIT, CC-BY-4.0, uso_proprio) com comprovante e créditos na exportação. Já prevê kits importados com crédito, o que serve para bibliotecas CC-BY como a MuldjordKit",
+     "arquivos": "src/nucleo/musica-licencas.ts; docs/musica.md seção Licenças"
+    },
+    {
+     "item": "Precedente de WASM no app: o onnxruntime-web roda em worker (remover fundo). Mostra que o caminho WASM/worker já existe no build Vite/Electron",
+     "arquivos": "src/renderer/modulos/imagem/removerFundo.worker.ts; package.json (onnxruntime-web 1.30.0)"
+    },
+    {
+     "item": "Ferramentas MCP de música: trocar_kit, escrever_notas, aplicar_patch, modelos e estilos de bateria escritos à mão",
+     "arquivos": "src/nucleo/mcp-musica.ts; src/nucleo/musica-acoes.ts; src/nucleo/musica-estilos.ts; src/nucleo/musica-modelos.ts; docs/musica.md seção Ferramentas MCP"
+    }
+   ],
+   "lacunas": [
+    {
+     "id": "INS-01",
+     "item": "Arquitetura de instrumento genérica (plugin interno)",
+     "descricao": "Hoje o tipo do canal é fechado ('bateria' com 10 peças ou 'sintetizador' com 4 presets). Falta um canal 'instrumento' com id do instrumento, parâmetros e estado serializado no documento. Falta também um motor de vozes com polifonia e limite de vozes, modo mono/legato, glide, saída estéreo por voz (pan, spread) e parâmetros por nota (pitch bend, slide, articulação/keyswitch, pressão). Sem isso, nenhum dos itens abaixo encaixa limpo.",
+     "prioridade": "essencial",
+     "complexidade": "G",
+     "depende_de": [],
+     "exige_rever_D1": false,
+     "abordagem": "Em src/nucleo/, criar uma interface TS pura Instrumento { chaveCache(params), renderCanal(eventos, n, taxa, ctx) } com registro de instrumentos, e migrar 'bateria' e 'sintetizador' para ela, mantendo compatibilidade de leitura com o documento atual em resolverMusica. Estender NotaMusica com campos opcionais (bend em semitons ao longo da nota, art: 'palm'|'pinch'|'slide'..., legato) e lanes de controle. Mudar o cache para granularidade de clipe ou segmento em vez de canal inteiro, porque instrumentos de amostra com amp sim são caros. Continua TS puro e determinístico, dentro da D1."
+    },
+    {
+     "id": "INS-02",
+     "item": "Sampler de uma amostra (Channel Sampler)",
+     "descricao": "Tocar qualquer WAV/FLAC/OGG do projeto como instrumento afinado: nota raiz, afinação fina, início/fim, loop (forward, sustain, ping-pong), reverso, ADSR, filtro e velocidade para volume e filtro. Hoje um áudio só toca como clipe, sem altura.",
+     "prioridade": "essencial",
+     "complexidade": "M",
+     "depende_de": [
+      "INS-01"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "TS puro no motor. Reamostragem com interpolação Hermite cúbica ou sinc com janela (8-16 pontos), não a linear do naTaxa, para não serrilhar ao transpor. A decodificação de arquivos reaproveita a ponte já usada pelos clipes (decodeAudioData na janela, ffmpeg no processo/stdio)."
+    },
+    {
+     "id": "INS-03",
+     "item": "Sampler multi-zona (DirectWave) e import SFZ/SF2",
+     "descricao": "Zonas por tecla e velocidade, camadas por velocidade com crossfade, grupos com round robin, aleatório e 'evitar anterior', grupos de corte e envelopes/LFO/filtros por zona. Formato próprio em JSON (o kit.json da 'onda 2' cabe aqui) e import de SFZ e SF2, que são os formatos das bibliotecas livres.",
+     "prioridade": "essencial",
+     "complexidade": "G",
+     "depende_de": [
+      "INS-02"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "Parser SFZ próprio em TS: é texto, com opcodes principais region/group/control/lokey/hikey/lovel/hivel/seq_length/seq_position/trigger/group/off_by/ampeg_*. Para SF2: parser RIFF próprio, ou spessasynth_core, que eu acredito ser Apache-2.0 em TS e rodar em Node (conferir o LICENSE antes). Evitar FluidSynth/js-synthesizer: a FluidSynth é LGPL-2.1, delicado num app fechado (o package.json não declara licença). O round robin e o aleatório usam o gerador por semente (geradorDe) para manter o render idêntico entre janela, worker, processo e MCP."
+    },
+    {
+     "id": "INS-04",
+     "item": "Bateria acústica por amostras (FPC) com kit de metal",
+     "descricao": "As peças do kit atual não bastam para metal. Faltam: bumbo para pedal duplo (com variações de round robin para blast beat/gallop sem efeito metralhadora), caixa centro/aro/rimshot/ghost/flam, chimbal pedal/semiaberto/borda, ride corpo/cúpula, china, splash, 2 crashes, 3-4 tons, camadas de velocidade e mics close/overhead/room misturáveis. O mapa GM precisa crescer junto (35/36, 37/38/40, 42/44/46, 49/57, 51/53, 52, 55, 41-50).",
+     "prioridade": "essencial",
+     "complexidade": "G",
+     "depende_de": [
+      "INS-03",
+      "INS-15",
+      "INS-16"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "Trocar PecaBateria fixo por peças definidas pelo kit (kit.json com peça, nota GM, camadas e rr), mantendo os 10 nomes atuais como apelidos. Kits livres candidatos: DrumGizmo MuldjordKit (Tama Superstar, descrito como kit de metal/rock, CC-BY-4.0, 16 canais originais, versão estéreo simplificada na FreePats); DrumGizmo DRSKit (CC-BY-4.0); Karoryfer Big Rusty Drums (CC0-1.0, porte SFZ). O fluxo de crédito CC-BY já existe em musica-licencas.ts. Não encontrei kit CC0 específico de metal. Opção para o 'clique' moderno de bumbo de metal: camada de trigger sintetizado somada à amostra (o motor atual já sabe sintetizar). Estilos de bateria de metal (blast, d-beat, gallop, groove polirrítmico estilo Meshuggah em 4/4 com ciclo ímpar) entram em musica-estilos.ts."
+    },
+    {
+     "id": "INS-05",
+     "item": "Guitarra elétrica distorcida convincente",
+     "descricao": "É o motivo direto da falha do teste. Precisa de uma fonte de guitarra (DI) e de uma cadeia de amp: noise gate, pré com ganho alto, tone stack, power amp e gabinete por IR. Sem a cadeia de amp, nem uma guitarra real gravada soa como metal.",
+     "prioridade": "essencial",
+     "complexidade": "GG",
+     "depende_de": [
+      "INS-01",
+      "INS-07"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "Fonte DI em TS: Karplus-Strong estendido (Jaffe-Smith), com filtro de posição da palheta, amortecimento ajustável (palm mute = perda alta nos agudos, nota curta), dispersão leve por allpass para corda grave e afinação fracionária por allpass. Uma corda virtual por nota de power chord, com pequeno espalhamento de tempo no ataque (strum). Amp em TS: sobreamostragem 4-8x com filtro anti-alias, waveshaper assimétrico em estágios (tanh/diodo) com passa-altas antes (tight) e tone stack de 3 bandas (aproximação Fender/Marshall por biquads), e gabinete por convolução FFT particionada com IRs. Os IRs livres precisam de licença conferida; alternativa: gerar IR próprio por modelo de alto-falante 4x12 (EQ). Fase 2: Neural Amp Modeler via WASM (neural-amp-modeler-wasm da TONE3000 ou @opendaw/nam-wasm, ambos listados como MIT sobre o NAM Core MIT; conferir o LICENSE). WASM roda no worker, no processo principal e no Node do MCP stdio, então não fere a D1. Antes, testar se a saída é idêntica amostra a amostra entre ambientes: sem relaxed-SIMD, com o mesmo build. Modelos .nam de terceiros têm licença própria por modelo, e o rastreador de licenças precisa cobrir isso. Double tracking: duas tomadas L/R com sementes diferentes (micro-timing de ±5-15 ms e afinação de ±3 cents). A distorção e a convolução também são efeitos (área de efeitos): compartilhar o código."
+    },
+    {
+     "id": "INS-06",
+     "item": "Baixo elétrico (BooBass) e baixo distorcido de metal",
+     "descricao": "Baixo dedilhado/palhetado por modelagem ou amostras, com o caminho de drive/amp do INS-05 (técnica de dividir grave limpo e médio distorcido).",
+     "prioridade": "importante",
+     "complexidade": "M",
+     "depende_de": [
+      "INS-05"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "Reusar o motor Karplus-Strong com corda mais grossa (mais dispersão, menos agudo) ou um multi-sample SFZ livre de baixo, se houver um com licença boa (não verifiquei). O split de bandas é a cadeia do INS-05 em paralelo com um passa-baixas limpo."
+    },
+    {
+     "id": "INS-07",
+     "item": "Articulações e performance de guitarra para metal e solos",
+     "descricao": "Palm mute, nota aberta, harmônico artificial (pinch), tremolo picking, bend com curva, vibrato, slide, hammer-on/pull-off (legato sem novo ataque), dive bomb, helper de power chord/strum (o FL Slayer tinha Strumming/Powerchords) e humanização determinística. Sem isso, solos e breakdowns soam mecânicos.",
+     "prioridade": "essencial",
+     "complexidade": "G",
+     "depende_de": [
+      "INS-01"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "Campos por nota em NotaMusica (art, bend, legato) e lanes no piano roll (área de edição, fora deste escopo). No motor KS: legato altera o comprimento da linha de atraso sem reexcitar; bend/vibrato são modulação suave do atraso fracionário; pinch usa a posição da palheta num nó mais excitação com harmônico; palm mute muda amortecimento e duração. Ferramentas MCP: escrever_riff com power chords, gerar_tremolo e humanizar, para o Claude compor."
+    },
+    {
+     "id": "INS-08",
+     "item": "Sintetizador subtrativo completo (3x Osc, PoiZone)",
+     "descricao": "3 osciladores mais ruído; formas seno, triângulo, serra, pulso com PWM; unison com detune e spread estéreo; 2 filtros (LP/HP/BP/notch, 12/24 dB, SVF ou ladder) com drive; 2-3 envelopes; 2 LFOs; glide; matriz de modulação; presets editáveis e salvos pela pessoa (hoje são 4 receitas fixas com 4 macros).",
+     "prioridade": "importante",
+     "complexidade": "M",
+     "depende_de": [
+      "INS-01"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "Generalizar ReceitaSint e notaDoSintetizador em TS. SVF trapezoidal (Zavalishin/Simper, estável quando modulado) no lugar do biquad recalculado. Os presets atuais viram presets do novo sintetizador, com equivalência medida por teste."
+    },
+    {
+     "id": "INS-09",
+     "item": "Sintetizador FM/RM (Sytrus, DX10)",
+     "descricao": "4-6 operadores com razão, envelope e feedback, matriz de modulação e algoritmos. Cobre sinos, metálicos, baixos FM e leads.",
+     "prioridade": "importante",
+     "complexidade": "G",
+     "depende_de": [
+      "INS-01",
+      "INS-08"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "TS puro com phase modulation; sobreamostragem 2x opcional contra aliasing. Não portar Dexed (GPL-3) num app de licença fechada. Escrever do zero a partir da literatura (Chowning)."
+    },
+    {
+     "id": "INS-10",
+     "item": "Sintetizador wavetable (Vital-like)",
+     "descricao": "Tabelas de onda com posição modulável, warp e import de wavetables. Incerteza: não confirmei um wavetable nativo dedicado no FL (o Vital é de terceiro). Vital e Surge XT são GPL-3, então não dá para embutir num app fechado sem rever a licença do Estúdio.",
+     "prioridade": "desejavel",
+     "complexidade": "G",
+     "depende_de": [
+      "INS-08"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "TS com mipmaps de banda limitada gerados por FFT (uma tabela por oitava) e interpolação entre quadros. Importar WAV de wavetable (2048 amostras por quadro, formato comum do Serum/Vital)."
+    },
+    {
+     "id": "INS-11",
+     "item": "Síntese aditiva e ressíntese (Harmor, Harmless, Morphine)",
+     "descricao": "Banco de parciais com envelopes, ressíntese de áudio e síntese por imagem.",
+     "prioridade": "desejavel",
+     "complexidade": "GG",
+     "depende_de": [
+      "INS-01"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "Começar por aditivo simples em TS (IFFT por quadro, overlap-add). A ressíntese pede análise STFT; se o desempenho pedir, um módulo WASM compilado de Rust/C (FFT tipo pffft ou rustfft, MIT/BSD)."
+    },
+    {
+     "id": "INS-12",
+     "item": "Fatiador (Slicex, Fruity Slicer)",
+     "descricao": "Detectar transientes num loop, fatiar, mapear fatias em notas, gerar o padrão MIDI equivalente e reordenar. Útil para loops de bateria e guitarra de terceiros.",
+     "prioridade": "importante",
+     "complexidade": "M",
+     "depende_de": [
+      "INS-02"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "Detecção por fluxo espectral (STFT em TS) mais limiar adaptativo; cada fatia vira uma zona do sampler (INS-03). O time-stretch para mudar o BPM fica com a área de áudio/edição."
+    },
+    {
+     "id": "INS-13",
+     "item": "Granular (Fruity Granulizer)",
+     "descricao": "Grãos com tamanho, densidade, posição, espalhamento e afinação a partir de uma amostra.",
+     "prioridade": "desejavel",
+     "complexidade": "M",
+     "depende_de": [
+      "INS-02"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "TS puro com janelas Hann e posições sorteadas pelo gerador com semente (determinístico)."
+    },
+    {
+     "id": "INS-14",
+     "item": "Rompler e bancos GM/orquestrais (FLEX, FL Keys, SoundFont Player)",
+     "descricao": "Piano, órgão, cordas, coro e metais: o black metal sinfônico usa teclado/orquestra. Inclui um banco GM básico para que um MIDI importado soe completo (hoje um MIDI vira só os 4 presets por programa).",
+     "prioridade": "importante",
+     "complexidade": "G",
+     "depende_de": [
+      "INS-03",
+      "INS-15"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "Via SFZ/SF2 do INS-03. Fontes a conferir: VSCO-2 Community Edition (acredito que CC0), Karoryfer (CC0/CC-BY por pacote), FreePats (licença por instrumento). Licença do Salamander Grand Piano incerta; conferir antes. Mapear o programa GM do MIDI importado para o preset do banco."
+    },
+    {
+     "id": "INS-15",
+     "item": "Biblioteca de amostras e presets com navegador (Browser, Sound Content, FL Cloud)",
+     "descricao": "Catálogo de kits, instrumentos, presets e one-shots com tags, busca, pré-escuta, favoritos e presets da pessoa. Download sob demanda, porque bibliotecas reais têm centenas de MB ou GB e não cabem no instalador. A licença de cada pacote é conferida e registrada.",
+     "prioridade": "essencial",
+     "complexidade": "G",
+     "depende_de": [
+      "INS-03"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "Manifesto JSON por pacote (id, versão, SHA-256, spdx, crédito, lista de instrumentos), baixado para a pasta de dados do app, com integridade verificada. Plugar em musica-licencas.ts (os campos spdx e credito já existem). Ferramentas MCP listar_instrumentos, carregar_instrumento e buscar_amostra, para o Claude escolher sons. O FL Cloud é um serviço pago com acervo licenciado; algo equivalente aqui é decisão de produto, não técnica."
+    },
+    {
+     "id": "INS-16",
+     "item": "Memória, carga de amostras e desempenho do render",
+     "descricao": "Kits multi-mic e bibliotecas de guitarra/piano somam GB, e a memória medida do processo já é 414 MB. O render é do canal inteiro a cada mudança; com amp sim, IR e NAM a mudança de uma nota fica cara. Some-se a isso o render em 4 ambientes.",
+     "prioridade": "essencial",
+     "complexidade": "G",
+     "depende_de": [
+      "INS-01"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "Carregar só as camadas/zonas usadas pelas notas do documento, com cache em disco de amostras decodificadas em Float32 a 48 kHz (memória mapeada no Node; no worker, carga preguiçosa por zona). Cache por clipe ou segmento com a cauda calculada. Render de canais em paralelo em vários workers, com a soma no fim mantendo a ordem para conservar a identidade amostra a amostra. Orçamento de memória com aviso."
+    },
+    {
+     "id": "INS-17",
+     "item": "Interface dos instrumentos e ferramentas MCP",
+     "descricao": "Editor de parâmetros por instrumento, teclado virtual, pads de bateria tocáveis (FPC), mapeador de zonas, navegação de presets e pré-escuta de uma nota (hoje existe somDeUmaBatida só para a bateria). Do lado MCP: criar e ajustar instrumentos e salvar presets.",
+     "prioridade": "essencial",
+     "complexidade": "G",
+     "depende_de": [
+      "INS-01"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "Componentes React em src/renderer/modulos/musica/ (Inspector.tsx e paineis.tsx são o ponto de entrada). Pré-escuta pelo mesmo motor no worker. Para tocar ao vivo com baixa latência, um AudioWorklet que roda o mesmo código TS das vozes: render em tempo real na janela, ainda dentro da D1. Tocar ao vivo e gravar MIDI é da área de gravação/controladores."
+    },
+    {
+     "id": "INS-18",
+     "item": "Camadas e cadeias (Layer Channel, Patcher)",
+     "descricao": "Empilhar instrumentos numa nota (ex.: amostra de bumbo mais sub sintetizado; guitarra mais oitava), split por tecla e por velocidade entre instrumentos.",
+     "prioridade": "desejavel",
+     "complexidade": "M",
+     "depende_de": [
+      "INS-01"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "Um instrumento 'camada' que contém outros e soma as saídas, serializado no documento. Barato depois do INS-01."
+    },
+    {
+     "id": "INS-19",
+     "item": "Modelagem de percussão e kick (Drumaxx, BassDrum, Fruit Kick, Drumpad)",
+     "descricao": "O kit eletrônico já cobre parte, mas sem parâmetros expostos (tom, queda de afinação, clique, ruído) nem modelagem de membrana.",
+     "prioridade": "desejavel",
+     "complexidade": "M",
+     "depende_de": [
+      "INS-01"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "Expor os parâmetros de sintetizarPeca como instrumento 'kick/percussão' e adicionar membrana por modos ressonantes (banco de filtros ressonantes ou waveguide 2D simples) em TS."
+    },
+    {
+     "id": "INS-20",
+     "item": "Hospedar plugins de terceiros (Fruity Wrapper: VST/AU), ou padrão aberto web",
+     "descricao": "O FL hospeda VST/AU, e é assim que a maioria dos produtores obtém guitarra e bateria de metal realistas (Superior Drummer, amp sims). Isto conflita diretamente com a D1. VST3/CLAP pedem módulo nativo, só rodam em tempo real no processo e não reproduzem o render idêntico no MCP stdio.",
+     "prioridade": "importante",
+     "complexidade": "GG",
+     "depende_de": [
+      "INS-01"
+     ],
+     "exige_rever_D1": true,
+     "abordagem": "Hospedar VST3/CLAP só é possível revendo a D1: addon nativo (N-API) com host JUCE (GPL/comercial) ou CLAP (MIT) por plataforma, render offline no processo principal e o MCP stdio chamando esse mesmo host. Alternativa compatível com a D1: Web Audio Modules 2.0 (padrão aberto de plugins WASM/JS). Ressalva: WAM supõe AudioWorklet do navegador, e no Node do MCP precisaria de uma casca; determinismo a verificar. Recomendo tratar como decisão separada (ADR) depois do INS-05/INS-04."
+    }
+   ],
+   "riscos": [
+    "Licença do próprio Estúdio: o package.json não declara licença e não há LICENSE no repo. Vital, Surge XT, Dexed e Hydrogen são GPL-3/GPL-2, e a FluidSynth é LGPL-2.1, então não podem ser embutidos num app fechado sem decisão jurídica. As preferidas são MIT, BSD, Apache-2.0, CC0 e CC-BY (com crédito pelo fluxo de musica-licencas.ts).",
+    "Kits e IRs: só confirmei CC-BY-4.0 para DrumGizmo MuldjordKit e DRSKit (portes SFZ) e CC0 para kits Karoryfer. Não achei kit CC0 de metal nem banco livre de guitarra multi-sample de qualidade. Packs 'free metal drums' de Gumroad e similares têm licença não declarada. Conferir o LICENSE dentro de cada pacote, como a docs/musica.md já exige para a onda 2.",
+    "Determinismo: round robin, humanização e granular precisam usar o gerador por semente, ou a prévia e o render divergem. Se WASM (NAM) entrar, provar com teste que janela, worker, processo e Node do MCP dão saída idêntica: sem relaxed-SIMD, mesmo binário, sem Math.random/fast-math.",
+    "Desempenho: o render offline do canal inteiro a cada mudança (1 s medido hoje com sintetizadores leves) tende a vários segundos com amp sim sobreamostrado, convolução de IR e NAM em 4-8 guitarras dobradas. Isso exige o cache por segmento e o paralelismo (INS-16) antes, ou a edição fica lenta.",
+    "Tamanho e memória: bibliotecas reais têm centenas de MB a GB; com o processo já em 414 MB, carregar tudo quebra. O instalador não pode carregar as bibliotecas: download sob demanda com verificação de hash.",
+    "Qualidade percebida: guitarra Karplus-Strong mais amp em TS dá metal 'aceitável' para demo, mas dificilmente iguala a guitarra real reamplificada ou um amp NAM. O teste do dono (Satyricon + Meshuggah) provavelmente só passa com NAM ou IR de gabinete bons e double tracking. Gravar guitarra real (entrada de áudio, outra área) é o complemento natural.",
+    "Sobreposição de áreas: distorção, convolução, noise gate e time-stretch são efeitos/áudio; lanes de bend e articulação são do piano roll; tocar ao vivo é de gravação/MIDI. Coordenar para não haver duas implementações.",
+    "Incertezas na pesquisa do FL: a contagem de plugins e de sons do FL Cloud varia entre páginas oficiais; não confirmei um wavetable nativo dedicado; o FL Slayer consta como deprecated no manual."
+   ],
+   "fontes": [
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/generator_plugins.htm",
+    "https://www.image-line.com/fl-studio/compare",
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/plugins/DirectWave.htm",
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/plugins/FPC.htm",
+    "https://www.image-line.com/fl-studio-news/fpc-layer-randomization",
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/plugins/FL%20Slayer.htm",
+    "https://forum.image-line.com/viewtopic.php?t=98559",
+    "https://www.image-line.com/fl-studio-news/fl-studio-2025-whats-new-2",
+    "https://www.image-line.com/blog/more-plugins-and-sounds-in-fl-cloud",
+    "https://www.image-line.com/fl-cloud/faq",
+    "https://www.image-line.com/fl-cloud/whats-new",
+    "https://sfzinstruments.github.io/drums",
+    "https://github.com/sfzinstruments/DrumGizmo.MuldjordKit",
+    "https://freepats.zenvoid.org/Percussion/acoustic-drum-kit.html",
+    "https://www.tone3000.com/blog/introducing-the-nam-web-player",
+    "https://www.pkgstats.com/pkg:neural-amp-modeler-wasm",
+    "https://www.pkgstats.com/pkg:@opendaw/nam-wasm",
+    "https://www.tone3000.com/blog/opendaw-now-supports-tone3000",
+    "/home/laures/Projects/estudio/src/nucleo/musica-som.ts",
+    "/home/laures/Projects/estudio/src/nucleo/musica.ts",
+    "/home/laures/Projects/estudio/docs/musica.md",
+    "/home/laures/Projects/estudio/package.json"
+   ]
+  },
+  {
+   "area": "efeitos-mixer",
+   "fl_studio": [
+    {
+     "feature": "Mixer com 500 faixas de insert + Current + Master",
+     "descricao": "Manual oficial (mixer.htm): 500 Insert Tracks, uma faixa 'Current' e o Master, em três docks e oito modos de layout; mudo, solo, trava, chave geral de FX por faixa, seleção múltipla para mexer faders juntos."
+    },
+    {
+     "feature": "10 slots de efeito por faixa",
+     "descricao": "Cada faixa tem 10 slots de insert (ordem, bypass, mix por slot). Para mais, usa-se envio para outra faixa ou o Patcher num slot."
+    },
+    {
+     "feature": "Roteamento livre entre faixas (buses/grupos)",
+     "descricao": "Qualquer faixa pode mandar para qualquer outra (pós-fader pelos interruptores de envio), formando grupos e subgrupos; envio pré-fader exige o plugin Fruity Send; saída direta para uma saída ASIO. O manual não usa o termo 'bus', mas é o mesmo conceito."
+    },
+    {
+     "feature": "Envios de sidechain",
+     "descricao": "Ligação 'sidechain' que manda áudio inaudível para a faixa destino, usado por plugins com entrada de sidechain (Fruity Limiter no modo compressor, Maximus, Vocoder etc.). Várias fontes podem ir a um mesmo destino; opção 'Sidechain to this track only'."
+    },
+    {
+     "feature": "Propriedades da faixa",
+     "descricao": "EQ paramétrico de 3 bandas embutido em cada faixa, polaridade (inverter fase), troca L/R, separação estéreo (alarga/estreita), pan com lei circular, volume, braço de gravação em disco e Track Delay (ms, amostras ou batidas)."
+    },
+    {
+     "feature": "PDC automático e manual",
+     "descricao": "Plugin Delay Compensation automático (APDC) cobre instrumentos, efeitos, roteamento entre faixas, plugins multi-I/O e sidechains; deslocamento manual por faixa como ajuste; opção 'compensate automations'; bypass de PDC ao gravar/monitorar; IDC separado para a entrada gravada."
+    },
+    {
+     "feature": "Fruity Parametric EQ 2",
+     "descricao": "7 bandas (PB, PF, PA, notch, prateleiras, sino), inclinações de 12 a 48 dB/oit, analisador de espectro pré/pós (L/R, Mid, Side, histograma e mapa de calor), modo de fase linear (FFT, com latência) e comparação A/B. Outros EQs: EQUO, Fruity 7 Band EQ, Fruity Parametric EQ (1), Bass Boost, Convolver (fase linear por preset)."
+    },
+    {
+     "feature": "Dinâmica",
+     "descricao": "Fruity Compressor; Fruity Limiter (abas COMP com joelho e sidechain, LIMIT com saturação e teto, e um noise gate); Maximus (multibanda: maximizador, compressor, limitador, gate, expansor, ducker, de-esser; Producer Edition para cima); Fruity Multiband Compressor; Fruity Soft Clipper; Transient Processor; Soundgoodizer; Emphasis, Emphasizer, Low Lifter, Transmitter (lista da página effects_plugins)."
+    },
+    {
+     "feature": "Distorção / amp / cabinet",
+     "descricao": "Distructor (modular: distorções do Harmor, Blood Overdrive, Fast Dist, Soft Clipper, bit e rate reduction), Fruity Blood Overdrive, Fruity Fast Dist, Fruity Squeeze, Fruity WaveShaper, Effector e Hardcore. O Hardcore é uma pedaleira de guitarra (até 5 pedais de 11: distortion, tubedrive, gate, compressor, EQ, chorus, flanger, phaser, delay, reverb, modulator) com EQ gráfico de 8 bandas e simulador de caixa (modelos A-E algorítmicos, os demais por resposta a impulso). O manual não lista um módulo de 'amp' separado; não há um amp sim moderno de alto ganho nativo (incerto se versões 2025 trouxeram)."
+    },
+    {
+     "feature": "Modulação",
+     "descricao": "Fruity Chorus, Fruity Flanger, Fruity Flangus, Fruity Phaser, Hyper Chorus, Vintage Chorus, Vintage Phaser, Effector, Hardcore."
+    },
+    {
+     "feature": "Delay",
+     "descricao": "Fruity Delay, Delay 2, Delay 3 (com bit/rate reduction, filtros, modulação), Delay Bank, Multiband Delay, Effector, Gross Beat (manipulação de tempo/volume), Transporter."
+    },
+    {
+     "feature": "Reverb",
+     "descricao": "Algorítmicos: Fruity Reeverb, Fruity Reeverb 2, LuxeVerb. Convolução: Fruity Convolver e a função de convolução do Edison."
+    },
+    {
+     "feature": "Filtros",
+     "descricao": "Fruity Filter, Fruity Free Filter, Fruity Fast LP, Fruity Love Philter (filtro multimodo com envelopes/modulação), Effector."
+    },
+    {
+     "feature": "Vocoder",
+     "descricao": "Fruity Vocoder e Vocodex, com modulador e portadora via roteamento/sidechain do mixer."
+    },
+    {
+     "feature": "Pitch / formant / tempo",
+     "descricao": "Pitcher (correção de afinação em tempo real e harmonizador), Newtone (edição de afinação estilo Melodyne), Pitch Shifter, Frequency Shifter, Newtime (edição de tempo)."
+    },
+    {
+     "feature": "Utilitários e imagem estéreo",
+     "descricao": "Fruity Balance, Fruity Phase Inverter, Fruity Stereo Enhancer, Fruity Stereo Shaper, Spreader, Fruity PanOMatic, Fruity Center, Fruity Mute 2, Frequency Splitter, Fruity Send, Patcher (cadeias modulares/paralelas num slot), Fruity Wrapper (hospeda VST/VST3; AU no Mac; CLAP em versões recentes, incerto quanto à versão)."
+    },
+    {
+     "feature": "Medidores / análise",
+     "descricao": "Wave Candy: osciloscópio, espectro, medidor (Peak, PPM, RMS, VU, Leq(A), ITU-R BS.1770) e vectorscope; Fruity Spectroman; Fruity dB Meter; Tuner; analisador do Parametric EQ 2; vista de forma de onda nos medidores do mixer (Alt+W). A página do Wave Candy não cita medidor de correlação de fase nem a palavra LUFS (só o modo BS.1770)."
+    },
+    {
+     "feature": "Automação e controladores",
+     "descricao": "Quase todo parâmetro de mixer e de plugin é automatizável (clipes de automação na playlist, editor de eventos); controladores Fruity Peak Controller (seguidor de envelope/LFO), Fruity Formula Controller, Fruity X-Y Controller, e o 'link to controller'."
+    }
+   ],
+   "estudio_ja_tem": [
+    {
+     "item": "Mixer com faixas, volume, pan de potência igual, mudo e solo; canais caem numa faixa (canal.faixa_mixer); toda faixa vai direto para o master",
+     "arquivos": "src/nucleo/musica.ts (FaixaMixer, FaixaMixerP, resolverMusica), src/nucleo/musica-som.ts (renderizarMusica, processarFaixa, panLei), src/renderer/modulos/musica/Monitor.tsx (faders)"
+    },
+    {
+     "item": "EQ fixo de 3 bandas por faixa (prateleira 200 Hz, sino 1 kHz Q 0,9, prateleira 5 kHz, ±18 dB), biquads do Audio EQ Cookbook; filtros PB/PA/PF disponíveis só como funções internas",
+     "arquivos": "src/nucleo/musica-som.ts (passaBaixas, passaAltas, passaFaixa, sino, prateleiraGraves/Agudos, filtrarNoLugar), src/nucleo/musica.ts (EqFaixa, GANHO_EQ_DB)"
+    },
+    {
+     "item": "Compressor de alimentação direta por faixa (limiar, razão, ataque, soltura, makeup; detector de pico ligado L/R; sem joelho, sem RMS, sem lookahead, sem mix paralelo); ordem fixa EQ -> compressor -> volume/pan",
+     "arquivos": "src/nucleo/musica-som.ts (comprimir, processarFaixa)"
+    },
+    {
+     "item": "Dois retornos fixos no master: reverb Freeverb (tamanho, amortecimento, volume) e delay estéreo sincronizado ao BPM (realimentação, passa-baixas no laço, pingue-pongue); envios pós-fader 0..1 por faixa",
+     "arquivos": "src/nucleo/musica-som.ts (reverberar, atrasar), src/nucleo/musica.ts (ReverbMaster, DelayMaster, DELAY_PADRAO)"
+    },
+    {
+     "item": "Limitador de pico de amostra no fim do master (antecipação 1,5 ms, soltura); entrega com loudness BS.1770 e limitador iterativo até o pico verdadeiro",
+     "arquivos": "src/nucleo/musica-som.ts (limitarNoLugar), src/nucleo/musica-entrega.ts"
+    },
+    {
+     "item": "Sidechain por NOTAS do canal de origem (não por áudio): ducking com quanto_db, ataque e soltura",
+     "arquivos": "src/nucleo/musica-som.ts (disparosDoSidechain, ganhoDoSidechain), src/nucleo/musica.ts (SidechainFaixa)"
+    },
+    {
+     "item": "Automação só de volume (faixa e master), reta em dB entre pontos, amostra a amostra, no lugar do fader",
+     "arquivos": "src/nucleo/musica.ts (AutomacaoMusica com parametro?: 'volume'), src/nucleo/musica-som.ts (ganhoDaAutomacao), src/renderer/modulos/musica/AutomacaoArranjo.tsx"
+    },
+    {
+     "item": "Presets de faixa (Limpo, Bateria, Baixo, Pad, Lead, Cama, Voz) que só escrevem EQ/compressor/envios",
+     "arquivos": "src/nucleo/musica.ts (PRESETS_FAIXA)"
+    },
+    {
+     "item": "Medidores: pico por janela de 50 ms por faixa e master, pré-calculado do buffer e lido na cabeça; LUFS integrado/curto/momentâneo e true peak BS.1770 (usado no vídeo, na entrega e no medir_musica do MCP), não exibido como medidor vivo por faixa na Música; sem espectro, correlação nem vectorscope",
+     "arquivos": "src/renderer/modulos/musica/render.worker.ts (NiveisSom, picos), src/renderer/modulos/musica/Monitor.tsx (Medidor), src/nucleo/loudness.ts, src/renderer/... MedidorLoudness.tsx (vídeo)"
+    },
+    {
+     "item": "Processamento espectral (STFT) já existe, mas só na limpeza de voz: porta espectral, de-esser leve, passa-altas/baixas de fase zero",
+     "arquivos": "src/nucleo/limpeza-voz.ts, docs/audio.md (Limpeza de voz)"
+    },
+    {
+     "item": "Arquitetura de render: render offline do buffer inteiro em TS puro, com cache em três camadas (seco por canal, faixa processada, retornos), no Web Worker da janela, no processo principal e no MCP stdio; o Web Audio só toca o buffer pronto. Sem processamento por blocos, sem AudioWorklet, sem latência declarada (PDC desnecessário hoje porque nenhum efeito tem latência)",
+     "arquivos": "src/nucleo/musica-som.ts (renderizarMusica, doCache), src/renderer/modulos/musica/motor.ts, src/renderer/modulos/musica/render.worker.ts, docs/musica.md (O som)"
+    },
+    {
+     "item": "Edição do mixer pelo MCP só por aplicar_patch (volume, pan, EQ, compressor, envios, sidechain, automações, master); medir_musica dá LUFS e pico por faixa",
+     "arquivos": "src/nucleo/mcp-musica.ts, docs/musica.md (Ferramentas MCP)"
+    },
+    {
+     "item": "Exportação WAV 16/24 bits sem dither (arredondamento simples)",
+     "arquivos": "src/nucleo/musica-som.ts (codificarWav16), src/nucleo/musica-entrega.ts"
+    }
+   ],
+   "lacunas": [
+    {
+     "id": "EM-01",
+     "item": "Motor de processamento por blocos (processadores com estado e latência declarada)",
+     "descricao": "Hoje cada efeito é uma função sobre o buffer inteiro (comprimir, reverberar, atrasar, limitarNoLugar). Sem uma interface comum de processador não dá para ter cadeia de inserts, automação de qualquer parâmetro, roteamento em grafo, PDC nem pré-escuta em tempo real. É a base de quase tudo abaixo.",
+     "prioridade": "essencial",
+     "complexidade": "G",
+     "abordagem": "Criar src/nucleo/musica-dsp/ com `interface Processador {latencia: number; reiniciar(); processar(ent: Float32Array[], sai: Float32Array[], ini: number, n: number, params: ParamsResolvidos)}` e uma fábrica por tipo. O render offline continua sendo um laço sobre blocos (por exemplo 512 amostras) dentro de renderizarMusica, então o cache por faixa (chave = JSON da cadeia + entradas) e o render idêntico amostra a amostra (mesmo V8 no worker, no main e no stdio) se mantêm. Migrar o EQ, o compressor, o reverb, o delay e o limitador atuais para esse formato e conferir byte a byte com os testes que já existem. Cabe na D1.",
+     "depende_de": [],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "EM-02",
+     "item": "Cadeia de inserts por faixa (slots ordenáveis, bypass, mix seco/molhado)",
+     "descricao": "O FL tem 10 slots por faixa. Aqui a ordem é fixa (EQ 3 bandas, compressor, volume) e não há como pôr distorção, gate ou outro efeito numa faixa.",
+     "prioridade": "essencial",
+     "complexidade": "M",
+     "abordagem": "Esquema `FaixaMixer.efeitos: {id, tipo, ativo, mix, params}[]` (sem limite rígido, ou 10 para paridade). Migração: o `eq` e o `compressor` atuais viram os dois primeiros slots quando o documento é lido (resolverMusica), e o documento antigo soa igual. Cache por slot (prefixo da cadeia) para que mexer no slot 5 não refaça os 4 primeiros. UI: rack no Inspector/Monitor. MCP: ferramenta `efeitos` (por, tirar, mover, ajustar, bypass, preset) com Zod discriminado por tipo.",
+     "depende_de": [
+      "EM-01"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "EM-03",
+     "item": "Roteamento livre: buses, grupos, envios pré/pós-fader para qualquer faixa, retornos genéricos",
+     "descricao": "Hoje toda faixa vai ao master e só existem 2 retornos fixos (reverb e delay). Metal precisa de bus de bateria, bus de guitarras (quatro guitarras dobradas), compressão paralela (NY) e vários reverbs (sala na bateria, hall no solo).",
+     "prioridade": "essencial",
+     "complexidade": "G",
+     "abordagem": "Faixa ganha `saida` (id de faixa ou master) e `envios: [{para, quanto_db, pre_fader}]`; os retornos viram faixas comuns com inserts. Resolver como DAG (ordenação topológica, recusar ciclos com aviso, como o FL que proíbe laços). Render por camadas na ordem topológica com cache por nó. Migrar `reverb`/`delay` 0..1 e `master.reverb/delay` para duas faixas de retorno criadas na leitura. Stems por bus na entrega (musica-entrega.ts).",
+     "depende_de": [
+      "EM-01",
+      "EM-02"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "EM-04",
+     "item": "Distorção / saturação / amp sim de alto ganho com oversampling",
+     "descricao": "Não há nenhuma não linearidade no mixer. Sem distorção não existe guitarra de metal; também falta saturação de bus/fita, overdrive de baixo e bitcrusher.",
+     "prioridade": "essencial",
+     "complexidade": "G",
+     "abordagem": "Implementar em TS (ou Rust/C++ -> WASM se o custo pedir): (a) módulo de waveshaping com curvas tanh, assimétrica (diodo), hard/soft clip, foldback, bitcrush/downsample; (b) oversampling 4x/8x com FIR polifásico de meia banda (anti-aliasing é obrigatório em alto ganho); (c) amp sim: pré-EQ apertado (passa-altas ~ 100 Hz e realce em ~700 Hz-1 kHz, o 'tube screamer na frente'), 2-4 estágios de triodo em cascata com filtros entre eles, tone stack (modelo analítico de Yeh & Smith para o TMB estilo Fender/Marshall, de domínio público na literatura), power amp com sag e presença/ressonância. Referências com licença compatível: Airwindows (MIT, muitos saturadores para portar), código do Neural Amp Modeler core (MIT) se quiser capturas neurais via WASM (incerto o custo em render offline de 4+ faixas). Presets da casa: 'rítmica high gain', 'solo', 'limpa', 'baixo com drive'. Determinismo: sem aleatório, ou com a semente da música.",
+     "depende_de": [
+      "EM-02"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "EM-05",
+     "item": "Convolução (cabinet IR e reverb de convolução) com FFT",
+     "descricao": "Amp sim sem caixa soa como abelha: o IR do falante é parte da guitarra. Também falta reverb de convolução (Fruity Convolver).",
+     "prioridade": "essencial",
+     "complexidade": "M",
+     "abordagem": "Convolução particionada uniforme (overlap-add/save) com FFT real; para IR de reverb longos, partição não uniforme. FFT: escrever radix-2/4 em TS (a STFT de limpeza-voz.ts já tem uma, reaproveitar) ou fft.js (MIT) / pffft (licença BSD-like) em WASM. Latência zero no offline (primeira partição direta ou atraso compensado, ver EM-12). IRs: carregar WAV do projeto (com licença em `licencas`, como os áudios) e embarcar alguns próprios. IRs de caixa livres: gerar os da casa (medir/sintetizar) ou só usar pacotes com licença explícita CC0/CC BY verificada; não incluir IRs 'free' sem licença clara. Mixagem de 2 IRs com atraso (como os loaders de IR comerciais) é barata depois disso.",
+     "depende_de": [
+      "EM-02"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "EM-06",
+     "item": "Noise gate / expansor",
+     "descricao": "Indispensável para guitarra de alto ganho (corte seco do chug do Meshuggah) e bateria acústica (tons, caixa). O FL tem gate no Fruity Limiter, no Maximus e no Hardcore.",
+     "prioridade": "essencial",
+     "complexidade": "P",
+     "abordagem": "Processador com limiar de abertura e fechamento (histerese), hold, ataque, soltura, faixa (range) e lookahead (latência declarada), filtro no detector (PA/PB) e entrada de sidechain externa (gate da guitarra pela DI ou pela caixa). Em TS puro.",
+     "depende_de": [
+      "EM-01",
+      "EM-02"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "EM-07",
+     "item": "EQ paramétrico de N bandas com analisador",
+     "descricao": "O EQ fixo de 3 bandas não corta graves de guitarra (passa-altas), não tira ressonância de caixa (notch estreito) nem tem passa-baixas íngreme para o fizz. O FL tem 7 bandas, 12-48 dB/oit, analisador e fase linear.",
+     "prioridade": "essencial",
+     "complexidade": "M",
+     "abordagem": "Até 8 bandas, cada uma com tipo (PA, PB, sino, prateleiras, notch, passa-faixa), freq, ganho, Q e inclinação 12/24/36/48 dB/oit (Butterworth em cascata de biquads, coeficientes já existem em musica-som.ts). Modo Mid/Side opcional. Analisador pré/pós a partir do mesmo FFT de EM-10. Fase linear (FFT, com latência) é uma segunda fase (G). Na UI: curva de resposta desenhada em canvas a partir dos coeficientes.",
+     "depende_de": [
+      "EM-02"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "EM-08",
+     "item": "Compressor completo e sidechain por áudio",
+     "descricao": "Falta joelho, detector RMS/pico, lookahead, mix paralelo e, sobretudo, sidechain por ÁUDIO de outra faixa (hoje só pelas notas de um canal: não funciona com áudio gravado, nem para baixo seguindo o bumbo de uma bateria em clipe de áudio).",
+     "prioridade": "essencial",
+     "complexidade": "M",
+     "abordagem": "Reescrever o comprimir() como processador: joelho suave, RMS/pico, link estéreo ajustável, lookahead, mix, filtro passa-altas no detector e entrada de sidechain vinda do grafo (EM-03 entrega o áudio da faixa fonte, como o envio 'sidechain' do FL). Manter o sidechain por notas atual como opção 'gatilho por notas' (é exato e barato).",
+     "depende_de": [
+      "EM-01",
+      "EM-03"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "EM-09",
+     "item": "Automação de qualquer parâmetro e controladores",
+     "descricao": "Só o volume é automatizável. O FL automatiza quase tudo (corte de filtro, envio de delay no solo, wah, drive), com clipes de automação e controladores (Peak Controller, Formula Controller).",
+     "prioridade": "essencial",
+     "complexidade": "G",
+     "abordagem": "Cada parâmetro de processador ganha um endereço estável (`faixa/efeito_id/param`), faixa de valores e escala (linear, log, dB). AutomacaoMusica vira `{alvo: endereço, pontos: [{em, valor, curva?}]}` com tensão por segmento e degrau. No render por blocos, valor por amostra (ou por sub-bloco de 32) com suavização para não dar zipper. Controladores: LFO sincronizado ao BPM e seguidor de envelope de uma faixa. A chave do cache inclui só a automação dos parâmetros da cadeia. UI: lane escolhendo parâmetro em AutomacaoArranjo.tsx; MCP: `automatizar` com o endereço.",
+     "depende_de": [
+      "EM-01",
+      "EM-02"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "EM-10",
+     "item": "Medidores: LUFS vivo, espectro, correlação de fase / vectorscope, RMS",
+     "descricao": "O mixer só mostra o pico de 50 ms. Não há espectro, correlação, vectorscope nem LUFS por faixa na Música (o loudness.ts existe, mas só no vídeo e na entrega).",
+     "prioridade": "importante",
+     "complexidade": "M",
+     "abordagem": "Como o render já é offline, pré-calcular no worker (junto de NiveisSom) por faixa e master: momentâneo e curto prazo (loudness.ts já faz), RMS, correlação L/R por janela e espectro (FFT de 4096 com média por janela) e ler na cabeça, sem custo durante a reprodução. Vectorscope desenhado a partir de amostras do buffer na posição da cabeça (canvas). Expor no MCP (`medir_musica` com espectro em bandas de terço de oitava e correlação), útil para o Claude 'ouvir' a mixagem.",
+     "depende_de": [],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "EM-11",
+     "item": "Pré-escuta em tempo real (mexer no botão e ouvir na hora)",
+     "descricao": "Cada ajuste refaz a faixa inteira no worker (medido: 0,16-0,8 s numa música de 60 s; com amp sim sobreamostrado em 4 guitarras de 4 min será da ordem de segundos, estimado, não medido). Numa DAW, girar o drive ou o corte de um filtro durante a reprodução é básico.",
+     "prioridade": "importante",
+     "complexidade": "GG",
+     "abordagem": "Rodar os mesmos processadores de EM-01 dentro de um AudioWorkletProcessor (o código TS é compilado para o worklet também; cabe na D1, é Web Audio). Modo híbrido: o render offline continua sendo a verdade para o vídeo e a exportação; durante a reprodução, a faixa que está sendo ajustada sai do worklet a partir do sinal seco em cache, e as outras do buffer pronto; ao parar de mexer, o worker refaz o offline e troca o buffer. Parâmetros via SharedArrayBuffer ou mensagens. Alternativa menor: renderizar só a janela em volta da cabeça primeiro (render progressivo por trechos).",
+     "depende_de": [
+      "EM-01",
+      "EM-12"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "EM-12",
+     "item": "PDC (compensação de latência) e track delay",
+     "descricao": "Gate e limitador com lookahead, EQ de fase linear e convolução com partição introduzem atraso; em buses e sidechains as faixas se desalinham. O FL tem PDC automático e manual.",
+     "prioridade": "importante",
+     "complexidade": "M",
+     "abordagem": "No offline, a compensação é exata e barata: cada processador declara `latencia`, o grafo soma por caminho e desloca as entradas mais curtas no nó de soma (e o envio de sidechain). No worklet (EM-11) o mesmo cálculo vira atraso nas outras faixas. Acrescentar 'atraso da faixa' manual em ms/amostras (útil também para alinhar microfones de bateria).",
+     "depende_de": [
+      "EM-01",
+      "EM-03"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "EM-13",
+     "item": "Utilitários de canal: polaridade, troca L/R, largura estéreo, mono, trim",
+     "descricao": "O FL tem inverter fase, swap L/R e separação estéreo em cada faixa. Para bateria acústica multimic e guitarras dobradas (L/R 100 %) isso é rotina.",
+     "prioridade": "importante",
+     "complexidade": "P",
+     "abordagem": "Processador 'utilitário' (ou campos fixos da faixa): ganho de entrada, inversão por lado, troca L/R, largura M/S (0 = mono, 1 = original, 2 = largo), pan duplo. Trivial em TS.",
+     "depende_de": [
+      "EM-02"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "EM-14",
+     "item": "Transient shaper",
+     "descricao": "Realce de ataque de bumbo e caixa (o clique do bumbo de metal) e corte de sustain. O FL tem o Transient Processor.",
+     "prioridade": "importante",
+     "complexidade": "P",
+     "abordagem": "Dois seguidores de envelope (rápido e lento); a diferença dá o ganho de ataque e de sustain. TS puro, sem latência.",
+     "depende_de": [
+      "EM-02"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "EM-15",
+     "item": "Reverb algorítmico de qualidade e reverbs como inserts",
+     "descricao": "Só há um Freeverb fixo num retorno, sem pré-delay, sem EQ, sem modulação. O FL tem Reeverb 2 e LuxeVerb.",
+     "prioridade": "importante",
+     "complexidade": "M",
+     "abordagem": "Placa de Dattorro (algoritmo publicado, implementável livremente) e/ou FDN de 8-16 linhas com modulação, pré-delay, decay por banda, EQ de entrada/saída e largura. Manter o Freeverb atual como tipo para não mudar documentos antigos. Os reverbs entram como processadores e podem ir em qualquer faixa de retorno (EM-03).",
+     "depende_de": [
+      "EM-02",
+      "EM-03"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "EM-16",
+     "item": "Delay completo como insert",
+     "descricao": "O delay atual é um só, fixo no retorno 2, com o mesmo tempo para L e R. Nos solos de metal se automatiza o envio e se usa delay dotted/L-R diferentes com filtros.",
+     "prioridade": "importante",
+     "complexidade": "P",
+     "abordagem": "Processador com tempo L/R independente (sync ou ms), realimentação com PA/PB, cruzado, modulação leve, saturação no laço, ducking pelo seco. Aproveitar atrasar() existente.",
+     "depende_de": [
+      "EM-02"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "EM-17",
+     "item": "Modulação: chorus, flanger, phaser, tremolo, auto-pan",
+     "descricao": "Nenhum efeito de modulação existe. Úteis em guitarra limpa, interlúdios e solos.",
+     "prioridade": "importante",
+     "complexidade": "M",
+     "abordagem": "Linhas de atraso fracionárias (interpolação cúbica/allpass) com LFO determinístico sincronizado ao BPM; phaser com 4-12 estágios passa-tudo de primeira ordem. TS puro.",
+     "depende_de": [
+      "EM-02"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "EM-18",
+     "item": "Filtros como efeito (multimodo, ressonante, com LFO/envelope, wah)",
+     "descricao": "O FL tem Fruity Filter, Love Philter, Fast LP. Aqui filtros só existem dentro do EQ e do sintetizador.",
+     "prioridade": "importante",
+     "complexidade": "P",
+     "abordagem": "SVF de Chamberlin/TPT (Zavalishin, sem problemas de modulação) e ladder; modulação por LFO, envelope follower (auto-wah) ou automação (EM-09).",
+     "depende_de": [
+      "EM-02",
+      "EM-09"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "EM-19",
+     "item": "Compressor multibanda / maximizador e dinâmica de master",
+     "descricao": "Sem multibanda (Maximus, Fruity Multiband Compressor), soft clipper e dither. Exportação em 16 bits arredonda sem dither (codificarWav16).",
+     "prioridade": "importante",
+     "complexidade": "M",
+     "abordagem": "Crossover Linkwitz-Riley de 4ª ordem (soma plana) em 3-4 bandas, um compressor (EM-08) por banda; soft clipper com oversampling (EM-04); limitador com lookahead maior e detecção de pico verdadeiro no master; dither TPDF com ruído de semente fixa na exportação de 16 bits (mantém determinismo).",
+     "depende_de": [
+      "EM-08",
+      "EM-04"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "EM-20",
+     "item": "Presets, A/B e cadeias salvas por gênero; UI do rack e do roteamento; ferramentas MCP",
+     "descricao": "Os PRESETS_FAIXA só escrevem 3 bandas e envios. Para o Claude montar um metal, faltam presets de cadeia ('guitarra rítmica high gain', 'bus de bateria acústica', 'master metal') e ferramentas MCP para efeitos, roteamento e automação (hoje só aplicar_patch).",
+     "prioridade": "essencial",
+     "complexidade": "M",
+     "abordagem": "Presets como dados versionados em src/nucleo (cadeia completa), comparação A/B guardada no documento, ferramentas MCP `efeitos`, `rotear`, `automatizar`, `preset_mixer`, e `ler_musica` listando a cadeia de forma curta. UI: rack de slots arrastáveis no Monitor/Inspector e uma matriz de roteamento.",
+     "depende_de": [
+      "EM-02",
+      "EM-03",
+      "EM-09"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "EM-21",
+     "item": "Congelar / bounce de faixa (freeze, render in place)",
+     "descricao": "Com cadeias pesadas (amp sim 8x, convolução longa), o render a frio fica caro. O cache atual vive na memória do worker e se perde ao fechar.",
+     "prioridade": "importante",
+     "complexidade": "M",
+     "abordagem": "Congelar faixa = gravar a saída da cadeia em midia/musica/congelado/<hash>.wav (fora do git, como os renders) e usá-la como seco até descongelar; 'render in place' cria um clipe de áudio novo. A chave é o mesmo hash do cache de faixa.",
+     "depende_de": [
+      "EM-02"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "EM-22",
+     "item": "Pitch shift / formant / harmonizador / correção de afinação",
+     "descricao": "O FL tem Pitcher, Newtone, Pitch Shifter. Para um instrumental de metal pesa pouco (drop tuning se faz no instrumento), mas é parte de uma DAW completa.",
+     "prioridade": "desejavel",
+     "complexidade": "G",
+     "abordagem": "Signalsmith Stretch (MIT, C++) compilado para WASM para pitch/tempo de alta qualidade; evitar Rubber Band (GPL ou licença comercial) e cuidado com SoundTouch (LGPL). Correção de afinação estilo Newtone (detecção YIN/pYIN + edição de notas) é GG e fica para depois.",
+     "depende_de": [
+      "EM-02"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "EM-23",
+     "item": "Vocoder",
+     "descricao": "Fruity Vocoder e Vocodex. Não serve ao metal instrumental, mas faz parte do catálogo.",
+     "prioridade": "desejavel",
+     "complexidade": "M",
+     "abordagem": "Banco de 16-32 passa-faixas no modulador (entrada de sidechain de EM-03/EM-08) e na portadora, seguidores de envelope, sibilância passando direto. TS puro.",
+     "depende_de": [
+      "EM-03",
+      "EM-08"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "EM-24",
+     "item": "Efeitos de manipulação (Gross Beat-like, stutter, frequency shifter, de-esser, EQ dinâmico, Patcher)",
+     "descricao": "Gross Beat, Frequency Shifter, de-esser do Maximus, Patcher (cadeias paralelas num slot).",
+     "prioridade": "desejavel",
+     "complexidade": "M",
+     "abordagem": "Gross Beat: envelopes de volume/posição sincronizados ao BPM sobre um buffer circular. Frequency shifter: transformada de Hilbert por passa-tudo. Patcher: um slot que contém um subgrafo (reusa EM-03).",
+     "depende_de": [
+      "EM-02",
+      "EM-03",
+      "EM-09"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "EM-25",
+     "item": "Hospedar plugins de terceiros (VST3/CLAP/AU)",
+     "descricao": "O FL hospeda VST/VST3 (e AU no Mac, CLAP nas versões recentes, incerto). Para metal profissional, plugins como amp sims comerciais e Superior Drummer são o caminho de mercado. Fora da D1: exige módulo nativo e quebra o 'render idêntico em todos os processos' (o MCP stdio teria de carregar o mesmo binário; plugins não são determinísticos nem amostra a amostra entre execuções).",
+     "prioridade": "importante",
+     "complexidade": "GG",
+     "abordagem": "Se a D1 for revista: um processo hospedeiro nativo separado (C++ com JUCE, GPL/comercial, ou a SDK do CLAP, MIT, com VST3 SDK agora MIT desde 2025, incerto quanto à data/versão) falando com o Electron por memória compartilhada, sandbox por plugin, render offline bloco a bloco com latência informada ao PDC (EM-12), e o resultado do plugin congelado em WAV (EM-21) para manter o MCP stdio e o vídeo reproduzíveis. Sem rever a D1: aceitar Web Audio Modules 2 (WAM, padrão aberto para AudioWorklet), que só roda onde há AudioWorklet (janela), não no main nem no MCP stdio, o que também quebra o 'mesmo motor em todo lugar' a menos que se congele. Recomendação: primeiro esgotar EM-04/EM-05 nativos da casa.",
+     "depende_de": [
+      "EM-01",
+      "EM-12",
+      "EM-21"
+     ],
+     "exige_rever_D1": true
+    }
+   ],
+   "fontes": [
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/mixer.htm",
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/effects_plugins.htm",
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/plugins/Hardcore.htm",
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/plugins/Wave%20Candy.htm",
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/plugins/Fruity%20Parametric%20EQ%202.htm",
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/plugins/Fruity%20Limiter.htm",
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/mixer_trackprops.htm",
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/plugins/Distructor.htm",
+    "https://www.image-line.com/fl-studio-learning/fl-studio-beta-online-manual/html/plugins/Maximus.htm",
+    "/home/laures/Projects/estudio/src/nucleo/musica-som.ts",
+    "/home/laures/Projects/estudio/src/nucleo/musica.ts",
+    "/home/laures/Projects/estudio/src/renderer/modulos/musica/render.worker.ts",
+    "/home/laures/Projects/estudio/src/renderer/modulos/musica/Monitor.tsx",
+    "/home/laures/Projects/estudio/src/renderer/modulos/musica/motor.ts",
+    "/home/laures/Projects/estudio/src/nucleo/loudness.ts",
+    "/home/laures/Projects/estudio/src/nucleo/limpeza-voz.ts",
+    "/home/laures/Projects/estudio/docs/musica.md",
+    "/home/laures/Projects/estudio/docs/audio.md"
+   ],
+   "riscos": [
+    "O motor renderiza o buffer inteiro e o Web Audio só toca. Com cadeias pesadas (amp sim sobreamostrado 8x em 4 guitarras dobradas, convolução longa, multibanda) o tempo de re-render de cada ajuste deve passar de segundos numa música de 4-5 min (estimado, não medido). Por isso EM-01, EM-21 (congelar) e EM-11 (worklet) entram cedo.",
+    "Memória: hoje o cache guarda buffers Float32 da música inteira por canal e por faixa (414 MB medidos com 60 s). Com 20-30 faixas, inserts com cache por prefixo e buses, numa música de 5 min, a memória pode estourar em notebooks de 8 GB. Será preciso cache em disco ou guardar só o fim da cadeia.",
+    "Determinismo: o render idêntico depende de todos os processos rodarem o mesmo V8 (Electron e Node do MCP). Math.sin/exp/tanh podem mudar entre versões de V8. Se o Electron e o Node do stdio divergirem, o teste byte a byte quebra. WASM com operações IEEE básicas é mais estável; para funções transcendentais, usar aproximações próprias ou tabelas.",
+    "Qualidade de amp sim é subjetiva e difícil de acertar sem ouvido: o docs/musica.md registra que o som foi conferido só por medida (o sink estava mudo). Distorção de metal precisa de audição com referência (por exemplo, comparar com uma DI reamplificada) antes de declarar pronto.",
+    "Licença de IRs de caixa: muitos pacotes 'free' na web não têm licença explícita de redistribuição. Só embarcar IRs próprios ou com CC0/CC BY verificada, registrando no sistema de licenças (musica-licencas.ts).",
+    "A migração do esquema (eq/compressor/reverb/delay fixos -> slots e faixas de retorno) tem de manter documentos antigos soando igual amostra a amostra, ou mudar o código do render e com isso refazer todos os renders ligados a vídeos.",
+    "Hospedar VST/CLAP (EM-25) contradiz a D1 em dois pontos: módulo nativo e render reprodutível no MCP stdio. Se o dono quiser paridade real com o FL nesse ponto, a D1 precisa ser revista explicitamente; congelar a saída de plugins em WAV é o que preserva a ligação viva com o vídeo.",
+    "Incertezas sobre o FL: a lista de plugins muda entre versões do manual (Fruity Limiter e Maximus aparecem com títulos diferentes); suporte a CLAP e a data da relicença do VST3 SDK não foram confirmados em fonte oficial nesta pesquisa; o Wave Candy tem modo BS.1770, mas a página não cita medidor de correlação de fase."
+   ]
+  },
+  {
+   "area": "Sequenciamento (composição, edição, gravação, tempo e áudio no arranjo)",
+   "fl_studio": [
+    {
+     "feature": "Channel Rack e step sequencer",
+     "descricao": "Canais (Generators, Sampler, Layers, Audio Clips, Automation Clips) com botões de passo de 16avo; grupos e filtro de exibição; roteamento por canal para faixa do Mixer; comprimento de padrão automático ou 1 a 512 passos (outra página do manual cita 64: incerto). Fonte: image-line.com manual channelrack.htm."
+    },
+    {
+     "feature": "Graph editor por passo",
+     "descricao": "Por passo: nota, velocity, release, fine pitch (±100 cents), pan, Mod X, Mod Y, Shift (deslocamento de tempo) e Rep (retrigger/ratchet). Rampas com botão direito."
+    },
+    {
+     "feature": "Swing",
+     "descricao": "Swing global (passos pares/ímpares), 'swing mix' por canal e opção de truncar notas swingadas."
+    },
+    {
+     "feature": "Piano roll: ferramentas",
+     "descricao": "Draw, Paint (inclui acordes), Paint drum sequencer, Delete, Mute, Interpolate, Slice e Glue, seleção por laço/tempo/altura, agrupar notas, duplicar com intervalo, nudge, stretch handle, trava H/V, redimensionar pelo início, marcador de comprimento do padrão."
+    },
+    {
+     "feature": "Piano roll: ghost notes",
+     "descricao": "Notas do mesmo padrão (sólidas) e de outros padrões (vazadas), com edição opcional; waveform de fundo para alinhar notas a áudio."
+    },
+    {
+     "feature": "Piano roll: slide, portamento e grupos de cor",
+     "descricao": "Slide notes (glissando; o tempo é a sobreposição) e flag de portamento, só em instrumentos nativos do FL. 16 grupos de cor para notas sobrepostas independentes, que mapeiam canal MIDI em plugins hospedados."
+    },
+    {
+     "feature": "Piano roll: propriedades por nota",
+     "descricao": "Diálogo com PAN, VEL, REL (release velocity), MODX, MODY, slide/portamento, cor, início e duração. Editor de eventos inferior para velocity, pan, pitch, cutoff e automação."
+    },
+    {
+     "feature": "Piano roll: escala e acordes",
+     "descricao": "Snap to scale (raiz+escala) para edição e MIDI de entrada; sombreamento por escala; Chord Stamp (acordes, escalas melódicas, padrões de percussão, slide up); Chord Progression Tool (botão direito em Tools); compasso próprio por padrão."
+    },
+    {
+     "feature": "Piano roll: menu Tools (Riff Machine, Arpeggiate, Strum, Randomize, Chop, Flam, Articulate, Quantize, Limit, Claw Machine)",
+     "descricao": "Riff Machine confirmada no manual (clique do meio em Tools). Os demais itens do menu Tools eu conheço do FL, mas a página consultada NÃO os descreve: incerto, confirmar nas páginas de Tools do manual."
+    },
+    {
+     "feature": "Playlist: faixas e clipes",
+     "descricao": "Faixas livres que misturam clipes Pattern, Audio e Automation; Track Mode liga faixa do Playlist, canal e faixa do Mixer; subfaixas e grupos; renomear, cor, ícone, travar, clonar."
+    },
+    {
+     "feature": "Playlist: edição",
+     "descricao": "Draw, Paint, Delete, Mute, Slip, Slice (também diagonal), Select; chop por compasso/tempo/aleatório; slip e ripple; merge, make unique, consolidar; Picker Panel; congelar/bounce para áudio; múltiplos Arrangements que compartilham rack e mixer."
+    },
+    {
+     "feature": "Clipes de áudio",
+     "descricao": "Ganho, fades, pitch, reverse, stretch, zero-cross, detectar tempo, fit to tempo, extração de stems, deverb (manual do Playlist)."
+    },
+    {
+     "feature": "Clipes de automação e tempo",
+     "descricao": "Automation Clips em Step ou Slide, com ferramentas de escalar, normalizar, suavizar, filtrar, analisar áudio e fundir. Andamento automatizável pelo knob de tempo (da memória; a página do Playlist não descreve controle de tempo)."
+    },
+    {
+     "feature": "Marcadores de compasso e de ação",
+     "descricao": "Time signature markers em pontos ou seleções, com padrões de compasso próprio. Marcadores Start, Loop, Marker loop, Marker skip, Marker pause, Time signature, Start/Stop recording; saltos ao vivo quantizados."
+    },
+    {
+     "feature": "Loop e seleção",
+     "descricao": "Marcador de loop da música, loop de seleção na régua, render de seleção como seção."
+    },
+    {
+     "feature": "Performance mode",
+     "descricao": "Ctrl+P: dispara e repete clipes/faixas ao vivo, com indicadores de progresso e preparação de marcadores em colunas."
+    },
+    {
+     "feature": "Gravação de áudio",
+     "descricao": "Entrada por faixa do Mixer (uma entrada estéreo por faixa), ponto de captura (EXT, pós-FX, pós-fader), gravação em disco como clipe de áudio em Audio track, monitoramento Off/Armado/On, compensação de latência, contagem de 4 cliques, loop recording sound-on-sound com Blend. Producer Edition ou superior."
+    },
+    {
+     "feature": "Gravação de MIDI",
+     "descricao": "Notas tocadas gravam no piano roll/Playlist com quantização de entrada no snap; MIDI Out para hardware. Punch e precount não aparecem na página consultada; 'Score logger' é da memória, incerto."
+    },
+    {
+     "feature": "Takes e comping",
+     "descricao": "Sem comping dedicado documentado. Takes via loop recording do Edison (marcadores de região por volta; audita com setas; Shift+C envia ao Playlist) e bounce. Take recording nativo no Playlist: incerto."
+    },
+    {
+     "feature": "Edison",
+     "descricao": "Grava em RAM a partir de qualquer slot de FX (~20 MB/min); edição de seleção, regiões, detecção de tempo; envia ao Playlist, canal ou arquivo (WAV, WavPack, MP3, Ogg); BPM da amostra acompanha o projeto. Ferramentas de limpeza/espectro: da memória, incerto."
+    },
+    {
+     "feature": "Newtime",
+     "descricao": "Time stretch por warp markers (motor Zplane), quantize time na grade (1 beat a 1/32), detecção de batidas (Transient, Tempo, None), marcadores de tempo forte, fatias, templates de groove (.groovepat), envio ao Playlist ou partitura ao piano roll."
+    },
+    {
+     "feature": "Newtone",
+     "descricao": "Correção de afinação e tempo (Zplane): notas detectadas em piano roll, Center/Variation/Transition, snap to scale, pitch por nota, formant, vibrato, fatias, sync ao tempo do projeto; envia ao Playlist ou exporta as notas como MIDI."
+    }
+   ],
+   "estudio_ja_tem": [
+    {
+     "item": "Padrões e clipes de padrão repetidos no arranjo; pintar clipes, dividir (S), repetir, variação por semente",
+     "arquivos": "src/nucleo/musica.ts (PadraoMusica, ClipeMusica com inicio), src/renderer/modulos/musica/Arranjo.tsx, docs/musica.md"
+    },
+    {
+     "feature": "x",
+     "item": "Sequenciador de passos da bateria (grade 16 passos, estilos, forca por nota) e notas com em/dur/forca (1 a 127)",
+     "arquivos": "src/nucleo/musica.ts (NotaMusica), src/renderer/modulos/musica/Inspector.tsx"
+    },
+    {
+     "item": "Piano roll de sintetizador: desenhar, mover, esticar, seleção, transpor, quantizar, duplicar, carimbo de acordes, teclado do PC com gravar passo a passo, destaque de escala",
+     "arquivos": "src/renderer/modulos/musica/PianoRoll.tsx, src/nucleo/musica-teoria.ts"
+    },
+    {
+     "item": "Operações de nota: quantizar, transpor, duplicar, apagar, força, humanizar, esticar, na_escala (UI e MCP)",
+     "arquivos": "src/nucleo/musica.ts (AcaoNotas), src/nucleo/musica-acoes.ts, ferramentas escrever_notas/editar_notas em src/nucleo/mcp-musica.ts"
+    },
+    {
+     "item": "Geração de baixo, arpejo e acordes a partir de progressão; faixa de acordes por grau ou cifra",
+     "arquivos": "src/nucleo/musica-teoria.ts, docs/musica.md"
+    },
+    {
+     "item": "BPM único (20 a 300) e compasso único por documento; swing global 0 a 1; semente",
+     "arquivos": "src/nucleo/musica.ts (DocMusica.bpm, compasso, swing, BPM_MIN/MAX)"
+    },
+    {
+     "item": "Seções (marcadores nomeados) e loop de região no transporte, metrônomo, voz guia do vídeo",
+     "arquivos": "src/nucleo/musica.ts (secoes), src/renderer/modulos/musica/Monitor.tsx, motor.ts"
+    },
+    {
+     "item": "Clipes de áudio com corte (corte_s), ganho, fade in/out, forma de onda; Editar em Música a partir do vídeo",
+     "arquivos": "src/nucleo/musica.ts (ClipeMusica), src/nucleo/musica-som.ts, docs/musica.md"
+    },
+    {
+     "item": "Automação de volume por pontos (faixa e master) com editor desenhado no arranjo; sidechain por notas",
+     "arquivos": "src/nucleo/musica.ts (AutomacaoMusica, parametro só 'volume'), src/renderer/modulos/musica/AutomacaoArranjo.tsx"
+    },
+    {
+     "item": "Import e export MIDI (formato 0/1, tempo, compasso, marcadores, programa); export WAV/M4A/Opus com stems",
+     "arquivos": "src/nucleo/midi.ts, src/nucleo/musica-midi.ts, src/nucleo/musica-entrega.ts"
+    },
+    {
+     "item": "Mesmo motor em janela, worker, processo principal e MCP, com cache por camada; undo da pessoa (Ctrl+Z); ligação viva com o vídeo",
+     "arquivos": "src/nucleo/musica-som.ts, src/renderer/modulos/musica/render.worker.ts, docs/musica.md, docs/audio.md"
+    }
+   ],
+   "lacunas": [
+    {
+     "id": "SEQ-01",
+     "item": "Modelo de dados de nota estendido",
+     "descricao": "NotaMusica só tem peca/nota, em, dur, forca. Falta pan, afinação fina, release velocity, mod X/Y, slide/portamento, mudo por nota, id estável e grupo de cor. Sem isso não há ghost/slide/edição por nota nem automação expressiva (bends de guitarra, pitch de solo).",
+     "prioridade": "essencial",
+     "complexidade": "M",
+     "abordagem": "Estender o tipo com campos opcionais (pan, pitch_cents, rel, slide, id) mantendo documento antigo idêntico (formato 1 compatível; campos ausentes = comportamento atual); id gerado na migração para suportar seleção/undo robusto. Motor lê os campos em musica-som.ts; os instrumentos novos (guitarra, sampler) consomem. Teste de render byte a byte permanece.",
+     "depende_de": [],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "SEQ-02",
+     "item": "Mapa de andamento e de compasso ao longo da música",
+     "descricao": "Há um BPM e um compasso por documento. Faltam mudanças de andamento (rampas e saltos) e de compasso (5/4, 7/8, 13/16), polirritmia e padrões com compasso próprio. Essencial para metal progressivo/Meshuggah (compassos ímpares, polimetria) e para qualquer DAW.",
+     "prioridade": "essencial",
+     "complexidade": "G",
+     "abordagem": "Adicionar ao documento 'mapa_tempo' [{em, bpm, rampa?}] e 'mapa_compasso' [{em, compasso}]. Tudo hoje em batidas (semínima) a 960 PPQ, então o domínio musical não muda; muda a conversão batidas para segundos: função monotônica por integração por partes (rampa linear em BPM = integral fechada). Centralizar em segPorBatida/tempoDeBatida; auditar todo uso de spb em musica-som.ts, delay sincronizado ao BPM, metrônomo, encaixe no vídeo (que muda o BPM até 8%), swing, MIDI import/export (eventos de tempo e compasso já são lidos, hoje só o primeiro vale). Clipes de áudio ficam em segundos ou em batidas conforme modo de stretch (ver SEQ-09). Padrão com 'compasso' próprio só afeta grade e acentos. Mantém D1 (aritmética pura).",
+     "depende_de": [],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "SEQ-03",
+     "item": "Gravação de áudio (microfone/interface) e de MIDI em tempo real",
+     "descricao": "Não existe captura. Falta gravar áudio em faixa armada com contagem, monitoramento, compensação de latência, punch e loop recording; e gravar MIDI tocado ao vivo com quantização de entrada (hoje só o teclado do PC escreve passo a passo).",
+     "prioridade": "essencial",
+     "complexidade": "G",
+     "abordagem": "Captura fica na janela (única com hardware): getUserMedia + AudioWorklet que grava PCM Float32 em chunks para arquivo via ponte (WAV no projeto); enumerateDevices/seletor de entrada; latência medida por loopback (clique no metrônomo gravado) e gravada como offset por entrada. MIDI: Web MIDI API (navigator.requestMIDIAccess, disponível no Electron com permissão) com timestamps convertidos em batidas pelo mapa de tempo e quantização opcional. O render continua puro: a gravação só cria clipes/notas no documento. Sem módulo nativo, mas limites do Web Audio em latência (ASIO/JACK indisponíveis; no Linux PipeWire ok). Risco: latência de monitoramento em Windows. Registrar que não rever D1 mas assumir a limitação de latência.",
+     "depende_de": [
+      "SEQ-01",
+      "SEQ-02"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "SEQ-04",
+     "item": "Time-stretch e pitch-shift de clipes de áudio (Newtime/Newtone)",
+     "descricao": "Clipes de áudio só têm corte, ganho e fade; não acompanham o BPM, não têm pitch, reverse, nem fit-to-tempo. Sem isso não se usa loops/amostras nem se corrige guitarra ou voz gravada.",
+     "prioridade": "essencial",
+     "complexidade": "G",
+     "abordagem": "Implementar em TypeScript puro um phase vocoder/WSOLA para stretch (e resample para pitch), pois precisa ser determinístico e rodar no Node e no worker. Zplane/élastique são proprietários, não usar. Alternativas de licença compatível: SoundTouch (LGPL, porta TS 'soundtouchjs' é LGPL; verificar compatibilidade com o instalador) ou Rubber Band (GPL, só se o app for GPL; inviável). Recomendado: escrever WSOLA+phase vocoder próprio (algoritmos de domínio público) ou usar soundtouchjs se a LGPL for aceita via dynamic import. Pré-renderizar o stretch como cache em disco por clipe (hash dos parâmetros) para manter o render amostra a amostra idêntico. Campos no clipe: stretch {modo, razao|bpm_origem}, pitch_semitons, reverse.",
+     "depende_de": [
+      "SEQ-02"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "SEQ-05",
+     "item": "Warp markers, detecção de batidas e quantização de áudio (Newtime)",
+     "descricao": "Sem detecção de tempo/transientes nem warp markers para alinhar áudio gravado à grade ou fatiar loops em MIDI/sampler.",
+     "prioridade": "importante",
+     "complexidade": "G",
+     "abordagem": "Detecção de onsets por fluxo espectral (FFT própria já existe? verificar; senão fft.js MIT) e estimativa de BPM por autocorrelação; warp = lista de pares (tempo_origem, batida) com interpolação linear e stretch por segmento reaproveitando SEQ-04. Fatiar para padrão (slices em notas de sampler) depende de existir sampler (área de instrumentos).",
+     "depende_de": [
+      "SEQ-04"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "SEQ-06",
+     "item": "Correção de afinação de áudio monofônico (Newtone)",
+     "descricao": "Detectar notas de voz/guitarra gravada, corrigir afinação e exportar como MIDI.",
+     "prioridade": "desejavel",
+     "complexidade": "G",
+     "abordagem": "Detector de pitch YIN/pYIN (domínio público) em TS e re-síntese por PSOLA para mudar pitch por nota com formantes preservados. Sem Zplane. Exportar notas detectadas como NotaMusica.",
+     "depende_de": [
+      "SEQ-04",
+      "SEQ-01"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "SEQ-07",
+     "item": "Piano roll avançado: ghost notes, slide/portamento, propriedades por nota, editor de eventos inferior",
+     "descricao": "O piano roll atual só edita altura/tempo/duração. Faltam ghost notes de outros padrões, editor de velocity/pan/pitch embaixo, notas slide e portamento, laço de seleção, slice/glue, mudo de nota, desenho de curvas, redimensionar pelo início, trava H/V, zoom independente, grade por padrão e prévia de nota (Play selected) completa. Também só está disponível para sintetizador, não para bateria (que usa só passos).",
+     "prioridade": "essencial",
+     "complexidade": "G",
+     "abordagem": "Evoluir PianoRoll.tsx (251 linhas) para um editor em canvas (React + canvas 2D, sem dependência) com camadas; painel de eventos com barras de velocity/pan/pitch alinhadas ao tempo; ghost = renderizar notas de padrões escolhidos com alpha. Slide/portamento viram dado (SEQ-01) e o instrumento (guitarra/synth monofônico) interpola pitch no render. Reaproveitar acoes.ts/estado.ts para undo. Expor tudo no MCP (editar_notas com novas ações).",
+     "depende_de": [
+      "SEQ-01"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "SEQ-08",
+     "item": "Ferramentas de composição: strum, arpejador, randomize, riff machine, chop, flam, articulação, limitar, progressão de acordes",
+     "descricao": "Há quantizar, transpor, humanizar, variação e geradores de baixo/arpejo/acorde por progressão, mas faltam: strum (acorde espalhado no tempo), arpejador com direção/oitavas/gate/padrão de ritmo, randomize (altura/tempo/velocity com escala), riff machine, chop, flam, articulação (staccato/legato), limit notes, scale levels, chord progression tool interativo. FL: só Riff Machine confirmada no manual; os outros itens vêm da memória.",
+     "prioridade": "importante",
+     "complexidade": "M",
+     "abordagem": "Funções puras sobre NotaMusica em musica-teoria.ts/musica.ts, seguindo o padrão atual de AcaoNotas (determinísticas com semente), expostas na UI e no MCP (editar_notas, nova ferramenta gerar_riff). Para metal: gerador de riffs palm-mute com padrões rítmicos por subdivisão (galloping, polirritmia 'djent' por contagem de 16avos agrupada em 3+3+3+3+4) é a lacuna mais útil. Sem dependências.",
+     "depende_de": [
+      "SEQ-01"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "SEQ-09",
+     "item": "Sequenciador de passos avançado (graph editor por passo, passos longos, ratchet/Rep, shift, swing por canal)",
+     "descricao": "Grade de 16 passos com força; faltam gráfico por passo (velocity, pan, pitch, release, mod, shift de tempo, Rep/retrigger), comprimento de padrão livre (compassos ímpares, 1 a 512 passos), swing por canal, grupos de canais, canais de áudio/sample no rack, Layers e roteamento por canal.",
+     "prioridade": "importante",
+     "complexidade": "M",
+     "abordagem": "Nova camada de UI sobre NotaMusica (SEQ-01: pan, pitch_cents, shift, rep). 'passos' já existe em PadraoMusica; liberar para qualquer valor e acoplar ao compasso do padrão (SEQ-02). Swing por canal = campo 'swing_mix' em CanalMusica. Rep (ratchet) expande em notas na leitura do padrão (determinístico). Essencial para blast beat/double bass: Rep e subdivisão em 32avos e 64avos.",
+     "depende_de": [
+      "SEQ-01",
+      "SEQ-02"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "SEQ-10",
+     "item": "Playlist completo: faixas livres, clipes de automação, vários arranjos",
+     "descricao": "O arranjo tem uma linha por canal (clipes de áudio ou de padrão), sem faixas livres misturando tipos, sem clipes de automação genéricos (só volume por pontos), sem make unique, consolidar, fatiar/chop, slip/ripple, picker, bounce/congelar e arrangements múltiplos.",
+     "prioridade": "essencial",
+     "complexidade": "G",
+     "abordagem": "Fase 1: 'faixas' do arranjo desacopladas de canal (um clipe referencia canal e a faixa só agrupa visualmente) e clipes de automação (alvo/parâmetro/curva) substituindo AutomacaoMusica. Fase 2: make unique de padrão, chop, bounce de clipe para áudio (usa o render por camada que já existe), arrangements como lista de 'arranjo'. Compatível com o formato atual via migração.",
+     "depende_de": [
+      "SEQ-01"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "SEQ-11",
+     "item": "Automação de qualquer parâmetro (e do tempo)",
+     "descricao": "Só há automação de volume em dB por reta entre pontos. Faltam automação de pan, EQ, envio, cutoff e macros de instrumentos, curvas (não só reta), LFO, e automação do andamento. Importante para solos (wah, filtro), swells e breakdowns.",
+     "prioridade": "essencial",
+     "complexidade": "G",
+     "abordagem": "Generalizar AutomacaoMusica.parametro para um caminho de parâmetro (faixa.eq.graves_db, canal.macros.brilho, master.tempo) com tipos de curva (linear, hold, exponencial, bezier simples). O render por amostra já aplica volume automatizado; estender a um avaliador de parâmetros por bloco (ex.: 64 amostras, suavizado) e invalidar o cache por faixa pela chave. Tempo automatizado = SEQ-02. Cuidado com o custo do cache por camada que hoje assume parâmetros constantes por faixa; cada parâmetro automatizado exige recalcular a faixa (filtros com coeficientes variando).",
+     "depende_de": [
+      "SEQ-02"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "SEQ-12",
+     "item": "Marcadores de ação, loop de música e modos de reprodução",
+     "descricao": "Há seções e um loop manual no transporte, mas faltam marcadores de salto/pausa/loop, marcador de compasso, loop de seleção na régua com render de seção, pré-roll, punch in/out e contagem.",
+     "prioridade": "importante",
+     "complexidade": "M",
+     "abordagem": "Estender 'secoes' com tipo e ações; o motor da janela (motor.ts) já faz loop nativo. Marcadores de ação só valem na prévia/interpretação do transporte; o render para arquivo deve definir semântica determinística (ex.: ignorar saltos ou expandir). Documentar a diferença para não quebrar a regra 'render idêntico'.",
+     "depende_de": [
+      "SEQ-02"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "SEQ-13",
+     "item": "Performance mode (disparo ao vivo de clipes)",
+     "descricao": "Sem disparo ao vivo de clipes/faixas quantizado por compasso, nem controle por MIDI/teclado.",
+     "prioridade": "desejavel",
+     "complexidade": "G",
+     "abordagem": "Camada nova só na janela (agendador de tempo real sobre o worker): clipes como células disparáveis com quantização de compasso. Fora do escopo de render offline; a gravação do 'performance' vira clipes no arranjo (ver SEQ-03). Exige agendador em tempo real próprio (o motor atual toca buffers pré-renderizados), o que obriga o render a ser incremental/por camada para evitar latência.",
+     "depende_de": [
+      "SEQ-03",
+      "SEQ-10"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "SEQ-14",
+     "item": "Takes e comping",
+     "descricao": "Sem várias passagens por faixa, sem escolher trechos de cada take e juntá-los. O FL não tem comping dedicado documentado, então é desejável, não essencial.",
+     "prioridade": "desejavel",
+     "complexidade": "M",
+     "abordagem": "Modelo de 'grupo de takes' no clipe de áudio (lista de arquivos com intervalos ativos por trecho) renderizado como corte+crossfade curto. UI de faixas empilhadas. Depende da gravação em loop.",
+     "depende_de": [
+      "SEQ-03",
+      "SEQ-10"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "SEQ-15",
+     "item": "Edição de áudio (Edison): cortar, normalizar, reverse, fades, gerar amostra, limpeza e análise",
+     "descricao": "Só existe corte e fade de clipe. Falta editor de forma de onda com seleção, normalizar, remover DC, reverse, declicker, ganho, regiões e análise espectral, e enviar o resultado a um canal sampler ou ao Playlist.",
+     "prioridade": "importante",
+     "complexidade": "G",
+     "abordagem": "Operações puras sobre Float32Array no mesmo pacote nucleo (testáveis com vitest), com UI em canvas de forma de onda (a forma de onda do clipe já existe). Espectro com FFT própria (fft.js MIT). Resultados gravados como novos arquivos no projeto com licença registrada (musica-licencas.ts). Sampler depende da área de instrumentos.",
+     "depende_de": [
+      "SEQ-04"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "SEQ-16",
+     "item": "Importar/gravar MIDI avançado e mapa de bateria acústica",
+     "descricao": "O MIDI importa só 10 peças de bateria (mapa GM reduzido). Uma bateria acústica de metal exige bumbo duplo, caixa com rim/ghost, vários toms, chimbal com pedal e estados, pratos (crash/ride/china/splash) com abafamento, e mapeamento GM completo (35 a 81), além de articulações (velocity layers, round robin). Não é o sequenciamento em si, mas o padrão de bateria depende de ele.",
+     "prioridade": "essencial",
+     "complexidade": "M",
+     "abordagem": "Ampliar PecaBateria e o mapa MIDI (musica-midi.ts) para GM completo; o sequenciador de passos deve tratar peças como linhas livres. O som da bateria acústica é lacuna da área de instrumentos/sampler (depende de samples multi-camada e licenças), não deste relatório.",
+     "depende_de": [
+      "SEQ-01"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "SEQ-17",
+     "item": "Eventos MIDI de controle (CC, pitch bend, aftertouch, program change) e múltiplos canais por pista",
+     "descricao": "O modelo só tem notas. Importar MIDI descarta pitch bend e CC; solos de guitarra e expressão (mod wheel, sustain) dependem disso.",
+     "prioridade": "importante",
+     "complexidade": "M",
+     "abordagem": "Tratar CC/bend como automação por canal (SEQ-11) e eventos em padrão ('eventos' ao lado de 'notas'); import/export em musica-midi.ts. Pitch bend vira curva de pitch_cents do canal/nota.",
+     "depende_de": [
+      "SEQ-01",
+      "SEQ-11"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "SEQ-18",
+     "item": "Prévia em tempo real sem render prévio (latência e polifonia ao tocar)",
+     "descricao": "O motor renderiza em lote (cache por camada, 17 a 600 ms por edição) e toca buffers. Para gravar, tocar um instrumento ao vivo com monitoramento e usar o Performance mode é preciso um caminho de baixa latência que o design atual (offline) não oferece. A janela só toca nota avulsa pré-renderizada (tocarNota).",
+     "prioridade": "essencial",
+     "complexidade": "GG",
+     "abordagem": "Rodar o mesmo código de síntese dentro de um AudioWorkletProcessor em tempo real (o código é TypeScript puro: empacotar para worklet, com a mesma matemática; garantir que o resultado do worklet seja o do render offline com um teste de equivalência por tolerância, pois bit-exato em tempo real com buffers de 128 amostras exige estado idêntico). Isso fecha a decisão: 'mesmo render amostra a amostra' pode ser mantida, mas o realtime vira um terceiro executor do mesmo núcleo. Sinalizar como o item que mais pressiona a D1; não exige módulo nativo, mas faz a janela não ser 'só worker de render'.",
+     "depende_de": [
+      "SEQ-01"
+     ],
+     "exige_rever_D1": true
+    },
+    {
+     "id": "SEQ-19",
+     "item": "Hospedagem de plugins (VST/CLAP) e latência de plugin",
+     "descricao": "Não é sequenciamento, mas condiciona gravação e compensação de latência (PDC) no mixer e a automação de parâmetros de plugin. Registrar como dependência externa.",
+     "prioridade": "desejavel",
+     "complexidade": "GG",
+     "abordagem": "Fora da D1 (exige módulo nativo/processo separado). Recomenda-se não incluir nesta fase; se vier, tratar como processo auxiliar com ponte, o que quebra o render idêntico entre executores (VST não é determinístico entre máquinas). Alternativa dentro da D1: plugins Web Audio (WAM, Web Audio Modules, licença MIT) em AudioWorklet. Decidir com o dono.",
+     "depende_de": [
+      "SEQ-18"
+     ],
+     "exige_rever_D1": true
+    }
+   ],
+   "riscos": [
+    "D1 e determinismo: SEQ-18 (execução em tempo real do núcleo num AudioWorklet) e SEQ-19 (plugins) são os pontos que pressionam a regra de 'render idêntico amostra a amostra'. Tempo real não pode ter o mesmo cache/ordem de operações; exige um teste de equivalência por tolerância e disciplina de ponto flutuante.",
+    "Mapa de tempo (SEQ-02) toca em todo código que converte batidas em segundos (delay, metrônomo, swing, encaixe no vídeo, MIDI). É a mudança mais transversal; fazer antes de gravação e stretch.",
+    "Stretch e pitch (SEQ-04) devem ser pré-renderizados e cacheados para o motor continuar puro; Zplane/élastique são proprietários e Rubber Band é GPL: licença é decisão do dono.",
+    "Itens do menu Tools do piano roll (arpejo, strum, randomize, chop, flam, articulação), Score logger, take recording do Playlist, ferramentas do Edison e algoritmos de stretch do FL vêm da memória, não do manual consultado: incerto.",
+    "O manual do FL se contradiz sobre o máximo de passos do Channel Rack (64 vs 512): incerto.",
+    "Fora desta área mas bloqueante para o caso do teste (metal): guitarra distorcida, bateria acústica sampleada e solos dependem de instrumentos/FX; o sequenciamento só entrega notas, bends, slides e compassos ímpares para eles."
+   ],
+   "fontes": [
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/pianoroll.htm",
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/playlist.htm",
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/channelrack.htm",
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/recording_audio.htm",
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/plugins/Newtone.htm",
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/plugins/Newtime.htm",
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/plugins/Edison_2.htm"
+   ]
+  },
+  {
+   "area": "integracoes (plugins, MIDI e controladores, interfaces de áudio e latência, sincronização, troca de projetos, bibliotecas de samples, marketplace e licenças)",
+   "fl_studio": [
+    {
+     "feature": "Hospedagem de plugins de terceiros (Fruity Wrapper)",
+     "descricao": "Windows: VST 1/2 de 32 e 64 bits, VST3 de 32 e 64 bits, CLAP e o formato nativo do FL. macOS: VST 1/2 e VST3 de 64 bits, AU de 64 bits e CLAP. O wrapper faz o roteamento de entradas e saídas, guarda o estado do plugin no projeto e expõe parâmetros para automação. Fonte: manual, plugins_supported.htm e plugins/wrapper.htm."
+    },
+    {
+     "feature": "Ponte para plugins em processo separado (bridging)",
+     "descricao": "A opção 'Make bridged' roda o plugin em outro processo. É o caminho para plugins de 32 bits desde que o FL de 32 bits acabou na versão 20.9. O próprio manual avisa que a ponte pode causar travamentos aleatórios e que plugins em ponte roubam o foco do teclado."
+    },
+    {
+     "feature": "Solução de problemas por plugin",
+     "descricao": "'Use fixed size buffers' (segundo o PyFLP, soma uns 2 ms de latência), 'Smart disable', 'Allow threaded processing' e, nas configurações de áudio, 'Align tick lengths'."
+    },
+    {
+     "feature": "Drivers e latência de áudio",
+     "descricao": "Windows: ASIO do fabricante (recomendado), ASIO4ALL, 'FL Studio ASIO' (multicliente, por cima do áudio do Windows) e Primary Sound Driver (WDM). macOS: Core Audio, com dispositivos agregados para usar mais de uma interface. O buffer vai pelo painel ASIO ou por um controle deslizante (no Apple Silicon, de 128 a 1024 amostras). Há triple buffer, fonte de clock interna ou externa, taxa padrão de 44,1 kHz, processamento multithread de geradores e do mixer e interpolação de reamostragem de linear até sinc de 512 pontos. Fonte: envsettings_audio.htm."
+    },
+    {
+     "feature": "Entradas e saídas por faixa do mixer",
+     "descricao": "Os menus IN/OUT de cada faixa do mixer escolhem as entradas e saídas físicas da interface. O metrônomo e a prévia podem ir para faixas próprias."
+    },
+    {
+     "feature": "Entrada MIDI e controladores",
+     "descricao": "Lista de dispositivos com Enable, tipo de controlador, script MIDI por dispositivo, portas de 0 a 255, 'Update MIDI Scripts' (baixa os scripts da Image-Line), 'Auto accept controller', modo Pickup (takeover), 'Toggle on release', pedal de sustain (CC64) controlando o note-off e curvas que ligam a velocidade de ataque e de soltura a parâmetros. Também tem canais MIDI dedicados para Omni preview, Performance mode, salto entre marcadores e mute de geradores. Fonte: envsettings_midi.htm."
+    },
+    {
+     "feature": "Link to Controller (MIDI learn)",
+     "descricao": "Clique direito num botão ou controle deslizante e 'Link to Controller'. Aceita até 16 controladores simultâneos, um por canal MIDI. O vínculo fica preso ao número do CC e ao canal. Há vínculos por projeto e vínculos globais, que valem entre projetos e sessões. Fonte: automation_linking.htm."
+    },
+    {
+     "feature": "Scripts de controlador em Python",
+     "descricao": "Pela configuração de MIDI, cada dispositivo usa um script. Pelo que conheço, é uma API Python de 'MIDI Controller Scripting' publicada pela Image-Line. A página de configurações só diz 'MIDI scripts', então os detalhes da API não foram conferidos aqui."
+    },
+    {
+     "feature": "Saída MIDI e sincronização",
+     "descricao": "O plugin MIDI Out controla hardware e softwares externos. Na saída: 'Send master sync' por dispositivo, um 'Enable MIDI master sync' global e o tipo de sincronização (o MIDI clock é o normal). Na entrada: sincronia externa com escolha de dispositivo e um ajuste de offset em ms. Não confirmei os tipos MTC e SPP na página atual do manual."
+    },
+    {
+     "feature": "Ableton Link",
+     "descricao": "Não encontrei suporte oficial. Só há pedidos de usuários no fórum da Image-Line, o mais recente de maio de 2026. Trato como ausente no FL, com alguma incerteza."
+    },
+    {
+     "feature": "MPE (MIDI Polyphonic Expression)",
+     "descricao": "Não encontrei suporte nativo documentado no piano roll. Há pedidos no fórum entre 2024 e 2026, e em 2024 um técnico da Image-Line disse que o MIDI 2.0 'não está pronto'. O piano roll tem slides e bends por nota próprios, que não são MPE. Incerto, mas tudo indica que não tem."
+    },
+    {
+     "feature": "ReWire",
+     "descricao": "O suporte oficial acabou na versão 20.7. Para usar o FL dentro de outra DAW, o manual manda usar o FL Studio como plugin VST ou AU."
+    },
+    {
+     "feature": "FL Studio como plugin",
+     "descricao": "O FL roda como VST ou AU dentro de outras DAWs, que é o substituto oficial do ReWire."
+    },
+    {
+     "feature": "Image-Line Remote",
+     "descricao": "Controle remoto por Wi-Fi com app para iOS e Android, com retorno opcional ('Enable feedback') para o app. Fica na página de MIDI."
+    },
+    {
+     "feature": "Troca de projetos e arquivos",
+     "descricao": "Importa e exporta MIDI e exporta áudio com stems (uma faixa por mixer). Não encontrei suporte a DAWproject: só o Bitwig importa .flp, em mão única, e a lista oficial do DAWproject não inclui o FL. Também não encontrei AAF/OMF. Pelo que conheço, exporta WAV, MP3, OGG e FLAC, mas não conferi na página de exportação."
+    },
+    {
+     "feature": "FL Cloud: sons, masterização, distribuição e backup",
+     "descricao": "Desde a versão 21.2 (outubro de 2023) tem biblioteca de sons na nuvem (as reportagens falam em mais de 1 milhão), masterização por IA e distribuição. Na versão 2025: Loop Starter (pilhas de loops geradas por gênero a partir do FL Cloud) e um PDF com as licenças de todos os samples do FL Cloud usados no projeto. Backup do projeto na nuvem e o Audio Logger aparecem em reportagens, sem conferência na Image-Line."
+    },
+    {
+     "feature": "Separação de stems por IA",
+     "descricao": "Entrou na versão 21.2: separa vocais, instrumental, baixo e bateria. As reportagens dizem que exige a edição Producer ou superior."
+    },
+    {
+     "feature": "Gopher (assistente de IA)",
+     "descricao": "Entrou na versão 2025: assistente treinado no manual. Nada indica que ele opere o projeto como o MCP do Estúdio."
+    }
+   ],
+   "estudio_ja_tem": [
+    {
+     "item": "Importação e exportação MIDI próprias, sem biblioteca",
+     "arquivos": "src/nucleo/midi.ts, src/nucleo/musica-midi.ts, docs/musica.md (item 26). Lê os formatos 0 e 1, mas não lê SMPTE. Grava o formato 1 a 960 PPQ, com a bateria no canal 10 pelo mapa General MIDI, programas e marcadores. Ferramentas MCP importar_midi e exportar_musica com formato mid (src/nucleo/mcp-musica.ts)."
+    },
+    {
+     "item": "Exportação de mistura e stems",
+     "arquivos": "src/nucleo/musica-entrega.ts e src/main/musica-render.ts. WAV de 24 bits, M4A (AAC 256 kb/s) e Opus (192 kb/s) pelo ffmpeg do Remotion, no alvo de loudness. Os stems saem um WAV por faixa e por retorno. A taxa é fixa em 48 kHz (TAXA_MUSICA, em src/nucleo/musica-som.ts:10)."
+    },
+    {
+     "item": "Licenças e comprovante de cada som",
+     "arquivos": "src/nucleo/musica-licencas.ts. Classes livre, credito, declarado e sem_licenca, o arquivo saidas/<título>.licencas.json com o SHA-256 de cada áudio e o arquivo de créditos. É o equivalente ao PDF de licenças do FL Cloud. KITS (musica-som.ts:197) só tem o kit 'eletronico' próprio."
+    },
+    {
+     "item": "Biblioteca de trilhas e músicas livres",
+     "arquivos": "src/nucleo/biblioteca-musicas.ts, src/nucleo/pasta-trilhas.ts, docs/audio.md (seção da biblioteca) e docs/musicas-livres.md. Lista mp3, wav, m4a, ogg e aac de uma pasta. É para trilhas inteiras, não é um navegador de samples."
+    },
+    {
+     "item": "Captura de microfone (só a narração do vídeo)",
+     "arquivos": "src/renderer/modulos/video/gravador.ts (getUserMedia com escolha de dispositivo, ScriptProcessorNode porque o AudioWorklet esbarrou no CSP script-src 'self') e src/main/ipc-gravacao.ts. A Música não grava áudio."
+    },
+    {
+     "item": "Reprodução pelo Web Audio, sem tempo real",
+     "arquivos": "src/renderer/modulos/musica/motor.ts:107 (AudioContext a 48 kHz, latencyHint 'interactive') e render.worker.ts. O som é renderizado inteiro no worker e tocado como AudioBuffer em loop, então não dá para tocar um instrumento ao vivo."
+    },
+    {
+     "item": "API de automação externa (MCP) e ponte com a janela",
+     "arquivos": "src/nucleo/mcp-musica.ts, src/main/ponte-janela.ts e o servidor HTTP em 127.0.0.1 servido pelo main (docs/arquitetura.md, seção 0). Para controle por software, faz o papel dos scripts Python de controlador do FL."
+    },
+    {
+     "item": "Segurança da janela: lista de permissões",
+     "arquivos": "src/main/janela-segura.ts:94 (permissaoLiberada aceita só media/áudio, clipboard e fullscreen, então Web MIDI ('midi' e 'midiSysex') é negado hoje), src/main/main.ts:272 (sandbox: true, contextIsolation) e o CSP em index.html."
+    },
+    {
+     "item": "Decisão D1 e o porquê do motor próprio",
+     "arquivos": "docs/musica.md:206-218 (só Web Audio, sem módulo nativo nem VST, e o mesmo render na janela, no worker, no main e no MCP stdio). O onnxruntime-web já é dependência (package.json), o que serve para separar stems."
+    }
+   ],
+   "lacunas": [
+    {
+     "id": "INT-01",
+     "item": "Caminho de áudio em tempo real (AudioWorklet) para tocar ao vivo",
+     "descricao": "Hoje a música é renderizada inteira e tocada como buffer. Sem um caminho em tempo real (bloco de 128 amostras) não dá para tocar um sintetizador pelo teclado MIDI, monitorar uma guitarra passando por um efeito nem gravar sobre a música com baixa latência. Todas as integrações ao vivo dependem disso.",
+     "prioridade": "essencial",
+     "complexidade": "G",
+     "depende_de": [],
+     "exige_rever_D1": false,
+     "abordagem": "Reescrever os nós do musica-som.ts como processadores por bloco com estado explícito, de modo que o render offline continue sendo a mesma função chamada em laço. Assim se mantém a igualdade amostra a amostra entre janela, worker, main e MCP. Na janela, um AudioWorkletProcessor empacotado pelo Vite (new URL('./worklet.ts', import.meta.url) passa no script-src 'self'; o gravador.ts falhou por não empacotar). A comunicação com o worker vai por SharedArrayBuffer e ring buffer, o que exige COOP/COEP na janela, ou por MessagePort. Também serve para trocar o ScriptProcessorNode do gravador. Fica dentro da D1. Coordenar com a área do motor."
+    },
+    {
+     "id": "INT-02",
+     "item": "Entrada Web MIDI: tocar e gravar notas",
+     "descricao": "Escolher dispositivos MIDI, tocar o instrumento do canal selecionado, gravar no piano roll com quantização, overdub e loop record, e usar o sustain (CC64), o pitch bend e o mod wheel. Hoje a permissão de MIDI é negada.",
+     "prioridade": "essencial",
+     "complexidade": "M",
+     "depende_de": [
+      "INT-01"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "Liberar 'midi' (e 'midiSysex' só quando a pessoa pedir) em permissaoLiberada (src/main/janela-segura.ts:94), mais setPermissionCheckHandler. navigator.requestMIDIAccess na janela, com o carimbo de tempo de cada evento convertido para o relógio do AudioContext, e a gravação vira patch na NotaMusica (musica.ts:57). No MCP stdio e no main não há Web MIDI, o que não faz falta para render. Se um dia o main precisar de MIDI, @julusian/midi (RtMidi, licença MIT) entra como módulo nativo e aí exige rever a D1."
+    },
+    {
+     "id": "INT-03",
+     "item": "MIDI learn (Link to Controller) e mapeamentos",
+     "descricao": "Clique direito em qualquer botão giratório ou fader e 'Ligar ao controle'. O vínculo é por CC e canal, por projeto ou global, com modo pickup ou takeover. Mexer no controle durante a gravação grava automação.",
+     "prioridade": "importante",
+     "complexidade": "M",
+     "depende_de": [
+      "INT-02"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "Mapa {dispositivo, canal, cc} → caminho @id/campo do documento, com escala min/max/curva. Os vínculos globais ficam nas preferências do app e os do projeto no documento. Os movimentos viram patches com autor 'pessoa', juntados por gesto para não encher o diário. Depende da automação de qualquer parâmetro (outra área: hoje só o volume é automatizado)."
+    },
+    {
+     "id": "INT-04",
+     "item": "Saída MIDI e sincronização por MIDI clock (mestre e escravo)",
+     "descricao": "Mandar notas para sintetizadores e baterias de hardware (equivalente ao MIDI Out do FL), mandar o clock com 24 pulsos por semínima, Start/Stop/Continue e Song Position, e seguir um clock externo com offset em ms. MTC é desejável.",
+     "prioridade": "importante",
+     "complexidade": "M",
+     "depende_de": [
+      "INT-01",
+      "INT-02"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "MIDIOutput.send(dados, timestamp), agendando à frente pelo relógio do AudioContext (lookahead de 50 a 100 ms) para tirar o jitter da thread JS. Como escravo, um PLL simples sobre os 0xF8 recebidos ajusta o BPM do transporte. Uma canal 'MIDI externo' no documento sai no export MIDI e não soa no render."
+    },
+    {
+     "id": "INT-05",
+     "item": "Gravação de áudio multipista na Música, com compensação de latência",
+     "descricao": "Para a guitarra DI do teste de metal: armar faixas, escolher a entrada e o canal da interface, monitorar direto ou pelo software, punch-in e punch-out, takes com comping e compensação de latência de ida e volta medida.",
+     "prioridade": "essencial",
+     "complexidade": "G",
+     "depende_de": [
+      "INT-01"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "getUserMedia com echoCancellation, noiseSuppression e autoGainControl desligados e channelCount pedido, e captura por AudioWorklet (o mesmo de INT-01) gravando WAV de 24 bits ou float em midia/ pelo IPC que já existe (ipc-gravacao.ts). Latência: um teste de loopback (pulso de saída e detecção na entrada) guarda o offset por dispositivo e o desconta do clipe. O Chromium não expõe mais de 2 canais de entrada em toda interface, e isso não foi medido. Interface com 8 ou mais entradas leva a INT-07."
+    },
+    {
+     "id": "INT-06",
+     "item": "Escolha da saída de áudio, buffer e relatório de latência",
+     "descricao": "Escolher o dispositivo de saída, o tamanho do buffer (latencyHint) e mostrar a latência real, como faz a página Audio Settings do FL, até onde o navegador permite.",
+     "prioridade": "importante",
+     "complexidade": "P",
+     "depende_de": [
+      "INT-01"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "AudioContext.setSinkId (Chromium 110 em diante; o Electron 42 tem) com a lista de enumerateDevices, latencyHint numérico (por exemplo 0,005 s) e a exibição de baseLatency + outputLatency. O Chromium usa WASAPI compartilhado no Windows, Core Audio no Mac e Pulse/PipeWire no Linux, então quantum e latência ficam por conta do sistema. Documentar o limite: tipicamente de 10 a 30 ms no Windows, não medido aqui."
+    },
+    {
+     "id": "INT-07",
+     "item": "Drivers de baixa latência e E/S multicanal (ASIO, WASAPI exclusivo, JACK, Core Audio com buffer pequeno)",
+     "descricao": "Interfaces de áudio profissionais com 64 a 256 amostras de buffer, mais de 2 entradas e saídas e monitoramento da guitarra pelo amp sim sem atraso perceptível. O FL oferece ASIO do fabricante, ASIO4ALL, FL Studio ASIO e Core Audio.",
+     "prioridade": "importante",
+     "complexidade": "GG",
+     "depende_de": [
+      "INT-01"
+     ],
+     "exige_rever_D1": true,
+     "abordagem": "Um processo auxiliar nativo de áudio (executável separado, não addon no main nem no renderer em sandbox), em Rust com cpal (Apache-2.0/MIT) ou em C/C++ com miniaudio (domínio público/MIT-0), RtAudio (licença tipo MIT) ou PortAudio (MIT). Ele roda o mesmo DSP compilado para WASM (wasmtime ou wasm3) ou recebe blocos por memória compartilhada. Licença: o SDK ASIO hoje é GPLv3 ou a licença proprietária da Steinberg. Como o Estúdio não é GPL, precisa do acordo proprietário (gratuito, com assinatura) ou ficar sem ASIO e usar WASAPI exclusivo. No Mac também exige assinar e notarizar o binário. Também sai o determinismo garantido da D1 na escuta ao vivo, mas não no render, que pode continuar sendo o do TS/WASM."
+    },
+    {
+     "id": "INT-08",
+     "item": "Formato de plugin da casa em WASM (dentro da D1)",
+     "descricao": "Um jeito de pôr no motor DSP de terceiros e open source (amp sim, cabinet por IR, distorção, reverb melhor, sampler SFZ) que roda igual na janela, no worker, no main e no MCP stdio. É o caminho mais curto para o teste de metal sem rever a D1.",
+     "prioridade": "importante",
+     "complexidade": "G",
+     "depende_de": [
+      "INT-01"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "Uma interface mínima própria (init(taxa), process(bloco de entradas e saídas), parâmetros declarados, estado serializável em JSON), com módulos .wasm empacotados no app. Em Node e no navegador o WASM escalar é determinístico, desde que se evite relaxed SIMD e se fixem as constantes de desnormais. Fontes de DSP: Faust (o código gerado não herda a GPL do compilador; conferir a licença de cada biblioteca .lib usada), NeuralAmpModelerCore (MIT) para amp de guitarra por modelo neural e sfizz (o motor SFZ, BSD-2-Clause, a conferir) compilado com emscripten. O WAM 2.0 serve de referência de API, mas WAM é feito para o AudioWorklet do navegador e não roda direto no Node, então convém um formato próprio ou um adaptador."
+    },
+    {
+     "id": "INT-09",
+     "item": "Hospedagem de plugins nativos VST3 e CLAP (e AU no macOS)",
+     "descricao": "O FL vive do ecossistema de plugins: varredura, carregamento, interface gráfica do plugin, estado salvo no projeto, automação de parâmetros, compensação de latência (PDC), multi-saída, sidechain e ponte em processo separado. Sem isso o Estúdio não se compara a uma DAW comercial. VST2 fica de fora: o SDK foi descontinuado e não entra na licença MIT do VST3.",
+     "prioridade": "essencial",
+     "complexidade": "GG",
+     "depende_de": [
+      "INT-01",
+      "INT-07"
+     ],
+     "exige_rever_D1": true,
+     "abordagem": "1. Um executável 'plugin-host' por plataforma, fora do Electron, com um processo por plugin ou por grupo para que um plugin que trave não derrube o app (o FL avisa dos travamentos da ponte). Bibliotecas: CLAP SDK (MIT), VST3 SDK (MIT desde a 3.8, outubro de 2025) e, em Rust, clack (MIT/Apache) e o crate vst3. Evitar o JUCE (AGPLv3 ou licença comercial) salvo com licença comprada. O Carla (GPL-2+) só como programa à parte e com parecer. 2. A varredura roda em processo isolado com lista negra e cache. 3. O áudio vai por memória compartilhada (ring buffer sem lock) e o controle por pipe nomeado ou socket local, com o main supervisionando como já faz com o pty (docs/arquitetura.md, seção 2). 4. A interface gráfica do plugin é uma janela nativa do próprio auxiliar. Reparentar dentro da BrowserWindow (getNativeWindowHandle) é frágil. 5. O estado vai como chunk em base64 no documento e o render offline passa pelo mesmo auxiliar, que o MCP stdio também consegue subir. Plugins não são determinísticos, então para o vídeo e para a paridade vale 'congelar' (freeze) a faixa num WAV. 6. Mac: entitlement com.apple.security.cs.disable-library-validation no auxiliar, notarização e varredura dos .component e .vst3. 7. O renderer continua em sandbox e só vê a lista e os parâmetros pelo IPC."
+    },
+    {
+     "id": "INT-10",
+     "item": "Navegador de samples, kits acústicos e formatos SFZ/SF2",
+     "descricao": "Para a bateria acústica do teste: um navegador com prévia, busca e tags, detecção de BPM e tom e arrastar para um canal. Ler WAV, AIFF, FLAC, OGG, MP3, SFZ e, de preferência, SF2. Pôr kits livres de verdade no catálogo de KITS, que hoje só tem o eletrônico.",
+     "prioridade": "essencial",
+     "complexidade": "G",
+     "depende_de": [
+      "INT-08"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "Reaproveitar o padrão de pasta_trilhas e biblioteca-musicas.ts para uma pasta de samples com índice em .estudio/. A decodificação usa o ffmpeg que já existe (no worker ou no main) ou decodeAudioData. O SFZ vai pelo sfizz em WASM (INT-08) ou por um leitor TS próprio dos opcodes principais (regiões, camadas de velocidade, round robin, grupos de corte). Kits candidatos: DrumGizmo DRSKit e MuldjordKit em porte SFZ (CC-BY-4.0, que pede crédito e já cabe na classe 'credito' de musica-licencas.ts); confirmar se o DRSKit tem restrição além da CC-BY. Os kits são baixados sob demanda e ficam fora do instalador, porque têm centenas de MB. O sampler em si é de outra área."
+    },
+    {
+     "id": "INT-11",
+     "item": "Conformidade de licenças para plugins, presets e conteúdo de terceiros",
+     "descricao": "Estender o comprovante de licenças a plugins, presets, IRs de gabinete, modelos NAM e samples, e gerar os avisos de terceiros (third-party notices) no instalador para tudo que for embutido.",
+     "prioridade": "importante",
+     "complexidade": "M",
+     "depende_de": [],
+     "exige_rever_D1": false,
+     "abordagem": "Novos tipos em SomUsado (musica-licencas.ts:22): 'plugin', 'preset', 'amostra' e 'modelo'. Plugin nativo de terceiros não contamina a licença do áudio que ele produz, mas os samples e presets embutidos nele podem ter licença própria, então isso fica como campo declarado. Gerar um SBOM e um NOTICE no build com license-checker ou equivalente. Regra explícita: nada GPL dentro do bundle ou do WASM do app enquanto o Estúdio não for GPL."
+    },
+    {
+     "id": "INT-12",
+     "item": "Plugins livres prontos para oferecer (Surge XT, Vital, LSP, Dragonfly, NAM, Guitarix)",
+     "descricao": "Oferecer de saída um sintetizador sério, reverbs e um amp sim de guitarra, que são as peças que faltaram no teste de metal.",
+     "prioridade": "importante",
+     "complexidade": "M",
+     "depende_de": [
+      "INT-09",
+      "INT-11"
+     ],
+     "exige_rever_D1": true,
+     "abordagem": "Licenças (conhecimento prévio; conferir cada repositório antes de qualquer decisão): Surge XT GPL-3.0, Vital GPL-3.0 com nome e presets de fábrica protegidos (o fork Vitalium não usa a marca), LSP Plugins LGPL-3.0, Dragonfly Reverb GPL-3.0, Guitarix GPL e NeuralAmpModelerCore MIT. Com o Estúdio fechado, os GPL não podem ser embutidos no app nem compilados para o WASM dele. O caminho seguro é o app oferecer 'baixar e instalar' o binário oficial (agregação, com o código-fonte disponível) e hospedá-lo por INT-09, o que exige a D1 revista. Sem rever a D1: só os MIT ou BSD (NAM, sfizz) e DSP próprio ou em Faust via INT-08. O LSP (LGPL) no WASM do app exige permitir relink, o que na prática pede um módulo .wasm separado e substituível; ainda assim, pedir parecer."
+    },
+    {
+     "id": "INT-13",
+     "item": "Formatos de troca: DAWproject, importação de stems, MP3, FLAC, outras taxas e float",
+     "descricao": "Levar o projeto para Bitwig, Studio One e Cubase e trazer de volta (o FL não tem DAWproject, então seria vantagem). Importar uma pasta de stems alinhados no zero. Exportar MP3 e FLAC, 44,1, 88,2 e 96 kHz e WAV float de 32 bits. Hoje são só WAV de 24 bits, M4A e Opus a 48 kHz.",
+     "prioridade": "importante",
+     "complexidade": "M",
+     "depende_de": [],
+     "exige_rever_D1": false,
+     "abordagem": "DAWproject é um ZIP com project.xml e metadata.xml mais os áudios (a especificação está aberta no GitHub da Bitwig; conferir a licença do repositório). Mapear canais e padrões para Tracks, Lanes e Clips, com plugins como referência opaca. Stems vão como clipes de áudio em canais novos (o modelo já tem clipes com corte e ganho). MP3 e FLAC: conferir os codificadores do ffmpeg do Remotion, que é enxuto (docs/audio.md:129). Se faltarem, libFLAC em WASM (BSD) e LAME em WASM (LGPL, num módulo separado). Taxa: reamostrar na entrega (sinc própria) mantendo os 48 kHz internos. AAF/OMF ficam para depois, porque o FL também não tem."
+    },
+    {
+     "id": "INT-14",
+     "item": "Importação de projetos .flp",
+     "descricao": "Ajuda quem vem do FL: canais, padrões, playlist e notas. Plugins nativos do FL não têm equivalente.",
+     "prioridade": "desejavel",
+     "complexidade": "G",
+     "depende_de": [
+      "INT-13"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "O formato não tem documentação oficial. O PyFLP (GPL-3.0) serve só de referência de leitura, sem copiar código. O valor real são as notas, os padrões, o BPM e os áudios, e para isso o MIDI já cobre parte."
+    },
+    {
+     "id": "INT-15",
+     "item": "Superfícies de controle com script (equivalente aos scripts Python de controlador do FL)",
+     "descricao": "Mapeamentos prontos para controladores populares (pads, faders, transporte, LEDs de retorno), escritos de forma declarativa.",
+     "prioridade": "desejavel",
+     "complexidade": "M",
+     "depende_de": [
+      "INT-02",
+      "INT-03",
+      "INT-04"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "Um perfil JSON por controlador (entradas para ações ou parâmetros e feedback por MIDI Out) carregado na janela. Evitar código arbitrário. Se for preciso script, rodar num Worker sem acesso a nada além de uma API de ações que reaproveite as ações do MCP (musica-acoes.ts)."
+    },
+    {
+     "id": "INT-16",
+     "item": "Controle remoto pela rede (equivalente ao Image-Line Remote) e OSC",
+     "descricao": "Transporte, mixer e pads num celular ou tablet na mesma rede.",
+     "prioridade": "desejavel",
+     "complexidade": "M",
+     "depende_de": [
+      "INT-03"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "Uma página web servida pelo main numa porta própria, ligada à LAN só se a pessoa ativar, com token e pareamento por QR, falando por WebSocket (o ws já é dependência). Hoje tudo escuta em 127.0.0.1 (docs/arquitetura.md), então abrir para a rede é decisão de segurança. OSC por UDP pelo dgram do main é JS puro."
+    },
+    {
+     "id": "INT-17",
+     "item": "Ableton Link",
+     "descricao": "Sincroniza tempo e fase com Live, Bitwig e apps de celular pela rede. O FL não tem (são só pedidos no fórum), então seria um diferencial, não uma lacuna em relação ao FL.",
+     "prioridade": "desejavel",
+     "complexidade": "M",
+     "depende_de": [
+      "INT-01"
+     ],
+     "exige_rever_D1": true,
+     "abordagem": "A biblioteca oficial é GPLv2+ ou proprietária, e para o Estúdio fechado precisa da licença comercial da Ableton (pedido por link-devs@ableton.com). Com isso, um addon nativo ou o auxiliar de INT-07. Reimplementar o protocolo em TS no main (dgram multicast) evita código nativo, mas a situação legal e de compatibilidade é incerta e exige parecer antes."
+    },
+    {
+     "id": "INT-18",
+     "item": "Expressão por nota (MPE)",
+     "descricao": "Pitch bend, pressão e timbre por nota, para controladores MPE (Roli, Linnstrument, Osmose). O FL também não tem nativo, pelo que se vê no fórum, mas é preparo para o futuro.",
+     "prioridade": "desejavel",
+     "complexidade": "M",
+     "depende_de": [
+      "INT-02"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "Curvas opcionais por nota em NotaMusica (bend, pressao, timbre), alocação de canais MPE na entrada (zona inferior, canais de 2 a 16) e export MIDI com MPE. Os sintetizadores da casa precisam ler as curvas (outra área)."
+    },
+    {
+     "id": "INT-19",
+     "item": "Estúdio como plugin VST3/CLAP ou ReWire dentro de outras DAWs",
+     "descricao": "O FL faz isso como VST e AU. O ReWire morreu: o FL tirou o suporte na versão 20.7.",
+     "prioridade": "desejavel",
+     "complexidade": "GG",
+     "depende_de": [
+      "INT-09"
+     ],
+     "exige_rever_D1": true,
+     "abordagem": "Não fazer ReWire. Se for preciso, um plugin CLAP ou VST3 fino (MIT) que conversa com o Estúdio aberto por memória compartilhada, no mesmo desenho do auxiliar de INT-09. Custo alto para pouco ganho no uso atual."
+    },
+    {
+     "id": "INT-20",
+     "item": "Biblioteca de conteúdo online com licença (equivalente aos sons do FL Cloud)",
+     "descricao": "Buscar e baixar samples e loops dentro do app, com a licença capturada no projeto automaticamente.",
+     "prioridade": "desejavel",
+     "complexidade": "M",
+     "depende_de": [
+      "INT-10",
+      "INT-11"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "Integrar a API do Freesound, onde cada som tem licença CC0, CC-BY ou CC-BY-NC. Filtrar o NC por padrão e gravar em doc.licencas com autor e link. Conferir os termos da API (chave por app, possível restrição de uso comercial; incerto). Pacotes curados próprios (como docs/musicas-livres.md) vão por download sob demanda."
+    },
+    {
+     "id": "INT-21",
+     "item": "Separação de stems por IA",
+     "descricao": "Separar vocal, bateria, baixo e outros de um áudio importado, como o FL faz desde a versão 21.2.",
+     "prioridade": "desejavel",
+     "complexidade": "G",
+     "depende_de": [
+      "INT-13"
+     ],
+     "exige_rever_D1": false,
+     "abordagem": "O onnxruntime-web já está no package.json. Usar um modelo Demucs ou HTDemucs (código MIT; conferir a licença dos pesos) exportado para ONNX, baixado sob demanda (de 80 a 300 MB), rodando no worker por blocos. Os stems viram clipes por INT-13. Sobrepõe-se à área de IA."
+    }
+   ],
+   "riscos": [
+    "A D1 é o divisor. Dá para fazer sem revê-la: AudioWorklet (INT-01), Web MIDI (INT-02 a INT-04), gravação e saída pelo navegador (INT-05 e INT-06), plugins próprios em WASM (INT-08), samples e SFZ (INT-10) e troca de formatos (INT-13). Exigem revê-la: ASIO e E/S profissional (INT-07), VST3, CLAP e AU (INT-09), plugins GPL de terceiros (INT-12), Ableton Link (INT-17) e o Estúdio como plugin (INT-19). Para manter a promessa de 'render idêntico amostra a amostra', proponho: o render que vai para o vídeo e o MCP stdio usa só o motor TS/WASM, e faixas com plugin nativo entram por freeze (WAV congelado, com a chave do plugin e do estado).",
+    "Licenças: o Estúdio é privado (package.json com private, sem LICENSE). Embutir Surge XT, Vital, Dragonfly ou Guitarix (GPL-3) no app ou no WASM dele obriga a liberar o app sob GPL ao distribuir o instalador. O ASIO SDK é GPLv3 ou proprietário. O Ableton Link é GPLv2+ ou comercial. O JUCE é AGPLv3 ou comercial. As licenças MIT ou BSD seguras para embutir: VST3 SDK (desde 3.8), CLAP, NeuralAmpModelerCore, cpal, miniaudio, PortAudio, RtMidi e, a conferir, o sfizz.",
+    "Segurança: plugins nativos rodam com todos os privilégios do usuário e fora da sandbox do Electron. Precisam de processo separado, supervisão e, no Mac, da entitlement disable-library-validation, o que enfraquece o hardened runtime só no auxiliar. Abrir controle remoto na LAN (INT-16) tira o app do 127.0.0.1.",
+    "Latência pelo Chromium: o WASAPI compartilhado no Windows não foi medido aqui. Pode não servir para monitorar guitarra por amp sim em software com a sensação de uma DAW com ASIO. Medir antes de decidir sobre INT-07.",
+    "Tempo real em JS: coleta de lixo e trabalho na thread do AudioWorklet podem causar estalos. O DSP em tempo real precisa ficar sem alocação (buffers pré-alocados), e o caminho por SharedArrayBuffer exige COOP/COEP na janela, o que pode afetar o servidor de mídia e as fontes do Google no CSP atual.",
+    "Incertezas sobre o FL: MPE, Ableton Link, DAWproject e AAF parecem ausentes (pedidos no fórum e nenhuma página oficial), mas não há negação oficial. A API Python de scripts e os formatos exatos de exportação não foram conferidos página a página nesta pesquisa."
+   ],
+   "fontes": [
+    "https://www.image-line.com/fl-studio-learning-content/fl-studio-online-manual/html/plugins_supported.htm",
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/plugins/wrapper.htm",
+    "https://www.image-line.com/support/flstudio_online_manual/html/app_plugin.htm",
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/envsettings_audio.htm",
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/envsettings_midi.htm",
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/automation_linking.htm",
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/rewire.htm",
+    "https://www.image-line.com/support/flstudio_online_manual/html/il_remote.htm",
+    "https://forum.image-line.com/viewtopic.php?p=1863571 (pedido de Ableton Link)",
+    "https://forum.image-line.com/viewtopic.php?p=2030818 (pedido de MPE)",
+    "https://www.image-line.com/fl-studio-news/fl-studio-2025-2",
+    "https://www.image-line.com/fl-studio-learning-content/fl-studio-online-manual/html/basics_new_25.htm",
+    "https://musictech.net/reviews/digital-audio-workstations/fl-studio-21-2-review/",
+    "https://pyflp.readthedocs.io/en/latest/reference/plugins/vst.html",
+    "https://steinbergmedia.github.io/vst3_dev_portal/pages/VST+3+Licensing/VST3+License",
+    "https://librearts.org/2025/11/steinberg-relicenses-vst3-and-asio/",
+    "https://www.bitwig.com/stories/transferring-projects-between-bitwig-studio-and-other-daws-333",
+    "https://github.com/ircam-ismm/node-web-audio-api",
+    "https://github.com/webaudiomodules/api",
+    "https://sfzinstruments.github.io/drums",
+    "https://github.com/sfzinstruments/DrumGizmo.MuldjordKit",
+    "https://tracker.debian.org/media/packages/a/ableton-link/copyright-3.1.2dfsg-1",
+    "Código local: /home/laures/Projects/estudio/docs/musica.md, /home/laures/Projects/estudio/docs/audio.md, /home/laures/Projects/estudio/docs/arquitetura.md, /home/laures/Projects/estudio/src/main/janela-segura.ts, /home/laures/Projects/estudio/src/main/main.ts, /home/laures/Projects/estudio/src/renderer/modulos/musica/motor.ts, /home/laures/Projects/estudio/src/renderer/modulos/video/gravador.ts, /home/laures/Projects/estudio/src/nucleo/musica-som.ts, /home/laures/Projects/estudio/src/nucleo/musica-licencas.ts, /home/laures/Projects/estudio/src/nucleo/musica.ts, /home/laures/Projects/estudio/src/nucleo/midi.ts, /home/laures/Projects/estudio/index.html"
+   ]
+  },
+  {
+   "area": "motor-desempenho (arquitetura do motor de áudio: tempo real vs. offline, AudioWorklet/Worker, WASM, polifonia, latência, multicore, freeze/bounce, cache, determinismo, memória)",
+   "fl_studio": [
+    {
+     "feature": "Motor de mixagem em tempo real com buffer configurável",
+     "descricao": "Audio Settings: Device, Buffer Length (troca latência por tolerância a picos de CPU), Status com a latência total de saída incluindo plugins, Triple buffer (menos underruns perto de 100% de CPU, latência cerca de 2x), Mix in buffer switch (ASIO, menos latência). No Windows usa ASIO (FL Studio ASIO próprio, ou ASIO do fabricante); no macOS, Core Audio com dispositivos agregados. Fonte: manual oficial, envsettings_audio.htm."
+    },
+    {
+     "feature": "Thread de áudio com prioridade e proteção contra sobrecarga",
+     "descricao": "Audio Processing Thread: Priority, Safe overloads (baixa a prioridade do mixer na sobrecarga para a interface não travar) e contador de Underruns."
+    },
+    {
+     "feature": "Multicore",
+     "descricao": "CPU: Multithreaded generator processing (instrumentos em vários núcleos) e Multithreaded mixer processing (efeitos e mixer em vários núcleos). Por plugin, o wrapper tem 'Allow threaded processing', que alguns plugins de terceiros pedem desligado."
+    },
+    {
+     "feature": "Smart disable",
+     "descricao": "Para de processar o plugin enquanto ele está inativo ou em silêncio. Liga no geral (Audio Settings) e por plugin (wrapper), e há uma macro para todos os plugins. O manual avisa que pode cortar efeitos de cauda longa ou baseados em envelope ou tempo."
+    },
+    {
+     "feature": "Compensação de atraso de plugin (PDC)",
+     "descricao": "PDC automática por faixa do mixer, que segue a latência informada pelo plugin, mais um ajuste manual somado à automática. Há um offset permanente no wrapper para plugin que informa a latência errada, e a opção 'Compensate automations'. Com o PDC desligado numa faixa, o monitoramento não espera, mas o render aplica a compensação. A compensação de latência da entrada de áudio (gravação) é uma opção separada, no menu do Mixer."
+    },
+    {
+     "feature": "Rastreamento e offset do cursor",
+     "descricao": "Playback tracking source (Driver, Hybrid ou Mixer) e Offset global para alinhar o cursor e a posição de gravação."
+    },
+    {
+     "feature": "Qualidade ao vivo x render",
+     "descricao": "Interpolação de reamostragem ao vivo configurável (Linear até sinc de 512 pontos; o padrão é 24 pontos). No render há uma configuração separada (Linear, Hermite de 6 pontos, sinc de 16 a 512 pontos), 'HQ for all plugins' e 'Disable maximum polyphony'. O render não é em tempo real e o manual diz que costuma ter qualidade maior que o som ao vivo."
+    },
+    {
+     "feature": "Polifonia por canal",
+     "descricao": "Max polyphony e Mono nas configurações diversas do canal; no render, a opção 'Disable maximum polyphony' ignora o máximo, mas respeita o Mono."
+    },
+    {
+     "feature": "Opções de compatibilidade do wrapper de plugins",
+     "descricao": "Use fixed size buffers, Process maximum size buffers, Allow threaded processing, Smart disable e execução 'bridged' (o plugin num processo separado). Os nomes mudam um pouco entre versões do manual (incerteza)."
+    },
+    {
+     "feature": "Consolidar e renderizar no lugar (equivalente a freeze)",
+     "descricao": "O FL não tem um botão 'Freeze' com esse nome, segundo um guia de terceiros (incerto). O que existe é Consolidate: renderiza o padrão, o clipe ou a faixa do mixer ('Consolidate this track', 'From track start') em áudio e libera a CPU. Também exporta 'Split mixer tracks' (um WAV por faixa) com cauda Leave, Wrap ou Cut. A referência oficial completa de Consolidate não foi conferida."
+    },
+    {
+     "feature": "Exportação",
+     "descricao": "WAV (16 int, 24 int, 32 float), MP3, OGG, FLAC, M4A e MIDI; dither de 32 para 16 bits; render minimizado em segundo plano."
+    },
+    {
+     "feature": "Reset plugins on transport / Play truncated notes",
+     "descricao": "Zera o estado dos plugins ao dar play ou parar, para a reprodução ficar consistente, e toca as notas que começaram antes do ponto de play."
+    }
+   ],
+   "estudio_ja_tem": [
+    {
+     "item": "Motor DSP próprio em TypeScript puro que renderiza a MÚSICA INTEIRA em buffers Float32 do tamanho da duração (não por blocos). Cada canal gera L/R de n amostras, e a mixagem soma tudo.",
+     "arquivos": "src/nucleo/musica-som.ts (renderizarMusica, renderBateria, renderSintetizador, renderAudio)"
+    },
+    {
+     "item": "Prévia offline: o Web Worker refaz o render e devolve o buffer estéreo inteiro; a janela cria um AudioBuffer e toca com AudioBufferSourceNode. Quando o documento muda, o worker refaz o que mudou e a reprodução reinicia na mesma posição. Não há grafo Web Audio de verdade nem processamento em tempo real.",
+     "arquivos": "src/renderer/modulos/musica/render.worker.ts, src/renderer/modulos/musica/motor.ts (preparar, tocar, retomar)"
+    },
+    {
+     "item": "Determinismo: ruído com semente (mulberry32), sem Math.random, a mesma conta na janela (worker), no processo principal e no MCP por stdio. O stdio roda o próprio Electron com ELECTRON_RUN_AS_NODE=1, então o V8 é o mesmo. Há testes que comparam byte a byte o render da janela com o do processo.",
+     "arquivos": "src/nucleo/musica-som.ts (geradorDe), src/nucleo/ide.ts:65-73, src/main/musica-render.ts, testes/musica-janela.test.ts"
+    },
+    {
+     "item": "Cache em memória em três camadas (canal seco, faixa processada, retorno de reverb ou delay), mais as batidas de bateria por (peça, afinação, semente, taxa). Cada render remove do cache o que não usou. Medido no docs/musica.md: 60 s com 3 canais levam 1,1 s a frio, 0,16 a 0,8 s para mudar um volume e 1,0 s para uma nota nova; o processo ocupou 414 MB.",
+     "arquivos": "src/nucleo/musica-som.ts (CacheSom, doCache, chaveDoCanal), docs/musica.md seção O som"
+    },
+    {
+     "item": "Medidores calculados offline (pico a cada 50 ms por faixa e no master), lidos na posição do cursor, não ao vivo.",
+     "arquivos": "render.worker.ts (picos, NiveisSom), motor.ts (nivelEm)"
+    },
+    {
+     "item": "Render para o vídeo e exportação (WAV 16 ou 24 bits, M4A e Opus pelo ffmpeg do Remotion, stems, alvo de loudness com pico verdadeiro). Saem pelo worker da janela pela ponte ou, sem janela, no processo; o render fica guardado em disco pelo hash do documento (midia/musica/<id>.<código>.wav).",
+     "arquivos": "src/main/musica-render.ts, src/nucleo/musica-entrega.ts, src/main/ponte-janela.ts"
+    },
+    {
+     "item": "Taxa fixa de 48 kHz. Reamostragem por interpolação linear (naTaxa) ou pelo ffmpeg ao decodificar no processo.",
+     "arquivos": "src/nucleo/musica-som.ts (TAXA_MUSICA, naTaxa), src/main/musica-render.ts (decodificarParaMusica)"
+    },
+    {
+     "item": "Efeitos escritos para o buffer inteiro: compressor de alimentação direta, EQ biquad RBJ, Freeverb, delay e um limitador que usa a 'frente' do buffer (look-ahead de 1,5 ms sem custo de latência, porque o futuro já é conhecido).",
+     "arquivos": "src/nucleo/musica-som.ts (comprimir, reverberar, atrasar, limitarNoLugar)"
+    },
+    {
+     "item": "Prévia de nota e batida ao clicar: sintetiza a nota inteira na thread da janela e toca como buffer. Não há instrumento vivo com voz sustentada nem note-off real.",
+     "arquivos": "motor.ts (tocarNota, tocarBatida)"
+    },
+    {
+     "item": "Gravação de microfone (narração) com ScriptProcessorNode, porque o AudioWorklet foi evitado por causa do CSP script-src 'self'. A latência de monitoramento não foi medida.",
+     "arquivos": "docs/audio.md:332-353, src/renderer/modulos/video/gravador.ts, src/nucleo/gravacao.ts"
+    },
+    {
+     "item": "Já há precedente de processamento em pedaços com resultado igual ao de uma vez só: a medição de envelope ocupou 94 MB contra 845 MB inteira.",
+     "arquivos": "docs/audio.md:365-370, src/main/ipc-audio.ts"
+    },
+    {
+     "item": "Já existe um proposta de orçamento de memória para notebook de 8 GB, com tetos por estado e Workers no renderer.",
+     "arquivos": "docs/desempenho.md"
+    }
+   ],
+   "lacunas": [
+    {
+     "id": "MD1",
+     "item": "Motor por blocos (streaming) com grafo de processadores",
+     "descricao": "Hoje cada etapa aloca e processa a música inteira (n = duração x 48000). Sem processadores com estado que rodam bloco a bloco (process(entrada, saída, 128 ou 512 amostras)), não há tempo real, PDC, automação de qualquer parâmetro nem plugins pesados. É a base de quase todo o resto.",
+     "prioridade": "essencial",
+     "complexidade": "GG",
+     "abordagem": "Reescrever musica-som.ts como um grafo: nós (gerador, efeito, bus, envio, master) com interface process(bloco) e estado explícito (filtros, linhas de atraso, envelopes de voz). Um agendador de eventos converte notas, clipes e automação em eventos com offset dentro do bloco. Fixar um tamanho de bloco canônico (por exemplo 128) no render offline. Manter o motor atual como oráculo de teste durante a migração: o render por blocos deve bater com ele em toda conta linear e ficar dentro de uma tolerância medida no compressor e no limitador, que mudam de algoritmo (o look-ahead vira latência). Continua dentro da D1: é TypeScript ou WASM puro, roda no Node e no navegador.",
+     "depende_de": [],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "MD2",
+     "item": "Reprodução em tempo real em AudioWorklet (transporte vivo)",
+     "descricao": "Hoje qualquer mudança refaz o render (de 0,16 s a mais de 1 s para 60 s com 3 canais; para 5 min com 30 faixas e distorção, a estimativa é de dezenas de segundos) e reinicia o buffer. Mexer num knob tocando, tocar teclado MIDI, fazer scrub ou gravar não funcionam.",
+     "prioridade": "essencial",
+     "complexidade": "G",
+     "abordagem": "Um AudioWorkletProcessor roda o grafo do MD1. O documento chega por MessagePort (diffs) e os parâmetros por SharedArrayBuffer sem bloqueio. O CSP 'self' não impede: o Vite emite o módulo do worklet como arquivo próprio (audioWorklet.addModule(new URL('./motor.worklet.ts', import.meta.url))), o mesmo caminho dos workers que já existem. Medidores ao vivo voltam pelo SAB. O render offline do worker e do Node usa o mesmo grafo fora do worklet.",
+     "depende_de": [
+      "MD1"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "MD3",
+     "item": "Núcleo DSP compilado para WASM (com SIMD), compartilhado entre worklet, worker e Node",
+     "descricao": "O TypeScript não sustenta dezenas de faixas com amp-sim, oversampling e convolução em tempo real. Além disso, a determinismo de Math.sin, exp e pow depende da versão do V8 (hoje é a mesma, porque o stdio usa o Electron, mas uma atualização do Electron pode mudar o som).",
+     "prioridade": "importante",
+     "complexidade": "G",
+     "abordagem": "Rust para wasm32 (crates MIT ou Apache: fundsp, dasp, realfft ou rustfft) ou Faust gerando C++ ou Rust. O código gerado pelo Faust pode ter licença própria; as bibliotecas do Faust têm licenças variadas por arquivo, então é preciso conferir cada uma. O mesmo .wasm roda no AudioWorklet, no Worker e no Node, com aritmética IEEE determinística (sem relaxed-simd; o SIMD128 padrão não tem FMA não determinístico) e funções matemáticas compiladas junto, sem depender do V8. Elementary Audio (núcleo MIT, incerteza sobre a versão atual da licença) serve para o grafo declarativo, mas o renderer offline em Node dele usa um addon (conferir). Evitar RNBO: a licença de exportação para uso comercial é da Cycling '74 (termos não conferidos). O build ganha um passo (cargo e wasm-pack) e o binário vai embutido no instalador.",
+     "depende_de": [
+      "MD1"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "MD4",
+     "item": "Compensação automática de atraso (PDC)",
+     "descricao": "Limitador com look-ahead, oversampling com filtros de fase linear, convolução particionada e qualquer plugin de terceiros introduzem latência. Sem PDC, as faixas e o sidechain saem desalinhados. Hoje o limitador 'olha o futuro' porque tem o buffer inteiro; no motor por blocos ele ganha latência.",
+     "prioridade": "essencial",
+     "complexidade": "M",
+     "abordagem": "Cada nó informa a própria latência; o grafo calcula a latência acumulada por caminho e insere atrasos nos ramos curtos (faixas, envios aos retornos, sidechain por áudio), além de deslocar a automação (como o 'Compensate automations' do FL). Ajuste manual por faixa. No render offline, compensa removendo as amostras iniciais.",
+     "depende_de": [
+      "MD1"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "MD5",
+     "item": "Entrada de áudio, monitoramento e gravação com latência baixa e compensada",
+     "descricao": "Para o teste de metal: gravar guitarra DI e ouvir o amp-sim enquanto toca. Hoje só há gravação de narração por ScriptProcessorNode (obsoleto), sem monitoramento por efeito e sem medida de latência. No Chromium não há ASIO nem modo exclusivo: no Windows é WASAPI compartilhado e, no Linux, PulseAudio ou PipeWire. Pelos relatos, a latência de ida e volta costuma ficar entre 20 e 40 ms ou mais, o que é ruim para tocar guitarra (inferência, medir).",
+     "prioridade": "essencial",
+     "complexidade": "G",
+     "abordagem": "Dentro da D1: getUserMedia com echoCancellation, noiseSuppression e autoGainControl desligados, um MediaStreamSource no mesmo AudioWorklet do MD2, AudioContext com latencyHint 0, e baseLatency e outputLatency mostrados. Medir a ida e volta com um loopback (pulso) e compensar a posição das tomadas gravadas; trocar o ScriptProcessorNode do gravador pelo worklet. Para menos de 10 ms com interface de áudio no Windows é preciso E/S nativa (addon com RtAudio, MIT, ou PortAudio, MIT; ASIO pede o SDK da Steinberg, que tem licença própria), num utilityProcess ligado ao motor WASM por memória compartilhada. Esse caminho exige rever a D1.",
+     "depende_de": [
+      "MD2",
+      "MD4"
+     ],
+     "exige_rever_D1": true
+    },
+    {
+     "id": "MD6",
+     "item": "Orçamento de memória e cache em disco (o cache atual não escala)",
+     "descricao": "Cálculo, não medido: uma camada estéreo Float32 de 5 min a 48 kHz ocupa cerca de 115 MB. O cache guarda o canal seco e a faixa processada, ou seja, cerca de 230 MB por faixa. Com 24 faixas são mais de 5 GB, além da mistura, dos retornos, da cópia transferida e do AudioBuffer na janela. Isso estoura o alvo de notebook de 8 GB do docs/desempenho.md. Bibliotecas de bateria acústica multiamostradas ocupam de centenas de MB a GB.",
+     "prioridade": "essencial",
+     "complexidade": "G",
+     "abordagem": "Com o MD1, o tempo real não guarda a música inteira na RAM. Os renders congelados (MD7) vão para disco: WAV ou float32 bruto em midia/musica/cache, com chave pelo hash do subgrafo da faixa, lidos em streaming por janelas (no Node, fs.read; na janela, pelo servidor de mídia com Range ou por OPFS). O sampler carrega só o início de cada amostra (pré-carga de 64 KB, como os samplers de disco) e lê o resto em streaming; amostras de 16 ou 24 bits ficam inteiras na memória e só viram float ao tocar. LRU com teto de MB configurável e medido no teste de desempenho.",
+     "depende_de": [
+      "MD1"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "MD7",
+     "item": "Freeze, bounce e consolidar faixa e trecho (renderizar no lugar)",
+     "descricao": "Não existe freeze por faixa. O cache em RAM faz algo parecido, mas é invisível, volátil e preso à música inteira. É preciso congelar uma faixa pesada (amp-sim mais oversampling), renderizar seleção ou padrão para clipe de áudio e descongelar.",
+     "prioridade": "importante",
+     "complexidade": "M",
+     "abordagem": "Uma operação no documento (faixa.congelada = {arquivo, hash}): o motor offline renderiza o subgrafo da faixa (até o fader, ou antes dele, à escolha) para WAV em disco, e o tempo real toca o arquivo em vez do grafo. O hash invalida o freeze sozinho. Expor no MCP (congelar_faixa, consolidar). Reaproveitar o código de stems do musica-entrega.ts. Cauda: deixar, cortar ou dar a volta, como o FL.",
+     "depende_de": [
+      "MD1",
+      "MD6"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "MD8",
+     "item": "Multicore: processamento paralelo de faixas",
+     "descricao": "Hoje todo o som roda numa thread (o worker) e o AudioWorklet também é uma thread só. Dezenas de faixas com efeitos pesados não cabem num núcleo.",
+     "prioridade": "importante",
+     "complexidade": "G",
+     "abordagem": "Pool de Workers com WASM threads mais SharedArrayBuffer e Atomics. As faixas sem entrada ao vivo são renderizadas por antecipação (como o 'anticipative FX' do Reaper), algumas centenas de ms à frente, em anéis de memória compartilhada; o worklet só mistura e roda as faixas armadas ou monitoradas. No offline e no Node, worker_threads renderizam faixas em paralelo e somam em ordem fixa, para manter o resultado bit a bit. Pede crossOriginIsolated na janela (COOP/COEP pelos cabeçalhos da sessão do Electron); o servidor de mídia e o Player do Remotion precisam de CORP ou credentialless (risco).",
+     "depende_de": [
+      "MD1",
+      "MD2",
+      "MD3"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "MD9",
+     "item": "Polifonia, alocação de vozes e instrumento ao vivo",
+     "descricao": "Hoje cada nota é um Float32Array sintetizado inteiro e somado. Não há limite de vozes, roubo de voz, mono, legato, portamento, note-off vivo nem round-robin, o que é necessário para sampler de bateria acústica e de guitarra e para tocar com teclado MIDI.",
+     "prioridade": "essencial",
+     "complexidade": "M",
+     "abordagem": "Um alocador de vozes por instrumento no grafo do MD1 (máximo de polifonia, roubo da mais antiga ou da mais baixa, mono e legato, grupos de corte já existentes, como o chimbal), mais um round-robin e camadas de força com semente determinística. No offline, opção de ignorar o máximo de polifonia, como o 'Disable maximum polyphony' do FL.",
+     "depende_de": [
+      "MD1"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "MD10",
+     "item": "Automação de qualquer parâmetro, suave e com precisão de amostra",
+     "descricao": "Hoje só o volume (por faixa e no master) tem automação. Tremolo picking, filtros, wah, envios e parâmetros de plugin precisam de automação por bloco ou por amostra, sem zipper noise.",
+     "prioridade": "essencial",
+     "complexidade": "M",
+     "abordagem": "Parâmetros com rampa (linear ou exponencial) por bloco e subdivisão no ponto do evento. As curvas ficam no documento, como hoje (ganhoDaAutomacao generalizado). No tempo real, o ganho pelo SAB; no offline, a mesma curva e o mesmo resultado. O PDC desloca a automação.",
+     "depende_de": [
+      "MD1",
+      "MD4"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "MD11",
+     "item": "Oversampling e modo de qualidade separado para render",
+     "descricao": "Distorção pesada (guitarras de metal) sem oversampling gera aliasing audível. O FL separa a qualidade ao vivo e a do render (interpolação, 'HQ for all plugins').",
+     "prioridade": "importante",
+     "complexidade": "M",
+     "abordagem": "Oversampling de 2x a 8x por nó, com filtros polifásicos half-band (IIR de fase mínima ao vivo e FIR de fase linear no render, com a latência informada ao PDC), escrito no núcleo WASM. A chave 'qualidade' faz parte do hash do render: a prévia pode usar uma qualidade mais baixa, mas o render canônico (vídeo, exportação, MCP) usa sempre a mesma.",
+     "depende_de": [
+      "MD3",
+      "MD4"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "MD12",
+     "item": "Convolução particionada (IR de gabinete e reverb por convolução)",
+     "descricao": "O amp-sim de guitarra depende de IR de gabinete. O ConvolverNode do Web Audio não existe no Node nem no MCP stdio e não garante o mesmo resultado entre processos, então não serve ao modelo de determinismo.",
+     "prioridade": "essencial",
+     "complexidade": "M",
+     "abordagem": "Convolução particionada uniforme (ou não uniforme, para IRs longas de reverb) em WASM, com FFT de licença compatível: rustfft ou realfft (MIT ou Apache) ou PFFFT (licença do tipo BSD). Sem latência extra com partição direta no primeiro bloco; os IRs carregados com licença registrada (o musica-licencas.ts já existe).",
+     "depende_de": [
+      "MD3",
+      "MD1"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "MD13",
+     "item": "Hospedar plugins de terceiros (VST3, CLAP) com ponte de processo",
+     "descricao": "Um 'FL completo' inclui hospedar VST. Isso fere diretamente a D1 e a garantia de render igual na janela, no processo e no MCP: plugins de terceiros não são determinísticos, nem todos rodam sem interface e não existem no MCP stdio em outra máquina.",
+     "prioridade": "importante",
+     "complexidade": "GG",
+     "abordagem": "Se a D1 for revista: um processo host nativo separado (utilityProcess mais um addon em C++; o SDK do VST3 é dual, GPLv3 ou proprietário da Steinberg, e o CLAP é MIT, o que favorece começar por CLAP), com áudio por memória compartilhada em blocos e o PDC do MD4. O render de um projeto com plugin nativo é marcado 'não reproduzível' e pode ser congelado (MD7) para voltar a ser determinístico. Dentro da D1, a alternativa é o padrão Web Audio Modules 2.0 (plugins web em AudioWorklet; licença do SDK a conferir), que não roda no Node.",
+     "depende_de": [
+      "MD1",
+      "MD4",
+      "MD7"
+     ],
+     "exige_rever_D1": true
+    },
+    {
+     "id": "MD14",
+     "item": "Controle de carga: medidor de CPU, underruns, buffer configurável, smart disable",
+     "descricao": "Não há medida de carga do áudio nem contador de underruns; não há escolha de latência nem desligamento automático de nós em silêncio.",
+     "prioridade": "importante",
+     "complexidade": "M",
+     "abordagem": "O worklet mede o tempo por bloco em relação ao orçamento (128 / 48000 s) e publica a carga e os underruns (detectados pelo currentTime e pela fila do anel) via SAB, também pelo MCP (estado_motor). Configurações: latencyHint, tamanho do anel do pré-render (equivalente ao triple buffer) e 'Safe overloads' (baixar a qualidade da prévia). Smart disable: o nó sem entrada e com cauda abaixo de -120 dB pula o process, com a cauda informada pelo próprio nó, para não cortar reverb e delay (o problema que o manual do FL aponta).",
+     "depende_de": [
+      "MD2"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "MD15",
+     "item": "Contrato de determinismo em duas classes e testes de referência",
+     "descricao": "Com tempo real, a prévia viva (knob mexido na hora, blocos variáveis, entrada de microfone) deixa de ser igual ao render. É preciso redefinir a garantia sem perdê-la onde importa: vídeo, exportação e MCP.",
+     "prioridade": "essencial",
+     "complexidade": "M",
+     "abordagem": "Render canônico: offline, bloco fixo, mesmo .wasm, sem relaxed-simd, denormais tratados igual (DC minúsculo ou zerar abaixo do limiar no próprio código, sem depender de FTZ), soma das faixas em ordem fixa mesmo no multicore. Testes com hash SHA-256 do PCM por documento de referência, na janela, no processo e no stdio. A prévia viva é declarada 'aproximada' e o 'tocar como no render' toca o canônico em cache.",
+     "depende_de": [
+      "MD1",
+      "MD3",
+      "MD8"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "MD16",
+     "item": "Render offline fora da janela, mais rápido que o tempo real, com progresso e cancelamento",
+     "descricao": "Hoje o render no processo principal ou no stdio roda no mesmo processo do MCP e bloqueia o event loop durante a conta inteira. Com projetos grandes, o MCP fica sem resposta.",
+     "prioridade": "importante",
+     "complexidade": "M",
+     "abordagem": "Render por blocos num worker_thread ou utilityProcess (o docs/desempenho.md já prevê um render-host), com progresso por bloco, cancelamento, stems em paralelo (MD8) e escrita em streaming direto para o WAV (sem a música inteira na RAM, como no envelope medido em pedaços).",
+     "depende_de": [
+      "MD1"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "MD17",
+     "item": "Reamostragem de qualidade (clipes, sampler com transposição, taxas diferentes de 48 kHz)",
+     "descricao": "O naTaxa usa interpolação linear; o FL vai de linear a sinc de 512 pontos. Um sampler de bateria e guitarra transpondo amostras com interpolação linear fica com aliasing e agudos abafados.",
+     "prioridade": "importante",
+     "complexidade": "M",
+     "abordagem": "Sinc com janela (Kaiser) em WASM, com mais pontos no render e menos ao vivo, ou portar o resampler do speexdsp (BSD) ou o libsamplerate (BSD-2 desde 2016) para WASM. Opcional: projeto em 44,1 ou 96 kHz, mantendo 48 kHz para o vídeo.",
+     "depende_de": [
+      "MD3"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "MD18",
+     "item": "Entrada MIDI ao vivo sincronizada ao relógio de áudio",
+     "descricao": "Tocar e gravar com teclado ou bateria eletrônica MIDI exige que o timestamp do evento chegue ao worklet alinhado ao currentTime, com jitter baixo.",
+     "prioridade": "importante",
+     "complexidade": "P",
+     "abordagem": "Web MIDI no renderer (o Electron precisa conceder a permissão midi), com o timestamp do evento convertido para o tempo do AudioContext e mandado ao worklet por um anel SAB com offset no bloco. Gravar com quantização opcional. Continua dentro da D1.",
+     "depende_de": [
+      "MD2"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "MD19",
+     "item": "Proteções do master e do grafo (NaN, DC, denormais, proteção de alto-falante)",
+     "descricao": "Com efeitos realimentados e plugins, um NaN ou uma explosão de feedback pode estourar os fones. O FL tem 'Hard-clip output at 0dB' na saída ao vivo.",
+     "prioridade": "desejavel",
+     "complexidade": "P",
+     "abordagem": "Detector de NaN e Inf por nó, que zera o estado e mostra um aviso; filtro de DC opcional; clip duro de segurança só na saída ao vivo (fora do render canônico).",
+     "depende_de": [
+      "MD2"
+     ],
+     "exige_rever_D1": false
+    }
+   ],
+   "fontes": [
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/envsettings_audio.htm (Audio Settings: buffer, triple buffer, multithreaded generator e mixer processing, smart disable, resampling, prioridade, safe overloads, underruns)",
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/fformats_save_export.htm (render: resampling, HQ for all plugins, disable max polyphony, split mixer tracks, tail, render não é em tempo real)",
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/mixer_trackprops.htm e mixer_mixermenu.htm (PDC automática e manual, compensate automations, latência da entrada; resumo pela busca, páginas não lidas por inteiro)",
+    "https://www.image-line.com/support/flstudio_online_manual/html/plugins/wrapper.htm (wrapper: smart disable, allow threaded processing, use fixed size buffers; resumo pela busca)",
+    "https://support.spitfireaudio.com/en/articles/11816169-how-to-freeze-tracks-in-fl-studio e forum.image-line.com (Consolidate como equivalente de freeze; não oficial, incerto)",
+    "Código local: /home/laures/Projects/estudio/src/nucleo/musica-som.ts, /home/laures/Projects/estudio/src/renderer/modulos/musica/render.worker.ts, /home/laures/Projects/estudio/src/renderer/modulos/musica/motor.ts, /home/laures/Projects/estudio/src/main/musica-render.ts, /home/laures/Projects/estudio/src/nucleo/ide.ts, /home/laures/Projects/estudio/docs/musica.md, /home/laures/Projects/estudio/docs/audio.md, /home/laures/Projects/estudio/docs/desempenho.md"
+   ],
+   "riscos": [
+    "O MD1 é uma reescrita do coração do motor e quebra os testes byte a byte atuais (testes/musica-janela.test.ts e outros). Mitigação: manter o motor atual como oráculo e migrar nó a nó; o compressor e o limitador mudam de algoritmo (o look-ahead vira latência) e precisam de uma tolerância nova, aprovada.",
+    "Memória: o modelo atual de buffer inteiro por camada é O(faixas x duração). O cálculo dá mais de 5 GB para 24 faixas de 5 min, o que inviabiliza o alvo de 8 GB do docs/desempenho.md antes mesmo de qualquer plugin pesado. É o gargalo mais imediato para o teste de metal.",
+    "SharedArrayBuffer e WASM threads exigem crossOriginIsolated (COOP/COEP). Isso pode quebrar o servidor de mídia local, iframes e o Player do Remotion na mesma janela, se não mandarem CORP ou usarem credentialless. É preciso testar antes de assumir o MD8.",
+    "Latência de entrada no Chromium sem ASIO ou modo exclusivo: monitorar guitarra pelo amp-sim pode ficar inaceitável no Windows. A única saída garantida (E/S nativa) exige rever a D1 e cria um caminho que o MCP stdio em outra máquina não reproduz.",
+    "Plugins de terceiros (VST3 ou CLAP) acabam com a garantia de render igual na janela, no processo e no MCP. Se a D1 for revista, o projeto com plugin nativo precisa ser congelado (freeze) para voltar a ser reproduzível, e o MCP sem a janela não consegue renderizá-lo.",
+    "Determinismo em JS hoje depende da versão do V8 (o stdio usa o mesmo binário do Electron, então está ok agora). Atualizar o Electron pode mudar Math.sin, exp e pow e, com isso, os hashes dos renders em disco. O WASM com matemática própria elimina esse risco; o relaxed-simd e o FMA reintroduzem.",
+    "A cadeia de build ganha Rust e wasm-pack (ou Faust): mais tempo de CI e mais tamanho de instalador. Conferir a licença por arquivo das bibliotecas do Faust e os termos do RNBO e do WAM antes de adotar (não verificado aqui).",
+    "As features do FL listadas sobre Consolidate e freeze e sobre os nomes exatos das opções do wrapper vieram em parte de fontes não oficiais e de várias versões do manual; os nomes podem variar por versão."
+   ]
+  },
+  {
+   "area": "fluxo-ia",
+   "fl_studio": [
+    {
+     "feature": "Browser (painel lateral)",
+     "descricao": "Árvore de pastas de samples, presets e projetos, com pré-escuta (preview) ao clicar, favoritos/tags e busca de arquivos configurável (manual, 'The Browser' e 'File Search & Browser Settings'). Detalhes de tags e Plugin Database: não confirmados nesta pesquisa (a página do manual retornou 404)."
+    },
+    {
+     "feature": "Histórico de undo no Browser",
+     "descricao": "A pasta 'Current project' do Browser lista o undo; clicar num item salta para aquele ponto; o número máximo de passos é configurável em General settings (manual oficial)."
+    },
+    {
+     "feature": "Autosave e backups",
+     "descricao": "Autosave grava cópias do projeto numa pasta Backup do Browser (de nunca a cada 5 min; em 5 min também antes de operações arriscadas); 'Revert to last backup' no menu File. Notas de 13/07/2026 permitem limitar a contagem de backups a 1."
+    },
+    {
+     "feature": "Templates de projeto",
+     "descricao": "File > Save as template, pasta Templates em User data, e template padrão escolhido em General settings."
+    },
+    {
+     "feature": "FL Cloud: backup de projeto",
+     "descricao": "FL Studio 2026 traz backup de projeto na nuvem redesenhado (FLEX/Cloud backup); salvar e subir para FL Cloud, opcional a cada save. Fontes secundárias (imprensa)."
+    },
+    {
+     "feature": "FL Cloud: stem separation",
+     "descricao": "Desde o 21.2 (2023): separa em vocais, música, baixo e bateria; um post de fórum (informal, jul/2026) diz que é opcional, baseado em Demucs treinado de novo pela Image-Line. Qualidade varia, com artefatos."
+    },
+    {
+     "feature": "FL Cloud: AI mastering",
+     "descricao": "Masterização com detecção automática de gênero (ou escolha manual); camada gratuita com gênero padrão; assinatura citada a US$ 7,99/mês (fonte secundária)."
+    },
+    {
+     "feature": "Gopher (assistente IA)",
+     "descricao": "2025: chat treinado no manual e base de conhecimento. 2026: executa ações no projeto (organizar tracks, roteamento do mixer, volume, gerar scripts de Piano Roll e VFX por linguagem natural). Segundo uma fonte, NÃO gera curvas de automação, não coloca notas individuais e não navega presets de terceiros. Incluído sem custo extra. Fontes de imprensa; o release note oficial não foi aberto."
+    },
+    {
+     "feature": "Loop Starter / Loop Starter expandido",
+     "descricao": "Gerador de pontos de partida (loops) citado como expandido no 2026 (fonte de imprensa; escopo exato incerto)."
+    },
+    {
+     "feature": "Janelas: Channel Rack, Playlist, Mixer, Piano roll",
+     "descricao": "Janelas flutuantes/encaixáveis, múltiplas ao mesmo tempo, atalhos F5-F9 para alternar, Picker panel, layouts de tela por projeto e multi-monitor. Do conhecimento geral do produto; não reconferido no manual nesta rodada (incerteza)."
+    },
+    {
+     "feature": "Atalhos e personalização",
+     "descricao": "Atalhos de teclado extensos e rebind pelo menu Options; Piano roll com ferramentas e scripts em Python (Piano Roll scripting). Conhecimento geral, não reconferido."
+    },
+    {
+     "feature": "Versões do projeto",
+     "descricao": "Salvar com numeração incremental (Ctrl+Shift+S 'save new version'), arquivos .flp e .zip com samples ('Save as zipped loops' / 'Export project data files'); conhecimento geral, incerto na redação exata."
+    },
+    {
+     "feature": "Tutoriais",
+     "descricao": "Manual online, dicas contextuais (hint bar), vídeos e projetos de exemplo ('Projects' > Templates/Examples); Gopher como suporte. Conhecimento geral."
+    }
+   ],
+   "estudio_ja_tem": [
+    {
+     "item": "Ctrl+Z na Música e diário JSON Patch com Reverter; Histórico agrupado por transição; cancelar-e-desfazer a transição",
+     "arquivos": "docs/musica.md (seção Como se chega, O contrato da transição); src/nucleo/musica-acoes.ts; src/nucleo/documentos.ts"
+    },
+    {
+     "item": "Ferramentas MCP de Música (15): ler_musica, arranjar, medir_musica, por_no_video, levar_para, concluir/cancelar_transicao, trocar_kit, criar_padrao, escrever_notas, editar_notas (quantizar/transpor/humanizar/etc.), aplicar_progressao, gerar_notas (baixo/arpejo/acordes), encaixar_no_video, exportar_musica, importar_midi, licencas_do_projeto; patch descrito para o mixer",
+     "arquivos": "src/nucleo/mcp-musica.ts; docs/musica.md (Ferramentas MCP)"
+    },
+    {
+     "item": "Geração por regras: 6 estilos de bateria (basico, pop, eletronico, dembow, trap, calmo), baixo/arpejo/acordes sobre faixa de acordes, teoria (tom, escala maior/menor, acordes, cifras)",
+     "arquivos": "src/nucleo/musica-estilos.ts; src/nucleo/musica-teoria.ts; src/nucleo/musica-acoes.ts"
+    },
+    {
+     "item": "Modelos de projeto: vazio, batida, trilha_video, efeito_sonoro",
+     "arquivos": "src/nucleo/musica-modelos.ts"
+    },
+    {
+     "item": "Presets de faixa (Limpo, Bateria, Baixo, Pad, Lead, Cama, Voz) e presets de sintetizador com macros",
+     "arquivos": "src/nucleo/musica.ts (PRESETS_FAIXA); src/renderer/modulos/musica/Inspector.tsx"
+    },
+    {
+     "item": "Medição de loudness (LUFS integrado, true peak, por faixa) e export com alvo de loudness (padrão -14 LUFS, -1 dBTP), stems, MIDI",
+     "arquivos": "src/nucleo/loudness.ts; src/nucleo/musica-entrega.ts; docs/musica.md (Exportar)"
+    },
+    {
+     "item": "Pasta de trilhas e músicas livres com fichas de licença (CC0/CC BY), créditos, licenças do projeto",
+     "arquivos": "src/nucleo/biblioteca-musicas.ts; src/nucleo/pasta-trilhas.ts; src/nucleo/musica-licencas.ts; docs/musicas-livres.md; docs/audio.md"
+    },
+    {
+     "item": "IA no app: painel do Claude em todas as áreas, narração por IA, limpeza de voz, remover fundo",
+     "arquivos": "docs/ia.md; docs/narracao.md; src/nucleo/limpeza-voz.ts; src/nucleo/remover-fundo.ts; src/nucleo/mcp-ia.ts"
+    },
+    {
+     "item": "Atalhos da Música (Espaço, S, Delete, L, Home, Ctrl+Z, teclas do piano roll, teclado musical no piano roll) e zoom",
+     "arquivos": "docs/musica.md; src/renderer/modulos/musica/PianoRoll.tsx; src/renderer/modulos/musica/acoes.ts"
+    },
+    {
+     "item": "Layout fixo da Música: arranjo, inspetor, piano roll (aba Passos), mixer, monitor do vídeo",
+     "arquivos": "src/renderer/modulos/musica/Arranjo.tsx; Inspector.tsx; Monitor.tsx; paineis.tsx"
+    },
+    {
+     "item": "Importação MIDI e roteiro de verificação manual (20 minutos)",
+     "arquivos": "src/nucleo/musica-midi.ts; docs/musica.md"
+    }
+   ],
+   "lacunas": [
+    {
+     "id": "FI-01",
+     "item": "Ferramentas MCP de composição por gênero e de guitarra/riff",
+     "descricao": "Hoje gerar_notas só faz baixo/arpejo/acordes e criar_padrao só 6 estilos de bateria pop/eletrônica. Faltam: riff (palm-mute, tremolo picking, power chords por graus), blast beat, double-bass, breakdown/polirritmia, escalas além de maior/menor (frígio, harmônica menor, menor natural/ dórico, cromática), compassos ímpares e subdivisões (7/8, 5/4, 15/16) para estilo Meshuggah, solo (frases, bends via pitch), e estruturas de música (intro/verso/breakdown/solo/outro).",
+     "prioridade": "essencial",
+     "complexidade": "G",
+     "abordagem": "Estender musica-estilos.ts e musica-teoria.ts (escalas e modos, acordes de potência), adicionar ferramentas gerar_riff, gerar_bateria (estilo metal: blast, d-beat, half-time, breakdown) e gerar_estrutura, todas determinísticas por semente (mesmo padrão de gerar_notas) e gravando pelo diário. A IA compõe de fato pelo escrever_notas; as geradoras servem de andaime. Exige que o motor tenha instrumentos adequados (guitarra, bateria acústica), tratados por outras áreas.",
+     "depende_de": [
+      "FI-05"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "FI-02",
+     "item": "Mix e master assistidos pelo Claude (e referência de loudness/espectro)",
+     "descricao": "medir_musica entrega só LUFS e pico. Faltam: análise espectral por faixa (bandas, mascaramento, correlação de fase, crest factor, faixa dinâmica LRA), comparação com faixa de referência (carregar áudio e comparar curva de EQ média, LUFS, largura), sugestão de EQ/compressor, e um master automático (EQ, multibanda, limitador). Gopher do FL também só faz volume/roteamento; o master por IA do FL é no FL Cloud.",
+     "prioridade": "importante",
+     "complexidade": "G",
+     "abordagem": "Novas ferramentas medir_espectro (FFT em núcleo puro, reaproveitando loudness.ts e o render offline determinístico), comparar_referencia e sugerir_mix (heurística com regras + a IA decide e aplica via patch no mixer). Master: cadeia pronta (preset de master) usando os blocos de outra área (EQ/multibanda/limitador). Tudo roda no mesmo motor e sem rede; mantém D1.",
+     "depende_de": [
+      "FI-05"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "FI-03",
+     "item": "Separação de stems por IA",
+     "descricao": "O FL oferece stem separation (4 stems, Demucs treinado de novo, via FL Cloud/download opcional). O Estúdio não tem. Útil para extrair referência, remixar, tirar voz.",
+     "prioridade": "desejavel",
+     "complexidade": "G",
+     "abordagem": "Demucs (MIT, Meta) ou Open-Unmix (MIT); rodar via onnxruntime-node (MIT) ou onnxruntime-web/WebGPU em processo separado, com download opcional do modelo (pesos htdemucs são MIT, mas conferir). Pesado: não precisa de nativo próprio, mas onnxruntime-node é binário nativo para o processo principal. Isso NÃO afeta o motor de render; é ferramenta offline que produz arquivos de áudio, então D1 vale para o motor de síntese e mixagem, não para esse recurso. Ainda assim, registrar a exceção em docs/arquitetura.md.",
+     "depende_de": [],
+     "exige_rever_D1": true
+    },
+    {
+     "id": "FI-04",
+     "item": "Geração de áudio por IA (texto para música/amostra)",
+     "descricao": "Não existe no FL (Gopher não gera áudio; FL Cloud tem Loop Starter e samples). Para o Estúdio seria opcional: gerar texturas, loops, vocais. Licenças: MusicGen/Stable Audio Open têm termos restritivos de uso comercial (pesos MusicGen em CC-BY-NC; Stable Audio Open com licença própria da Stability, com limite de receita; confirmar), então não são seguros por padrão.",
+     "prioridade": "desejavel",
+     "complexidade": "GG",
+     "abordagem": "Tratar como plugin de fonte externa (API do usuário ou modelo local) e nunca como padrão do motor; registrar licença de cada saída em musica-licencas.ts (já existe campo de licença por áudio) e bloquear 'publicar' se o modelo for não comercial. Recomendado adiar; a prioridade do dono (metal instrumental) se resolve melhor com síntese/sampler mais composição pela IA.",
+     "depende_de": [
+      "FI-08"
+     ],
+     "exige_rever_D1": true
+    },
+    {
+     "id": "FI-05",
+     "item": "Escuta e verificação pelo Claude (feedback de áudio)",
+     "descricao": "O Claude não ouve. Para compor e mixar bem ele precisa de proxies: espectrograma, piano roll textual, medições por trecho, detecção de clipping, transientes, comparação A/B com referência. Hoje só há ler_musica (eventos) e medir_musica.",
+     "prioridade": "essencial",
+     "complexidade": "M",
+     "abordagem": "Ferramentas analisar_trecho (LUFS curto prazo, centroide, energia por banda, picos, silêncio), espectrograma/forma de onda como imagem PNG devolvida ao Claude (já há png.ts e a tela de preview mcp-previa), e verificar_musica (avisos: notas fora da escala, sobreposição, clipping, graves em fase). Usa o render offline idêntico.",
+     "depende_de": [],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "FI-06",
+     "item": "Browser de samples/presets/projetos com pré-escuta",
+     "descricao": "O FL tem Browser lateral com pastas, pré-escuta, favoritos e busca. O Estúdio só tem lista de trilhas em pasta (listar_trilhas) e presets em menus do inspetor. Faltam: painel Browser na Música, preview ao clicar (reproduz no AudioContext), busca por nome/tag/BPM/tom, arrastar para o arranjo ou para um canal de sampler, e listagem de presets de faixa/sintetizador/kits.",
+     "prioridade": "importante",
+     "complexidade": "M",
+     "abordagem": "Novo painel React em src/renderer/modulos/musica/ lendo um índice (nome, duração, BPM, tom, tags, licença) montado por varredura no processo principal e cache em JSON (modelo igual ao da pasta de trilhas e fichas). Prévia por AudioBufferSourceNode simples fora do motor de render. MCP: listar_biblioteca/buscar_samples/preview (a IA lê metadados, não escuta).",
+     "depende_de": [
+      "FI-07"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "FI-07",
+     "item": "Sampler e importação de pacotes de samples/kits (base do Browser)",
+     "descricao": "Sem sampler, o Browser não tem o que carregar. Pertence a outra área (som), mas o fluxo depende dele; fichas de licença por sample reutilizam o sistema atual.",
+     "prioridade": "essencial",
+     "complexidade": "G",
+     "abordagem": "Definido pela área de motor/instrumentos; aqui só garantir o contrato: arquivo + ficha + hash, igual a biblioteca-musicas.ts.",
+     "depende_de": [],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "FI-08",
+     "item": "Plugins de terceiros (VST/CLAP) e Plugin Database",
+     "descricao": "O FL tem Plugin Database, gestão de presets de plugin e wrapper. D1 proíbe VST e módulo nativo. A alternativa é o formato próprio de plugin/efeito em TypeScript/WASM.",
+     "prioridade": "desejavel",
+     "complexidade": "GG",
+     "abordagem": "Manter D1 e oferecer um formato de efeito/instrumento próprio (TS puro ou WASM determinístico, com manifesto e licença) carregável da pasta do usuário. Hospedar VST/CLAP exigiria rever D1 e quebraria o render idêntico (e o MCP stdio); só se o dono decidir explicitamente.",
+     "depende_de": [],
+     "exige_rever_D1": true
+    },
+    {
+     "id": "FI-09",
+     "item": "Templates de projeto de gênero e salvar como template",
+     "descricao": "Há só 4 modelos (vazio, batida, trilha_video, efeito_sonoro), sem Save as template do usuário nem pasta de templates. Faltam modelos por gênero (metal black/death, rock, lo-fi, EDM, hip-hop) com canais, mixer, presets e estrutura prontos, e um fluxo 'salvar como modelo'.",
+     "prioridade": "importante",
+     "complexidade": "M",
+     "abordagem": "Estender musica-modelos.ts (montagem por edições) e permitir templates do usuário como arquivos musica/*.json numa pasta de modelos (já há pasta-modelos.ts, para outra área). Ferramentas MCP salvar_como_modelo e listar_modelos; levar_para já aceita 'modelo'.",
+     "depende_de": [
+      "FI-01"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "FI-10",
+     "item": "Histórico de undo navegável, versões nomeadas e autosave/backup",
+     "descricao": "O Estúdio tem Ctrl+Z, diário com Reverter e histórico por transição, mas não exibe um painel de histórico navegável na Música com salto para um ponto, nem versões nomeadas/snapshots do projeto musical, nem 'reverter para o último backup'. O FL oferece lista de undo no Browser, autosave em Backup e save-new-version.",
+     "prioridade": "importante",
+     "complexidade": "M",
+     "abordagem": "Reaproveitar o diário JSON Patch (a seq de cada entrada já existe): painel Histórico com rótulo por edição e botão 'voltar a este ponto'; snapshots nomeados = marcar seq + cópia do JSON em musica/versoes/; ferramenta MCP criar_versao/restaurar_versao. Confirmar no código o limite e a retenção do diário (não verificado).",
+     "depende_de": [],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "FI-11",
+     "item": "Layout de janelas (Channel Rack, Playlist, Mixer, Piano roll simultâneos)",
+     "descricao": "O FL tem janelas flutuantes/encaixáveis e múltiplas ao mesmo tempo. A Música tem layout fixo (arranjo, inspetor, abas Passos/mixer). Faltam um Channel Rack real (lista de canais com pads/steps, mute/solo, grade de passos), painéis acopláveis, divisores ajustáveis e layouts salvos por projeto.",
+     "prioridade": "importante",
+     "complexidade": "G",
+     "abordagem": "Biblioteca de docking em React com licença permissiva (dockview, MIT, ou rc-dock, MIT; golden-layout, MIT) guardando o layout em preferências; criar o componente Channel Rack (grade de step sequencer sobre os padrões existentes, estado.ts já tem a seleção). Sem impacto no motor.",
+     "depende_de": [],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "FI-12",
+     "item": "Atalhos configuráveis e paleta de comandos",
+     "descricao": "Os atalhos da Música são fixos (documentados) e não há rebind, nem lista de atalhos pesquisável, nem paleta de comandos.",
+     "prioridade": "desejavel",
+     "complexidade": "M",
+     "abordagem": "Registro central de comandos (id, nome, atalho padrão) em src/renderer; mapa de rebind em preferencias-arquivo.ts; paleta Ctrl+K com busca. Os mesmos ids de comando podem ser expostos ao MCP.",
+     "depende_de": [],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "FI-13",
+     "item": "Tutoriais e ajuda dentro do app para música",
+     "descricao": "Existe roteiro de verificação de 20 minutos (para o responsável) e primeiros-passos geral (src/nucleo/primeiros-passos.ts), mas nada de tutorial guiado da Música, dicas contextuais ou projetos de exemplo por gênero. O FL tem manual, hint bar, exemplos e Gopher.",
+     "prioridade": "desejavel",
+     "complexidade": "M",
+     "abordagem": "Tours curtos por área (passos ancorados em elementos), projetos de exemplo em exemplos/ por gênero, e um assistente de ajuda que o próprio Claude do painel responde lendo docs/musica.md (RAG simples sobre os docs, como o Gopher sobre o manual).",
+     "depende_de": [
+      "FI-09"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "FI-14",
+     "item": "Automação geral e edição por IA além do volume",
+     "descricao": "A IA escreve automação só por patch (volume). FL automatiza qualquer parâmetro e o Gopher não cria curvas (limite do concorrente). Para metal e produção em geral, é preciso automação de filtro, ganho, pan, parâmetros de efeito e do sintetizador, via ferramenta MCP dedicada.",
+     "prioridade": "importante",
+     "complexidade": "M",
+     "abordagem": "Generalizar automacoes (hoje só volume) para qualquer parâmetro endereçável por caminho JSON; ferramenta MCP automatizar com pontos/curvas e formas (rampa, LFO) e evolução no render. Mexe no motor (área motor/mixer), no contrato do documento (versionar o esquema).",
+     "depende_de": [],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "FI-15",
+     "item": "Gravação/importação e edição de áudio (guitarra DI, voz) com IA assistida",
+     "descricao": "Importa clipe de áudio (waveform, fade, ganho), mas sem gravação multi-faixa, comping, afinação/tempo (time-stretch, pitch shift) nem edição de transientes; essencial para guitarra DI real e reamp.",
+     "prioridade": "importante",
+     "complexidade": "G",
+     "abordagem": "Gravação via MediaRecorder/AudioWorklet na janela (já existe gravação de narração: src/nucleo/gravacao.ts); time-stretch com Rubber Band (GPL, incompatível a menos que se use a licença comercial) ou SoundTouch (LGPL) ou signalsmith-stretch (MIT) em WASM determinístico. Esse último é o mais seguro em licença.",
+     "depende_de": [],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "FI-16",
+     "item": "Referência de MIDI e partitura para IA (importar tablatura/MusicXML, exportar notação)",
+     "descricao": "MIDI importa/exporta; sem tablatura, Guitar Pro ou MusicXML, que são o formato comum do metal e permitem a IA ler riffs existentes. O FL não tem isso nativamente (incerteza: só MIDI); seria diferencial.",
+     "prioridade": "desejavel",
+     "complexidade": "M",
+     "abordagem": "Leitor Guitar Pro (.gp5/.gpx) via alphaTab (MPL-2.0, compatível como dependência) e MusicXML por parser próprio; converter para padrões existentes. Sem impacto no motor.",
+     "depende_de": [],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "FI-17",
+     "item": "Gopher-equivalente: assistente de uso e ações na UI",
+     "descricao": "O painel do Claude já age por MCP com o mesmo conjunto de edições. Falta cobertura de ações de UI/mixer pelas ferramentas (criar canal de sintetizador direto, rotear faixa, agrupar/bus, renomear, cores), pois há só patch descrito para o mixer.",
+     "prioridade": "importante",
+     "complexidade": "M",
+     "abordagem": "Ferramentas MCP de mixer de alto nível (criar_faixa, rotear, criar_bus, aplicar_preset_faixa, definir_efeito) em cima do patch já existente, com validação de esquema; ficam como atalho tipado para a IA errar menos.",
+     "depende_de": [
+      "FI-14"
+     ],
+     "exige_rever_D1": false
+    },
+    {
+     "id": "FI-18",
+     "item": "Cloud/colaboração e backup",
+     "descricao": "FL Cloud: backup de projeto, samples e colaboração. O Estúdio é local e git-friendly (midia-git.ts). Backup em nuvem é fora de escopo agora.",
+     "prioridade": "desejavel",
+     "complexidade": "G",
+     "abordagem": "Usar git já presente (midia-git.ts) para versões e backup remoto opcional; nuvem própria não recomendada.",
+     "depende_de": [
+      "FI-10"
+     ],
+     "exige_rever_D1": false
+    }
+   ],
+   "riscos": [
+    "Quase todo o teste que falhou (metal com guitarra distorcida, bateria acústica, solos) depende das áreas de motor/instrumentos (distorção, amp sim, sampler, bateria acústica); as ferramentas MCP de composição (FI-01) são inúteis sem esses instrumentos para soar. Sequenciar depois.",
+    "O Claude não ouve: sem FI-05, a composição e a mixagem por IA serão cegas, só com métricas. Planejar proxies (espectrograma como imagem, medições) antes de prometer mix/master assistido.",
+    "Geração de áudio por IA e stems: licenças dos pesos (MusicGen NC; Stable Audio Open com licença própria; Demucs MIT) precisam de conferência direta nas fontes antes de adotar; não foram verificadas nesta rodada.",
+    "Pesquisa sobre o FL: o manual oficial retornou 404 em algumas páginas, e as capacidades do Gopher 2026 vêm de imprensa, não do release note oficial. Layout de janelas, atalhos e versionamento do FL vêm de conhecimento geral, marcados como incertos.",
+    "O limite e a retenção do diário (undo) e o comportamento de reverter não foram lidos no código (apenas na documentação): confirmar antes de implementar FI-10.",
+    "D1 só precisa ser revista para stems (FI-03, binário onnxruntime fora do render), geração de áudio por IA (FI-04) e plugins de terceiros (FI-08). O resto cabe em TypeScript puro e preserva o render idêntico."
+   ],
+   "fontes": [
+    "https://www.djmag.com/tech/fl-studio-adds-stem-separation-and-ai-mastering-new-beta",
+    "https://mixmag.net/read/fl-studio-21-2-available-download-ai-mastering-stem-separation-tech",
+    "https://www.musicradar.com/music-tech/fl-studio-2025-introduces-chatgpt-style-ai-assistant-that-offers-music-production-advice-and-helps-you-use-the-daw",
+    "https://www.musicradar.com/music-tech/you-can-now-control-fl-studio-with-an-ai-chatbot-from-inside-the-daw",
+    "https://www.aixploria.com/en/ai-radar/fl-studio-2026-gopher-ai-mixer-routing/",
+    "https://www.attackmagazine.com/news/fl-studio-2026-adds-redesigned-flex-cloud-backup-and-built-in-smart-assistance/",
+    "https://image-line.com/support/flstudio_online_manual/html/browser.htm",
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/envsettings_files.htm",
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/menu_file.htm",
+    "https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/envsettings_general.htm",
+    "https://forum.image-line.com/viewtopic.php?p=2067040",
+    "/home/laures/Projects/estudio/docs/musica.md",
+    "/home/laures/Projects/estudio/docs/audio.md",
+    "/home/laures/Projects/estudio/src/nucleo/mcp-musica.ts",
+    "/home/laures/Projects/estudio/src/nucleo/musica-estilos.ts",
+    "/home/laures/Projects/estudio/src/nucleo/musica-modelos.ts",
+    "/home/laures/Projects/estudio/src/nucleo/musica-teoria.ts",
+    "/home/laures/Projects/estudio/src/nucleo/loudness.ts"
+   ]
+  }
+ ],
+ "critica": {
+  "faltando": [
+   {
+    "item": "Modelo de dados por canal/faixa para projeto como 'documento de sessão' (migração e versionamento de esquema)",
+    "area": "transversal (fundação)",
+    "prioridade": "essencial",
+    "complexidade": "M",
+    "abordagem": "Nenhuma área trata a migração de esquema como item próprio, embora EM-02/03, SEQ-01/02/10/11, INS-01 e FI-14 mudem o documento. Criar um item único: versão do esquema, migradores puros e idempotentes (resolverMusica), teste de 'documento antigo soa idêntico amostra a amostra', e um único endereçamento estável de parâmetros (faixa/efeito/param) compartilhado por automação, MIDI learn, MCP e UI."
+   },
+   {
+    "item": "Mapa de dependências e ordem de implementação entre as 5 áreas",
+    "area": "transversal",
+    "prioridade": "essencial",
+    "complexidade": "P",
+    "abordagem": "A base comum é: motor por blocos (EM-01 = MD1 = INT-01) -> instrumento genérico (INS-01) + NotaMusica estendida (SEQ-01) + endereço de parâmetro -> inserts/roteamento -> amp/IR/gate -> sampler/SFZ + bateria de metal -> riffs/MCP. Publicar como um grafo único para o dono decidir fases; o teste de metal exige a cadeia completa."
+   },
+   {
+    "item": "Mixagem de bateria multi-mic (close/overhead/room) com roteamento por mic",
+    "area": "efeitos-mixer + instrumentos",
+    "prioridade": "importante",
+    "complexidade": "M",
+    "abordagem": "Um instrumento de bateria com saída multicanal (uma saída por mic/peça) que vira várias faixas do mixer com bus de bateria; depende de EM-03 e INS-04. Hoje INS-04 fala em 'mics misturáveis' mas EM-03 não prevê saídas múltiplas por instrumento (multi-out), que o FL tem no Fruity Wrapper e no FPC."
+   },
+   {
+    "item": "Multi-saída de instrumento e entrada de sidechain por áudio no grafo",
+    "area": "efeitos-mixer / motor",
+    "prioridade": "importante",
+    "complexidade": "M",
+    "abordagem": "No grafo (MD1/EM-03) um nó pode ter N saídas e entradas auxiliares; sidechain por áudio é só um caso. Declarar na interface Processador (numEntradas, numSaidas)."
+   },
+   {
+    "item": "Arranjo: clipes de padrão com variações/compasso próprio e 'make unique' coerentes com mapa de tempo",
+    "area": "sequenciamento",
+    "prioridade": "importante",
+    "complexidade": "M",
+    "abordagem": "Já em SEQ-10/02 de forma dispersa; ligar explicitamente a polimetria do Meshuggah (padrão de 15/16 sobre compasso 4/4) exigindo padrões de comprimento arbitrário em passos e loop independente por canal (polirritmia, como o FL permite com padrões de tamanhos distintos)."
+   },
+   {
+    "item": "Mixer: grupos de faixa, VCA/macro-controle, cores/nomes, reordenação, faixa 'Current', seleção múltipla, travar/linkar faixas, A/B de master",
+    "area": "efeitos-mixer / UI",
+    "prioridade": "desejavel",
+    "complexidade": "M",
+    "abordagem": "Dados de UI no documento (cor, ordem, pasta/grupo) mais ação de lote no MCP. EM-20 cobre só presets/rack."
+   },
+   {
+    "item": "Biblioteca de loops/one-shots de partida (conteúdo próprio embarcado) e 'Loop Starter'",
+    "area": "conteúdo / fluxo-ia",
+    "prioridade": "importante",
+    "complexidade": "M",
+    "abordagem": "FI-06/INS-15/INT-20 tratam navegador e download, mas ninguém lista o conteúdo base distribuído com o app (kit de bateria acústica mínimo, IRs próprios, 10-20 presets). Produzir pacote CC0 próprio e versionado; o app não pode ser entregue sem som acústico. Ligar ao rastreador de licenças."
+   },
+   {
+    "item": "Notação/visualizações de composição: partitura/tablatura de leitura e editor de tablatura de guitarra",
+    "area": "sequenciamento / fluxo-ia",
+    "prioridade": "importante",
+    "complexidade": "G",
+    "abordagem": "FI-16 só cobre importar GP. Para metal, entrada por tablatura (corda/casa) mapeada para notas com afinação (drop C, 7/8 cordas, escala de 27\"), via alphaTab (MPL-2.0) para render e modelo 'afinação do instrumento' em INS-05/INS-07. Nenhuma área trata afinação customizada de guitarra (drop tuning, 7-8 cordas), essencial ao Meshuggah."
+   },
+   {
+    "item": "Afinação de instrumento e temperamento (drop tuning, 7/8 cordas, microtonal, A=440 ajustável)",
+    "area": "instrumentos / sequenciamento",
+    "prioridade": "importante",
+    "complexidade": "P",
+    "abordagem": "Campo 'afinacao' no canal de guitarra/baixo com offsets por corda e referência de A4; sem ele os riffs graves (F# em 8 cordas) não soam. Escalas Scala (.scl/.kbm) como desejável."
+   },
+   {
+    "item": "Tempo real: pitch bend/mod wheel/sustain e controle ao vivo do instrumento por teclado do PC e MIDI",
+    "area": "integracoes / instrumentos",
+    "prioridade": "importante",
+    "complexidade": "M",
+    "abordagem": "INT-02 liga MIDI, mas depende de um instrumento com voz viva (MD9/INS-01). Consolidar: SEQ-17 + INT-02 + MD9 como um bloco 'performance ao vivo'."
+   },
+   {
+    "item": "Teste de qualidade/aceitação sonora (suíte de referência e audição)",
+    "area": "qualidade",
+    "prioridade": "essencial",
+    "complexidade": "M",
+    "abordagem": "docs/musica.md admite que o som foi conferido só por medida. Criar suíte: renders de referência com hashes, análise espectral automática (FI-05) comparando com DI/reamp de referência, e roteiro de audição humana. Sem isso 'metal convincente' não é verificável."
+   },
+   {
+    "item": "Conversão de áudio para MIDI e detecção de acordes/tom/BPM",
+    "area": "sequenciamento / fluxo-ia",
+    "prioridade": "desejavel",
+    "complexidade": "G",
+    "abordagem": "SEQ-05/06 tocam em onsets e YIN, mas não polifônico. Basic Pitch (Spotify, Apache-2.0) via onnxruntime-web, já presente. Útil para transcrever riffs gravados."
+   },
+   {
+    "item": "Exportação/stems avançados: dither, formatos, estéreo-mid/side, render de seleção, normalização por stem, master 'dry/wet'",
+    "area": "integracoes",
+    "prioridade": "importante",
+    "complexidade": "P",
+    "abordagem": "Dither TPDF só aparece em EM-19; consolidar com INT-13 (taxas, float32, FLAC, MP3) numa tarefa única de 'entrega'. Confirmar que o ffmpeg do Remotion tem os codificadores antes."
+   },
+   {
+    "item": "Acessibilidade, latência de UI e desempenho de edição do piano roll com milhares de notas (metal tem 16avos/32avos a 200+ BPM)",
+    "area": "UI / desempenho",
+    "prioridade": "importante",
+    "complexidade": "M",
+    "abordagem": "PianoRoll.tsx tem 251 linhas em DOM/SVG provável; riffs de 4 min com 20 mil notas exigem canvas e virtualização (SEQ-07 menciona canvas, mas sem requisito de desempenho)."
+   },
+   {
+    "item": "Segurança e sandbox para módulos WASM/plugins próprios e modelos NAM/IR baixados",
+    "area": "integracoes / motor",
+    "prioridade": "importante",
+    "complexidade": "M",
+    "abordagem": "INT-08/INS-05/INS-15 baixam e executam binários e modelos de terceiros. Exigir hash assinado, execução em worker sem rede/fs, limites de memória/tempo e manifesto de licença. Hoje só há menção a licença."
+   }
+  ],
+  "duplicadas": [
+   "Motor por blocos: EM-01 (efeitos-mixer), MD1 (motor-desempenho) e INT-01 (integracoes) descrevem o mesmo trabalho; SEQ-18 e MD2/EM-11 repetem a prévia em AudioWorklet. Unificar num item único dono do motor (MD1/MD2), as demais áreas só dependem dele.",
+   "Hospedar VST3/CLAP: INS-20, EM-25, SEQ-19, INT-09, MD13 e FI-08 (6 cópias). Deve ser uma única decisão (ADR sobre revisão da D1), com INT-09 como dono; também INT-12 e INT-19 derivam dela.",
+   "Convolução/IR de gabinete: EM-05 e MD12 (e parte de INS-05). Um dono: EM-05; MD12 só entra como 'implementação em WASM'.",
+   "Amp sim / distorção / oversampling: EM-04, INS-05 (cadeia de amp) e MD11 (oversampling). Unificar num 'módulo de amp' com dono em EM-04; INS-05 fica só com a fonte de guitarra (Karplus-Strong) e articulações.",
+   "Automação de qualquer parâmetro: EM-09, SEQ-11, MD10, FI-14 e INT-03 (dependência). Um item só com endereço de parâmetro; SEQ-02 (tempo automatizável) fica separado.",
+   "Sampler/SFZ/SF2 e navegador de samples: INS-02/03/15, INT-10, FI-06/07, SEQ-15 (parte). Um dono (INS-03 para o formato; INS-15 para o navegador); FI-07 e INT-10 viram dependências.",
+   "Time-stretch/pitch/reamostragem: SEQ-04, EM-22, FI-15, MD17. Um dono (SEQ-04); signalsmith-stretch aparece em duas, mas SoundTouch/LGPL em outra: padronizar a recomendação.",
+   "Gravação de áudio e latência: SEQ-03, INT-05, MD5, FI-15 (parte). Um dono (INT-05).",
+   "PDC: EM-12 e MD4. Um dono (MD4/EM-12 unificado).",
+   "Freeze/bounce: EM-21, MD7, SEQ-10 (bounce) e SEQ-15. Um dono (MD7).",
+   "Memória/cache em disco: INS-16, MD6 e riscos de EM. Um dono (MD6).",
+   "Medidores/análise espectral: EM-10, FI-02 (medir_espectro) e FI-05 (analisar_trecho). Compartilhar a mesma FFT e o mesmo código no núcleo.",
+   "Mapa GM de bateria: INS-04 e SEQ-16. Um dono (INS-04).",
+   "Stems por IA: INT-21 e FI-03 (prioridades iguais, mas FI-03 marca exige_rever_D1=true e INT-21 false: inconsistente).",
+   "Web MIDI e Ableton Link/MPE: INT-18 vs SEQ-17 (campos por nota) sobrepõem-se parcialmente.",
+   "Teste de determinismo: riscos de EM, INS, MD15 e SEQ repetem o mesmo risco de V8/Math.sin; centralizar em MD15."
+  ],
+  "correcoes": [
+   "Verificado no repo: Web MIDI está de fato negada (src/main/janela-segura.ts:94-96 só libera media/áudio, clipboard e fullscreen). Confere com INT-02. Também confere private:true sem licença, electron 42.11.16, ws 8.21.0 e onnxruntime-web 1.30.0 (package.json).",
+   "TAXA_MUSICA = 48000 confere (musica-som.ts:10). O swing existe como comSwing (atraso de até 1/12 de batida, só semicolcheias do contratempo): SEQ-09 diz 'swing por canal' como lacuna, correto, mas o 'swing 0 a 1' global é limitado e mudar o BPM exige o mapa de tempo; vale mencionar.",
+   "Há um compressor com limiar_db em musica-som.ts:344, mas nenhum noise gate/expansor: EM-06 está correto. Não há nenhuma FFT em src/nucleo exceto limpeza-voz.ts: EM-05 e SEQ-05 ('FFT própria já existe? verificar') devem ser resolvidos: existe só em limpeza-voz.ts (STFT), não como módulo reutilizável; precisa extrair para um módulo comum antes de convolução/analisador.",
+   "musica-midi.ts lê o bpm do arquivo e só o primeiro vale (linhas 83, 99-104): SEQ-02 e INT confirmam; mas a exportação escreve um BPM só, então mapa de tempo também exige mudar o export.",
+   "INS-05 sugere 'neural-amp-modeler-wasm ... MIT' e INT-08/MD3 sugerem determinismo em WASM sem relaxed-SIMD: o NAM Core usa Eigen e funções transcendentais (tanh/exp) cujo resultado em WASM depende da libm compilada; a afirmação de 'idêntico amostra a amostra' é plausível no mesmo binário, mas o custo (RTF) de NAM em 4+ guitarras no render offline não foi medido; marcar como risco aberto e não como solução.",
+   "Prioridades: INT-09 (hospedar VST3/CLAP) está 'essencial' em integracoes mas 'importante'/'desejavel' em INS-20, EM-25, MD13, SEQ-19, FI-08. Inconsistente; para o objetivo do dono e dado D1, o correto é 'importante' com decisão de ADR, não essencial.",
+   "INS-16 (memória) e MD6 estão 'essencial' mas só INS-16 reconhece que o cálculo de 5 GB é crítico; MD6 deve ser pré-requisito de INS-04/INS-05, não paralelo.",
+   "SEQ-18 marca exige_rever_D1=true enquanto sua própria abordagem diz 'não exige módulo nativo' e INT-01/MD2/EM-11 marcam false para a mesma coisa. Corrigir para false e registrar apenas a mudança da garantia 'bit a bit' para duas classes de determinismo (MD15).",
+   "MD3 chama de 'importante' o núcleo WASM, mas INS-05/EM-04/EM-05/MD12 (essenciais) dependem de desempenho que só o WASM entrega: subir para essencial ou declarar TS suficiente; hoje há contradição. Também a licença do 'VST3 SDK MIT desde 3.8, outubro de 2025' aparece como certa em INT-09 e 'incerta' em EM-25 e MD13 (que diz GPLv3/proprietário): uniformizar e marcar incerto.",
+   "Faltou no relatório de instrumentos a lista FL 'Direct Wave Player gratuito' etc.: irrelevante; mas afirmar 'o FL não tem wavetable nativo' é incerto: o Harmor/Sytrus/Morphine e o Wave Traveller cobrem parcialmente; manter marcado incerto. Do FL, FPC 'Layer Randomization' e 'Cycle' são do manual; ok.",
+   "SEQ-07 diz PianoRoll.tsx tem 251 linhas (confere: 251). Mas afirma 'só disponível para sintetizador, não para bateria': não verificado aqui; checar Inspector/PianoRoll antes de assumir.",
+   "FI-10: o limite/retenção do diário não foi lido; manter como incerto. FI-03 diz onnxruntime-node; o repo usa onnxruntime-web (package.json), então o caminho já aprovado é web/worker, sem binário nativo, o que contradiz 'exige_rever_D1=true'.",
+   "INT-20/FI-04 sobre licenças: pesos MusicGen CC-BY-NC é o código MIT, pesos CC-BY-NC (correto); Stable Audio Open 'limite de receita' é da Stability Community License (correto, mas conferir). Manter 'não verificado'."
+  ]
+ }
+}

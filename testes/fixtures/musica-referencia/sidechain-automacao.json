@@ -1,0 +1,402 @@
+{
+  "formato": 1,
+  "tipo": "musica",
+  "titulo": "Sidechain e automação",
+  "bpm": 128,
+  "compasso": [
+    4,
+    4
+  ],
+  "tom": "C",
+  "escala": "maior",
+  "swing": 0.35,
+  "semente": 7,
+  "canais": [
+    {
+      "id": "bateria",
+      "nome": "Bateria",
+      "tipo": "bateria",
+      "faixa_mixer": "bateria",
+      "kit": "eletronico",
+      "pecas": {
+        "caixa": {
+          "afinacao": 2,
+          "pan": -0.2
+        },
+        "chimbal_fechado": {
+          "volume_db": -4,
+          "pan": 0.3
+        },
+        "palma": {
+          "afinacao": -3
+        }
+      }
+    },
+    {
+      "id": "baixo",
+      "nome": "Baixo",
+      "tipo": "sintetizador",
+      "faixa_mixer": "baixo",
+      "preset": "baixo",
+      "macros": {
+        "brilho": 0.65,
+        "cor": 0.6
+      }
+    },
+    {
+      "id": "pad",
+      "nome": "Pad",
+      "tipo": "sintetizador",
+      "faixa_mixer": "pad",
+      "preset": "pad",
+      "macros": {
+        "ataque": 0.4,
+        "soltura": 0.7
+      }
+    }
+  ],
+  "padroes": [
+    {
+      "id": "p1",
+      "nome": "Groove",
+      "canal": "bateria",
+      "dur": 4,
+      "passos": 16,
+      "notas": [
+        {
+          "peca": "bumbo",
+          "em": 0,
+          "forca": 120
+        },
+        {
+          "peca": "chimbal_fechado",
+          "em": 0,
+          "forca": 70
+        },
+        {
+          "peca": "chimbal_fechado",
+          "em": 0.25,
+          "forca": 70
+        },
+        {
+          "peca": "chimbal_fechado",
+          "em": 0.5,
+          "forca": 110
+        },
+        {
+          "peca": "chimbal_fechado",
+          "em": 0.75,
+          "forca": 70
+        },
+        {
+          "peca": "bumbo",
+          "em": 1,
+          "forca": 120
+        },
+        {
+          "peca": "chimbal_fechado",
+          "em": 1,
+          "forca": 70
+        },
+        {
+          "peca": "chimbal_fechado",
+          "em": 1.25,
+          "forca": 70
+        },
+        {
+          "peca": "chimbal_fechado",
+          "em": 1.5,
+          "forca": 110
+        },
+        {
+          "peca": "chimbal_fechado",
+          "em": 1.75,
+          "forca": 70
+        },
+        {
+          "peca": "bumbo",
+          "em": 2,
+          "forca": 120
+        },
+        {
+          "peca": "chimbal_fechado",
+          "em": 2,
+          "forca": 70
+        },
+        {
+          "peca": "chimbal_fechado",
+          "em": 2.25,
+          "forca": 70
+        },
+        {
+          "peca": "chimbal_fechado",
+          "em": 2.5,
+          "forca": 110
+        },
+        {
+          "peca": "chimbal_fechado",
+          "em": 2.75,
+          "forca": 70
+        },
+        {
+          "peca": "bumbo",
+          "em": 3,
+          "forca": 120
+        },
+        {
+          "peca": "chimbal_fechado",
+          "em": 3,
+          "forca": 70
+        },
+        {
+          "peca": "chimbal_fechado",
+          "em": 3.25,
+          "forca": 70
+        },
+        {
+          "peca": "chimbal_fechado",
+          "em": 3.5,
+          "forca": 110
+        },
+        {
+          "peca": "chimbal_fechado",
+          "em": 3.75,
+          "forca": 70
+        },
+        {
+          "peca": "caixa",
+          "em": 1
+        },
+        {
+          "peca": "caixa",
+          "em": 3
+        },
+        {
+          "peca": "palma",
+          "em": 3,
+          "forca": 90
+        },
+        {
+          "peca": "chimbal_aberto",
+          "em": 3.5,
+          "forca": 80
+        }
+      ]
+    },
+    {
+      "id": "p2",
+      "nome": "Baixo",
+      "canal": "baixo",
+      "dur": 4,
+      "passos": 16,
+      "notas": [
+        {
+          "nota": 33,
+          "em": 0,
+          "dur": 0.5,
+          "forca": 100
+        },
+        {
+          "nota": 33,
+          "em": 0.75,
+          "dur": 0.5,
+          "forca": 100
+        },
+        {
+          "nota": 45,
+          "em": 1.5,
+          "dur": 0.5,
+          "forca": 100
+        },
+        {
+          "nota": 36,
+          "em": 2,
+          "dur": 0.5,
+          "forca": 100
+        },
+        {
+          "nota": 36,
+          "em": 2.75,
+          "dur": 0.5,
+          "forca": 100
+        },
+        {
+          "nota": 43,
+          "em": 3.5,
+          "dur": 0.5,
+          "forca": 100
+        }
+      ]
+    },
+    {
+      "id": "p3",
+      "nome": "Pad",
+      "canal": "pad",
+      "dur": 8,
+      "passos": 32,
+      "notas": [
+        {
+          "nota": 57,
+          "em": 0,
+          "dur": 8,
+          "forca": 80
+        },
+        {
+          "nota": 60,
+          "em": 0,
+          "dur": 8,
+          "forca": 80
+        },
+        {
+          "nota": 64,
+          "em": 0,
+          "dur": 8,
+          "forca": 80
+        }
+      ]
+    }
+  ],
+  "arranjo": {
+    "clipes": [
+      {
+        "id": "c1",
+        "canal": "bateria",
+        "em": 0,
+        "dur": 16,
+        "padrao": "p1"
+      },
+      {
+        "id": "c2",
+        "canal": "baixo",
+        "em": 0,
+        "dur": 16,
+        "padrao": "p2"
+      },
+      {
+        "id": "c3",
+        "canal": "pad",
+        "em": 4,
+        "dur": 12,
+        "padrao": "p3",
+        "inicio": 2
+      }
+    ]
+  },
+  "mixer": {
+    "faixas": [
+      {
+        "id": "bateria",
+        "nome": "Bateria",
+        "volume_db": 0,
+        "pan": 0,
+        "eq": {
+          "graves_db": 3,
+          "medios_db": -2,
+          "agudos_db": 2
+        },
+        "compressor": {
+          "ativo": true,
+          "limiar_db": -20,
+          "razao": 4,
+          "ataque_ms": 8,
+          "soltura_ms": 120,
+          "ganho_db": 3
+        },
+        "reverb": 0.1
+      },
+      {
+        "id": "baixo",
+        "nome": "Baixo",
+        "volume_db": -2,
+        "pan": -0.1,
+        "sidechain": {
+          "de": "bateria",
+          "peca": "bumbo",
+          "quanto_db": 10,
+          "ataque_ms": 4,
+          "soltura_ms": 220
+        },
+        "compressor": {
+          "ativo": true,
+          "limiar_db": -18,
+          "razao": 3
+        }
+      },
+      {
+        "id": "pad",
+        "nome": "Pad",
+        "volume_db": 0,
+        "pan": 0.25,
+        "eq": {
+          "graves_db": -6,
+          "agudos_db": 1.5
+        },
+        "reverb": 0.45,
+        "sidechain": {
+          "de": "bateria",
+          "peca": "caixa",
+          "quanto_db": 4,
+          "soltura_ms": 90
+        }
+      }
+    ],
+    "master": {
+      "volume_db": 0,
+      "reverb": {
+        "tamanho": 0.6,
+        "amortecimento": 0.4,
+        "volume_db": -2
+      },
+      "delay": {
+        "tempo": "1/8.",
+        "realimentacao": 0.35,
+        "brilho": 0.5,
+        "pingue_pongue": true,
+        "volume_db": 0
+      },
+      "limitador": {
+        "ativo": true,
+        "teto_db": -1
+      }
+    }
+  },
+  "marcadores": [],
+  "automacoes": [
+    {
+      "alvo": "pad",
+      "parametro": "volume",
+      "pontos": [
+        {
+          "em": 4,
+          "db": -30
+        },
+        {
+          "em": 8,
+          "db": -4
+        },
+        {
+          "em": 12,
+          "db": -4
+        },
+        {
+          "em": 16,
+          "db": -20
+        }
+      ]
+    },
+    {
+      "alvo": "baixo",
+      "parametro": "volume",
+      "pontos": [
+        {
+          "em": 0,
+          "db": -6
+        },
+        {
+          "em": 2,
+          "db": 0
+        }
+      ]
+    }
+  ]
+}

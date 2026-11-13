@@ -6,6 +6,7 @@
 import {medirAmostras, type FonteAudio} from './loudness';
 import {resolverMusica, type DocMusica} from './musica';
 import {ganhoDaAutomacao, limitarNoLugar, renderizarMusica, TAXA_MUSICA, type CacheSom} from './musica-som';
+import type {ArmazemAudio} from './audio-grafo/amostras';
 
 export const ALVO_LUFS_MUSICA = -14;
 export const PICO_DBTP_MUSICA = -1;
@@ -96,9 +97,9 @@ export type PedidoEntrega = {stems?: boolean; alvo_lufs?: number; pico_dbtp?: nu
 export type ResultadoEntrega = {mistura: Float32Array[]; taxa: number; duracao_s: number; medida: MedidaEntrega; stems?: {nome: string; canais: Float32Array[]}[]; avisos: string[]};
 
 /** O que vai para o arquivo: a música inteira renderizada, masterizada no alvo, e os stems se pedidos. */
-export const entregaDaMusica = (doc: DocMusica, fontes: Record<string, FonteAudio | undefined>, o: PedidoEntrega & {cache?: CacheSom} = {}): ResultadoEntrega => {
+export const entregaDaMusica = (doc: DocMusica, fontes: Record<string, FonteAudio | undefined>, o: PedidoEntrega & {cache?: CacheSom; armazem?: ArmazemAudio} = {}): ResultadoEntrega => {
   const taxa = TAXA_MUSICA;
-  const som = renderizarMusica(doc, fontes, {taxa, cache: o.cache, porFaixa: o.stems});
+  const som = renderizarMusica(doc, fontes, {taxa, cache: o.cache, armazem: o.armazem, porFaixa: o.stems});
   const alvo_lufs = o.alvo_lufs ?? (typeof doc.alvo_lufs === 'number' ? doc.alvo_lufs : ALVO_LUFS_MUSICA);
   const pico_dbtp = o.pico_dbtp ?? (typeof doc.pico_dbtp === 'number' ? doc.pico_dbtp : PICO_DBTP_MUSICA);
   const {canais, ganho, medida} = masterizar(som.canais, taxa, {alvo_lufs, pico_dbtp, folga_db: o.folga_db});
@@ -130,7 +131,7 @@ export const entregaDaMusica = (doc: DocMusica, fontes: Record<string, FonteAudi
 
 /** A entrega já em bytes (WAV de 24 bits), para atravessar a ponte com a janela ou ir direto ao disco. */
 export type EntregaEmBytes = {mistura: Uint8Array<ArrayBuffer>; stems?: {nome: string; wav: Uint8Array<ArrayBuffer>}[]; medida: MedidaEntrega; avisos: string[]; duracao_s: number};
-export const entregaEmBytes = (doc: DocMusica, fontes: Record<string, FonteAudio | undefined>, o: PedidoEntrega & {cache?: CacheSom} = {}): EntregaEmBytes => {
+export const entregaEmBytes = (doc: DocMusica, fontes: Record<string, FonteAudio | undefined>, o: PedidoEntrega & {cache?: CacheSom; armazem?: ArmazemAudio} = {}): EntregaEmBytes => {
   const r = entregaDaMusica(doc, fontes, o);
   return {mistura: codificarWav(r.mistura, r.taxa, 24), ...(r.stems ? {stems: r.stems.map((s) => ({nome: s.nome, wav: codificarWav(s.canais, r.taxa, 24)}))} : {}),
     medida: r.medida, avisos: r.avisos, duracao_s: r.duracao_s};

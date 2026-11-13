@@ -125,7 +125,7 @@ export const registrarMusica = (servidor: McpServer, projeto: Projeto, autor: st
         ...(c.ganho_db ? {ganho_db: c.ganho_db} : {}), ...(c.mudo ? {mudo: true} : {})})),
       mixer: r.faixas.map((f) => ({id: f.id, volume_db: f.volume_db, pan: f.pan, ...(f.mudo ? {mudo: true} : {}), ...(f.solo ? {solo: true} : {}),
         ...(f.eq.graves_db || f.eq.medios_db || f.eq.agudos_db ? {eq: f.eq} : {}), ...(f.compressor.ativo ? {compressor: f.compressor} : {}), ...(f.reverb ? {reverb: f.reverb} : {}),
-        ...(f.delay ? {delay: f.delay} : {}), ...(f.sidechain ? {sidechain: f.sidechain} : {})})),
+        ...(f.delay ? {delay: f.delay} : {}), ...(f.sidechain ? {sidechain: f.sidechain} : {}), ...(f.atraso_ms ? {atraso_ms: f.atraso_ms} : {})})),
       master: r.master,
       ...(m.doc.automacoes?.length ? {automacoes: m.doc.automacoes} : {}),
       licencas: (() => {
@@ -168,13 +168,13 @@ export const registrarMusica = (servidor: McpServer, projeto: Projeto, autor: st
 
   // ---------- medir ----------
   servidor.registerTool('medir_musica', {
-    description: 'Loudness integrado (LUFS) e pico (dBTP) da música renderizada e, com por_faixa, de cada faixa do mixer. O vídeo leva a mistura final a −14 LUFS; aqui se vê o equilíbrio. Precisa do app ou do MCP por stdio.',
-    inputSchema: {documento: z.string().optional(), por_faixa: z.boolean().optional()},
-  }, seguro(async ({documento, por_faixa}: {documento?: string; por_faixa?: boolean}) => {
+    description: 'Loudness integrado (LUFS) e pico (dBTP) da música renderizada e, com por_faixa, de cada faixa do mixer. O vídeo leva a mistura final a −14 LUFS; aqui se vê o equilíbrio. Com hash, o SHA-256 do PCM (conferir que o render é o mesmo). Precisa do app ou do MCP por stdio.',
+    inputSchema: {documento: z.string().optional(), por_faixa: z.boolean().optional(), hash: z.boolean().optional().describe('devolve pcm_sha256: o SHA-256 do PCM float32 da mistura')},
+  }, seguro(async ({documento, por_faixa, hash}: {documento?: string; por_faixa?: boolean; hash?: boolean}) => {
     const m = musicaDe(projeto, documento);
     const s = servicoMusica();
     if (!s) throw new ErroProjeto('medir precisa do render: abra o projeto no Estúdio ou use o MCP por stdio (mcp/nucleo.ts)', 'patch');
-    return {documento: m.id, ...(await s.medir(projeto, m.id, {porFaixa: por_faixa}))};
+    return {documento: m.id, ...(await s.medir(projeto, m.id, {porFaixa: por_faixa, hash}))};
   }));
 
   // ---------- pôr no vídeo ----------

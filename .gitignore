@@ -1,4 +1,4 @@
-node_modules/
+node_modules
 .vite/
 out/
 dist-mcp/
@@ -10,3 +10,4 @@ referencia/
 .vite-bloqueada-bitdefender/
 Estudio-Setup-*.exe
 dist/
+scripts/espicula-metal/saida/

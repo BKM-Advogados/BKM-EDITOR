@@ -7,6 +7,7 @@
 // faixa quando ela domina (o "s" e o "ch"), até `deesser_db`. O tamanho e o alinhamento do arquivo não mudam: o clipe
 // limpo continua com o mesmo corte e a mesma duração. O processo principal (src/main/limpeza-voz.ts) decodifica com o
 // ffmpeg do Remotion, chama `limparVoz` e grava midia/<arquivo>.limpo.wav.
+import {criarFft, janelaHann} from './fft';
 import {envelopeDeAmostras, referenciaDeJanelas, SILENCIO_DB, type Biquad, type Envelope, type IntensidadeLimpeza, type LimpezaClipe} from './audio';
 
 export type ParametrosLimpeza = {nome: string; reducao_db: number; margem_db: number; deesser_db: number; graves_hz: number; chiado_hz: number};
@@ -28,7 +29,7 @@ const SIBILO_INICIO = 0.35; // fração de energia do quadro na faixa do sibilo 
 const SIBILO_CHEIO = 0.75; // ... e onde ele chega a deesser_db
 const DIGITAL_SILENCIO_DB = -90; // janela abaixo disto é zero digital, não ruído de sala
 
-// ---------- filtros e FFT ----------
+// ---------- filtros ----------
 const butterworth = (tipo: 'altas' | 'baixas', fc: number, taxa: number, q: number): Biquad => {
   const w0 = (2 * Math.PI * fc) / taxa;
   const cos = Math.cos(w0);
@@ -55,48 +56,6 @@ const filtrarIdaEVolta = (x: Float32Array, tipo: 'altas' | 'baixas', fc: number,
   return passar(passar(x, f).reverse(), f).reverse();
 };
 
-/** FFT complexa de raiz 2, no lugar, de tamanho `n` (potência de 2). */
-const fftDe = (n: number) => {
-  const bits = Math.round(Math.log2(n));
-  const rev = new Uint32Array(n);
-  for (let i = 0; i < n; i++) {
-    let r = 0;
-    for (let b = 0; b < bits; b++) r |= ((i >> b) & 1) << (bits - 1 - b);
-    rev[i] = r;
-  }
-  const cos = new Float64Array(n / 2);
-  const sin = new Float64Array(n / 2);
-  for (let k = 0; k < n / 2; k++) {
-    cos[k] = Math.cos((2 * Math.PI * k) / n);
-    sin[k] = Math.sin((2 * Math.PI * k) / n);
-  }
-  return (re: Float64Array, im: Float64Array, inversa: boolean) => {
-    for (let i = 0; i < n; i++) {
-      const j = rev[i];
-      if (j > i) {
-        let t = re[i]; re[i] = re[j]; re[j] = t;
-        t = im[i]; im[i] = im[j]; im[j] = t;
-      }
-    }
-    const sinal = inversa ? 1 : -1;
-    for (let tam = 2; tam <= n; tam <<= 1) {
-      const meio = tam >> 1;
-      const passo = n / tam;
-      for (let i = 0; i < n; i += tam) {
-        for (let j = 0, k = 0; j < meio; j++, k += passo) {
-          const wr = cos[k], wi = sinal * sin[k];
-          const a = i + j, b = a + meio;
-          const tr = wr * re[b] - wi * im[b];
-          const ti = wr * im[b] + wi * re[b];
-          re[b] = re[a] - tr; im[b] = im[a] - ti;
-          re[a] += tr; im[a] += ti;
-        }
-      }
-    }
-    if (inversa) for (let i = 0; i < n; i++) (re[i] /= n), (im[i] /= n);
-  };
-};
-
 const tamanhoDoQuadro = (taxa: number) => {
   let n = 256;
   while (n < taxa * 0.042) n <<= 1; // ~43 ms: 2048 a 44,1 e 48 kHz
@@ -116,10 +75,9 @@ const portaEspectral = async (x: Float32Array, taxa: number, p: ParametrosLimpez
   const n = tamanhoDoQuadro(taxa);
   const hop = n / 4;
   const bins = n / 2 + 1;
-  const fft = fftDe(n);
+  const fft = criarFft(n);
   // janela de Hann periódica na análise e na síntese (raiz quadrada de cada lado): soma constante 2 com 75 %
-  const janela = new Float64Array(n);
-  for (let i = 0; i < n; i++) janela[i] = Math.sqrt(0.5 - 0.5 * Math.cos((2 * Math.PI * i) / n));
+  const janela = janelaHann(n, true);
   const total = x.length;
   const quadros = Math.ceil((total + n) / hop) + 1;
   const inicio = (q: number) => q * hop - n; // amostra onde o quadro q começa (os primeiros caem antes do zero)
